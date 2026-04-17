@@ -142,11 +142,11 @@ export default function Onboarding() {
   const { profile, loading, isOnboarded, upsertProfile } = useProfile()
   const navigate = useNavigate()
 
-  const [companyName, setCompanyName] = useState(profile?.company_name || '')
-  const [services, setServices] = useState(profile?.services || [])
-  const [coords, setCoords] = useState(() =>
-    profile?.location_lat ? { lat: profile.location_lat, lon: profile.location_lon } : null
-  )
+  // Onboarding is for fresh signups. Never read from an existing profile —
+  // those values belong to a different session/user and leak if prefilled.
+  const [companyName, setCompanyName] = useState('')
+  const [services, setServices] = useState([])
+  const [coords, setCoords] = useState(null)
   const [locStatus, setLocStatus] = useState('idle') // idle | requesting | ok | error
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -209,35 +209,35 @@ export default function Onboarding() {
       </header>
 
       <section className="fh-onb__hero" style={{ animationDelay: '40ms' }}>
-        <p className="fh-onb__eyebrow">Field handbook · Onboarding</p>
+        <p className="fh-onb__eyebrow">Onboarding · Three steps</p>
         <h1 className="fh-onb__title">
           Set up<br />
           <span className="fh-outline-text">your rig.</span>
         </h1>
         <p className="fh-onb__lede">
-          Tell Fieldhorse who you are and what you run. Takes under a minute. Sharpens every brief, bid, and pour after.
+          Three things to lock in before the work day starts.
         </p>
         <p className="fh-hero-coord">
           {coords ? `${coords.lat.toFixed(4)}° N` : 'COORDS PENDING'}
           <span className="fh-hero-coord__dot">·</span>
           {coords ? `${coords.lon.toFixed(4)}° W` : 'NO LOCK'}
           <span className="fh-hero-coord__dot">·</span>
-          {(companyName || 'FIELDHORSE OPERATOR').toUpperCase()}
+          {(companyName || 'NEW OPERATOR').toUpperCase()}
         </p>
       </section>
 
       <form className="fh-onb__form" onSubmit={onSubmit} noValidate>
         <section className="fh-onb__section" style={{ animationDelay: '120ms' }}>
           <div className="fh-onb__section-head">
-            <h2 className="fh-onb__section-title">Company</h2>
-            <span className="fh-onb__section-hint">Shows on bids + invoices</span>
+            <h2 className="fh-onb__section-title">Your company.</h2>
+            <span className="fh-onb__section-hint">Shows on bids, invoices, and every schedule notification.</span>
           </div>
           <div className="fh-onb__company-row">
             <div className="fh-onb__logo-slot">
               <span className="fh-onb__logo-label">Logo</span>
               <LogoUploader
-                logoUrl={profile?.logo_url}
-                companyName={companyName || profile?.company_name}
+                logoUrl={null}
+                companyName={companyName}
                 onUpload={async (url) => { await upsertProfile({ logo_url: url }) }}
                 size="lg"
               />
@@ -252,7 +252,7 @@ export default function Onboarding() {
                 required
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Parker Construction Company"
+                placeholder="Your company name"
                 disabled={busy}
               />
             </label>
@@ -261,8 +261,8 @@ export default function Onboarding() {
 
         <section className="fh-onb__section" style={{ animationDelay: '200ms' }}>
           <div className="fh-onb__section-head">
-            <h2 className="fh-onb__section-title">What you run</h2>
-            <span className="fh-onb__section-hint">Pick all that apply · changes anything</span>
+            <h2 className="fh-onb__section-title">What you run.</h2>
+            <span className="fh-onb__section-hint">Pick every trade. This configures your rate card and pour-condition rules.</span>
           </div>
           <div className="fh-svc-grid" role="group" aria-label="Trade services">
             {SERVICES.map((svc) => {
@@ -304,8 +304,8 @@ export default function Onboarding() {
 
         <section className="fh-onb__section" style={{ animationDelay: '280ms' }}>
           <div className="fh-onb__section-head">
-            <h2 className="fh-onb__section-title">Job market</h2>
-            <span className="fh-onb__section-hint">Pins weather + pour windows</span>
+            <h2 className="fh-onb__section-title">Lock your location.</h2>
+            <span className="fh-onb__section-hint">Weather and pour windows anchor to this point.</span>
           </div>
           <div className="fh-loc">
             <button
