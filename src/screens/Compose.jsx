@@ -83,7 +83,6 @@ export default function Compose() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">AI compose</span>
           </span>
           <h1 className="fh-page__title">Draft in a tap.</h1>

@@ -55,7 +55,6 @@ export default function Settings() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">Your rig</span>
           </span>
           <h1 className="fh-page__title">Settings</h1>

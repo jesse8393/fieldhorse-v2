@@ -123,7 +123,6 @@ export default function Importer() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">Bring your book of business</span>
           </span>
           <h1 className="fh-page__title">Import</h1>

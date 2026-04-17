@@ -84,7 +84,6 @@ export default function Schedule() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">Calendar</span>
           </span>
           <h1 className="fh-page__title">Schedule</h1>

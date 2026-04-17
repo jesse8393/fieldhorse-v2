@@ -168,10 +168,10 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   }
 
   const voiceLabel = {
-    idle: 'Hold to speak',
-    listening: 'Listening…',
-    parsing: 'Parsing…',
-    error: 'Voice unavailable'
+    idle: 'HOLD TO SPEAK',
+    listening: 'LISTENING…',
+    parsing: 'PARSING…',
+    error: 'VOICE UNAVAILABLE'
   }[voiceState]
 
   return (
@@ -190,9 +190,14 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
     >
       {/* Voice capture hero */}
       <div className="fh-voice-hero">
+        <div className="fh-voice-hero__head">
+          <span className="fh-voice-hero__label">Fast capture</span>
+          <span className="fh-voice-hero__chip">AI · SONNET 4</span>
+        </div>
+        <p className="fh-voice-hero__desc">One sentence. AI fills every field.</p>
         <button
           type="button"
-          className={`fh-voice-hero__btn${voiceState === 'listening' ? ' is-listening' : ''}`}
+          className={`fh-voice-hero__btn${voiceState === 'listening' ? ' is-recording' : ''}`}
           aria-label="Hold to speak"
           disabled={voiceState === 'error' || voiceState === 'parsing' || saving}
           onPointerDown={(e) => { e.preventDefault(); startVoice() }}
@@ -200,22 +205,17 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
           onPointerLeave={() => { if (voiceState === 'listening') stopVoice() }}
           onPointerCancel={() => { if (voiceState === 'listening') stopVoice() }}
         >
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="fh-voice-hero__mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="9" y="3" width="6" height="12" rx="3" />
-            <path d="M5 11a7 7 0 0 0 14 0" />
-            <path d="M12 18v3" />
+            <path d="M5 11 V12 A7 7 0 0 0 19 12 V11" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+            <line x1="8" y1="22" x2="16" y2="22" />
           </svg>
+          <span className="fh-voice-hero__btnLabel">{voiceLabel}</span>
         </button>
-        <div className="fh-voice-hero__body">
-          <p className="fh-voice-hero__title">{voiceLabel}</p>
-          <p className="fh-voice-hero__sub">
-            One sentence — name, job, price. Sonnet fills the fields.
-          </p>
-          {transcript && (
-            <p className="fh-voice-hero__transcript">“{transcript}”</p>
-          )}
-        </div>
-        <span className="fh-voice-hero__code">AI·VOICE</span>
+        {transcript && (
+          <p className="fh-voice-hero__transcript">"{transcript}"</p>
+        )}
       </div>
 
       {/* Contact */}

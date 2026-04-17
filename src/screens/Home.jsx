@@ -234,7 +234,6 @@ export default function Home() {
 
       <section className="fh-quick">
         <span className="fh-sec-tag">
-          <span className="fh-sec-tag__num">§ 01</span>
           <span className="fh-sec-tag__label">Quick actions</span>
         </span>
         <div className="fh-quick__grid">
@@ -248,7 +247,6 @@ export default function Home() {
       <section className="fh-sched">
         <header className="fh-sched__head">
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 02</span>
             <span className="fh-sec-tag__label">Today</span>
           </span>
           <span className="fh-status-pill fh-status-pill--steel">0 jobs</span>

@@ -15,7 +15,7 @@ const PRIMARY = [
 
 const MORE_GROUPS = [
   {
-    label: '§ Money tools',
+    label: 'Money tools',
     items: [
       { to: '/bid', label: 'AI Bid Engine', icon: 'bid' },
       { to: '/compose', label: 'AI Compose', icon: 'compose' },
@@ -23,13 +23,13 @@ const MORE_GROUPS = [
     ]
   },
   {
-    label: '§ Data',
+    label: 'Data',
     items: [
       { to: '/import', label: 'Import Data', icon: 'upload' }
     ]
   },
   {
-    label: '§ App',
+    label: 'App',
     items: [
       { to: '/settings', label: 'Settings', icon: 'settings' }
     ]
@@ -95,8 +95,7 @@ export default function BottomNav() {
             <div className="fh-drawer__grip" aria-hidden="true" />
             <header className="fh-drawer__head">
               <span className="fh-sec-tag" style={{ margin: 0, borderBottom: 'none', padding: 0 }}>
-                <span className="fh-sec-tag__num">§ MORE</span>
-                <span className="fh-sec-tag__label">Tools + settings</span>
+                <span className="fh-sec-tag__label">Claude tools</span>
               </span>
               <button
                 type="button"

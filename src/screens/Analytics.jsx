@@ -62,7 +62,6 @@ export default function Analytics() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">CEO dashboard</span>
           </span>
           <h1 className="fh-page__title">Analytics</h1>

@@ -65,7 +65,6 @@ export default function ResetPassword() {
 
         <header className="fh-auth__head">
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01 / 01</span>
             <span className="fh-sec-tag__label">Password reset</span>
           </span>
           <h1 className="fh-auth__title">Set a new password</h1>

@@ -140,7 +140,7 @@ export default function ActionSheet({
               <div className="fh-asheet__headMeta">
                 <span className="fh-sec-tag fh-asheet__sectag">
                   <span className="fh-sec-tag__num">
-                    § {String(currentStep).padStart(2, '0')} / {String(stepCount).padStart(2, '0')}
+                    {String(currentStep).padStart(2, '0')} / {String(stepCount).padStart(2, '0')}
                   </span>
                   <span className="fh-sec-tag__label">{sectionLabel}</span>
                 </span>

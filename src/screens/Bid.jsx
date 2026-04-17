@@ -59,7 +59,6 @@ export default function Bid() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">AI bid engine</span>
           </span>
           <h1 className="fh-page__title">Scope to number.</h1>

@@ -74,7 +74,6 @@ export default function Login() {
 
         <header className="fh-auth__head">
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ {isSignIn ? '01 / 01' : '01 / 02'}</span>
             <span className="fh-sec-tag__label">{isSignIn ? 'Authenticate' : 'Provision account'}</span>
           </span>
           <h1 className="fh-auth__title">

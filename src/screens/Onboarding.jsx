@@ -205,7 +205,6 @@ export default function Onboarding() {
         <Wordmark size="1.6rem" />
         <div className="fh-onb__spec">
           <span className="fh-onb__spec-k">Setup</span>
-          <span className="fh-onb__spec-v">01 / 01</span>
         </div>
       </header>
 
@@ -230,7 +229,6 @@ export default function Onboarding() {
       <form className="fh-onb__form" onSubmit={onSubmit} noValidate>
         <section className="fh-onb__section" style={{ animationDelay: '120ms' }}>
           <div className="fh-onb__section-head">
-            <span className="fh-onb__section-idx">01</span>
             <h2 className="fh-onb__section-title">Company</h2>
             <span className="fh-onb__section-hint">Shows on bids + invoices</span>
           </div>
@@ -263,7 +261,6 @@ export default function Onboarding() {
 
         <section className="fh-onb__section" style={{ animationDelay: '200ms' }}>
           <div className="fh-onb__section-head">
-            <span className="fh-onb__section-idx">02</span>
             <h2 className="fh-onb__section-title">What you run</h2>
             <span className="fh-onb__section-hint">Pick all that apply · changes anything</span>
           </div>
@@ -307,7 +304,6 @@ export default function Onboarding() {
 
         <section className="fh-onb__section" style={{ animationDelay: '280ms' }}>
           <div className="fh-onb__section-head">
-            <span className="fh-onb__section-idx">03</span>
             <h2 className="fh-onb__section-title">Job market</h2>
             <span className="fh-onb__section-hint">Pins weather + pour windows</span>
           </div>

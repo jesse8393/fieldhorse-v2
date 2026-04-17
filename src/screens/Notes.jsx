@@ -124,7 +124,6 @@ export default function Notes() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">Capture</span>
           </span>
           <h1 className="fh-page__title">Notes</h1>

@@ -96,7 +96,6 @@ export default function Jobs() {
       <header className="fh-page__head">
         <div>
           <span className="fh-sec-tag">
-            <span className="fh-sec-tag__num">§ 01</span>
             <span className="fh-sec-tag__label">Pipeline</span>
           </span>
           <h1 className="fh-page__title">Jobs</h1>
@@ -163,7 +162,7 @@ export default function Jobs() {
           ) : (
             <EmptyState
               icon="pipeline"
-              code="§ 00 · EMPTY BOARD"
+              code="EMPTY BOARD"
               title="No jobs on the board."
               sub="Drop in your first lead. Watch the pipeline fill."
               action="Add first lead"
