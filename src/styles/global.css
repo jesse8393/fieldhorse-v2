@@ -1332,6 +1332,8 @@ a {
 }
 
 /* More drawer */
+/* Legacy scrim kept for any caller still using it (non-portal modals).
+   Prefer the portal-based patterns used by ActionSheet + Drawer. */
 .fh-scrim {
   position: fixed;
   inset: 0;
@@ -1340,115 +1342,197 @@ a {
   -webkit-backdrop-filter: blur(4px);
   z-index: var(--z-modal);
 }
+
+/* Drawer root — portaled into document.body to escape any transform/stacking
+   contexts that would otherwise clip the scrim. */
+.fh-drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  pointer-events: none;
+}
+.fh-drawer-root > * { pointer-events: auto; }
+
+.fh-drawer__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  /* Force GPU layer so background text doesn't smear on backdrop-filter. */
+  transform: translateZ(0);
+  will-change: backdrop-filter;
+}
+
 .fh-drawer {
   position: fixed;
-  bottom: 0;
   left: 0;
   right: 0;
-  z-index: calc(var(--z-modal) + 1);
+  bottom: 0;
+  z-index: 1;
   background: var(--surface-1);
-  border-top: 1px solid var(--rule);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  padding: 10px var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
-  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.35);
+  border-top: 1px solid var(--rule-bold);
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  box-shadow: 0 -20px 60px -12px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  max-height: 88dvh;
-  overflow-y: auto;
+  max-height: min(86dvh, calc(100vh - env(safe-area-inset-top) - 40px));
+  overflow: hidden;
 }
+[data-theme='dark'] .fh-drawer { background: var(--onyx-2); }
+@media (min-width: 720px) {
+  .fh-drawer {
+    max-width: 640px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
 .fh-drawer__grip {
   width: 44px;
   height: 4px;
   border-radius: 999px;
   background: var(--rule-bold);
-  margin: 0 auto 6px;
+  margin: 10px auto 6px;
+  flex-shrink: 0;
 }
+
 .fh-drawer__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  padding: 6px var(--space-5) 0;
+  flex-shrink: 0;
 }
 .fh-drawer__close {
   background: transparent;
   border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  padding: 6px;
+  border-radius: var(--radius-spec);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
   color: var(--ink-muted);
   cursor: pointer;
   transition: color 160ms var(--ease), border-color 160ms var(--ease);
 }
-.fh-drawer__close:hover { color: var(--ink-strong); border-color: var(--field-gold); }
-.fh-drawer__grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-2);
+.fh-drawer__close:hover { color: var(--field-gold); border-color: var(--field-gold); }
+
+.fh-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
-@media (min-width: 560px) {
-  .fh-drawer__grid { grid-template-columns: repeat(2, 1fr); }
+
+.fh-drawer__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fh-drawer__section-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--field-gold);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  padding: 8px 4px 4px;
+  opacity: 0.85;
+}
+
+.fh-drawer__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .fh-drawer__tile {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: 14px var(--space-4);
   background: var(--surface-2);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-spec);
   color: var(--ink-strong);
   text-align: left;
   cursor: pointer;
-  transition: border-color 160ms var(--ease), transform 160ms var(--ease);
+  transition: border-color 160ms var(--ease), transform 160ms var(--ease), background 160ms var(--ease);
 }
 .fh-drawer__tile:hover {
   border-color: var(--field-gold);
   transform: translateX(2px);
 }
 .fh-drawer__tile-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-spec);
+  background: color-mix(in srgb, var(--field-gold) 10%, transparent);
   color: var(--field-gold);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .fh-drawer__tile-label {
   flex: 1;
   font-family: var(--font-display);
-  font-size: 1.05rem;
-  letter-spacing: 0.08em;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.fh-drawer__row {
+
+/* Footer: theme (primary ghost) + sign out (destructive ghost), 2:1 ratio */
+.fh-drawer__foot {
   display: flex;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
+  gap: 10px;
+  padding: 12px var(--space-5) calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--rule);
+  flex-shrink: 0;
+  background: var(--surface-1);
 }
-.fh-drawer__linkbtn {
-  flex: 1;
+[data-theme='dark'] .fh-drawer__foot { background: var(--onyx-2); }
+.fh-drawer__theme,
+.fh-drawer__signout {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--surface-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  color: var(--ink-strong);
-  font-family: var(--font-body);
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-spec);
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: border-color 160ms var(--ease), color 160ms var(--ease);
+  transition: border-color 160ms var(--ease), background 160ms var(--ease), color 160ms var(--ease);
 }
-.fh-drawer__linkbtn:hover { border-color: var(--field-gold); color: var(--field-gold); }
-.fh-drawer__linkbtn--danger:hover { border-color: var(--alert-red); color: var(--alert-red); }
+.fh-drawer__theme {
+  flex: 2;
+  background: var(--surface-2);
+  border: 1px solid var(--rule-bold);
+  color: var(--ink-strong);
+}
+.fh-drawer__theme:hover {
+  border-color: var(--field-gold);
+  color: var(--field-gold);
+}
+.fh-drawer__signout {
+  flex: 1;
+  background: transparent;
+  border: 1px solid rgba(192, 57, 43, 0.4);
+  color: var(--alert-red);
+}
+.fh-drawer__signout:hover {
+  background: rgba(192, 57, 43, 0.08);
+  border-color: var(--alert-red);
+}
 
 /* =========================================================================
    COMMAND PALETTE — Cmd+K raycast-grade
@@ -4333,6 +4417,82 @@ a {
 .fh-toast--closed { color: var(--stage-closed); border-color: var(--stage-closed); }
 .fh-toast--lost { color: var(--stage-lost); border-color: var(--stage-lost); }
 .fh-toast__text { color: var(--raw-linen); letter-spacing: 0.15em; }
+
+/* =========================================================================
+   SPEC TABS — shared industrial segment control.
+   Used for view toggles (Day/Week/Month), tab rows on detail screens, etc.
+   ========================================================================= */
+.fh-spectabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fh-spectab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-spec);
+  color: var(--ink-strong);
+  cursor: pointer;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease), transform 160ms var(--ease), color 160ms var(--ease);
+  overflow: hidden;
+}
+.fh-spectab__label {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.fh-spectab__code {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: color 160ms var(--ease);
+}
+.fh-spectab:hover:not(.is-on) { border-color: rgba(201, 150, 58, 0.45); }
+.fh-spectab.is-on {
+  background: linear-gradient(145deg, #211A0D 0%, var(--onyx) 100%);
+  border-color: var(--field-gold);
+  color: var(--raw-linen);
+  box-shadow: 0 0 0 1px rgba(201, 150, 58, 0.22);
+  transform: translateY(-1px);
+}
+.fh-spectab.is-on .fh-spectab__code { color: var(--field-gold-hot); }
+.fh-spectab.is-on::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 22px;
+  height: 22px;
+  background: var(--field-gold);
+  transform: rotate(45deg);
+  opacity: 0.2;
+  pointer-events: none;
+}
+.fh-spectabs--sm .fh-spectab { padding: 7px 11px; }
+.fh-spectabs--sm .fh-spectab__label { font-size: 0.78rem; }
+
+/* Tabs wrap allows horizontal scroll on mobile when tab count exceeds width */
+.fh-tabs-wrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 0 6px;
+  margin: 0 calc(-1 * var(--space-5)) 0;
+  padding-left: var(--space-5);
+  padding-right: var(--space-5);
+}
+.fh-tabs-wrap .fh-spectabs { flex-wrap: nowrap; }
+.fh-tabs-wrap .fh-spectab { white-space: nowrap; flex-shrink: 0; }
+.fh-tabs-wrap::-webkit-scrollbar { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .fh-skel::after,
   .fh-skel-card::after,

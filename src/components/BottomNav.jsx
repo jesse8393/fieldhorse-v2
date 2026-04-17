@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Icon from './icons/Icon.jsx'
@@ -12,12 +13,27 @@ const PRIMARY = [
   { to: '/schedule', label: 'Schedule', icon: 'schedule' }
 ]
 
-const MORE_ITEMS = [
-  { to: '/bid', label: 'AI Bid Engine', icon: 'bid' },
-  { to: '/compose', label: 'AI Compose', icon: 'compose' },
-  { to: '/analytics', label: 'Analytics', icon: 'analytics' },
-  { to: '/import', label: 'Import Data', icon: 'upload' },
-  { to: '/settings', label: 'Settings', icon: 'settings' }
+const MORE_GROUPS = [
+  {
+    label: '§ Money tools',
+    items: [
+      { to: '/bid', label: 'AI Bid Engine', icon: 'bid' },
+      { to: '/compose', label: 'AI Compose', icon: 'compose' },
+      { to: '/analytics', label: 'Analytics', icon: 'analytics' }
+    ]
+  },
+  {
+    label: '§ Data',
+    items: [
+      { to: '/import', label: 'Import Data', icon: 'upload' }
+    ]
+  },
+  {
+    label: '§ App',
+    items: [
+      { to: '/settings', label: 'Settings', icon: 'settings' }
+    ]
+  }
 ]
 
 export default function BottomNav() {
@@ -25,6 +41,21 @@ export default function BottomNav() {
   const navigate = useNavigate()
   const { signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
+
+  // Lock body scroll and listen for Escape while drawer is open
+  useEffect(() => {
+    if (!moreOpen) return
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); setMoreOpen(false) }
+    }
+    window.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [moreOpen])
 
   async function handleSignOut() {
     setMoreOpen(false)
@@ -36,6 +67,86 @@ export default function BottomNav() {
     setMoreOpen(false)
     navigate(to)
   }
+
+  const drawer = (
+    <AnimatePresence>
+      {moreOpen && (
+        <div className="fh-drawer-root">
+          <motion.div
+            key="scrim"
+            className="fh-drawer__scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24 }}
+            onClick={() => setMoreOpen(false)}
+          />
+          <motion.div
+            key="drawer"
+            className="fh-drawer"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 380, damping: 36 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="More tools"
+          >
+            <div className="fh-drawer__grip" aria-hidden="true" />
+            <header className="fh-drawer__head">
+              <span className="fh-sec-tag" style={{ margin: 0, borderBottom: 'none', padding: 0 }}>
+                <span className="fh-sec-tag__num">§ MORE</span>
+                <span className="fh-sec-tag__label">Tools + settings</span>
+              </span>
+              <button
+                type="button"
+                className="fh-drawer__close"
+                onClick={() => setMoreOpen(false)}
+                aria-label="Close"
+              >
+                <Icon name="x" size={18} />
+              </button>
+            </header>
+
+            <div className="fh-drawer__body">
+              {MORE_GROUPS.map((group) => (
+                <section key={group.label} className="fh-drawer__group">
+                  <div className="fh-drawer__section-label">{group.label}</div>
+                  <div className="fh-drawer__grid">
+                    {group.items.map((it) => (
+                      <button
+                        key={it.to}
+                        type="button"
+                        className="fh-drawer__tile"
+                        onClick={() => go(it.to)}
+                      >
+                        <span className="fh-drawer__tile-icon">
+                          <Icon name={it.icon} size={20} />
+                        </span>
+                        <span className="fh-drawer__tile-label">{it.label}</span>
+                        <Icon name="chevron" size={14} />
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <div className="fh-drawer__foot">
+              <button type="button" className="fh-drawer__theme" onClick={toggleTheme}>
+                <Icon name={theme === 'dark' ? 'sun' : 'cloud'} size={16} />
+                <span>{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
+              </button>
+              <button type="button" className="fh-drawer__signout" onClick={handleSignOut}>
+                <Icon name="logout" size={16} />
+                <span>Sign out</span>
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  )
 
   return (
     <>
@@ -77,70 +188,7 @@ export default function BottomNav() {
         </button>
       </nav>
 
-      <AnimatePresence>
-        {moreOpen && (
-          <>
-            <motion.div
-              key="scrim"
-              className="fh-scrim"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              onClick={() => setMoreOpen(false)}
-            />
-            <motion.div
-              key="drawer"
-              className="fh-drawer"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 380, damping: 36 }}
-              role="dialog"
-              aria-label="More"
-            >
-              <div className="fh-drawer__grip" aria-hidden="true" />
-              <header className="fh-drawer__head">
-                <span className="fh-eye">More tools</span>
-                <button
-                  type="button"
-                  className="fh-drawer__close"
-                  onClick={() => setMoreOpen(false)}
-                  aria-label="Close"
-                >
-                  <Icon name="x" size={20} />
-                </button>
-              </header>
-              <div className="fh-drawer__grid">
-                {MORE_ITEMS.map((it) => (
-                  <button
-                    key={it.to}
-                    type="button"
-                    className="fh-drawer__tile"
-                    onClick={() => go(it.to)}
-                  >
-                    <span className="fh-drawer__tile-icon">
-                      <Icon name={it.icon} size={22} />
-                    </span>
-                    <span className="fh-drawer__tile-label">{it.label}</span>
-                    <Icon name="chevron" size={16} />
-                  </button>
-                ))}
-              </div>
-              <div className="fh-drawer__row">
-                <button type="button" className="fh-drawer__linkbtn" onClick={toggleTheme}>
-                  <Icon name={theme === 'dark' ? 'sun' : 'cloud'} size={18} />
-                  <span>{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
-                </button>
-                <button type="button" className="fh-drawer__linkbtn fh-drawer__linkbtn--danger" onClick={handleSignOut}>
-                  <Icon name="logout" size={18} />
-                  <span>Sign out</span>
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {typeof document !== 'undefined' && createPortal(drawer, document.body)}
     </>
   )
 }

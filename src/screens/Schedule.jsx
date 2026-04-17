@@ -5,15 +5,16 @@ import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
+import SpecTabs from '../components/SpecTabs.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { getWeather, workWindow } from '../lib/weather.js'
 
 const VIEWS = [
-  { id: 'day', label: 'Day' },
-  { id: 'week', label: 'Week' },
-  { id: 'month', label: 'Month' }
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' }
 ]
 
 function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x }
@@ -90,7 +91,7 @@ export default function Schedule() {
         </div>
         <button type="button" className="fh-btn fh-btn--gold" onClick={() => setAddOpen(true)}>
           <Icon name="plus" size={18} />
-          New event
+          <span>New event</span>
         </button>
       </header>
 
@@ -103,13 +104,12 @@ export default function Schedule() {
       )}
 
       <div className="fh-sched-bar">
-        <div className="fh-seg fh-seg--view">
-          {VIEWS.map((v) => (
-            <button key={v.id} type="button" className={v.id === view ? 'is-on' : ''} onClick={() => setView(v.id)}>
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <SpecTabs
+          options={VIEWS}
+          value={view}
+          onChange={setView}
+          ariaLabel="Calendar view"
+        />
         <div className="fh-sched-bar__nav">
           <button type="button" className="fh-iconbtn" onClick={() => shift(-1)} aria-label="Previous"><Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} /></button>
           <span className="fh-sched-bar__cur">{view === 'month'

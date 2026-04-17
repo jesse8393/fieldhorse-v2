@@ -5,6 +5,7 @@ import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { SkeletonBlock, SkeletonList } from '../components/Skeleton.jsx'
+import SpecTabs from '../components/SpecTabs.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
@@ -164,19 +165,15 @@ export default function ContactDetail() {
         onLogPayment={() => setPayModalOpen(true)}
       />
 
-      <nav className="fh-tabs" role="tablist">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`fh-tab${tab === t.id ? ' is-active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <div className="fh-tabs-wrap">
+        <SpecTabs
+          options={tabs.map((t) => ({ value: t.id, label: t.label }))}
+          value={tab}
+          onChange={setTab}
+          ariaLabel="Detail tabs"
+          size="sm"
+        />
+      </div>
 
       <div className="fh-tabpanel">
         {tab === 'overview' && <OverviewTab contact={contact} onPatch={patch} />}
