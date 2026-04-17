@@ -10,10 +10,24 @@ const STAGE_OPTIONS = [
   { value: 'job', label: 'Job' }
 ]
 
-const EMPTY = {
-  name: '', phone: '', email: '', address: '',
-  job_title: '', job_type: '', amount: '', notes: '', referred_by: '',
-  stage: 'lead'
+const LAST_JOB_TYPE_KEY = 'fh:lastJobType'
+
+function readLastJobType() {
+  if (typeof window === 'undefined') return ''
+  try { return window.localStorage.getItem(LAST_JOB_TYPE_KEY) || '' } catch { return '' }
+}
+
+function writeLastJobType(value) {
+  if (typeof window === 'undefined' || !value) return
+  try { window.localStorage.setItem(LAST_JOB_TYPE_KEY, value) } catch {}
+}
+
+function buildEmptyForm() {
+  return {
+    name: '', phone: '', email: '', address: '',
+    job_title: '', job_type: readLastJobType(), amount: '', notes: '', referred_by: '',
+    stage: 'lead'
+  }
 }
 
 const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a new lead. Extract structured data from what they said. Return ONLY a single JSON object with these keys — use null for anything not clearly mentioned:
@@ -44,7 +58,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
 
   useEffect(() => {
     if (!open) {
-      setForm(EMPTY)
+      setForm(buildEmptyForm())
       setErr('')
       setTranscript('')
       setVoiceState('idle')
@@ -168,6 +182,8 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         .select()
         .single()
       if (error) throw error
+      // Remember the job type choice for next lead
+      if (form.job_type) writeLastJobType(form.job_type)
       // Success: flash "Captured." + step 03/03 briefly, then close.
       setCommitted(true)
       setSaving(false)
@@ -243,14 +259,22 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
           <span className="fh-voice-hero__btnLabel">{voiceLabel}</span>
         </button>
         <div
-          className={`fh-voice-hero__transcript${voiceState === 'listening' ? ' is-listening' : ''}${voiceState === 'parsing' ? ' is-parsing' : ''}`}
+          className={[
+            'fh-voice-hero__transcript',
+            voiceState === 'listening' ? 'is-listening' : '',
+            voiceState === 'parsing' ? 'is-parsing' : '',
+            transcript ? 'is-result' : '',
+            !transcript && voiceState === 'idle' ? 'is-idle' : ''
+          ].filter(Boolean).join(' ')}
           aria-live="polite"
         >
           {voiceState === 'listening' && !transcript && 'Listening…'}
           {voiceState === 'parsing' && !transcript && 'Parsing…'}
           {transcript && `"${transcript}"`}
           {voiceState === 'idle' && !transcript && (
-            <span className="fh-voice-hero__transcript-hint">Hold the button above and speak.</span>
+            <span className="fh-voice-hero__transcript-placeholder">
+              Transcribed text will appear here
+            </span>
           )}
         </div>
         {voiceState === 'denied' && (

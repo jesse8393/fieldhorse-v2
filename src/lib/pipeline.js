@@ -29,7 +29,7 @@ export async function approveQuote(contact) {
   const res = await baseApproveQuote(contact)
   if (!res.error) {
     hapticMedium()
-    toast('Moved to Job · Scheduled for tomorrow 9am', { accent: 'job', duration: 3400 })
+    toast('Moved to Job · Scheduled for tomorrow 9am', { accent: 'job', heavy: true })
   }
   return res
 }
@@ -59,7 +59,7 @@ export async function logPayment(contact, input) {
   hapticSuccess()
   const paid = Number(input.amount || 0)
   if (res && res.total !== undefined && res.total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
-    toast(`Paid in full · moved to Closed`, { accent: 'closed', duration: 3400 })
+    toast(`Paid in full · moved to Closed`, { accent: 'closed', heavy: true })
   } else {
     toast(`Payment logged · $${paid.toLocaleString()}`, { accent: 'gold' })
   }

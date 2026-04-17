@@ -51,6 +51,7 @@ export default function ContactDetail() {
   const [payments, setPayments] = useState([])
   const [inspections, setInspections] = useState([])
   const [notes, setNotes] = useState([])
+  const [scheduleCount, setScheduleCount] = useState(0)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [payModalOpen, setPayModalOpen] = useState(false)
@@ -59,13 +60,14 @@ export default function ContactDetail() {
   const fetchAll = useCallback(async () => {
     if (!user || !id) return
     setLoading(true)
-    const [c, s, e, p, i, n] = await Promise.all([
+    const [c, s, e, p, i, n, sch] = await Promise.all([
       supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
       supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
       supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
       supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-      supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false })
+      supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+      supabase.from('fh_schedule').select('id', { count: 'exact', head: true }).eq('contact_id', id)
     ])
     setContact(c.data || null)
     setSubs(s.data || [])
@@ -73,6 +75,7 @@ export default function ContactDetail() {
     setPayments(p.data || [])
     setInspections(i.data || [])
     setNotes(n.data || [])
+    setScheduleCount(sch.count || 0)
     setLoading(false)
   }, [user, id])
 
@@ -93,7 +96,7 @@ export default function ContactDetail() {
     try {
       const { error } = await supabase.from('fh_contacts').delete().eq('id', id)
       if (error) throw error
-      toast('Job deleted', { accent: 'gold', duration: 2400 })
+      toast('Job deleted', { accent: 'gold', destructive: true })
       navigate('/jobs')
     } catch (e) {
       console.error('Delete contact failed:', e)
@@ -250,11 +253,12 @@ export default function ContactDetail() {
           Removing <strong>{contact?.name || 'this job'}</strong> cascades to everything attached.
         </p>
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <DeleteRow label="Subs" count={subs.length} />
-          <DeleteRow label="Expenses" count={expenses.length} />
-          <DeleteRow label="Payments" count={payments.length} />
-          <DeleteRow label="Inspections" count={inspections.length} />
-          <DeleteRow label="Notes + schedule items" count={notes.length} detail="kept but detached" />
+          <DeleteRow label="Subs" count={subs.length} detail="deleted" />
+          <DeleteRow label="Expenses" count={expenses.length} detail="deleted" />
+          <DeleteRow label="Payments" count={payments.length} detail="deleted" />
+          <DeleteRow label="Inspections" count={inspections.length} detail="deleted" />
+          <DeleteRow label="Schedule items" count={scheduleCount} detail="deleted" />
+          <DeleteRow label="Notes" count={notes.length} detail="detached + archived" />
         </ul>
         <p style={{ margin: 0, color: 'var(--alert-red)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
           This cannot be undone.

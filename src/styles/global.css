@@ -4311,8 +4311,8 @@ a {
 }
 .fh-voice-hero__transcript {
   margin: 0;
-  min-height: 40px;
-  padding: 10px 12px;
+  min-height: 48px;
+  padding: 12px 14px;
   background: color-mix(in srgb, var(--onyx) 88%, transparent);
   border: 1px solid var(--onyx-border);
   border-radius: var(--radius-spec);
@@ -4321,23 +4321,37 @@ a {
   letter-spacing: 0.02em;
   color: var(--steel-xlt);
   line-height: 1.45;
-  transition: border-color 200ms var(--ease), color 200ms var(--ease);
+  transition: border-color 200ms var(--ease), border-style 200ms var(--ease), color 200ms var(--ease), background 200ms var(--ease);
+  display: flex;
+  align-items: center;
+}
+.fh-voice-hero__transcript.is-idle {
+  border-style: dashed;
+  border-color: rgba(140, 140, 140, 0.35);
 }
 .fh-voice-hero__transcript.is-listening {
+  border-style: solid;
   border-color: var(--field-gold);
   color: var(--field-gold);
   background: color-mix(in srgb, var(--field-gold) 6%, var(--onyx));
 }
 .fh-voice-hero__transcript.is-parsing {
+  border-style: solid;
   border-color: var(--field-gold-deep);
   color: var(--field-gold-hot);
 }
-.fh-voice-hero__transcript-hint {
-  color: var(--ink-muted);
-  font-family: var(--font-body);
-  font-size: 12px;
+.fh-voice-hero__transcript.is-result {
+  border-style: solid;
+  border-color: var(--steel-lt);
+  color: var(--raw-linen);
+}
+.fh-voice-hero__transcript-placeholder {
+  color: var(--steel);
   font-style: italic;
-  letter-spacing: 0;
+  opacity: 0.7;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
 }
 .fh-voice-hero__note {
   margin: 0;
