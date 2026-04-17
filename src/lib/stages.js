@@ -40,16 +40,29 @@ export async function startQuote(contact) {
 
 export async function approveQuote(contact) {
   const { data, error } = await transitionStage(contact, 'job')
-  if (!error) {
-    const start = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    await supabase.from('fh_schedule').insert({
-      user_id: contact.user_id,
-      contact_id: contact.id,
-      title: `${contact.job_title || contact.name || 'Job'} — start`,
-      start_at: start.toISOString()
-    })
-  }
-  return { data, error }
+  if (error) return { data, error }
+
+  // Default the kickoff to tomorrow 9am–5pm local. Operator can edit later.
+  const start = new Date()
+  start.setDate(start.getDate() + 1)
+  start.setHours(9, 0, 0, 0)
+  const end = new Date(start)
+  end.setHours(17, 0, 0, 0)
+
+  const title = contact.job_title || contact.name || 'New job'
+  const description = `Approved quote for ${contact.name || 'job'}${contact.address ? ` at ${contact.address}` : ''}`
+
+  const { error: schedErr } = await supabase.from('fh_schedule').insert({
+    user_id: contact.user_id,
+    contact_id: contact.id,
+    title,
+    description,
+    start_at: start.toISOString(),
+    end_at: end.toISOString()
+  })
+  if (schedErr) console.warn('[fieldhorse] approveQuote schedule insert failed', schedErr)
+
+  return { data, error: null }
 }
 
 export async function completeJob(contact) {

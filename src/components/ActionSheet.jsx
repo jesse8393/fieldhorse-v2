@@ -32,6 +32,7 @@ export default function ActionSheet({
   commitLabel = 'Commit',
   commitBusy = false,
   commitDisabled = false,
+  destructive = false,
   onClose,
   onCommit,
   children
@@ -178,12 +179,12 @@ export default function ActionSheet({
             <footer className="fh-asheet__foot">
               <button
                 type="button"
-                className={`fh-btn fh-btn--primary fh-asheet__commit${commitBusy ? ' is-committing' : ''}`}
+                className={`fh-btn ${destructive ? 'fh-btn--danger-solid' : 'fh-btn--primary'} fh-asheet__commit${commitBusy ? ' is-committing' : ''}${destructive ? ' is-destructive' : ''}`}
                 onClick={handleCommit}
                 disabled={commitBusy || commitDisabled}
               >
                 <span className="fh-asheet__commit-label">
-                  {commitBusy ? 'Committing…' : commitLabel}
+                  {commitBusy ? (destructive ? 'Deleting…' : 'Committing…') : commitLabel}
                 </span>
               </button>
               <p className="fh-asheet__hint">

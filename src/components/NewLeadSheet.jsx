@@ -242,11 +242,17 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
           </svg>
           <span className="fh-voice-hero__btnLabel">{voiceLabel}</span>
         </button>
-        {(voiceState === 'listening' || transcript || voiceState === 'parsing') && (
-          <p className="fh-voice-hero__transcript">
-            {transcript ? `"${transcript}"` : 'Listening…'}
-          </p>
-        )}
+        <div
+          className={`fh-voice-hero__transcript${voiceState === 'listening' ? ' is-listening' : ''}${voiceState === 'parsing' ? ' is-parsing' : ''}`}
+          aria-live="polite"
+        >
+          {voiceState === 'listening' && !transcript && 'Listening…'}
+          {voiceState === 'parsing' && !transcript && 'Parsing…'}
+          {transcript && `"${transcript}"`}
+          {voiceState === 'idle' && !transcript && (
+            <span className="fh-voice-hero__transcript-hint">Hold the button above and speak.</span>
+          )}
+        </div>
         {voiceState === 'denied' && (
           <p className="fh-voice-hero__note">
             Mic access needed for voice capture. Enable it in browser settings and try again.

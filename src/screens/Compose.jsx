@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Icon from '../components/icons/Icon.jsx'
+import SpecTabs from '../components/SpecTabs.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -95,13 +96,12 @@ export default function Compose() {
       </header>
 
       <div className="fh-compose">
-        <div className="fh-seg">
-          {CHANNELS.map((c) => (
-            <button key={c.id} type="button" className={c.id === channel ? 'is-on' : ''} onClick={() => setChannel(c.id)}>
-              {c.label}
-            </button>
-          ))}
-        </div>
+        <SpecTabs
+          options={CHANNELS.map((c) => ({ value: c.id, label: c.label }))}
+          value={channel}
+          onChange={setChannel}
+          ariaLabel="Message channel"
+        />
 
         <label className="fh-field">
           <span className="fh-field__k">Intent</span>
@@ -153,7 +153,12 @@ export default function Compose() {
                   <Icon name="check" size={16} />
                   {copied ? 'Copied' : 'Copy'}
                 </button>
-                {contact && (
+                {channel === 'voice' ? (
+                  <button type="button" className="fh-btn fh-btn--ink" disabled>
+                    <Icon name="mic" size={16} />
+                    Voice script
+                  </button>
+                ) : contact && (
                   <button type="button" className="fh-btn fh-btn--ink" onClick={sendAction}>
                     <Icon name={channel === 'email' ? 'mail' : 'phone'} size={16} />
                     Open {channel === 'email' ? 'email' : 'SMS'}

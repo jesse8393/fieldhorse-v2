@@ -135,7 +135,12 @@ export default function BottomNav() {
             </div>
 
             <div className="fh-drawer__foot">
-              <button type="button" className="fh-drawer__theme" onClick={toggleTheme}>
+              <button type="button" className="fh-drawer__theme" onClick={toggleTheme} aria-pressed={theme === 'dark'}>
+                <span
+                  className={`fh-drawer__theme-dot fh-drawer__theme-dot--${theme}`}
+                  aria-hidden="true"
+                  title={theme === 'dark' ? 'Currently dark' : 'Currently light'}
+                />
                 <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
                 <span>{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
               </button>

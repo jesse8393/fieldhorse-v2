@@ -15,6 +15,7 @@ import {
 import {
   startQuote, approveQuote, markComplete, markLost, reopen, logPayment
 } from '../lib/pipeline.js'
+import { toast } from '../lib/toast.js'
 
 const TABS = [
   { id: 'overview',  label: 'Overview' },
@@ -82,9 +83,23 @@ export default function ContactDetail() {
     await supabase.from('fh_contacts').update(update).eq('id', id)
   }
 
+  const [deleting, setDeleting] = useState(false)
+  const [deleteErr, setDeleteErr] = useState('')
+
   async function handleDelete() {
-    await supabase.from('fh_contacts').delete().eq('id', id)
-    navigate('/jobs')
+    if (deleting) return
+    setDeleting(true)
+    setDeleteErr('')
+    try {
+      const { error } = await supabase.from('fh_contacts').delete().eq('id', id)
+      if (error) throw error
+      toast('Job deleted', { accent: 'gold', duration: 2400 })
+      navigate('/jobs')
+    } catch (e) {
+      console.error('Delete contact failed:', e)
+      setDeleting(false)
+      setDeleteErr("Couldn't delete this job. Check your connection and try again.")
+    }
   }
 
   if (loading) return (
@@ -123,31 +138,45 @@ export default function ContactDetail() {
           <h1 className="fh-page__title">{contact.name || 'Untitled'}</h1>
         </div>
         <div className="fh-detail__tools">
-          <button className="fh-iconbtn" onClick={() => setMenuOpen((v) => !v)} aria-label="More">
+          <button
+            className="fh-iconbtn"
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
+            aria-label="More"
+            aria-expanded={menuOpen}
+          >
             <Icon name="more" size={20} />
           </button>
           <AnimatePresence>
             {menuOpen && (
-              <motion.div
-                className="fh-menu"
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.14 }}
-              >
-                <button onClick={() => { setMenuOpen(false); setTab('overview') }}>
-                  <Icon name="edit" size={16} /> Edit
-                </button>
-                <button onClick={() => { setMenuOpen(false); markLost(contact).then(fetchAll) }}>
-                  <Icon name="lost" size={16} /> Mark lost
-                </button>
-                <button onClick={() => { setMenuOpen(false); patch({ partner_shared: !contact.partner_shared }) }}>
-                  <Icon name="partner" size={16} /> {contact.partner_shared ? 'Unshare partner' : 'Share with partner'}
-                </button>
-                <button className="is-danger" onClick={() => { setMenuOpen(false); setDeleteOpen(true) }}>
-                  <Icon name="trash" size={16} /> Delete
-                </button>
-              </motion.div>
+              <>
+                <div
+                  className="fh-menu-backdrop"
+                  aria-hidden="true"
+                  onClick={() => setMenuOpen(false)}
+                />
+                <motion.div
+                  className="fh-menu"
+                  role="menu"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.14 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setTab('overview') }}>
+                    <Icon name="edit" size={16} /> Edit
+                  </button>
+                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); markLost(contact).then(fetchAll) }}>
+                    <Icon name="lost" size={16} /> Mark lost
+                  </button>
+                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); patch({ partner_shared: !contact.partner_shared }) }}>
+                    <Icon name="partner" size={16} /> {contact.partner_shared ? 'Unshare partner' : 'Share with partner'}
+                  </button>
+                  <button role="menuitem" className="is-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setDeleteOpen(true) }}>
+                    <Icon name="trash" size={16} /> Delete
+                  </button>
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
         </div>
@@ -194,33 +223,75 @@ export default function ContactDetail() {
             onLogged={() => { setPayModalOpen(false); fetchAll() }}
           />
         )}
-        {deleteOpen && (
-          <ConfirmModal
-            title="Delete this job?"
-            body="This removes the contact plus every sub, expense, payment, inspection, and photo. Cannot be undone."
-            confirmLabel="Delete"
-            onCancel={() => setDeleteOpen(false)}
-            onConfirm={handleDelete}
-          />
-        )}
       </AnimatePresence>
+
+      <ActionSheet
+        open={deleteOpen}
+        title="Delete this job?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deleting ? 'Deleting…' : 'Yes, delete everything'}
+        commitBusy={deleting}
+        commitDisabled={deleting}
+        destructive
+        onClose={() => { if (!deleting) { setDeleteOpen(false); setDeleteErr('') } }}
+        onCommit={handleDelete}
+      >
+        {deleteErr && (
+          <div className="fh-sheet-error" role="alert">
+            <span className="fh-sheet-error__dot" aria-hidden="true" />
+            <span className="fh-sheet-error__text">{deleteErr}</span>
+            <button type="button" className="fh-sheet-error__dismiss" aria-label="Dismiss" onClick={() => setDeleteErr('')}>×</button>
+          </div>
+        )}
+        <p style={{ margin: 0, color: 'var(--ink-strong)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{contact?.name || 'this job'}</strong> cascades to everything attached.
+        </p>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <DeleteRow label="Subs" count={subs.length} />
+          <DeleteRow label="Expenses" count={expenses.length} />
+          <DeleteRow label="Payments" count={payments.length} />
+          <DeleteRow label="Inspections" count={inspections.length} />
+          <DeleteRow label="Notes + schedule items" count={notes.length} detail="kept but detached" />
+        </ul>
+        <p style={{ margin: 0, color: 'var(--alert-red)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+          This cannot be undone.
+        </p>
+      </ActionSheet>
     </section>
   )
 }
 
+function DeleteRow({ label, count, detail }) {
+  return (
+    <li style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-spec)' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-strong)' }}>
+        {count} {detail ? <span style={{ color: 'var(--ink-muted)', marginLeft: 8 }}>· {detail}</span> : null}
+      </span>
+    </li>
+  )
+}
+
 function SummaryPanel({ contact, paid, balance }) {
-  const m = margin(contact)
-  const tier = marginTier(m)
+  const cost = Number(contact.cost || 0)
   const milestones = Array.isArray(contact.milestones) ? contact.milestones : []
   const milestonesDone = milestones.filter((x) => x.done).length
   const pct = milestones.length ? Math.round((milestonesDone / milestones.length) * 100) : 0
+  // Show em-dash until the operator has actual cost data; "100% margin on $0 cost" reads as noise.
+  const hasCostData = cost > 0 || milestonesDone > 0
+  const m = margin(contact)
+  const tier = hasCostData ? marginTier(m) : undefined
+  const marginValue = hasCostData ? `${m.toFixed(0)}%` : '—'
 
   return (
     <div className="fh-summary-card">
       <div className="fh-summary-card__row">
         <SumItem k="Amount" v={money(contact.amount)} />
         <SumItem k="Cost" v={money(contact.cost)} />
-        <SumItem k="Margin" v={`${m.toFixed(0)}%`} tone={tier} />
+        <SumItem k="Margin" v={marginValue} tone={tier} />
       </div>
       {(contact.stage === 'invoice' || contact.stage === 'closed') && (
         <div className="fh-summary-card__row">

@@ -28,8 +28,8 @@ export async function startQuote(contact) {
 export async function approveQuote(contact) {
   const res = await baseApproveQuote(contact)
   if (!res.error) {
-    notify('job')
-    toast('Schedule entry created', { accent: 'gold', duration: 2400 })
+    hapticMedium()
+    toast('Moved to Job · Scheduled for tomorrow 9am', { accent: 'job', duration: 3400 })
   }
   return res
 }

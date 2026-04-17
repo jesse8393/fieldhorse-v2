@@ -30,6 +30,7 @@ export default function Schedule() {
   const [view, setView] = useState('day')
   const [cursor, setCursor] = useState(() => startOfDay(new Date()))
   const [events, setEvents] = useState([])
+  const [upcoming, setUpcoming] = useState([])
   const [loading, setLoading] = useState(true)
   const [weather, setWeather] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
@@ -54,14 +55,31 @@ export default function Schedule() {
       .from('fh_schedule')
       .select('*, fh_contacts(name, stage)')
       .eq('user_id', user.id)
-      .gte('starts_at', range.start.toISOString())
-      .lt('starts_at', range.end.toISOString())
-      .order('starts_at', { ascending: true })
+      .gte('start_at', range.start.toISOString())
+      .lt('start_at', range.end.toISOString())
+      .order('start_at', { ascending: true })
     setEvents(data || [])
     setLoading(false)
   }, [user, range.start, range.end])
 
+  // Next 7 days, independent of current view. Used for the Upcoming lane.
+  const loadUpcoming = useCallback(async () => {
+    if (!user) return
+    const now = new Date()
+    const in7 = addDays(startOfDay(now), 7)
+    const { data } = await supabase
+      .from('fh_schedule')
+      .select('*, fh_contacts(name, stage)')
+      .eq('user_id', user.id)
+      .gte('start_at', now.toISOString())
+      .lt('start_at', in7.toISOString())
+      .order('start_at', { ascending: true })
+      .limit(8)
+    setUpcoming(data || [])
+  }, [user])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadUpcoming() }, [loadUpcoming, addOpen])
 
   useEffect(() => {
     if (!hasCoords) return
@@ -100,6 +118,39 @@ export default function Schedule() {
           <span className="fh-weatherbar__label">{windowRead.label}</span>
           {windowRead.reasons.length > 0 && <span className="fh-weatherbar__reason">{windowRead.reasons.join(' · ')}</span>}
         </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <section className="fh-upcoming">
+          <header className="fh-upcoming__head">
+            <span className="fh-eye">Upcoming · 7 days</span>
+            <span className="fh-status-pill fh-status-pill--gold">{upcoming.length}</span>
+          </header>
+          <div className="fh-upcoming__list">
+            {upcoming.map((e) => {
+              const fromQuote = Boolean(e.contact_id && e.fh_contacts?.name)
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  className={`fh-upcoming__card${fromQuote ? ' is-fromquote' : ''}`}
+                  onClick={() => e.contact_id && navigate(`/jobs/${e.contact_id}`)}
+                >
+                  <span className="fh-upcoming__date">
+                    {new Date(e.start_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    <span className="fh-upcoming__time"> · {fmtTime(e.start_at)}</span>
+                  </span>
+                  <span className="fh-upcoming__title">{e.title || 'Untitled'}</span>
+                  <span className="fh-upcoming__sub">
+                    {fromQuote
+                      ? `FROM APPROVED QUOTE · ${e.fh_contacts.name.toUpperCase()}`
+                      : 'MANUAL EVENT'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
       )}
 
       <div className="fh-sched-bar">
@@ -163,7 +214,7 @@ function DayView({ events, onClick, onAdd }) {
           onClick={() => e.contact_id && onClick(e.contact_id)}
           role={e.contact_id ? 'button' : undefined}
         >
-          <span className="fh-tl-item__time">{fmtTime(e.starts_at)}</span>
+          <span className="fh-tl-item__time">{fmtTime(e.start_at)}</span>
           <span className="fh-tl-item__body">
             <span className="fh-tl-item__title">{e.title}</span>
             {e.fh_contacts?.name && <span className="fh-tl-item__sub">{e.fh_contacts.name}</span>}
@@ -179,7 +230,7 @@ function WeekView({ start, events, onClick }) {
   return (
     <div className="fh-week">
       {days.map((d) => {
-        const dayEvents = events.filter((e) => sameDay(new Date(e.starts_at), d))
+        const dayEvents = events.filter((e) => sameDay(new Date(e.start_at), d))
         return (
           <div key={d.toISOString()} className="fh-week__col">
             <header className="fh-week__head">
@@ -190,7 +241,7 @@ function WeekView({ start, events, onClick }) {
               {dayEvents.length === 0 && <span className="fh-week__empty">—</span>}
               {dayEvents.map((e) => (
                 <button key={e.id} type="button" className="fh-week__evt" onClick={() => e.contact_id && onClick(e.contact_id)}>
-                  <span>{fmtTime(e.starts_at)}</span>
+                  <span>{fmtTime(e.start_at)}</span>
                   <strong>{e.title}</strong>
                 </button>
               ))}
@@ -216,7 +267,7 @@ function MonthView({ cursor, events, onDay }) {
       {['S','M','T','W','T','F','S'].map((d, i) => <span key={i} className="fh-month__dow">{d}</span>)}
       {cells.map((d, i) => {
         if (!d) return <div key={i} className="fh-month__cell fh-month__cell--empty" />
-        const dayEvents = events.filter((e) => sameDay(new Date(e.starts_at), d))
+        const dayEvents = events.filter((e) => sameDay(new Date(e.start_at), d))
         return (
           <button key={i} type="button" className={`fh-month__cell${dayEvents.length ? ' has-events' : ''}`} onClick={() => onDay(d)}>
             <span className="fh-month__num">{d.getDate()}</span>
@@ -257,12 +308,12 @@ function AddEventSheet({ open, userId, onClose, onSaved }) {
     if (!title.trim()) return
     setSaving(true)
     const starts = new Date(`${date}T${time}:00`).toISOString()
-    const rows = [{ user_id: userId, contact_id: contactId || null, title: title.trim(), starts_at: starts }]
+    const rows = [{ user_id: userId, contact_id: contactId || null, title: title.trim(), start_at: starts }]
     if (recurs) {
       for (let i = 1; i <= 4; i++) {
         const next = new Date(starts)
         next.setDate(next.getDate() + recurDays * i)
-        rows.push({ user_id: userId, contact_id: contactId || null, title: title.trim(), starts_at: next.toISOString() })
+        rows.push({ user_id: userId, contact_id: contactId || null, title: title.trim(), start_at: next.toISOString() })
       }
     }
     await supabase.from('fh_schedule').insert(rows)
