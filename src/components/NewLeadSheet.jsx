@@ -2,24 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField, haptic } from './ActionSheet.jsx'
 import { supabase } from '../lib/supabase.js'
 import { claudeMessage } from '../lib/anthropic.js'
+import { JOB_TYPES } from '../lib/jobTypes.js'
 
 const STAGE_OPTIONS = [
   { value: 'lead', label: 'Lead' },
   { value: 'quote', label: 'Quote' },
   { value: 'job', label: 'Job' }
-]
-
-const JOB_TYPES = [
-  { value: 'Kitchen remodel', label: 'Kitchen' },
-  { value: 'Bath remodel', label: 'Bath' },
-  { value: 'Addition', label: 'Addition' },
-  { value: 'New build', label: 'New build' },
-  { value: 'Deck', label: 'Deck' },
-  { value: 'Roof', label: 'Roof' },
-  { value: 'Concrete', label: 'Concrete' },
-  { value: 'Fence', label: 'Fence' },
-  { value: 'Paint', label: 'Paint' },
-  { value: 'Other', label: 'Other' }
 ]
 
 const EMPTY = {
@@ -48,8 +36,9 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
-  const [voiceState, setVoiceState] = useState('idle') // idle | listening | parsing | error
+  const [voiceState, setVoiceState] = useState('idle') // idle | listening | parsing | error | denied
   const [transcript, setTranscript] = useState('')
+  const [committed, setCommitted] = useState(false)
   const recognitionRef = useRef(null)
   const heldRef = useRef(false)
 
@@ -59,15 +48,14 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       setErr('')
       setTranscript('')
       setVoiceState('idle')
+      setSaving(false)
+      setCommitted(false)
     }
   }, [open])
 
-  const currentStep = useMemo(() => {
-    if (form.amount || form.stage !== 'lead' || form.notes) return 3
-    if (form.job_type || form.job_title) return 2
-    if (form.name) return 2
-    return 1
-  }, [form])
+  // Fill progress is shown as a muted hint; the sheet counter doesn't advance
+  // until the insert actually succeeds. Prevents the "03/03 even on error" bug.
+  const currentStep = committed ? 3 : 1
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
 
@@ -80,6 +68,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
     rec.interimResults = true
     rec.lang = 'en-US'
     let full = ''
+    setTranscript('')
     rec.onresult = (e) => {
       let chunk = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -88,17 +77,32 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       full = chunk
       setTranscript(chunk)
     }
-    rec.onerror = () => setVoiceState('error')
+    rec.onerror = (e) => {
+      heldRef.current = false
+      if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) {
+        setVoiceState('denied')
+      } else {
+        setVoiceState('error')
+      }
+    }
     rec.onend = () => {
       if (!heldRef.current) return
       heldRef.current = false
-      if (full.trim().length > 2) parseTranscript(full.trim())
-      else setVoiceState('idle')
+      if (full.trim().length > 2) {
+        // Keep transcript visible while parse runs
+        setTimeout(() => parseTranscript(full.trim()), 200)
+      } else {
+        setVoiceState('idle')
+      }
     }
-    rec.start()
-    recognitionRef.current = rec
-    setVoiceState('listening')
-    haptic(20)
+    try {
+      rec.start()
+      recognitionRef.current = rec
+      setVoiceState('listening')
+      haptic(20)
+    } catch {
+      setVoiceState('error')
+    }
   }
 
   function stopVoice() {
@@ -141,7 +145,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   }
 
   async function commit() {
-    if (!form.name.trim()) { setErr('Name is required'); return }
+    if (!form.name.trim()) { setErr('Name is required.'); return }
     setSaving(true)
     setErr('')
     const payload = {
@@ -157,37 +161,62 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       referred_by: form.referred_by || null,
       stage: form.stage || 'lead'
     }
-    const { data, error } = await supabase
-      .from('fh_contacts')
-      .insert(payload)
-      .select()
-      .single()
-    setSaving(false)
-    if (error) { setErr(error.message); return }
-    onCreated?.(data)
+    try {
+      const { data, error } = await supabase
+        .from('fh_contacts')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      // Success: flash "Captured." + step 03/03 briefly, then close.
+      setCommitted(true)
+      setSaving(false)
+      setTimeout(() => onCreated?.(data), 600)
+    } catch (err) {
+      console.error('Lead commit failed:', err)
+      setSaving(false)
+      setErr("Couldn't save this lead. Check your connection and try again.")
+    }
   }
 
   const voiceLabel = {
     idle: 'HOLD TO SPEAK',
     listening: 'LISTENING…',
     parsing: 'PARSING…',
-    error: 'VOICE UNAVAILABLE'
+    error: 'VOICE UNAVAILABLE',
+    denied: 'MIC BLOCKED'
   }[voiceState]
 
   return (
     <ActionSheet
       open={open}
-      title="New lead, captured."
-      accentWord="lead"
+      title={committed ? 'Lead captured.' : 'New lead.'}
+      accentWord={committed ? 'captured' : 'lead'}
       sectionLabel="New lead"
       stepCount={3}
       currentStep={currentStep}
-      commitLabel={saving ? 'Committing…' : 'Commit lead'}
+      commitLabel={saving ? 'Committing…' : committed ? 'Captured' : 'Commit lead'}
       commitBusy={saving}
-      commitDisabled={!form.name.trim()}
+      commitDisabled={!form.name.trim() || committed}
       onClose={onClose}
       onCommit={commit}
     >
+      {/* Commit error banner */}
+      {err && (
+        <div className="fh-sheet-error" role="alert">
+          <span className="fh-sheet-error__dot" aria-hidden="true" />
+          <span className="fh-sheet-error__text">{err}</span>
+          <button
+            type="button"
+            className="fh-sheet-error__dismiss"
+            aria-label="Dismiss error"
+            onClick={() => setErr('')}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Voice capture hero */}
       <div className="fh-voice-hero">
         <div className="fh-voice-hero__head">
@@ -197,9 +226,9 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         <p className="fh-voice-hero__desc">One sentence. AI fills every field.</p>
         <button
           type="button"
-          className={`fh-voice-hero__btn${voiceState === 'listening' ? ' is-recording' : ''}`}
+          className={`fh-voice-hero__btn${voiceState === 'listening' ? ' is-recording' : ''}${voiceState === 'denied' ? ' is-denied' : ''}`}
           aria-label="Hold to speak"
-          disabled={voiceState === 'error' || voiceState === 'parsing' || saving}
+          disabled={voiceState === 'error' || voiceState === 'denied' || voiceState === 'parsing' || saving}
           onPointerDown={(e) => { e.preventDefault(); startVoice() }}
           onPointerUp={(e) => { e.preventDefault(); stopVoice() }}
           onPointerLeave={() => { if (voiceState === 'listening') stopVoice() }}
@@ -213,8 +242,20 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
           </svg>
           <span className="fh-voice-hero__btnLabel">{voiceLabel}</span>
         </button>
-        {transcript && (
-          <p className="fh-voice-hero__transcript">"{transcript}"</p>
+        {(voiceState === 'listening' || transcript || voiceState === 'parsing') && (
+          <p className="fh-voice-hero__transcript">
+            {transcript ? `"${transcript}"` : 'Listening…'}
+          </p>
+        )}
+        {voiceState === 'denied' && (
+          <p className="fh-voice-hero__note">
+            Mic access needed for voice capture. Enable it in browser settings and try again.
+          </p>
+        )}
+        {voiceState === 'error' && (
+          <p className="fh-voice-hero__note">
+            Voice capture isn't available on this browser. Fill the fields manually.
+          </p>
         )}
       </div>
 
@@ -300,11 +341,6 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         />
       </SheetField>
 
-      {err && (
-        <p style={{ color: 'var(--alert-red)', fontSize: '0.85rem', margin: 0 }} role="alert">
-          {err}
-        </p>
-      )}
     </ActionSheet>
   )
 }

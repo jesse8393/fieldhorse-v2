@@ -37,7 +37,12 @@ export default function Compose() {
 
   useEffect(() => {
     if (!user) return
-    supabase.from('fh_contacts').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).then(({ data }) => setContacts(data || []))
+    supabase
+      .from('fh_contacts')
+      .select('id, name, phone, email, job_title, job_type, stage, amount')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .then(({ data }) => setContacts(data || []))
   }, [user])
 
   useEffect(() => {
@@ -106,10 +111,17 @@ export default function Compose() {
         </label>
 
         <label className="fh-field">
-          <span className="fh-field__k">Contact</span>
+          <span className="fh-field__k">Contact{contacts.length > 0 ? ` · ${contacts.length}` : ''}</span>
           <select value={contactId} onChange={(e) => setContactId(e.target.value)}>
             <option value="">No contact (generic)</option>
-            {contacts.map((c) => <option key={c.id} value={c.id}>{c.name} — {c.stage}</option>)}
+            {contacts.map((c) => {
+              const tail = c.job_title || c.job_type || c.stage || ''
+              return (
+                <option key={c.id} value={c.id}>
+                  {c.name}{tail ? ` — ${tail}` : ''}
+                </option>
+              )
+            })}
           </select>
         </label>
 

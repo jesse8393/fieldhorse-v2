@@ -1303,7 +1303,11 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
+  /* Enforce 48x48 minimum tap area (iOS HIG + Android a11y). */
+  min-height: 48px;
+  min-width: 48px;
   padding: 8px 6px 6px;
   background: none;
   border: none;
@@ -1313,16 +1317,24 @@ a {
   border-radius: var(--radius-sm);
   transition: color 160ms var(--ease);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .fh-nav__item.is-active { color: var(--field-gold); }
 .fh-nav__item:hover { color: var(--ink-strong); }
-.fh-nav__icon { display: inline-flex; align-items: center; justify-content: center; }
+.fh-nav__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
 .fh-nav__label {
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+  pointer-events: none;
 }
 .fh-nav__dot {
   position: absolute;
@@ -1332,6 +1344,8 @@ a {
   border-radius: 999px;
   background: var(--field-gold);
   box-shadow: 0 0 0 4px rgba(199, 164, 90, 0.18);
+  /* The layoutId dot can otherwise steal the first tap while animating. */
+  pointer-events: none;
 }
 
 /* More drawer */
@@ -1408,6 +1422,12 @@ a {
   gap: var(--space-3);
   padding: 6px var(--space-5) 0;
   flex-shrink: 0;
+}
+.fh-drawer__heading {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-strong);
 }
 .fh-drawer__close {
   background: transparent;
@@ -4258,6 +4278,59 @@ a {
   font-style: italic;
   line-height: 1.4;
 }
+.fh-voice-hero__note {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--alert-red);
+  line-height: 1.4;
+}
+.fh-voice-hero__btn.is-denied {
+  border-color: rgba(192, 57, 43, 0.45);
+  color: var(--alert-red);
+}
+
+/* Sheet-level commit error banner, sits above form body */
+.fh-sheet-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 10px;
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid rgba(192, 57, 43, 0.35);
+  border-left: 3px solid var(--alert-red);
+  border-radius: var(--radius-spec);
+}
+.fh-sheet-error__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--alert-red);
+  flex-shrink: 0;
+  box-shadow: 0 0 8px var(--alert-red);
+}
+.fh-sheet-error__text {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink-strong);
+  line-height: 1.4;
+}
+.fh-sheet-error__dismiss {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--alert-red);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-spec);
+  display: grid;
+  place-items: center;
+}
+.fh-sheet-error__dismiss:hover { background: rgba(192, 57, 43, 0.12); }
 @keyframes fh-voice-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }

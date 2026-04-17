@@ -94,9 +94,12 @@ export default function BottomNav() {
           >
             <div className="fh-drawer__grip" aria-hidden="true" />
             <header className="fh-drawer__head">
-              <span className="fh-sec-tag" style={{ margin: 0, borderBottom: 'none', padding: 0 }}>
-                <span className="fh-sec-tag__label">Claude tools</span>
-              </span>
+              <h2
+                className="fh-drawer__heading"
+                style={{ margin: 0 }}
+              >
+                CLAUDE TOOLS
+              </h2>
               <button
                 type="button"
                 className="fh-drawer__close"
@@ -133,7 +136,7 @@ export default function BottomNav() {
 
             <div className="fh-drawer__foot">
               <button type="button" className="fh-drawer__theme" onClick={toggleTheme}>
-                <Icon name={theme === 'dark' ? 'sun' : 'cloud'} size={16} />
+                <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
                 <span>{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
               </button>
               <button type="button" className="fh-drawer__signout" onClick={handleSignOut}>

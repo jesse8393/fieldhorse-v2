@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Icon from '../components/icons/Icon.jsx'
 import { RATE_CARD } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
+import { JOB_TYPES } from '../lib/jobTypes.js'
 
-const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Return ONLY JSON.`
+const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Return ONLY JSON.`
 
 const TRADES = Object.keys(RATE_CARD)
 
@@ -17,6 +18,7 @@ export default function Bid() {
   const [bid, setBid] = useState(null)
   const [err, setErr] = useState('')
   const [picks, setPicks] = useState([])
+  const [jobType, setJobType] = useState('')
 
   const total = useMemo(() => {
     if (!bid) return null
@@ -36,7 +38,10 @@ export default function Bid() {
       const rateText = TRADES.map((k) => `${k}: $${RATE_CARD[k].low}–$${RATE_CARD[k].high} per ${RATE_CARD[k].unit}`).join('; ')
       const res = await claudeMessage({
         system: `${SYSTEM}\n\nRate card: ${rateText}`,
-        messages: [{ role: 'user', content: `Scope: ${scope}\n\nPre-checked trades: ${picks.join(', ') || 'none'}` }],
+        messages: [{
+          role: 'user',
+          content: `Job type: ${jobType || 'unspecified'}\nScope: ${scope}\nPre-checked trades: ${picks.join(', ') || 'none'}`
+        }],
         maxTokens: 1400
       })
       const text = res?.content?.[0]?.text || ''
@@ -76,6 +81,21 @@ export default function Bid() {
               placeholder="1,800 sqft rambler. Demo kitchen + two baths. New cabinets, LVP throughout, tile surrounds, electrical rough-in for island. Permit pulled."
             />
           </label>
+          <div className="fh-bid__trades">
+            <span className="fh-eye">Job type</span>
+            <div className="fh-chips">
+              {JOB_TYPES.map((jt) => (
+                <button
+                  key={jt.value}
+                  type="button"
+                  className={`fh-chip${jobType === jt.value ? ' is-active' : ''}`}
+                  onClick={() => setJobType(jt.value === jobType ? '' : jt.value)}
+                >
+                  {jt.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="fh-bid__trades">
             <span className="fh-eye">Trades on job</span>
             <div className="fh-chips">

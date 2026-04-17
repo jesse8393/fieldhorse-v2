@@ -9,6 +9,19 @@ import { useTheme } from '../contexts/ThemeContext.jsx'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Flooring', 'Landscaping', 'Excavation', 'Remodel']
 
+const CLEANUP_TABLES = [
+  'fh_payments',
+  'fh_inspections',
+  'fh_subs',
+  'fh_expenses',
+  'fh_schedule',
+  'fh_notes',
+  'fh_mileage',
+  'fh_contacts'
+]
+
+const DEV_BUILD = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
+
 export default function Settings() {
   const { user, signOut } = useAuth()
   const { profile, upsertProfile, refresh } = useProfile()
@@ -18,6 +31,36 @@ export default function Settings() {
   const [services, setServices] = useState(profile?.services || [])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [wiping, setWiping] = useState(false)
+  const [confirmWipe, setConfirmWipe] = useState(false)
+  const [wipeResult, setWipeResult] = useState('')
+
+  const canWipe = DEV_BUILD || user?.email === 'test@test.com'
+
+  async function wipeTestData() {
+    if (!user) return
+    setWiping(true)
+    setWipeResult('')
+    try {
+      const counts = {}
+      for (const table of CLEANUP_TABLES) {
+        const { error, count } = await supabase
+          .from(table)
+          .delete({ count: 'exact' })
+          .eq('user_id', user.id)
+        if (error) throw new Error(`${table}: ${error.message}`)
+        counts[table] = count ?? 0
+      }
+      const total = Object.values(counts).reduce((a, b) => a + b, 0)
+      setWipeResult(`Cleared ${total} rows across ${CLEANUP_TABLES.length} tables.`)
+      setConfirmWipe(false)
+    } catch (e) {
+      setWipeResult(`Wipe failed: ${e.message}`)
+    } finally {
+      setWiping(false)
+      setTimeout(() => setWipeResult(''), 4000)
+    }
+  }
 
   useEffect(() => {
     setCompanyName(profile?.company_name || '')
@@ -137,6 +180,53 @@ export default function Settings() {
           </div>
         </div>
       </section>
+
+      {canWipe && (
+        <section className="fh-section" style={{ borderColor: 'rgba(192, 57, 43, 0.25)' }}>
+          <div className="fh-section__head">
+            <span className="fh-section__title">Dev · Cleanup</span>
+            <span className="fh-status-pill fh-status-pill--red">{DEV_BUILD ? 'LOCAL' : 'TEST USER'}</span>
+          </div>
+          <p style={{ margin: 0, color: 'var(--ink-muted)', fontSize: '0.9rem' }}>
+            Deletes every contact, note, schedule item, sub, expense, inspection, payment, and mileage row owned by this user. RLS-scoped so it can only touch your own data.
+          </p>
+          {!confirmWipe ? (
+            <button
+              type="button"
+              className="fh-btn fh-btn--danger"
+              onClick={() => setConfirmWipe(true)}
+              disabled={wiping}
+            >
+              <Icon name="trash" size={16} />
+              Clear all my test data
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="fh-btn fh-btn--ghost"
+                onClick={() => setConfirmWipe(false)}
+                disabled={wiping}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="fh-btn fh-btn--danger"
+                onClick={wipeTestData}
+                disabled={wiping}
+              >
+                {wiping ? 'Clearing…' : 'Yes, delete everything'}
+              </button>
+            </div>
+          )}
+          {wipeResult && (
+            <p style={{ margin: 0, color: wipeResult.startsWith('Wipe failed') ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: '0.9rem' }}>
+              {wipeResult}
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="fh-settings__save">
         <button type="button" className="fh-btn fh-btn--gold" onClick={save} disabled={saving}>
