@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import Wordmark from '../components/Wordmark.jsx'
 import LogoUploader from '../components/LogoUploader.jsx'
+import EmptyState from '../components/EmptyState.jsx'
 import { getWeather, workWindow, hourlyStrip, weatherLabel } from '../lib/weather.js'
 
 function formatDay(d) {
@@ -252,10 +253,14 @@ export default function Home() {
           </span>
           <span className="fh-status-pill fh-status-pill--steel">0 jobs</span>
         </header>
-        <div className="fh-sched__empty">
-          <p>No jobs on the board yet.</p>
-          <button type="button" className="fh-link" onClick={() => navigate('/jobs?new=1')}>Add the first one →</button>
-        </div>
+        <EmptyState
+          icon="pipeline"
+          code="QUEUE · CLEAR"
+          title="Day's clear."
+          sub="No jobs on the board yet. Drop in your first lead."
+          action="Add first lead"
+          onAction={() => navigate('/jobs?new=1')}
+        />
       </section>
 
       <footer className="fh-home__foot">

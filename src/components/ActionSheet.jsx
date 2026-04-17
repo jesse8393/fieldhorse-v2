@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -36,6 +36,9 @@ export default function ActionSheet({
   onCommit,
   children
 }) {
+  const sheetRef = useRef(null)
+  const bodyRef = useRef(null)
+
   useEffect(() => {
     if (!open) return
     function handleKey(e) {
@@ -52,9 +55,49 @@ export default function ActionSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose])
 
+  // visualViewport — track real viewport height and keyboard height.
+  // Sets --fh-vvh + --fh-kbd CSS vars on the sheet element.
+  useEffect(() => {
+    if (!open) return
+    const vv = window.visualViewport
+    const el = sheetRef.current
+    if (!el || !vv) return
+    function update() {
+      const vvh = vv.height
+      const kbd = Math.max(0, window.innerHeight - vvh - (vv.offsetTop || 0))
+      el.style.setProperty('--fh-vvh', `${vvh}px`)
+      el.style.setProperty('--fh-kbd', kbd > 40 ? `${kbd}px` : '0px')
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      el.style.removeProperty('--fh-vvh')
+      el.style.removeProperty('--fh-kbd')
+    }
+  }, [open])
+
+  // Scroll the focused field into view inside the sheet body when keyboard opens.
+  useEffect(() => {
+    if (!open) return
+    const body = bodyRef.current
+    if (!body) return
+    function onFocusIn(e) {
+      const t = e.target
+      if (!t || !(t.matches?.('input, textarea, select'))) return
+      setTimeout(() => {
+        try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
+      }, 260)
+    }
+    body.addEventListener('focusin', onFocusIn)
+    return () => body.removeEventListener('focusin', onFocusIn)
+  }, [open])
+
   function handleCommit() {
     if (commitBusy || commitDisabled) return
-    haptic(14)
+    haptic([20, 50, 20])
     onCommit?.()
   }
 
@@ -75,6 +118,7 @@ export default function ActionSheet({
             onClick={onClose}
           />
           <motion.div
+            ref={sheetRef}
             className="fh-asheet"
             role="dialog"
             aria-modal="true"
@@ -127,18 +171,20 @@ export default function ActionSheet({
               ))}
             </div>
 
-            <div className="fh-asheet__body">
+            <div className="fh-asheet__body" ref={bodyRef}>
               {children}
             </div>
 
             <footer className="fh-asheet__foot">
               <button
                 type="button"
-                className="fh-btn fh-btn--primary fh-asheet__commit"
+                className={`fh-btn fh-btn--primary fh-asheet__commit${commitBusy ? ' is-committing' : ''}`}
                 onClick={handleCommit}
                 disabled={commitBusy || commitDisabled}
               >
-                {commitBusy ? 'Committing…' : commitLabel}
+                <span className="fh-asheet__commit-label">
+                  {commitBusy ? 'Committing…' : commitLabel}
+                </span>
               </button>
               <p className="fh-asheet__hint">
                 <span>Enter</span> · to submit&nbsp;&nbsp;·&nbsp;&nbsp;<span>Esc</span> · to cancel

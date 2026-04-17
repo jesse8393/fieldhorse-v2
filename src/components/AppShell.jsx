@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from './BottomNav.jsx'
 import CommandPalette from './CommandPalette.jsx'
+import Toaster from './Toaster.jsx'
 
 export default function AppShell() {
   const location = useLocation()
@@ -33,6 +34,7 @@ export default function AppShell() {
       </AnimatePresence>
       <BottomNav />
       <CommandPalette />
+      <Toaster />
     </div>
   )
 }

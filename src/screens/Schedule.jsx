@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
+import EmptyState from '../components/EmptyState.jsx'
+import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -121,9 +123,9 @@ export default function Schedule() {
         </div>
       </div>
 
-      {loading && <div className="fh-skeleton" />}
+      {loading && <SkeletonList rows={5} card={false} />}
 
-      {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} />}
+      {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onAdd={() => setAddOpen(true)} />}
       {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} />}
       {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
 
@@ -137,13 +139,17 @@ export default function Schedule() {
   )
 }
 
-function DayView({ events, onClick }) {
+function DayView({ events, onClick, onAdd }) {
   if (events.length === 0) {
     return (
-      <div className="fh-empty">
-        <Icon name="schedule" size={32} />
-        <p>Day's clear. Queue something up.</p>
-      </div>
+      <EmptyState
+        icon="calendar"
+        code="DAY · CLEAR"
+        title="Nothing scheduled."
+        sub="Queue something up. Crew runs smoother when the day's on the board."
+        action={onAdd ? 'Add event' : undefined}
+        onAction={onAdd}
+      />
     )
   }
   return (

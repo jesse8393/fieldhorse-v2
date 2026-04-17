@@ -1273,6 +1273,7 @@ a {
 }
 .fh-app__main {
   flex: 1;
+  padding-top: env(safe-area-inset-top);
   padding-bottom: calc(84px + env(safe-area-inset-bottom));
   min-height: 100dvh;
 }
@@ -1796,6 +1797,17 @@ a {
   inset: 0 auto 0 0;
   width: 3px;
 }
+/* New card just inserted: 4px gold left border flashes, fades to stage color */
+.fh-card.just-added::before {
+  width: 4px;
+  animation: fh-justadded-flash 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 0 16px rgba(201, 150, 58, 0.4);
+}
+@keyframes fh-justadded-flash {
+  0%   { background: var(--field-gold-bright); box-shadow: 0 0 16px rgba(201,150,58,0.6); }
+  60%  { background: var(--field-gold); }
+  100% { background: var(--stage-lead); box-shadow: 0 0 0 rgba(201,150,58,0); }
+}
 .fh-card--lead::before    { background: var(--stage-lead); }
 .fh-card--quote::before   { background: var(--stage-quote); }
 .fh-card--job::before     { background: var(--stage-job); }
@@ -2158,6 +2170,9 @@ a {
 .fh-sumitem__v--good { color: var(--signal-green); }
 .fh-sumitem__v--warn { color: var(--field-gold); }
 .fh-sumitem__v--thin { color: var(--alert-red); }
+.fh-sumitem--good .fh-sumitem__v { color: var(--signal-green); transition: color 360ms var(--ease); }
+.fh-sumitem--warn .fh-sumitem__v { color: var(--field-gold); transition: color 360ms var(--ease); }
+.fh-sumitem--thin .fh-sumitem__v { color: var(--alert-red); transition: color 360ms var(--ease); }
 
 /* Progress bar (milestones) */
 .fh-progress {
@@ -3397,16 +3412,24 @@ a {
 .fh-corner--bl { bottom: 0; left: 0; border-right: 0; border-top: 0; }
 .fh-corner--br { bottom: 0; right: 0; border-left: 0; border-top: 0; }
 
-/* Fixed-viewport corner brackets for AppShell */
+/* Fixed-viewport corner brackets for AppShell. Respect notch + home indicator. */
 .fh-page-corners {
   position: fixed;
-  inset: 14px;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: max(14px, env(safe-area-inset-left));
   pointer-events: none;
   z-index: 30;
 }
 .fh-page-corners .fh-corner { width: 22px; height: 22px; }
 @media (min-width: 768px) {
-  .fh-page-corners { inset: 24px; }
+  .fh-page-corners {
+    top: max(24px, env(safe-area-inset-top));
+    right: max(24px, env(safe-area-inset-right));
+    bottom: max(24px, env(safe-area-inset-bottom));
+    left: max(24px, env(safe-area-inset-left));
+  }
   .fh-page-corners .fh-corner { width: 28px; height: 28px; }
 }
 
@@ -3748,8 +3771,12 @@ a {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 92vh;
-  max-height: 92dvh;
+  /* Fits inside visual viewport, leaves 40px below the notch, and shrinks by keyboard height. */
+  height: min(
+    92vh,
+    calc(var(--fh-vvh, 100vh) - env(safe-area-inset-top) - 40px - var(--fh-kbd, 0px))
+  );
+  max-height: calc(100dvh - env(safe-area-inset-top) - 40px);
   background: var(--surface-1);
   border-top: 1px solid var(--rule-bold);
   border-top-left-radius: 14px;
@@ -3758,7 +3785,9 @@ a {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: contain;
   will-change: transform;
+  transition: height 220ms var(--ease);
 }
 [data-theme='dark'] .fh-asheet {
   background: var(--onyx-2);
@@ -3839,6 +3868,7 @@ a {
 .fh-asheet__body {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: var(--space-5);
   padding-bottom: var(--space-6);
@@ -3864,6 +3894,25 @@ a {
   justify-content: center;
   font-size: 1rem;
   letter-spacing: 0.2em;
+  position: relative;
+  overflow: hidden;
+}
+.fh-asheet__commit-label {
+  position: relative;
+  z-index: 1;
+}
+.fh-asheet__commit.is-committing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--field-gold-deep) 0%, var(--field-gold) 60%, var(--field-gold-deep) 100%);
+  transform-origin: left center;
+  animation: fh-commit-fill 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  z-index: 0;
+}
+@keyframes fh-commit-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .fh-asheet__hint {
@@ -4102,5 +4151,191 @@ a {
     border-top-left-radius: 14px;
     border-top-right-radius: 14px;
   }
+}
+
+/* =========================================================================
+   EMPTY STATE — designed, not a blank gap
+   ========================================================================= */
+.fh-emptystate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  max-width: 44ch;
+  margin: 0 auto;
+}
+.fh-emptystate__glyph {
+  width: 80px;
+  height: 80px;
+  color: var(--ink-muted);
+  opacity: 0.4;
+  margin-bottom: var(--space-2);
+}
+.fh-emptystate__glyph svg { width: 100%; height: 100%; }
+.fh-emptystate__code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--field-gold);
+  font-weight: 600;
+}
+.fh-emptystate__title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--ink-strong);
+  margin: 0;
+}
+.fh-emptystate__sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+  line-height: 1.45;
+}
+.fh-emptystate__cta {
+  margin-top: var(--space-3);
+  align-self: center;
+  font-size: 0.95rem;
+}
+
+/* =========================================================================
+   SKELETON LOADER — gold shimmer sweep
+   ========================================================================= */
+.fh-skel,
+.fh-skel-card,
+.fh-skel-stat {
+  position: relative;
+  background: color-mix(in srgb, var(--ink-muted) 14%, transparent);
+  overflow: hidden;
+  display: inline-block;
+  isolation: isolate;
+}
+.fh-skel::after,
+.fh-skel-card::after,
+.fh-skel-stat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 150, 58, 0.15) 45%,
+    rgba(201, 150, 58, 0.28) 50%,
+    rgba(201, 150, 58, 0.15) 55%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: fh-skel-sweep 1.5s infinite;
+  pointer-events: none;
+}
+.fh-skel-stack {
+  display: inline-flex;
+  flex-direction: column;
+  width: 100%;
+}
+.fh-skel-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.fh-skel-card {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  align-items: center;
+}
+.fh-skel-card::after { inset: 0; }
+.fh-skel-card__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.fh-skel-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fh-skel-stat {
+  padding: var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+@keyframes fh-skel-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* =========================================================================
+   TOASTER — stage transitions, commit confirmations
+   ========================================================================= */
+.fh-toaster {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+}
+.fh-toast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--onyx) 92%, transparent);
+  border: 1px solid var(--field-gold);
+  border-radius: var(--radius-spec);
+  color: var(--raw-linen);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+}
+.fh-toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+.fh-toast--gold { color: var(--field-gold); border-color: var(--field-gold); }
+.fh-toast--green { color: var(--signal-green); border-color: var(--signal-green); }
+.fh-toast--red { color: var(--alert-red); border-color: var(--alert-red); }
+.fh-toast--steel { color: var(--steel-lt); border-color: var(--steel); }
+.fh-toast--lead { color: var(--stage-lead); border-color: var(--stage-lead); }
+.fh-toast--quote { color: var(--stage-quote); border-color: var(--stage-quote); }
+.fh-toast--job { color: var(--stage-job); border-color: var(--stage-job); }
+.fh-toast--invoice { color: var(--stage-invoice); border-color: var(--stage-invoice); }
+.fh-toast--closed { color: var(--stage-closed); border-color: var(--stage-closed); }
+.fh-toast--lost { color: var(--stage-lost); border-color: var(--stage-lost); }
+.fh-toast__text { color: var(--raw-linen); letter-spacing: 0.15em; }
+@media (prefers-reduced-motion: reduce) {
+  .fh-skel::after,
+  .fh-skel-card::after,
+  .fh-skel-stat::after { animation: none; opacity: 0.5; }
 }
 

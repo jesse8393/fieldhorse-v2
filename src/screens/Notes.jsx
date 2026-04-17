@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Icon from '../components/icons/Icon.jsx'
+import EmptyState from '../components/EmptyState.jsx'
+import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
@@ -190,13 +192,14 @@ export default function Notes() {
       </div>
 
       <div className="fh-list">
-        {loading && <div className="fh-skeleton" />}
+        {loading && <SkeletonList rows={3} card={false} />}
         {!loading && notes.length === 0 && (
-          <div className="fh-empty">
-            <Icon name="notes" size={32} />
-            <h3>Nothing logged yet.</h3>
-            <p>Speak it. Type it. Drop it mid-drive. AI turns it into action.</p>
-          </div>
+          <EmptyState
+            icon="note"
+            code="LOG · EMPTY"
+            title="Nothing logged yet."
+            sub="Speak it. Type it. Drop it mid-drive. AI turns it into action."
+          />
         )}
         <AnimatePresence>
           {notes.map((n, i) => (

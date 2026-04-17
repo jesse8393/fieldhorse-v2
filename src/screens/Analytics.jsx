@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import Icon from '../components/icons/Icon.jsx'
+import EmptyState from '../components/EmptyState.jsx'
+import { SkeletonStat } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGES, ACTIVE_STAGES, margin } from '../lib/stages.js'
@@ -67,9 +69,22 @@ export default function Analytics() {
         </div>
       </header>
 
-      {loading && <div className="fh-skeleton" />}
+      {loading && (
+        <div className="fh-summary">
+          {Array.from({ length: 8 }, (_, i) => <SkeletonStat key={i} />)}
+        </div>
+      )}
 
-      {!loading && (
+      {!loading && contacts.length === 0 && (
+        <EmptyState
+          icon="chart"
+          code="DATA · INSUFFICIENT"
+          title="Not enough data yet."
+          sub="Add a few leads and start closing. Analytics lights up once the pipeline moves."
+        />
+      )}
+
+      {!loading && contacts.length > 0 && (
         <>
           <div className="fh-summary">
             <KPI label="Pipeline" value={money(stats.pipeline)} accent />
@@ -113,10 +128,12 @@ export default function Analytics() {
               <span className="fh-pill">IRS 2026 · $0.67/mi</span>
             </div>
             {mileage.length === 0 ? (
-              <div className="fh-empty">
-                <Icon name="pin" size={28} />
-                <p>No miles logged yet.</p>
-              </div>
+              <EmptyState
+                icon="calendar"
+                code="MILES · 0"
+                title="No miles logged."
+                sub="Log drives as you go. Every mile is $0.67 deducted at tax time."
+              />
             ) : (
               <div className="fh-rows">
                 {mileage.slice(0, 10).map((m) => (

@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Icon from '../components/icons/Icon.jsx'
 import NewLeadSheet from '../components/NewLeadSheet.jsx'
+import EmptyState from '../components/EmptyState.jsx'
+import { SkeletonList, SkeletonStat } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGES, STAGE_MAP, ACTIVE_STAGES, margin, marginTier } from '../lib/stages.js'
@@ -32,6 +34,7 @@ export default function Jobs() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
+  const [justAddedId, setJustAddedId] = useState(null)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -148,22 +151,43 @@ export default function Jobs() {
       </div>
 
       <div className="fh-list">
-        {loading && <div className="fh-skeleton" aria-hidden="true" />}
+        {loading && <SkeletonList rows={5} />}
         {!loading && filtered.length === 0 && (
-          <EmptyState onAdd={() => setAddOpen(true)} filterActive={filter !== 'all' || !!search} />
+          filter !== 'all' || search ? (
+            <EmptyState
+              icon="search"
+              code="FILTER · ACTIVE"
+              title="No jobs match that filter."
+              sub="Clear the search or switch stages to see more."
+            />
+          ) : (
+            <EmptyState
+              icon="pipeline"
+              code="§ 00 · EMPTY BOARD"
+              title="No jobs on the board."
+              sub="Drop in your first lead. Watch the pipeline fill."
+              action="Add first lead"
+              onAction={() => setAddOpen(true)}
+            />
+          )
         )}
         <AnimatePresence>
-          {filtered.map((c, i) => (
+          {filtered.map((c, i) => {
+            const isNew = c.id === justAddedId
+            return (
             <motion.button
               key={c.id}
               type="button"
               layout
-              className={`fh-card fh-card--stage fh-card--${c.stage}`}
+              className={`fh-card fh-card--stage fh-card--${c.stage}${isNew ? ' just-added' : ''}`}
               onClick={() => navigate(`/jobs/${c.id}`)}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={isNew ? { opacity: 0, scale: 0.9, y: 0 } : { opacity: 0, y: 8 }}
+              animate={isNew ? { opacity: 1, scale: [0.9, 1.02, 1], y: 0 } : { opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18, delay: Math.min(i * 0.02, 0.2) }}
+              transition={isNew
+                ? { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
+                : { duration: 0.18, delay: Math.min(i * 0.02, 0.2) }
+              }
             >
               <span className="fh-avatar" aria-hidden="true">{initials(c.name)}</span>
               <div className="fh-card__body">
@@ -179,7 +203,8 @@ export default function Jobs() {
               </div>
               <StageBadge id={c.stage} />
             </motion.button>
-          ))}
+            )
+          })}
         </AnimatePresence>
       </div>
 
@@ -189,8 +214,9 @@ export default function Jobs() {
         onClose={() => setAddOpen(false)}
         onCreated={async (created) => {
           setAddOpen(false)
+          if (created?.id) setJustAddedId(created.id)
           await load()
-          if (created?.id) navigate(`/jobs/${created.id}`)
+          setTimeout(() => setJustAddedId(null), 1200)
         }}
       />
     </section>
@@ -224,25 +250,4 @@ function MarginPill({ pct, hasCost }) {
   return <span className={`fh-margin fh-margin--${tier}`}>{pct.toFixed(0)}% margin</span>
 }
 
-function EmptyState({ onAdd, filterActive }) {
-  if (filterActive) {
-    return (
-      <div className="fh-empty">
-        <Icon name="search" size={32} />
-        <p>No jobs match that filter.</p>
-      </div>
-    )
-  }
-  return (
-    <div className="fh-empty">
-      <Icon name="lead" size={32} />
-      <h3>No jobs on the board.</h3>
-      <p>Drop in your first lead. Watch the pipeline fill.</p>
-      <button type="button" className="fh-btn fh-btn--gold" onClick={onAdd}>
-        <Icon name="plus" size={16} />
-        Add first lead
-      </button>
-    </div>
-  )
-}
 

@@ -3,12 +3,17 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
+import EmptyState from '../components/EmptyState.jsx'
+import { SkeletonBlock, SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   STAGES, STAGE_MAP, ACTIVE_STAGES, stageColor, stageLabel,
-  startQuote, approveQuote, completeJob, markLost, logPayment, recalcCost, margin, marginTier
+  recalcCost, margin, marginTier
 } from '../lib/stages.js'
+import {
+  startQuote, approveQuote, markComplete, markLost, reopen, logPayment
+} from '../lib/pipeline.js'
 
 const TABS = [
   { id: 'overview',  label: 'Overview' },
@@ -81,7 +86,15 @@ export default function ContactDetail() {
     navigate('/jobs')
   }
 
-  if (loading) return <div className="fh-page"><div className="fh-skeleton" /></div>
+  if (loading) return (
+    <div className="fh-page">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <SkeletonBlock w="40%" h={14} />
+        <SkeletonBlock w="70%" h={48} />
+        <SkeletonList rows={4} card={false} />
+      </div>
+    </div>
+  )
   if (!contact) return (
     <div className="fh-page">
       <button className="fh-link" onClick={() => navigate('/jobs')}>← Back to jobs</button>
@@ -242,34 +255,40 @@ function StageActions({ contact, onAction, onLogPayment }) {
   return (
     <div className="fh-stagerow">
       {stage === 'lead' && (
-        <button className="fh-btn fh-btn--gold" onClick={() => onAction(startQuote)}>
+        <button className="fh-btn fh-btn--primary" onClick={() => onAction(startQuote)}>
           Start quote <Icon name="arrowRight" size={16} />
         </button>
       )}
       {stage === 'quote' && (
-        <button className="fh-btn fh-btn--gold" onClick={() => onAction(approveQuote)}>
+        <button className="fh-btn fh-btn--primary" onClick={() => onAction(approveQuote)}>
           Approve quote <Icon name="check" size={16} />
         </button>
       )}
       {stage === 'job' && (
-        <button className="fh-btn fh-btn--gold" onClick={() => onAction(completeJob)}>
+        <button className="fh-btn fh-btn--primary" onClick={() => onAction(markComplete)}>
           Mark complete <Icon name="check" size={16} />
         </button>
       )}
       {stage === 'invoice' && (
-        <button className="fh-btn fh-btn--gold" onClick={onLogPayment}>
+        <button className="fh-btn fh-btn--primary" onClick={onLogPayment}>
           Log payment <Icon name="dollar" size={16} />
         </button>
       )}
       {stage === 'closed' && (
-        <span className="fh-pill fh-pill--good">
-          <Icon name="closed" size={14} /> Closed
-        </span>
+        <>
+          <span className="fh-status-pill fh-status-pill--gold">Closed</span>
+          <button className="fh-btn fh-btn--ghost fh-btn--danger-ghost" onClick={() => onAction(reopen)}>
+            Reopen
+          </button>
+        </>
       )}
       {stage === 'lost' && (
-        <span className="fh-pill fh-pill--bad">
-          <Icon name="lost" size={14} /> Lost
-        </span>
+        <>
+          <span className="fh-status-pill fh-status-pill--red">Lost</span>
+          <button className="fh-btn fh-btn--ghost" onClick={() => onAction(reopen)}>
+            Reopen
+          </button>
+        </>
       )}
     </div>
   )
@@ -447,7 +466,17 @@ function SubsTab({ contact, subs, userId, onChange }) {
           onChange={(v) => setForm({ ...form, status: v })}
         />
       </ActionSheet>
-      {subs.length === 0 && <EmptyMini label="No subs yet." />}
+      {subs.length === 0 && (
+        <EmptyState
+          icon="crew"
+          code="CREW · EMPTY"
+          title="No subs on this job."
+          sub="Add who's running each trade. Rates roll into cost + margin live."
+          action="Add sub"
+          onAction={() => setOpen(true)}
+        />
+      )
+      }}
       <ul className="fh-rows">
         {subs.map((s) => (
           <li key={s.id} className="fh-row">
@@ -564,7 +593,17 @@ function ExpensesTab({ contact, expenses, userId, onChange }) {
           />
         </SheetField>
       </ActionSheet>
-      {expenses.length === 0 && <EmptyMini label="No expenses logged." />}
+      {expenses.length === 0 && (
+        <EmptyState
+          icon="receipt"
+          code="EXPENSES · 0"
+          title="No expenses yet."
+          sub="Materials, fuel, permits — log as you go so margin stays real."
+          action="Add expense"
+          onAction={() => setOpen(true)}
+        />
+      )
+      }}
       <ul className="fh-rows">
         {expenses.map((e) => (
           <li key={e.id} className="fh-row">
@@ -714,7 +753,15 @@ function MessagesTab({ notes, contactId, userId, onChange }) {
         <input placeholder="Log a note, call, touchpoint…" value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
         <button className="fh-btn fh-btn--ghost" onClick={add}><Icon name="plus" size={14} /> Log</button>
       </div>
-      {notes.length === 0 && <EmptyMini label="Nothing logged yet." />}
+      {notes.length === 0 && (
+        <EmptyState
+          icon="message"
+          code="HISTORY · EMPTY"
+          title="No communications logged."
+          sub="Every touchpoint — call, text, onsite — captured in order below."
+        />
+      )
+      }}
       <ul className="fh-rows">
         {notes.map((n) => (
           <li key={n.id} className="fh-row">

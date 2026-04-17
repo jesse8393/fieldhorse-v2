@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Fieldhorse">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Fieldhorse">
   <defs>
     <radialGradient id="goldGlow" cx="50%" cy="50%" r="55%">
       <stop offset="0%" stop-color="#C9963A" stop-opacity="0.18"/>
@@ -10,19 +10,43 @@
       <rect x="0" y="0" width="512" height="512" rx="113" ry="113"/>
     </clipPath>
   </defs>
+
   <g clip-path="url(#corners)">
+    <!-- Onyx plate -->
     <rect x="0" y="0" width="512" height="512" fill="#141414"/>
+    <!-- Centered gold glow -->
     <rect x="0" y="0" width="512" height="512" fill="url(#goldGlow)"/>
+
+    <!-- Corner brackets: top-left + bottom-right, gold hairline -->
     <g stroke="#C9963A" stroke-width="2" fill="none" stroke-linecap="square">
+      <!-- TL -->
       <polyline points="58,100 58,58 100,58"/>
+      <!-- BR -->
       <polyline points="454,412 454,454 412,454"/>
     </g>
+
+    <!-- FH monogram + gold rule.
+         Bebas-style stacked capitals rendered as outlined geometry so the icon
+         stays crisp without needing the Bebas font embedded. -->
     <g transform="translate(256 256)" text-anchor="middle">
       <text y="0"
         font-family="'Bebas Neue', 'Impact', 'Oswald', sans-serif"
-        font-size="210" font-weight="400" letter-spacing="18" fill="#C9963A"
+        font-size="210"
+        font-weight="400"
+        letter-spacing="18"
+        fill="#C9963A"
         dominant-baseline="central">FH</text>
+      <!-- 80×2 rule 12px below the letterforms (centered) -->
       <rect x="-40" y="118" width="80" height="2" fill="#C9963A"/>
     </g>
+
+    <!-- Spec plate stamp: V2 bottom-right, steel mono -->
+    <text x="454" y="420"
+      font-family="'JetBrains Mono', 'SF Mono', ui-monospace, monospace"
+      font-size="22"
+      font-weight="500"
+      letter-spacing="4.4"
+      text-anchor="end"
+      fill="#8B8782">V2</text>
   </g>
 </svg>
