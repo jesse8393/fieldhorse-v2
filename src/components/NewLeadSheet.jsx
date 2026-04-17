@@ -46,7 +46,7 @@ const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a n
 Return ONLY the JSON. No prose, no fences.`
 
 export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(buildEmptyForm)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
