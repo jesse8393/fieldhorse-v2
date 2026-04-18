@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ChevronLeft, MoreVertical, Pencil, XCircle, Users, Trash2,
+  Wrench, Receipt, DollarSign, ClipboardCheck, Calendar, FileText,
+  ArrowRight, Check
+} from 'lucide-react'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { SkeletonBlock, SkeletonList } from '../components/Skeleton.jsx'
-import SpecTabs from '../components/SpecTabs.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
@@ -16,6 +20,9 @@ import {
   startQuote, approveQuote, markComplete, markLost, reopen, logPayment
 } from '../lib/pipeline.js'
 import { toast } from '../lib/toast.js'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import CountUp from '../components/fx/CountUp.jsx'
+import Spotlight from '../components/fx/Spotlight.jsx'
 
 const TABS = [
   { id: 'overview',  label: 'Overview' },
@@ -134,11 +141,45 @@ export default function ContactDetail() {
     <section className="fh-page fh-detail">
       <div className="fh-detail__top">
         <button className="fh-iconbtn" onClick={() => navigate('/jobs')} aria-label="Back">
-          <Icon name="chevron" size={18} style={{ transform: 'rotate(180deg)' }} />
+          <ChevronLeft size={18} />
         </button>
         <div className="fh-detail__title">
-          <span className="fh-eye">{stage?.label || contact.stage}</span>
-          <h1 className="fh-page__title">{contact.name || 'Untitled'}</h1>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '2px 9px',
+              borderRadius: 999,
+              background: `${stageColor(contact.stage)}22`,
+              border: `1px solid ${stageColor(contact.stage)}44`,
+              color: stageColor(contact.stage),
+              fontFamily: 'var(--font-display)',
+              fontSize: 11,
+              fontWeight: 400,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase'
+            }}
+          >
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: stageColor(contact.stage) }} />
+            {stage?.label || contact.stage}
+          </span>
+          {(() => {
+            const full = (contact.name || 'Untitled').trim()
+            const parts = full.split(/\s+/)
+            const hasFirst = parts.length > 1
+            const first = hasFirst ? parts.slice(0, -1).join(' ') : ''
+            const last = hasFirst ? parts[parts.length - 1] : parts[0]
+            return (
+              <h1
+                className="fh-font-serif"
+                style={{ margin: '6px 0 0', fontSize: 28, lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              >
+                {hasFirst && `${first} `}
+                <em className="fh-font-serif-italic fh-text-gradient-gold">{last}.</em>
+              </h1>
+            )
+          })()}
         </div>
         <div className="fh-detail__tools">
           <button
@@ -147,7 +188,7 @@ export default function ContactDetail() {
             aria-label="More"
             aria-expanded={menuOpen}
           >
-            <Icon name="more" size={20} />
+            <MoreVertical size={20} />
           </button>
           <AnimatePresence>
             {menuOpen && (
@@ -167,16 +208,16 @@ export default function ContactDetail() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setTab('overview') }}>
-                    <Icon name="edit" size={16} /> Edit
+                    <Pencil size={16} /> Edit
                   </button>
                   <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); markLost(contact).then(fetchAll) }}>
-                    <Icon name="lost" size={16} /> Mark lost
+                    <XCircle size={16} /> Mark lost
                   </button>
                   <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); patch({ partner_shared: !contact.partner_shared }) }}>
-                    <Icon name="partner" size={16} /> {contact.partner_shared ? 'Unshare partner' : 'Share with partner'}
+                    <Users size={16} /> {contact.partner_shared ? 'Unshare partner' : 'Share with partner'}
                   </button>
                   <button role="menuitem" className="is-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setDeleteOpen(true) }}>
-                    <Icon name="trash" size={16} /> Delete
+                    <Trash2 size={16} /> Delete
                   </button>
                 </motion.div>
               </>
@@ -198,13 +239,22 @@ export default function ContactDetail() {
       />
 
       <div className="fh-tabs-wrap">
-        <SpecTabs
-          options={tabs.map((t) => ({ value: t.id, label: t.label }))}
-          value={tab}
-          onChange={setTab}
-          ariaLabel="Detail tabs"
-          size="sm"
-        />
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList
+            aria-label="Detail tabs"
+            className="ui:flex ui:w-full ui:gap-1 ui:overflow-x-auto ui:bg-white/[0.03] ui:border ui:border-border ui:rounded-xl ui:p-1"
+          >
+            {tabs.map((t) => (
+              <TabsTrigger
+                key={t.id}
+                value={t.id}
+                className="ui:flex-shrink-0 ui:px-3 ui:py-1.5 ui:rounded-lg ui:text-xs ui:font-bold ui:uppercase ui:tracking-wider ui:text-muted-foreground ui:data-[state=active]:bg-white/[0.08] ui:data-[state=active]:text-foreground"
+              >
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="fh-tabpanel">
@@ -268,10 +318,23 @@ export default function ContactDetail() {
   )
 }
 
+const DELETE_ROW_ICONS = {
+  Subs: Wrench,
+  Expenses: Receipt,
+  Payments: DollarSign,
+  Inspections: ClipboardCheck,
+  'Schedule items': Calendar,
+  Notes: FileText
+}
+
 function DeleteRow({ label, count, detail }) {
+  const I = DELETE_ROW_ICONS[label]
   return (
-    <li style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-spec)' }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</span>
+    <li style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-spec)' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+        {I && <I size={12} aria-hidden="true" />}
+        {label}
+      </span>
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-strong)' }}>
         {count} {detail ? <span style={{ color: 'var(--ink-muted)', marginLeft: 8 }}>· {detail}</span> : null}
       </span>
@@ -291,20 +354,24 @@ function SummaryPanel({ contact, paid, balance }) {
   const marginValue = hasCostData ? `${m.toFixed(0)}%` : '—'
 
   return (
-    <div className="fh-summary-card">
-      <div className="fh-summary-card__row">
-        <SumItem k="Amount" v={money(contact.amount)} />
+    <div className="fh-summary-card" style={{ position: 'relative', overflow: 'hidden' }}>
+      <Spotlight style={{ top: -90, right: -90, opacity: 0.55 }} />
+      <div className="fh-summary-card__row" style={{ position: 'relative', zIndex: 1 }}>
+        <SumItem
+          k="Amount"
+          v={<CountUp to={Number(contact.amount || 0)} duration={0.9} formatter={money} />}
+        />
         <SumItem k="Cost" v={money(contact.cost)} />
         <SumItem k="Margin" v={marginValue} tone={tier} />
       </div>
       {(contact.stage === 'invoice' || contact.stage === 'closed') && (
-        <div className="fh-summary-card__row">
+        <div className="fh-summary-card__row" style={{ position: 'relative', zIndex: 1 }}>
           <SumItem k="Paid" v={money(paid)} />
           <SumItem k="Balance" v={money(balance)} tone={balance > 0 ? 'warn' : 'good'} />
         </div>
       )}
       {milestones.length > 0 && (
-        <div className="fh-progress">
+        <div className="fh-progress" style={{ position: 'relative', zIndex: 1 }}>
           <div className="fh-progress__bar" style={{ width: `${pct}%` }} />
           <span className="fh-progress__label">{milestonesDone}/{milestones.length} milestones · {pct}%</span>
         </div>
@@ -324,32 +391,62 @@ function SumItem({ k, v, tone }) {
 
 function StageActions({ contact, onAction, onLogPayment }) {
   const stage = contact.stage
+  const primaryBtn = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '11px 18px',
+    borderRadius: 12,
+    border: 'none',
+    background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+    color: 'var(--onyx)',
+    fontFamily: 'var(--font-display)',
+    fontSize: 14,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    boxShadow: '0 6px 16px rgba(201,150,58,0.3)'
+  }
+  const ghostBtn = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '10px 16px',
+    borderRadius: 12,
+    border: '1px solid var(--rule)',
+    background: 'rgba(255,255,255,0.04)',
+    color: 'var(--ink-strong)',
+    fontFamily: 'var(--font-body)',
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: 'pointer'
+  }
   return (
     <div className="fh-stagerow">
       {stage === 'lead' && (
-        <button className="fh-btn fh-btn--primary" onClick={() => onAction(startQuote)}>
-          Start quote <Icon name="arrowRight" size={16} />
-        </button>
+        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => onAction(startQuote)}>
+          Start quote <ArrowRight size={16} />
+        </motion.button>
       )}
       {stage === 'quote' && (
-        <button className="fh-btn fh-btn--primary" onClick={() => onAction(approveQuote)}>
-          Approve quote <Icon name="check" size={16} />
-        </button>
+        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => onAction(approveQuote)}>
+          Approve quote <Check size={16} />
+        </motion.button>
       )}
       {stage === 'job' && (
-        <button className="fh-btn fh-btn--primary" onClick={() => onAction(markComplete)}>
-          Mark complete <Icon name="check" size={16} />
-        </button>
+        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => onAction(markComplete)}>
+          Mark complete <Check size={16} />
+        </motion.button>
       )}
       {stage === 'invoice' && (
-        <button className="fh-btn fh-btn--primary" onClick={onLogPayment}>
-          Log payment <Icon name="dollar" size={16} />
-        </button>
+        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={onLogPayment}>
+          Log payment <DollarSign size={16} />
+        </motion.button>
       )}
       {stage === 'closed' && (
         <>
           <span className="fh-status-pill fh-status-pill--gold">Closed</span>
-          <button className="fh-btn fh-btn--ghost fh-btn--danger-ghost" onClick={() => onAction(reopen)}>
+          <button style={ghostBtn} onClick={() => onAction(reopen)}>
             Reopen
           </button>
         </>
@@ -357,7 +454,7 @@ function StageActions({ contact, onAction, onLogPayment }) {
       {stage === 'lost' && (
         <>
           <span className="fh-status-pill fh-status-pill--red">Lost</span>
-          <button className="fh-btn fh-btn--ghost" onClick={() => onAction(reopen)}>
+          <button style={ghostBtn} onClick={() => onAction(reopen)}>
             Reopen
           </button>
         </>
@@ -552,15 +649,20 @@ function SubsTab({ contact, subs, userId, onChange }) {
       <ul className="fh-rows">
         {subs.map((s) => (
           <li key={s.id} className="fh-row">
-            <div>
-              <strong>{s.name}</strong>
-              <span className="fh-row__sub">{s.trade || '—'} {s.phone ? ` · ${s.phone}` : ''}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
+                <Wrench size={14} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <strong>{s.name}</strong>
+                <span className="fh-row__sub">{s.trade || '—'} {s.phone ? ` · ${s.phone}` : ''}</span>
+              </div>
             </div>
             <div className="fh-row__right">
               <span className="fh-pill">{s.status}</span>
               <strong>{money(s.rate)}</strong>
               <button className="fh-iconbtn fh-iconbtn--sm" onClick={() => remove(s.id)} aria-label="Delete">
-                <Icon name="trash" size={14} />
+                <Trash2 size={14} />
               </button>
             </div>
           </li>
@@ -679,14 +781,19 @@ function ExpensesTab({ contact, expenses, userId, onChange }) {
       <ul className="fh-rows">
         {expenses.map((e) => (
           <li key={e.id} className="fh-row">
-            <div>
-              <strong>{e.description}</strong>
-              <span className="fh-row__sub">{e.category} · {e.expense_date}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
+                <Receipt size={14} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <strong>{e.description}</strong>
+                <span className="fh-row__sub">{e.category} · {e.expense_date}</span>
+              </div>
             </div>
             <div className="fh-row__right">
               <strong>{money(e.amount)}</strong>
               <button className="fh-iconbtn fh-iconbtn--sm" onClick={() => remove(e.id)} aria-label="Delete">
-                <Icon name="trash" size={14} />
+                <Trash2 size={14} />
               </button>
             </div>
           </li>
@@ -794,9 +901,14 @@ function InvoiceTab({ contact, payments, onLogPayment }) {
       <ul className="fh-rows">
         {payments.map((p) => (
           <li key={p.id} className="fh-row">
-            <div>
-              <strong>{money(p.amount)}</strong>
-              <span className="fh-row__sub">{p.method}{p.reference ? ` · #${p.reference}` : ''}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(45,122,79,0.12)', border: '1px solid rgba(45,122,79,0.3)', color: 'var(--signal-green)' }}>
+                <DollarSign size={14} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <strong>{money(p.amount)}</strong>
+                <span className="fh-row__sub">{p.method}{p.reference ? ` · #${p.reference}` : ''}</span>
+              </div>
             </div>
             <span className="fh-row__sub">{p.paid_on}</span>
           </li>
@@ -835,13 +947,20 @@ function MessagesTab({ notes, contactId, userId, onChange }) {
       )
       }}
       <ul className="fh-rows">
-        {notes.map((n) => (
-          <li key={n.id} className="fh-row">
+        {notes.map((n, i) => (
+          <motion.li
+            key={n.id}
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
+            className="fh-row"
+          >
             <div>
               <strong>{n.text || n.action || 'Note'}</strong>
               <span className="fh-row__sub">{n.category || 'note'} · {new Date(n.created_at).toLocaleString()}</span>
             </div>
-          </li>
+          </motion.li>
         ))}
       </ul>
     </div>

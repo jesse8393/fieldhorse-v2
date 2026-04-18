@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import Icon from '../components/icons/Icon.jsx'
+import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
 import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
-import EmptyState from '../components/EmptyState.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SpecTabs from '../components/SpecTabs.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -62,7 +61,6 @@ export default function Schedule() {
     setLoading(false)
   }, [user, range.start, range.end])
 
-  // Next 7 days, independent of current view. Used for the Upcoming lane.
   const loadUpcoming = useCallback(async () => {
     if (!user) return
     const now = new Date()
@@ -97,87 +95,152 @@ export default function Schedule() {
     [weather, profile?.services]
   )
 
-  return (
-    <section className="fh-page">
-      <header className="fh-page__head">
-        <div>
-          <span className="fh-sec-tag">
-            <span className="fh-sec-tag__label">Calendar</span>
-          </span>
-          <h1 className="fh-page__title">Schedule</h1>
-        </div>
-        <button type="button" className="fh-btn fh-btn--gold" onClick={() => setAddOpen(true)}>
-          <Icon name="plus" size={18} />
-          <span>New event</span>
-        </button>
-      </header>
+  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
+  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
 
+  return (
+    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+      {/* HEADER */}
+      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 6px' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+            Calendar
+          </span>
+          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 30, lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+            Run the{' '}
+            <em className="fh-font-serif-italic fh-text-gradient-gold">day.</em>
+          </h1>
+        </div>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.96 }}
+          onClick={() => setAddOpen(true)}
+          aria-label="New event"
+          style={{
+            flexShrink: 0,
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            border: 'none',
+            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+            color: 'var(--onyx)',
+            cursor: 'pointer',
+            display: 'grid',
+            placeItems: 'center',
+            boxShadow: '0 8px 20px rgba(201,150,58,0.35)'
+          }}
+        >
+          <Plus size={20} strokeWidth={2.5} />
+        </motion.button>
+      </motion.div>
+
+      {/* WEATHER STRIP */}
       {hasCoords && (
-        <div className={`fh-weatherbar fh-weatherbar--${windowRead.status}`}>
+        <motion.div variants={item} className={`fh-weatherbar fh-weatherbar--${windowRead.status}`} style={{ margin: '10px 20px 0' }}>
           <span className="fh-weatherbar__dot" />
           <span className="fh-weatherbar__label">{windowRead.label}</span>
           {windowRead.reasons.length > 0 && <span className="fh-weatherbar__reason">{windowRead.reasons.join(' · ')}</span>}
-        </div>
+        </motion.div>
       )}
 
+      {/* UPCOMING LANE */}
       {upcoming.length > 0 && (
-        <section className="fh-upcoming">
-          <header className="fh-upcoming__head">
-            <span className="fh-eye">Upcoming · 7 days</span>
-            <span className="fh-status-pill fh-status-pill--gold">{upcoming.length}</span>
+        <motion.section variants={item} style={{ padding: '14px 20px 0' }}>
+          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+              <CalendarIcon size={12} />
+              Upcoming · 7 days
+            </span>
+            <span style={{ padding: '2px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>
+              {upcoming.length}
+            </span>
           </header>
-          <div className="fh-upcoming__list">
-            {upcoming.map((e) => {
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' }}>
+            {upcoming.map((e, i) => {
               const fromQuote = Boolean(e.contact_id && e.fh_contacts?.name)
+              const accent = fromQuote ? 'var(--field-gold-bright)' : 'var(--steel)'
               return (
-                <button
+                <motion.button
                   key={e.id}
                   type="button"
-                  className={`fh-upcoming__card${fromQuote ? ' is-fromquote' : ''}`}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(i * 0.04, 0.24), duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => e.contact_id && navigate(`/jobs/${e.contact_id}`)}
+                  style={{
+                    flexShrink: 0,
+                    position: 'relative',
+                    width: 180,
+                    padding: '12px 14px',
+                    borderRadius: 14,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${fromQuote ? 'rgba(201,150,58,0.35)' : 'var(--rule)'}`,
+                    color: 'var(--ink-strong)',
+                    cursor: e.contact_id ? 'pointer' : 'default',
+                    textAlign: 'left'
+                  }}
                 >
-                  <span className="fh-upcoming__date">
+                  <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accent, boxShadow: `0 0 8px ${accent}66` }} />
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: 4 }}>
+                    <CalendarIcon size={11} />
                     {new Date(e.start_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    <span className="fh-upcoming__time"> · {fmtTime(e.start_at)}</span>
-                  </span>
-                  <span className="fh-upcoming__title">{e.title || 'Untitled'}</span>
-                  <span className="fh-upcoming__sub">
-                    {fromQuote
-                      ? `FROM APPROVED QUOTE · ${e.fh_contacts.name.toUpperCase()}`
-                      : 'MANUAL EVENT'}
-                  </span>
-                </button>
+                    <span aria-hidden="true">·</span>
+                    <Clock size={11} />
+                    {fmtTime(e.start_at)}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {e.title || 'Untitled'}
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: fromQuote ? 'var(--field-gold-bright)' : 'var(--ink-faint)' }}>
+                    {fromQuote ? <MapPin size={10} /> : null}
+                    {fromQuote ? `From quote · ${e.fh_contacts.name}` : 'Manual event'}
+                  </div>
+                </motion.button>
               )
             })}
           </div>
-        </section>
+        </motion.section>
       )}
 
-      <div className="fh-sched-bar">
+      {/* VIEW TABS + NAV */}
+      <motion.div variants={item} style={{ padding: '14px 20px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <SpecTabs
           options={VIEWS}
           value={view}
           onChange={setView}
           ariaLabel="Calendar view"
         />
-        <div className="fh-sched-bar__nav">
-          <button type="button" className="fh-iconbtn" onClick={() => shift(-1)} aria-label="Previous"><Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} /></button>
-          <span className="fh-sched-bar__cur">{view === 'month'
-            ? cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-            : view === 'week'
-              ? `Week of ${fmtDate(addDays(cursor, -cursor.getDay()))}`
-              : fmtDate(cursor)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button type="button" onClick={() => shift(-1)} aria-label="Previous" style={iconBtnStyle}>
+            <ChevronLeft size={16} />
+          </button>
+          <span style={{ flex: 1, fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', textAlign: 'center' }}>
+            {view === 'month'
+              ? cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+              : view === 'week'
+                ? `Week of ${fmtDate(addDays(cursor, -cursor.getDay()))}`
+                : fmtDate(cursor)}
           </span>
-          <button type="button" className="fh-iconbtn" onClick={() => shift(1)} aria-label="Next"><Icon name="chevron" size={16} /></button>
-          <button type="button" className="fh-btn fh-btn--ghost" onClick={() => setCursor(startOfDay(new Date()))}>Today</button>
+          <button type="button" onClick={() => shift(1)} aria-label="Next" style={iconBtnStyle}>
+            <ChevronRight size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setCursor(startOfDay(new Date()))}
+            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Today
+          </button>
         </div>
-      </div>
+      </motion.div>
 
-      {loading && <SkeletonList rows={5} card={false} />}
-
-      {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onAdd={() => setAddOpen(true)} />}
-      {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} />}
-      {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+      <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
+        {loading && <SkeletonList rows={5} card={false} />}
+        {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onAdd={() => setAddOpen(true)} />}
+        {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} />}
+        {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+      </motion.div>
 
       <AddEventSheet
         open={addOpen}
@@ -185,21 +248,38 @@ export default function Schedule() {
         onClose={() => setAddOpen(false)}
         onSaved={() => { setAddOpen(false); load() }}
       />
-    </section>
+    </motion.div>
   )
+}
+
+const iconBtnStyle = {
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  border: '1px solid var(--rule)',
+  background: 'rgba(255,255,255,0.04)',
+  color: 'var(--ink-strong)',
+  display: 'grid',
+  placeItems: 'center',
+  cursor: 'pointer'
 }
 
 function DayView({ events, onClick, onAdd }) {
   if (events.length === 0) {
     return (
-      <EmptyState
-        icon="calendar"
-        code="DAY · CLEAR"
-        title="Nothing scheduled."
-        sub="Queue something up. Crew runs smoother when the day's on the board."
-        action={onAdd ? 'Add event' : undefined}
-        onAction={onAdd}
-      />
+      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Nothing scheduled.</div>
+        <div style={{ fontSize: 12, marginBottom: 10 }}>Queue something up. Crew runs smoother when the day's on the board.</div>
+        {onAdd && (
+          <button
+            type="button"
+            onClick={onAdd}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+          >
+            Add event →
+          </button>
+        )}
+      </div>
     )
   }
   return (
@@ -207,9 +287,9 @@ function DayView({ events, onClick, onAdd }) {
       {events.map((e, i) => (
         <motion.li
           key={e.id}
-          initial={{ opacity: 0, y: 6 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: Math.min(i * 0.03, 0.2) }}
+          transition={{ delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
           className="fh-tl-item"
           onClick={() => e.contact_id && onClick(e.contact_id)}
           role={e.contact_id ? 'button' : undefined}

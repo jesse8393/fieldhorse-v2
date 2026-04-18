@@ -210,9 +210,9 @@ export default function Onboarding() {
 
       <section className="fh-onb__hero" style={{ animationDelay: '40ms' }}>
         <p className="fh-onb__eyebrow">Onboarding · Three steps</p>
-        <h1 className="fh-onb__title">
+        <h1 className="fh-onb__title fh-font-serif" style={{ fontWeight: 400 }}>
           Set up<br />
-          <span className="fh-outline-text">your rig.</span>
+          <em className="fh-font-serif-italic fh-text-gradient-gold">shop.</em>
         </h1>
         <p className="fh-onb__lede">
           Three things to lock in before the work day starts.
@@ -229,7 +229,9 @@ export default function Onboarding() {
       <form className="fh-onb__form" onSubmit={onSubmit} noValidate>
         <section className="fh-onb__section" style={{ animationDelay: '120ms' }}>
           <div className="fh-onb__section-head">
-            <h2 className="fh-onb__section-title">Your company.</h2>
+            <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
+              Your <em className="fh-font-serif-italic fh-text-gradient-gold">company.</em>
+            </h2>
             <span className="fh-onb__section-hint">Shows on bids, invoices, and every schedule notification.</span>
           </div>
           <div className="fh-onb__company-row">
@@ -261,7 +263,9 @@ export default function Onboarding() {
 
         <section className="fh-onb__section" style={{ animationDelay: '200ms' }}>
           <div className="fh-onb__section-head">
-            <h2 className="fh-onb__section-title">What you run.</h2>
+            <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
+              What you <em className="fh-font-serif-italic fh-text-gradient-gold">run.</em>
+            </h2>
             <span className="fh-onb__section-hint">Pick every trade. This configures your rate card and pour-condition rules.</span>
           </div>
           <div className="fh-svc-grid" role="group" aria-label="Trade services">
@@ -297,14 +301,16 @@ export default function Onboarding() {
           </div>
           {services.length > 0 && (
             <p className="fh-onb__count">
-              {services.length} trade{services.length === 1 ? '' : 's'} on the rig
+              {services.length} trade{services.length === 1 ? '' : 's'} picked
             </p>
           )}
         </section>
 
         <section className="fh-onb__section" style={{ animationDelay: '280ms' }}>
           <div className="fh-onb__section-head">
-            <h2 className="fh-onb__section-title">Lock your location.</h2>
+            <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
+              Lock your <em className="fh-font-serif-italic fh-text-gradient-gold">location.</em>
+            </h2>
             <span className="fh-onb__section-hint">Weather and pour windows anchor to this point.</span>
           </div>
           <div className="fh-loc">
@@ -343,7 +349,7 @@ export default function Onboarding() {
               <div className="fh-counter__num">{services.length}</div>
               <div>
                 <div className="fh-counter__label">
-                  {services.length === 1 ? 'Trade on the rig' : 'Trades on the rig'}
+                  {services.length === 1 ? 'Trade picked' : 'Trades picked'}
                 </div>
                 <div className="fh-counter__desc">Rate card + templates tuned to match</div>
               </div>

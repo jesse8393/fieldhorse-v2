@@ -1,27 +1,41 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import Icon from './icons/Icon.jsx'
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator
+} from '@/components/ui/command'
+import {
+  Home, Briefcase, FileText, Calendar, Calculator, MessageSquare,
+  BarChart3, Upload, Settings, Plus, Mic
+} from 'lucide-react'
 
-const ACTIONS = [
-  { id: 'home', label: 'Home', hint: 'Morning brief', icon: 'home', to: '/' },
-  { id: 'jobs', label: 'Jobs', hint: 'Pipeline', icon: 'jobs', to: '/jobs' },
-  { id: 'newLead', label: 'New lead', hint: 'Open pipeline card', icon: 'plus', to: '/jobs?new=1' },
-  { id: 'notes', label: 'Field notes', hint: 'Capture anything', icon: 'notes', to: '/notes' },
-  { id: 'voice', label: 'Voice capture', hint: 'Dictate a note', icon: 'mic', to: '/notes?voice=1' },
-  { id: 'schedule', label: 'Schedule', hint: 'Day / week / month', icon: 'schedule', to: '/schedule' },
-  { id: 'bid', label: 'AI Bid Engine', hint: 'Scope to number', icon: 'bid', to: '/bid' },
-  { id: 'compose', label: 'AI Compose', hint: 'Draft a message', icon: 'compose', to: '/compose' },
-  { id: 'analytics', label: 'Analytics', hint: 'Pipeline + margin', icon: 'analytics', to: '/analytics' },
-  { id: 'import', label: 'Import data', hint: 'CSV + webhooks', icon: 'upload', to: '/import' },
-  { id: 'settings', label: 'Settings', hint: 'Profile + billing', icon: 'settings', to: '/settings' }
+const QUICK_ACTIONS = [
+  { id: 'newLead', label: 'New lead', hint: 'Open pipeline card', icon: Plus, to: '/jobs?new=1' },
+  { id: 'voice', label: 'Voice capture', hint: 'Dictate a note', icon: Mic, to: '/notes?voice=1' }
+]
+const NAV_ITEMS = [
+  { id: 'home', label: 'Home', hint: 'Morning brief', icon: Home, to: '/' },
+  { id: 'jobs', label: 'Jobs', hint: 'Pipeline', icon: Briefcase, to: '/jobs' },
+  { id: 'notes', label: 'Field notes', hint: 'Capture anything', icon: FileText, to: '/notes' },
+  { id: 'schedule', label: 'Schedule', hint: 'Day / week / month', icon: Calendar, to: '/schedule' }
+]
+const MONEY_ITEMS = [
+  { id: 'bid', label: 'AI Bid Engine', hint: 'Scope to number', icon: Calculator, to: '/bid' },
+  { id: 'compose', label: 'AI Compose', hint: 'Draft a message', icon: MessageSquare, to: '/compose' },
+  { id: 'analytics', label: 'Analytics', hint: 'Pipeline + margin', icon: BarChart3, to: '/analytics' }
+]
+const SYSTEM_ITEMS = [
+  { id: 'import', label: 'Import data', hint: 'CSV + webhooks', icon: Upload, to: '/import' },
+  { id: 'settings', label: 'Settings', hint: 'Profile + billing', icon: Settings, to: '/settings' }
 ]
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  const [cursor, setCursor] = useState(0)
-  const inputRef = useRef(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -29,121 +43,49 @@ export default function CommandPalette() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOpen((v) => !v)
-      } else if (e.key === 'Escape' && open) {
-        setOpen(false)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  }, [])
 
-  useEffect(() => {
-    if (open) {
-      setQ('')
-      setCursor(0)
-      setTimeout(() => inputRef.current?.focus(), 40)
-    }
-  }, [open])
-
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    if (!needle) return ACTIONS
-    return ACTIONS.filter((a) => (a.label + ' ' + a.hint).toLowerCase().includes(needle))
-  }, [q])
-
-  function run(action) {
+  function run(item) {
     setOpen(false)
-    navigate(action.to)
+    navigate(item.to)
   }
 
-  function onKeyDown(e) {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setCursor((c) => Math.min(filtered.length - 1, c + 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setCursor((c) => Math.max(0, c - 1))
-    } else if (e.key === 'Enter' && filtered[cursor]) {
-      e.preventDefault()
-      run(filtered[cursor])
-    }
+  function renderGroup(heading, items) {
+    return (
+      <CommandGroup heading={heading}>
+        {items.map((it) => {
+          const I = it.icon
+          return (
+            <CommandItem key={it.id} onSelect={() => run(it)} className="ui:gap-3">
+              <I className="ui:text-fh-gold-bright" style={{ width: 16, height: 16 }} />
+              <div className="ui:flex ui:flex-col">
+                <span>{it.label}</span>
+                <span className="ui:text-xs ui:text-muted-foreground">{it.hint}</span>
+              </div>
+            </CommandItem>
+          )
+        })}
+      </CommandGroup>
+    )
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fh-cmdk"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.14 }}
-          onClick={() => setOpen(false)}
-        >
-          <motion.div
-            className="fh-cmdk__panel"
-            role="dialog"
-            aria-label="Command palette"
-            initial={{ y: -8, scale: 0.98, opacity: 0 }}
-            animate={{ y: 0, scale: 1, opacity: 1 }}
-            exit={{ y: -6, scale: 0.98, opacity: 0 }}
-            transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="fh-cmdk__row">
-              <Icon name="search" size={18} />
-              <input
-                ref={inputRef}
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value)
-                  setCursor(0)
-                }}
-                onKeyDown={onKeyDown}
-                placeholder="Jump to anywhere…"
-                className="fh-cmdk__input"
-                spellCheck={false}
-                autoComplete="off"
-              />
-              <kbd className="fh-kbd">Esc</kbd>
-            </div>
-            <ul className="fh-cmdk__list" role="listbox">
-              {filtered.length === 0 && (
-                <li className="fh-cmdk__empty">Nothing matches.</li>
-              )}
-              {filtered.map((a, i) => (
-                <li
-                  key={a.id}
-                  className={`fh-cmdk__item${i === cursor ? ' is-active' : ''}`}
-                  onMouseEnter={() => setCursor(i)}
-                  onClick={() => run(a)}
-                  role="option"
-                  aria-selected={i === cursor}
-                >
-                  <span className="fh-cmdk__icon">
-                    <Icon name={a.icon} size={18} />
-                  </span>
-                  <span className="fh-cmdk__label">{a.label}</span>
-                  <span className="fh-cmdk__hint">{a.hint}</span>
-                </li>
-              ))}
-            </ul>
-            <footer className="fh-cmdk__foot">
-              <span>
-                <kbd className="fh-kbd">↑</kbd>
-                <kbd className="fh-kbd">↓</kbd> navigate
-              </span>
-              <span>
-                <kbd className="fh-kbd">↵</kbd> open
-              </span>
-              <span>
-                <kbd className="fh-kbd">⌘</kbd>
-                <kbd className="fh-kbd">K</kbd> anywhere
-              </span>
-            </footer>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput placeholder="Search jobs, contacts, screens..." />
+      <CommandList>
+        <CommandEmpty>No results.</CommandEmpty>
+        {renderGroup('Quick actions', QUICK_ACTIONS)}
+        <CommandSeparator />
+        {renderGroup('Navigate', NAV_ITEMS)}
+        <CommandSeparator />
+        {renderGroup('Money tools', MONEY_ITEMS)}
+        <CommandSeparator />
+        {renderGroup('System', SYSTEM_ITEMS)}
+      </CommandList>
+    </CommandDialog>
   )
 }

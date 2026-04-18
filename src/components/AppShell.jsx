@@ -1,9 +1,12 @@
 import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Toaster as SonnerToaster } from 'sonner'
 import BottomNav from './BottomNav.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import Toaster from './Toaster.jsx'
+import Aurora from './fx/Aurora.jsx'
+import GridPattern from './fx/GridPattern.jsx'
 
 export default function AppShell() {
   const location = useLocation()
@@ -13,17 +16,22 @@ export default function AppShell() {
   }, [location.pathname])
 
   return (
-    <div className="fh-app">
+    <div className="fh-app" style={{ position: 'relative' }}>
+      <Aurora />
+      <GridPattern />
+
       <div className="fh-page-corners" aria-hidden="true">
         <span className="fh-corner fh-corner--tl" />
         <span className="fh-corner fh-corner--tr" />
         <span className="fh-corner fh-corner--bl" />
         <span className="fh-corner fh-corner--br" />
       </div>
+
       <AnimatePresence mode="wait">
         <motion.main
           key={location.pathname}
           className="fh-app__main"
+          style={{ position: 'relative', zIndex: 1 }}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
@@ -32,9 +40,27 @@ export default function AppShell() {
           <Outlet />
         </motion.main>
       </AnimatePresence>
+
       <BottomNav />
       <CommandPalette />
+
+      {/* Existing custom toaster stays — Sonner runs alongside it */}
       <Toaster />
+      <SonnerToaster
+        position="top-center"
+        theme="dark"
+        richColors
+        closeButton
+        toastOptions={{
+          style: {
+            background: 'rgba(20,20,20,0.95)',
+            color: 'var(--ink-strong)',
+            border: '1px solid rgba(232,176,76,0.25)',
+            fontFamily: 'var(--font-body)',
+            backdropFilter: 'blur(30px)'
+          }
+        }}
+      />
     </div>
   )
 }

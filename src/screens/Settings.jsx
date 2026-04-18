@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Icon from '../components/icons/Icon.jsx'
+import { motion } from 'framer-motion'
+import { MapPin, Trash2, LogOut, Upload as UploadIcon } from 'lucide-react'
 import LogoUploader from '../components/LogoUploader.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
+import { Switch } from '@/components/ui/switch'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Flooring', 'Landscaping', 'Excavation', 'Remodel']
 
@@ -93,146 +95,271 @@ export default function Settings() {
     })
   }
 
-  return (
-    <section className="fh-page">
-      <header className="fh-page__head">
-        <div>
-          <span className="fh-sec-tag">
-            <span className="fh-sec-tag__label">Your rig</span>
-          </span>
-          <h1 className="fh-page__title">Settings</h1>
-        </div>
-      </header>
+  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
+  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
 
-      <section className="fh-section">
-        <div className="fh-section__head">
-          <span className="fh-section__title">Brand</span>
-        </div>
-        <div className="fh-settings__row">
+  return (
+    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+      {/* HEADER */}
+      <motion.div variants={item} style={{ padding: '20px 20px 14px' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+          Profile
+        </span>
+        <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 30, lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+          Run your{' '}
+          <em className="fh-font-serif-italic fh-text-gradient-gold">operation.</em>
+        </h1>
+      </motion.div>
+
+      {/* BRAND */}
+      <Section variants={item} title={<>Your <em>brand.</em></>}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <LogoUploader
             logoUrl={profile?.logo_url}
             companyName={profile?.company_name}
             onUpload={async (url) => { await upsertProfile({ logo_url: url }); refresh() }}
             size="lg"
           />
-          <label className="fh-field" style={{ flex: 1 }}>
-            <span className="fh-field__k">Company name</span>
-            <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Company name</span>
+            <input
+              type="text"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="Your company"
+              style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+            />
           </label>
         </div>
-      </section>
+      </Section>
 
-      <section className="fh-section">
-        <div className="fh-section__head">
-          <span className="fh-section__title">Services</span>
-          <span className="fh-pill">{services.length} picked</span>
+      {/* SERVICES */}
+      <Section variants={item} title={<>What you <em>do.</em></>} meta={`${services.length} picked`}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {SERVICES.map((s) => {
+            const isOn = services.includes(s)
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggleService(s)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 999,
+                  border: isOn ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
+                  background: isOn ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.03)',
+                  color: isOn ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 160ms ease'
+                }}
+              >
+                {s}
+              </button>
+            )
+          })}
         </div>
-        <div className="fh-chips">
-          {SERVICES.map((s) => (
-            <button key={s} type="button" className={`fh-chip${services.includes(s) ? ' is-active' : ''}`} onClick={() => toggleService(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
-      </section>
+      </Section>
 
-      <section className="fh-section">
-        <div className="fh-section__head">
-          <span className="fh-section__title">Market pin</span>
-        </div>
-        <div className="fh-settings__row">
-          <div className="fh-meta">
-            <span className="fh-meta__k">Lat</span>
-            <span className="fh-meta__v">{profile?.location_lat ? profile.location_lat.toFixed(3) : '—'}</span>
-          </div>
-          <div className="fh-meta">
-            <span className="fh-meta__k">Lon</span>
-            <span className="fh-meta__v">{profile?.location_lon ? profile.location_lon.toFixed(3) : '—'}</span>
-          </div>
-          <button type="button" className="fh-btn fh-btn--ghost" onClick={pinLocation}>
-            <Icon name="pin" size={16} />
+      {/* MARKET PIN */}
+      <Section variants={item} title={<>Where you <em>work.</em></>}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <Meta label="Lat" value={profile?.location_lat ? profile.location_lat.toFixed(3) : '—'} />
+          <Meta label="Lon" value={profile?.location_lon ? profile.location_lon.toFixed(3) : '—'} />
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={pinLocation}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <MapPin size={16} />
             {profile?.location_lat ? 'Repin' : 'Pin location'}
-          </button>
+          </motion.button>
         </div>
-      </section>
+      </Section>
 
-      <section className="fh-section">
-        <div className="fh-section__head">
-          <span className="fh-section__title">Appearance</span>
+      {/* APPEARANCE */}
+      <Section variants={item} title={<>Light or <em>dark.</em></>}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
+          <Switch
+            checked={theme === 'dark'}
+            onCheckedChange={() => toggleTheme()}
+            aria-label="Toggle dark theme"
+          />
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-strong)' }}>
+            {theme === 'dark' ? 'Dark theme' : 'Light theme'}
+          </span>
         </div>
-        <label className={`fh-toggle${theme === 'dark' ? ' is-on' : ''}`} onClick={toggleTheme}>
-          <span className="fh-toggle__rail" />
-          <span className="fh-toggle__label">{theme === 'dark' ? 'Dark theme' : 'Light theme'}</span>
-        </label>
-      </section>
+      </Section>
 
-      <section className="fh-section">
-        <div className="fh-section__head">
-          <span className="fh-section__title">Account</span>
-        </div>
-        <div className="fh-rows">
-          <div className="fh-row">
-            <div style={{ flex: 1 }}>
-              <div className="fh-row__k">{user?.email}</div>
-              <div className="fh-row__sub">Signed in</div>
+      {/* ACCOUNT */}
+      <Section variants={item} title={<>Your <em>session.</em></>}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.email}
             </div>
-            <button type="button" className="fh-btn fh-btn--danger" onClick={handleSignOut}>Sign out</button>
+            <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Signed in</div>
           </div>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={handleSignOut}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          >
+            <LogOut size={14} />
+            Sign out
+          </motion.button>
         </div>
-      </section>
+      </Section>
 
+      {/* DEV · CLEANUP */}
       {canWipe && (
-        <section className="fh-section" style={{ borderColor: 'rgba(192, 57, 43, 0.25)' }}>
-          <div className="fh-section__head">
-            <span className="fh-section__title">Dev · Cleanup</span>
-            <span className="fh-status-pill fh-status-pill--red">{DEV_BUILD ? 'LOCAL' : 'TEST USER'}</span>
-          </div>
-          <p style={{ margin: 0, color: 'var(--ink-muted)', fontSize: '0.9rem' }}>
+        <Section
+          variants={item}
+          title={<>Reset <em>everything.</em></>}
+          meta={DEV_BUILD ? 'LOCAL' : 'TEST USER'}
+          metaTone="red"
+        >
+          <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12 }}>
             Deletes every contact, note, schedule item, sub, expense, inspection, payment, and mileage row owned by this user. RLS-scoped so it can only touch your own data.
           </p>
-          {!confirmWipe ? (
-            <button
-              type="button"
-              className="fh-btn fh-btn--danger"
-              onClick={() => setConfirmWipe(true)}
-              disabled={wiping}
-            >
-              <Icon name="trash" size={16} />
-              Clear all my test data
-            </button>
-          ) : (
-            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-              <button
+          <div style={{ marginTop: 10 }}>
+            {!confirmWipe ? (
+              <motion.button
                 type="button"
-                className="fh-btn fh-btn--ghost"
-                onClick={() => setConfirmWipe(false)}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setConfirmWipe(true)}
                 disabled={wiping}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="fh-btn fh-btn--danger"
-                onClick={wipeTestData}
-                disabled={wiping}
-              >
-                {wiping ? 'Clearing…' : 'Yes, delete everything'}
-              </button>
-            </div>
-          )}
-          {wipeResult && (
-            <p style={{ margin: 0, color: wipeResult.startsWith('Wipe failed') ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: '0.9rem' }}>
-              {wipeResult}
-            </p>
-          )}
-        </section>
+                <Trash2 size={14} />
+                Clear all my test data
+              </motion.button>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setConfirmWipe(false)}
+                  disabled={wiping}
+                  style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.97 }}
+                  onClick={wipeTestData}
+                  disabled={wiping}
+                  style={{ padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(135deg, #c0392b, #8b1a0d)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.1em', cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
+                >
+                  {wiping ? 'CLEARING…' : 'YES, DELETE EVERYTHING'}
+                </motion.button>
+              </div>
+            )}
+            {wipeResult && (
+              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith('Wipe failed') ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+                {wipeResult}
+              </p>
+            )}
+          </div>
+        </Section>
       )}
 
-      <div className="fh-settings__save">
-        <button type="button" className="fh-btn fh-btn--gold" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : saved ? 'Saved' : 'Save changes'}
-        </button>
+      {/* SAVE BAR */}
+      <motion.div variants={item} style={{ padding: '0 20px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={save}
+          disabled={saving}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '12px 22px',
+            borderRadius: 12,
+            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+            color: 'var(--onyx)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 15,
+            letterSpacing: '0.14em',
+            border: 'none',
+            cursor: saving ? 'default' : 'pointer',
+            boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
+            opacity: saving ? 0.65 : 1
+          }}
+        >
+          <UploadIcon size={16} />
+          {saving ? 'SAVING…' : saved ? 'SAVED' : 'SAVE CHANGES'}
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function Section({ variants, title, meta, metaTone, children }) {
+  const metaBg = metaTone === 'red'
+    ? { background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)' }
+    : { background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }
+  return (
+    <motion.section variants={variants} style={{ padding: '0 20px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
+        <h2
+          className="fh-font-serif"
+          style={{ margin: 0, fontSize: 20, lineHeight: 1.15, letterSpacing: '-0.01em', fontWeight: 400, color: 'var(--ink-strong)' }}
+        >
+          {renderSectionTitle(title)}
+        </h2>
+        {meta && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '3px 9px',
+              borderRadius: 999,
+              fontFamily: 'var(--font-body)',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              ...metaBg
+            }}
+          >
+            {meta}
+          </span>
+        )}
       </div>
-    </section>
+      {children}
+    </motion.section>
+  )
+}
+
+function renderSectionTitle(node) {
+  // node is a React fragment with <em> around the accent word.
+  // Wrap the <em> in a span with the italic gradient class so the rendered word is gold-italic.
+  if (node && node.props && Array.isArray(node.props.children)) {
+    return node.props.children.map((child, i) => {
+      if (child && child.type === 'em') {
+        return (
+          <em key={i} className="fh-font-serif-italic fh-text-gradient-gold" style={{ fontStyle: 'italic' }}>
+            {child.props.children}
+          </em>
+        )
+      }
+      return child
+    })
+  }
+  return node
+}
+
+function Meta({ label, value }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', minWidth: 80 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</span>
+      <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{value}</span>
+    </div>
   )
 }

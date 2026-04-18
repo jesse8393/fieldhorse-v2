@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import Icon from '../components/icons/Icon.jsx'
+import { Calculator, Sparkles } from 'lucide-react'
 import { RATE_CARD } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
+import CountUp from '../components/fx/CountUp.jsx'
 
 const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Return ONLY JSON.`
 
 const TRADES = Object.keys(RATE_CARD)
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
+function formatThousands(n) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }
 
 export default function Bid() {
   const [scope, setScope] = useState('')
@@ -59,18 +61,32 @@ export default function Bid() {
     setPicks((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
   }
 
-  return (
-    <section className="fh-page">
-      <header className="fh-page__head">
-        <div>
-          <span className="fh-sec-tag">
-            <span className="fh-sec-tag__label">AI bid engine</span>
-          </span>
-          <h1 className="fh-page__title">Scope to number.</h1>
-        </div>
-      </header>
+  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
+  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
 
-      <div className="fh-bid">
+  return (
+    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+      {/* HEADER */}
+      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 14px' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+            AI bid engine
+          </span>
+          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 30, lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+            Bid it,{' '}
+            <em className="fh-font-serif-italic fh-text-gradient-gold">clean.</em>
+          </h1>
+        </div>
+        <div
+          aria-hidden="true"
+          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}
+        >
+          <Calculator size={20} />
+        </div>
+      </motion.div>
+
+      {/* FORM */}
+      <motion.div variants={item} className="fh-bid">
         <div className="fh-bid__scope">
           <label className="fh-field">
             <span className="fh-field__k">Scope description</span>
@@ -113,10 +129,33 @@ export default function Bid() {
               <span className="fh-bid__marginval">{marginPct}%</span>
             </label>
           </div>
-          <button type="button" className="fh-btn fh-btn--gold" onClick={generate} disabled={!scope.trim() || generating}>
-            <Icon name="bid" size={18} />
-            {generating ? 'Crunching…' : 'Generate bid'}
-          </button>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={generate}
+            disabled={!scope.trim() || generating}
+            style={{
+              marginTop: 8,
+              padding: '12px 18px',
+              borderRadius: 12,
+              border: 'none',
+              background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+              color: 'var(--onyx)',
+              fontFamily: 'var(--font-display)',
+              fontSize: 15,
+              letterSpacing: '0.14em',
+              cursor: !scope.trim() || generating ? 'default' : 'pointer',
+              boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              opacity: !scope.trim() || generating ? 0.55 : 1
+            }}
+          >
+            <Sparkles size={16} />
+            {generating ? 'CRUNCHING…' : 'GENERATE BID'}
+          </motion.button>
           {err && <p className="fh-err">{err}</p>}
         </div>
 
@@ -136,7 +175,7 @@ export default function Bid() {
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.1, type: 'spring', stiffness: 240, damping: 22 }}
                 >
-                  {money(total.withMargin)}
+                  <CountUp to={Math.round(total.withMargin)} duration={0.9} prefix="$" formatter={formatThousands} />
                 </motion.span>
                 <span className="fh-bid__range">Raw: {money(total.low)} – {money(total.high)}</span>
               </div>
@@ -176,7 +215,7 @@ export default function Bid() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-    </section>
+      </motion.div>
+    </motion.div>
   )
 }

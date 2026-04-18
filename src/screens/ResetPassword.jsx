@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { Lock, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import Wordmark from '../components/Wordmark.jsx'
+import Aurora from '../components/fx/Aurora.jsx'
+import GridPattern from '../components/fx/GridPattern.jsx'
 
 export default function ResetPassword() {
   const { updatePassword } = useAuth()
@@ -15,13 +18,9 @@ export default function ResetPassword() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    // Supabase emits PASSWORD_RECOVERY when the reset link is opened
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || session) {
-        setReady(true)
-      }
+      if (event === 'PASSWORD_RECOVERY' || session) setReady(true)
     })
-    // Also handle the hash-based token in the URL (older style)
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) setReady(true)
     })
@@ -54,85 +53,161 @@ export default function ResetPassword() {
   }
 
   return (
-    <main className="fh-auth">
-      <div className="fh-auth__stack">
-        <div className="fh-auth__stampline">
-          <Wordmark size="3rem" tagline />
-          <span className={`fh-status-pill ${ready ? 'fh-status-pill--gold' : 'fh-status-pill--steel'}`}>
+    <div style={{ position: 'relative', minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'var(--surface-0)', color: 'var(--ink-strong)', overflow: 'hidden' }}>
+      <Aurora />
+      <GridPattern />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+        style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, letterSpacing: '0.14em', lineHeight: 1 }}>
+            <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
+            <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
+          </div>
+          <h1
+            className="fh-font-serif"
+            style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', marginTop: 28, marginBottom: 8, fontWeight: 400 }}
+          >
+            Reset your
+            <br />
+            <em className="fh-font-serif-italic fh-text-gradient-gold">password.</em>
+          </h1>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              marginTop: 12,
+              padding: '3px 10px',
+              borderRadius: 999,
+              background: ready ? 'rgba(201,150,58,0.12)' : 'rgba(255,255,255,0.05)',
+              border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)',
+              color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase'
+            }}
+          >
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }} />
             {ready ? 'Link verified' : 'Verifying'}
-          </span>
+          </div>
         </div>
 
-        <header className="fh-auth__head">
-          <span className="fh-sec-tag">
-            <span className="fh-sec-tag__label">Password reset</span>
-          </span>
-          <h1 className="fh-auth__title">Set a new password</h1>
-          <p className="fh-auth__sub">
-            {ready
-              ? 'Pick something strong. Jobsite-ready.'
-              : 'Verifying reset link…'}
-          </p>
-        </header>
-
-        {ready && (
-          <form className="fh-auth__form" onSubmit={onSubmit} noValidate>
-            <label className="fh-field">
-              <span className="fh-field__label">New password</span>
-              <input
-                className="fh-field__input"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={busy}
-              />
+        {ready ? (
+          <form
+            onSubmit={onSubmit}
+            noValidate
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              padding: 20,
+              borderRadius: 18,
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--rule)',
+              backdropFilter: 'blur(20px)'
+            }}
+          >
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>New password</span>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={busy}
+                  placeholder="••••••••"
+                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                />
+              </div>
             </label>
 
-            <label className="fh-field">
-              <span className="fh-field__label">Confirm password</span>
-              <input
-                className="fh-field__input"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={6}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                disabled={busy}
-              />
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Confirm password</span>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  disabled={busy}
+                  placeholder="••••••••"
+                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                />
+              </div>
             </label>
 
-            {error && <p className="fh-auth__error" role="alert">{error}</p>}
-            {notice && <p className="fh-auth__notice">{notice}</p>}
+            {error && (
+              <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--alert-red)', fontFamily: 'var(--font-body)' }}>{error}</p>
+            )}
+            {notice && (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--signal-green)', fontFamily: 'var(--font-body)' }}>{notice}</p>
+            )}
 
-            <button
-              className="fh-btn fh-btn--primary"
+            <motion.button
               type="submit"
               disabled={busy}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                marginTop: 6,
+                padding: '14px 18px',
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                color: 'var(--onyx)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 18,
+                letterSpacing: '0.15em',
+                border: 'none',
+                cursor: busy ? 'default' : 'pointer',
+                boxShadow: '0 8px 24px rgba(201,150,58,0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                opacity: busy ? 0.6 : 1
+              }}
             >
-              {busy ? 'Saving…' : 'Update password'}
-            </button>
+              {busy ? 'SAVING…' : (<>UPDATE PASSWORD<ArrowRight size={18} /></>)}
+            </motion.button>
           </form>
-        )}
-
-        {!ready && (
-          <p className="fh-auth__notice">
-            If nothing happens, the link may have expired. Request a new reset
-            from the sign-in page.
-          </p>
+        ) : (
+          <div
+            style={{
+              padding: 20,
+              borderRadius: 18,
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--rule)',
+              backdropFilter: 'blur(20px)',
+              fontSize: 13,
+              color: 'var(--ink-muted)',
+              fontFamily: 'var(--font-body)',
+              textAlign: 'center'
+            }}
+          >
+            If nothing happens, the link may have expired. Request a new reset from the sign-in page.
+          </div>
         )}
 
         <button
-          className="fh-auth__toggle"
           type="button"
           onClick={() => navigate('/login', { replace: true })}
+          style={{ marginTop: 12, width: '100%', background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center' }}
         >
           Back to sign in
         </button>
-      </div>
-    </main>
+      </motion.div>
+    </div>
   )
 }
