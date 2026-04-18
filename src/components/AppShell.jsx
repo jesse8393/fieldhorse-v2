@@ -50,12 +50,16 @@ export default function AppShell() {
         position="top-center"
         theme="dark"
         richColors
-        closeButton
+        expand
+        visibleToasts={3}
+        mobileOffset={{ top: '16px', left: '16px', right: '16px' }}
         toastOptions={{
           style: {
-            background: 'rgba(20,20,20,0.95)',
+            width: '100%',
+            maxWidth: 'calc(100vw - 32px)',
+            background: 'rgba(20, 20, 20, 0.95)',
             color: 'var(--ink-strong)',
-            border: '1px solid rgba(232,176,76,0.25)',
+            border: '1px solid rgba(201, 150, 58, 0.35)',
             fontFamily: 'var(--font-body)',
             backdropFilter: 'blur(30px)'
           }

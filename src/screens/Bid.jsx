@@ -4,6 +4,7 @@ import { Calculator, Sparkles } from 'lucide-react'
 import { RATE_CARD } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
+import { toastSuccess } from '../lib/toast.js'
 import CountUp from '../components/fx/CountUp.jsx'
 
 const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Return ONLY JSON.`
@@ -48,8 +49,16 @@ export default function Bid() {
       })
       const text = res?.content?.[0]?.text || ''
       const match = text.match(/\{[\s\S]*\}/)
-      if (match) setBid(JSON.parse(match[0]))
-      else setErr('AI returned no structured bid')
+      if (match) {
+        const parsedBid = JSON.parse(match[0])
+        setBid(parsedBid)
+        const low = parsedBid.total_low || parsedBid.line_items?.reduce((s, li) => s + (li.rate_low * (li.qty || 1)), 0) || 0
+        const high = parsedBid.total_high || parsedBid.line_items?.reduce((s, li) => s + (li.rate_high * (li.qty || 1)), 0) || 0
+        const withMargin = ((low + high) / 2) / (1 - marginPct / 100)
+        toastSuccess('Bid ready', money(Math.round(withMargin)))
+      } else {
+        setErr('AI returned no structured bid')
+      }
     } catch (e) {
       setErr(e.message || 'Bid generation failed')
     } finally {

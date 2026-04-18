@@ -7,6 +7,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGE_MAP, ACTIVE_STAGES, margin, marginTier } from '../lib/stages.js'
+import { toastSuccess } from '../lib/toast.js'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
 // Stage progression for the pipeline progress bar (pure visual; lost collapses to zero).
@@ -412,8 +413,8 @@ export default function Jobs() {
               primary
               onClick={() => {
                 const id = drawerContact?.id
-                closeDrawer()
                 if (id) navigate(`/jobs/${id}`)
+                closeDrawer()
               }}
             />
           </div>
@@ -433,6 +434,10 @@ export default function Jobs() {
           if (created?.id) setJustAddedId(created.id)
           await load()
           setTimeout(() => setJustAddedId(null), 1200)
+          toastSuccess(
+            'New lead added',
+            created?.name ? `${created.name} is in your pipeline` : 'In your pipeline'
+          )
         }}
       />
     </motion.div>

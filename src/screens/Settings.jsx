@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
+import { toastSuccess } from '../lib/toast.js'
 import { Switch } from '@/components/ui/switch'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Flooring', 'Landscaping', 'Excavation', 'Remodel']
@@ -55,6 +56,7 @@ export default function Settings() {
       }
       const total = Object.values(counts).reduce((a, b) => a + b, 0)
       setWipeResult(`Cleared ${total} rows across ${CLEANUP_TABLES.length} tables.`)
+      toastSuccess(`Cleared ${total} rows`, 'All test data wiped')
       setConfirmWipe(false)
     } catch (e) {
       setWipeResult(`Wipe failed: ${e.message}`)
@@ -79,6 +81,7 @@ export default function Settings() {
     refresh()
     setSaving(false)
     setSaved(true)
+    toastSuccess('Saved', 'Settings updated')
     setTimeout(() => setSaved(false), 1600)
   }
 

@@ -19,7 +19,7 @@ import {
 import {
   startQuote, approveQuote, markComplete, markLost, reopen, logPayment
 } from '../lib/pipeline.js'
-import { toast } from '../lib/toast.js'
+import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import CountUp from '../components/fx/CountUp.jsx'
 import Spotlight from '../components/fx/Spotlight.jsx'
@@ -90,7 +90,8 @@ export default function ContactDetail() {
 
   async function patch(update) {
     setContact((c) => ({ ...c, ...update }))
-    await supabase.from('fh_contacts').update(update).eq('id', id)
+    const { error } = await supabase.from('fh_contacts').update(update).eq('id', id)
+    if (!error) toastSuccess('Saved', 'Changes synced')
   }
 
   const [deleting, setDeleting] = useState(false)
@@ -101,9 +102,10 @@ export default function ContactDetail() {
     setDeleting(true)
     setDeleteErr('')
     try {
+      const deletedName = contact?.name || 'this job'
       const { error } = await supabase.from('fh_contacts').delete().eq('id', id)
       if (error) throw error
-      toast('Job deleted', { accent: 'gold', destructive: true })
+      toastSuccess('Deleted', `${deletedName} and cascading rows removed`)
       navigate('/jobs')
     } catch (e) {
       console.error('Delete contact failed:', e)
@@ -210,7 +212,7 @@ export default function ContactDetail() {
                   <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setTab('overview') }}>
                     <Pencil size={16} /> Edit
                   </button>
-                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); markLost(contact).then(fetchAll) }}>
+                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); markLost(contact).then(() => { toastInfo('Marked lost', 'Moved to lost column'); fetchAll() }) }}>
                     <XCircle size={16} /> Mark lost
                   </button>
                   <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); patch({ partner_shared: !contact.partner_shared }) }}>
@@ -234,7 +236,11 @@ export default function ContactDetail() {
 
       <StageActions
         contact={contact}
-        onAction={async (fn) => { await fn(contact); fetchAll() }}
+        onAction={async (fn) => {
+          await fn(contact)
+          fetchAll()
+          if (fn === markComplete) toastSuccess('Job complete', 'Ready to invoice')
+        }}
         onLogPayment={() => setPayModalOpen(true)}
       />
 
@@ -982,6 +988,7 @@ function PaymentModal({ contact, balance, onClose, onLogged }) {
     setSaving(true)
     await logPayment(contact, { amount, method, reference, paid_on: paidOn })
     setSaving(false)
+    toastSuccess('Payment logged', `${money(amount)} recorded`)
     onLogged()
   }
 

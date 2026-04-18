@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
+import { toastSuccess } from '../lib/toast.js'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ScanLine from '../components/fx/ScanLine.jsx'
 
@@ -65,7 +66,9 @@ export default function Compose() {
         messages: [{ role: 'user', content: `Intent: ${intent}\n${contactLine}\nExtra context: ${context || 'none'}\n\nReturn only the message text, no preamble.` }],
         maxTokens: 500
       })
-      setDraft(res?.content?.[0]?.text || '')
+      const text = res?.content?.[0]?.text || ''
+      setDraft(text)
+      if (text) toastSuccess('Draft ready', 'Copy, send, or edit')
     } catch (e) {
       setDraft(`AI unavailable. Hand-draft fallback: Hi ${contact?.name || 'there'}, quick note on ${intent.toLowerCase()}. — ${profile?.company_name || ''}`)
     } finally {

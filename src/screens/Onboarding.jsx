@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
+import { toastSuccess } from '../lib/toast.js'
 import Wordmark from '../components/Wordmark.jsx'
 import LogoUploader from '../components/LogoUploader.jsx'
 
@@ -196,6 +197,7 @@ export default function Onboarding() {
       setError(error.message || 'Could not save profile')
       return
     }
+    toastSuccess('Welcome aboard', 'Your workspace is ready')
     navigate('/', { replace: true })
   }
 

@@ -6,13 +6,16 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
+import { toastSuccess } from '../lib/toast.js'
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
 
-// Pick the primary Lucide glyph for a note based on its body + parsed signals.
+// Pick the primary Lucide glyph for a note based on its text + parsed signals.
+// Schema stores the note body in `text` (not `body`); `parsed` is session-only
+// unless migration 003_add_notes_parsed.sql has been applied.
 function iconForNote(note) {
   const p = note?.parsed
-  const body = (note?.body || '').toLowerCase()
+  const body = (note?.text || note?.body || '').toLowerCase()
   if (p?.follow_up_date) return Calendar
   if (p?.materials_needed?.length) return Package
   if (p?.action_items?.length) return ClipboardCheck
@@ -118,12 +121,16 @@ export default function Notes() {
 
   async function save() {
     if (!draft.trim()) return
+    if (!user) return
     setSaving(true)
+    // Schema (migrations/002_full_schema.sql) has `text` column; no `parsed`
+    // column exists. AI-parsed data is kept in component state until migration
+    // 003_add_notes_parsed.sql is applied (optional).
     const payload = {
       user_id: user.id,
       contact_id: contactId || null,
-      body: draft.trim(),
-      parsed: parsed || null
+      text: draft.trim(),
+      category: 'note'
     }
     const { data, error } = await supabase.from('fh_notes').insert(payload).select().single()
     setSaving(false)
@@ -132,6 +139,7 @@ export default function Notes() {
       setParsed(null)
       setContactId('')
       setNotes((n) => [data, ...n])
+      toastSuccess('Note saved', 'Synced across devices')
     }
   }
 
@@ -339,7 +347,7 @@ export default function Notes() {
                 {n.parsed?.summary && (
                   <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)' }}>{n.parsed.summary}</p>
                 )}
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', whiteSpace: 'pre-wrap' }}>{n.body}</p>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', whiteSpace: 'pre-wrap' }}>{n.text || n.body || ''}</p>
                 {n.parsed?.action_items?.length > 0 && (
                   <ul style={{ margin: '8px 0 0', paddingLeft: 16, fontSize: 12, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)' }}>
                     {n.parsed.action_items.map((it, j) => <li key={j} style={{ marginBottom: 2 }}>{it}</li>)}

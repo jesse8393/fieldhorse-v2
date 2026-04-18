@@ -5,6 +5,7 @@ import { Upload, Check, Zap, Copy, FileSpreadsheet } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { toastSuccess } from '../lib/toast.js'
 
 const PRESETS = {
   jobber: {
@@ -122,8 +123,13 @@ export default function Importer() {
     setProgress(100)
     setTimeout(() => setProgress(0), 400)
     setImporting(false)
-    setDone(error ? { err: error.message } : { count: count ?? payload.length })
-    if (!error) { setRows([]); setMapped([]) }
+    const finalCount = count ?? payload.length
+    setDone(error ? { err: error.message } : { count: finalCount })
+    if (!error) {
+      setRows([])
+      setMapped([])
+      toastSuccess(`Imported ${finalCount} contacts`, 'Now in your pipeline')
+    }
   }
 
   async function copyWebhook() {
