@@ -14,6 +14,16 @@ import { toastSuccess, toastError } from '../lib/toast.js'
  * copies the stub invite URL to clipboard so the UX can be test-driven
  * end-to-end before the backend is wired.
  */
+function friendlyInviteError(code) {
+  if (code === 'server_misconfigured') return "Server isn't set up — missing Supabase keys in Netlify env."
+  if (code === 'forbidden_or_not_found') return "Can't invite on a job that isn't yours."
+  if (code === 'db_insert_failed') return 'Database rejected the invite.'
+  if (code === 'job_lookup_failed') return "Couldn't look up the job."
+  if (code === 'invalid_email') return 'That email looks invalid.'
+  if (code === 'missing_fields') return 'Missing required fields.'
+  return `Invite failed (${code}).`
+}
+
 export default function InvitePartnerSheet({ open, onOpenChange, contactId, contactName, invitedByUserId }) {
   const [email, setEmail] = useState('')
   const [sending, setSending] = useState(false)
@@ -45,7 +55,10 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data?.error || `Invite failed (${res.status})`)
+        const code = data?.error || `http_${res.status}`
+        const friendly = friendlyInviteError(code)
+        const detail = data?.detail || data?.hint
+        throw new Error(detail ? `${friendly} — ${detail}` : friendly)
       }
       if (data?.invite_url) {
         await navigator.clipboard.writeText(data.invite_url).catch(() => {})
@@ -61,10 +74,15 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     }
   }
 
+  const boxSizing = 'border-box'
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent>
-        <DrawerHeader>
+      <DrawerContent
+        className="ui:max-w-full ui:overflow-x-hidden"
+        style={{ maxWidth: '100vw', overflowX: 'hidden' }}
+      >
+        <DrawerHeader className="ui:text-left" style={{ boxSizing, maxWidth: '100%', minWidth: 0 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
             <Users size={12} />
             Partner
@@ -79,16 +97,19 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
           >
             They'll get an email link to join <strong style={{ color: 'var(--ink-strong)' }}>{contactName || 'this job'}</strong>. They'll only see this specific job — not your other contacts, rates, or data.
           </DrawerDescription>
         </DrawerHeader>
 
-        <form onSubmit={submit} style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <form
+          onSubmit={submit}
+          style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12, boxSizing, maxWidth: '100%', minWidth: 0 }}
+        >
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, boxSizing, maxWidth: '100%' }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Partner email</span>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', boxSizing, maxWidth: '100%' }}>
               <Mail size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
               <input
                 type="email"
@@ -100,17 +121,17 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="buddy@example.com"
-                style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                style={{ width: '100%', boxSizing, padding: '12px 14px 12px 40px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
               />
             </div>
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4, boxSizing, maxWidth: '100%' }}>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
               disabled={sending}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing }}
             >
               <X size={14} />
               Cancel
@@ -134,7 +155,9 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                 letterSpacing: '0.14em',
                 cursor: sending ? 'default' : 'pointer',
                 boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
-                opacity: sending ? 0.6 : 1
+                opacity: sending ? 0.6 : 1,
+                minWidth: 0,
+                boxSizing
               }}
             >
               <Send size={14} />

@@ -64,7 +64,8 @@ export default async (request) => {
     .eq('user_id', invited_by_user_id)
     .maybeSingle()
   if (ownErr) {
-    return json({ error: 'job_lookup_failed', message: ownErr.message }, 500)
+    console.error('[partner-invite] job lookup failed', ownErr)
+    return json({ error: 'job_lookup_failed', detail: ownErr.message }, 500)
   }
   if (!ownedJob) {
     return json({ error: 'forbidden_or_not_found' }, 403)
@@ -92,7 +93,8 @@ export default async (request) => {
         .eq('partner_email', normalizedEmail)
         .maybeSingle()
       if (reErr || !existing) {
-        return json({ error: 'db_insert_failed', message: insErr.message }, 500)
+        console.error('[partner-invite] unique-violation resend lookup failed', { insErr, reErr })
+        return json({ error: 'db_insert_failed', detail: insErr.message, code: insErr.code }, 500)
       }
       return json({
         ok: true,
@@ -102,7 +104,20 @@ export default async (request) => {
         job_name: ownedJob.name || null
       })
     }
-    return json({ error: 'db_insert_failed', message: insErr.message }, 500)
+    // Surface the raw Supabase error to both Netlify logs and the client so
+    // the operator can see whether it's a missing-table (migration 004 not run)
+    // vs an RLS / schema issue.
+    console.error('[partner-invite] insert failed', insErr)
+    const missingTable = String(insErr.message || '').toLowerCase().includes('fh_job_partners')
+      && /does not exist|not.found/.test(String(insErr.message || '').toLowerCase())
+    return json({
+      error: 'db_insert_failed',
+      code: insErr.code || null,
+      detail: insErr.message || null,
+      hint: missingTable
+        ? 'Table fh_job_partners does not exist. Re-run supabase/migrations/004_partner_jobs.sql in the SQL editor.'
+        : (insErr.hint || null)
+    }, 500)
   }
 
   return json({
