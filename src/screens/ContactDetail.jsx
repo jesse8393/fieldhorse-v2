@@ -599,17 +599,17 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
       </div>
 
       {/* Partner row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
           <span
             aria-hidden="true"
             style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)' }}
           >
             <Users size={14} />
           </span>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>Partner</div>
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Share this job with someone else to co-manage</div>
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, overflowWrap: 'anywhere' }}>Share this job with someone else to co-manage</div>
           </div>
         </div>
         <motion.button
@@ -618,6 +618,7 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
           onClick={() => setInviteOpen(true)}
           style={{
             flexShrink: 0,
+            whiteSpace: 'nowrap',
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,

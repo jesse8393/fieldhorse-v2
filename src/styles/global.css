@@ -1562,10 +1562,25 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 [vaul-drawer] {
   max-width: 100dvw;
   overflow-x: hidden;
+  box-sizing: border-box;
 }
+[vaul-drawer] * { box-sizing: border-box; max-width: 100%; }
 [vaul-drawer][vaul-drawer-direction='bottom'] {
   left: 0;
   right: 0;
+}
+
+/* ContactDetail page — defensively clamp every child so the Partner card
+   and other info rows can never push past the viewport on iOS Safari,
+   regardless of what padding/flex logic the row uses internally. */
+.fh-detail {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+.fh-detail > *,
+.fh-detail .fh-tabpanel > * {
+  max-width: 100%;
 }
 
 /* Drawer root — portaled into document.body to escape any transform/stacking
