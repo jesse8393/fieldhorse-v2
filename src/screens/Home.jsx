@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Bell, MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight } from 'lucide-react'
+import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -59,9 +59,6 @@ export default function Home() {
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
   const displayName = displayNameFrom(profile, user)
   const firstName = displayName ? displayName.split(/\s+/)[0] : 'there'
-  const avatarInitials = displayName
-    ? displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
-    : emailFirstToken(user?.email).slice(0, 1) || '—'
 
   useEffect(() => {
     let cancelled = false
@@ -175,30 +172,7 @@ export default function Home() {
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* TOP BAR */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 0' }}>
-        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', padding: 2 }}>
-          <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'var(--surface-1)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', color: 'var(--field-gold-bright)', fontSize: 14, letterSpacing: '0.05em' }}>
-            {avatarInitials}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.14em' }}>
-            <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
-            <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
-          </span>
-          <span className="fh-fx-pulse-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--signal-green)', boxShadow: '0 0 0 3px rgba(45,122,79,0.2), 0 0 8px var(--signal-green)' }} />
-        </div>
-        <button
-          type="button"
-          aria-label={notesCount > 0 ? `Notifications — ${notesCount} open note${notesCount === 1 ? '' : 's'}` : 'Notifications'}
-          onClick={() => navigate('/notes')}
-          style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', display: 'grid', placeItems: 'center', position: 'relative', color: 'var(--ink-strong)', cursor: 'pointer' }}
-        >
-          <Bell size={18} />
-          {notesCount > 0 && <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: 'var(--alert-red)', boxShadow: '0 0 0 2px var(--surface-0)' }} />}
-        </button>
-      </motion.div>
+      {/* Top bar moved to shared AppHeader in AppShell (Phase 16). */}
 
       {/* HERO GREETING */}
       <motion.div variants={item} style={{ padding: '24px 20px 16px' }}>

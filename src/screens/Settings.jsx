@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon } from 'lucide-react'
-import LogoUploader from '../components/LogoUploader.jsx'
+import BrandLogoPicker from '../components/BrandLogoPicker.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -124,27 +124,22 @@ export default function Settings() {
       </motion.div>
 
       {/* BRAND */}
-      <Section variants={item} title={<>Your <em>brand.</em></>}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Display name</span>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            onBlur={saveDisplayName}
-            placeholder="First name or full name"
-            style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
-          />
-          <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>Shown on the greeting and avatar initials.</span>
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <LogoUploader
-            logoUrl={profile?.logo_url}
-            companyName={profile?.company_name}
-            onUpload={async (url) => { await upsertProfile({ logo_url: url }); refresh() }}
-            size="lg"
-          />
-          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Section variants={item} title={<>Your <em>brand.</em></>} sub="Make Fieldhorse feel like your app.">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Display name</span>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              onBlur={saveDisplayName}
+              placeholder="First name or full name"
+              style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>Shown on the greeting and avatar initials.</span>
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Company name</span>
             <input
               type="text"
@@ -154,6 +149,20 @@ export default function Settings() {
               style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
             />
           </label>
+
+          <BrandLogoPicker
+            logoUrl={profile?.logo_url}
+            companyName={profile?.company_name}
+            fullName={profile?.full_name}
+            onSaved={async (url) => {
+              await upsertProfile({ logo_url: url, logo_uploaded_at: new Date().toISOString() })
+              refresh()
+            }}
+            onRemoved={async () => {
+              await upsertProfile({ logo_url: null, logo_uploaded_at: null })
+              refresh()
+            }}
+          />
         </div>
       </Section>
 
@@ -324,13 +333,13 @@ export default function Settings() {
   )
 }
 
-function Section({ variants, title, meta, metaTone, children }) {
+function Section({ variants, title, sub, meta, metaTone, children }) {
   const metaBg = metaTone === 'red'
     ? { background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)' }
     : { background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }
   return (
     <motion.section variants={variants} style={{ padding: '0 20px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sub ? 4 : 10, gap: 10 }}>
         <h2
           className="fh-font-serif"
           style={{ margin: 0, fontSize: 20, lineHeight: 1.15, letterSpacing: '-0.01em', fontWeight: 400, color: 'var(--ink-strong)' }}
@@ -356,6 +365,11 @@ function Section({ variants, title, meta, metaTone, children }) {
           </span>
         )}
       </div>
+      {sub && (
+        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
+          {sub}
+        </p>
+      )}
       {children}
     </motion.section>
   )

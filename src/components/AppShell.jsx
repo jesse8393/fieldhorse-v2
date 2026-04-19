@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster as SonnerToaster } from 'sonner'
+import AppHeader from './AppHeader.jsx'
 import BottomNav from './BottomNav.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import Toaster from './Toaster.jsx'
@@ -26,6 +27,8 @@ export default function AppShell() {
         <span className="fh-corner fh-corner--bl" />
         <span className="fh-corner fh-corner--br" />
       </div>
+
+      <AppHeader />
 
       <AnimatePresence mode="wait">
         <motion.main
