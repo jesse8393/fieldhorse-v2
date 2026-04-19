@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, Check, Zap, Copy, FileSpreadsheet } from 'lucide-react'
+import { Upload, Check, Zap, Copy, FileSpreadsheet, ChevronDown } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -320,72 +320,87 @@ export default function Importer() {
         </AnimatePresence>
       </motion.section>
 
-      {/* WEBHOOK ENDPOINT */}
+      {/* ADVANCED INTEGRATIONS — collapsed by default so contractors aren't
+          greeted with dev-speak. Webhook endpoint + POST JSON shape live here. */}
       <motion.section variants={item} style={{ padding: '0 20px 24px' }}>
-        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-            Webhook endpoint
-          </span>
-          <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--ink-muted)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em' }}>
-            GoHighLevel · Zapier · Make
-          </span>
-        </header>
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-          POST lead JSON to this URL and it shows up in your pipeline as a new lead.
-        </p>
-        {webhookKey ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
-            <code style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {origin}/api/webhook-lead?key={webhookKey}
-            </code>
-            <button
-              type="button"
-              onClick={copyWebhook}
-              aria-label="Copy webhook URL"
-              style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: copiedWebhook ? 'var(--signal-green)' : 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-            >
-              {copiedWebhook ? <Check size={14} /> : <Copy size={14} />}
-            </button>
-          </div>
-        ) : (
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.97 }}
-            onClick={ensureWebhookKey}
+        <details style={{ borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
+          <summary
             style={{
-              padding: '10px 16px',
-              borderRadius: 12,
-              border: 'none',
-              background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-              color: 'var(--onyx)',
-              fontFamily: 'var(--font-display)',
-              fontSize: 14,
-              letterSpacing: '0.12em',
-              cursor: 'pointer',
-              boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
-              gap: 8
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              cursor: 'pointer',
+              listStyle: 'none',
+              userSelect: 'none'
             }}
           >
-            <Zap size={14} />
-            GENERATE WEBHOOK KEY
-          </motion.button>
-        )}
-        <pre
-          style={{
-            marginTop: 10,
-            padding: '12px 14px',
-            borderRadius: 12,
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid var(--rule)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-muted)',
-            lineHeight: 1.5,
-            whiteSpace: 'pre-wrap'
-          }}
-        >{`POST JSON shape:
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Zap size={14} color="var(--field-gold-bright)" />
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--ink-strong)' }}>
+                Advanced integrations
+              </span>
+            </span>
+            <ChevronDown size={16} color="var(--ink-muted)" className="fh-importer-chev" />
+          </summary>
+
+          <div style={{ padding: '4px 14px 16px', borderTop: '1px solid var(--rule)' }}>
+            <p style={{ margin: '12px 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
+              Send leads from GoHighLevel, Zapier, Make, or any tool that can POST JSON. The endpoint routes new leads straight into your pipeline.
+            </p>
+            {webhookKey ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+                <code style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {origin}/api/webhook-lead?key={webhookKey}
+                </code>
+                <button
+                  type="button"
+                  onClick={copyWebhook}
+                  aria-label="Copy webhook URL"
+                  style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: copiedWebhook ? 'var(--signal-green)' : 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                >
+                  {copiedWebhook ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+              </div>
+            ) : (
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                onClick={ensureWebhookKey}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                  color: 'var(--onyx)',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 14,
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+                <Zap size={14} />
+                GENERATE WEBHOOK KEY
+              </motion.button>
+            )}
+            <pre
+              style={{
+                marginTop: 10,
+                padding: '12px 14px',
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--rule)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                color: 'var(--ink-muted)',
+                lineHeight: 1.5,
+                whiteSpace: 'pre-wrap'
+              }}
+            >{`POST JSON shape:
 {
   "name": "Jane Homeowner",
   "phone": "555-0199",
@@ -395,6 +410,8 @@ export default function Importer() {
   "amount": 42000,
   "notes": "Heard about us from Houzz"
 }`}</pre>
+          </div>
+        </details>
       </motion.section>
     </motion.div>
   )
