@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { TrendingUp, BarChart3, DollarSign, Target, Car } from 'lucide-react'
+import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.jsx'
 import CountUp from '../components/fx/CountUp.jsx'
+import LogMilesSheet from '../components/LogMilesSheet.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGES, ACTIVE_STAGES, margin } from '../lib/stages.js'
+import { toastSuccess } from '../lib/toast.js'
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
-function fmtCurrency(n) { return money(n) }
+// Compact currency — matches Home hero pattern. Skips compaction under $1k
+// so small numbers don't render as "$900" / "$0K" weirdness.
+function fmtMoneyCompact(n) {
+  const v = Number(n || 0)
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
+  return `$${Math.round(v).toLocaleString()}`
+}
 function fmtPct(n) { return `${Math.round(n)}%` }
 function fmtInt(n) { return String(Math.round(n)) }
 
@@ -17,6 +26,7 @@ export default function Analytics() {
   const [contacts, setContacts] = useState([])
   const [mileage, setMileage] = useState([])
   const [loading, setLoading] = useState(true)
+  const [logOpen, setLogOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!user) return
@@ -100,15 +110,15 @@ export default function Analytics() {
       {!loading && contacts.length > 0 && (
         <>
           {/* KPI GRID */}
-          <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 20px 16px' }}>
-            <KPI label="Pipeline" to={stats.pipeline} format={fmtCurrency} Icon={TrendingUp} accent />
-            <KPI label="Won YTD" to={stats.wonYTD} format={fmtCurrency} Icon={DollarSign} />
-            <KPI label="Profit YTD" to={stats.profitYTD} format={fmtCurrency} Icon={DollarSign} />
+          <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 20px 16px' }}>
+            <KPI label="Pipeline" to={stats.pipeline} format={fmtMoneyCompact} Icon={TrendingUp} gold />
+            <KPI label="Won YTD" to={stats.wonYTD} format={fmtMoneyCompact} Icon={DollarSign} gold />
+            <KPI label="Profit YTD" to={stats.profitYTD} format={fmtMoneyCompact} Icon={DollarSign} gold />
             <KPI label="Avg margin" to={stats.avgMargin} format={fmtPct} Icon={Target} />
             <KPI label="Close rate" to={stats.closeRate} format={fmtPct} Icon={Target} />
             <KPI label="Active leads" to={stats.leads} format={fmtInt} Icon={TrendingUp} />
             <KPI label="Miles YTD" to={stats.milesYTD} format={fmtInt} Icon={Car} />
-            <KPI label="Mileage deduction" to={stats.mileageDeduction} format={fmtCurrency} Icon={Car} />
+            <KPI label="Mileage deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
           </motion.div>
 
           {/* PIPELINE BY STAGE */}
@@ -129,8 +139,10 @@ export default function Analytics() {
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}99` }} />
                         {s.label}
                       </span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-muted)' }}>
-                        {money(s.value)} · {s.count}
+                      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{fmtMoneyCompact(s.value)}</span>
+                        <span style={{ color: 'var(--ink-faint)' }}>·</span>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--ink-muted)' }}>{s.count}</span>
                       </span>
                     </div>
                     <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
@@ -154,16 +166,41 @@ export default function Analytics() {
 
           {/* MILEAGE LOG */}
           <motion.section variants={item} style={{ padding: '0 20px 24px' }}>
-            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
+            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Car size={13} color="var(--field-gold-bright)" />
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
                   Mileage log
                 </span>
               </div>
-              <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em' }}>
-                IRS 2026 · $0.67/mi
-              </span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 400, letterSpacing: '0.1em' }}>
+                  IRS 2026 · $0.67/mi
+                </span>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setLogOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '7px 12px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                    color: 'var(--onyx)',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 11,
+                    letterSpacing: '0.12em',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(201,150,58,0.3)'
+                  }}
+                >
+                  <Plus size={12} />
+                  LOG MILES
+                </motion.button>
+              </div>
             </header>
             {mileage.length === 0 ? (
               <div style={{ padding: '24px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
@@ -186,25 +223,43 @@ export default function Analytics() {
           </motion.section>
         </>
       )}
+
+      <LogMilesSheet
+        open={logOpen}
+        userId={user?.id}
+        onOpenChange={setLogOpen}
+        onSaved={() => { setLogOpen(false); load(); toastSuccess('Miles logged', 'Deduction updated') }}
+      />
     </motion.div>
   )
 }
 
-function KPI({ label, to, format, Icon, accent }) {
+function KPI({ label, to, format, Icon, gold }) {
   return (
     <div
       style={{
         position: 'relative',
         overflow: 'hidden',
-        padding: '12px 13px',
+        padding: '14px 14px 16px',
         borderRadius: 14,
-        background: accent ? 'linear-gradient(135deg, rgba(30,20,10,0.8), rgba(20,20,20,0.6))' : 'rgba(255,255,255,0.03)',
-        border: accent ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)'
+        background: gold ? 'linear-gradient(135deg, rgba(30,20,10,0.9), rgba(20,15,10,0.6))' : 'rgba(255,255,255,0.03)',
+        border: gold ? '1px solid rgba(201,150,58,0.35)' : '1px solid var(--rule)',
+        minHeight: 92
       }}
     >
-      {Icon && <Icon size={14} style={{ position: 'absolute', top: 10, right: 10, color: accent ? 'var(--field-gold-bright)' : 'rgba(201,150,58,0.4)' }} />}
-      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, letterSpacing: '0.02em', lineHeight: 1, marginTop: 6, color: 'var(--ink-strong)' }}>
+      {Icon && <Icon size={14} style={{ position: 'absolute', top: 12, right: 12, color: gold ? 'var(--field-gold-bright)' : 'rgba(201,150,58,0.4)' }} />}
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</div>
+      <div
+        className={gold ? 'fh-text-gradient-gold' : undefined}
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 30,
+          letterSpacing: '0.01em',
+          lineHeight: 1,
+          marginTop: 10,
+          color: gold ? undefined : 'var(--ink-strong)'
+        }}
+      >
         <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />
       </div>
     </div>
