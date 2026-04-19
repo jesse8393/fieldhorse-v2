@@ -709,8 +709,7 @@ function SubsTab({ contact, subs, userId, onChange }) {
           action="Add sub"
           onAction={() => setOpen(true)}
         />
-      )
-      }}
+      )}
       <ul className="fh-rows">
         {subs.map((s) => (
           <li key={s.id} className="fh-row">
@@ -841,8 +840,7 @@ function ExpensesTab({ contact, expenses, userId, onChange }) {
           action="Add expense"
           onAction={() => setOpen(true)}
         />
-      )
-      }}
+      )}
       <ul className="fh-rows">
         {expenses.map((e) => (
           <li key={e.id} className="fh-row">
@@ -1009,8 +1007,7 @@ function MessagesTab({ notes, contactId, userId, onChange }) {
           title="No communications logged."
           sub="Every touchpoint — call, text, onsite — captured in order below."
         />
-      )
-      }}
+      )}
       <ul className="fh-rows">
         {notes.map((n, i) => (
           <motion.li
