@@ -139,12 +139,6 @@ export default function ActionSheet({
             <div className="fh-asheet__handle" aria-hidden="true" />
             <header className="fh-asheet__head">
               <div className="fh-asheet__headMeta">
-                <span className="fh-sec-tag fh-asheet__sectag">
-                  <span className="fh-sec-tag__num">
-                    {String(currentStep).padStart(2, '0')} / {String(stepCount).padStart(2, '0')}
-                  </span>
-                  <span className="fh-sec-tag__label">{sectionLabel}</span>
-                </span>
                 <h2 className="fh-asheet__title">
                   {before}
                   {accent && <span className="fh-asheet__title-accent">{accent}</span>}
@@ -187,9 +181,6 @@ export default function ActionSheet({
                   {commitBusy ? (destructive ? 'Deleting…' : 'Committing…') : commitLabel}
                 </span>
               </button>
-              <p className="fh-asheet__hint">
-                <span>Enter</span> · to submit&nbsp;&nbsp;·&nbsp;&nbsp;<span>Esc</span> · to cancel
-              </p>
             </footer>
           </motion.div>
         </div>
@@ -204,7 +195,6 @@ export function SheetField({ label, code, children }) {
     <label className="fh-asheet-field">
       <span className="fh-asheet-field__k">
         {label}
-        {code && <span className="fh-asheet-field__code">{code}</span>}
       </span>
       {children}
     </label>
@@ -216,7 +206,6 @@ export function SheetChipRow({ label, value, options, onChange, code }) {
     <div className="fh-asheet-field">
       <span className="fh-asheet-field__k">
         {label}
-        {code && <span className="fh-asheet-field__code">{code}</span>}
       </span>
       <div className="fh-asheet-chips" role="radiogroup" aria-label={label}>
         {options.map((opt) => {
@@ -244,7 +233,6 @@ export function SheetMoneyField({ label, value, onChange, code, placeholder = '0
     <label className="fh-asheet-field">
       <span className="fh-asheet-field__k">
         {label}
-        {code && <span className="fh-asheet-field__code">{code}</span>}
       </span>
       <div className="fh-asheet-money">
         <span className="fh-asheet-money__prefix">$</span>
