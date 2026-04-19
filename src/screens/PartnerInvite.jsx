@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Users, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import Aurora from '../components/fx/Aurora.jsx'
@@ -15,14 +14,22 @@ function friendlyError(code) {
   return code
 }
 
+function isFatalError(msg) {
+  if (!msg) return false
+  const lower = msg.toLowerCase()
+  return lower.includes('invalid') || lower.includes('revoked')
+}
+
 /**
  * PartnerInvite — landing page for /partner-invite/:token
  *
- * Route is PUBLIC (see App.jsx — not wrapped in RequireAuth). Renders the
- * hero + CTA block on first paint regardless of auth / info-fetch state
- * so signed-out users always see something. When the lookup resolves the
- * inviter details get swapped in; when already-signed-in the auto-accept
- * path takes over.
+ * Hard requirements (Phase 15.3):
+ * - Route is PUBLIC (App.jsx).
+ * - Paints hero + a CTA zone on the FIRST frame, regardless of auth state,
+ *   info-fetch state, or StrictMode double-invocation. No opacity-0 wrapper,
+ *   no conditional that could hide the entire shell, no reliance on
+ *   framer-motion to animate opacity from 0.
+ * - If anything below throws, AppErrorBoundary in main.jsx catches it.
  */
 export default function PartnerInvite() {
   const { token } = useParams()
@@ -33,7 +40,10 @@ export default function PartnerInvite() {
   const [accepting, setAccepting] = useState(false)
 
   useEffect(() => {
-    if (!token) return
+    if (!token) {
+      setInfoErr(friendlyError('invite_not_found'))
+      return
+    }
     let cancelled = false
     fetch(`/api/partner-invite-info?token=${encodeURIComponent(token)}`)
       .then((r) => r.json().catch(() => ({})))
@@ -51,9 +61,13 @@ export default function PartnerInvite() {
     return () => { cancelled = true }
   }, [token])
 
-  // If already signed in, auto-accept and redirect.
   useEffect(() => {
-    if (loading || !session?.access_token || !token || accepting || infoErr) return
+    if (loading) return
+    if (!session?.access_token) return
+    if (!token) return
+    if (accepting) return
+    if (isFatalError(infoErr)) return
+    let cancelled = false
     setAccepting(true)
     fetch(`/api/partner-invite-accept`, {
       method: 'POST',
@@ -65,43 +79,54 @@ export default function PartnerInvite() {
     })
       .then((r) => r.json().catch(() => ({})))
       .then((data) => {
+        if (cancelled) return
         if (data?.job_id) navigate(`/jobs/${data.job_id}`, { replace: true })
         else setInfoErr(friendlyError(data?.error) || 'Could not accept invite')
       })
       .catch((err) => {
+        if (cancelled) return
         // eslint-disable-next-line no-console
         console.error('[partner-invite] accept failed', err)
         setInfoErr('Accept failed')
       })
-      .finally(() => setAccepting(false))
+      .finally(() => { if (!cancelled) setAccepting(false) })
+    return () => { cancelled = true }
   }, [loading, session, token, accepting, infoErr, navigate])
 
-  // Spec: company_name first, fall back to display_name (full_name), then
-  // generic label. Locked in per Phase 15.1.
   const inviterName = info?.inviter_company || info?.inviter_name || 'A contractor on Fieldhorse'
   const jobTitle = info?.job_title || 'a job'
-  const terminalError = infoErr && (
-    infoErr.includes('invalid') ||
-    infoErr.includes('revoked')
-  )
-  const showSignIn = !loading && !session && !terminalError
-  const showLinking = !!session && accepting && !terminalError
-  const showFatal = !!terminalError
+  const fatal = isFatalError(infoErr)
+  const showFatal = fatal
+  // Sign-in block shows for any non-fatal, non-accepting state where we
+  // know the user isn't signed in. Auth-loading intentionally still shows
+  // the buttons — the Sign In button goes to /login which handles the
+  // loading itself. Paint-something > paint-nothing.
+  const showSignIn = !session && !accepting && !fatal
+  const showLinking = !!session && accepting && !fatal
+  const showSoftError = !fatal && infoErr && !showSignIn && !showLinking
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'var(--surface-0)', color: 'var(--ink-strong)', overflow: 'hidden' }}>
+    <div
+      style={{
+        position: 'relative',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        background: 'var(--surface-0, #141414)',
+        color: 'var(--ink-strong, #f4f1ea)',
+        overflow: 'hidden',
+        boxSizing: 'border-box'
+      }}
+    >
       <Aurora />
       <GridPattern />
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
-        style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}
-      >
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, opacity: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, letterSpacing: '0.14em', lineHeight: 1 }}>
-            <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
-            <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
+          <div style={{ fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)', fontSize: 36, letterSpacing: '0.14em', lineHeight: 1 }}>
+            <span style={{ color: 'var(--field-gold, #c9963a)' }}>FIELD</span>
+            <span style={{ color: 'var(--ink-strong, #f4f1ea)' }}>HORSE</span>
           </div>
           <div
             style={{
@@ -113,8 +138,8 @@ export default function PartnerInvite() {
               borderRadius: 999,
               background: 'rgba(201,150,58,0.12)',
               border: '1px solid rgba(201,150,58,0.3)',
-              color: 'var(--field-gold-bright)',
-              fontFamily: 'var(--font-body)',
+              color: 'var(--field-gold-bright, #e8b04c)',
+              fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: '0.14em',
@@ -126,29 +151,29 @@ export default function PartnerInvite() {
           </div>
           <h1
             className="fh-font-serif"
-            style={{ fontSize: 'clamp(24px, 6.5vw, 32px)', lineHeight: 1.15, letterSpacing: '-0.02em', marginTop: 14, marginBottom: 6, fontWeight: 400 }}
+            style={{ fontSize: 'clamp(24px, 6.5vw, 32px)', lineHeight: 1.15, letterSpacing: '-0.02em', marginTop: 14, marginBottom: 6, fontWeight: 400, color: 'var(--ink-strong, #f4f1ea)' }}
           >
             {inviterName} invited you to{' '}
             <em className="fh-font-serif-italic fh-text-gradient-gold">co-manage.</em>
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted)', lineHeight: 1.5, fontFamily: 'var(--font-body)' }}>
-            You'll get access to <strong style={{ color: 'var(--ink-strong)' }}>{jobTitle}</strong> — notes, schedule, payments, subs, expenses. Nothing else from their account.
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted, #8a8577)', lineHeight: 1.5, fontFamily: 'var(--font-body, "DM Sans", sans-serif)' }}>
+            You'll get access to <strong style={{ color: 'var(--ink-strong, #f4f1ea)' }}>{jobTitle}</strong> — notes, schedule, payments, subs, expenses. Nothing else from their account.
           </p>
         </div>
 
-        {infoErr && !terminalError && (
+        {showFatal && (
           <div
             role="alert"
-            style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}
+            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #c0392b)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
           >
             {infoErr}
           </div>
         )}
 
-        {showFatal && (
+        {showSoftError && (
           <div
             role="alert"
-            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
+            style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #c0392b)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}
           >
             {infoErr}
           </div>
@@ -163,9 +188,14 @@ export default function PartnerInvite() {
               padding: 20,
               borderRadius: 18,
               background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--rule)'
+              border: '1px solid var(--rule, rgba(255,255,255,0.08))'
             }}
           >
+            {loading && (
+              <p style={{ margin: '0 0 4px', textAlign: 'center', fontSize: 11, color: 'var(--ink-muted, #8a8577)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                Checking session…
+              </p>
+            )}
             <Link
               to={`/login?partner_invite=${encodeURIComponent(token || '')}`}
               style={{
@@ -175,9 +205,9 @@ export default function PartnerInvite() {
                 gap: 8,
                 padding: '14px 18px',
                 borderRadius: 12,
-                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-                color: 'var(--onyx)',
-                fontFamily: 'var(--font-display)',
+                background: 'linear-gradient(135deg, var(--field-gold-bright, #e8b04c), var(--field-gold-deep, #8c6f30))',
+                color: 'var(--onyx, #141414)',
+                fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)',
                 fontSize: 16,
                 letterSpacing: '0.14em',
                 textDecoration: 'none',
@@ -197,9 +227,9 @@ export default function PartnerInvite() {
                 padding: '14px 18px',
                 borderRadius: 12,
                 background: 'rgba(255,255,255,0.04)',
-                border: '1px solid var(--rule)',
-                color: 'var(--ink-strong)',
-                fontFamily: 'var(--font-display)',
+                border: '1px solid var(--rule, rgba(255,255,255,0.08))',
+                color: 'var(--ink-strong, #f4f1ea)',
+                fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)',
                 fontSize: 14,
                 letterSpacing: '0.14em',
                 textDecoration: 'none'
@@ -211,11 +241,11 @@ export default function PartnerInvite() {
         )}
 
         {showLinking && (
-          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-muted)' }}>
+          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 13, color: 'var(--ink-muted, #8a8577)' }}>
             Linking you to the job…
           </p>
         )}
-      </motion.div>
+      </div>
     </div>
   )
 }
