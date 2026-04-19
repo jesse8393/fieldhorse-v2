@@ -62,7 +62,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
       }
       if (data?.invite_url) {
         await navigator.clipboard.writeText(data.invite_url).catch(() => {})
-        toastSuccess('Invite ready', 'Link copied. Email delivery comes online once the migration runs.')
+        toastSuccess('Invite ready', 'Link copied. Paste it into a text or email to send to your partner.')
       } else {
         toastSuccess('Invite sent', `${trimmed} will get the link shortly.`)
       }
@@ -80,7 +80,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{ maxWidth: '100vw', overflowX: 'hidden' }}
+        style={{ maxWidth: '100%', overflowX: 'hidden' }}
       >
         <DrawerHeader className="ui:text-left" style={{ boxSizing, maxWidth: '100%', minWidth: 0 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>

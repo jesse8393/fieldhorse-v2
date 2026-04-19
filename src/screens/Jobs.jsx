@@ -19,7 +19,7 @@ const TABS = [
   { id: 'all',    label: 'All',    match: () => true },
   { id: 'lead',   label: 'Lead',   match: (c) => c.stage === 'lead' },
   { id: 'quote',  label: 'Quote',  match: (c) => c.stage === 'quote' },
-  { id: 'active', label: 'Active', match: (c) => c.stage === 'job' },
+  { id: 'active', label: 'Active', match: (c) => c.stage === 'job' || c.stage === 'invoice' },
   { id: 'won',    label: 'Won',    match: (c) => c.stage === 'invoice' || c.stage === 'closed' }
 ]
 

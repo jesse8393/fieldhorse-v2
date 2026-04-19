@@ -73,7 +73,9 @@ export default function PartnerInvite() {
       .finally(() => setAccepting(false))
   }, [loading, session, token, accepting, infoErr, navigate])
 
-  const inviterName = info?.inviter_name || info?.inviter_company || 'A contractor on Fieldhorse'
+  // Spec: company_name first, fall back to display_name (full_name), then
+  // generic label. Locked in per Phase 15.1.
+  const inviterName = info?.inviter_company || info?.inviter_name || 'A contractor on Fieldhorse'
   const jobTitle = info?.job_title || 'a job'
 
   return (
