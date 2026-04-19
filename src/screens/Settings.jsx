@@ -30,6 +30,7 @@ export default function Settings() {
   const { profile, upsertProfile, refresh } = useProfile()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
   const [services, setServices] = useState(profile?.services || [])
   const [saving, setSaving] = useState(false)
@@ -67,9 +68,17 @@ export default function Settings() {
   }
 
   useEffect(() => {
+    setDisplayName(profile?.full_name || '')
     setCompanyName(profile?.company_name || '')
     setServices(profile?.services || [])
   }, [profile])
+
+  async function saveDisplayName() {
+    const next = displayName.trim()
+    if (next === (profile?.full_name || '')) return
+    await upsertProfile({ full_name: next || null })
+    refresh()
+  }
 
   function toggleService(s) {
     setServices((arr) => arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s])
@@ -116,6 +125,18 @@ export default function Settings() {
 
       {/* BRAND */}
       <Section variants={item} title={<>Your <em>brand.</em></>}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Display name</span>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            onBlur={saveDisplayName}
+            placeholder="First name or full name"
+            style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>Shown on the greeting and avatar initials.</span>
+        </label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <LogoUploader
             logoUrl={profile?.logo_url}

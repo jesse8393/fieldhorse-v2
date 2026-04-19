@@ -24,6 +24,16 @@ function initials(name) {
   if (!name) return ''
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
 }
+function emailFirstToken(email) {
+  if (!email) return ''
+  const raw = email.split('@')[0].split(/[._-]/).filter(Boolean)[0] || ''
+  return raw ? raw[0].toUpperCase() + raw.slice(1) : ''
+}
+function displayNameFrom(profile, user) {
+  const full = profile?.full_name?.trim()
+  if (full) return full
+  return emailFirstToken(user?.email)
+}
 
 export default function Home() {
   const { user } = useAuth()
@@ -47,7 +57,11 @@ export default function Home() {
   const [weeklyBooked, setWeeklyBooked] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
-  const firstName = profile?.full_name?.trim().split(/\s+/)[0] || 'there'
+  const displayName = displayNameFrom(profile, user)
+  const firstName = displayName ? displayName.split(/\s+/)[0] : 'there'
+  const avatarInitials = displayName
+    ? displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+    : emailFirstToken(user?.email).slice(0, 1) || '—'
 
   useEffect(() => {
     let cancelled = false
@@ -145,7 +159,7 @@ export default function Home() {
       <motion.div variants={item} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 0' }}>
         <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', padding: 2 }}>
           <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'var(--surface-1)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', color: 'var(--field-gold-bright)', fontSize: 14, letterSpacing: '0.05em' }}>
-            {initials(profile?.full_name)}
+            {avatarInitials}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

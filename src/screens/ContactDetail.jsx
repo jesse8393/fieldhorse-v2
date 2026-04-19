@@ -484,7 +484,7 @@ function OverviewTab({ contact, onPatch, userId }) {
     await onPatch({ [k]: form[k] ?? null })
   }
   return (
-    <div className="fh-tab-overview">
+    <div className="fh-tab-overview fh-form">
       <div className="fh-grid2">
         <Field label="Name"><input value={form.name || ''} onChange={(e) => set('name', e.target.value)} onBlur={() => save('name')} /></Field>
         <Field label="Phone"><input value={form.phone || ''} onChange={(e) => set('phone', e.target.value)} onBlur={() => save('phone')} /></Field>
