@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronLeft, MoreVertical, Pencil, XCircle, Users, UserPlus, Trash2,
+  ChevronLeft, MoreHorizontal, Pencil, XCircle, Users, UserPlus, Trash2,
   Wrench, Receipt, DollarSign, ClipboardCheck, Calendar, FileText,
-  ArrowRight, Check
+  ArrowRight, Check, Plus, X as XIcon, Save as SaveIcon
 } from 'lucide-react'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
+import AddEventSheet from '../components/AddEventSheet.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { SkeletonBlock, SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -23,6 +24,9 @@ import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu'
 import CountUp from '../components/fx/CountUp.jsx'
 import Spotlight from '../components/fx/Spotlight.jsx'
 import InvitePartnerSheet from '../components/InvitePartnerSheet.jsx'
@@ -63,9 +67,10 @@ export default function ContactDetail() {
   const [notes, setNotes] = useState([])
   const [scheduleCount, setScheduleCount] = useState(0)
 
-  const [menuOpen, setMenuOpen] = useState(false)
   const [payModalOpen, setPayModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [eventOpen, setEventOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   const fetchAll = useCallback(async () => {
     if (!user || !id) return
@@ -186,49 +191,37 @@ export default function ContactDetail() {
             )
           })()}
         </div>
-        <div className="fh-detail__tools">
-          <button
-            className="fh-iconbtn"
-            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
-            aria-label="More"
-            aria-expanded={menuOpen}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="fh-iconbtn"
+              aria-label="More actions"
+            >
+              <MoreHorizontal size={20} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="bottom"
+            align="end"
+            sideOffset={8}
+            collisionPadding={20}
+            className="ui:min-w-[180px]"
           >
-            <MoreVertical size={20} />
-          </button>
-          <AnimatePresence>
-            {menuOpen && (
-              <>
-                <div
-                  className="fh-menu-backdrop"
-                  aria-hidden="true"
-                  onClick={() => setMenuOpen(false)}
-                />
-                <motion.div
-                  className="fh-menu"
-                  role="menu"
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.14 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setTab('overview') }}>
-                    <Pencil size={16} /> Edit
-                  </button>
-                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); markLost(contact).then(() => { toastInfo('Marked lost', 'Moved to lost column'); fetchAll() }) }}>
-                    <XCircle size={16} /> Mark lost
-                  </button>
-                  <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); patch({ partner_shared: !contact.partner_shared }) }}>
-                    <Users size={16} /> {contact.partner_shared ? 'Unshare partner' : 'Share with partner'}
-                  </button>
-                  <button role="menuitem" className="is-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setDeleteOpen(true) }}>
-                    <Trash2 size={16} /> Delete
-                  </button>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        </div>
+            <DropdownMenuItem
+              onSelect={() => markLost(contact).then(() => { toastInfo('Marked lost', 'Moved to lost column'); fetchAll() })}
+            >
+              <XCircle size={14} /> Mark lost
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setDeleteOpen(true)}
+            >
+              <Trash2 size={14} /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <SummaryPanel
@@ -236,6 +229,57 @@ export default function ContactDetail() {
         paid={paid}
         balance={balance}
       />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 20px 12px' }}>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setIsEditing((v) => !v)}
+          aria-pressed={isEditing}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '11px 14px',
+            borderRadius: 12,
+            background: isEditing ? 'rgba(201,150,58,0.18)' : 'rgba(255,255,255,0.04)',
+            border: isEditing ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
+            color: isEditing ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 12,
+            letterSpacing: '0.14em',
+            cursor: 'pointer'
+          }}
+        >
+          <Pencil size={14} />
+          {isEditing ? 'EDITING' : 'EDIT'}
+        </motion.button>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setEventOpen(true)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '11px 14px',
+            borderRadius: 12,
+            border: 'none',
+            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+            color: 'var(--onyx)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 12,
+            letterSpacing: '0.14em',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(201,150,58,0.3)'
+          }}
+        >
+          <Calendar size={14} />
+          + EVENT
+        </motion.button>
+      </div>
 
       <StageActions
         contact={contact}
@@ -267,7 +311,15 @@ export default function ContactDetail() {
       </div>
 
       <div className="fh-tabpanel">
-        {tab === 'overview' && <OverviewTab contact={contact} onPatch={patch} userId={user.id} />}
+        {tab === 'overview' && (
+          <OverviewTab
+            contact={contact}
+            onPatch={patch}
+            userId={user.id}
+            isEditing={isEditing}
+            onExitEdit={() => setIsEditing(false)}
+          />
+        )}
         {tab === 'milestones' && <MilestonesTab contact={contact} onPatch={patch} />}
         {tab === 'subs' && <SubsTab contact={contact} subs={subs} userId={user.id} onChange={fetchAll} />}
         {tab === 'expenses' && <ExpensesTab contact={contact} expenses={expenses} userId={user.id} onChange={fetchAll} />}
@@ -323,6 +375,14 @@ export default function ContactDetail() {
           This cannot be undone.
         </p>
       </ActionSheet>
+
+      <AddEventSheet
+        open={eventOpen}
+        userId={user.id}
+        defaultContactId={contact.id}
+        onClose={() => setEventOpen(false)}
+        onSaved={() => { setEventOpen(false); toastSuccess('Event scheduled', 'Added to schedule') }}
+      />
     </section>
   )
 }
@@ -475,39 +535,58 @@ function StageActions({ contact, onAction, onLogPayment }) {
 // ============================================================
 // TABS
 // ============================================================
-function OverviewTab({ contact, onPatch, userId }) {
+const JOB_TYPES = [
+  'New Construction',
+  'Renovation',
+  'Concrete',
+  'Outdoor Living',
+  'Insurance',
+  'Roofing',
+  'Kitchen',
+  'Bath',
+  'Addition'
+]
+
+function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
   const [form, setForm] = useState({ ...contact })
   const [inviteOpen, setInviteOpen] = useState(false)
-  useEffect(() => setForm({ ...contact }), [contact])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { setForm({ ...contact }) }, [contact, isEditing])
+
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
-  async function save(k) {
-    if (form[k] === contact[k]) return
-    await onPatch({ [k]: form[k] ?? null })
+
+  async function commit() {
+    const EDITABLE = ['name', 'phone', 'email', 'address', 'job_title', 'job_type', 'amount', 'referred_by', 'notes']
+    const patch = {}
+    for (const k of EDITABLE) {
+      const next = form[k]
+      const prev = contact[k]
+      if ((next ?? null) !== (prev ?? null)) {
+        patch[k] = next === '' ? null : (k === 'amount' ? Number(next) || 0 : next)
+      }
+    }
+    if (Object.keys(patch).length === 0) { onExitEdit(); return }
+    setSaving(true)
+    await onPatch(patch)
+    setSaving(false)
+    onExitEdit()
   }
+
+  function cancel() {
+    setForm({ ...contact })
+    onExitEdit()
+  }
+
   return (
-    <div className="fh-tab-overview fh-form">
-      <div className="fh-grid2">
-        <Field label="Name"><input value={form.name || ''} onChange={(e) => set('name', e.target.value)} onBlur={() => save('name')} /></Field>
-        <Field label="Phone"><input value={form.phone || ''} onChange={(e) => set('phone', e.target.value)} onBlur={() => save('phone')} /></Field>
-      </div>
-      <div className="fh-grid2">
-        <Field label="Email"><input type="email" value={form.email || ''} onChange={(e) => set('email', e.target.value)} onBlur={() => save('email')} /></Field>
-        <Field label="Address"><input value={form.address || ''} onChange={(e) => set('address', e.target.value)} onBlur={() => save('address')} /></Field>
-      </div>
-      <div className="fh-grid2">
-        <Field label="Job title"><input value={form.job_title || ''} onChange={(e) => set('job_title', e.target.value)} onBlur={() => save('job_title')} /></Field>
-        <Field label="Job type"><input value={form.job_type || ''} onChange={(e) => set('job_type', e.target.value)} onBlur={() => save('job_type')} /></Field>
-      </div>
-      <div className="fh-grid2">
-        <Field label="Amount"><input type="number" value={form.amount || 0} onChange={(e) => set('amount', e.target.value)} onBlur={() => save('amount')} /></Field>
-        <Field label="Referred by"><input value={form.referred_by || ''} onChange={(e) => set('referred_by', e.target.value)} onBlur={() => save('referred_by')} /></Field>
-      </div>
-      <Field label="Notes">
-        <textarea rows={3} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} onBlur={() => save('notes')} />
-      </Field>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {isEditing
+        ? <OverviewEditForm form={form} set={set} saving={saving} onCommit={commit} onCancel={cancel} />
+        : <OverviewReadCard contact={contact} />
+      }
 
       {/* Inspections toggle — gates the Inspections tab */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>This job requires inspections</div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Enables the Inspections tab for permit-tracked trades</div>
@@ -519,8 +598,8 @@ function OverviewTab({ contact, onPatch, userId }) {
         />
       </div>
 
-      {/* Partner row — UI shell. Full wiring lands after migration 004 runs. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', marginTop: 10 }}>
+      {/* Partner row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <span
             aria-hidden="true"
@@ -566,6 +645,157 @@ function OverviewTab({ contact, onPatch, userId }) {
         contactName={contact.name || 'this job'}
         invitedByUserId={userId}
       />
+    </div>
+  )
+}
+
+function OverviewReadCard({ contact }) {
+  const rows = [
+    { label: 'Name', value: contact.name },
+    { label: 'Phone', value: contact.phone },
+    { label: 'Email', value: contact.email },
+    { label: 'Address', value: contact.address },
+    { label: 'Job title', value: contact.job_title },
+    { label: 'Job type', value: contact.job_type },
+    { label: 'Amount', value: contact.amount ? money(contact.amount) : '', isGold: !!contact.amount },
+    { label: 'Referred by', value: contact.referred_by },
+    { label: 'Notes', value: contact.notes, multiline: true }
+  ]
+  return (
+    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+      {rows.map((r, i) => (
+        <div
+          key={r.label}
+          style={{
+            display: r.multiline ? 'block' : 'grid',
+            gridTemplateColumns: r.multiline ? undefined : '110px 1fr',
+            gap: r.multiline ? 4 : 12,
+            alignItems: 'baseline',
+            padding: '12px 0',
+            borderBottom: i < rows.length - 1 ? '1px solid rgba(201,150,58,0.08)' : 'none'
+          }}
+        >
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{r.label}</span>
+          {r.value
+            ? <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: r.isGold ? 'var(--field-gold-bright)' : 'var(--ink-strong)', fontWeight: r.isGold ? 700 : 400, wordBreak: 'break-word', whiteSpace: r.multiline ? 'pre-wrap' : 'normal' }}>{r.value}</span>
+            : <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-faint)', fontStyle: 'italic' }}>Not set</span>
+          }
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function OverviewEditForm({ form, set, saving, onCommit, onCancel }) {
+  const fieldStyle = {
+    width: '100%',
+    padding: '11px 14px',
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid var(--rule)',
+    color: 'var(--ink-strong)',
+    fontFamily: 'var(--font-body)',
+    fontSize: 14,
+    outline: 'none'
+  }
+  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  return (
+    <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={labelStyle}>Name</span>
+          <input style={fieldStyle} value={form.name || ''} onChange={(e) => set('name', e.target.value)} placeholder="Contact name" />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={labelStyle}>Phone</span>
+          <input type="tel" inputMode="tel" style={fieldStyle} value={form.phone || ''} onChange={(e) => set('phone', e.target.value)} placeholder="555-1234" />
+        </label>
+      </div>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={labelStyle}>Email</span>
+        <input type="email" inputMode="email" style={fieldStyle} value={form.email || ''} onChange={(e) => set('email', e.target.value)} placeholder="name@example.com" />
+      </label>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={labelStyle}>Address</span>
+        <textarea rows={2} style={{ ...fieldStyle, resize: 'vertical' }} value={form.address || ''} onChange={(e) => set('address', e.target.value)} placeholder="Street, city, state" />
+      </label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={labelStyle}>Job title</span>
+          <input style={fieldStyle} value={form.job_title || ''} onChange={(e) => set('job_title', e.target.value)} placeholder="Kitchen remodel" />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={labelStyle}>Job type</span>
+          <select style={fieldStyle} value={form.job_type || ''} onChange={(e) => set('job_type', e.target.value)}>
+            <option value="">Select…</option>
+            {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={labelStyle}>Amount</span>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14, pointerEvents: 'none' }}>$</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              style={{ ...fieldStyle, paddingLeft: 28 }}
+              value={form.amount ?? ''}
+              onChange={(e) => set('amount', e.target.value)}
+              placeholder="0"
+            />
+          </div>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={labelStyle}>Referred by</span>
+          <input style={fieldStyle} value={form.referred_by || ''} onChange={(e) => set('referred_by', e.target.value)} placeholder="Source" />
+        </label>
+      </div>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={labelStyle}>Notes</span>
+        <textarea rows={4} style={{ ...fieldStyle, resize: 'vertical' }} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} placeholder="Anything worth remembering…" />
+      </label>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+        >
+          <XIcon size={14} />
+          Cancel
+        </button>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={onCommit}
+          disabled={saving}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '12px 14px',
+            borderRadius: 12,
+            border: 'none',
+            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+            color: 'var(--onyx)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 14,
+            letterSpacing: '0.14em',
+            cursor: saving ? 'default' : 'pointer',
+            boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
+            opacity: saving ? 0.6 : 1
+          }}
+        >
+          <SaveIcon size={14} />
+          {saving ? 'SAVING…' : 'SAVE'}
+        </motion.button>
+      </div>
     </div>
   )
 }
