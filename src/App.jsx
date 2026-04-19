@@ -6,6 +6,7 @@ import Home from './screens/Home.jsx'
 import Login from './screens/Login.jsx'
 import ResetPassword from './screens/ResetPassword.jsx'
 import Onboarding from './screens/Onboarding.jsx'
+import PartnerInvite from './screens/PartnerInvite.jsx'
 import Jobs from './screens/Jobs.jsx'
 import ContactDetail from './screens/ContactDetail.jsx'
 import Notes from './screens/Notes.jsx'
@@ -43,6 +44,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/partner-invite/:token" element={<PartnerInvite />} />
       <Route
         path="/onboarding"
         element={

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronLeft, MoreVertical, Pencil, XCircle, Users, Trash2,
+  ChevronLeft, MoreVertical, Pencil, XCircle, Users, UserPlus, Trash2,
   Wrench, Receipt, DollarSign, ClipboardCheck, Calendar, FileText,
   ArrowRight, Check
 } from 'lucide-react'
@@ -21,8 +21,10 @@ import {
 } from '../lib/pipeline.js'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
 import CountUp from '../components/fx/CountUp.jsx'
 import Spotlight from '../components/fx/Spotlight.jsx'
+import InvitePartnerSheet from '../components/InvitePartnerSheet.jsx'
 
 const TABS = [
   { id: 'overview',  label: 'Overview' },
@@ -264,7 +266,7 @@ export default function ContactDetail() {
       </div>
 
       <div className="fh-tabpanel">
-        {tab === 'overview' && <OverviewTab contact={contact} onPatch={patch} />}
+        {tab === 'overview' && <OverviewTab contact={contact} onPatch={patch} userId={user.id} />}
         {tab === 'milestones' && <MilestonesTab contact={contact} onPatch={patch} />}
         {tab === 'subs' && <SubsTab contact={contact} subs={subs} userId={user.id} onChange={fetchAll} />}
         {tab === 'expenses' && <ExpensesTab contact={contact} expenses={expenses} userId={user.id} onChange={fetchAll} />}
@@ -472,8 +474,9 @@ function StageActions({ contact, onAction, onLogPayment }) {
 // ============================================================
 // TABS
 // ============================================================
-function OverviewTab({ contact, onPatch }) {
+function OverviewTab({ contact, onPatch, userId }) {
   const [form, setForm] = useState({ ...contact })
+  const [inviteOpen, setInviteOpen] = useState(false)
   useEffect(() => setForm({ ...contact }), [contact])
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
   async function save(k) {
@@ -501,10 +504,66 @@ function OverviewTab({ contact, onPatch }) {
       <Field label="Notes">
         <textarea rows={3} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} onBlur={() => save('notes')} />
       </Field>
-      <Toggle
-        on={!!contact.has_inspections}
-        label="This job requires inspections"
-        onChange={(v) => onPatch({ has_inspections: v })}
+
+      {/* Inspections toggle — gates the Inspections tab */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', marginTop: 12 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>This job requires inspections</div>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Enables the Inspections tab for permit-tracked trades</div>
+        </div>
+        <Switch
+          checked={!!contact.has_inspections}
+          onCheckedChange={(v) => onPatch({ has_inspections: v })}
+          aria-label="Toggle inspections tab"
+        />
+      </div>
+
+      {/* Partner row — UI shell. Full wiring lands after migration 004 runs. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', marginTop: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <span
+            aria-hidden="true"
+            style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)' }}
+          >
+            <Users size={14} />
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>Partner</div>
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Share this job with someone else to co-manage</div>
+          </div>
+        </div>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setInviteOpen(true)}
+          style={{
+            flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 12px',
+            borderRadius: 10,
+            border: 'none',
+            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+            color: 'var(--onyx)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 11,
+            letterSpacing: '0.12em',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(201,150,58,0.3)'
+          }}
+        >
+          <UserPlus size={12} />
+          INVITE
+        </motion.button>
+      </div>
+
+      <InvitePartnerSheet
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        contactId={contact.id}
+        contactName={contact.name || 'this job'}
+        invitedByUserId={userId}
       />
     </div>
   )

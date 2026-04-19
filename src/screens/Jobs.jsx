@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, MessageSquare, Mail, Phone, ExternalLink } from 'lucide-react'
+import { Plus, Search, MessageSquare, Mail, Phone, ExternalLink, Users as UsersIcon } from 'lucide-react'
 import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -276,6 +276,10 @@ export default function Jobs() {
             const progressPct = (step / TOTAL_STAGES) * 100
             const m = margin(c)
             const hasCost = Number(c.cost || 0) > 0
+            // Shared-in job: row's user_id doesn't match the viewer — means
+            // they're seeing it via fh_job_partners RLS. Latent until
+            // migration 004 runs; always false today.
+            const isSharedIn = !!user?.id && !!c.user_id && c.user_id !== user.id
             return (
               <motion.button
                 key={c.id}
@@ -350,6 +354,15 @@ export default function Jobs() {
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: `${stageColor}22`, border: `1px solid ${stageColor}44`, color: stageColor, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                       <span style={{ width: 5, height: 5, borderRadius: '50%', background: stageColor }} />
                       {stageMeta.label}
+                    </span>
+                  )}
+                  {isSharedIn && (
+                    <span
+                      title="Shared with you"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                    >
+                      <UsersIcon size={10} />
+                      Shared
                     </span>
                   )}
                   <MarginPill pct={m} hasCost={hasCost} />
