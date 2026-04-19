@@ -10,7 +10,7 @@ import { useTheme } from '../contexts/ThemeContext.jsx'
 import { toastSuccess } from '../lib/toast.js'
 import { Switch } from '@/components/ui/switch'
 
-const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Flooring', 'Landscaping', 'Excavation', 'Remodel']
+const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
 
 const CLEANUP_TABLES = [
   'fh_payments',

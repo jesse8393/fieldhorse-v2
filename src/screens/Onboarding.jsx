@@ -24,33 +24,9 @@ const SERVICES = [
     )
   },
   {
-    key: 'roofing',
-    label: 'Roofing',
-    code: '02·ROOF',
-    glyph: (
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M3 18 L16 6 L29 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M6 18 L6 26 L26 26 L26 18" fill="none" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M14 26 L14 20 L18 20 L18 26" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      </svg>
-    )
-  },
-  {
-    key: 'paint',
-    label: 'Paint',
-    code: '03·PNT',
-    glyph: (
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M20 4 L26 10 L14 22 L8 22 L8 16 Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M8 22 L5 28" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        <path d="M14 22 L11 28" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    )
-  },
-  {
     key: 'framing',
     label: 'Framing',
-    code: '04·FRM',
+    code: '02·FRM',
     glyph: (
       <svg viewBox="0 0 32 32" aria-hidden="true">
         <rect x="5" y="5" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" />
@@ -62,23 +38,21 @@ const SERVICES = [
     )
   },
   {
-    key: 'gc',
-    label: 'General Contracting',
-    code: '05·GC',
+    key: 'roofing',
+    label: 'Roofing',
+    code: '03·ROOF',
     glyph: (
       <svg viewBox="0 0 32 32" aria-hidden="true">
-        <rect x="7" y="5" width="18" height="22" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-        <rect x="12" y="3" width="8" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
-        <line x1="11" y1="13" x2="21" y2="13" stroke="currentColor" strokeWidth="1.4" />
-        <line x1="11" y1="17" x2="21" y2="17" stroke="currentColor" strokeWidth="1.4" />
-        <line x1="11" y1="21" x2="17" y2="21" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M3 18 L16 6 L29 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M6 18 L6 26 L26 26 L26 18" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M14 26 L14 20 L18 20 L18 26" fill="none" stroke="currentColor" strokeWidth="1.4" />
       </svg>
     )
   },
   {
     key: 'electrical',
     label: 'Electrical',
-    code: '06·ELEC',
+    code: '04·ELEC',
     glyph: (
       <svg viewBox="0 0 32 32" aria-hidden="true">
         <path d="M18 3 L8 18 L15 18 L13 29 L24 13 L17 13 Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
@@ -88,7 +62,7 @@ const SERVICES = [
   {
     key: 'plumbing',
     label: 'Plumbing',
-    code: '07·PLMB',
+    code: '05·PLMB',
     glyph: (
       <svg viewBox="0 0 32 32" aria-hidden="true">
         <path d="M4 10 L14 10 Q18 10 18 14 L18 22 Q18 26 22 26 L28 26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -98,41 +72,92 @@ const SERVICES = [
     )
   },
   {
-    key: 'fencing',
-    label: 'Fencing',
-    code: '08·FENC',
+    key: 'hvac',
+    label: 'HVAC',
+    code: '06·HVAC',
     glyph: (
       <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M6 12 L6 26 L10 26 L10 12 L8 9 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M14 12 L14 26 L18 26 L18 12 L16 9 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M22 12 L22 26 L26 26 L26 12 L24 9 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <line x1="4" y1="16" x2="28" y2="16" stroke="currentColor" strokeWidth="1.4" />
-        <line x1="4" y1="22" x2="28" y2="22" stroke="currentColor" strokeWidth="1.4" />
+        <rect x="5" y="7" width="22" height="18" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <line x1="8" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="8" y1="16" x2="24" y2="16" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="8" y1="20" x2="24" y2="20" stroke="currentColor" strokeWidth="1.3" />
       </svg>
     )
   },
   {
-    key: 'outdoor',
-    label: 'Outdoor Living',
-    code: '09·OUT',
+    key: 'drywall',
+    label: 'Drywall',
+    code: '07·DRY',
     glyph: (
       <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M16 6 L16 22" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        <path d="M16 10 Q8 10 6 18 Q12 14 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M16 10 Q24 10 26 18 Q20 14 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <line x1="4" y1="26" x2="28" y2="26" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <rect x="5" y="5" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <line x1="16" y1="5" x2="16" y2="27" stroke="currentColor" strokeWidth="1.3" strokeDasharray="2,2" />
+        <path d="M 20 13 L 22 15 L 20 17" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 12 13 L 10 15 L 12 17" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   },
   {
-    key: 'demo',
-    label: 'Demolition',
-    code: '10·DEMO',
+    key: 'paint',
+    label: 'Paint',
+    code: '08·PNT',
     glyph: (
       <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M5 27 L16 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        <rect x="14" y="10" width="12" height="8" rx="1" transform="rotate(-20 20 14)" fill="none" stroke="currentColor" strokeWidth="1.6" />
-        <line x1="18" y1="8" x2="26" y2="5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M20 4 L26 10 L14 22 L8 22 L8 16 Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M8 22 L5 28" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M14 22 L11 28" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    )
+  },
+  {
+    key: 'tile',
+    label: 'Tile',
+    code: '09·TILE',
+    glyph: (
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="5" y="5" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <line x1="12.3" y1="5" x2="12.3" y2="27" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="19.6" y1="5" x2="19.6" y2="27" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="5" y1="12.3" x2="27" y2="12.3" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="5" y1="19.6" x2="27" y2="19.6" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    )
+  },
+  {
+    key: 'landscaping',
+    label: 'Landscaping',
+    code: '10·LAND',
+    glyph: (
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 4 L10 13 L13 13 L8 21 L14 21 L13 25 L19 25 L18 21 L24 21 L19 13 L22 13 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <line x1="16" y1="25" x2="16" y2="28" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <line x1="4" y1="28" x2="28" y2="28" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    )
+  },
+  {
+    key: 'excavation',
+    label: 'Excavation',
+    code: '11·EXCA',
+    glyph: (
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M4 22 L10 22 L10 17 L17 17 L17 22 L28 22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="19" y="10" width="6" height="5" rx="0.5" transform="rotate(-15 22 12.5)" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <line x1="17" y1="17" x2="20" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <circle cx="12" cy="25" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <circle cx="22" cy="25" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    )
+  },
+  {
+    key: 'insulation',
+    label: 'Insulation',
+    code: '12·INSL',
+    glyph: (
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M4 10 Q8 6 12 10 T 20 10 T 28 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M4 16 Q8 12 12 16 T 20 16 T 28 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M4 22 Q8 18 12 22 T 20 22 T 28 22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
     )
   }

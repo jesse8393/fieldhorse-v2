@@ -404,7 +404,7 @@ function AddEventSheet({ open, userId, onClose, onSaved }) {
   return (
     <ActionSheet
       open={open}
-      title="New event on the board."
+      title="New event."
       accentWord="event"
       sectionLabel="New event"
       stepCount={3}
