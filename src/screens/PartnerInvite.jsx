@@ -36,26 +36,38 @@ export default function PartnerInvite() {
       .then((r) => r.json().catch(() => ({})))
       .then((data) => {
         if (cancelled) return
-        if (data?.error) setInfoErr(data.error)
+        if (data?.error) setInfoErr(friendlyError(data.error))
         else setInfo(data || {})
       })
       .catch(() => { if (!cancelled) setInfoErr('Invite lookup failed') })
     return () => { cancelled = true }
   }, [token])
 
+  function friendlyError(code) {
+    if (!code) return ''
+    if (code === 'invite_not_found') return 'This invite link is invalid or was removed.'
+    if (code === 'invite_revoked') return 'This invite was revoked by the sender.'
+    if (code === 'email_mismatch') return 'Sign in with the email this invite was sent to.'
+    if (code === 'not_authenticated' || code === 'invalid_token') return 'Please sign in to accept this invite.'
+    return code
+  }
+
   // If already signed in, auto-accept and redirect.
   useEffect(() => {
-    if (loading || !session || !token || accepting || infoErr) return
+    if (loading || !session?.access_token || !token || accepting || infoErr) return
     setAccepting(true)
     fetch(`/api/partner-invite-accept`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, user_id: session.user?.id })
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ token })
     })
       .then((r) => r.json().catch(() => ({})))
       .then((data) => {
         if (data?.job_id) navigate(`/jobs/${data.job_id}`, { replace: true })
-        else setInfoErr(data?.error || 'Could not accept invite')
+        else setInfoErr(friendlyError(data?.error) || 'Could not accept invite')
       })
       .catch(() => setInfoErr('Accept failed'))
       .finally(() => setAccepting(false))
