@@ -89,9 +89,9 @@ export default function Home() {
         .eq('user_id', user.id)
       if (cancelled) return
       const rows = contacts || []
-      // Include 'invoice' — the crew is still on site until the check clears,
-      // and the UX-visible "N crews on site" / Today on site should reflect it.
-      const active = rows.filter((c) => ['quote', 'job', 'invoice'].includes(c.stage))
+      // "N crews on site" should only count approved work — quotes aren't a
+      // crew on site yet. Job + invoice (check hasn't cleared) = active work.
+      const active = rows.filter((c) => ['job', 'invoice'].includes(c.stage))
       const totalPipeline = rows
         .filter((c) => c.stage !== 'closed' && c.stage !== 'lost')
         .reduce((s, c) => s + Number(c.amount || 0), 0)
