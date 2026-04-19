@@ -19,7 +19,11 @@ const TABS = [
   { id: 'all',    label: 'All',    match: () => true },
   { id: 'lead',   label: 'Lead',   match: (c) => c.stage === 'lead' },
   { id: 'quote',  label: 'Quote',  match: (c) => c.stage === 'quote' },
-  { id: 'active', label: 'Active', match: (c) => c.stage === 'job' || c.stage === 'invoice' },
+  // Jobs page "Active" is a pipeline-depth filter (job-stage only).
+  // The Home "Crews on site" KPI intentionally differs — it counts
+  // job-stage contacts with a scheduled fh_schedule entry in the next
+  // 7 days. Different purposes, different numbers by design.
+  { id: 'active', label: 'Active', match: (c) => c.stage === 'job' },
   { id: 'won',    label: 'Won',    match: (c) => c.stage === 'invoice' || c.stage === 'closed' }
 ]
 

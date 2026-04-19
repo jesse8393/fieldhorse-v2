@@ -83,15 +83,35 @@ export default function Home() {
     if (!user) return
     let cancelled = false
     async function load() {
-      const { data: contacts } = await supabase
-        .from('fh_contacts')
-        .select('id, name, amount, stage, job_title, job_type')
-        .eq('user_id', user.id)
+      // "Crews on site" = job-stage contacts with at least one fh_schedule
+      // entry in the next 7 days. Open jobs without any scheduled work
+      // don't count — makes the KPI a real operational signal, not a
+      // pipeline-depth metric.
+      const now = new Date()
+      const windowStart = new Date(now); windowStart.setHours(0, 0, 0, 0)
+      const windowEnd = new Date(windowStart); windowEnd.setDate(windowEnd.getDate() + 7)
+
+      const [{ data: contacts }, { data: upcomingSchedule }] = await Promise.all([
+        supabase
+          .from('fh_contacts')
+          .select('id, name, amount, stage, job_title, job_type')
+          .eq('user_id', user.id),
+        supabase
+          .from('fh_schedule')
+          .select('contact_id, start_at')
+          .eq('user_id', user.id)
+          .gte('start_at', windowStart.toISOString())
+          .lte('start_at', windowEnd.toISOString())
+      ])
+
       if (cancelled) return
       const rows = contacts || []
-      // "N crews on site" should only count approved work — quotes aren't a
-      // crew on site yet. Job + invoice (check hasn't cleared) = active work.
-      const active = rows.filter((c) => ['job', 'invoice'].includes(c.stage))
+      const scheduledContactIds = new Set(
+        (upcomingSchedule || []).map((s) => s.contact_id).filter(Boolean)
+      )
+      const crewsOnSite = rows.filter(
+        (c) => c.stage === 'job' && scheduledContactIds.has(c.id)
+      )
       const totalPipeline = rows
         .filter((c) => c.stage !== 'closed' && c.stage !== 'lost')
         .reduce((s, c) => s + Number(c.amount || 0), 0)
@@ -99,9 +119,9 @@ export default function Home() {
         .filter((c) => c.stage === 'invoice' || c.stage === 'closed')
         .reduce((s, c) => s + Number(c.amount || 0), 0)
       setPipeline(totalPipeline)
-      setActiveCount(active.length)
+      setActiveCount(crewsOnSite.length)
       setWeeklyBooked(booked)
-      setTodayJobs(active.slice(0, 3))
+      setTodayJobs(crewsOnSite.slice(0, 3))
       const { count } = await supabase
         .from('fh_notes')
         .select('id', { count: 'exact', head: true })
@@ -289,7 +309,7 @@ export default function Home() {
       <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 20px 20px' }}>
         {[
           { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp },
-          { label: 'Active', value: activeCount, format: (n) => String(n).padStart(2, '0'), icon: Briefcase },
+          { label: 'Crews on site', value: activeCount, format: (n) => String(n).padStart(2, '0'), icon: Briefcase },
           { label: 'Notes', value: notesCount, format: (n) => String(n).padStart(2, '0'), icon: FileText }
         ].map((kpi) => {
           const I = kpi.icon
