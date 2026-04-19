@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { Plus, Search, MessageSquare, Mail, Phone, ExternalLink, Users as UsersIcon } from 'lucide-react'
 import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -268,126 +268,16 @@ export default function Jobs() {
           />
         )}
         <AnimatePresence>
-          {filtered.map((c, i) => {
-            const isNew = c.id === justAddedId
-            const stageMeta = STAGE_MAP[c.stage]
-            const stageColor = stageMeta?.color || 'var(--steel)'
-            const step = STAGE_STEP[c.stage] ?? 0
-            const progressPct = (step / TOTAL_STAGES) * 100
-            const m = margin(c)
-            const hasCost = Number(c.cost || 0) > 0
-            // Shared-in job: row's user_id doesn't match the viewer — means
-            // they're seeing it via fh_job_partners RLS. Latent until
-            // migration 004 runs; always false today.
-            const isSharedIn = !!user?.id && !!c.user_id && c.user_id !== user.id
-            return (
-              <motion.button
-                key={c.id}
-                type="button"
-                layout
-                onClick={() => openDrawer(c)}
-                initial={isNew ? { opacity: 0, scale: 0.9 } : { opacity: 0, y: 10 }}
-                animate={isNew ? { opacity: 1, scale: [0.9, 1.02, 1] } : { opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={isNew
-                  ? { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
-                  : { duration: 0.22, delay: Math.min(i * 0.04, 0.25), ease: [0.2, 0.8, 0.2, 1] }
-                }
-                whileTap={{ scale: 0.99 }}
-                style={{
-                  position: 'relative',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                  padding: '14px 14px 12px',
-                  borderRadius: 16,
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
-                  border: '1px solid var(--rule)',
-                  backdropFilter: 'blur(20px)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  color: 'var(--ink-strong)'
-                }}
-              >
-                {/* Accent spine */}
-                <span style={{ position: 'absolute', left: 0, top: 14, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: stageColor, boxShadow: `0 0 10px ${stageColor}66` }} />
-
-                {/* Top row: avatar + name + amount */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 11,
-                      display: 'grid',
-                      placeItems: 'center',
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 15,
-                      letterSpacing: '0.04em',
-                      background: `linear-gradient(135deg, ${stageColor}33, ${stageColor}11)`,
-                      color: stageColor,
-                      border: `1px solid ${stageColor}33`
-                    }}
-                  >
-                    {initials(c.name) || '—'}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.name || 'Untitled'}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.job_title || c.job_type || 'No job title'}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--field-gold-bright)' }}>
-                      {money(c.amount)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom row: stage badge + margin pill + stages count */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  {stageMeta && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: `${stageColor}22`, border: `1px solid ${stageColor}44`, color: stageColor, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: stageColor }} />
-                      {stageMeta.label}
-                    </span>
-                  )}
-                  {isSharedIn && (
-                    <span
-                      title="Shared with you"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
-                    >
-                      <UsersIcon size={10} />
-                      Shared
-                    </span>
-                  )}
-                  <MarginPill pct={m} hasCost={hasCost} />
-                  <span style={{ fontSize: 10, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
-                    {step}/{TOTAL_STAGES} stages
-                  </span>
-                </div>
-
-                {/* Progress bar */}
-                <div style={{ position: 'relative', height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                  <span
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      width: `${progressPct}%`,
-                      background: `linear-gradient(90deg, ${stageColor}, ${stageColor}cc)`,
-                      boxShadow: `0 0 8px ${stageColor}99`,
-                      borderRadius: 999,
-                      transition: 'width 240ms ease'
-                    }}
-                  />
-                </div>
-              </motion.button>
-            )
-          })}
+          {filtered.map((c, i) => (
+            <JobCard
+              key={c.id}
+              contact={c}
+              index={i}
+              isNew={c.id === justAddedId}
+              viewerUserId={user?.id}
+              onOpen={openDrawer}
+            />
+          ))}
         </AnimatePresence>
       </motion.div>
 
@@ -454,6 +344,156 @@ export default function Jobs() {
         }}
       />
     </motion.div>
+  )
+}
+
+// Cache the hover-capability check across cards — matchMedia is cheap but
+// running it 30 times per render (once per card) is wasteful.
+const SUPPORTS_HOVER = typeof window !== 'undefined'
+  && typeof window.matchMedia === 'function'
+  && window.matchMedia('(hover: hover)').matches
+
+function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
+  const stageMeta = STAGE_MAP[contact.stage]
+  const stageColor = stageMeta?.color || 'var(--steel)'
+  const step = STAGE_STEP[contact.stage] ?? 0
+  const progressPct = (step / TOTAL_STAGES) * 100
+  const m = margin(contact)
+  const hasCost = Number(contact.cost || 0) > 0
+  // Shared-in job: row's user_id doesn't match the viewer — via fh_job_partners
+  // RLS (latent until migration 004 runs; always false today).
+  const isSharedIn = !!viewerUserId && !!contact.user_id && contact.user_id !== viewerUserId
+
+  // 3D tilt — desktop/mouse only. Motion values are created regardless so
+  // hook order stays stable; they just never receive non-zero input on touch.
+  const mx = useMotionValue(0)
+  const my = useMotionValue(0)
+  const springX = useSpring(mx, { stiffness: 260, damping: 26 })
+  const springY = useSpring(my, { stiffness: 260, damping: 26 })
+  const rotateY = useTransform(springX, [-80, 80], [-6, 6])
+  const rotateX = useTransform(springY, [-80, 80], [5, -5])
+
+  function handleMouseMove(e) {
+    if (!SUPPORTS_HOVER) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    mx.set(e.clientX - (rect.left + rect.width / 2))
+    my.set(e.clientY - (rect.top + rect.height / 2))
+  }
+  function handleMouseLeave() {
+    mx.set(0)
+    my.set(0)
+  }
+
+  return (
+    <motion.button
+      type="button"
+      layout
+      onClick={() => onOpen(contact)}
+      onMouseMove={SUPPORTS_HOVER ? handleMouseMove : undefined}
+      onMouseLeave={SUPPORTS_HOVER ? handleMouseLeave : undefined}
+      initial={isNew ? { opacity: 0, scale: 0.9 } : { opacity: 0, y: 10 }}
+      animate={isNew ? { opacity: 1, scale: [0.9, 1.02, 1] } : { opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={isNew
+        ? { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
+        : { duration: 0.22, delay: Math.min(index * 0.04, 0.25), ease: [0.2, 0.8, 0.2, 1] }
+      }
+      whileTap={{ scale: 0.99 }}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        padding: '14px 14px 12px',
+        borderRadius: 16,
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+        border: '1px solid var(--rule)',
+        backdropFilter: 'blur(20px)',
+        cursor: 'pointer',
+        textAlign: 'left',
+        color: 'var(--ink-strong)',
+        transformPerspective: SUPPORTS_HOVER ? 1000 : undefined,
+        rotateX: SUPPORTS_HOVER ? rotateX : 0,
+        rotateY: SUPPORTS_HOVER ? rotateY : 0
+      }}
+    >
+      {/* Accent spine */}
+      <span style={{ position: 'absolute', left: 0, top: 14, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: stageColor, boxShadow: `0 0 10px ${stageColor}66` }} />
+
+      {/* Top row: avatar + name + amount */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          aria-hidden="true"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 11,
+            display: 'grid',
+            placeItems: 'center',
+            fontFamily: 'var(--font-display)',
+            fontSize: 15,
+            letterSpacing: '0.04em',
+            background: `linear-gradient(135deg, ${stageColor}33, ${stageColor}11)`,
+            color: stageColor,
+            border: `1px solid ${stageColor}33`
+          }}
+        >
+          {initials(contact.name) || '—'}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {contact.name || 'Untitled'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {contact.job_title || contact.job_type || 'No job title'}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--field-gold-bright)' }}>
+            {money(contact.amount)}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom row: stage badge + margin pill + stages count */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {stageMeta && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: `${stageColor}22`, border: `1px solid ${stageColor}44`, color: stageColor, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: stageColor }} />
+            {stageMeta.label}
+          </span>
+        )}
+        {isSharedIn && (
+          <span
+            title="Shared with you"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+          >
+            <UsersIcon size={10} />
+            Shared
+          </span>
+        )}
+        <MarginPill pct={m} hasCost={hasCost} />
+        <span style={{ fontSize: 10, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
+          {step}/{TOTAL_STAGES} stages
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ position: 'relative', height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: `${progressPct}%`,
+            background: `linear-gradient(90deg, ${stageColor}, ${stageColor}cc)`,
+            boxShadow: `0 0 8px ${stageColor}99`,
+            borderRadius: 999,
+            transition: 'width 240ms ease'
+          }}
+        />
+      </div>
+    </motion.button>
   )
 }
 

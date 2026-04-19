@@ -209,7 +209,19 @@ export default function Home() {
 
       {/* WEEKLY TARGET CARD */}
       <motion.div variants={item} style={{ position: 'relative', margin: '0 20px 14px', padding: '18px 20px', borderRadius: 22, background: 'linear-gradient(135deg, rgba(30,20,10,0.8), rgba(20,20,20,0.6))', border: '1px solid rgba(201,150,58,0.2)', backdropFilter: 'blur(20px)', overflow: 'hidden' }}>
+        {/* Outer pulse — 200x200 (default), phase 0 */}
         <Spotlight style={{ top: -80, right: -80 }} />
+        {/* Inner pulse — smaller, more gold-saturated, behind the $ amount, 1.5s out of phase */}
+        <Spotlight
+          style={{
+            bottom: -20,
+            left: -20,
+            width: 120,
+            height: 120,
+            background: 'radial-gradient(circle, rgba(232,176,76,0.55), transparent 55%)',
+            animationDelay: '-1.5s'
+          }}
+        />
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10, position: 'relative' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Weekly target</div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: 'var(--signal-green)', background: 'rgba(45,122,79,0.12)', border: '1px solid rgba(45,122,79,0.25)', padding: '3px 10px', borderRadius: 999 }}>

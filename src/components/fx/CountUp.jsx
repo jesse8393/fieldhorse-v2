@@ -1,17 +1,21 @@
-import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
+import { motion, useSpring, useTransform } from 'framer-motion'
 import { useEffect } from 'react'
 
-export default function CountUp({ to = 0, duration = 1.2, prefix = '', suffix = '', formatter }) {
-  const count = useMotionValue(0)
+// Spring-driven count-up. Stiffness 120 / damping 20 gives a subtle bouncy
+// arrival — the number overshoots the target by a hair then settles. Tuned
+// to feel "premium" without overshooting wildly enough to ship wrong values
+// mid-animation. The `duration` prop (legacy from the tween-based version)
+// is accepted and ignored — spring physics use stiffness/damping instead.
+export default function CountUp({ to = 0, duration, prefix = '', suffix = '', formatter }) {
+  const count = useSpring(0, { stiffness: 120, damping: 20 })
   const rounded = useTransform(count, (v) => {
     const n = Math.round(v)
     if (formatter) return formatter(n)
     return n.toLocaleString()
   })
   useEffect(() => {
-    const controls = animate(count, to, { duration, ease: [0.32, 0.72, 0, 1] })
-    return controls.stop
-  }, [to, duration])
+    count.set(to)
+  }, [to, count])
   return (
     <motion.span>
       {prefix}

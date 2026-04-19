@@ -62,9 +62,17 @@
   0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(30px, 40px) scale(1.1); }
 }
+@keyframes fh-aurora-drift-alt {
+  0%, 100% { transform: translate(0, 0) scale(1.02); }
+  50% { transform: translate(-40px, 30px) scale(1.15); }
+}
+@keyframes fh-grid-drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 80px 80px; }
+}
 @keyframes fh-spotlight-breathe {
   0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.12); }
+  50% { opacity: 0.9; transform: scale(1.2); }
 }
 @keyframes fh-shimmer-sweep {
   0% { transform: translateX(-120%); }
@@ -81,34 +89,49 @@
 
 /* Premium FX utility classes */
 .fh-fx-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+/* Three warm layers, all gold — blueprint spec is constant yellow breathing.
+   Different positions + durations + directions + negative animation-delays
+   keep the three blobs from pulsing in lockstep. */
 .fh-fx-aurora__a {
   position: absolute; top: -200px; left: -100px;
   width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(201,150,58,0.22), transparent 60%);
+  background: radial-gradient(circle, rgba(232,176,76,0.26), transparent 60%);
   filter: blur(60px);
-  animation: fh-aurora-drift 20s ease-in-out infinite;
+  animation: fh-aurora-drift 22s ease-in-out infinite;
 }
 .fh-fx-aurora__b {
   position: absolute; bottom: -150px; right: -150px;
   width: 450px; height: 450px;
-  background: radial-gradient(circle, rgba(120,60,220,0.14), transparent 60%);
+  background: radial-gradient(circle, rgba(201,150,58,0.22), transparent 60%);
   filter: blur(70px);
-  animation: fh-aurora-drift 25s ease-in-out infinite reverse;
+  animation: fh-aurora-drift-alt 28s ease-in-out infinite reverse;
+  animation-delay: -6s;
 }
-[data-theme='light'] .fh-fx-aurora__a { background: radial-gradient(circle, rgba(201,150,58,0.15), transparent 60%); }
-[data-theme='light'] .fh-fx-aurora__b { background: radial-gradient(circle, rgba(120,60,220,0.08), transparent 60%); }
+.fh-fx-aurora__c {
+  position: absolute; top: 38%; right: -120px;
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(140,111,48,0.18), transparent 60%);
+  filter: blur(80px);
+  animation: fh-aurora-drift 36s ease-in-out infinite;
+  animation-delay: -12s;
+}
+[data-theme='light'] .fh-fx-aurora__a { background: radial-gradient(circle, rgba(232,176,76,0.18), transparent 60%); }
+[data-theme='light'] .fh-fx-aurora__b { background: radial-gradient(circle, rgba(201,150,58,0.14), transparent 60%); }
+[data-theme='light'] .fh-fx-aurora__c { background: radial-gradient(circle, rgba(140,111,48,0.10), transparent 60%); }
 
 .fh-fx-grid {
   position: absolute; inset: 0; pointer-events: none; z-index: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
   background-size: 40px 40px;
+  animation: fh-grid-drift 60s linear infinite;
+  will-change: background-position;
 }
 [data-theme='light'] .fh-fx-grid {
   background-image:
-    linear-gradient(rgba(20,20,20,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,20,20,0.025) 1px, transparent 1px);
+    linear-gradient(rgba(20,20,20,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20,20,20,0.045) 1px, transparent 1px);
 }
 
 .fh-fx-spotlight {
