@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FileText, Phone, Calendar, Mail, MessageSquare, Package, ClipboardCheck, Mic, MicOff, Sparkles, Trash2, AlertTriangle } from 'lucide-react'
+import { FileText, Phone, Calendar, Mail, MessageSquare, Package, ClipboardCheck, Mic, MicOff, Sparkles, Trash2, AlertTriangle, Briefcase } from 'lucide-react'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -311,8 +311,11 @@ export default function Notes() {
         )}
         <AnimatePresence>
           {notes.map((n, i) => {
-            const NoteIcon = iconForNote(n)
-            const tone = iconTone(n)
+            const body = n.text || n.body || ''
+            const title = n.parsed?.summary || (body.split('\n').find((l) => l.trim()) || '').slice(0, 80) || 'Untitled'
+            const contact = contacts.find((c) => c.id === n.contact_id)
+            const hasParsed = !!(n.parsed && (n.parsed.summary || n.parsed.action_items?.length || n.parsed.risks?.length || n.parsed.follow_up_date || n.parsed.materials_needed?.length))
+            const whenShort = new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
             return (
               <motion.article
                 key={n.id}
@@ -321,33 +324,80 @@ export default function Notes() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.22, delay: Math.min(i * 0.04, 0.25), ease: [0.2, 0.8, 0.2, 1] }}
-                style={{ position: 'relative', padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)' }}
+                whileHover={{ boxShadow: '0 0 24px rgba(201,150,58,0.18), 0 0 0 1px rgba(201,150,58,0.25)' }}
+                className="fh-note-card"
+                style={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  padding: '14px 16px 14px 20px',
+                  borderRadius: 14,
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 100%)',
+                  border: '1px solid var(--rule)'
+                }}
               >
-                <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <span
-                      aria-hidden="true"
-                      style={{ width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: tone.bg, border: `1px solid ${tone.border}`, color: tone.fg, flexShrink: 0 }}
-                    >
-                      <NoteIcon size={14} />
+                {/* gold accent bar on the left edge */}
+                <span
+                  aria-hidden="true"
+                  style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: 'linear-gradient(180deg, var(--field-gold-bright), var(--field-gold-deep))', boxShadow: '0 0 10px rgba(201,150,58,0.35)' }}
+                />
+
+                {/* top-right: timestamp + delete */}
+                <span style={{ position: 'absolute', top: 12, right: 12, display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--steel, #5C5C5C)' }}>
+                  {whenShort}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => remove(n.id)}
+                  aria-label="Delete note"
+                  className="fh-note-card__del"
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 50,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 6,
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--ink-faint)',
+                    cursor: 'pointer',
+                    display: 'grid',
+                    placeItems: 'center',
+                    opacity: 0.4,
+                    transition: 'opacity 160ms ease, color 160ms ease'
+                  }}
+                  onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--alert-red)' }}
+                  onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.4'; ev.currentTarget.style.color = 'var(--ink-faint)' }}
+                >
+                  <Trash2 size={13} />
+                </button>
+
+                {/* title row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 88, marginBottom: body && body !== title ? 6 : 0 }}>
+                  <h3 style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600, color: 'var(--ink-strong)', lineHeight: 1.35, overflowWrap: 'anywhere' }}>
+                    {title}
+                  </h3>
+                  {hasParsed && (
+                    <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.14em' }}>
+                      <Sparkles size={10} />
+                      AI
                     </span>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {new Date(n.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => remove(n.id)}
-                    aria-label="Delete note"
-                    style={{ width: 28, height: 28, borderRadius: 8, background: 'transparent', border: 'none', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </header>
-                {n.parsed?.summary && (
-                  <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)' }}>{n.parsed.summary}</p>
+                  )}
+                </div>
+
+                {/* body preview (hidden if title IS the whole body) */}
+                {body && body !== title && (
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{body}</p>
                 )}
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', whiteSpace: 'pre-wrap' }}>{n.text || n.body || ''}</p>
+
+                {/* linked-job chip */}
+                {contact?.name && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.28)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <Briefcase size={10} />
+                    {contact.name}
+                  </span>
+                )}
+
                 {n.parsed?.action_items?.length > 0 && (
                   <ul style={{ margin: '8px 0 0', paddingLeft: 16, fontSize: 12, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)' }}>
                     {n.parsed.action_items.map((it, j) => <li key={j} style={{ marginBottom: 2 }}>{it}</li>)}
