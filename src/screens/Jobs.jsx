@@ -296,19 +296,19 @@ export default function Jobs() {
               icon={MessageSquare}
               label="Text"
               disabled={!drawerContact?.phone}
-              onClick={() => { if (drawerContact?.phone) window.open(`sms:${drawerContact.phone}`) }}
+              href={drawerContact?.phone ? `sms:${drawerContact.phone}` : undefined}
             />
             <ActionTile
               icon={Mail}
               label="Email"
               disabled={!drawerContact?.email}
-              onClick={() => { if (drawerContact?.email) window.open(`mailto:${drawerContact.email}`) }}
+              href={drawerContact?.email ? `mailto:${drawerContact.email}` : undefined}
             />
             <ActionTile
               icon={Phone}
               label="Call"
               disabled={!drawerContact?.phone}
-              onClick={() => { if (drawerContact?.phone) window.open(`tel:${drawerContact.phone}`) }}
+              href={drawerContact?.phone ? `tel:${drawerContact.phone}` : undefined}
             />
             <ActionTile
               icon={ExternalLink}
@@ -514,36 +514,50 @@ function MarginPill({ pct, hasCost }) {
   )
 }
 
-function ActionTile({ icon: I, label, onClick, disabled, primary }) {
+function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
   const bg = primary
     ? 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))'
     : 'rgba(255,255,255,0.04)'
   const color = primary ? 'var(--onyx)' : disabled ? 'var(--ink-faint)' : 'var(--ink-strong)'
   const border = primary ? 'none' : '1px solid var(--rule)'
+  const style = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: '14px 12px',
+    borderRadius: 14,
+    background: bg,
+    border,
+    color,
+    fontFamily: primary ? 'var(--font-display)' : 'var(--font-body)',
+    fontSize: primary ? 15 : 13,
+    letterSpacing: primary ? '0.12em' : '0',
+    fontWeight: primary ? 400 : 600,
+    cursor: disabled ? 'default' : 'pointer',
+    opacity: disabled ? 0.45 : 1,
+    boxShadow: primary ? '0 8px 20px rgba(201,150,58,0.35)' : 'none',
+    textDecoration: 'none'
+  }
+  if (href && !disabled) {
+    return (
+      <motion.a
+        href={href}
+        whileTap={{ scale: 0.97 }}
+        style={style}
+      >
+        <I size={18} />
+        <span>{label}</span>
+      </motion.a>
+    )
+  }
   return (
     <motion.button
       type="button"
       whileTap={disabled ? undefined : { scale: 0.97 }}
       onClick={onClick}
       disabled={disabled}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        padding: '14px 12px',
-        borderRadius: 14,
-        background: bg,
-        border,
-        color,
-        fontFamily: primary ? 'var(--font-display)' : 'var(--font-body)',
-        fontSize: primary ? 15 : 13,
-        letterSpacing: primary ? '0.12em' : '0',
-        fontWeight: primary ? 400 : 600,
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
-        boxShadow: primary ? '0 8px 20px rgba(201,150,58,0.35)' : 'none'
-      }}
+      style={style}
     >
       <I size={18} />
       <span>{label}</span>
