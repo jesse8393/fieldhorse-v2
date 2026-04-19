@@ -58,27 +58,8 @@ create policy "job_files_owner"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- Partner read (shared jobs) — accepted partners can read the files of
--- jobs they co-manage. Read-only; partners cannot upload into another
--- owner's storage folder (matches fh_expenses/fh_notes partner policies,
--- which are full CRUD inside Postgres tables, but storage objects are
--- physically owned by the inviter and the UI uploads via the signed-in
--- user so a partner uploads into THEIR OWN folder under their uid).
-drop policy if exists "job_files_partner_read" on storage.objects;
-create policy "job_files_partner_read"
-  on storage.objects for select to authenticated
-  using (
-    bucket_id in ('job-files', 'job-photos')
-    and exists (
-      select 1
-      from public.fh_job_files jf
-      join public.fh_job_partners jp on jp.job_id = jf.job_id
-      where jf.storage_path = storage.objects.name
-        and jp.partner_user_id = auth.uid()
-        and jp.status = 'accepted'
-        and jp.deleted_by_partner_at is null
-    )
-  );
+-- The partner-read storage policy depends on public.fh_job_files, so it
+-- is defined in section B2 below — AFTER section C creates the table.
 
 -- ============================================================
 -- C) TABLES — fh_job_files, fh_job_todos
@@ -111,6 +92,30 @@ create table if not exists public.fh_job_todos (
 );
 
 create index if not exists idx_fh_job_todos_job on public.fh_job_todos(job_id, created_at desc);
+
+-- ============================================================
+-- B2) STORAGE PARTNER-READ POLICY (deferred — depends on fh_job_files)
+-- ============================================================
+-- Accepted partners can read the files of jobs they co-manage. Read-only;
+-- partners cannot upload into another owner's storage folder. Storage
+-- objects are physically owned by the inviter; the UI uploads via the
+-- signed-in user, so a partner always uploads into THEIR OWN folder
+-- under their own auth.uid().
+drop policy if exists "job_files_partner_read" on storage.objects;
+create policy "job_files_partner_read"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id in ('job-files', 'job-photos')
+    and exists (
+      select 1
+      from public.fh_job_files jf
+      join public.fh_job_partners jp on jp.job_id = jf.job_id
+      where jf.storage_path = storage.objects.name
+        and jp.partner_user_id = auth.uid()
+        and jp.status = 'accepted'
+        and jp.deleted_by_partner_at is null
+    )
+  );
 
 -- ============================================================
 -- D) RLS — owner + accepted-partner pattern matching fh_expenses
