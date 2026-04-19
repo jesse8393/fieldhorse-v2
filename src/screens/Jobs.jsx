@@ -130,7 +130,7 @@ export default function Jobs() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1
             className="fh-font-serif"
-            style={{ margin: 0, fontSize: 30, lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+            style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
           >
             Jobs &{' '}
             <em className="fh-font-serif-italic fh-text-gradient-gold">pipeline</em>

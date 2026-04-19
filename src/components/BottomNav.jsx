@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
+import { Switch } from '@/components/ui/switch'
 
 const PRIMARY = [
   { to: '/', label: 'Home', icon: 'home', end: true },
@@ -17,21 +19,21 @@ const MORE_GROUPS = [
   {
     label: 'Money tools',
     items: [
-      { to: '/bid', label: 'AI Bid Engine', icon: 'bid' },
-      { to: '/compose', label: 'AI Compose', icon: 'compose' },
-      { to: '/analytics', label: 'Analytics', icon: 'analytics' }
+      { to: '/bid', label: 'AI Bid Engine', Icon: Calculator },
+      { to: '/compose', label: 'AI Compose', Icon: MessageSquare },
+      { to: '/analytics', label: 'Analytics', Icon: BarChart3 }
     ]
   },
   {
     label: 'Data',
     items: [
-      { to: '/import', label: 'Import Data', icon: 'upload' }
+      { to: '/import', label: 'Import Data', Icon: Upload }
     ]
   },
   {
     label: 'App',
     items: [
-      { to: '/settings', label: 'Settings', icon: 'settings' }
+      { to: '/settings', label: 'Settings', Icon: SettingsIcon }
     ]
   }
 ]
@@ -93,61 +95,111 @@ export default function BottomNav() {
             aria-label="More tools"
           >
             <div className="fh-drawer__grip" aria-hidden="true" />
-            <header className="fh-drawer__head">
-              <h2
-                className="fh-drawer__heading"
-                style={{ margin: 0 }}
-              >
-                CLAUDE TOOLS
-              </h2>
+            <header className="fh-drawer__head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, padding: '4px 20px 16px' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+                  Shortcuts
+                </span>
+                <h2
+                  className="fh-font-serif"
+                  style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+                >
+                  More{' '}
+                  <em className="fh-font-serif-italic fh-text-gradient-gold">tools.</em>
+                </h2>
+              </div>
               <button
                 type="button"
-                className="fh-drawer__close"
                 onClick={() => setMoreOpen(false)}
                 aria-label="Close"
+                style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
               >
-                <Icon name="x" size={18} />
+                <X size={16} />
               </button>
             </header>
 
-            <div className="fh-drawer__body">
+            <div className="fh-drawer__body" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
               {MORE_GROUPS.map((group) => (
-                <section key={group.label} className="fh-drawer__group">
-                  <div className="fh-drawer__section-label">{group.label}</div>
-                  <div className="fh-drawer__grid">
-                    {group.items.map((it) => (
-                      <button
-                        key={it.to}
-                        type="button"
-                        className="fh-drawer__tile"
-                        onClick={() => go(it.to)}
-                      >
-                        <span className="fh-drawer__tile-icon">
-                          <Icon name={it.icon} size={20} />
-                        </span>
-                        <span className="fh-drawer__tile-label">{it.label}</span>
-                        <Icon name="chevron" size={14} />
-                      </button>
-                    ))}
+                <section key={group.label}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: 8 }}>
+                    {group.label}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {group.items.map((it) => {
+                      const I = it.Icon
+                      return (
+                        <button
+                          key={it.to}
+                          type="button"
+                          onClick={() => go(it.to)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid var(--rule)',
+                            color: 'var(--ink-strong)',
+                            fontFamily: 'var(--font-body)',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            width: '100%'
+                          }}
+                        >
+                          <span
+                            aria-hidden="true"
+                            style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)' }}
+                          >
+                            <I size={16} />
+                          </span>
+                          <span style={{ flex: 1 }}>{it.label}</span>
+                          <ChevronRight size={14} color="var(--ink-faint)" />
+                        </button>
+                      )
+                    })}
                   </div>
                 </section>
               ))}
             </div>
 
-            <div className="fh-drawer__foot">
-              <button type="button" className="fh-drawer__theme" onClick={toggleTheme} aria-pressed={theme === 'dark'}>
-                <span
-                  className={`fh-drawer__theme-dot fh-drawer__theme-dot--${theme}`}
-                  aria-hidden="true"
-                  title={theme === 'dark' ? 'Currently dark' : 'Currently light'}
+            <div className="fh-drawer__foot" style={{ padding: '18px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600 }}>
+                  {theme === 'dark' ? <Moon size={16} color="var(--field-gold-bright)" /> : <Sun size={16} color="var(--field-gold-bright)" />}
+                  {theme === 'dark' ? 'Dark theme' : 'Light theme'}
+                </span>
+                <Switch
+                  checked={theme === 'dark'}
+                  onCheckedChange={() => toggleTheme()}
+                  aria-label="Toggle dark theme"
                 />
-                <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
-                <span>{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
-              </button>
-              <button type="button" className="fh-drawer__signout" onClick={handleSignOut}>
-                <Icon name="logout" size={16} />
-                <span>Sign out</span>
-              </button>
+              </div>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                onClick={handleSignOut}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: 'rgba(192,57,43,0.12)',
+                  border: '1px solid rgba(192,57,43,0.35)',
+                  color: 'var(--alert-red)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <LogOut size={16} />
+                Sign out
+              </motion.button>
             </div>
           </motion.div>
         </div>

@@ -75,7 +75,9 @@ export default function Home() {
         .eq('user_id', user.id)
       if (cancelled) return
       const rows = contacts || []
-      const active = rows.filter((c) => ['quote', 'job'].includes(c.stage))
+      // Include 'invoice' — the crew is still on site until the check clears,
+      // and the UX-visible "N crews on site" / Today on site should reflect it.
+      const active = rows.filter((c) => ['quote', 'job', 'invoice'].includes(c.stage))
       const totalPipeline = rows
         .filter((c) => c.stage !== 'closed' && c.stage !== 'lost')
         .reduce((s, c) => s + Number(c.amount || 0), 0)
@@ -153,7 +155,12 @@ export default function Home() {
           </span>
           <span className="fh-fx-pulse-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--signal-green)', boxShadow: '0 0 0 3px rgba(45,122,79,0.2), 0 0 8px var(--signal-green)' }} />
         </div>
-        <button aria-label="Notifications" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', display: 'grid', placeItems: 'center', position: 'relative', color: 'var(--ink-strong)', cursor: 'pointer' }}>
+        <button
+          type="button"
+          aria-label={notesCount > 0 ? `Notifications — ${notesCount} open note${notesCount === 1 ? '' : 's'}` : 'Notifications'}
+          onClick={() => navigate('/notes')}
+          style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', display: 'grid', placeItems: 'center', position: 'relative', color: 'var(--ink-strong)', cursor: 'pointer' }}
+        >
           <Bell size={18} />
           {notesCount > 0 && <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: 'var(--alert-red)', boxShadow: '0 0 0 2px var(--surface-0)' }} />}
         </button>

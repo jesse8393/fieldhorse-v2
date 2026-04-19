@@ -16,4 +16,22 @@ export const RATE_CARD = {
   outdoorLiving: { unit: 'sqft', low: 25,   high: 65 }
 }
 
+// Display labels for the trade keys above. Keep keys camelCase (stable DB/AI refs)
+// but show a proper-cased, spaced label in UI so CSS uppercase doesn't smash it
+// into PLUMBINGROUGH / LVPFLOORING / OUTDOORLIVING.
+export const TRADE_LABELS = {
+  concrete:      'Concrete',
+  framing:       'Framing',
+  drywall:       'Drywall',
+  demo:          'Demo',
+  roofing:       'Roofing',
+  electrical:    'Electrical',
+  plumbingRough: 'Plumbing rough',
+  insulation:    'Insulation',
+  lvpFlooring:   'LVP flooring',
+  paint:         'Paint',
+  permits:       'Permits',
+  outdoorLiving: 'Outdoor living'
+}
+
 export const TAGLINE = 'Built for the jobsite.'

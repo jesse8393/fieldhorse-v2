@@ -196,12 +196,26 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   }
 
   const voiceLabel = {
-    idle: 'HOLD TO SPEAK',
-    listening: 'LISTENING…',
+    idle: 'TAP TO SPEAK',
+    listening: 'TAP TO STOP',
     parsing: 'PARSING…',
-    error: 'VOICE UNAVAILABLE',
+    error: 'VOICE NOT AVAILABLE',
     denied: 'MIC BLOCKED'
   }[voiceState]
+
+  function onVoiceTap(e) {
+    e.preventDefault()
+    // Error/denied states let the user try once more (e.g. grant permission).
+    if (voiceState === 'error' || voiceState === 'denied') {
+      setVoiceState('idle')
+      // Next tick: try again immediately so they don't have to tap twice.
+      setTimeout(() => startVoice(), 0)
+      return
+    }
+    if (voiceState === 'listening') stopVoice()
+    else if (voiceState === 'idle') startVoice()
+    // parsing state: no-op
+  }
 
   return (
     <ActionSheet
@@ -243,12 +257,9 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         <button
           type="button"
           className={`fh-voice-hero__btn${voiceState === 'listening' ? ' is-recording' : ''}${voiceState === 'denied' ? ' is-denied' : ''}`}
-          aria-label="Hold to speak"
-          disabled={voiceState === 'error' || voiceState === 'denied' || voiceState === 'parsing' || saving}
-          onPointerDown={(e) => { e.preventDefault(); startVoice() }}
-          onPointerUp={(e) => { e.preventDefault(); stopVoice() }}
-          onPointerLeave={() => { if (voiceState === 'listening') stopVoice() }}
-          onPointerCancel={() => { if (voiceState === 'listening') stopVoice() }}
+          aria-label={voiceState === 'listening' ? 'Stop voice capture' : 'Start voice capture'}
+          disabled={voiceState === 'parsing' || saving}
+          onClick={onVoiceTap}
         >
           <svg className="fh-voice-hero__mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="9" y="3" width="6" height="12" rx="3" />

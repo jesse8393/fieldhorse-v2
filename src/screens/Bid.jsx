@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Calculator, Sparkles } from 'lucide-react'
-import { RATE_CARD } from '../lib/rateCard.js'
+import { RATE_CARD, TRADE_LABELS } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
 import { toastSuccess } from '../lib/toast.js'
@@ -81,7 +81,7 @@ export default function Bid() {
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
             AI bid engine
           </span>
-          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 30, lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
             Bid it,{' '}
             <em className="fh-font-serif-italic fh-text-gradient-gold">clean.</em>
           </h1>
@@ -126,7 +126,7 @@ export default function Bid() {
             <div className="fh-chips">
               {TRADES.map((t) => (
                 <button key={t} type="button" className={`fh-chip${picks.includes(t) ? ' is-active' : ''}`} onClick={() => togglePick(t)}>
-                  {t}
+                  {TRADE_LABELS[t] || t}
                 </button>
               ))}
             </div>
