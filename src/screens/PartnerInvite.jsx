@@ -6,20 +6,23 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import Aurora from '../components/fx/Aurora.jsx'
 import GridPattern from '../components/fx/GridPattern.jsx'
 
+function friendlyError(code) {
+  if (!code) return ''
+  if (code === 'invite_not_found') return 'This invite link is invalid or was removed.'
+  if (code === 'invite_revoked') return 'This invite was revoked by the sender.'
+  if (code === 'email_mismatch') return 'Sign in with the email this invite was sent to.'
+  if (code === 'not_authenticated' || code === 'invalid_token') return 'Please sign in to accept this invite.'
+  return code
+}
+
 /**
  * PartnerInvite — landing page for /partner-invite/:token
  *
- * Flow (when fully wired, post-migration-004):
- *   1. Unauthenticated user clicks email link -> lands here
- *   2. We fetch invite details via /api/partner-invite-info?token=...
- *      (invoker name + company, job title, invited email)
- *   3. Two CTAs: [Sign in] (existing user) or [Create account]
- *   4. After auth, POST /api/partner-invite-accept?token=... which validates,
- *      flips fh_job_partners.status -> 'accepted', sets partner_user_id, then
- *      redirects to /jobs/:id for that shared job.
- *
- * Current state: UI shell only. The info fetch + accept-POST are stubbed and
- * will fail gracefully until the migration + Netlify functions are live.
+ * Route is PUBLIC (see App.jsx — not wrapped in RequireAuth). Renders the
+ * hero + CTA block on first paint regardless of auth / info-fetch state
+ * so signed-out users always see something. When the lookup resolves the
+ * inviter details get swapped in; when already-signed-in the auto-accept
+ * path takes over.
  */
 export default function PartnerInvite() {
   const { token } = useParams()
@@ -39,18 +42,14 @@ export default function PartnerInvite() {
         if (data?.error) setInfoErr(friendlyError(data.error))
         else setInfo(data || {})
       })
-      .catch(() => { if (!cancelled) setInfoErr('Invite lookup failed') })
+      .catch((err) => {
+        if (cancelled) return
+        // eslint-disable-next-line no-console
+        console.error('[partner-invite] info fetch failed', err)
+        setInfoErr('Invite lookup failed')
+      })
     return () => { cancelled = true }
   }, [token])
-
-  function friendlyError(code) {
-    if (!code) return ''
-    if (code === 'invite_not_found') return 'This invite link is invalid or was removed.'
-    if (code === 'invite_revoked') return 'This invite was revoked by the sender.'
-    if (code === 'email_mismatch') return 'Sign in with the email this invite was sent to.'
-    if (code === 'not_authenticated' || code === 'invalid_token') return 'Please sign in to accept this invite.'
-    return code
-  }
 
   // If already signed in, auto-accept and redirect.
   useEffect(() => {
@@ -69,7 +68,11 @@ export default function PartnerInvite() {
         if (data?.job_id) navigate(`/jobs/${data.job_id}`, { replace: true })
         else setInfoErr(friendlyError(data?.error) || 'Could not accept invite')
       })
-      .catch(() => setInfoErr('Accept failed'))
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[partner-invite] accept failed', err)
+        setInfoErr('Accept failed')
+      })
       .finally(() => setAccepting(false))
   }, [loading, session, token, accepting, infoErr, navigate])
 
@@ -77,6 +80,13 @@ export default function PartnerInvite() {
   // generic label. Locked in per Phase 15.1.
   const inviterName = info?.inviter_company || info?.inviter_name || 'A contractor on Fieldhorse'
   const jobTitle = info?.job_title || 'a job'
+  const terminalError = infoErr && (
+    infoErr.includes('invalid') ||
+    infoErr.includes('revoked')
+  )
+  const showSignIn = !loading && !session && !terminalError
+  const showLinking = !!session && accepting && !terminalError
+  const showFatal = !!terminalError
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'var(--surface-0)', color: 'var(--ink-strong)', overflow: 'hidden' }}>
@@ -126,7 +136,7 @@ export default function PartnerInvite() {
           </p>
         </div>
 
-        {infoErr && (
+        {infoErr && !terminalError && (
           <div
             role="alert"
             style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}
@@ -135,7 +145,16 @@ export default function PartnerInvite() {
           </div>
         )}
 
-        {!session && !accepting && (
+        {showFatal && (
+          <div
+            role="alert"
+            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
+          >
+            {infoErr}
+          </div>
+        )}
+
+        {showSignIn && (
           <div
             style={{
               display: 'flex',
@@ -144,8 +163,7 @@ export default function PartnerInvite() {
               padding: 20,
               borderRadius: 18,
               background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--rule)',
-              backdropFilter: 'blur(20px)'
+              border: '1px solid var(--rule)'
             }}
           >
             <Link
@@ -192,7 +210,7 @@ export default function PartnerInvite() {
           </div>
         )}
 
-        {session && accepting && (
+        {showLinking && (
           <p style={{ textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-muted)' }}>
             Linking you to the job…
           </p>

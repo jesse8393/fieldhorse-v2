@@ -5,8 +5,13 @@ const STORAGE_KEY = 'fh:theme'
 
 function initial() {
   if (typeof window === 'undefined') return 'dark'
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'dark' || stored === 'light') return stored
+  // Safari Private Mode on older iOS throws SecurityError on localStorage
+  // access. A throw here would crash the whole app. Default to dark on
+  // any failure.
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored === 'dark' || stored === 'light') return stored
+  } catch { /* noop */ }
   return 'dark' // Fieldhorse ships dark-first
 }
 
@@ -16,7 +21,7 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     const root = document.documentElement
     root.setAttribute('data-theme', theme)
-    localStorage.setItem(STORAGE_KEY, theme)
+    try { localStorage.setItem(STORAGE_KEY, theme) } catch { /* private mode */ }
   }, [theme])
 
   const toggleTheme = useCallback(() => {

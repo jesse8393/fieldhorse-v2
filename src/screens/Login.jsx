@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, Lock, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -11,15 +11,23 @@ export default function Login() {
   const { signIn, signUp, sendPasswordReset, session, loading } = useAuth()
   const { profile } = useProfile()
   const navigate = useNavigate()
-  const [mode, setMode] = useState('signin')
+  const [params] = useSearchParams()
+  const partnerInviteToken = params.get('partner_invite') || ''
+  const initialMode = params.get('mode') === 'signup' ? 'signup' : 'signin'
+  const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // After-auth destination: partner invite flow > root.
+  const afterAuthTarget = partnerInviteToken
+    ? `/partner-invite/${partnerInviteToken}`
+    : '/'
+
   if (loading) return null
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to={afterAuthTarget} replace />
 
   async function handleForgotPassword() {
     setError('')
@@ -49,13 +57,15 @@ export default function Login() {
       if (mode === 'signin') {
         const { error } = await signIn(email, password)
         if (error) throw error
-        navigate('/', { replace: true })
+        navigate(afterAuthTarget, { replace: true })
       } else {
         const { data, error } = await signUp(email, password)
         if (error) throw error
         if (!data.session) {
           setNotice('Check your email to confirm, then sign in.')
           setMode('signin')
+        } else if (partnerInviteToken) {
+          navigate(afterAuthTarget, { replace: true })
         } else {
           navigate('/onboarding', { replace: true })
         }
