@@ -22,6 +22,7 @@ import {
 import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import CountUp from '../components/fx/CountUp.jsx'
 import Spotlight from '../components/fx/Spotlight.jsx'
 import InvitePartnerSheet from '../components/InvitePartnerSheet.jsx'
@@ -905,44 +906,124 @@ function InspectionsTab({ contact, inspections, userId, onChange }) {
           )
         })}
       </div>
-      <AnimatePresence>
-        {active && (
-          <InspectionLog trade={active} onClose={() => setActive(null)} onSave={logResult} />
-        )}
-      </AnimatePresence>
+      <InspectionLog
+        open={!!active}
+        trade={active}
+        onOpenChange={(v) => { if (!v) setActive(null) }}
+        onSave={logResult}
+      />
     </div>
   )
 }
 
-function InspectionLog({ trade, onClose, onSave }) {
+function InspectionLog({ open, trade, onOpenChange, onSave }) {
   const [result, setResult] = useState('pass')
   const [notes, setNotes] = useState('')
+  useEffect(() => {
+    if (!open) { setResult('pass'); setNotes('') }
+  }, [open])
+  function commit() {
+    onSave(trade, result, notes)
+  }
   return (
-    <>
-      <motion.div className="fh-scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
-      <motion.div className="fh-modal" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 12, opacity: 0 }}>
-        <header className="fh-modal__head">
-          <span className="fh-eye">Log inspection · {trade}</span>
-          <button className="fh-iconbtn" onClick={onClose}><Icon name="x" size={18} /></button>
-        </header>
-        <div className="fh-form">
-          <Field label="Result">
-            <div className="fh-seg">
-              {['pass', 'fail', 'na'].map((r) => (
-                <button key={r} className={result === r ? 'is-active' : ''} onClick={() => setResult(r)} type="button">
-                  {r.toUpperCase()}
-                </button>
-              ))}
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+            <ClipboardCheck size={12} />
+            Inspection
+          </div>
+          <DrawerTitle asChild>
+            <h2
+              className="fh-font-serif"
+              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+            >
+              Log{' '}
+              <em className="fh-font-serif-italic fh-text-gradient-gold">{trade || 'inspection'}.</em>
+            </h2>
+          </DrawerTitle>
+          <DrawerDescription
+            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+          >
+            Record the result and any notes from the inspector.
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <div style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Result</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {['pass', 'fail', 'na'].map((r) => {
+                const on = result === r
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setResult(r)}
+                    style={{
+                      padding: '12px 8px',
+                      borderRadius: 12,
+                      border: on ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
+                      background: on ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.03)',
+                      color: on ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 13,
+                      letterSpacing: '0.14em',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {r.toUpperCase()}
+                  </button>
+                )
+              })}
             </div>
-          </Field>
-          <Field label="Notes"><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
-          <div className="fh-modal__foot">
-            <button className="fh-btn fh-btn--ghost" onClick={onClose}>Cancel</button>
-            <button className="fh-btn fh-btn--gold" onClick={() => onSave(trade, result, notes)}>Save</button>
+          </div>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Notes</span>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Corrections needed, re-inspection date, inspector name…"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none', resize: 'vertical' }}
+            />
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={commit}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 14px',
+                borderRadius: 12,
+                border: 'none',
+                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                color: 'var(--onyx)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 14,
+                letterSpacing: '0.14em',
+                cursor: 'pointer',
+                boxShadow: '0 6px 16px rgba(201,150,58,0.3)'
+              }}
+            >
+              SAVE
+            </motion.button>
           </div>
         </div>
-      </motion.div>
-    </>
+      </DrawerContent>
+    </Drawer>
   )
 }
 
