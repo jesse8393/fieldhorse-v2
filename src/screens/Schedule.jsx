@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { toast, toastSuccess } from '../lib/toast.js'
 import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -27,13 +28,45 @@ export default function Schedule() {
   const { user } = useAuth()
   const { profile } = useProfile()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  const initialCursor = (() => {
+    const d = params.get('d')
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      const [y, m, day] = d.split('-').map(Number)
+      return startOfDay(new Date(y, m - 1, day))
+    }
+    return startOfDay(new Date())
+  })()
   const [view, setView] = useState('day')
-  const [cursor, setCursor] = useState(() => startOfDay(new Date()))
+  const [cursor, setCursor] = useState(initialCursor)
   const [events, setEvents] = useState([])
   const [upcoming, setUpcoming] = useState([])
   const [loading, setLoading] = useState(true)
   const [weather, setWeather] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
+
+  // If the URL had ?d=YYYY-MM-DD, consume it once so the back button
+  // doesn't keep forcing the cursor back to that day.
+  useEffect(() => {
+    if (params.get('d')) {
+      const next = new URLSearchParams(params)
+      next.delete('d')
+      setParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function deleteEvent(evtId) {
+    if (!evtId) return
+    const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId)
+    if (error) {
+      toast({ kind: 'error', title: "Couldn't delete", body: error.message })
+      return
+    }
+    toastSuccess('Event deleted', 'Schedule updated')
+    load()
+    loadUpcoming()
+  }
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
 
@@ -238,8 +271,8 @@ export default function Schedule() {
 
       <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
         {loading && <SkeletonList rows={5} card={false} />}
-        {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onAdd={() => setAddOpen(true)} />}
-        {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} />}
+        {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} onAdd={() => setAddOpen(true)} />}
+        {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
         {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
       </motion.div>
 
@@ -265,7 +298,7 @@ const iconBtnStyle = {
   cursor: 'pointer'
 }
 
-function DayView({ events, onClick, onAdd }) {
+function DayView({ events, onClick, onDelete, onAdd }) {
   if (events.length === 0) {
     return (
       <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
@@ -284,29 +317,50 @@ function DayView({ events, onClick, onAdd }) {
     )
   }
   return (
-    <ul className="fh-timeline">
+    <ul className="fh-timeline" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
       {events.map((e, i) => (
         <motion.li
           key={e.id}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
-          className="fh-tl-item"
-          onClick={() => e.contact_id && onClick(e.contact_id)}
-          role={e.contact_id ? 'button' : undefined}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)' }}
         >
-          <span className="fh-tl-item__time">{fmtTime(e.start_at)}</span>
-          <span className="fh-tl-item__body">
-            <span className="fh-tl-item__title">{e.title}</span>
-            {e.fh_contacts?.name && <span className="fh-tl-item__sub">{e.fh_contacts.name}</span>}
+          <span style={{ flexShrink: 0, width: 62, fontFamily: 'var(--font-display)', fontSize: 13, letterSpacing: '0.04em', color: 'var(--field-gold-bright)' }}>
+            {fmtTime(e.start_at)}
           </span>
+          <button
+            type="button"
+            onClick={() => e.contact_id && onClick(e.contact_id)}
+            style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: e.contact_id ? 'pointer' : 'default', color: 'var(--ink-strong)' }}
+          >
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {e.title || 'Untitled'}
+            </div>
+            {e.fh_contacts?.name && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 3, padding: '2px 8px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <MapPin size={9} />
+                {e.fh_contacts.name}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={(ev) => { ev.stopPropagation(); if (onDelete && window.confirm('Delete this event?')) onDelete(e.id) }}
+            aria-label="Delete event"
+            style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.7 }}
+            onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--alert-red)' }}
+            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.7'; ev.currentTarget.style.color = 'var(--ink-faint)' }}
+          >
+            <Trash2 size={14} />
+          </button>
         </motion.li>
       ))}
     </ul>
   )
 }
 
-function WeekView({ start, events, onClick }) {
+function WeekView({ start, events, onClick, onDelete }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
   return (
     <div className="fh-week">
@@ -321,10 +375,22 @@ function WeekView({ start, events, onClick }) {
             <div className="fh-week__body">
               {dayEvents.length === 0 && <span className="fh-week__empty">—</span>}
               {dayEvents.map((e) => (
-                <button key={e.id} type="button" className="fh-week__evt" onClick={() => e.contact_id && onClick(e.contact_id)}>
-                  <span>{fmtTime(e.start_at)}</span>
-                  <strong>{e.title}</strong>
-                </button>
+                <div key={e.id} className="fh-week__evt" style={{ position: 'relative' }}>
+                  <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit' }}>
+                    <span>{fmtTime(e.start_at)}</span>
+                    <strong>{e.title}</strong>
+                  </button>
+                  {onDelete && (
+                    <button
+                      type="button"
+                      onClick={(ev) => { ev.stopPropagation(); if (window.confirm('Delete this event?')) onDelete(e.id) }}
+                      aria-label="Delete event"
+                      style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.6 }}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
