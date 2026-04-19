@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, MoreHorizontal, Pencil, XCircle, Users, UserPlus, Trash2,
   Wrench, Receipt, DollarSign, ClipboardCheck, Calendar, FileText,
-  ArrowRight, Check, Plus, X as XIcon, Save as SaveIcon
+  ArrowRight, Check, Plus, X as XIcon, Save as SaveIcon,
+  Image as ImageIcon, Paperclip, ListChecks, Download, Upload as UploadIcon,
+  Clock
 } from 'lucide-react'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
@@ -38,7 +40,11 @@ const TABS = [
   { id: 'expenses',  label: 'Expenses' },
   { id: 'inspections', label: 'Inspections' },
   { id: 'invoice',   label: 'Invoice' },
-  { id: 'messages',  label: 'Messages' }
+  { id: 'messages',  label: 'Messages' },
+  { id: 'files',     label: 'Files' },
+  { id: 'photos',    label: 'Photos' },
+  { id: 'todos',     label: 'To-do' },
+  { id: 'scheduled', label: 'Scheduled' }
 ]
 
 const TRADES = [
@@ -326,6 +332,10 @@ export default function ContactDetail() {
         {tab === 'inspections' && <InspectionsTab contact={contact} inspections={inspections} userId={user.id} onChange={fetchAll} />}
         {tab === 'invoice' && <InvoiceTab contact={contact} payments={payments} onLogPayment={() => setPayModalOpen(true)} />}
         {tab === 'messages' && <MessagesTab notes={notes} contactId={contact.id} userId={user.id} onChange={fetchAll} />}
+        {tab === 'files' && <FilesTab jobId={contact.id} userId={user.id} />}
+        {tab === 'photos' && <PhotosTab jobId={contact.id} userId={user.id} />}
+        {tab === 'todos' && <TodosTab jobId={contact.id} userId={user.id} />}
+        {tab === 'scheduled' && <ScheduledTab jobId={contact.id} userId={user.id} />}
       </div>
 
       <AnimatePresence>
@@ -1419,6 +1429,407 @@ function ConfirmModal({ title, body, confirmLabel = 'Confirm', onConfirm, onCanc
 // ============================================================
 // PRIMITIVES
 // ============================================================
+// ============================================================
+// FILES TAB (Phase 17 item 4a)
+// ============================================================
+function FilesTab({ jobId, userId }) {
+  return <UploadList jobId={jobId} userId={userId} kind="file" />
+}
+
+// ============================================================
+// PHOTOS TAB (Phase 17 item 4b) — same storage/table as files, kind='photo'
+// ============================================================
+function PhotosTab({ jobId, userId }) {
+  return <UploadList jobId={jobId} userId={userId} kind="photo" />
+}
+
+function UploadList({ jobId, userId, kind }) {
+  const bucket = kind === 'photo' ? 'job-photos' : 'job-files'
+  const accept = kind === 'photo' ? 'image/*' : '*/*'
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState('')
+  const inputRef = useRef(null)
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('fh_job_files')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('kind', kind)
+      .order('uploaded_at', { ascending: false })
+    setRows(data || [])
+    setLoading(false)
+  }, [jobId, kind])
+
+  useEffect(() => { fetchRows() }, [fetchRows])
+
+  async function pick() { inputRef.current?.click() }
+
+  async function handleFile(e) {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    setUploading(true)
+    try {
+      for (const file of files) {
+        // Basic per-file size cap: 25 MB for files, 10 MB for photos
+        const cap = kind === 'photo' ? 10 * 1024 * 1024 : 25 * 1024 * 1024
+        if (file.size > cap) {
+          toast({ kind: 'error', title: 'File too large', body: `${file.name} exceeds ${Math.round(cap / (1024 * 1024))} MB` })
+          continue
+        }
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
+        const rowId = crypto.randomUUID()
+        const path = `${userId}/${jobId}/${rowId}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from(bucket)
+          .upload(path, file, { upsert: false, contentType: file.type })
+        if (upErr) throw upErr
+        const { error: insErr } = await supabase.from('fh_job_files').insert({
+          id: rowId,
+          user_id: userId,
+          job_id: jobId,
+          filename: file.name,
+          storage_path: path,
+          mime_type: file.type || null,
+          size_bytes: file.size,
+          kind
+        })
+        if (insErr) throw insErr
+      }
+      toastSuccess(kind === 'photo' ? 'Photos uploaded' : 'Files uploaded', `Added ${files.length}`)
+      await fetchRows()
+    } catch (ex) {
+      toast({ kind: 'error', title: 'Upload failed', body: ex?.message || 'Try again' })
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  async function remove(row) {
+    if (!window.confirm(`Delete "${row.filename}"?`)) return
+    try {
+      await supabase.storage.from(bucket).remove([row.storage_path])
+      await supabase.from('fh_job_files').delete().eq('id', row.id)
+      toastSuccess('Deleted', row.filename)
+      await fetchRows()
+    } catch (ex) {
+      toast({ kind: 'error', title: 'Delete failed', body: ex?.message || 'Try again' })
+    }
+  }
+
+  async function open(row) {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(row.storage_path, 60 * 60)
+    if (error || !data?.signedUrl) {
+      toast({ kind: 'error', title: 'Could not open', body: error?.message || 'Try again' })
+      return
+    }
+    if (kind === 'photo') {
+      setLightboxUrl(data.signedUrl)
+    } else {
+      window.open(data.signedUrl, '_blank', 'noopener')
+    }
+  }
+
+  function fmtSize(n) {
+    if (!n) return ''
+    if (n < 1024) return `${n} B`
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+          {kind === 'photo' ? `${rows.length} photo${rows.length === 1 ? '' : 's'}` : `${rows.length} file${rows.length === 1 ? '' : 's'}`}
+        </span>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={pick}
+          disabled={uploading}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: uploading ? 'default' : 'pointer', boxShadow: '0 4px 12px rgba(201,150,58,0.3)', opacity: uploading ? 0.6 : 1 }}
+        >
+          <UploadIcon size={12} />
+          {uploading ? 'UPLOADING…' : (kind === 'photo' ? 'ADD PHOTOS' : 'ADD FILES')}
+        </motion.button>
+      </div>
+      <input ref={inputRef} type="file" accept={accept} multiple hidden onChange={handleFile} />
+
+      {loading && <SkeletonList rows={3} card={false} />}
+      {!loading && rows.length === 0 && (
+        <EmptyMini label={kind === 'photo' ? 'No photos yet.' : 'No files yet.'} />
+      )}
+
+      {!loading && rows.length > 0 && kind === 'photo' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          {rows.map((r) => (
+            <PhotoThumb key={r.id} row={r} bucket={bucket} onOpen={() => open(r)} onDelete={() => remove(r)} />
+          ))}
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && kind === 'file' && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {rows.map((r) => (
+            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
+                <Paperclip size={14} />
+              </span>
+              <button type="button" onClick={() => open(r)} style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)' }}>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.filename}</div>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)' }}>
+                  {fmtSize(r.size_bytes)} · {new Date(r.uploaded_at).toLocaleDateString()}
+                </div>
+              </button>
+              <button type="button" onClick={() => open(r)} aria-label="Open" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                <Download size={14} />
+              </button>
+              <button type="button" onClick={() => remove(r)} aria-label="Delete" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                <Trash2 size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {lightboxUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLightboxUrl('')}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.88)', display: 'grid', placeItems: 'center', padding: 16, cursor: 'zoom-out' }}
+        >
+          <img src={lightboxUrl} alt="Photo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PhotoThumb({ row, bucket, onOpen, onDelete }) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    supabase.storage
+      .from(bucket)
+      .createSignedUrl(row.storage_path, 60 * 60)
+      .then(({ data }) => { if (!cancelled && data?.signedUrl) setUrl(data.signedUrl) })
+    return () => { cancelled = true }
+  }, [row.storage_path, bucket])
+  return (
+    <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)' }}>
+      <button
+        type="button"
+        onClick={onOpen}
+        style={{ position: 'absolute', inset: 0, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }}
+        aria-label={row.filename}
+      >
+        {url ? (
+          <img src={url} alt={row.filename} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        ) : (
+          <span style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', color: 'var(--ink-faint)' }}>
+            <ImageIcon size={20} />
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Delete photo"
+        style={{ position: 'absolute', top: 4, right: 4, width: 24, height: 24, borderRadius: 7, border: 'none', background: 'rgba(0,0,0,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.85 }}
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  )
+}
+
+// ============================================================
+// TO-DO TAB (Phase 17 item 4c)
+// ============================================================
+function TodosTab({ jobId, userId }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [draft, setDraft] = useState('')
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('fh_job_todos')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('done', { ascending: true })
+      .order('created_at', { ascending: false })
+    setRows(data || [])
+    setLoading(false)
+  }, [jobId])
+
+  useEffect(() => { fetchRows() }, [fetchRows])
+
+  async function add() {
+    const txt = draft.trim()
+    if (!txt) return
+    const { error } = await supabase.from('fh_job_todos').insert({
+      user_id: userId, job_id: jobId, text: txt
+    })
+    if (error) {
+      toast({ kind: 'error', title: "Couldn't add", body: error.message })
+      return
+    }
+    setDraft('')
+    fetchRows()
+  }
+
+  async function toggle(row) {
+    const next = !row.done
+    const { error } = await supabase
+      .from('fh_job_todos')
+      .update({ done: next, completed_at: next ? new Date().toISOString() : null })
+      .eq('id', row.id)
+    if (error) {
+      toast({ kind: 'error', title: "Couldn't update", body: error.message })
+      return
+    }
+    fetchRows()
+  }
+
+  async function remove(rowId) {
+    const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId)
+    if (!error) fetchRows()
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add() }}
+          placeholder="Add a task…"
+          style={{ flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+        />
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={add}
+          disabled={!draft.trim()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.12em', cursor: draft.trim() ? 'pointer' : 'default', opacity: draft.trim() ? 1 : 0.5 }}
+        >
+          <Plus size={14} />
+          ADD
+        </motion.button>
+      </div>
+
+      {loading && <SkeletonList rows={3} card={false} />}
+      {!loading && rows.length === 0 && <EmptyMini label="No tasks yet." />}
+      {!loading && rows.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {rows.map((r) => (
+            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+              <button
+                type="button"
+                onClick={() => toggle(r)}
+                aria-label={r.done ? 'Mark not done' : 'Mark done'}
+                style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, border: `1px solid ${r.done ? 'rgba(45,122,79,0.6)' : 'var(--rule)'}`, background: r.done ? 'rgba(45,122,79,0.22)' : 'rgba(255,255,255,0.04)', color: 'var(--signal-green)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+              >
+                {r.done && <Check size={13} />}
+              </button>
+              <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-body)', fontSize: 14, color: r.done ? 'var(--ink-faint)' : 'var(--ink-strong)', textDecoration: r.done ? 'line-through' : 'none', opacity: r.done ? 0.6 : 1, overflowWrap: 'anywhere' }}>
+                {r.text}
+              </span>
+              <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
+                {new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
+              <button type="button" onClick={() => remove(r.id)} aria-label="Delete task" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                <Trash2 size={13} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// SCHEDULED TAB (Phase 17 item 3b)
+// ============================================================
+function ScheduledTab({ jobId }) {
+  const navigate = useNavigate()
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const { data } = await supabase
+        .from('fh_schedule')
+        .select('*')
+        .eq('contact_id', jobId)
+        .order('start_at', { ascending: true })
+      if (cancelled) return
+      setRows(data || [])
+      setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [jobId])
+
+  function openOnSchedule(row) {
+    const d = new Date(row.start_at)
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    navigate(`/schedule?d=${iso}`)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {loading && <SkeletonList rows={3} card={false} />}
+      {!loading && rows.length === 0 && (
+        <EmptyMini label="Nothing scheduled for this job." />
+      )}
+      {!loading && rows.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {rows.map((e) => {
+            const d = new Date(e.start_at)
+            const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+            const timeStr = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+            return (
+              <li key={e.id}>
+                <button
+                  type="button"
+                  onClick={() => openOnSchedule(e)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)' }}
+                >
+                  <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
+                    <Calendar size={14} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700 }}>{e.title || 'Untitled'}</div>
+                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', display: 'inline-flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                      <Calendar size={10} /> {dateStr}
+                      <span aria-hidden="true">·</span>
+                      <Clock size={10} /> {timeStr}
+                    </div>
+                  </div>
+                  <ArrowRight size={14} color="var(--ink-faint)" />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function Field({ label, children }) {
   return (
     <label className="fh-field">
