@@ -30,7 +30,12 @@ function emailFirstToken(email) {
   return raw ? raw[0].toUpperCase() + raw.slice(1) : ''
 }
 function displayNameFrom(profile, user) {
-  const full = profile?.full_name?.trim()
+  // Multi-tenant guard: only use profile.full_name when it actually belongs
+  // to the currently-signed-in auth user. Without this, a stale profile
+  // row left in context during a sign-out→sign-in transition can leak
+  // the prior user's name onto the new user's greeting.
+  const profileMatchesUser = profile && user && profile.user_id === user.id
+  const full = profileMatchesUser ? profile.full_name?.trim() : ''
   if (full) return full
   return emailFirstToken(user?.email)
 }
@@ -283,8 +288,8 @@ export default function Home() {
       <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 20px 20px' }}>
         {[
           { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp },
-          { label: 'Crews on site', value: activeCount, format: (n) => String(n).padStart(2, '0'), icon: Briefcase },
-          { label: 'Notes', value: notesCount, format: (n) => String(n).padStart(2, '0'), icon: FileText }
+          { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase },
+          { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText }
         ].map((kpi) => {
           const I = kpi.icon
           return (

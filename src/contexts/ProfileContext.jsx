@@ -22,9 +22,18 @@ export function ProfileProvider({ children }) {
       .eq('user_id', user.id)
       .maybeSingle()
     if (error) console.warn('[fieldhorse] profile fetch error', error)
-    setProfile(data || null)
+    // Multi-tenant guard: only accept the row if it actually belongs to
+    // the current auth user. Prevents a stale cross-user profile from
+    // leaking into state during a fast sign-out→sign-in transition.
+    setProfile(data && data.user_id === user.id ? data : null)
     setLoading(false)
   }, [user])
+
+  // Clear the prior profile the instant the auth user changes so a
+  // renaming screen never paints with the previous user's name.
+  useEffect(() => {
+    setProfile(null)
+  }, [user?.id])
 
   useEffect(() => {
     fetchProfile()
