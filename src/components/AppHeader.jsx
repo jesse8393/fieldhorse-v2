@@ -101,7 +101,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(62px, 9.5vw, 82px)',
+          maxHeight: 'clamp(46px, 7vw, 62px)',
           maxWidth: 'min(60vw, 380px)',
           width: 'auto',
           height: 'auto',

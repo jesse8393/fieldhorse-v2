@@ -1465,7 +1465,10 @@ a {
   /* AppHeader already reserves safe-area-inset-top on its own paddingTop.
      Duplicating it here put ~40-50px of dead black space between the
      header and the first page content on iPhone. */
-  padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  /* Phase 18.2: 84 -> 96 to clear the BottomNav on Settings + Importer
+     where the terminal sections were getting clipped. Global because
+     every Gated screen sits in .fh-app__main and shares the problem. */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 /* =========================================================================
