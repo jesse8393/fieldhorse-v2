@@ -7,7 +7,7 @@
  * Bebas Neue, F in Field Gold, H in ink-strong. Transparent background,
  * no border, no circle.
  */
-export default function FieldhorseBadge({ size = 15 }) {
+export default function FieldhorseBadge({ size = 18 }) {
   return (
     <span
       aria-label="Fieldhorse"
