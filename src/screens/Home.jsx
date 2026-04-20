@@ -180,7 +180,7 @@ export default function Home() {
       {/* Top bar moved to shared AppHeader in AppShell (Phase 16). */}
 
       {/* HERO GREETING */}
-      <motion.div variants={item} style={{ padding: '24px 20px 16px' }}>
+      <motion.div variants={item} style={{ padding: '10px 20px 16px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.2)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', marginBottom: 14 }}>
           <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--field-gold-bright)' }} />
           {formatDate(now)}

@@ -1462,9 +1462,10 @@ a {
 }
 .fh-app__main {
   flex: 1;
-  padding-top: env(safe-area-inset-top);
+  /* AppHeader already reserves safe-area-inset-top on its own paddingTop.
+     Duplicating it here put ~40-50px of dead black space between the
+     header and the first page content on iPhone. */
   padding-bottom: calc(84px + env(safe-area-inset-bottom));
-  min-height: 100dvh;
 }
 
 /* =========================================================================
