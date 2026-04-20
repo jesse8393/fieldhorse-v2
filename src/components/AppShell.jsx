@@ -55,7 +55,7 @@ export default function AppShell() {
         richColors
         expand
         visibleToasts={3}
-        mobileOffset={{ top: '16px', left: '16px', right: '16px' }}
+        mobileOffset={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: '16px', right: '16px' }}
         toastOptions={{
           style: {
             width: '100%',

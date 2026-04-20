@@ -1566,6 +1566,14 @@ a {
   z-index: var(--z-modal);
 }
 
+/* Sonner top-center toast clear the Dynamic Island / notch in iOS PWA
+   standalone. The prop `mobileOffset.top` should handle this but CSS
+   belt-and-suspenders so there's no way a toast renders behind the
+   cutout. */
+[data-sonner-toaster][data-y-position="top"] {
+  top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
+}
+
 /* AppHeader Notes shortcut — steel at rest, gold on hover/active. */
 .fh-header-notes-btn:hover,
 .fh-header-notes-btn:active {
