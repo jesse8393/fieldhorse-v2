@@ -38,6 +38,12 @@ const ICONS = {
       <circle cx="19" cy="12" r="1.5" fill="currentColor" />
     </>
   ),
+  clients: (
+    <>
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M5 20c0-3.2 3.1-5.5 7-5.5s7 2.3 7 5.5" />
+    </>
+  ),
 
   // Actions
   plus: (
