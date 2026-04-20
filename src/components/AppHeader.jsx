@@ -56,8 +56,9 @@ export default function AppHeader() {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
-        padding: '16px 20px 12px',
-        paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
+        padding: '22px 20px 18px',
+        paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))',
+        minHeight: 108,
         background: 'linear-gradient(180deg, rgba(20,20,20,0.88) 0%, rgba(20,20,20,0.72) 82%, rgba(20,20,20,0) 100%)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
@@ -120,14 +121,16 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }) {
+  // Logo should be the dominant visual. clamp scales between iPhone SE
+  // (~72px) and desktop (~96px) without any breakpoint CSS.
   if (logoSrc) {
     return (
       <img
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 36,
-          maxWidth: 'min(60vw, 260px)',
+          maxHeight: 'clamp(72px, 11vw, 96px)',
+          maxWidth: 'min(60vw, 380px)',
           width: 'auto',
           height: 'auto',
           objectFit: 'contain',
@@ -143,40 +146,27 @@ function BrandSlot({ logoSrc, company, fullName }) {
       />
     )
   }
+  const fallbackTextStyle = {
+    fontFamily: 'var(--font-display)',
+    fontSize: 'clamp(26px, 5.5vw, 34px)',
+    letterSpacing: '0.12em',
+    lineHeight: 1,
+    textTransform: 'uppercase',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 'min(60vw, 380px)'
+  }
   if (company) {
     return (
-      <span
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 18,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--field-gold-bright)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          maxWidth: 'min(60vw, 260px)'
-        }}
-      >
+      <span style={{ ...fallbackTextStyle, color: 'var(--field-gold-bright)' }}>
         {company}
       </span>
     )
   }
   if (fullName) {
     return (
-      <span
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 18,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-strong)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          maxWidth: 'min(60vw, 260px)'
-        }}
-      >
+      <span style={{ ...fallbackTextStyle, color: 'var(--ink-strong)' }}>
         {fullName}
       </span>
     )
@@ -186,7 +176,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 18,
+        fontSize: 'clamp(26px, 5.5vw, 34px)',
         letterSpacing: '0.14em',
         lineHeight: 1,
         display: 'inline-flex',
