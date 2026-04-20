@@ -9,6 +9,8 @@ import Onboarding from './screens/Onboarding.jsx'
 import PartnerInvite from './screens/PartnerInvite.jsx'
 import Jobs from './screens/Jobs.jsx'
 import ContactDetail from './screens/ContactDetail.jsx'
+import Clients from './screens/Clients.jsx'
+import ClientDetail from './screens/ClientDetail.jsx'
 import Notes from './screens/Notes.jsx'
 import Schedule from './screens/Schedule.jsx'
 import Bid from './screens/Bid.jsx'
@@ -57,6 +59,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/jobs/:id" element={<ContactDetail />} />
+        <Route path="/clients" element={<Clients />} />
+        <Route path="/clients/:id" element={<ClientDetail />} />
         <Route path="/notes" element={<Notes />} />
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/bid" element={<Bid />} />

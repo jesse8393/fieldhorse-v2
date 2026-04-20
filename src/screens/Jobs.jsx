@@ -66,7 +66,7 @@ export default function Jobs() {
     setLoading(true)
     const { data, error } = await supabase
       .from('fh_contacts')
-      .select('*')
+      .select('*, fh_clients(name)')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
     if (!error) setContacts(data || [])
@@ -452,6 +452,12 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
           <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {contact.job_title || contact.job_type || 'No job title'}
           </div>
+          {contact.fh_clients?.name && !isSharedIn && (
+            <div style={{ marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+              <UsersIcon size={10} />
+              {contact.fh_clients.name}
+            </div>
+          )}
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--field-gold-bright)' }}>

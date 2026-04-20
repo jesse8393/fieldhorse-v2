@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField, haptic } from './ActionSheet.jsx'
+import ClientPicker from './ClientPicker.jsx'
 import { supabase } from '../lib/supabase.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
@@ -47,6 +48,7 @@ Return ONLY the JSON. No prose, no fences.`
 
 export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   const [form, setForm] = useState(buildEmptyForm)
+  const [client, setClient] = useState(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -59,6 +61,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   useEffect(() => {
     if (!open) {
       setForm(buildEmptyForm())
+      setClient(null)
       setErr('')
       setTranscript('')
       setVoiceState('idle')
@@ -173,7 +176,8 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       amount: Number(form.amount) || 0,
       notes: form.notes || null,
       referred_by: form.referred_by || null,
-      stage: form.stage || 'lead'
+      stage: form.stage || 'lead',
+      client_id: client?.id || null
     }
     try {
       const { data, error } = await supabase
@@ -299,6 +303,16 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
           </p>
         )}
       </div>
+
+      {/* Client link — optional, picks an existing fh_clients row or
+          inline-creates one so this new job inherits client_id. */}
+      <SheetField label="Client">
+        <ClientPicker
+          userId={userId}
+          value={client}
+          onChange={setClient}
+        />
+      </SheetField>
 
       {/* Contact */}
       <SheetField label="Name" code="01·NAME">

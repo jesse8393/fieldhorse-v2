@@ -78,6 +78,8 @@ export default function ContactDetail() {
   const [eventOpen, setEventOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
+  const [clientSummary, setClientSummary] = useState(null)
+
   const fetchAll = useCallback(async () => {
     if (!user || !id) return
     setLoading(true)
@@ -90,13 +92,28 @@ export default function ContactDetail() {
       supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_schedule').select('id', { count: 'exact', head: true }).eq('contact_id', id)
     ])
-    setContact(c.data || null)
+    const contactRow = c.data || null
+    setContact(contactRow)
     setSubs(s.data || [])
     setExpenses(e.data || [])
     setPayments(p.data || [])
     setInspections(i.data || [])
     setNotes(n.data || [])
     setScheduleCount(sch.count || 0)
+    // Client pill: only fetch the client row when the viewer is the owner.
+    // Migration 007's fh_clients RLS denies partner reads; in partner view
+    // we paint a static "CLIENT" pill with no name leak.
+    const isOwnerView = contactRow && contactRow.user_id === user.id
+    if (isOwnerView && contactRow.client_id) {
+      const { data: cli } = await supabase
+        .from('fh_clients')
+        .select('id, name')
+        .eq('id', contactRow.client_id)
+        .maybeSingle()
+      setClientSummary(cli || null)
+    } else {
+      setClientSummary(null)
+    }
     setLoading(false)
   }, [user, id])
 
@@ -196,6 +213,29 @@ export default function ContactDetail() {
               </h1>
             )
           })()}
+          {/* CLIENT pill — owner: tappable link. Partner: static, no name. */}
+          {contact.client_id && (
+            contact.user_id === user.id
+              ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/clients/${contact.client_id}`)}
+                  style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.28)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                >
+                  <Users size={10} />
+                  Client · {clientSummary?.name || '…'}
+                </button>
+                )
+              : (
+                <span
+                  aria-label="Shared job — client visible only to owner"
+                  style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'default' }}
+                >
+                  <Users size={10} />
+                  Client
+                </span>
+                )
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
