@@ -192,7 +192,7 @@ create policy "fh_job_todos_partner" on public.fh_job_todos
 --   and policyname in ('company_logos_owner','job_files_owner','job_files_partner_read');
 --   -- 3 rows
 --
---   select tablename from information_schema.tables
+--   select table_name from information_schema.tables
 --   where table_schema = 'public'
 --   and table_name in ('fh_job_files','fh_job_todos');
 --   -- 2 rows
