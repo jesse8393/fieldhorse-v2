@@ -56,9 +56,9 @@ export default function AppHeader() {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
-        padding: '18px 20px 14px',
-        paddingTop: 'calc(18px + env(safe-area-inset-top, 0px))',
-        minHeight: 92,
+        padding: '22px 20px 18px',
+        paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))',
+        minHeight: 108,
         background: 'linear-gradient(180deg, rgba(20,20,20,0.88) 0%, rgba(20,20,20,0.72) 82%, rgba(20,20,20,0) 100%)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
@@ -129,7 +129,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(56px, 9vw, 76px)',
+          maxHeight: 'clamp(72px, 11vw, 96px)',
           maxWidth: 'min(60vw, 380px)',
           width: 'auto',
           height: 'auto',
@@ -148,7 +148,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(22px, 4.8vw, 30px)',
+    fontSize: 'clamp(26px, 5.5vw, 34px)',
     letterSpacing: '0.12em',
     lineHeight: 1,
     textTransform: 'uppercase',
@@ -176,7 +176,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(22px, 4.8vw, 30px)',
+        fontSize: 'clamp(26px, 5.5vw, 34px)',
         letterSpacing: '0.14em',
         lineHeight: 1,
         display: 'inline-flex',
