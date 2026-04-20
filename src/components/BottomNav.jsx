@@ -12,7 +12,6 @@ const PRIMARY = [
   { to: '/', label: 'Home', icon: 'home', end: true },
   { to: '/jobs', label: 'Jobs', icon: 'jobs' },
   { to: '/clients', label: 'Clients', icon: 'clients' },
-  { to: '/notes', label: 'Notes', icon: 'notes' },
   { to: '/schedule', label: 'Schedule', icon: 'schedule' }
 ]
 
