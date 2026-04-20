@@ -1,26 +1,17 @@
-import { useNavigate } from 'react-router-dom'
-
 /**
  * Small "FH" wordmark — top-left of AppHeader.
- * Matches the FIELDHORSE wordmark compressed to two letters:
- *   F in Field Gold, H in white, Bebas Neue, tight letter-spacing.
- * No circle, no border, transparent background.
- * Tap → /settings.
+ * Static visual mark only: no tap target, no navigation, no cursor
+ * pointer. Exists solely to signal "this app is Fieldhorse" without
+ * competing with the user's centered company logo.
+ *
+ * Bebas Neue, F in Field Gold, H in ink-strong. Transparent background,
+ * no border, no circle.
  */
-export default function FieldhorseBadge({ size = 26 }) {
-  const navigate = useNavigate()
+export default function FieldhorseBadge({ size = 15 }) {
   return (
-    <button
-      type="button"
-      onClick={() => navigate('/settings')}
-      aria-label="Settings"
-      title="Fieldhorse — open settings"
+    <span
+      aria-label="Fieldhorse"
       style={{
-        background: 'transparent',
-        border: 'none',
-        padding: 0,
-        margin: 0,
-        cursor: 'pointer',
         display: 'inline-flex',
         alignItems: 'center',
         lineHeight: 1,
@@ -28,11 +19,12 @@ export default function FieldhorseBadge({ size = 26 }) {
         fontSize: size,
         letterSpacing: '0.06em',
         fontWeight: 400,
-        height: size
+        userSelect: 'none',
+        pointerEvents: 'none'
       }}
     >
       <span style={{ color: 'var(--field-gold)' }}>F</span>
       <span style={{ color: 'var(--ink-strong)' }}>H</span>
-    </button>
+    </span>
   )
 }
