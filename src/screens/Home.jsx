@@ -5,7 +5,7 @@ import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight } from 
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import { getWeather, workWindow } from '../lib/weather.js'
+import { getWeather, workWindow, MURFREESBORO } from '../lib/weather.js'
 import Spotlight from '../components/fx/Spotlight.jsx'
 import ShimmerBar from '../components/fx/ShimmerBar.jsx'
 import GreetingTitle from '../components/fx/GreetingTitle.jsx'
@@ -67,14 +67,19 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false
-    if (!hasCoords) { setWeather(null); return }
+    // Always fetch SOMETHING so the weather card doesn't read "— / —".
+    // If the user pinned a location, use it. Otherwise fall back to the
+    // Murfreesboro default. The "Pin location for weather" button stays
+    // visible so they can switch to their own coords.
+    const lat = profile?.location_lat ?? MURFREESBORO.lat
+    const lon = profile?.location_lon ?? MURFREESBORO.lon
     setWeatherLoading(true); setWeatherErr('')
-    getWeather(profile.location_lat, profile.location_lon)
+    getWeather(lat, lon)
       .then((d) => { if (!cancelled) setWeather(d) })
       .catch((e) => { if (!cancelled) setWeatherErr(e.message || 'Forecast unavailable') })
       .finally(() => { if (!cancelled) setWeatherLoading(false) })
     return () => { cancelled = true }
-  }, [profile?.location_lat, profile?.location_lon, hasCoords])
+  }, [profile?.location_lat, profile?.location_lon])
 
   const windowRead = useMemo(
     () => workWindow(weather?.current, profile?.services || []),
