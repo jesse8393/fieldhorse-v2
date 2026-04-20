@@ -191,7 +191,14 @@ body,
 #root {
   margin: 0;
   padding: 0;
-  height: 100%;
+  /* iOS PWA standalone: `height: 100%` resolves shorter than the full
+     viewport (WebView extends under home indicator with viewport-fit
+     cover, but html's containing block doesn't). Result: ~30% black
+     dead zone below the fixed BottomNav. min-height:100dvh keeps the
+     root chain at the actual visual viewport on iOS 16+, matches
+     Safari browser mode, and keeps the nav pinned to the physical
+     bottom edge. */
+  min-height: 100dvh;
   /* iOS Safari safety net — 100vw can exceed visual viewport when the
      address bar shrinks, which pushes fixed-position drawers + wide rows
      past the right edge. Clamp + hide horizontal overflow globally. */
@@ -1453,6 +1460,10 @@ a {
    APP SHELL — page transitions, main scroll, bottom nav safe area
    ========================================================================= */
 .fh-app {
+  /* Fallback for older WebKit that doesn't understand 100dvh. dvh is
+     supported on iOS 15.4+; below that 100vh is the same as 100dvh
+     in practice because there's no address-bar animation. */
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -1484,7 +1495,11 @@ a {
   grid-template-columns: repeat(5, 1fr);
   gap: 0;
   padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
-  background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+  /* iOS PWA standalone dead-zone fix: nav bg must be fully opaque so
+     the home-indicator safe-area reserved inside the nav's padding-
+     bottom reads as nav, not as a black gap under the nav. Previous
+     78% translucent glass let the body paint through. */
+  background: var(--surface-1);
   backdrop-filter: saturate(150%) blur(18px);
   -webkit-backdrop-filter: saturate(150%) blur(18px);
   border-top: 1px solid var(--rule);
