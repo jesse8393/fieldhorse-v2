@@ -67,7 +67,7 @@ begin
     select
       u.user_id,
       coalesce(nullif(trim(max(c.name)), ''), 'Unnamed client'),
-      nullif(trim(max(c.job_type)), ''),
+      null::text,
       nullif(trim(max(c.phone)), ''),
       nullif(trim(max(c.email)), ''),
       nullif(trim(max(c.address)), ''),
