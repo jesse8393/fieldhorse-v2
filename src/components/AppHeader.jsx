@@ -1,16 +1,13 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { NotebookPen } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.jsx'
-import { supabase } from '../lib/supabase.js'
 import FieldhorseBadge from './FieldhorseBadge.jsx'
 
 /**
  * AppHeader — the shared top bar.
  *
  * Layout:
- *   [FH badge 26px] · · · [USER COMPANY LOGO / NAME centered] · · · [bell + count]
+ *   [FH badge] · · · [USER COMPANY LOGO / NAME centered] · · · [Notes shortcut]
  *
  * Fallback chain for center slot:
  *   1. profile.logo_url     -> <img>
@@ -20,26 +17,15 @@ import FieldhorseBadge from './FieldhorseBadge.jsx'
  *
  * Partner view: always renders THIS user's brand (not the inviter's).
  * Shared-job content is shared; chrome is not.
+ *
+ * Phase 18.1: right slot swapped from Bell + red-dot notification stub
+ * to a plain Notes shortcut. Notes moved out of BottomNav; header becomes
+ * the jump point. No unread badge until a real notifications system
+ * backs it.
  */
 export default function AppHeader() {
-  const { user } = useAuth()
   const { profile } = useProfile()
   const navigate = useNavigate()
-  const [notesCount, setNotesCount] = useState(0)
-
-  useEffect(() => {
-    if (!user) { setNotesCount(0); return }
-    let cancelled = false
-    supabase
-      .from('fh_notes')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('done', false)
-      .then(({ count }) => {
-        if (!cancelled) setNotesCount(count || 0)
-      })
-    return () => { cancelled = true }
-  }, [user])
 
   const logoSrc = profile?.logo_url
   const company = profile?.company_name?.trim()
@@ -82,8 +68,9 @@ export default function AppHeader() {
 
       <button
         type="button"
-        aria-label={notesCount > 0 ? `Notifications — ${notesCount} open note${notesCount === 1 ? '' : 's'}` : 'Notifications'}
+        aria-label="Notes"
         onClick={() => navigate('/notes')}
+        className="fh-header-notes-btn"
         style={{
           width: 36,
           height: 36,
@@ -93,28 +80,13 @@ export default function AppHeader() {
           border: '1px solid var(--rule)',
           display: 'grid',
           placeItems: 'center',
-          position: 'relative',
           color: 'var(--ink-strong)',
           cursor: 'pointer',
-          padding: 0
+          padding: 0,
+          transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
         }}
       >
-        <Bell size={16} />
-        {notesCount > 0 && (
-          <span
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              top: 7,
-              right: 7,
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              background: 'var(--alert-red)',
-              boxShadow: '0 0 0 2px var(--surface-0)'
-            }}
-          />
-        )}
+        <NotebookPen size={16} />
       </button>
     </header>
   )

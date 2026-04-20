@@ -1548,6 +1548,14 @@ a {
   z-index: var(--z-modal);
 }
 
+/* AppHeader Notes shortcut — steel at rest, gold on hover/active. */
+.fh-header-notes-btn:hover,
+.fh-header-notes-btn:active {
+  color: var(--field-gold-bright) !important;
+  border-color: rgba(201, 150, 58, 0.35) !important;
+  background: rgba(201, 150, 58, 0.08) !important;
+}
+
 /* Importer "Advanced integrations" disclosure — hide the default
    browser arrow on summary and rotate our chevron on open. */
 details > summary::-webkit-details-marker { display: none; }
