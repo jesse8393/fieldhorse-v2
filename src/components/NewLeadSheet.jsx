@@ -7,6 +7,7 @@ import { claudeMessage } from '../lib/anthropic.js'
 import { parseLeadFromImage } from '../lib/docIntelligence.js'
 import { toastSuccess } from '../lib/toast.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
+import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.js'
 
 const STAGE_OPTIONS = [
   { value: 'lead', label: 'Lead' },
@@ -54,6 +55,9 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   const [client, setClient] = useState(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  // Picked job-template slug. Reset whenever job_type changes since
+  // templates are filtered by trade.
+  const [templateSlug, setTemplateSlug] = useState('')
 
   const [voiceState, setVoiceState] = useState('idle') // idle | listening | parsing | error | denied
   const [transcript, setTranscript] = useState('')
@@ -70,8 +74,20 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       setVoiceState('idle')
       setSaving(false)
       setCommitted(false)
+      setTemplateSlug('')
     }
   }, [open])
+
+  // When the trade changes, drop any template that no longer applies.
+  // Avoids the user picking "Roof tear-off" then switching to Kitchen
+  // and silently shipping the wrong checklist.
+  const availableTemplates = useMemo(() => getTemplatesForJobType(form.job_type), [form.job_type])
+  useEffect(() => {
+    if (!templateSlug) return
+    if (!availableTemplates.some((t) => t.slug === templateSlug)) {
+      setTemplateSlug('')
+    }
+  }, [availableTemplates, templateSlug])
 
   // Fill progress is shown as a muted hint; the sheet counter doesn't advance
   // until the insert actually succeeds. Prevents the "03/03 even on error" bug.
@@ -218,6 +234,18 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       if (error) throw error
       // Remember the job type choice for next lead
       if (form.job_type) writeLastJobType(form.job_type)
+      // Apply template milestones (if picked) BEFORE we close, so the
+      // checklist is already populated when the user lands on the job.
+      // Failure is non-fatal — the lead is already saved.
+      if (templateSlug) {
+        const tmpl = getTemplate(templateSlug)
+        if (tmpl) {
+          const { inserted } = await applyTemplate(supabase, { template: tmpl, jobId: data.id, userId })
+          if (inserted > 0) {
+            toastSuccess(`Loaded ${inserted} milestones`, tmpl.label)
+          }
+        }
+      }
       // Success: flash "Captured." + step 03/03 briefly, then close.
       setCommitted(true)
       setSaving(false)
@@ -413,6 +441,17 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         onChange={(v) => set('job_type', v)}
       />
 
+      {/* Templates — auto-create milestones on commit. Only renders if
+          the chosen job_type has matching templates. Picking a template
+          shows a count + label so the user knows what they're getting. */}
+      {availableTemplates.length > 0 && (
+        <TemplatePickerInline
+          templates={availableTemplates}
+          value={templateSlug}
+          onChange={setTemplateSlug}
+        />
+      )}
+
       <SheetField label="Job title" code="07·TTL">
         <input
           value={form.job_title}
@@ -439,5 +478,65 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       </SheetField>
 
     </ActionSheet>
+  )
+}
+
+// Inline template chip row — renders a "Skip" pseudo-chip + one chip per
+// matching template, then if a template is picked shows a small footer
+// with the milestone count + description. Visual matches SheetChipRow
+// so it feels like a 7th field, not an add-on.
+function TemplatePickerInline({ templates, value, onChange }) {
+  const picked = templates.find((t) => t.slug === value) || null
+  return (
+    <SheetField label="Template">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
+        <TemplateChip
+          active={!value}
+          onClick={() => onChange('')}
+          label="Skip"
+        />
+        {templates.map((t) => (
+          <TemplateChip
+            key={t.slug}
+            active={value === t.slug}
+            onClick={() => onChange(t.slug)}
+            label={t.label}
+          />
+        ))}
+      </div>
+      {picked && (
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(201,150,58,0.07)', border: '1px solid rgba(201,150,58,0.22)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 10, letterSpacing: '0.14em', color: 'var(--field-gold-bright)' }}>
+            +{picked.todos.length}
+          </span>
+          <span style={{ flex: 1, fontFamily: 'var(--font-body)', fontSize: 11.5, color: 'var(--ink-muted)', lineHeight: 1.35 }}>
+            {picked.description}
+          </span>
+        </div>
+      )}
+    </SheetField>
+  )
+}
+
+function TemplateChip({ active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '7px 12px',
+        borderRadius: 999,
+        border: active ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)',
+        background: active ? 'rgba(201,150,58,0.15)' : 'rgba(255,255,255,0.03)',
+        color: active ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
+        fontFamily: 'var(--font-body)',
+        fontSize: 12,
+        fontWeight: active ? 700 : 500,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      {label}
+    </button>
   )
 }
