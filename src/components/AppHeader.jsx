@@ -129,16 +129,17 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }) {
-  // Logo should be the dominant visual. clamp scales between iPhone SE
-  // (~72px) and desktop (~96px) without any breakpoint CSS.
+  // Brand identifier — small + centered. Header has Search + Bell + Notes
+  // on the right and the FH badge on the left, so the brand stays
+  // compact or it crowds them at narrow viewports.
   if (logoSrc) {
     return (
       <img
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(46px, 7vw, 62px)',
-          maxWidth: 'min(60vw, 380px)',
+          maxHeight: 'clamp(22px, 3.4vw, 32px)',
+          maxWidth: 'min(36vw, 200px)',
           width: 'auto',
           height: 'auto',
           objectFit: 'contain',
@@ -156,14 +157,14 @@ function BrandSlot({ logoSrc, company, fullName }) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(26px, 5.5vw, 34px)',
+    fontSize: 'clamp(13px, 2.6vw, 17px)',
     letterSpacing: '0.12em',
     lineHeight: 1,
     textTransform: 'uppercase',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    maxWidth: 'min(60vw, 380px)'
+    maxWidth: 'min(40vw, 220px)'
   }
   if (company) {
     return (
@@ -184,7 +185,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(26px, 5.5vw, 34px)',
+        fontSize: 'clamp(13px, 2.6vw, 17px)',
         letterSpacing: '0.14em',
         lineHeight: 1,
         display: 'inline-flex',
