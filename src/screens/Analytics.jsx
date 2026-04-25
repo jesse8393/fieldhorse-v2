@@ -165,7 +165,7 @@ export default function Analytics() {
                 Active value
               </span>
             </header>
-            <div style={{ height: 120, padding: '6px 0', borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid var(--rule)' }}>
+            <div style={{ height: 120, padding: '6px 0', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
                   <defs>
@@ -219,7 +219,7 @@ export default function Analytics() {
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--ink-muted)' }}>{s.count}</span>
                       </span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${widthPct}%` }}

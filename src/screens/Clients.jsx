@@ -151,7 +151,7 @@ export default function Clients() {
                 overflow: 'hidden',
                 padding: '14px 16px 14px 20px',
                 borderRadius: 14,
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 100%)',
+                background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%)',
                 border: '1px solid var(--rule)',
                 textAlign: 'left',
                 color: 'var(--ink-strong)',
@@ -195,21 +195,21 @@ export default function Clients() {
                 >
                   {c.phone && (
                     <>
-                      <a href={`tel:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Call ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                      <a href={`tel:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Call ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
                         <Phone size={16} />
                       </a>
-                      <a href={`sms:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Text ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                      <a href={`sms:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Text ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
                         <MessageSquare size={16} />
                       </a>
                     </>
                   )}
                   {c.email && (
-                    <a href={`mailto:${c.email}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Email ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                    <a href={`mailto:${c.email}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Email ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
                       <Mail size={16} />
                     </a>
                   )}
                   {c.address && (
-                    <a href={`https://maps.apple.com/?address=${encodeURIComponent(c.address)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Map to ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                    <a href={`https://maps.apple.com/?address=${encodeURIComponent(c.address)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Map to ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
                       <Map size={16} />
                     </a>
                   )}

@@ -277,7 +277,7 @@ function InvoiceRow({ row, onPDF, onPaid }) {
           <span>{fmtMoney(paid)} paid of {fmtMoney(amount)}</span>
           <span>{Math.round(pctPaid)}%</span>
         </div>
-        <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-2)', overflow: 'hidden' }}>
           <div style={{ width: `${pctPaid}%`, height: '100%', background: pctPaid >= 100 ? 'var(--signal-green)' : 'linear-gradient(90deg, var(--field-gold-deep), var(--field-gold-bright))', transition: 'width 220ms ease' }} />
         </div>
       </div>

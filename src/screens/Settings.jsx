@@ -338,7 +338,7 @@ export default function Settings() {
 function Section({ variants, title, sub, meta, metaTone, children }) {
   const metaBg = metaTone === 'red'
     ? { background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)' }
-    : { background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }
+    : { background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }
   return (
     <motion.section variants={variants} style={{ padding: '0 20px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sub ? 4 : 10, gap: 10 }}>

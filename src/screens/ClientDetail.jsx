@@ -207,7 +207,7 @@ export default function ClientDetail() {
                 aria-label="Call"
                 aria-disabled={!client.phone}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
               >
                 <Phone size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Call</span>
@@ -218,7 +218,7 @@ export default function ClientDetail() {
                 aria-label="Text"
                 aria-disabled={!client.phone}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
               >
                 <MessageSquare size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Text</span>
@@ -229,7 +229,7 @@ export default function ClientDetail() {
                 aria-label="Email"
                 aria-disabled={!client.email}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.email ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.email ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.email ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.email ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.email ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.email ? 1 : 0.4 }}
               >
                 <Mail size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Email</span>
@@ -242,7 +242,7 @@ export default function ClientDetail() {
                 aria-label="Map"
                 aria-disabled={!client.address}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.address ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.address ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.address ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.address ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.address ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.address ? 1 : 0.4 }}
               >
                 <Map size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Map</span>
@@ -566,7 +566,7 @@ function JobsList({ jobs, onOpen }) {
             <button
               type="button"
               onClick={() => onOpen(j.id)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)', position: 'relative', overflow: 'hidden' }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, var(--surface-2), var(--surface-2))', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)', position: 'relative', overflow: 'hidden' }}
             >
               <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: c, boxShadow: `0 0 10px ${c}66` }} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -597,7 +597,7 @@ function NotesList({ notes }) {
         const body = n.text || n.body || ''
         const title = n.parsed?.summary || (body.split('\n').find((l) => l.trim()) || '').slice(0, 80) || 'Untitled'
         return (
-          <li key={n.id} style={{ position: 'relative', overflow: 'hidden', padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))', border: '1px solid var(--rule)' }}>
+          <li key={n.id} style={{ position: 'relative', overflow: 'hidden', padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, var(--surface-2), var(--surface-2))', border: '1px solid var(--rule)' }}>
             <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: 'linear-gradient(180deg, var(--field-gold-bright), var(--field-gold-deep))' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <h4 style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', overflowWrap: 'anywhere' }}>

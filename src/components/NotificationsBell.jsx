@@ -212,7 +212,7 @@ export default function NotificationsBell() {
                           borderRadius: 12,
                           background: isUnread
                             ? 'linear-gradient(180deg, rgba(201,150,58,0.08), rgba(201,150,58,0.03))'
-                            : 'rgba(255,255,255,0.02)',
+                            : 'var(--surface-2)',
                           border: isUnread ? '1px solid rgba(201,150,58,0.25)' : '1px solid var(--rule)',
                           cursor: 'pointer',
                           color: 'var(--ink-strong)',

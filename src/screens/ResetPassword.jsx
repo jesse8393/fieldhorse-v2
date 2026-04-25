@@ -83,7 +83,7 @@ export default function ResetPassword() {
               marginTop: 12,
               padding: '3px 10px',
               borderRadius: 999,
-              background: ready ? 'rgba(201,150,58,0.12)' : 'rgba(255,255,255,0.05)',
+              background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)',
               border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)',
               color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
               fontFamily: 'var(--font-body)',

@@ -357,7 +357,7 @@ useEffect(() => {
                     overflow: 'hidden',
                     padding: '14px 16px 14px 20px',
                     borderRadius: 16,
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 100%)',
+                    background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%)',
                     border: '1px solid var(--rule)'
                   }}
                 >

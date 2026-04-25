@@ -486,7 +486,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
         padding: '14px 14px 12px',
         borderRadius: 16,
         minHeight: 88,
-        background: 'linear-gradient(135deg, var(--surface-2), rgba(255,255,255,0.02))',
+        background: 'linear-gradient(135deg, var(--surface-2), var(--surface-2))',
         border: '1px solid var(--rule)',
         backdropFilter: 'blur(20px)',
         cursor: 'pointer',
@@ -564,7 +564,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
       </div>
 
       {/* Progress bar */}
-      <div style={{ position: 'relative', height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', height: 3, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
         <span
           style={{
             position: 'absolute',
@@ -584,7 +584,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
 function MarginPill({ pct, hasCost }) {
   if (!hasCost) {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.18)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid rgba(255,255,255,0.18)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em' }}>
         No cost yet
       </span>
     )

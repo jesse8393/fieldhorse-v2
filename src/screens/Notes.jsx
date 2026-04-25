@@ -35,7 +35,7 @@ function iconTone(note) {
   if (p?.risks?.length) return { fg: 'var(--alert-red)', bg: 'rgba(192,57,43,0.15)', border: 'rgba(192,57,43,0.35)' }
   if (p?.follow_up_date) return { fg: 'var(--field-gold-bright)', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)' }
   if (p?.action_items?.length) return { fg: 'var(--signal-green)', bg: 'rgba(45,122,79,0.14)', border: 'rgba(45,122,79,0.35)' }
-  return { fg: 'var(--ink-muted)', bg: 'rgba(255,255,255,0.05)', border: 'var(--rule)' }
+  return { fg: 'var(--ink-muted)', bg: 'var(--surface-2)', border: 'var(--rule)' }
 }
 
 export default function Notes() {
@@ -367,7 +367,7 @@ export default function Notes() {
                   overflow: 'hidden',
                   padding: '14px 16px 14px 20px',
                   borderRadius: 14,
-                  background: 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 100%)',
+                  background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%)',
                   border: '1px solid var(--rule)'
                 }}
               >

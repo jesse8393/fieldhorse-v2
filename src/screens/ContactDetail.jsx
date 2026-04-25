@@ -1021,7 +1021,7 @@ function SubsTab({ contact, subs, userId, onChange }) {
         {subs.map((s) => (
           <li key={s.id} className="fh-row">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
                 <Wrench size={14} />
               </span>
               <div style={{ minWidth: 0 }}>
@@ -1165,7 +1165,7 @@ function ExpensesTab({ contact, expenses, userId, onChange }) {
         {expenses.map((e) => (
           <li key={e.id} className="fh-row">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
                 <Receipt size={14} />
               </span>
               <div style={{ minWidth: 0 }}>
@@ -2274,7 +2274,7 @@ function PhotoLightbox({ url, row, captioning, hasPrev, hasNext, onPrev, onNext,
               }}
               rows={2}
               placeholder="Describe what's in this photo…"
-              style={{ width: '100%', resize: 'vertical', minHeight: 44, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.4, boxSizing: 'border-box' }}
+              style={{ width: '100%', resize: 'vertical', minHeight: 44, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'var(--surface-2)', color: '#fff', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.4, boxSizing: 'border-box' }}
             />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button

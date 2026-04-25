@@ -218,7 +218,7 @@ export default function TimeClockCard({ contact, userId, onLogged }) {
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Billable</span>
-              <span style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.02)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--field-gold-bright)' }}>
+              <span style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--field-gold-bright)' }}>
                 ${billablePreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>
             </div>
