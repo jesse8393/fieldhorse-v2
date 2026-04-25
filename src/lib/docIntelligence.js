@@ -135,6 +135,31 @@ export async function parseExpenseFromImage(dataUrl) {
   return normalizeExpense(parsed)
 }
 
+const CAPTION_SYSTEM = `You are captioning a single jobsite photo for a contractor's project record. The caption is read later when the photo is searched, scanned, or shown to a homeowner — it must be specific and useful.
+
+Return ONE plain-text sentence, under 18 words, no quotes, no markdown.
+
+Rules:
+- Lead with what is happening or what was built. Examples: "Footing pour, east wall — slump looks tight, no rebar exposed." / "Demo of upstairs bath complete; subfloor sound, no rot under tub." / "Roof underlayment + drip edge installed before shingle delivery."
+- Note any visible issues (cracks, water, damage, code concerns) when present.
+- Don't guess at addresses, dates, names, or measurements that aren't visible.
+- If the photo isn't a jobsite photo (selfie, screenshot, blank, blurred), say so plainly: "Not a jobsite photo." or "Image too blurred to caption." — do not invent.
+- No prefacing ("This image shows…"), no markdown, no JSON.`
+
+export async function captionPhoto(dataUrl) {
+  const res = await claudeVision({
+    system: CAPTION_SYSTEM,
+    prompt: 'Caption this jobsite photo. One sentence, under 18 words.',
+    imageData: dataUrl,
+    maxTokens: 120
+  })
+  const text = res?.content?.[0]?.text || ''
+  const cleaned = text.trim().replace(/^["']|["']$/g, '').trim()
+  if (!cleaned) return null
+  // Hard cap so a runaway response can't blow up the thumb caption.
+  return cleaned.length > 220 ? cleaned.slice(0, 217) + '…' : cleaned
+}
+
 function normalizeLead(p) {
   // Coerce types + strip junk so the parsed object slots cleanly into
   // the form state. Anything questionable becomes null so the field
