@@ -23,6 +23,7 @@ import {
   startQuote, approveQuote, markComplete, markLost, reopen, logPayment
 } from '../lib/pipeline.js'
 import { toast, toastSuccess, toastInfo, toastUndo, toastError } from '../lib/toast.js'
+import { notifySelf } from '../lib/notifications.js'
 import { hapticTap, hapticMedium, hapticStageChange, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
@@ -1195,6 +1196,15 @@ function InspectionsTab({ contact, inspections, userId, onChange }) {
       result,
       data: { notes: notes || '' }
     })
+    // Notification — owner sees a trail of inspections in the inbox so
+    // the bell is meaningful even before partner-accept / payment-received
+    // triggers land server-side.
+    notifySelf(userId, {
+      kind: 'inspection_logged',
+      title: `${trade} · ${String(result).toUpperCase()}`,
+      body: contact?.name ? `Inspection logged on ${contact.name}` : 'Inspection logged',
+      link: `/jobs/${contact.id}`
+    }).catch(() => {})
     setActive(null)
     onChange()
   }

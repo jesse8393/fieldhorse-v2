@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { NotebookPen, Search } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import FieldhorseBadge from './FieldhorseBadge.jsx'
+import NotificationsBell from './NotificationsBell.jsx'
 
 function openPalette() {
   if (typeof window === 'undefined') return
@@ -71,10 +72,11 @@ export default function AppHeader() {
         <BrandSlot logoSrc={logoSrc} company={company} fullName={fullName} />
       </div>
 
-      {/* Right slot: search + notes. Search opens the universal command
-          palette (the spine — search jobs/clients/notes/events/files in
-          one query). Notes is a quick jump to /notes. ⌘K still works on
-          desktop independently. */}
+      {/* Right slot: search + notifications + notes shortcut.
+          Search opens the universal palette (jobs/clients/notes/events/
+          files in one query, also bound to ⌘K). The bell shows unread
+          count badge + opens the inbox drawer. Notes is a quick jump
+          to /notes. */}
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <button
           type="button"
@@ -98,6 +100,7 @@ export default function AppHeader() {
         >
           <Search size={16} />
         </button>
+        <NotificationsBell />
         <button
           type="button"
           aria-label="Notes"
