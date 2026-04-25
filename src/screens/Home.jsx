@@ -5,7 +5,7 @@ import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight, Receip
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import { getWeather, workWindow, tradeStatus, MURFREESBORO } from '../lib/weather.js'
+import { getWeather, workWindow, MURFREESBORO } from '../lib/weather.js'
 import Spotlight from '../components/fx/Spotlight.jsx'
 import ShimmerBar from '../components/fx/ShimmerBar.jsx'
 import GreetingTitle from '../components/fx/GreetingTitle.jsx'
@@ -216,17 +216,6 @@ export default function Home() {
   const pourStatus = windowRead?.status || (weather ? 'ok' : '—')
   const pourGood = String(pourStatus).toLowerCase().includes('good') || String(pourStatus).toLowerCase().includes('ok')
 
-  // Trade-window strip — same forecast snapshot, evaluated per trade.
-  // Surfaces "Roof window" + "Paint window" as first-class daily checks
-  // alongside the existing concrete pour window.
-  const tradeWindows = useMemo(() => {
-    if (!weather?.current) return []
-    return [
-      { trade: 'concrete', label: 'Pour' },
-      { trade: 'roofing',  label: 'Roof' },
-      { trade: 'paint',    label: 'Paint' }
-    ].map((t) => ({ ...t, ...tradeStatus(t.trade, weather.current) }))
-  }, [weather])
 
   const { stagger, item } = useFhMotion()
 
@@ -359,49 +348,6 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* TRADE WINDOWS — Concrete, Roofing, Paint side-by-side. Each is
-          evaluated against the current snapshot using TRADE_RULES from
-          weather.js. Tapping any opens the full Pour Window screen. */}
-      {tradeWindows.length > 0 && (
-        <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-            {tradeWindows.map((tw) => {
-              const tone = tw.status === 'stop' ? 'alert' : tw.status === 'warn' ? 'warn' : 'ok'
-              const color = tone === 'alert' ? 'var(--alert-red)' : tone === 'warn' ? 'var(--field-gold-bright)' : 'var(--signal-green)'
-              const statusLabel = tw.status === 'stop' ? 'STOP' : tw.status === 'warn' ? 'TIGHT' : 'GO'
-              return (
-                <button
-                  key={tw.trade}
-                  type="button"
-                  onClick={() => { hapticTap(); navigate('/pour-window') }}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 12,
-                    background: 'var(--surface-2)',
-                    border: `1px solid ${color}`,
-                    boxShadow: `inset 4px 0 0 ${color}`,
-                    color: 'var(--ink-strong)',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4
-                  }}
-                  aria-label={`${tw.label} window: ${statusLabel}${tw.reasons.length ? ' — ' + tw.reasons.join(', ') : ''}`}
-                >
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{tw.label}</span>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, lineHeight: 1, color }}>{statusLabel}</span>
-                  {tw.reasons.length > 0 && (
-                    <span style={{ fontSize: 10, color: 'var(--ink-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {tw.reasons[0]}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </motion.div>
-      )}
 
       {/* KPI CAROUSEL — phase 18.4: horizontal scroll-snap row instead
           of a 3-col grid. On 375px iPhone the prior grid gave each tile
