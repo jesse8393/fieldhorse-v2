@@ -6,9 +6,10 @@ import {
   Wrench, Receipt, DollarSign, ClipboardCheck, Calendar, FileText,
   ArrowRight, Check, Plus, X as XIcon, Save as SaveIcon,
   Image as ImageIcon, Paperclip, ListChecks, Download, Upload as UploadIcon,
-  Clock, Sparkles
+  Clock, Sparkles, GitCompareArrows
 } from 'lucide-react'
 import { compressImageToDataUrl, captionPhoto } from '../lib/docIntelligence.js'
+import TimeClockCard from '../components/TimeClockCard.jsx'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
@@ -367,6 +368,7 @@ export default function ContactDetail() {
             userId={user.id}
             isEditing={isEditing}
             onExitEdit={() => setIsEditing(false)}
+            onChange={fetchAll}
           />
         )}
         {tab === 'milestones' && <MilestonesTab contact={contact} onPatch={patch} />}
@@ -600,7 +602,7 @@ const JOB_TYPES = [
   'Addition'
 ]
 
-function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
+function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit, onChange }) {
   const [form, setForm] = useState({ ...contact })
   const [inviteOpen, setInviteOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -637,6 +639,13 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
         ? <OverviewEditForm form={form} set={set} saving={saving} onCommit={commit} onCancel={cancel} />
         : <OverviewReadCard contact={contact} />
       }
+
+      {/* Time clock — only on jobs that are actually being worked. Hidden
+          for leads / quotes (you don't punch in on a quote) and for
+          closed/lost (no point clocking time on a finished job). */}
+      {(contact.stage === 'job' || contact.stage === 'invoice') && (
+        <TimeClockCard contact={contact} userId={userId} onLogged={onChange} />
+      )}
 
       {/* Inspections toggle — gates the Inspections tab */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
@@ -1534,6 +1543,12 @@ function UploadList({ jobId, userId, kind }) {
   // Track which rows are still waiting on a Vision caption so the thumb
   // can show a "captioning…" shimmer instead of empty space.
   const [captioningIds, setCaptioningIds] = useState(() => new Set())
+  // Compare picker state — when active, taps on thumbs select before+after
+  // instead of opening the lightbox. After both are picked, the slider
+  // shows over the grid.
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareBefore, setCompareBefore] = useState(null)
+  const [compareAfter, setCompareAfter] = useState(null)
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
@@ -1703,23 +1718,77 @@ function UploadList({ jobId, userId, kind }) {
     return `${(n / (1024 * 1024)).toFixed(1)} MB`
   }
 
+  async function urlFor(row) {
+    const { data } = await supabase.storage.from(bucket).createSignedUrl(row.storage_path, 60 * 60)
+    return data?.signedUrl || ''
+  }
+
+  async function handleThumbTap(row) {
+    if (!compareMode) {
+      open(row)
+      return
+    }
+    const url = await urlFor(row)
+    if (!url) return
+    if (!compareBefore) {
+      setCompareBefore({ row, url })
+    } else if (!compareAfter && row.id !== compareBefore.row.id) {
+      setCompareAfter({ row, url })
+    } else {
+      // Reset to a new before
+      setCompareBefore({ row, url })
+      setCompareAfter(null)
+    }
+  }
+
+  function exitCompare() {
+    setCompareMode(false)
+    setCompareBefore(null)
+    setCompareAfter(null)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
           {kind === 'photo' ? `${rows.length} photo${rows.length === 1 ? '' : 's'}` : `${rows.length} file${rows.length === 1 ? '' : 's'}`}
         </span>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.97 }}
-          onClick={pick}
-          disabled={uploading}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: uploading ? 'default' : 'pointer', boxShadow: '0 4px 12px rgba(201,150,58,0.3)', opacity: uploading ? 0.6 : 1 }}
-        >
-          <UploadIcon size={12} />
-          {uploading ? 'UPLOADING…' : (kind === 'photo' ? 'ADD PHOTOS' : 'ADD FILES')}
-        </motion.button>
+        <div style={{ display: 'inline-flex', gap: 6 }}>
+          {kind === 'photo' && rows.length >= 2 && (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { compareMode ? exitCompare() : setCompareMode(true) }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: compareMode ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)', background: compareMode ? 'rgba(201,150,58,0.15)' : 'rgba(255,255,255,0.04)', color: compareMode ? 'var(--field-gold-bright)' : 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
+            >
+              <GitCompareArrows size={12} />
+              {compareMode ? 'EXIT COMPARE' : 'COMPARE'}
+            </motion.button>
+          )}
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={pick}
+            disabled={uploading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: uploading ? 'default' : 'pointer', boxShadow: '0 4px 12px rgba(201,150,58,0.3)', opacity: uploading ? 0.6 : 1 }}
+          >
+            <UploadIcon size={12} />
+            {uploading ? 'UPLOADING…' : (kind === 'photo' ? 'ADD PHOTOS' : 'ADD FILES')}
+          </motion.button>
+        </div>
       </div>
+
+      {/* Compare hint + slider */}
+      {compareMode && kind === 'photo' && (
+        <div style={{ padding: 10, borderRadius: 12, background: 'rgba(201,150,58,0.07)', border: '1px solid rgba(201,150,58,0.22)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: '0.06em' }}>
+            {!compareBefore ? 'Tap the BEFORE photo' : !compareAfter ? 'Now tap the AFTER photo' : 'Drag the slider'}
+          </div>
+          {compareBefore && compareAfter && (
+            <BeforeAfterSlider beforeUrl={compareBefore.url} afterUrl={compareAfter.url} beforeLabel={compareBefore.row.caption} afterLabel={compareAfter.row.caption} />
+          )}
+        </div>
+      )}
       <input ref={inputRef} type="file" accept={accept} multiple hidden onChange={handleFile} />
 
       {loading && <SkeletonList rows={3} card={false} />}
@@ -1729,16 +1798,22 @@ function UploadList({ jobId, userId, kind }) {
 
       {!loading && rows.length > 0 && kind === 'photo' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-          {rows.map((r) => (
-            <PhotoThumb
-              key={r.id}
-              row={r}
-              bucket={bucket}
-              captioning={captioningIds.has(r.id)}
-              onOpen={() => open(r)}
-              onDelete={() => remove(r)}
-            />
-          ))}
+          {rows.map((r) => {
+            const selected = compareMode && (compareBefore?.row.id === r.id || compareAfter?.row.id === r.id)
+            const compareLabel = compareBefore?.row.id === r.id ? 'BEFORE' : compareAfter?.row.id === r.id ? 'AFTER' : ''
+            return (
+              <PhotoThumb
+                key={r.id}
+                row={r}
+                bucket={bucket}
+                captioning={captioningIds.has(r.id)}
+                selectionLabel={compareLabel}
+                selected={selected}
+                onOpen={() => handleThumbTap(r)}
+                onDelete={() => remove(r)}
+              />
+            )
+          })}
         </div>
       )}
 
@@ -1783,7 +1858,7 @@ function UploadList({ jobId, userId, kind }) {
   )
 }
 
-function PhotoThumb({ row, bucket, captioning, onOpen, onDelete }) {
+function PhotoThumb({ row, bucket, captioning, selectionLabel, selected, onOpen, onDelete }) {
   const [url, setUrl] = useState('')
   useEffect(() => {
     let cancelled = false
@@ -1795,7 +1870,7 @@ function PhotoThumb({ row, bucket, captioning, onOpen, onDelete }) {
   }, [row.storage_path, bucket])
   const caption = row.caption?.trim()
   return (
-    <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)' }}>
+    <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: selected ? '2px solid var(--field-gold-bright)' : '1px solid var(--rule)' }}>
       <button
         type="button"
         onClick={onOpen}
@@ -1843,6 +1918,67 @@ function PhotoThumb({ row, bucket, captioning, onOpen, onDelete }) {
       >
         <Trash2 size={12} />
       </button>
+      {selectionLabel && (
+        <span aria-hidden="true" style={{ position: 'absolute', top: 4, left: 4, padding: '2px 6px', borderRadius: 6, background: 'var(--field-gold-bright)', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.12em' }}>
+          {selectionLabel}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Before/after slider — drag the vertical handle to wipe between two
+// photos. Single touch / mouse, both supported. Used by PhotosTab's
+// Compare mode. Stays inside the parent's content area so the page
+// itself doesn't lock to drag.
+function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }) {
+  const [pct, setPct] = useState(50)
+  const wrapRef = useRef(null)
+  const draggingRef = useRef(false)
+
+  function setFromClientX(clientX) {
+    const el = wrapRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const next = Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100))
+    setPct(next)
+  }
+
+  function onPointerDown(e) {
+    draggingRef.current = true
+    setFromClientX(e.clientX)
+    try { e.target.setPointerCapture(e.pointerId) } catch {}
+  }
+  function onPointerMove(e) {
+    if (!draggingRef.current) return
+    setFromClientX(e.clientX)
+  }
+  function onPointerUp() {
+    draggingRef.current = false
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--rule)', aspectRatio: '4 / 3', userSelect: 'none', touchAction: 'none', cursor: 'ew-resize' }}
+    >
+      <img src={afterUrl} alt={afterLabel || 'After'} draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', clipPath: `inset(0 ${100 - pct}% 0 0)` }}>
+        <img src={beforeUrl} alt={beforeLabel || 'Before'} draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      {/* Labels */}
+      <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.12em' }}>BEFORE</span>
+      <span style={{ position: 'absolute', top: 8, right: 8, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.12em' }}>AFTER</span>
+      {/* Handle line */}
+      <div aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: `${pct}%`, width: 2, background: 'var(--field-gold-bright)', boxShadow: '0 0 12px rgba(201,150,58,0.6)', transform: 'translateX(-1px)', pointerEvents: 'none' }} />
+      {/* Handle knob */}
+      <div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: `${pct}%`, width: 32, height: 32, borderRadius: '50%', background: 'var(--field-gold-bright)', border: '2px solid var(--onyx)', transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.5)', pointerEvents: 'none' }}>
+        <span style={{ color: 'var(--onyx)', fontSize: 9, fontFamily: 'var(--font-display)', letterSpacing: '0.12em' }}>‹›</span>
+      </div>
     </div>
   )
 }
