@@ -6,7 +6,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
-import { toastSuccess } from '../lib/toast.js'
+import { toastSuccess, toastUndo, toastError } from '../lib/toast.js'
 import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import SwipeableRow from '../components/SwipeableRow.jsx'
@@ -153,8 +153,20 @@ export default function Notes() {
   }
 
   async function remove(id) {
-    await supabase.from('fh_notes').delete().eq('id', id)
+    const snapshot = notes.find((n) => n.id === id)
+    const { error } = await supabase.from('fh_notes').delete().eq('id', id)
+    if (error) { toastError("Couldn't delete", error.message); return }
     setNotes((n) => n.filter((x) => x.id !== id))
+    toastUndo('Note deleted', {
+      description: snapshot?.parsed?.summary || (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_notes').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        setNotes((n) => [snapshot, ...n])
+        toastSuccess('Restored', '')
+      }
+    })
   }
 
   const listening = voiceState === 'listening'

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
-import { toast, toastSuccess } from '../lib/toast.js'
+import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.js'
 import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -60,14 +60,30 @@ export default function Schedule() {
 
   async function deleteEvent(evtId) {
     if (!evtId) return
+    // Snapshot before deletion so Undo can re-insert. Strip generated
+    // fields and the joined relation; only re-insert the source row.
+    const snapshot = events.find((e) => e.id === evtId) || upcoming.find((e) => e.id === evtId)
     const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId)
     if (error) {
-      toast({ kind: 'error', title: "Couldn't delete", body: error.message })
+      toastError("Couldn't delete", error.message)
       return
     }
-    toastSuccess('Event deleted', 'Schedule updated')
-    load()
-    loadUpcoming()
+    // Optimistic local-state removal so the row vanishes immediately
+    setEvents((prev) => prev.filter((e) => e.id !== evtId))
+    setUpcoming((prev) => prev.filter((e) => e.id !== evtId))
+    toastUndo('Event deleted', {
+      description: snapshot?.title || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        // eslint-disable-next-line no-unused-vars
+        const { fh_contacts, ...row } = snapshot
+        const { error: insErr } = await supabase.from('fh_schedule').insert(row)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        load()
+        loadUpcoming()
+        toastSuccess('Restored', snapshot.title || '')
+      }
+    })
   }
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null

@@ -22,7 +22,7 @@ import {
 import {
   startQuote, approveQuote, markComplete, markLost, reopen, logPayment
 } from '../lib/pipeline.js'
-import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
+import { toast, toastSuccess, toastInfo, toastUndo, toastError } from '../lib/toast.js'
 import { hapticTap, hapticMedium, hapticStageChange, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
@@ -936,9 +936,22 @@ function SubsTab({ contact, subs, userId, onChange }) {
   }
 
   async function remove(id) {
-    await supabase.from('fh_subs').delete().eq('id', id)
+    const snapshot = subs.find((s) => s.id === id)
+    const { error } = await supabase.from('fh_subs').delete().eq('id', id)
+    if (error) { toastError("Couldn't delete", error.message); return }
     await recalcCost(contact.id)
     onChange()
+    toastUndo('Sub removed', {
+      description: snapshot?.name || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_subs').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        await recalcCost(contact.id)
+        onChange()
+        toastSuccess('Restored', snapshot.name || '')
+      }
+    })
   }
 
   return (
@@ -1059,9 +1072,22 @@ function ExpensesTab({ contact, expenses, userId, onChange }) {
   }
 
   async function remove(id) {
-    await supabase.from('fh_expenses').delete().eq('id', id)
+    const snapshot = expenses.find((e) => e.id === id)
+    const { error } = await supabase.from('fh_expenses').delete().eq('id', id)
+    if (error) { toastError("Couldn't delete", error.message); return }
     await recalcCost(contact.id)
     onChange()
+    toastUndo('Expense removed', {
+      description: snapshot ? `${snapshot.description || 'Expense'} · $${Number(snapshot.amount || 0).toLocaleString()}` : 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_expenses').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        await recalcCost(contact.id)
+        onChange()
+        toastSuccess('Restored', snapshot.description || '')
+      }
+    })
   }
 
   return (
@@ -1742,8 +1768,20 @@ function TodosTab({ jobId, userId }) {
   }
 
   async function remove(rowId) {
+    const snapshot = rows.find((r) => r.id === rowId)
     const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId)
-    if (!error) fetchRows()
+    if (error) { toastError("Couldn't delete", error.message); return }
+    setRows((rs) => rs.filter((r) => r.id !== rowId))
+    toastUndo('Task deleted', {
+      description: (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_job_todos').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        fetchRows()
+        toastSuccess('Restored', '')
+      }
+    })
   }
 
   return (
