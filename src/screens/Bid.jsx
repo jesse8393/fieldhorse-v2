@@ -5,6 +5,8 @@ import { RATE_CARD, TRADE_LABELS } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
 import { toastSuccess } from '../lib/toast.js'
+import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
 
 const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Return ONLY JSON.`
@@ -51,11 +53,11 @@ export default function Bid() {
       const match = text.match(/\{[\s\S]*\}/)
       if (match) {
         const parsedBid = JSON.parse(match[0])
-        setBid(parsedBid)
+        hapticSuccess(); setBid(parsedBid)
         const low = parsedBid.total_low || parsedBid.line_items?.reduce((s, li) => s + (li.rate_low * (li.qty || 1)), 0) || 0
         const high = parsedBid.total_high || parsedBid.line_items?.reduce((s, li) => s + (li.rate_high * (li.qty || 1)), 0) || 0
         const withMargin = ((low + high) / 2) / (1 - marginPct / 100)
-        toastSuccess('Bid ready', money(Math.round(withMargin)))
+        hapticSuccess(); toastSuccess('Bid ready', money(Math.round(withMargin)))
       } else {
         setErr('AI returned no structured bid')
       }
@@ -70,8 +72,7 @@ export default function Bid() {
     setPicks((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
   }
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -83,7 +84,7 @@ export default function Bid() {
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
             Bid it,{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">clean.</em>
+            clean.
           </h1>
         </div>
         <div
@@ -141,7 +142,7 @@ export default function Bid() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.97 }}
-            onClick={generate}
+            onClick={() => { hapticMedium(); generate() }}
             disabled={!scope.trim() || generating}
             style={{
               marginTop: 8,

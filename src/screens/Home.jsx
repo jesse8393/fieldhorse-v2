@@ -10,6 +10,8 @@ import Spotlight from '../components/fx/Spotlight.jsx'
 import ShimmerBar from '../components/fx/ShimmerBar.jsx'
 import GreetingTitle from '../components/fx/GreetingTitle.jsx'
 import CountUp from '../components/fx/CountUp.jsx'
+import { hapticTap, hapticMedium } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 
 function formatDate(d) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()
@@ -60,6 +62,7 @@ export default function Home() {
   const [todayJobs, setTodayJobs] = useState([])
   const [weeklyTarget] = useState(25000)
   const [weeklyBooked, setWeeklyBooked] = useState(0)
+  const [refreshTick, setRefreshTick] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
   const displayName = displayNameFrom(profile, user)
@@ -138,6 +141,22 @@ export default function Home() {
     }
     load()
     return () => { cancelled = true }
+  }, [user, refreshTick])
+
+  // Supabase Realtime — re-fetch Home on any fh_contacts change for this user.
+  // Filter is server-side via the postgres_changes config; the channel only
+  // forwards rows matching the user_id. Cleanup unsubscribes on unmount.
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`fh_contacts:home:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${user.id}` },
+        () => setRefreshTick((t) => t + 1)
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [user])
 
   function pinLocation() {
@@ -177,8 +196,7 @@ export default function Home() {
   const pourStatus = windowRead?.status || (weather ? 'ok' : '—')
   const pourGood = String(pourStatus).toLowerCase().includes('good') || String(pourStatus).toLowerCase().includes('ok')
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.1 } } }
-  const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 200, damping: 24 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -225,8 +243,8 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* WEEKLY TARGET CARD */}
-      <motion.div variants={item} style={{ position: 'relative', margin: '0 20px 14px', padding: '18px 20px', borderRadius: 22, background: 'linear-gradient(135deg, rgba(30,20,10,0.8), rgba(20,20,20,0.6))', border: '1px solid rgba(201,150,58,0.2)', backdropFilter: 'blur(20px)', overflow: 'hidden' }}>
+      {/* WEEKLY TARGET CARD — Aceternity-style moving gradient border */}
+      <motion.div variants={item} className="fh-fx-moving-border fh-card-raised" style={{ position: 'relative', margin: '0 20px 14px', padding: '18px 20px', borderRadius: 22, background: 'linear-gradient(135deg, rgba(30,20,10,0.8), rgba(20,20,20,0.6))', border: '1px solid rgba(201,150,58,0.2)', backdropFilter: 'blur(20px)', overflow: 'hidden' }}>
         {/* Outer pulse — 200x200 (default), phase 0 */}
         <Spotlight style={{ top: -80, right: -80 }} />
         {/* Inner pulse — smaller, more gold-saturated, behind the $ amount, 1.5s out of phase */}
@@ -246,7 +264,7 @@ export default function Home() {
             <TrendingUp size={12} />{targetPct}%
           </div>
         </div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 52, lineHeight: 1, letterSpacing: '0.01em', color: 'var(--ink-strong)', position: 'relative' }}>
+        <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 52, letterSpacing: '0.01em', lineHeight: 1 }}>
           <span style={{ fontSize: 26, color: 'var(--ink-muted)', verticalAlign: 'top', marginRight: 2 }}>$</span>
           <CountUp to={weeklyBooked} />
         </div>
@@ -259,10 +277,22 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* WEATHER + POUR */}
+      {/* WEATHER + POUR — tappable, routes to /pour-window */}
       {hasCoords ? (
-        <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 10, padding: '0 20px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)' }}>
+        <motion.div
+          variants={item}
+          role="button"
+          tabIndex={0}
+          aria-label="Open work-window forecast"
+          whileTap={{ scale: 0.98 }}
+          onClick={() => { hapticTap(); navigate('/pour-window') }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hapticTap(); navigate('/pour-window') } }}
+          style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 10, padding: '0 20px 14px', cursor: 'pointer' }}
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)' }}>
+            <span aria-hidden="true" style={{ position: 'absolute', top: 8, right: 10, fontSize: 8, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', opacity: 0.7 }}>
+              Open →
+            </span>
             <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg, #2d3f54, #1a2535)', display: 'grid', placeItems: 'center' }}>
               <CloudSun size={18} color="#8fb4e3" />
             </div>
@@ -298,10 +328,10 @@ export default function Home() {
         ].map((kpi) => {
           const I = kpi.icon
           return (
-            <div key={kpi.label} style={{ position: 'relative', overflow: 'hidden', padding: '12px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+            <div key={kpi.label} className="fh-card-raised" style={{ position: 'relative', overflow: 'hidden', padding: '12px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
               <I size={14} style={{ position: 'absolute', top: 10, right: 10, color: 'rgba(201,150,58,0.4)' }} />
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{kpi.label}</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: '0.02em', lineHeight: 1, marginTop: 5 }}>
+              <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: '0.02em', lineHeight: 1, marginTop: 5 }}>
                 <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
               </div>
             </div>

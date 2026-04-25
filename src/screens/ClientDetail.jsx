@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import {
-  ChevronLeft, Pencil, X as XIcon, Save as SaveIcon, Briefcase, FileText,
-  Paperclip, Image as ImageIcon, Download, Phone, Mail, MapPin, Trash2
-} from 'lucide-react'
+import { ChevronLeft, Pencil, X as XIcon, Save as SaveIcon, Briefcase, FileText, Paperclip, Image as ImageIcon, Download, Phone, Mail, MapPin, Trash2, MessageSquare } from 'lucide-react'
+import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.js'
 import Aurora from '../components/fx/Aurora.jsx'
 import GridPattern from '../components/fx/GridPattern.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -37,10 +35,23 @@ export default function ClientDetail() {
   const [client, setClient] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('overview')
+
   const [isEditing, setIsEditing] = useState(false)
   const [jobs, setJobs] = useState([])
   const [notes, setNotes] = useState([])
   const [files, setFiles] = useState([])
+
+  // Derived bento metrics — computed from jobs[] (populated by the loadTabData effect).
+  // Outstanding = sum of amount on jobs in invoice stage (treated as "billed but not yet
+  // closed"). When fh_payments wiring lands, swap to amount - sum(payments).
+  const outstanding = useMemo(
+    () => (jobs || []).filter((j) => j.stage === 'invoice').reduce((s, j) => s + Number(j.amount || 0), 0),
+    [jobs]
+  )
+  const activeCount = useMemo(
+    () => (jobs || []).filter((j) => j.stage === 'job' || j.stage === 'quote' || j.stage === 'lead' || j.stage === 'invoice').length,
+    [jobs]
+  )
 
   const fetchClient = useCallback(async () => {
     if (!user || !id) return
@@ -159,9 +170,9 @@ export default function ClientDetail() {
                 Client
               </span>
               <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(24px, 7vw, 34px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-                <em className="fh-font-serif-italic fh-text-gradient-gold" style={{ fontStyle: 'italic' }}>
+                
                   {client.name}.
-                </em>
+                
               </h1>
               {client.company_name && (
                 <div style={{ marginTop: 6, fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
@@ -170,15 +181,79 @@ export default function ClientDetail() {
               )}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
-            <KpiPill label="Lifetime" value={money(client.total_lifetime_value)} gold />
-            <KpiPill label="Active jobs" value={String(client.active_jobs_count)} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: 10, marginTop: 14 }}>
+            <BentoCard label="Lifetime">
+              <span className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 24, lineHeight: 1 }}>
+                {money(client.total_lifetime_value)}
+              </span>
+            </BentoCard>
+            <BentoCard label="Outstanding" tone={outstanding > 0 ? 'alert' : 'muted'}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, lineHeight: 1, color: outstanding > 0 ? 'var(--alert-red)' : 'var(--ink-faint)', fontWeight: 800, letterSpacing: '-0.01em' }}>
+                {money(outstanding)}
+              </span>
+            </BentoCard>
+            <BentoCard label="Active">
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, lineHeight: 1, color: activeCount > 0 ? 'var(--ink-strong)' : 'var(--ink-faint)', fontWeight: 800 }}>
+                {activeCount}
+              </span>
+            </BentoCard>
           </div>
+          {/* COMMAND CENTER — quick-access action row */}
+          {(client.phone || client.email || client.address) && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 14 }}>
+              <a
+                href={client.phone ? `tel:${client.phone}` : '#'}
+                onClick={(e) => { if (!client.phone) { e.preventDefault(); return } hapticMedium() }}
+                aria-label="Call"
+                aria-disabled={!client.phone}
+                className="fh-press-instant"
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
+              >
+                <Phone size={20} />
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Call</span>
+              </a>
+              <a
+                href={client.phone ? `sms:${client.phone}` : '#'}
+                onClick={(e) => { if (!client.phone) { e.preventDefault(); return } hapticMedium() }}
+                aria-label="Text"
+                aria-disabled={!client.phone}
+                className="fh-press-instant"
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
+              >
+                <MessageSquare size={20} />
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Text</span>
+              </a>
+              <a
+                href={client.email ? `mailto:${client.email}` : '#'}
+                onClick={(e) => { if (!client.email) { e.preventDefault(); return } hapticMedium() }}
+                aria-label="Email"
+                aria-disabled={!client.email}
+                className="fh-press-instant"
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.email ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.email ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.email ? 1 : 0.4 }}
+              >
+                <Mail size={20} />
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Email</span>
+              </a>
+              <a
+                href={client.address ? `https://maps.apple.com/?address=${encodeURIComponent(client.address)}` : '#'}
+                target={client.address ? '_blank' : undefined}
+                rel={client.address ? 'noopener noreferrer' : undefined}
+                onClick={(e) => { if (!client.address) { e.preventDefault(); return } hapticMedium() }}
+                aria-label="Map"
+                aria-disabled={!client.address}
+                className="fh-press-instant"
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.address ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.address ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.address ? 1 : 0.4 }}
+              >
+                <Map size={20} />
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Map</span>
+              </a>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
-              onClick={() => setIsEditing((v) => !v)}
+              onClick={() => { hapticTap(); setIsEditing((v) => !v) }}
               aria-pressed={isEditing}
               style={{
                 display: 'inline-flex',
@@ -202,7 +277,7 @@ export default function ClientDetail() {
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
-              onClick={handleDelete}
+              onClick={() => { hapticError(); handleDelete() }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -252,11 +327,111 @@ export default function ClientDetail() {
             ? <OverviewEdit client={client} onCommit={async (patch) => { await supabase.from('fh_clients').update(patch).eq('id', client.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
             : <OverviewRead client={client} />
         )}
-        {tab === 'jobs' && <JobsList jobs={jobs} onOpen={(jobId) => navigate(`/jobs/${jobId}`)} />}
+        {tab === 'jobs' && (
+          <>
+            <JobsList jobs={jobs} onOpen={(jobId) => navigate(`/jobs/${jobId}`)} />
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--rule)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+                Activity
+              </span>
+              <ActivityTimeline jobs={jobs} notes={notes} />
+            </div>
+          </>
+        )}
         {tab === 'notes' && <NotesList notes={notes} onOpen={() => navigate('/notes')} />}
         {tab === 'files' && <FilesList rows={files} />}
       </div>
     </motion.div>
+  )
+}
+
+
+function BentoCard({ label, children, tone }) {
+  return (
+    <div
+      className="fh-card-raised"
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        padding: '12px 14px',
+        borderRadius: 14,
+        background: tone === 'alert'
+          ? 'linear-gradient(135deg, rgba(192,57,43,0.10), rgba(192,57,43,0.04))'
+          : 'rgba(255,255,255,0.03)',
+        border: tone === 'alert'
+          ? '1px solid rgba(192,57,43,0.30)'
+          : '1px solid var(--rule)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        minHeight: 64
+      }}
+    >
+      <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: tone === 'alert' ? 'var(--alert-red)' : 'var(--ink-muted)' }}>
+        {label}
+      </span>
+      {children}
+    </div>
+  )
+}
+
+
+function ActivityTimeline({ jobs, notes }) {
+  // Merge stage transitions (from jobs[].updated_at) and recent notes into a single sorted list.
+  // Each event gets a status color: gray (past), gold (pending follow-up), green (completed).
+  const events = []
+  for (const j of jobs || []) {
+    const stage = j.stage
+    let tone = 'past'
+    if (stage === 'invoice' || stage === 'quote') tone = 'pending'
+    if (stage === 'closed') tone = 'done'
+    if (stage === 'lost') tone = 'lost'
+    events.push({
+      id: 'job-' + j.id,
+      iso: j.updated_at || j.created_at,
+      title: (j.job_title || j.name || 'Job') + (stage ? ' · ' + stage.toUpperCase() : ''),
+      sub: j.amount ? '$' + Math.round(Number(j.amount) || 0).toLocaleString() : null,
+      tone
+    })
+  }
+  for (const n of (notes || []).slice(0, 8)) {
+    events.push({
+      id: 'note-' + n.id,
+      iso: n.created_at,
+      title: 'Note',
+      sub: (n.text || '').slice(0, 80),
+      tone: 'past'
+    })
+  }
+  events.sort((a, b) => new Date(b.iso || 0) - new Date(a.iso || 0))
+  if (events.length === 0) {
+    return (
+      <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13, fontFamily: 'var(--font-body)' }}>
+        No activity yet.
+      </div>
+    )
+  }
+  const colorFor = (t) => t === 'done' ? 'var(--signal-green)' : t === 'pending' ? 'var(--field-gold-bright)' : t === 'lost' ? 'var(--alert-red)' : 'var(--steel)'
+  return (
+    <div style={{ position: 'relative', paddingLeft: 20, marginTop: 12 }}>
+      <div aria-hidden="true" style={{ position: 'absolute', left: 7, top: 4, bottom: 4, width: 1, background: 'var(--rule-bold)' }} />
+      {events.slice(0, 12).map((e, i) => (
+        <div key={e.id} style={{ position: 'relative', marginBottom: 14 }}>
+          <span aria-hidden="true" style={{ position: 'absolute', left: -16, top: 4, width: 9, height: 9, borderRadius: '50%', background: colorFor(e.tone), boxShadow: '0 0 8px ' + colorFor(e.tone) + '99' }} />
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', lineHeight: 1.3 }}>
+            {e.title}
+          </div>
+          {e.sub && (
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {e.sub}
+            </div>
+          )}
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 10, color: 'var(--ink-faint)', marginTop: 2, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            {e.iso ? new Date(e.iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 

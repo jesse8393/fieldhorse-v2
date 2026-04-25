@@ -12,7 +12,7 @@ export default function GreetingTitle({ prefix = 'Morning,', name = 'there' }) {
     >
       {prefix}
       <br />
-      <em className="fh-font-serif-italic fh-text-gradient-gold">{name}.</em>
+      {name}.
     </h1>
   )
 }

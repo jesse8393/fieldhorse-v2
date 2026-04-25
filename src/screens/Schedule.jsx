@@ -11,6 +11,8 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { getWeather, workWindow } from '../lib/weather.js'
+import { hapticTap, hapticMedium } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
@@ -129,8 +131,7 @@ export default function Schedule() {
     [weather, profile?.services]
   )
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -142,13 +143,13 @@ export default function Schedule() {
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
             Run the{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">day.</em>
+            day.
           </h1>
         </div>
         <motion.button
           type="button"
           whileTap={{ scale: 0.96 }}
-          onClick={() => setAddOpen(true)}
+          onClick={() => { hapticMedium(); setAddOpen(true) }}
           aria-label="New event"
           style={{
             flexShrink: 0,

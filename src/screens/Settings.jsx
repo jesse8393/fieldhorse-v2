@@ -8,6 +8,8 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
 import { toastSuccess } from '../lib/toast.js'
+import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 import { Switch } from '@/components/ui/switch'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
@@ -90,6 +92,7 @@ export default function Settings() {
     refresh()
     setSaving(false)
     setSaved(true)
+    hapticSuccess()
     toastSuccess('Saved', 'Settings updated')
     setTimeout(() => setSaved(false), 1600)
   }
@@ -107,8 +110,7 @@ export default function Settings() {
     })
   }
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -119,7 +121,7 @@ export default function Settings() {
         </span>
         <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
           Run your{' '}
-          <em className="fh-font-serif-italic fh-text-gradient-gold">operation.</em>
+          operation.
         </h1>
       </motion.div>
 
@@ -239,7 +241,7 @@ export default function Settings() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.97 }}
-            onClick={handleSignOut}
+            onClick={handleSignOut} className="fh-press-instant"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
           >
             <LogOut size={14} />
@@ -264,7 +266,7 @@ export default function Settings() {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
-                onClick={() => setConfirmWipe(true)}
+                onClick={() => setConfirmWipe(true)} className="fh-press-instant"
                 disabled={wiping}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
               >
@@ -306,7 +308,7 @@ export default function Settings() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
-          onClick={save}
+          onClick={save} className="fh-press-instant"
           disabled={saving}
           style={{
             display: 'inline-flex',
@@ -381,11 +383,7 @@ function renderSectionTitle(node) {
   if (node && node.props && Array.isArray(node.props.children)) {
     return node.props.children.map((child, i) => {
       if (child && child.type === 'em') {
-        return (
-          <em key={i} className="fh-font-serif-italic fh-text-gradient-gold" style={{ fontStyle: 'italic' }}>
-            {child.props.children}
-          </em>
-        )
+        return <span key={i}>{child.props.children}</span>
       }
       return child
     })

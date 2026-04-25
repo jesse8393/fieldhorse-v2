@@ -72,9 +72,9 @@ export default function AppHeader() {
         onClick={() => navigate('/notes')}
         className="fh-header-notes-btn"
         style={{
-          width: 36,
-          height: 36,
-          minWidth: 36,
+          width: 44,
+          height: 44,
+          minWidth: 44,
           borderRadius: 11,
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid var(--rule)',

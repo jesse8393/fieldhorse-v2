@@ -154,7 +154,7 @@ export default function PartnerInvite() {
             style={{ fontSize: 'clamp(24px, 6.5vw, 32px)', lineHeight: 1.15, letterSpacing: '-0.02em', marginTop: 14, marginBottom: 6, fontWeight: 400, color: 'var(--ink-strong, #f4f1ea)' }}
           >
             {inviterName} invited you to{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">co-manage.</em>
+            co-manage.
           </h1>
           <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted, #8a8577)', lineHeight: 1.5, fontFamily: 'var(--font-body, "DM Sans", sans-serif)' }}>
             You'll get access to <strong style={{ color: 'var(--ink-strong, #f4f1ea)' }}>{jobTitle}</strong> — notes, schedule, payments, subs, expenses. Nothing else from their account.

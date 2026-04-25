@@ -179,6 +179,128 @@
 .fh-font-serif { font-family: var(--font-serif); }
 .fh-font-serif-italic { font-family: var(--font-serif); font-style: italic; }
 
+/* Raised cards — drop onto KPI tiles, job cards, client rows, weekly target.
+   Brand rule: surfaces lift off the base; never float in the void. */
+.fh-card-raised {
+  box-shadow: var(--shadow-raised);
+  transition: box-shadow var(--dur-mechanical) var(--ease-mechanical),
+              transform var(--dur-mechanical) var(--ease-mechanical);
+}
+.fh-card-raised:hover { transform: translateY(-1px); }
+
+/* Instant press depress — tap registers before network/HMR completes.
+   Pairs with framer-motion whileTap for the visual confirmation. */
+.fh-press-instant {
+  transition: transform 60ms var(--ease-mechanical),
+              box-shadow 60ms var(--ease-mechanical);
+}
+.fh-press-instant:active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* Tap flash — list rows go slightly lighter on :active so the tap registers
+   before navigation. Used alongside framer-motion whileTap. */
+.fh-tap-flash { transition: background 80ms var(--ease-mechanical); }
+.fh-tap-flash:active { background: rgba(255, 255, 255, 0.08); }
+[data-theme='light'] .fh-tap-flash:active { background: rgba(11, 11, 11, 0.04); }
+
+/* Money numeric treatment — neon gold + 800 weight + tight tracking.
+   Apply to $amount renders only; never to labels or counts. */
+.fh-money {
+  color: var(--field-gold-neon);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Stage pill — solid fill + onyx text. High-contrast, sunlight legible.
+   Color set via inline style or a stage-specific modifier. */
+.fh-stage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--onyx);
+  line-height: 1.4;
+}
+.fh-stage-pill--lead    { background: var(--stage-lead); }
+.fh-stage-pill--quote   { background: var(--stage-quote); }
+.fh-stage-pill--job     { background: var(--stage-job); }
+.fh-stage-pill--invoice { background: var(--stage-invoice); }
+.fh-stage-pill--closed  { background: var(--stage-closed); }
+.fh-stage-pill--lost    { background: var(--stage-lost); color: #FAF7F1; }
+
+/* Floating action button — bottom-right, clears bottom nav + iOS home bar. */
+.fh-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--field-gold);
+  color: var(--onyx);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(201, 150, 58, 0.45),
+              0 2px 6px rgba(0, 0, 0, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  z-index: calc(var(--z-nav) - 1);
+  transition: transform 80ms var(--ease-mechanical);
+  -webkit-tap-highlight-color: transparent;
+}
+.fh-fab:active { transform: translateY(1px) scale(0.96); }
+@media (prefers-reduced-motion: reduce) {
+  .fh-fab { transition: none; }
+}
+
+/* Aceternity-style animated moving border. Wrap any container and the gradient ring
+   orbits its perimeter. Adds "premium shimmer" without affecting layout. */
+@keyframes fh-moving-border {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.fh-fx-moving-border {
+  position: relative;
+  isolation: isolate;
+}
+.fh-fx-moving-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg,
+    rgba(199, 164, 90, 0.0) 0%,
+    rgba(228, 190, 111, 0.65) 20%,
+    rgba(232, 184, 101, 0.85) 35%,
+    rgba(199, 164, 90, 0.65) 50%,
+    rgba(228, 190, 111, 0.25) 65%,
+    rgba(199, 164, 90, 0.0) 100%
+  );
+  background-size: 300% 100%;
+  animation: fh-moving-border 6s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fh-fx-moving-border::before { animation: none; }
+}
+
 /* END TAILWIND v4 ADDITIVE LAYER */
 *,
 *::before,
@@ -330,6 +452,8 @@ a {
 }
 .fh-field__label {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.2em;
@@ -506,6 +630,8 @@ a {
 .fh-onb__eyebrow {
   margin: 0;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0.28em;
@@ -1429,6 +1555,8 @@ a {
 
 .fh-onb__logo-label {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.78rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1526,7 +1654,16 @@ a {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-.fh-nav__item.is-active { color: var(--field-gold); }
+/* Active tab: strong read via color + subtle bg tile + gold glyph.
+   Dark theme gets a faint gold wash; light theme gets an onyx-tinted wash. */
+.fh-nav__item.is-active {
+  color: var(--ink-strong);
+  background: rgba(199, 164, 90, 0.10);
+  border-radius: 12px;
+}
+.fh-nav__item.is-active .fh-nav__icon { color: var(--field-gold-bright); }
+.fh-nav__item.is-active .fh-nav__label { color: var(--ink-strong); font-weight: 700; }
+[data-theme='light'] .fh-nav__item.is-active { background: rgba(11, 11, 11, 0.05); }
 .fh-nav__item:hover { color: var(--ink-strong); }
 .fh-nav__icon {
   display: inline-flex;
@@ -1536,6 +1673,8 @@ a {
 }
 .fh-nav__label {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.2em;
@@ -1719,6 +1858,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-drawer__section-label {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   font-weight: 600;
   color: var(--field-gold);
@@ -1933,6 +2074,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-kbd {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.66rem;
   padding: 2px 6px;
   border: 1px solid var(--rule-bold);
@@ -1977,6 +2120,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-eye {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.625rem;
   font-weight: 500;
   letter-spacing: 0.3em;
@@ -2120,6 +2265,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border-radius: var(--radius-spec);
   color: var(--ink-muted);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -2139,6 +2286,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   color: var(--field-gold);
   border-radius: var(--radius-spec);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.68rem;
   font-weight: 600;
 }
@@ -2373,6 +2522,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-form .fh-field__k {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.2em;
@@ -3698,6 +3849,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-webhook__url code {
   flex: 1;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.82rem;
   color: var(--field-gold);
   overflow-x: auto;
@@ -3710,6 +3863,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 0.78rem;
   line-height: 1.55;
   color: #B8B8B8;
@@ -3781,6 +3936,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 
 .fh-mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   letter-spacing: 0.05em;
 }
 
@@ -3833,6 +3990,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-sec-tag__num {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   font-weight: 600;
   color: var(--field-gold);
@@ -3844,6 +4003,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-sec-tag__label {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   color: var(--ink-muted);
   letter-spacing: 0.3em;
@@ -3856,6 +4017,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   top: 10px;
   right: 12px;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   color: var(--ink-muted);
   letter-spacing: 0.1em;
@@ -3881,6 +4044,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border: 1px solid rgba(45, 122, 79, 0.3);
   border-radius: var(--radius-spec);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   font-weight: 600;
   color: var(--signal-green);
@@ -3957,6 +4122,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-spec-line__k {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   font-weight: 500;
   color: var(--ink-muted);
@@ -3965,6 +4132,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-spec-line__v {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 11px;
   font-weight: 500;
   color: var(--ink-strong);
@@ -3986,6 +4155,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 /* ---- Hero coordinate line (monospace) ---- */
 .fh-hero-coord {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 11px;
   color: var(--ink-muted);
   letter-spacing: 0.1em;
@@ -4037,6 +4208,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-loc-bar__text {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 11px;
   color: var(--ink-strong);
   letter-spacing: 0.05em;
@@ -4053,6 +4226,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border: 1px solid var(--field-gold);
   color: var(--field-gold);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.2em;
@@ -4103,6 +4278,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-counter__label {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   font-weight: 600;
   color: var(--ink-muted);
@@ -4330,6 +4507,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   margin: 0;
   text-align: center;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   font-weight: 500;
   color: var(--ink-muted);
@@ -4346,6 +4525,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-asheet-field__k {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.2em;
@@ -4457,6 +4638,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-asheet-money__input {
   flex: 1;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 1.6rem;
   font-weight: 500;
   color: var(--ink-strong);
@@ -4489,6 +4672,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-voice-hero__label {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   color: var(--field-gold);
   letter-spacing: 0.3em;
@@ -4501,6 +4686,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-voice-hero__chip {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   color: var(--ink-muted);
   padding: 3px 8px;
@@ -4575,6 +4762,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border: 1px solid var(--onyx-border);
   border-radius: var(--radius-spec);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--steel-xlt);
@@ -4608,6 +4797,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-style: italic;
   opacity: 0.7;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 12px;
   letter-spacing: 0.02em;
 }
@@ -4703,6 +4894,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-emptystate__glyph svg { width: 100%; height: 100%; }
 .fh-emptystate__code {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   letter-spacing: 0.25em;
   text-transform: uppercase;
@@ -4834,6 +5027,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border-radius: var(--radius-spec);
   color: var(--raw-linen);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
@@ -4893,6 +5088,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-spectab__code {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   color: var(--ink-muted);
   letter-spacing: 0.2em;
@@ -4993,6 +5190,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-upcoming__card:hover { border-color: var(--field-gold); transform: translateY(-1px); }
 .fh-upcoming__date {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.2em;
@@ -5009,6 +5208,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-upcoming__sub {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   font-size: 9px;
   letter-spacing: 0.2em;
   color: var(--ink-muted);

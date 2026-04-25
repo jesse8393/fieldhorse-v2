@@ -146,6 +146,7 @@ export default function BottomNav() {
                             fontWeight: 600,
                             cursor: 'pointer',
                             textAlign: 'left',
+                            minHeight: 44,
                             width: '100%'
                           }}
                         >
@@ -194,7 +195,8 @@ export default function BottomNav() {
                   fontFamily: 'var(--font-body)',
                   fontSize: 14,
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                minHeight: 44
                 }}
               >
                 <LogOut size={16} />

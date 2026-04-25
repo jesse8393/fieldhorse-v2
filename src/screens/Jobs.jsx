@@ -7,7 +7,12 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGE_MAP, ACTIVE_STAGES, margin, marginTier } from '../lib/stages.js'
+import { hapticTap, hapticMedium } from '../lib/haptics.js'
+import KanbanBoard from '../components/KanbanBoard.jsx'
+import SwipeableRow from '../components/SwipeableRow.jsx'
+import { Phone as PhoneIcon, MessageSquare as MsgIcon } from 'lucide-react'
 import { toastSuccess } from '../lib/toast.js'
+import { useFhMotion } from '../lib/motion.js'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
 // Stage progression for the pipeline progress bar (pure visual; lost collapses to zero).
@@ -52,9 +57,12 @@ function triggerCommandPalette() {
 export default function Jobs() {
   const { user } = useAuth()
   const [contacts, setContacts] = useState([])
+  const [refreshTick, setRefreshTick] = useState(0)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [view, setView] = useState('list') // 'list' | 'kanban'
+  const [isWide, setIsWide] = useState(typeof window !== 'undefined' && window.innerWidth >= 768)
   const [addOpen, setAddOpen] = useState(false)
   const [justAddedId, setJustAddedId] = useState(null)
   const [drawerContact, setDrawerContact] = useState(null)
@@ -71,6 +79,20 @@ export default function Jobs() {
       .order('updated_at', { ascending: false })
     if (!error) setContacts(data || [])
     setLoading(false)
+  }, [user, refreshTick])
+
+  // Supabase Realtime — re-fetch Jobs on any fh_contacts change for this user.
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`fh_contacts:jobs:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${user.id}` },
+        () => setRefreshTick((t) => t + 1)
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [user])
 
   useEffect(() => { load() }, [load])
@@ -82,6 +104,18 @@ export default function Jobs() {
       setSearchParams(searchParams, { replace: true })
     }
   }, [searchParams, setSearchParams])
+
+  // Resize listener — Kanban is desktop/tablet only (≥768px). Falls back to list on mobile.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    function onResize() {
+      const wide = window.innerWidth >= 768
+      setIsWide(wide)
+      if (!wide) setView('list')
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const activeTab = TABS.find((t) => t.id === filter) || TABS[0]
 
@@ -112,6 +146,19 @@ export default function Jobs() {
     return out
   }, [contacts])
 
+  async function handleStageChange(contactId, nextStage) {
+    // Optimistic update — flip the stage locally first so the kanban card
+    // moves immediately, then write through to Supabase. Realtime listener
+    // will reconcile if anything else changes server-side.
+    setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, stage: nextStage } : c))
+    const { error } = await supabase.from('fh_contacts').update({ stage: nextStage }).eq('id', contactId)
+    if (error) {
+      // Rollback on failure
+      setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, stage: c.stage } : c))
+      console.warn('Stage change failed:', error.message)
+    }
+  }
+
   function openDrawer(contact) {
     setDrawerContact(contact)
   }
@@ -124,8 +171,7 @@ export default function Jobs() {
     if (!next) closeDrawer()
   }
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -137,7 +183,7 @@ export default function Jobs() {
             style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
           >
             Jobs &{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">pipeline</em>
+            pipeline
           </h1>
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             <span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{summary.activeCount}</span>
@@ -262,28 +308,84 @@ export default function Jobs() {
         </div>
       </motion.div>
 
-      {/* LIST */}
-      <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
-        {loading && <SkeletonList rows={5} />}
-        {!loading && filtered.length === 0 && (
-          <EmptyView
-            hasFilter={filter !== 'all' || !!search}
-            onAdd={() => setAddOpen(true)}
-          />
-        )}
-        <AnimatePresence>
-          {filtered.map((c, i) => (
-            <JobCard
-              key={c.id}
-              contact={c}
-              index={i}
-              isNew={c.id === justAddedId}
-              viewerUserId={user?.id}
-              onOpen={openDrawer}
-            />
+      {/* VIEW TOGGLE — only on tablet+ where kanban is usable */}
+      {isWide && (
+        <motion.div variants={item} style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 20px 8px', gap: 6 }}>
+          {[{ id: 'list', label: 'List' }, { id: 'kanban', label: 'Kanban' }].map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => { hapticTap(); setView(v.id) }}
+              className="fh-press-instant"
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                border: view === v.id ? '1px solid var(--field-gold)' : '1px solid var(--rule)',
+                background: view === v.id ? 'rgba(201,150,58,0.14)' : 'transparent',
+                color: view === v.id ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: 'pointer'
+              }}
+            >
+              {v.label}
+            </button>
           ))}
-        </AnimatePresence>
-      </motion.div>
+        </motion.div>
+      )}
+
+      {/* LIST */}
+      {view === 'list' && (
+        <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
+          {loading && <SkeletonList rows={5} />}
+          {!loading && filtered.length === 0 && (
+            <EmptyView
+              hasFilter={filter !== 'all' || !!search}
+              onAdd={() => setAddOpen(true)}
+            />
+          )}
+          <AnimatePresence>
+            {filtered.map((c, i) => {
+              const swipeActions = []
+              if (c.phone) {
+                swipeActions.push({
+                  icon: <PhoneIcon size={18} />,
+                  label: `Call ${c.name || 'contact'}`,
+                  color: 'rgba(45, 122, 79, 0.22)',
+                  fg: 'var(--signal-green)',
+                  onClick: () => { window.location.href = `tel:${c.phone}` }
+                })
+                swipeActions.push({
+                  icon: <MsgIcon size={18} />,
+                  label: `Text ${c.name || 'contact'}`,
+                  color: 'rgba(199, 164, 90, 0.18)',
+                  fg: 'var(--field-gold-bright)',
+                  onClick: () => { window.location.href = `sms:${c.phone}` }
+                })
+              }
+              return (
+                <SwipeableRow key={c.id} actions={swipeActions} disabled={!c.phone}>
+                  <JobCard
+                    contact={c}
+                    index={i}
+                    isNew={c.id === justAddedId}
+                    viewerUserId={user?.id}
+                    onOpen={openDrawer}
+                  />
+                </SwipeableRow>
+              )
+            })}
+          </AnimatePresence>
+        </motion.div>
+      )}
+
+      {/* KANBAN — desktop / tablet drag-and-drop */}
+      {view === 'kanban' && isWide && (
+        <KanbanBoard contacts={filtered} onStageChange={handleStageChange} />
+      )}
 
       {/* VAUL DRAWER — quick actions */}
       <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>
@@ -392,7 +494,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
     <motion.button
       type="button"
       layout
-      onClick={() => onOpen(contact)}
+      onClick={() => { hapticTap(); onOpen(contact) }}
       onMouseMove={SUPPORTS_HOVER ? handleMouseMove : undefined}
       onMouseLeave={SUPPORTS_HOVER ? handleMouseLeave : undefined}
       initial={isNew ? { opacity: 0, scale: 0.9 } : { opacity: 0, y: 10 }}
@@ -403,6 +505,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
         : { duration: 0.22, delay: Math.min(index * 0.04, 0.25), ease: [0.2, 0.8, 0.2, 1] }
       }
       whileTap={{ scale: 0.99 }}
+      className="fh-card-raised fh-tap-flash"
       style={{
         position: 'relative',
         overflow: 'hidden',
@@ -411,6 +514,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
         gap: 10,
         padding: '14px 14px 12px',
         borderRadius: 16,
+        minHeight: 88,
         background: 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
         border: '1px solid var(--rule)',
         backdropFilter: 'blur(20px)',
@@ -459,8 +563,8 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--field-gold-bright)' }}>
+        <div style={{ textAlign: 'right', opacity: Number(contact.amount || 0) > 0 ? 1 : 0.4 }}>
+          <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1 }}>
             {money(contact.amount)}
           </div>
         </div>
@@ -469,9 +573,8 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
       {/* Bottom row: stage badge + margin pill + stages count */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {stageMeta && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: `${stageColor}22`, border: `1px solid ${stageColor}44`, color: stageColor, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: stageColor }} />
-            {stageMeta.label}
+          <span className={`fh-stage-pill fh-stage-pill--${contact.stage || 'lead'}`}>
+            {stageMeta.label.toUpperCase()}
           </span>
         )}
         {isSharedIn && (

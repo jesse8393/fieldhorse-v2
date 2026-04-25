@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Briefcase, Phone, Mail } from 'lucide-react'
+import { Plus, Search, Briefcase, Phone, Mail, MessageSquare, Map } from 'lucide-react'
+import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
+import { useFhMotion } from '../lib/motion.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 
@@ -21,6 +23,7 @@ export default function Clients() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const [filter, setFilter] = useState('all') // 'all' | 'active' | 'recent'
   const [addOpen, setAddOpen] = useState(false)
 
   const load = useCallback(async () => {
@@ -40,59 +43,40 @@ export default function Clients() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return rows
-    return rows.filter((r) =>
+    let base = rows
+    if (filter === 'active') base = base.filter((r) => (r.active_jobs_count || 0) > 0)
+    if (filter === 'recent') {
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+      base = base.filter((r) => r.last_activity_at && new Date(r.last_activity_at).getTime() > cutoff)
+    }
+    if (!needle) return base
+    return base.filter((r) =>
       (r.name || '').toLowerCase().includes(needle)
       || (r.company_name || '').toLowerCase().includes(needle)
       || (r.email || '').toLowerCase().includes(needle)
       || (r.phone || '').toLowerCase().includes(needle)
     )
-  }, [rows, q])
+  }, [rows, q, filter])
 
   const totalLifetime = useMemo(
     () => rows.reduce((s, r) => s + Number(r.total_lifetime_value || 0), 0),
     [rows]
   )
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.05 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 20px 6px' }}>
+      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 20px 6px', position: 'sticky', top: 0, zIndex: 10, background: 'linear-gradient(180deg, var(--surface-0) 60%, transparent 100%)', backdropFilter: 'blur(10px)' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-            Directory · {rows.length}
-          </span>
-          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            Your{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">clients.</em>
+          <h1 className="fh-font-serif" style={{ margin: '0', fontSize: 'clamp(24px, 7vw, 34px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+            Clients
           </h1>
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             <span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{money(totalLifetime)}</span>{' '}lifetime
           </div>
         </div>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.96 }}
-          onClick={() => setAddOpen(true)}
-          aria-label="New client"
-          style={{
-            flexShrink: 0,
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            border: 'none',
-            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-            color: 'var(--onyx)',
-            cursor: 'pointer',
-            display: 'grid',
-            placeItems: 'center',
-            boxShadow: '0 8px 20px rgba(201,150,58,0.35)'
-          }}
-        >
-          <Plus size={20} strokeWidth={2.5} />
-        </motion.button>
+
       </motion.div>
 
       <motion.div variants={item} style={{ padding: '0 20px 10px' }}>
@@ -104,6 +88,31 @@ export default function Clients() {
             placeholder="Search name, company, phone, email…"
             style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
           />
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          {[{ id: 'all', label: 'All' }, { id: 'active', label: 'Active' }, { id: 'recent', label: 'Recent' }].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => { hapticTap(); setFilter(f.id) }}
+              className="fh-press-instant"
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                border: filter === f.id ? '1px solid var(--field-gold)' : '1px solid var(--rule)',
+                background: filter === f.id ? 'rgba(201,150,58,0.14)' : 'transparent',
+                color: filter === f.id ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: 'pointer'
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </motion.div>
 
@@ -135,7 +144,8 @@ export default function Clients() {
               whileHover={{ boxShadow: '0 0 24px rgba(201,150,58,0.18), 0 0 0 1px rgba(201,150,58,0.25)' }}
               whileTap={{ scale: 0.995 }}
               type="button"
-              onClick={() => navigate(`/clients/${c.id}`)}
+              onClick={() => { hapticTap(); navigate(`/clients/${c.id}`) }}
+              className="fh-card-raised fh-tap-flash"
               style={{
                 position: 'relative',
                 overflow: 'hidden',
@@ -154,7 +164,7 @@ export default function Clients() {
               />
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <h3 style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600, color: 'var(--ink-strong)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <h3 style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 700, color: 'var(--ink-strong)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.name || 'Unnamed client'}
                   </h3>
                   {c.company_name && (
@@ -163,8 +173,8 @@ export default function Clients() {
                     </div>
                   )}
                 </div>
-                <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--field-gold-bright)' }}>
+                <div style={{ flexShrink: 0, textAlign: 'right', opacity: Number(c.total_lifetime_value || 0) > 0 ? 1 : 0.4 }}>
+                  <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1 }}>
                     {money(c.total_lifetime_value)}
                   </div>
                   <div style={{ marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -172,24 +182,39 @@ export default function Clients() {
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', opacity: (c.active_jobs_count || 0) > 0 ? 1 : 0.45 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <Briefcase size={11} />
-                  {c.active_jobs_count} {c.active_jobs_count === 1 ? 'active' : 'active'}
+                  {c.active_jobs_count || 0} active {(c.active_jobs_count || 0) === 1 ? 'job' : 'jobs'}
                 </span>
-                {c.phone && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <Phone size={11} />
-                    {c.phone}
-                  </span>
-                )}
-                {c.email && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, overflow: 'hidden' }}>
-                    <Mail size={11} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</span>
-                  </span>
-                )}
               </div>
+              {(c.phone || c.email || c.address) && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}
+                >
+                  {c.phone && (
+                    <>
+                      <a href={`tel:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Call ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                        <Phone size={16} />
+                      </a>
+                      <a href={`sms:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Text ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                        <MessageSquare size={16} />
+                      </a>
+                    </>
+                  )}
+                  {c.email && (
+                    <a href={`mailto:${c.email}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Email ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                      <Mail size={16} />
+                    </a>
+                  )}
+                  {c.address && (
+                    <a href={`https://maps.apple.com/?address=${encodeURIComponent(c.address)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Map to ${c.name}`} className="fh-press-instant" style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule-bold)', color: 'var(--ink-strong)', textDecoration: 'none' }}>
+                      <Map size={16} />
+                    </a>
+                  )}
+                </div>
+              )}
             </motion.button>
           ))}
         </AnimatePresence>
@@ -205,6 +230,14 @@ export default function Clients() {
           else load()
         }}
       />
+      <button
+        type="button"
+        onClick={() => { hapticMedium(); setAddOpen(true) }}
+        aria-label="New client"
+        className="fh-fab"
+      >
+        <Plus size={26} strokeWidth={2.75} />
+      </button>
     </motion.div>
   )
 }

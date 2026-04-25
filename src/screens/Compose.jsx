@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
 import { toastSuccess } from '../lib/toast.js'
+import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ScanLine from '../components/fx/ScanLine.jsx'
 
@@ -67,7 +69,7 @@ export default function Compose() {
         maxTokens: 500
       })
       const text = res?.content?.[0]?.text || ''
-      setDraft(text)
+      hapticSuccess(); setDraft(text)
       if (text) toastSuccess('Draft ready', 'Copy, send, or edit')
     } catch (e) {
       setDraft(`AI unavailable. Hand-draft fallback: Hi ${contact?.name || 'there'}, quick note on ${intent.toLowerCase()}. — ${profile?.company_name || ''}`)
@@ -88,8 +90,7 @@ export default function Compose() {
     if (channel === 'email' && contact.email) window.location.href = `mailto:${contact.email}?body=${encodeURIComponent(draft)}`
   }
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -101,7 +102,7 @@ export default function Compose() {
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
             Write it,{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">perfectly.</em>
+            perfectly.
           </h1>
         </div>
         <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }} aria-hidden="true">
@@ -199,7 +200,7 @@ export default function Compose() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
-          onClick={generate}
+          onClick={() => { hapticMedium(); generate() }}
           disabled={loading}
           style={{
             marginTop: 4,

@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { toastSuccess } from '../lib/toast.js'
+import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import Wordmark from '../components/Wordmark.jsx'
 import LogoUploader from '../components/LogoUploader.jsx'
 
@@ -239,7 +240,7 @@ export default function Onboarding() {
         <p className="fh-onb__eyebrow">Onboarding · Three steps</p>
         <h1 className="fh-onb__title fh-font-serif" style={{ fontWeight: 400 }}>
           Set up<br />
-          <em className="fh-font-serif-italic fh-text-gradient-gold">shop.</em>
+          shop.
         </h1>
         <p className="fh-onb__lede">
           Three things to lock in before the work day starts.
@@ -257,7 +258,7 @@ export default function Onboarding() {
         <section className="fh-onb__section" style={{ animationDelay: '120ms' }}>
           <div className="fh-onb__section-head">
             <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
-              Your <em className="fh-font-serif-italic fh-text-gradient-gold">company.</em>
+              Your company.
             </h2>
             <span className="fh-onb__section-hint">Shows on bids, invoices, and every schedule notification.</span>
           </div>
@@ -291,7 +292,7 @@ export default function Onboarding() {
         <section className="fh-onb__section" style={{ animationDelay: '200ms' }}>
           <div className="fh-onb__section-head">
             <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
-              What you <em className="fh-font-serif-italic fh-text-gradient-gold">run.</em>
+              What you run.
             </h2>
             <span className="fh-onb__section-hint">Pick every trade. This configures your rate card and pour-condition rules.</span>
           </div>
@@ -336,7 +337,7 @@ export default function Onboarding() {
         <section className="fh-onb__section" style={{ animationDelay: '280ms' }}>
           <div className="fh-onb__section-head">
             <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
-              Lock your <em className="fh-font-serif-italic fh-text-gradient-gold">location.</em>
+              Lock your location.
             </h2>
             <span className="fh-onb__section-hint">Weather and pour windows anchor to this point.</span>
           </div>

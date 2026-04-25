@@ -23,6 +23,7 @@ import {
   startQuote, approveQuote, markComplete, markLost, reopen, logPayment
 } from '../lib/pipeline.js'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
+import { hapticTap, hapticMedium, hapticStageChange, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
@@ -209,7 +210,7 @@ export default function ContactDetail() {
                 style={{ margin: '6px 0 0', fontSize: 28, lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
               >
                 {hasFirst && `${first} `}
-                <em className="fh-font-serif-italic fh-text-gradient-gold">{last}.</em>
+                {last}.
               </h1>
             )
           })()}
@@ -255,7 +256,7 @@ export default function ContactDetail() {
             className="ui:min-w-[180px]"
           >
             <DropdownMenuItem
-              onSelect={() => markLost(contact).then(() => { toastInfo('Marked lost', 'Moved to lost column'); fetchAll() })}
+              onSelect={() => { hapticError(); markLost(contact).then(() => { toastInfo('Marked lost', 'Moved to lost column'); fetchAll() }) }}
             >
               <XCircle size={14} /> Mark lost
             </DropdownMenuItem>
@@ -543,17 +544,17 @@ function StageActions({ contact, onAction, onLogPayment }) {
   return (
     <div className="fh-stagerow">
       {stage === 'lead' && (
-        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => onAction(startQuote)}>
+        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => { hapticStageChange(); onAction(startQuote) }}>
           Start quote <ArrowRight size={16} />
         </motion.button>
       )}
       {stage === 'quote' && (
-        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => onAction(approveQuote)}>
+        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => { hapticStageChange(); onAction(approveQuote) }}>
           Approve quote <Check size={16} />
         </motion.button>
       )}
       {stage === 'job' && (
-        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => onAction(markComplete)}>
+        <motion.button whileTap={{ scale: 0.97 }} style={primaryBtn} onClick={() => { hapticSuccess(); onAction(markComplete) }}>
           Mark complete <Check size={16} />
         </motion.button>
       )}
@@ -565,7 +566,7 @@ function StageActions({ contact, onAction, onLogPayment }) {
       {stage === 'closed' && (
         <>
           <span className="fh-status-pill fh-status-pill--gold">Closed</span>
-          <button style={ghostBtn} onClick={() => onAction(reopen)}>
+          <button style={ghostBtn} onClick={() => { hapticTap(); onAction(reopen) }}>
             Reopen
           </button>
         </>
@@ -573,7 +574,7 @@ function StageActions({ contact, onAction, onLogPayment }) {
       {stage === 'lost' && (
         <>
           <span className="fh-status-pill fh-status-pill--red">Lost</span>
-          <button style={ghostBtn} onClick={() => onAction(reopen)}>
+          <button style={ghostBtn} onClick={() => { hapticTap(); onAction(reopen) }}>
             Reopen
           </button>
         </>
@@ -971,7 +972,7 @@ function SubsTab({ contact, subs, userId, onChange }) {
             <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </SheetField>
           <SheetField label="Rate" code="04·RATE">
-            <input type="number" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} placeholder="0" />
+            <input type="number" inputMode="decimal" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} placeholder="0" />
           </SheetField>
         </div>
         <SheetChipRow
@@ -1220,7 +1221,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
               style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               Log{' '}
-              <em className="fh-font-serif-italic fh-text-gradient-gold">{trade || 'inspection'}.</em>
+              {trade || 'inspection'}.
             </h2>
           </DrawerTitle>
           <DrawerDescription
@@ -1420,7 +1421,7 @@ function PaymentModal({ contact, balance, onClose, onLogged }) {
         </header>
         <form onSubmit={submit} className="fh-form">
           <div className="fh-grid2">
-            <Field label="Amount"><input autoFocus type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+            <Field label="Amount"><input autoFocus type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
             <Field label="Method">
               <select value={method} onChange={(e) => setMethod(e.target.value)}>
                 <option value="check">Check</option>

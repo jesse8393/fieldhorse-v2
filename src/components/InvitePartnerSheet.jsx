@@ -180,9 +180,9 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
               style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               {readyUrl ? (
-                <>Invite <em className="fh-font-serif-italic fh-text-gradient-gold">ready.</em></>
+                <>Invite ready.</>
               ) : (
-                <>Invite a <em className="fh-font-serif-italic fh-text-gradient-gold">partner.</em></>
+                <>Invite a partner.</>
               )}
             </h2>
           </DrawerTitle>

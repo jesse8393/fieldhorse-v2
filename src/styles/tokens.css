@@ -37,10 +37,20 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
 
-  /* Typography */
+  /* Typography
+     Brand rule: no monospaced typography anywhere. Numerics ride on DM Sans via
+     font-variant-numeric: tabular-nums + font-feature-settings: "tnum" at each callsite.
+     --font-mono is retained as a legacy alias pointing to DM Sans so in-flight references
+     fall back to body font automatically; new code should reference --font-body directly. */
   --font-display: 'Bebas Neue', 'Helvetica Neue', sans-serif;
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+
+  /* High-viz money gold — brighter than --field-gold-bright, reserved for $amount
+     numerics only. Bumped saturation + value off the hot gold so money reads
+     like neon against the onyx base. */
+  --field-gold-neon: #F3C65E;
+  --font-mono: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* Scale — industrial sharpness. Soft corners read toy; sharp read industrial. */
   --radius-xs: 0px;
@@ -58,12 +68,21 @@
   --space-7: 48px;
   --space-8: 64px;
 
-  /* Motion */
+  /* Motion — brand rule: mechanical, not bouncy. Skip spring physics on
+     primary actions; use snap curves (short in, very short out). */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Mechanical snap — think truck door, heavy switch. Fast in, instant stop. */
+  --ease-mechanical: cubic-bezier(0.5, 0, 0.2, 1);
+  --dur-instant: 60ms;
+  --dur-mechanical: 100ms;
   --dur-fast: 120ms;
   --dur: 200ms;
   --dur-slow: 360ms;
+
+  /* Raised card elevation — makes feature surfaces sit clearly above the base.
+     Heavier in dark theme (overridden below) so cards don't disappear into onyx. */
+  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.08), 0 12px 28px rgba(0, 0, 0, 0.10);
 
   /* Z-layers */
   --z-nav: 40;
@@ -86,6 +105,8 @@
   --rule-bold: rgba(242, 237, 228, 0.18);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 14px 40px rgba(0, 0, 0, 0.5);
   --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.35);
+  /* Dark-theme raised: use gold glow + onyx-drop combo so cards lift without washing. */
+  --shadow-raised: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 2px 6px rgba(0, 0, 0, 0.55), 0 18px 44px rgba(0, 0, 0, 0.45);
 }
 
 @media (prefers-color-scheme: dark) {

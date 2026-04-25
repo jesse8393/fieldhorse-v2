@@ -73,7 +73,7 @@ export default function ResetPassword() {
           >
             Reset your
             <br />
-            <em className="fh-font-serif-italic fh-text-gradient-gold">password.</em>
+            password.
           </h1>
           <div
             style={{

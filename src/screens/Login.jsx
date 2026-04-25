@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { hapticMedium, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, Lock, ArrowRight } from 'lucide-react'
@@ -103,7 +104,7 @@ export default function Login() {
           >
             {isSignIn ? heroPrefix : 'Sign up,'}
             <br />
-            <em className="fh-font-serif-italic fh-text-gradient-gold">{isSignIn ? `${heroName}.` : 'operator.'}</em>
+            {isSignIn ? `${heroName}.` : 'operator.'}
           </h1>
         </div>
 

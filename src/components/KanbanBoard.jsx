@@ -1,0 +1,207 @@
+import { useMemo, useState } from 'react'
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  closestCorners
+} from '@dnd-kit/core'
+import { useDroppable, useDraggable } from '@dnd-kit/core'
+import { motion } from 'framer-motion'
+import { GripVertical } from 'lucide-react'
+import { hapticStageChange, hapticTap } from '../lib/haptics.js'
+
+// Stage columns shown left-to-right. "lost" lives off-board (URL-only).
+const COLUMNS = [
+  { id: 'lead',    label: 'Lead' },
+  { id: 'quote',   label: 'Quote' },
+  { id: 'job',     label: 'Active' },
+  { id: 'invoice', label: 'Invoice' },
+  { id: 'closed',  label: 'Closed' }
+]
+
+function money(n) {
+  const v = Number(n || 0)
+  if (!v) return '$0'
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
+  return `$${Math.round(v).toLocaleString()}`
+}
+
+function initials(name) {
+  if (!name) return '—'
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+}
+
+function KanbanCard({ contact, dragging }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: contact.id, data: { contact } })
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+    : {}
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        position: 'relative',
+        padding: '11px 12px',
+        borderRadius: 12,
+        background: 'rgba(255, 255, 255, 0.04)',
+        border: '1px solid var(--rule)',
+        boxShadow: dragging
+          ? '0 18px 44px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3)'
+          : '0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 24px rgba(0, 0, 0, 0.30)',
+        cursor: 'grab',
+        userSelect: 'none',
+        touchAction: 'none'
+      }}
+      {...listeners}
+      {...attributes}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.14)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 13 }}>
+          {initials(contact.name)}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {contact.name || 'Untitled'}
+          </div>
+          {(contact.job_title || contact.job_type) && (
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {contact.job_title || contact.job_type}
+            </div>
+          )}
+        </div>
+        <GripVertical size={14} color="var(--ink-faint)" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
+      </div>
+      <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <span className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 16, lineHeight: 1, opacity: Number(contact.amount || 0) > 0 ? 1 : 0.4 }}>
+          {money(contact.amount)}
+        </span>
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+          #{String(contact.id).slice(0, 6)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function KanbanColumn({ id, label, contacts, isOver }) {
+  const { setNodeRef } = useDroppable({ id })
+  const total = contacts.reduce((s, c) => s + Number(c.amount || 0), 0)
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        padding: 12,
+        borderRadius: 16,
+        minHeight: 220,
+        background: isOver ? 'rgba(199, 164, 90, 0.06)' : 'rgba(255, 255, 255, 0.025)',
+        border: isOver ? '1px solid rgba(199, 164, 90, 0.45)' : '1px solid var(--rule)',
+        transition: 'background 120ms cubic-bezier(0.5, 0, 0.2, 1), border-color 120ms'
+      }}
+    >
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+        <span className={`fh-stage-pill fh-stage-pill--${id}`}>
+          {label.toUpperCase()}
+        </span>
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+          {contacts.length} · {money(total)}
+        </span>
+      </header>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {contacts.map((c) => (
+          <KanbanCard key={c.id} contact={c} />
+        ))}
+        {contacts.length === 0 && (
+          <div style={{ padding: '20px 8px', textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-faint)', border: '1px dashed var(--rule)', borderRadius: 10 }}>
+            Empty column
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function KanbanBoard({ contacts, onStageChange }) {
+  const [activeId, setActiveId] = useState(null)
+  const [overColumn, setOverColumn] = useState(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } })
+  )
+
+  const byStage = useMemo(() => {
+    const out = Object.fromEntries(COLUMNS.map((c) => [c.id, []]))
+    for (const c of contacts || []) {
+      if (out[c.stage]) out[c.stage].push(c)
+    }
+    return out
+  }, [contacts])
+
+  const activeContact = activeId ? (contacts || []).find((c) => c.id === activeId) : null
+
+  function handleDragStart(e) {
+    setActiveId(e.active.id)
+    hapticTap()
+  }
+
+  function handleDragOver(e) {
+    setOverColumn(e.over?.id || null)
+  }
+
+  function handleDragEnd(e) {
+    const id = e.active.id
+    const targetStage = e.over?.id
+    setActiveId(null)
+    setOverColumn(null)
+    if (!targetStage || !COLUMNS.some((c) => c.id === targetStage)) return
+    const moved = (contacts || []).find((c) => c.id === id)
+    if (!moved || moved.stage === targetStage) return
+    hapticStageChange()
+    onStageChange?.(id, targetStage)
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => { setActiveId(null); setOverColumn(null) }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.5, 0, 0.2, 1] }}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(220px, 1fr))`,
+          gap: 12,
+          padding: '4px 20px 20px',
+          overflowX: 'auto'
+        }}
+      >
+        {COLUMNS.map((col) => (
+          <KanbanColumn
+            key={col.id}
+            id={col.id}
+            label={col.label}
+            contacts={byStage[col.id] || []}
+            isOver={overColumn === col.id}
+          />
+        ))}
+      </motion.div>
+      <DragOverlay dropAnimation={{ duration: 100, easing: 'cubic-bezier(0.5, 0, 0.2, 1)' }}>
+        {activeContact ? <KanbanCard contact={activeContact} dragging /> : null}
+      </DragOverlay>
+    </DndContext>
+  )
+}

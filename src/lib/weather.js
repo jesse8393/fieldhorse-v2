@@ -2,6 +2,35 @@
 
 export const MURFREESBORO = { lat: 35.8456, lon: -86.3903 }
 
+// Reverse geocode lat/lon to "City, ST" via BigDataCloud's free client endpoint.
+// No API key. Falls back to "{lat}, {lon}" if the call fails.
+// Tiny in-memory cache keyed to 3-decimal coord pair (~100m precision) so the
+// same location doesn't re-fetch within a session.
+const _geocodeCache = new Map()
+export async function reverseGeocode(lat, lon) {
+  if (lat == null || lon == null) return null
+  const key = `${lat.toFixed(3)},${lon.toFixed(3)}`
+  if (_geocodeCache.has(key)) return _geocodeCache.get(key)
+  try {
+    const res = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+    )
+    if (!res.ok) throw new Error('geocode failed')
+    const d = await res.json()
+    const city = d.city || d.locality || d.principalSubdivision || ''
+    const region = d.principalSubdivisionCode
+      ? d.principalSubdivisionCode.replace(/^[A-Z]{2}-/, '')
+      : ''
+    const out = city ? (region ? `${city}, ${region}` : city) : `${lat.toFixed(2)}, ${lon.toFixed(2)}`
+    _geocodeCache.set(key, out)
+    return out
+  } catch {
+    const fallback = `${lat.toFixed(2)}, ${lon.toFixed(2)}`
+    _geocodeCache.set(key, fallback)
+    return fallback
+  }
+}
+
 export async function getWeather(lat = MURFREESBORO.lat, lon = MURFREESBORO.lon) {
   const params = new URLSearchParams({
     latitude: lat,

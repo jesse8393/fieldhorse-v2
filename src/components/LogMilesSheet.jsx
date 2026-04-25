@@ -86,7 +86,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }) {
               style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               Log{' '}
-              <em className="fh-font-serif-italic fh-text-gradient-gold">miles.</em>
+              miles.
             </h2>
           </DrawerTitle>
           <DrawerDescription

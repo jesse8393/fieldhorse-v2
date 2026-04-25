@@ -18,6 +18,7 @@ import Compose from './screens/Compose.jsx'
 import Analytics from './screens/Analytics.jsx'
 import Importer from './screens/Importer.jsx'
 import Settings from './screens/Settings.jsx'
+import PourWindow from './screens/PourWindow.jsx'
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth()
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/import" element={<Importer />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/pour-window" element={<PourWindow />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

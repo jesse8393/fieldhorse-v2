@@ -7,6 +7,10 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
 import { toastSuccess } from '../lib/toast.js'
+import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
+import SwipeableRow from '../components/SwipeableRow.jsx'
+import { Archive as ArchiveIcon, Trash2 as TrashIcon } from 'lucide-react'
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
 
@@ -143,6 +147,11 @@ export default function Notes() {
     }
   }
 
+  async function markDone(id) {
+    await supabase.from('fh_notes').update({ done: true }).eq('id', id)
+    setNotes((n) => n.filter((x) => x.id !== id))
+  }
+
   async function remove(id) {
     await supabase.from('fh_notes').delete().eq('id', id)
     setNotes((n) => n.filter((x) => x.id !== id))
@@ -150,8 +159,7 @@ export default function Notes() {
 
   const listening = voiceState === 'listening'
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -163,7 +171,7 @@ export default function Notes() {
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
             Notes,{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">fast.</em>
+            fast.
           </h1>
         </div>
         <motion.button
@@ -248,7 +256,7 @@ export default function Notes() {
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
-              onClick={save}
+              onClick={() => { hapticSuccess(); save() }}
               disabled={!draft.trim() || saving}
               style={{
                 display: 'inline-flex',
@@ -316,16 +324,32 @@ export default function Notes() {
             const contact = contacts.find((c) => c.id === n.contact_id)
             const hasParsed = !!(n.parsed && (n.parsed.summary || n.parsed.action_items?.length || n.parsed.risks?.length || n.parsed.follow_up_date || n.parsed.materials_needed?.length))
             const whenShort = new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+            const swipeActions = [
+              {
+                icon: <ArchiveIcon size={18} />,
+                label: 'Archive note',
+                color: 'rgba(45, 122, 79, 0.22)',
+                fg: 'var(--signal-green)',
+                onClick: () => { hapticSuccess(); markDone(n.id) }
+              },
+              {
+                icon: <TrashIcon size={18} />,
+                label: 'Delete note',
+                color: 'rgba(192, 57, 43, 0.18)',
+                fg: 'var(--alert-red)',
+                onClick: () => { hapticTap(); remove(n.id) }
+              }
+            ]
             return (
+              <SwipeableRow key={n.id} actions={swipeActions} openOffset={-100}>
               <motion.article
-                key={n.id}
                 layout
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.22, delay: Math.min(i * 0.04, 0.25), ease: [0.2, 0.8, 0.2, 1] }}
                 whileHover={{ boxShadow: '0 0 24px rgba(201,150,58,0.18), 0 0 0 1px rgba(201,150,58,0.25)' }}
-                className="fh-note-card"
+                className="fh-note-card fh-card-raised"
                 style={{
                   position: 'relative',
                   overflow: 'hidden',
@@ -404,6 +428,7 @@ export default function Notes() {
                   </ul>
                 )}
               </motion.article>
+              </SwipeableRow>
             )
           })}
         </AnimatePresence>

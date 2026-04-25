@@ -6,49 +6,52 @@ import { Progress } from '@/components/ui/progress'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { toastSuccess } from '../lib/toast.js'
+import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 
-const PRESETS = {
-  jobber: {
-    label: 'Jobber',
-    map: {
-      name: ['Client Name', 'Name', 'Client'],
-      phone: ['Mobile Phone', 'Phone', 'Primary Phone'],
-      email: ['Email', 'Primary Email'],
-      address: ['Street 1', 'Address', 'Property Address'],
-      job_title: ['Job Name', 'Title'],
-      job_type: ['Service', 'Category'],
-      amount: ['Total', 'Quote Total', 'Amount']
-    }
-  },
-  hubspot: {
-    label: 'HubSpot',
-    map: {
-      name: ['First Name', 'Company', 'Contact Name'],
-      phone: ['Phone Number', 'Mobile'],
-      email: ['Email'],
-      address: ['Street Address'],
-      job_title: ['Deal Name'],
-      job_type: ['Deal Stage'],
-      amount: ['Deal Amount']
-    }
-  },
-  generic: {
-    label: 'Generic CSV',
-    map: {
-      name: ['name', 'Name', 'Full Name', 'Contact'],
-      phone: ['phone', 'Phone'],
-      email: ['email', 'Email'],
-      address: ['address', 'Address'],
-      job_title: ['title', 'Job', 'Job Title'],
-      job_type: ['type', 'Category'],
-      amount: ['amount', 'Total', 'Value']
-    }
-  }
+// Normalize a column header so "First Name" / "first_name" / "firstname" all match.
+function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '') }
+
+// Each field has a list of common synonyms. Matching is normalized (case + punct + whitespace agnostic).
+const FIELD_SYNONYMS = {
+  name:      ['name', 'fullname', 'clientname', 'contact', 'contactname', 'customername', 'firstname', 'company', 'companyname', 'businessname', 'first', 'lead'],
+  phone:     ['phone', 'phonenumber', 'mobile', 'mobilephone', 'primaryphone', 'cell', 'cellphone', 'workphone', 'telephone', 'tel'],
+  email:     ['email', 'emailaddress', 'primaryemail', 'workemail', 'contactemail', 'mail'],
+  address:   ['address', 'street', 'streetaddress', 'street1', 'addressline1', 'propertyaddress', 'serviceaddress', 'location', 'address1'],
+  job_title: ['jobname', 'jobtitle', 'title', 'dealname', 'opportunity', 'opportunityname', 'project', 'projectname'],
+  job_type:  ['service', 'category', 'servicetype', 'jobtype', 'dealstage', 'stage', 'type', 'trade'],
+  amount:    ['total', 'amount', 'quotetotal', 'dealamount', 'value', 'price', 'revenue', 'estimate', 'bidamount']
 }
 
-function pick(row, keys) {
-  for (const k of keys) if (row[k] != null && row[k] !== '') return row[k]
-  return null
+const PRESETS = {
+  jobber:  { label: 'Jobber'      },
+  hubspot: { label: 'HubSpot'     },
+  generic: { label: 'Generic CSV' }
+}
+
+// Build a lookup once per parse: for each CSV header we see, resolve which field it maps to (if any).
+function buildHeaderMap(headers) {
+  const out = {}
+  for (const h of headers) {
+    const n = norm(h)
+    for (const [field, syns] of Object.entries(FIELD_SYNONYMS)) {
+      if (syns.includes(n)) { out[field] = h; break }
+    }
+    // Fallback: startsWith / contains match for loose cases.
+    if (!Object.values(out).includes(h)) {
+      for (const [field, syns] of Object.entries(FIELD_SYNONYMS)) {
+        if (out[field]) continue
+        if (syns.some((s) => n.startsWith(s) || n.includes(s))) { out[field] = h; break }
+      }
+    }
+  }
+  return out
+}
+
+function pick(row, header) {
+  if (!header) return null
+  const v = row[header]
+  return v != null && v !== '' ? v : null
 }
 
 export default function Importer() {
@@ -56,6 +59,7 @@ export default function Importer() {
   const [preset, setPreset] = useState('jobber')
   const [rows, setRows] = useState([])
   const [mapped, setMapped] = useState([])
+  const [headerMap, setHeaderMap] = useState({})
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState(0)
   const [done, setDone] = useState(null)
@@ -91,15 +95,18 @@ export default function Importer() {
   }
 
   function remap(data, p) {
-    const map = PRESETS[p].map
+    // Build a header map based on what's actually in the CSV (first row's keys).
+    const headers = data[0] ? Object.keys(data[0]) : []
+    const hm = buildHeaderMap(headers)
+    setHeaderMap(hm)
     const out = data.map((r) => ({
-      name: pick(r, map.name),
-      phone: pick(r, map.phone),
-      email: pick(r, map.email),
-      address: pick(r, map.address),
-      job_title: pick(r, map.job_title),
-      job_type: pick(r, map.job_type),
-      amount: Number(pick(r, map.amount) || 0),
+      name: pick(r, hm.name),
+      phone: pick(r, hm.phone),
+      email: pick(r, hm.email),
+      address: pick(r, hm.address),
+      job_title: pick(r, hm.job_title),
+      job_type: pick(r, hm.job_type),
+      amount: Number(pick(r, hm.amount) || 0),
       stage: 'lead'
     })).filter((r) => r.name)
     setMapped(out)
@@ -124,7 +131,7 @@ export default function Importer() {
     setTimeout(() => setProgress(0), 400)
     setImporting(false)
     const finalCount = count ?? payload.length
-    setDone(error ? { err: error.message } : { count: finalCount })
+    if (!error) hapticSuccess(); setDone(error ? { err: error.message } : { count: finalCount })
     if (!error) {
       setRows([])
       setMapped([])
@@ -141,8 +148,7 @@ export default function Importer() {
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -154,7 +160,7 @@ export default function Importer() {
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
             Bring it{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">all in.</em>
+            all in.
           </h1>
         </div>
         <div

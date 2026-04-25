@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.jsx'
 import CountUp from '../components/fx/CountUp.jsx'
@@ -8,6 +9,8 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGES, ACTIVE_STAGES, margin } from '../lib/stages.js'
 import { toastSuccess } from '../lib/toast.js'
+import { hapticTap, hapticMedium } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 // Compact currency — matches Home hero pattern. Skips compaction under $1k
@@ -42,6 +45,34 @@ export default function Analytics() {
 
   useEffect(() => { load() }, [load])
 
+  // 12-week pipeline trend — bucket contacts by created_at week,
+  // sum amount of rows still in active stages. Each bucket is Sunday-anchored.
+  const trendData = useMemo(() => {
+    const buckets = []
+    const now = new Date()
+    const sunday = new Date(now)
+    sunday.setHours(0, 0, 0, 0)
+    sunday.setDate(sunday.getDate() - sunday.getDay())
+    for (let i = 11; i >= 0; i--) {
+      const wkStart = new Date(sunday)
+      wkStart.setDate(wkStart.getDate() - i * 7)
+      const wkEnd = new Date(wkStart)
+      wkEnd.setDate(wkEnd.getDate() + 7)
+      const total = contacts
+        .filter((c) => {
+          const created = c.created_at ? new Date(c.created_at) : null
+          if (!created) return false
+          return created >= wkStart && created < wkEnd && ACTIVE_STAGES.includes(c.stage)
+        })
+        .reduce((s, c) => s + Number(c.amount || 0), 0)
+      buckets.push({
+        week: wkStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        amount: Math.round(total)
+      })
+    }
+    return buckets
+  }, [contacts])
+
   const stats = useMemo(() => {
     const pipeline = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage)).reduce((s, c) => s + Number(c.amount || 0), 0)
     const wonYTD = contacts.filter((c) => c.stage === 'closed').reduce((s, c) => s + Number(c.amount || 0), 0)
@@ -70,8 +101,7 @@ export default function Analytics() {
 
   const maxStageValue = Math.max(...byStage.map((b) => b.value), 1)
 
-  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }
+  const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
@@ -83,7 +113,7 @@ export default function Analytics() {
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
             CEO{' '}
-            <em className="fh-font-serif-italic fh-text-gradient-gold">read.</em>
+            read.
           </h1>
         </div>
         <div
@@ -122,6 +152,50 @@ export default function Analytics() {
           </motion.div>
 
           {/* PIPELINE BY STAGE */}
+          {/* PIPELINE TREND — 12-week area chart */}
+          <motion.section variants={item} style={{ padding: '0 20px 18px' }}>
+            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 10 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <TrendingUp size={13} color="var(--field-gold-bright)" />
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+                  Pipeline trend · 12 wks
+                </span>
+              </div>
+              <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+                Active value
+              </span>
+            </header>
+            <div style={{ height: 120, padding: '6px 0', borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid var(--rule)' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="fhPipelineGold" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#F3C65E" stopOpacity={0.55} />
+                      <stop offset="100%" stopColor="#F3C65E" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="week" hide />
+                  <YAxis hide />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--surface-1)', border: '1px solid var(--rule-bold)', borderRadius: 10, fontFamily: 'var(--font-body)', fontSize: 12 }}
+                    labelStyle={{ color: 'var(--ink-muted)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' }}
+                    itemStyle={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}
+                    formatter={(v) => [fmtMoneyCompact(v), 'Pipeline']}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="#F3C65E"
+                    strokeWidth={2}
+                    fill="url(#fhPipelineGold)"
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#F3C65E', stroke: 'var(--onyx)', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.section>
+
           <motion.section variants={item} style={{ padding: '0 20px 20px' }}>
             <header style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
               <BarChart3 size={13} color="var(--field-gold-bright)" />
@@ -215,7 +289,7 @@ export default function Analytics() {
                       <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>{m.purpose || 'Drive'}</div>
                       <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>{new Date(m.drove_on).toLocaleDateString()}</div>
                     </div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--field-gold-bright)' }}>{m.miles} mi</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em' }}>{m.miles} mi</div>
                   </div>
                 ))}
               </div>
