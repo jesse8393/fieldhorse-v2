@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
-import { toastSuccess } from '../lib/toast.js'
+import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.js'
+import { supabase } from '../lib/supabase.js'
+import { seedDemoData } from '../lib/demoSeed.js'
 import Wordmark from '../components/Wordmark.jsx'
 import LogoUploader from '../components/LogoUploader.jsx'
 
@@ -206,25 +208,46 @@ export default function Onboarding() {
     )
   }
 
-  async function onSubmit(e) {
-    e.preventDefault()
+  // First-run seed flag — true means "after profile saves, also seed
+  // demo data so the user lands on a stocked Home instead of em-dashes."
+  // Settings → Reset everything is the explicit undo path. Default true
+  // because the empty-state churn rate is brutal; user can opt out.
+  async function finish({ withSeed }) {
     if (!canSubmit || busy) return
     setBusy(true)
     setError('')
-    const { error } = await upsertProfile({
+    const { error: profErr } = await upsertProfile({
       company_name: companyName.trim(),
       services,
       location_lat: coords?.lat ?? null,
       location_lon: coords?.lon ?? null,
       onboarded_at: new Date().toISOString()
     })
-    setBusy(false)
-    if (error) {
-      setError(error.message || 'Could not save profile')
+    if (profErr) {
+      setBusy(false)
+      setError(profErr.message || 'Could not save profile')
       return
     }
-    toastSuccess('Welcome aboard', 'Your workspace is ready')
+    if (withSeed && user?.id) {
+      try {
+        const counts = await seedDemoData(supabase, user.id)
+        hapticSuccess()
+        toastSuccess('Workspace ready', `Seeded ${counts.clients} clients, ${counts.jobs} jobs, ${counts.events} events`)
+      } catch (ex) {
+        // Don't block the user — they still have a clean account, just no demo
+        toastError("Couldn't seed sample data", ex?.message || 'Continuing with empty workspace.')
+      }
+    } else {
+      toastSuccess('Welcome aboard', 'Your workspace is ready')
+    }
+    setBusy(false)
     navigate('/', { replace: true })
+  }
+
+  async function onSubmit(e) {
+    // Form's default submit (Enter key) seeds — matches the recommended path.
+    e.preventDefault()
+    finish({ withSeed: true })
   }
 
   return (
@@ -386,11 +409,39 @@ export default function Onboarding() {
               type="submit"
               className="fh-btn fh-btn--primary fh-onb__submit"
               disabled={!canSubmit || busy}
+              title="Recommended — seeds demo clients, jobs, and a schedule so you can see the whole app working"
             >
-              {busy ? 'Saving…' : 'Start the work day'}
+              {busy ? 'Saving…' : 'Start with sample data'}
             </button>
           </div>
-          <p className="fh-onb__meta">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+            <p className="fh-onb__meta" style={{ margin: 0 }}>
+              Sample data shows you the whole app immediately. Wipe anytime in Settings.
+            </p>
+            <button
+              type="button"
+              onClick={() => finish({ withSeed: false })}
+              disabled={!canSubmit || busy}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 0',
+                color: 'var(--ink-muted)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                cursor: (canSubmit && !busy) ? 'pointer' : 'default',
+                opacity: (canSubmit && !busy) ? 1 : 0.5,
+                textDecoration: 'underline',
+                textUnderlineOffset: 3
+              }}
+            >
+              Skip — start fresh
+            </button>
+          </div>
+          <p className="fh-onb__meta" style={{ marginTop: 14 }}>
             Signed in as <span>{user?.email}</span> ·{' '}
             <button
               type="button"
