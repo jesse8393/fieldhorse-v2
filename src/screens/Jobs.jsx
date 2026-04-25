@@ -215,7 +215,7 @@ export default function Jobs() {
               boxSizing: 'border-box',
               padding: '11px 14px 11px 40px',
               borderRadius: 12,
-              background: 'rgba(255,255,255,0.04)',
+              background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               color: 'var(--ink-strong)',
               fontFamily: 'var(--font-body)',
@@ -249,7 +249,7 @@ export default function Jobs() {
                   padding: '7px 12px',
                   borderRadius: 999,
                   border: isActive ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
-                  background: isActive ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.03)',
+                  background: isActive ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                   color: isActive ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
@@ -486,7 +486,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
         padding: '14px 14px 12px',
         borderRadius: 16,
         minHeight: 88,
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+        background: 'linear-gradient(135deg, var(--surface-2), rgba(255,255,255,0.02))',
         border: '1px solid var(--rule)',
         backdropFilter: 'blur(20px)',
         cursor: 'pointer',
@@ -601,7 +601,7 @@ function MarginPill({ pct, hasCost }) {
 function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
   const bg = primary
     ? 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))'
-    : 'rgba(255,255,255,0.04)'
+    : 'var(--surface-2)'
   const color = primary ? 'var(--onyx)' : disabled ? 'var(--ink-faint)' : 'var(--ink-strong)'
   const border = primary ? 'none' : '1px solid var(--rule)'
   const style = {
@@ -652,14 +652,14 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
 function EmptyView({ hasFilter, onAdd }) {
   if (hasFilter) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs match that filter.</div>
         <div style={{ fontSize: 12 }}>Clear the search or switch stages to see more.</div>
       </div>
     )
   }
   return (
-    <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+    <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs on the board.</div>
       <div style={{ fontSize: 12, marginBottom: 10 }}>Drop in your first lead. Watch the pipeline fill.</div>
       <button

@@ -268,14 +268,14 @@ export default function Home() {
             maxLength={90}
             rows={2}
             placeholder="What's the focus today?"
-            style={{ width: '100%', boxSizing: 'border-box', minHeight: 64, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', resize: 'none', outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: 64, padding: '14px 16px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', resize: 'none', outline: 'none' }}
           />
         ) : (
           <button
             type="button"
             onClick={() => setEditingFocus(true)}
             aria-label={profile?.greeting ? "Edit today's focus" : "Add today's focus"}
-            style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderRadius: 14, background: profile?.greeting ? 'rgba(255,255,255,0.04)' : 'rgba(201,150,58,0.06)', border: profile?.greeting ? '1px solid var(--rule)' : '1px dashed rgba(201,150,58,0.4)', color: profile?.greeting ? 'var(--ink-strong)' : 'var(--field-gold-bright)', fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: profile?.greeting ? 500 : 700, cursor: 'pointer', textAlign: 'left' }}
+            style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderRadius: 14, background: profile?.greeting ? 'var(--surface-2)' : 'rgba(201,150,58,0.06)', border: profile?.greeting ? '1px solid var(--rule)' : '1px dashed rgba(201,150,58,0.4)', color: profile?.greeting ? 'var(--ink-strong)' : 'var(--field-gold-bright)', fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: profile?.greeting ? 500 : 700, cursor: 'pointer', textAlign: 'left' }}
           >
             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {profile?.greeting || "Add today's focus"}
@@ -319,7 +319,9 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* WEATHER + POUR — tappable, routes to /pour-window */}
+      {/* WEATHER — tappable, routes to /pour-window. Trade-status pills
+          live in the dedicated 3-card row below so we don't duplicate them
+          here. */}
       {hasCoords ? (
         <motion.div
           variants={item}
@@ -329,9 +331,9 @@ export default function Home() {
           whileTap={{ scale: 0.98 }}
           onClick={() => { hapticTap(); navigate('/pour-window') }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hapticTap(); navigate('/pour-window') } }}
-          style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 10, padding: '0 20px 14px', cursor: 'pointer' }}
+          style={{ padding: '0 20px 14px', cursor: 'pointer' }}
         >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderRadius: 16, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
             <span aria-hidden="true" style={{ position: 'absolute', top: 8, right: 10, fontSize: 8, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', opacity: 0.7 }}>
               Open →
             </span>
@@ -339,17 +341,13 @@ export default function Home() {
               <CloudSun size={18} color="#8fb4e3" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: '0.02em', lineHeight: 1 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--ink-strong)' }}>
                 {weatherLoading ? '—' : weather?.current?.temperature_2m != null ? `${Math.round(weather.current.temperature_2m)}°` : '—'}
               </div>
               <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 3 }}>
                 {weather?.current?.wind_speed_10m != null ? `Wind ${Math.round(weather.current.wind_speed_10m)}mph` : '—'}
               </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '13px 15px', borderRadius: 16, background: pourGood ? 'linear-gradient(135deg, rgba(45,122,79,0.2), rgba(45,122,79,0.06))' : 'linear-gradient(135deg, rgba(192,57,43,0.2), rgba(192,57,43,0.06))', border: pourGood ? '1px solid rgba(78,214,147,0.25)' : '1px solid rgba(192,57,43,0.25)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: pourGood ? 'var(--signal-green)' : 'var(--alert-red)' }}>Pour</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: '0.03em', lineHeight: 1, marginTop: 3, color: pourGood ? 'var(--signal-green)' : 'var(--alert-red)' }}>{String(pourStatus).toUpperCase()}</div>
           </div>
         </motion.div>
       ) : (
@@ -370,11 +368,6 @@ export default function Home() {
             {tradeWindows.map((tw) => {
               const tone = tw.status === 'stop' ? 'alert' : tw.status === 'warn' ? 'warn' : 'ok'
               const color = tone === 'alert' ? 'var(--alert-red)' : tone === 'warn' ? 'var(--field-gold-bright)' : 'var(--signal-green)'
-              const bg = tone === 'alert'
-                ? 'linear-gradient(135deg, rgba(192,57,43,0.18), rgba(192,57,43,0.05))'
-                : tone === 'warn'
-                  ? 'linear-gradient(135deg, rgba(201,150,58,0.18), rgba(201,150,58,0.05))'
-                  : 'linear-gradient(135deg, rgba(45,122,79,0.18), rgba(45,122,79,0.05))'
               const statusLabel = tw.status === 'stop' ? 'STOP' : tw.status === 'warn' ? 'TIGHT' : 'GO'
               return (
                 <button
@@ -384,8 +377,9 @@ export default function Home() {
                   style={{
                     padding: '10px 12px',
                     borderRadius: 12,
-                    background: bg,
-                    border: `1px solid ${color}55`,
+                    background: 'var(--surface-2)',
+                    border: `1px solid ${color}`,
+                    boxShadow: `inset 4px 0 0 ${color}`,
                     color: 'var(--ink-strong)',
                     cursor: 'pointer',
                     textAlign: 'left',
@@ -451,14 +445,14 @@ export default function Home() {
                   padding: '14px 14px 16px',
                   borderRadius: 14,
                   background: kpi.gold
-                    ? 'linear-gradient(135deg, rgba(30,20,10,0.88), rgba(20,15,10,0.6))'
+                    ? 'linear-gradient(135deg, #2a1f10, #1a1208)'
                     : kpi.alert
-                      ? 'linear-gradient(135deg, rgba(40,18,15,0.7), rgba(20,12,10,0.5))'
-                      : 'rgba(255,255,255,0.03)',
+                      ? 'linear-gradient(135deg, #2a1210, #1a0c08)'
+                      : 'var(--surface-2)',
                   border: kpi.gold
-                    ? '1px solid rgba(201,150,58,0.35)'
+                    ? '1px solid rgba(201,150,58,0.5)'
                     : kpi.alert
-                      ? '1px solid rgba(192,57,43,0.35)'
+                      ? '1px solid rgba(192,57,43,0.5)'
                       : '1px solid var(--rule)',
                   minHeight: 86,
                   textAlign: 'left',
@@ -497,14 +491,14 @@ export default function Home() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 14px' }}>
           {todayJobs.length === 0 ? (
-            <div style={{ padding: '24px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12 }}>
+            <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12 }}>
               No active jobs yet. <button onClick={() => navigate('/jobs?new=1')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, cursor: 'pointer' }}>Add your first lead →</button>
             </div>
           ) : todayJobs.map((job) => {
             const accent = job.stage === 'job' ? 'green' : job.stage === 'quote' ? 'gold' : 'red'
             const accentColors = { green: 'var(--signal-green)', gold: 'var(--field-gold-bright)', red: 'var(--alert-red)' }
             return (
-              <motion.button key={job.id} whileTap={{ scale: 0.98 }} onClick={() => navigate(`/jobs/${job.id}`)} style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)', cursor: 'pointer', textAlign: 'left' }}>
+              <motion.button key={job.id} whileTap={{ scale: 0.98 }} onClick={() => navigate(`/jobs/${job.id}`)} style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accentColors[accent], boxShadow: `0 0 12px ${accentColors[accent]}99` }} />
                 <div style={{ width: 36, height: 36, borderRadius: 11, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 15, letterSpacing: '0.04em', background: `linear-gradient(135deg, ${accentColors[accent]}33, ${accentColors[accent]}11)`, color: accentColors[accent], border: `1px solid ${accentColors[accent]}33` }}>
                   {initials(job.name)}

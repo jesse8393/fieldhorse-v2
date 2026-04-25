@@ -233,7 +233,7 @@ export default function ContactDetail() {
               : (
                 <span
                   aria-label="Shared job — client visible only to owner"
-                  style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'default' }}
+                  style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'default' }}
                 >
                   <Users size={10} />
                   Client
@@ -293,7 +293,7 @@ export default function ContactDetail() {
             gap: 8,
             padding: '11px 14px',
             borderRadius: 12,
-            background: isEditing ? 'rgba(201,150,58,0.18)' : 'rgba(255,255,255,0.04)',
+            background: isEditing ? 'rgba(201,150,58,0.18)' : 'var(--surface-2)',
             border: isEditing ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
             color: isEditing ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
             fontFamily: 'var(--font-display)',
@@ -538,7 +538,7 @@ function StageActions({ contact, onAction, onLogPayment }) {
     padding: '10px 16px',
     borderRadius: 12,
     border: '1px solid var(--rule)',
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--surface-2)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
     fontSize: 13,
@@ -648,7 +648,7 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit, onChange
       )}
 
       {/* Inspections toggle — gates the Inspections tab */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>This job requires inspections</div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Enables the Inspections tab for permit-tracked trades</div>
@@ -661,7 +661,7 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit, onChange
       </div>
 
       {/* Partner row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
           <span
             aria-hidden="true"
@@ -725,7 +725,7 @@ function OverviewReadCard({ contact }) {
     { label: 'Notes', value: contact.notes, multiline: true }
   ]
   return (
-    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
       {rows.map((r, i) => (
         <div
           key={r.label}
@@ -754,7 +754,7 @@ function OverviewEditForm({ form, set, saving, onCommit, onCancel }) {
     width: '100%',
     padding: '11px 14px',
     borderRadius: 12,
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
@@ -763,7 +763,7 @@ function OverviewEditForm({ form, set, saving, onCommit, onCancel }) {
   }
   const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
   return (
-    <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={labelStyle}>Name</span>
@@ -827,7 +827,7 @@ function OverviewEditForm({ form, set, saving, onCommit, onCancel }) {
           type="button"
           onClick={onCancel}
           disabled={saving}
-          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
         >
           <XIcon size={14} />
           Cancel
@@ -1292,7 +1292,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
                       padding: '12px 8px',
                       borderRadius: 12,
                       border: on ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
-                      background: on ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.03)',
+                      background: on ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                       color: on ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
                       fontFamily: 'var(--font-display)',
                       fontSize: 13,
@@ -1314,7 +1314,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Corrections needed, re-inspection date, inspector name…"
-              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none', resize: 'vertical' }}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none', resize: 'vertical' }}
             />
           </label>
 
@@ -1322,7 +1322,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -1759,7 +1759,7 @@ function UploadList({ jobId, userId, kind }) {
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={() => { compareMode ? exitCompare() : setCompareMode(true) }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: compareMode ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)', background: compareMode ? 'rgba(201,150,58,0.15)' : 'rgba(255,255,255,0.04)', color: compareMode ? 'var(--field-gold-bright)' : 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: compareMode ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)', background: compareMode ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)', color: compareMode ? 'var(--field-gold-bright)' : 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
             >
               <GitCompareArrows size={12} />
               {compareMode ? 'EXIT COMPARE' : 'COMPARE'}
@@ -1820,7 +1820,7 @@ function UploadList({ jobId, userId, kind }) {
       {!loading && rows.length > 0 && kind === 'file' && (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map((r) => (
-            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
               <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
                 <Paperclip size={14} />
               </span>
@@ -1870,7 +1870,7 @@ function PhotoThumb({ row, bucket, captioning, selectionLabel, selected, onOpen,
   }, [row.storage_path, bucket])
   const caption = row.caption?.trim()
   return (
-    <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: selected ? '2px solid var(--field-gold-bright)' : '1px solid var(--rule)' }}>
+    <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-2)', border: selected ? '2px solid var(--field-gold-bright)' : '1px solid var(--rule)' }}>
       <button
         type="button"
         onClick={onOpen}
@@ -2392,7 +2392,7 @@ function TodosTab({ jobId, userId }) {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') add() }}
           placeholder="Add a task…"
-          style={{ flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+          style={{ flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
         />
         <motion.button
           type="button"
@@ -2411,12 +2411,12 @@ function TodosTab({ jobId, userId }) {
       {!loading && rows.length > 0 && (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map((r) => (
-            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
               <button
                 type="button"
                 onClick={() => toggle(r)}
                 aria-label={r.done ? 'Mark not done' : 'Mark done'}
-                style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, border: `1px solid ${r.done ? 'rgba(45,122,79,0.6)' : 'var(--rule)'}`, background: r.done ? 'rgba(45,122,79,0.22)' : 'rgba(255,255,255,0.04)', color: 'var(--signal-green)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, border: `1px solid ${r.done ? 'rgba(45,122,79,0.6)' : 'var(--rule)'}`, background: r.done ? 'rgba(45,122,79,0.22)' : 'var(--surface-2)', color: 'var(--signal-green)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
               >
                 {r.done && <Check size={13} />}
               </button>
@@ -2485,7 +2485,7 @@ function ScheduledTab({ jobId }) {
                 <button
                   type="button"
                   onClick={() => openOnSchedule(e)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)' }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)' }}
                 >
                   <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
                     <Calendar size={14} />

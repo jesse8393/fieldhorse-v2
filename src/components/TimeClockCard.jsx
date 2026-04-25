@@ -154,7 +154,7 @@ export default function TimeClockCard({ contact, userId, onLogged }) {
         borderRadius: 14,
         background: start
           ? 'linear-gradient(135deg, rgba(72,130,95,0.10), rgba(72,130,95,0.03))'
-          : 'rgba(255,255,255,0.03)',
+          : 'var(--surface-2)',
         border: start ? '1px solid rgba(72,130,95,0.35)' : '1px solid var(--rule)',
         display: 'flex',
         flexDirection: 'column',
@@ -212,7 +212,7 @@ export default function TimeClockCard({ contact, userId, onLogged }) {
                   step={1}
                   value={rate}
                   onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
-                  style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, boxSizing: 'border-box' }}
+                  style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, boxSizing: 'border-box' }}
                 />
               </div>
             </label>
@@ -228,7 +228,7 @@ export default function TimeClockCard({ contact, userId, onLogged }) {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="What was done? (optional)"
-            style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, boxSizing: 'border-box' }}
+            style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, boxSizing: 'border-box' }}
           />
           {hoursPreview < 0.05 && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--field-gold-bright)' }}>

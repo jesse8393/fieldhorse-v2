@@ -102,7 +102,7 @@ export default function NotificationsBell() {
           height: 44,
           minWidth: 44,
           borderRadius: 11,
-          background: 'rgba(255,255,255,0.04)',
+          background: 'var(--surface-2)',
           border: '1px solid var(--rule)',
           display: 'grid',
           placeItems: 'center',
@@ -166,7 +166,7 @@ export default function NotificationsBell() {
                 <button
                   type="button"
                   onClick={handleMarkAll}
-                  style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
                   <Check size={12} />
                   Mark all read
@@ -185,7 +185,7 @@ export default function NotificationsBell() {
               <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted)' }}>Loading…</div>
             )}
             {!loading && rows.length === 0 && (
-              <div style={{ padding: '32px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+              <div style={{ padding: '32px 16px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No notifications yet.</div>
                 <div style={{ fontSize: 12 }}>Quiet inbox. Check back after partners or subs respond.</div>
               </div>

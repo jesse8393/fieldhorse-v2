@@ -193,7 +193,7 @@ export default function Importer() {
                   padding: '8px 12px',
                   borderRadius: 10,
                   border: on ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
-                  background: on ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.04)',
+                  background: on ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                   color: on ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
@@ -247,7 +247,7 @@ export default function Importer() {
             </span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
               {mapped.slice(0, 5).map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {m.name}
@@ -329,7 +329,7 @@ export default function Importer() {
       {/* ADVANCED INTEGRATIONS — collapsed by default so contractors aren't
           greeted with dev-speak. Webhook endpoint + POST JSON shape live here. */}
       <motion.section variants={item} style={{ padding: '0 20px 24px' }}>
-        <details style={{ borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
+        <details style={{ borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
           <summary
             style={{
               display: 'flex',
@@ -355,7 +355,7 @@ export default function Importer() {
               Send leads from GoHighLevel, Zapier, Make, or any tool that can POST JSON. The endpoint routes new leads straight into your pipeline.
             </p>
             {webhookKey ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
                 <code style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {origin}/api/webhook-lead?key={webhookKey}
                 </code>
@@ -398,7 +398,7 @@ export default function Importer() {
                 marginTop: 10,
                 padding: '12px 14px',
                 borderRadius: 12,
-                background: 'rgba(255,255,255,0.03)',
+                background: 'var(--surface-2)',
                 border: '1px solid var(--rule)',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,

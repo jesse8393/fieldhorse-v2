@@ -136,7 +136,7 @@ export default function Settings() {
               onChange={(e) => setDisplayName(e.target.value)}
               onBlur={saveDisplayName}
               placeholder="First name or full name"
-              style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+              style={{ padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
             />
             <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>Shown on the greeting and avatar initials.</span>
           </label>
@@ -148,7 +148,7 @@ export default function Settings() {
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Your company"
-              style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+              style={{ padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
             />
           </label>
 
@@ -182,7 +182,7 @@ export default function Settings() {
                   padding: '7px 12px',
                   borderRadius: 999,
                   border: isOn ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
-                  background: isOn ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.03)',
+                  background: isOn ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                   color: isOn ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
@@ -231,7 +231,7 @@ export default function Settings() {
 
       {/* ACCOUNT */}
       <Section variants={item} title={<>Your <em>session.</em></>}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {user?.email}
@@ -279,7 +279,7 @@ export default function Settings() {
                   type="button"
                   onClick={() => setConfirmWipe(false)}
                   disabled={wiping}
-                  style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ padding: '10px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -393,7 +393,7 @@ function renderSectionTitle(node) {
 
 function Meta({ label, value }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', minWidth: 80 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', minWidth: 80 }}>
       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</span>
       <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{value}</span>
     </div>

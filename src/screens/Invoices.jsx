@@ -188,7 +188,7 @@ export default function Invoices() {
       {totals.total > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 }}>
           {AGING_BUCKETS.map((b) => (
-            <div key={b.id} style={{ padding: '12px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+            <div key={b.id} style={{ padding: '12px 10px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: b.color, marginBottom: 4 }}>
                 {b.label}
               </div>
@@ -232,7 +232,7 @@ function FilterPill({ active, onClick, label }) {
         padding: '7px 12px',
         borderRadius: 999,
         border: active ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)',
-        background: active ? 'rgba(201,150,58,0.15)' : 'rgba(255,255,255,0.03)',
+        background: active ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)',
         color: active ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
         fontFamily: 'var(--font-body)',
         fontSize: 12,
@@ -250,7 +250,7 @@ function InvoiceRow({ row, onPDF, onPaid }) {
   const bucketMeta = AGING_BUCKETS.find((b) => b.id === bucket) || AGING_BUCKETS[0]
   const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0
   return (
-    <li style={{ borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: isOutstanding ? `1px solid ${bucket === '60+' ? 'rgba(192,57,43,0.35)' : 'var(--rule)'}` : '1px solid var(--rule)', padding: '14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <li style={{ borderRadius: 12, background: 'var(--surface-2)', border: isOutstanding ? `1px solid ${bucket === '60+' ? 'rgba(192,57,43,0.35)' : 'var(--rule)'}` : '1px solid var(--rule)', padding: '14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Link to={`/jobs/${job.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-strong)', textDecoration: 'none' }}>
@@ -287,7 +287,7 @@ function InvoiceRow({ row, onPDF, onPaid }) {
           <button
             type="button"
             onClick={onPDF}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
             <FileDown size={12} /> Invoice PDF
           </button>

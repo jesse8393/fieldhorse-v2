@@ -527,7 +527,7 @@ function TemplateChip({ active, onClick, label }) {
         padding: '7px 12px',
         borderRadius: 999,
         border: active ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)',
-        background: active ? 'rgba(201,150,58,0.15)' : 'rgba(255,255,255,0.03)',
+        background: active ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)',
         color: active ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
         fontFamily: 'var(--font-body)',
         fontSize: 12,

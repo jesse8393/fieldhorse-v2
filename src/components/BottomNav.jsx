@@ -119,7 +119,7 @@ export default function BottomNav() {
                 type="button"
                 onClick={() => setMoreOpen(false)}
                 aria-label="Close"
-                style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+                style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
               >
                 <X size={16} />
               </button>
@@ -145,7 +145,7 @@ export default function BottomNav() {
                             gap: 12,
                             padding: '12px 14px',
                             borderRadius: 12,
-                            background: 'rgba(255,255,255,0.03)',
+                            background: 'var(--surface-2)',
                             border: '1px solid var(--rule)',
                             color: 'var(--ink-strong)',
                             fontFamily: 'var(--font-body)',
@@ -174,7 +174,7 @@ export default function BottomNav() {
             </div>
 
             <div className="fh-drawer__foot" style={{ padding: '18px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600 }}>
                   {theme === 'dark' ? <Moon size={16} color="var(--field-gold-bright)" /> : <Sun size={16} color="var(--field-gold-bright)" />}
                   {theme === 'dark' ? 'Dark theme' : 'Light theme'}

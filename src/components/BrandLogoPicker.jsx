@@ -167,7 +167,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
             </span>
           )}
         </div>
-        <span style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)' }} />
+        <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--rule)' }} />
       </div>
 
       <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
@@ -225,7 +225,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
                 gap: 6,
                 padding: '12px 14px',
                 borderRadius: 12,
-                background: 'rgba(255,255,255,0.04)',
+                background: 'var(--surface-2)',
                 border: '1px solid var(--rule)',
                 color: 'var(--ink-muted)',
                 fontFamily: 'var(--font-body)',
@@ -251,7 +251,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               justifyContent: 'center',
               padding: '12px 14px',
               borderRadius: 12,
-              background: 'rgba(255,255,255,0.04)',
+              background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               color: 'var(--ink-strong)',
               fontFamily: 'var(--font-body)',

@@ -131,7 +131,7 @@ export default function Analytics() {
       )}
 
       {!loading && contacts.length === 0 && (
-        <motion.div variants={item} style={{ padding: '32px 20px', margin: '0 20px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+        <motion.div variants={item} style={{ padding: '32px 20px', margin: '0 20px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Not enough data yet.</div>
           <div style={{ fontSize: 12 }}>Add a few leads and start closing. Analytics lights up once the pipeline moves.</div>
         </motion.div>
@@ -277,14 +277,14 @@ export default function Analytics() {
               </div>
             </header>
             {mileage.length === 0 ? (
-              <div style={{ padding: '24px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+              <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No miles logged.</div>
                 <div style={{ fontSize: 12 }}>Log drives as you go. Every mile is $0.67 deducted at tax time.</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {mileage.slice(0, 10).map((m) => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>{m.purpose || 'Drive'}</div>
                       <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>{new Date(m.drove_on).toLocaleDateString()}</div>
@@ -316,7 +316,7 @@ function KPI({ label, to, format, Icon, gold }) {
         overflow: 'hidden',
         padding: '14px 14px 16px',
         borderRadius: 14,
-        background: gold ? 'linear-gradient(135deg, rgba(30,20,10,0.9), rgba(20,15,10,0.6))' : 'rgba(255,255,255,0.03)',
+        background: gold ? 'linear-gradient(135deg, rgba(30,20,10,0.9), rgba(20,15,10,0.6))' : 'var(--surface-2)',
         border: gold ? '1px solid rgba(201,150,58,0.35)' : '1px solid var(--rule)',
         minHeight: 92
       }}

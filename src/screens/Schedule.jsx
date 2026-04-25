@@ -225,7 +225,7 @@ export default function Schedule() {
                     width: 180,
                     padding: '12px 14px',
                     borderRadius: 14,
-                    background: 'rgba(255,255,255,0.04)',
+                    background: 'var(--surface-2)',
                     border: `1px solid ${fromQuote ? 'rgba(201,150,58,0.35)' : 'var(--rule)'}`,
                     color: 'var(--ink-strong)',
                     cursor: e.contact_id ? 'pointer' : 'default',
@@ -279,7 +279,7 @@ export default function Schedule() {
           <button
             type="button"
             onClick={() => setCursor(startOfDay(new Date()))}
-            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
           >
             Today
           </button>
@@ -308,7 +308,7 @@ const iconBtnStyle = {
   height: 36,
   borderRadius: 10,
   border: '1px solid var(--rule)',
-  background: 'rgba(255,255,255,0.04)',
+  background: 'var(--surface-2)',
   color: 'var(--ink-strong)',
   display: 'grid',
   placeItems: 'center',
@@ -318,7 +318,7 @@ const iconBtnStyle = {
 function DayView({ events, onClick, onDelete, onAdd }) {
   if (events.length === 0) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Nothing scheduled.</div>
         <div style={{ fontSize: 12, marginBottom: 10 }}>Queue something up. Crew runs smoother when the day's on the board.</div>
         {onAdd && (
@@ -341,7 +341,7 @@ function DayView({ events, onClick, onDelete, onAdd }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}
         >
           <span style={{ flexShrink: 0, width: 62, fontFamily: 'var(--font-display)', fontSize: 13, letterSpacing: '0.04em', color: 'var(--field-gold-bright)' }}>
             {fmtTime(e.start_at)}

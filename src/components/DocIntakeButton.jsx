@@ -213,7 +213,7 @@ function intakeBtn() {
     gap: 6,
     padding: '11px 14px',
     borderRadius: 10,
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',

@@ -127,7 +127,7 @@ export default function Subs() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, phone, trade…"
-            style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: 10, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.03)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, boxSizing: 'border-box' }}
           />
         </div>
       </div>
@@ -171,7 +171,7 @@ function TradePill({ active, onClick, label }) {
         padding: '6px 10px',
         borderRadius: 999,
         border: active ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)',
-        background: active ? 'rgba(201,150,58,0.15)' : 'rgba(255,255,255,0.03)',
+        background: active ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)',
         color: active ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
         fontFamily: 'var(--font-body)',
         fontSize: 11,
@@ -189,7 +189,7 @@ function SubRow({ g, contacts }) {
   const [expanded, setExpanded] = useState(false)
   const tradeSummary = Array.from(g.trades).join(' · ') || 'No trade set'
   return (
-    <li style={{ borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
+    <li style={{ borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -240,7 +240,7 @@ function SubRow({ g, contacts }) {
                 <span style={{ flexShrink: 0, color: 'var(--ink-muted)' }}>
                   {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '—'}
                 </span>
-                <span style={{ flexShrink: 0, padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-muted)', fontSize: 10, textTransform: 'capitalize' }}>
+                <span style={{ flexShrink: 0, padding: '2px 6px', borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)', fontSize: 10, textTransform: 'capitalize' }}>
                   {r.status || 'scheduled'}
                 </span>
               </li>
