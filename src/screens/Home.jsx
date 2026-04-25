@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight } from 'lucide-react'
+import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight, Receipt } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -59,6 +59,7 @@ export default function Home() {
   const [pipeline, setPipeline] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
   const [notesCount, setNotesCount] = useState(0)
+  const [outstanding, setOutstanding] = useState(0)
   const [todayJobs, setTodayJobs] = useState([])
   const [weeklyTarget] = useState(25000)
   const [weeklyBooked, setWeeklyBooked] = useState(0)
@@ -101,7 +102,7 @@ export default function Home() {
       const windowStart = new Date(now); windowStart.setHours(0, 0, 0, 0)
       const windowEnd = new Date(windowStart); windowEnd.setDate(windowEnd.getDate() + 7)
 
-      const [{ data: contacts }, { data: upcomingSchedule }] = await Promise.all([
+      const [{ data: contacts }, { data: upcomingSchedule }, { data: pays }] = await Promise.all([
         supabase
           .from('fh_contacts')
           .select('id, name, amount, stage, job_title, job_type')
@@ -111,7 +112,11 @@ export default function Home() {
           .select('contact_id, start_at')
           .eq('user_id', user.id)
           .gte('start_at', windowStart.toISOString())
-          .lte('start_at', windowEnd.toISOString())
+          .lte('start_at', windowEnd.toISOString()),
+        supabase
+          .from('fh_payments')
+          .select('contact_id, amount')
+          .eq('user_id', user.id)
       ])
 
       if (cancelled) return
@@ -128,6 +133,21 @@ export default function Home() {
       const booked = rows
         .filter((c) => c.stage === 'invoice' || c.stage === 'closed')
         .reduce((s, c) => s + Number(c.amount || 0), 0)
+      // Outstanding AR — sum of (amount - paid) for jobs in money pipeline.
+      // Closed/lost jobs and fully-paid ones drop out automatically.
+      const paidByJob = new Map()
+      for (const p of pays || []) {
+        if (!p.contact_id) continue
+        paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
+      }
+      const outstandingTotal = rows
+        .filter((c) => c.stage === 'job' || c.stage === 'invoice')
+        .reduce((s, c) => {
+          const bal = Number(c.amount || 0) - (paidByJob.get(c.id) || 0)
+          return s + Math.max(0, bal)
+        }, 0)
+      setOutstanding(outstandingTotal)
+
       setPipeline(totalPipeline)
       setActiveCount(crewsOnSite.length)
       setWeeklyBooked(booked)
@@ -348,14 +368,19 @@ export default function Home() {
           }}
         >
           {[
-            { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp, gold: true },
-            { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase },
-            { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText }
+            { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp, gold: true, to: '/jobs' },
+            { label: 'Outstanding', value: outstanding, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: Receipt, alert: outstanding > 0, to: '/invoices' },
+            { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase, to: '/jobs' },
+            { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText, to: '/notes' }
           ].map((kpi) => {
             const I = kpi.icon
+            const isButton = !!kpi.to
+            const Tag = isButton ? 'button' : 'div'
             return (
-              <div
+              <Tag
                 key={kpi.label}
+                onClick={isButton ? () => navigate(kpi.to) : undefined}
+                type={isButton ? 'button' : undefined}
                 className="fh-card-raised"
                 style={{
                   flexShrink: 0,
@@ -367,14 +392,21 @@ export default function Home() {
                   borderRadius: 14,
                   background: kpi.gold
                     ? 'linear-gradient(135deg, rgba(30,20,10,0.88), rgba(20,15,10,0.6))'
-                    : 'rgba(255,255,255,0.03)',
+                    : kpi.alert
+                      ? 'linear-gradient(135deg, rgba(40,18,15,0.7), rgba(20,12,10,0.5))'
+                      : 'rgba(255,255,255,0.03)',
                   border: kpi.gold
                     ? '1px solid rgba(201,150,58,0.35)'
-                    : '1px solid var(--rule)',
-                  minHeight: 86
+                    : kpi.alert
+                      ? '1px solid rgba(192,57,43,0.35)'
+                      : '1px solid var(--rule)',
+                  minHeight: 86,
+                  textAlign: 'left',
+                  cursor: isButton ? 'pointer' : 'default',
+                  color: 'inherit'
                 }}
               >
-                <I size={14} style={{ position: 'absolute', top: 12, right: 12, color: kpi.gold ? 'var(--field-gold-bright)' : 'rgba(201,150,58,0.4)' }} />
+                <I size={14} style={{ position: 'absolute', top: 12, right: 12, color: kpi.gold ? 'var(--field-gold-bright)' : kpi.alert ? 'var(--alert-red)' : 'rgba(201,150,58,0.4)' }} />
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{kpi.label}</div>
                 <div
                   className={kpi.gold ? 'fh-money fh-text-gradient-gold' : 'fh-money'}
@@ -384,12 +416,12 @@ export default function Home() {
                     letterSpacing: '0.01em',
                     lineHeight: 1,
                     marginTop: 8,
-                    color: kpi.gold ? undefined : 'var(--ink-strong)'
+                    color: kpi.gold ? undefined : kpi.alert && kpi.value > 0 ? 'var(--alert-red)' : 'var(--ink-strong)'
                   }}
                 >
                   <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
                 </div>
-              </div>
+              </Tag>
             )
           })}
         </div>

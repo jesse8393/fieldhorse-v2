@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun, Hammer, Receipt } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
@@ -20,8 +20,15 @@ const MORE_GROUPS = [
     label: 'Money tools',
     items: [
       { to: '/bid', label: 'AI Bid Engine', Icon: Calculator },
+      { to: '/invoices', label: 'Invoices', Icon: Receipt },
       { to: '/compose', label: 'AI Compose', Icon: MessageSquare },
       { to: '/analytics', label: 'Analytics', Icon: BarChart3 }
+    ]
+  },
+  {
+    label: 'People',
+    items: [
+      { to: '/subs', label: 'Sub directory', Icon: Hammer }
     ]
   },
   {

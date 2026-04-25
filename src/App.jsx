@@ -29,6 +29,8 @@ const Analytics      = lazy(() => import('./screens/Analytics.jsx'))
 const Importer       = lazy(() => import('./screens/Importer.jsx'))
 const Settings       = lazy(() => import('./screens/Settings.jsx'))
 const PourWindow     = lazy(() => import('./screens/PourWindow.jsx'))
+const Subs           = lazy(() => import('./screens/Subs.jsx'))
+const Invoices       = lazy(() => import('./screens/Invoices.jsx'))
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth()
@@ -90,6 +92,8 @@ export default function App() {
           <Route path="/import" element={<Importer />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/pour-window" element={<PourWindow />} />
+          <Route path="/subs" element={<Subs />} />
+          <Route path="/invoices" element={<Invoices />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
