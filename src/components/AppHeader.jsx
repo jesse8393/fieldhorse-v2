@@ -47,10 +47,10 @@ export default function AppHeader() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 12,
-        padding: '22px 20px 18px',
-        paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))',
-        minHeight: 108,
+        gap: 8,
+        padding: '12px 14px 10px',
+        paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+        minHeight: 0,
         background: 'linear-gradient(180deg, rgba(20,20,20,0.88) 0%, rgba(20,20,20,0.72) 82%, rgba(20,20,20,0) 100%)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
@@ -66,7 +66,8 @@ export default function AppHeader() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6
+          gap: 6,
+          overflow: 'hidden'
         }}
       >
         <BrandSlot logoSrc={logoSrc} company={company} fullName={fullName} />
@@ -129,17 +130,17 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }) {
-  // Brand identifier — small + centered. Header has Search + Bell + Notes
-  // on the right and the FH badge on the left, so the brand stays
-  // compact or it crowds them at narrow viewports.
+  // Brand sits between FH badge (left) and the Search/Bell/Notes cluster
+  // (right). On a 375 px phone the right cluster eats ~150 px so the brand
+  // gets ~135 px max. Keep both image + text WAY small on phone.
   if (logoSrc) {
     return (
       <img
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(22px, 3.4vw, 32px)',
-          maxWidth: 'min(36vw, 200px)',
+          maxHeight: 'clamp(16px, 4vw, 28px)',
+          maxWidth: 'min(30vw, 160px)',
           width: 'auto',
           height: 'auto',
           objectFit: 'contain',
@@ -157,14 +158,14 @@ function BrandSlot({ logoSrc, company, fullName }) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(13px, 2.6vw, 17px)',
-    letterSpacing: '0.12em',
+    fontSize: 'clamp(10px, 2.6vw, 15px)',
+    letterSpacing: '0.1em',
     lineHeight: 1,
     textTransform: 'uppercase',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    maxWidth: 'min(40vw, 220px)'
+    maxWidth: 'min(32vw, 180px)'
   }
   if (company) {
     return (
@@ -185,8 +186,8 @@ function BrandSlot({ logoSrc, company, fullName }) {
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(13px, 2.6vw, 17px)',
-        letterSpacing: '0.14em',
+        fontSize: 'clamp(10px, 2.6vw, 15px)',
+        letterSpacing: '0.12em',
         lineHeight: 1,
         display: 'inline-flex',
         alignItems: 'center',
