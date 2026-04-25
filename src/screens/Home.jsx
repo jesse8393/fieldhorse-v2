@@ -202,45 +202,55 @@ export default function Home() {
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
       {/* Top bar moved to shared AppHeader in AppShell (Phase 16). */}
 
-      {/* HERO GREETING */}
-      <motion.div variants={item} style={{ padding: '10px 20px 16px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.2)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', marginBottom: 14 }}>
+      {/* HERO GREETING — phase 18.4: compact stack so the dashboard
+          actually appears above the fold on iPhone. Date now sits as
+          a small caption above the greeting (not a chunky pill on its
+          own row), subtitle tightens, focus prompt extracted to a
+          full-width card below for fat-finger compliance. */}
+      <motion.div variants={item} style={{ padding: '6px 20px 10px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', marginBottom: 4 }}>
           <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--field-gold-bright)' }} />
           {formatDate(now)}
         </div>
         <GreetingTitle prefix={greetingPrefix()} name={firstName} />
-        <div style={{ marginTop: 8, fontSize: 13, color: 'var(--ink-muted)' }}>
+        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-muted)' }}>
           {activeCount > 0
             ? <>{activeCount} {activeCount === 1 ? 'crew' : 'crews'} on site. <span style={{ color: 'var(--signal-green)', fontWeight: 600 }}>All green.</span></>
             : 'Nothing active. Quiet day.'}
         </div>
-        <div style={{ marginTop: 6 }}>
-          {editingFocus ? (
-            <textarea
-              ref={focusRef}
-              value={focusDraft}
-              onChange={(e) => setFocusDraft(e.target.value)}
-              onBlur={saveFocus}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveFocus() }
-                if (e.key === 'Escape') { setFocusDraft(profile?.greeting || ''); setEditingFocus(false) }
-              }}
-              maxLength={90}
-              rows={2}
-              placeholder="Add today's focus"
-              style={{ width: '100%', maxWidth: 360, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 13, fontFamily: 'var(--font-body)', resize: 'none', outline: 'none' }}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEditingFocus(true)}
-              aria-label="Edit today's focus"
-              style={{ background: 'none', border: 'none', padding: 0, color: profile?.greeting ? 'var(--ink-strong)' : 'var(--ink-faint)', fontSize: 13, fontFamily: 'var(--font-body)', cursor: 'text', textAlign: 'left' }}
-            >
-              {profile?.greeting || "Add today's focus →"}
-            </button>
-          )}
-        </div>
+      </motion.div>
+
+      {/* TODAY'S FOCUS — full-width tappable card. Replaces the inline
+          text-link pattern that was below 44×44 hit-target spec. */}
+      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+        {editingFocus ? (
+          <textarea
+            ref={focusRef}
+            value={focusDraft}
+            onChange={(e) => setFocusDraft(e.target.value)}
+            onBlur={saveFocus}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveFocus() }
+              if (e.key === 'Escape') { setFocusDraft(profile?.greeting || ''); setEditingFocus(false) }
+            }}
+            maxLength={90}
+            rows={2}
+            placeholder="What's the focus today?"
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: 64, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', resize: 'none', outline: 'none' }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingFocus(true)}
+            aria-label={profile?.greeting ? "Edit today's focus" : "Add today's focus"}
+            style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderRadius: 14, background: profile?.greeting ? 'rgba(255,255,255,0.04)' : 'rgba(201,150,58,0.06)', border: profile?.greeting ? '1px solid var(--rule)' : '1px dashed rgba(201,150,58,0.4)', color: profile?.greeting ? 'var(--ink-strong)' : 'var(--field-gold-bright)', fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: profile?.greeting ? 500 : 700, cursor: 'pointer', textAlign: 'left' }}
+          >
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {profile?.greeting || "Add today's focus"}
+            </span>
+            <ChevronRight size={16} color={profile?.greeting ? 'var(--ink-faint)' : 'var(--field-gold-bright)'} />
+          </button>
+        )}
       </motion.div>
 
       {/* WEEKLY TARGET CARD — Aceternity-style moving gradient border */}
@@ -319,24 +329,70 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* KPI ROW */}
-      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 20px 20px' }}>
-        {[
-          { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp },
-          { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase },
-          { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText }
-        ].map((kpi) => {
-          const I = kpi.icon
-          return (
-            <div key={kpi.label} className="fh-card-raised" style={{ position: 'relative', overflow: 'hidden', padding: '12px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
-              <I size={14} style={{ position: 'absolute', top: 10, right: 10, color: 'rgba(201,150,58,0.4)' }} />
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{kpi.label}</div>
-              <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: '0.02em', lineHeight: 1, marginTop: 5 }}>
-                <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
+      {/* KPI CAROUSEL — phase 18.4: horizontal scroll-snap row instead
+          of a 3-col grid. On 375px iPhone the prior grid gave each tile
+          ~98px which crammed the K-format numbers. Now each tile is
+          fixed at 160px (snaps), tiles can grow as we add more (Won
+          YTD, Today's bookings, etc.) without a layout rebuild. */}
+      <motion.div variants={item} style={{ padding: '0 0 20px' }}>
+        <div
+          className="fh-kpi-carousel"
+          style={{
+            display: 'flex',
+            gap: 10,
+            overflowX: 'auto',
+            scrollSnapType: 'x mandatory',
+            scrollPaddingLeft: 20,
+            padding: '2px 20px 6px',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          {[
+            { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp, gold: true },
+            { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase },
+            { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText }
+          ].map((kpi) => {
+            const I = kpi.icon
+            return (
+              <div
+                key={kpi.label}
+                className="fh-card-raised"
+                style={{
+                  flexShrink: 0,
+                  scrollSnapAlign: 'start',
+                  width: 160,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  padding: '14px 14px 16px',
+                  borderRadius: 14,
+                  background: kpi.gold
+                    ? 'linear-gradient(135deg, rgba(30,20,10,0.88), rgba(20,15,10,0.6))'
+                    : 'rgba(255,255,255,0.03)',
+                  border: kpi.gold
+                    ? '1px solid rgba(201,150,58,0.35)'
+                    : '1px solid var(--rule)',
+                  minHeight: 86
+                }}
+              >
+                <I size={14} style={{ position: 'absolute', top: 12, right: 12, color: kpi.gold ? 'var(--field-gold-bright)' : 'rgba(201,150,58,0.4)' }} />
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{kpi.label}</div>
+                <div
+                  className={kpi.gold ? 'fh-money fh-text-gradient-gold' : 'fh-money'}
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 28,
+                    letterSpacing: '0.01em',
+                    lineHeight: 1,
+                    marginTop: 8,
+                    color: kpi.gold ? undefined : 'var(--ink-strong)'
+                  }}
+                >
+                  <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </motion.div>
 
       {/* TODAY ON SITE */}

@@ -1623,13 +1623,11 @@ a {
   grid-template-columns: repeat(5, 1fr);
   gap: 0;
   padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
-  /* iOS PWA standalone dead-zone fix: nav bg must be fully opaque so
-     the home-indicator safe-area reserved inside the nav's padding-
-     bottom reads as nav, not as a black gap under the nav. Previous
-     78% translucent glass let the body paint through. */
+  /* Fully solid — no glass / blur / translucency. Per user feedback the
+     frosted backdrop-filter still read as "see-through" even with an
+     opaque background color, because the saturated blur layer sits on
+     top of the solid bg. Onyx tile only. */
   background: var(--surface-1);
-  backdrop-filter: saturate(150%) blur(18px);
-  -webkit-backdrop-filter: saturate(150%) blur(18px);
   border-top: 1px solid var(--rule);
 }
 .fh-nav__item {
@@ -1712,6 +1710,40 @@ a {
 [data-sonner-toaster][data-y-position="top"] {
   top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
 }
+
+/* Home KPI carousel — hide scrollbar on the horizontal scroll-snap row.
+   Snap behavior + touch momentum already handled inline. */
+.fh-kpi-carousel::-webkit-scrollbar { display: none; }
+.fh-kpi-carousel { scrollbar-width: none; }
+
+/* ⌘K hint inside the search input — pointer-only affordance. The kbd chord
+   is meaningless on a touch device, and the box steals input padding. */
+@media (hover: none) and (pointer: coarse) {
+  .fh-cmdk-hint { display: none !important; }
+}
+
+/* Floating Action Button — bottom-right, sits above BottomNav with
+   safe-area cushion. Used by Jobs (+) so the New Lead action is in
+   thumb reach instead of the top-right corner. */
+.fh-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  border: none;
+  background: linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep));
+  color: var(--onyx);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(201, 150, 58, 0.45), 0 0 0 1px rgba(201, 150, 58, 0.2);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.fh-fab:hover { transform: translateY(-2px); box-shadow: 0 16px 32px rgba(201, 150, 58, 0.55); }
+.fh-fab:active { transform: scale(0.94); }
 
 /* AppHeader Notes shortcut — steel at rest, gold on hover/active. */
 .fh-header-notes-btn:hover,
