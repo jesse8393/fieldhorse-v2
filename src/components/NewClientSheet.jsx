@@ -53,7 +53,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
     boxSizing: 'border-box',
     padding: '11px 14px',
     borderRadius: 12,
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
@@ -162,7 +162,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
               type="button"
               onClick={() => onClose?.()}
               disabled={saving}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing: 'border-box' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing: 'border-box' }}
             >
               <X size={14} />
               Cancel

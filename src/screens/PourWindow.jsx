@@ -157,7 +157,7 @@ useEffect(() => {
             height: 44,
             borderRadius: 14,
             border: hasCoords ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)',
-            background: hasCoords ? 'rgba(201,150,58,0.1)' : 'rgba(255,255,255,0.04)',
+            background: hasCoords ? 'rgba(201,150,58,0.1)' : 'var(--surface-2)',
             color: hasCoords ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
             display: 'grid',
             placeItems: 'center',
@@ -170,7 +170,7 @@ useEffect(() => {
 
       {/* LOCATION / ERROR STRIP */}
       <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600 }}>
           <MapPin size={11} color="var(--field-gold-bright)" />
           {hasCoords
             ? (cityName || `${profile.location_lat.toFixed(2)}, ${profile.location_lon.toFixed(2)}`)
@@ -288,7 +288,7 @@ useEffect(() => {
                     width: 48,
                     padding: '10px 4px 10px',
                     borderRadius: 12,
-                    background: 'rgba(255,255,255,0.03)',
+                    background: 'var(--surface-2)',
                     border: '1px solid var(--rule)',
                     display: 'flex',
                     flexDirection: 'column',
@@ -357,7 +357,7 @@ useEffect(() => {
                     overflow: 'hidden',
                     padding: '14px 16px 14px 20px',
                     borderRadius: 16,
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 100%)',
+                    background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%)',
                     border: '1px solid var(--rule)'
                   }}
                 >
@@ -429,7 +429,7 @@ useEffect(() => {
         </header>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {tradeRows.length === 0 && (
-            <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', color: 'var(--ink-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+            <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface-2)', border: '1px dashed var(--rule)', color: 'var(--ink-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
               Awaiting current conditions.
             </div>
           )}
@@ -445,7 +445,7 @@ useEffect(() => {
                   gap: 10,
                   padding: '12px 14px',
                   borderRadius: 12,
-                  background: 'rgba(255,255,255,0.03)',
+                  background: 'var(--surface-2)',
                   border: '1px solid var(--rule)'
                 }}
               >
@@ -526,7 +526,7 @@ function Metric({ Icon, label, value, unit }) {
       style={{
         padding: '10px 10px 12px',
         borderRadius: 12,
-        background: 'rgba(255,255,255,0.03)',
+        background: 'var(--surface-2)',
         border: '1px solid var(--rule)',
         display: 'flex',
         flexDirection: 'column',

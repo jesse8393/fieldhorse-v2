@@ -39,6 +39,51 @@ export const toastSuccess = (message, description) => toast(message, { variant: 
 export const toastError = (message, description) => toast(message, { variant: 'error', accent: 'red', description })
 export const toastInfo = (message, description) => toast(message, { description })
 
+/**
+ * toastUndo — destructive-action toast with an Undo button.
+ *
+ * Sonner action toast pattern: success-style toast with a label/onClick.
+ * The host call is responsible for the actual undo work (typically
+ * re-inserting the deleted row from a captured snapshot). Default 8s
+ * window so the user has time to react after putting the phone down.
+ *
+ * Usage:
+ *   const snapshot = { ...row }
+ *   setRows(rs => rs.filter(r => r.id !== id))
+ *   await supabase.from('foo').delete().eq('id', id)
+ *   toastUndo('Deleted Henderson kitchen', {
+ *     description: 'Tap Undo to restore',
+ *     onUndo: async () => {
+ *       await supabase.from('foo').insert(snapshot)
+ *       setRows(rs => [snapshot, ...rs])
+ *     }
+ *   })
+ */
+export function toastUndo(message, { description, onUndo, duration = 8000 } = {}) {
+  if (typeof window === 'undefined') return
+  // Mirror to legacy fh:toast for the in-app Toaster panel
+  const detail = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    message,
+    accent: 'gold',
+    duration
+  }
+  window.dispatchEvent(new CustomEvent('fh:toast', { detail }))
+  // Sonner — the action button is the whole point
+  sonnerToast(message, {
+    description,
+    duration,
+    action: onUndo
+      ? {
+          label: 'Undo',
+          onClick: async () => {
+            try { await onUndo() } catch { /* host toasts its own error */ }
+          }
+        }
+      : undefined
+  })
+}
+
 export function hapticSuccess() {
   if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
     try { navigator.vibrate([20, 50, 20]) } catch {}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight } from 'lucide-react'
+import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight, Receipt } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -59,6 +59,7 @@ export default function Home() {
   const [pipeline, setPipeline] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
   const [notesCount, setNotesCount] = useState(0)
+  const [outstanding, setOutstanding] = useState(0)
   const [todayJobs, setTodayJobs] = useState([])
   const [weeklyTarget] = useState(25000)
   const [weeklyBooked, setWeeklyBooked] = useState(0)
@@ -101,7 +102,7 @@ export default function Home() {
       const windowStart = new Date(now); windowStart.setHours(0, 0, 0, 0)
       const windowEnd = new Date(windowStart); windowEnd.setDate(windowEnd.getDate() + 7)
 
-      const [{ data: contacts }, { data: upcomingSchedule }] = await Promise.all([
+      const [{ data: contacts }, { data: upcomingSchedule }, { data: pays }] = await Promise.all([
         supabase
           .from('fh_contacts')
           .select('id, name, amount, stage, job_title, job_type')
@@ -111,7 +112,11 @@ export default function Home() {
           .select('contact_id, start_at')
           .eq('user_id', user.id)
           .gte('start_at', windowStart.toISOString())
-          .lte('start_at', windowEnd.toISOString())
+          .lte('start_at', windowEnd.toISOString()),
+        supabase
+          .from('fh_payments')
+          .select('contact_id, amount')
+          .eq('user_id', user.id)
       ])
 
       if (cancelled) return
@@ -128,6 +133,21 @@ export default function Home() {
       const booked = rows
         .filter((c) => c.stage === 'invoice' || c.stage === 'closed')
         .reduce((s, c) => s + Number(c.amount || 0), 0)
+      // Outstanding AR — sum of (amount - paid) for jobs in money pipeline.
+      // Closed/lost jobs and fully-paid ones drop out automatically.
+      const paidByJob = new Map()
+      for (const p of pays || []) {
+        if (!p.contact_id) continue
+        paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
+      }
+      const outstandingTotal = rows
+        .filter((c) => c.stage === 'job' || c.stage === 'invoice')
+        .reduce((s, c) => {
+          const bal = Number(c.amount || 0) - (paidByJob.get(c.id) || 0)
+          return s + Math.max(0, bal)
+        }, 0)
+      setOutstanding(outstandingTotal)
+
       setPipeline(totalPipeline)
       setActiveCount(crewsOnSite.length)
       setWeeklyBooked(booked)
@@ -196,51 +216,62 @@ export default function Home() {
   const pourStatus = windowRead?.status || (weather ? 'ok' : '—')
   const pourGood = String(pourStatus).toLowerCase().includes('good') || String(pourStatus).toLowerCase().includes('ok')
 
+
   const { stagger, item } = useFhMotion()
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
       {/* Top bar moved to shared AppHeader in AppShell (Phase 16). */}
 
-      {/* HERO GREETING */}
-      <motion.div variants={item} style={{ padding: '10px 20px 16px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.2)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', marginBottom: 14 }}>
+      {/* HERO GREETING — phase 18.4: compact stack so the dashboard
+          actually appears above the fold on iPhone. Date now sits as
+          a small caption above the greeting (not a chunky pill on its
+          own row), subtitle tightens, focus prompt extracted to a
+          full-width card below for fat-finger compliance. */}
+      <motion.div variants={item} style={{ padding: '6px 20px 10px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', marginBottom: 4 }}>
           <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--field-gold-bright)' }} />
           {formatDate(now)}
         </div>
         <GreetingTitle prefix={greetingPrefix()} name={firstName} />
-        <div style={{ marginTop: 8, fontSize: 13, color: 'var(--ink-muted)' }}>
+        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-muted)' }}>
           {activeCount > 0
             ? <>{activeCount} {activeCount === 1 ? 'crew' : 'crews'} on site. <span style={{ color: 'var(--signal-green)', fontWeight: 600 }}>All green.</span></>
             : 'Nothing active. Quiet day.'}
         </div>
-        <div style={{ marginTop: 6 }}>
-          {editingFocus ? (
-            <textarea
-              ref={focusRef}
-              value={focusDraft}
-              onChange={(e) => setFocusDraft(e.target.value)}
-              onBlur={saveFocus}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveFocus() }
-                if (e.key === 'Escape') { setFocusDraft(profile?.greeting || ''); setEditingFocus(false) }
-              }}
-              maxLength={90}
-              rows={2}
-              placeholder="Add today's focus"
-              style={{ width: '100%', maxWidth: 360, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 13, fontFamily: 'var(--font-body)', resize: 'none', outline: 'none' }}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEditingFocus(true)}
-              aria-label="Edit today's focus"
-              style={{ background: 'none', border: 'none', padding: 0, color: profile?.greeting ? 'var(--ink-strong)' : 'var(--ink-faint)', fontSize: 13, fontFamily: 'var(--font-body)', cursor: 'text', textAlign: 'left' }}
-            >
-              {profile?.greeting || "Add today's focus →"}
-            </button>
-          )}
-        </div>
+      </motion.div>
+
+      {/* TODAY'S FOCUS — full-width tappable card. Replaces the inline
+          text-link pattern that was below 44×44 hit-target spec. */}
+      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+        {editingFocus ? (
+          <textarea
+            ref={focusRef}
+            value={focusDraft}
+            onChange={(e) => setFocusDraft(e.target.value)}
+            onBlur={saveFocus}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveFocus() }
+              if (e.key === 'Escape') { setFocusDraft(profile?.greeting || ''); setEditingFocus(false) }
+            }}
+            maxLength={90}
+            rows={2}
+            placeholder="What's the focus today?"
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: 64, padding: '14px 16px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', resize: 'none', outline: 'none' }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingFocus(true)}
+            aria-label={profile?.greeting ? "Edit today's focus" : "Add today's focus"}
+            style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderRadius: 14, background: profile?.greeting ? 'var(--surface-2)' : 'rgba(201,150,58,0.06)', border: profile?.greeting ? '1px solid var(--rule)' : '1px dashed rgba(201,150,58,0.4)', color: profile?.greeting ? 'var(--ink-strong)' : 'var(--field-gold-bright)', fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: profile?.greeting ? 500 : 700, cursor: 'pointer', textAlign: 'left' }}
+          >
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {profile?.greeting || "Add today's focus"}
+            </span>
+            <ChevronRight size={16} color={profile?.greeting ? 'var(--ink-faint)' : 'var(--field-gold-bright)'} />
+          </button>
+        )}
       </motion.div>
 
       {/* WEEKLY TARGET CARD — Aceternity-style moving gradient border */}
@@ -277,7 +308,9 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* WEATHER + POUR — tappable, routes to /pour-window */}
+      {/* WEATHER — tappable, routes to /pour-window. Trade-status pills
+          live in the dedicated 3-card row below so we don't duplicate them
+          here. */}
       {hasCoords ? (
         <motion.div
           variants={item}
@@ -287,9 +320,9 @@ export default function Home() {
           whileTap={{ scale: 0.98 }}
           onClick={() => { hapticTap(); navigate('/pour-window') }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hapticTap(); navigate('/pour-window') } }}
-          style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 10, padding: '0 20px 14px', cursor: 'pointer' }}
+          style={{ padding: '0 20px 14px', cursor: 'pointer' }}
         >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderRadius: 16, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
             <span aria-hidden="true" style={{ position: 'absolute', top: 8, right: 10, fontSize: 8, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', opacity: 0.7 }}>
               Open →
             </span>
@@ -297,17 +330,13 @@ export default function Home() {
               <CloudSun size={18} color="#8fb4e3" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: '0.02em', lineHeight: 1 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--ink-strong)' }}>
                 {weatherLoading ? '—' : weather?.current?.temperature_2m != null ? `${Math.round(weather.current.temperature_2m)}°` : '—'}
               </div>
               <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 3 }}>
                 {weather?.current?.wind_speed_10m != null ? `Wind ${Math.round(weather.current.wind_speed_10m)}mph` : '—'}
               </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '13px 15px', borderRadius: 16, background: pourGood ? 'linear-gradient(135deg, rgba(45,122,79,0.2), rgba(45,122,79,0.06))' : 'linear-gradient(135deg, rgba(192,57,43,0.2), rgba(192,57,43,0.06))', border: pourGood ? '1px solid rgba(78,214,147,0.25)' : '1px solid rgba(192,57,43,0.25)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: pourGood ? 'var(--signal-green)' : 'var(--alert-red)' }}>Pour</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: '0.03em', lineHeight: 1, marginTop: 3, color: pourGood ? 'var(--signal-green)' : 'var(--alert-red)' }}>{String(pourStatus).toUpperCase()}</div>
           </div>
         </motion.div>
       ) : (
@@ -319,24 +348,83 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* KPI ROW */}
-      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 20px 20px' }}>
-        {[
-          { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp },
-          { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase },
-          { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText }
-        ].map((kpi) => {
-          const I = kpi.icon
-          return (
-            <div key={kpi.label} className="fh-card-raised" style={{ position: 'relative', overflow: 'hidden', padding: '12px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
-              <I size={14} style={{ position: 'absolute', top: 10, right: 10, color: 'rgba(201,150,58,0.4)' }} />
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{kpi.label}</div>
-              <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: '0.02em', lineHeight: 1, marginTop: 5 }}>
-                <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
-              </div>
-            </div>
-          )
-        })}
+
+      {/* KPI CAROUSEL — phase 18.4: horizontal scroll-snap row instead
+          of a 3-col grid. On 375px iPhone the prior grid gave each tile
+          ~98px which crammed the K-format numbers. Now each tile is
+          fixed at 160px (snaps), tiles can grow as we add more (Won
+          YTD, Today's bookings, etc.) without a layout rebuild. */}
+      <motion.div variants={item} style={{ padding: '0 0 20px' }}>
+        <div
+          className="fh-kpi-carousel"
+          style={{
+            display: 'flex',
+            gap: 10,
+            overflowX: 'auto',
+            scrollSnapType: 'x mandatory',
+            scrollPaddingLeft: 20,
+            padding: '2px 20px 6px',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          {[
+            { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp, gold: true, to: '/jobs' },
+            { label: 'Outstanding', value: outstanding, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: Receipt, alert: outstanding > 0, to: '/invoices' },
+            { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase, to: '/jobs' },
+            { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText, to: '/notes' }
+          ].map((kpi) => {
+            const I = kpi.icon
+            const isButton = !!kpi.to
+            const Tag = isButton ? 'button' : 'div'
+            return (
+              <Tag
+                key={kpi.label}
+                onClick={isButton ? () => navigate(kpi.to) : undefined}
+                type={isButton ? 'button' : undefined}
+                className="fh-card-raised"
+                style={{
+                  flexShrink: 0,
+                  scrollSnapAlign: 'start',
+                  width: 160,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  padding: '14px 14px 16px',
+                  borderRadius: 14,
+                  background: kpi.gold
+                    ? 'linear-gradient(135deg, #2a1f10, #1a1208)'
+                    : kpi.alert
+                      ? 'linear-gradient(135deg, #2a1210, #1a0c08)'
+                      : 'var(--surface-2)',
+                  border: kpi.gold
+                    ? '1px solid rgba(201,150,58,0.5)'
+                    : kpi.alert
+                      ? '1px solid rgba(192,57,43,0.5)'
+                      : '1px solid var(--rule)',
+                  minHeight: 86,
+                  textAlign: 'left',
+                  cursor: isButton ? 'pointer' : 'default',
+                  color: 'inherit'
+                }}
+              >
+                <I size={14} style={{ position: 'absolute', top: 12, right: 12, color: kpi.gold ? 'var(--field-gold-bright)' : kpi.alert ? 'var(--alert-red)' : 'rgba(201,150,58,0.4)' }} />
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{kpi.label}</div>
+                <div
+                  className={kpi.gold ? 'fh-money fh-text-gradient-gold' : 'fh-money'}
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 28,
+                    letterSpacing: '0.01em',
+                    lineHeight: 1,
+                    marginTop: 8,
+                    color: kpi.gold ? undefined : kpi.alert && kpi.value > 0 ? 'var(--alert-red)' : 'var(--ink-strong)'
+                  }}
+                >
+                  <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
+                </div>
+              </Tag>
+            )
+          })}
+        </div>
       </motion.div>
 
       {/* TODAY ON SITE */}
@@ -349,14 +437,14 @@ export default function Home() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 14px' }}>
           {todayJobs.length === 0 ? (
-            <div style={{ padding: '24px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12 }}>
+            <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12 }}>
               No active jobs yet. <button onClick={() => navigate('/jobs?new=1')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, cursor: 'pointer' }}>Add your first lead →</button>
             </div>
           ) : todayJobs.map((job) => {
             const accent = job.stage === 'job' ? 'green' : job.stage === 'quote' ? 'gold' : 'red'
             const accentColors = { green: 'var(--signal-green)', gold: 'var(--field-gold-bright)', red: 'var(--alert-red)' }
             return (
-              <motion.button key={job.id} whileTap={{ scale: 0.98 }} onClick={() => navigate(`/jobs/${job.id}`)} style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)', cursor: 'pointer', textAlign: 'left' }}>
+              <motion.button key={job.id} whileTap={{ scale: 0.98 }} onClick={() => navigate(`/jobs/${job.id}`)} style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accentColors[accent], boxShadow: `0 0 12px ${accentColors[accent]}99` }} />
                 <div style={{ width: 36, height: 36, borderRadius: 11, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 15, letterSpacing: '0.04em', background: `linear-gradient(135deg, ${accentColors[accent]}33, ${accentColors[accent]}11)`, color: accentColors[accent], border: `1px solid ${accentColors[accent]}33` }}>
                   {initials(job.name)}

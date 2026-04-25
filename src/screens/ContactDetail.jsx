@@ -6,8 +6,10 @@ import {
   Wrench, Receipt, DollarSign, ClipboardCheck, Calendar, FileText,
   ArrowRight, Check, Plus, X as XIcon, Save as SaveIcon,
   Image as ImageIcon, Paperclip, ListChecks, Download, Upload as UploadIcon,
-  Clock
+  Clock, Sparkles, GitCompareArrows
 } from 'lucide-react'
+import { compressImageToDataUrl, captionPhoto } from '../lib/docIntelligence.js'
+import TimeClockCard from '../components/TimeClockCard.jsx'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
@@ -22,7 +24,8 @@ import {
 import {
   startQuote, approveQuote, markComplete, markLost, reopen, logPayment
 } from '../lib/pipeline.js'
-import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
+import { toast, toastSuccess, toastInfo, toastUndo, toastError } from '../lib/toast.js'
+import { notifySelf } from '../lib/notifications.js'
 import { hapticTap, hapticMedium, hapticStageChange, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
@@ -230,7 +233,7 @@ export default function ContactDetail() {
               : (
                 <span
                   aria-label="Shared job — client visible only to owner"
-                  style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'default' }}
+                  style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'default' }}
                 >
                   <Users size={10} />
                   Client
@@ -290,7 +293,7 @@ export default function ContactDetail() {
             gap: 8,
             padding: '11px 14px',
             borderRadius: 12,
-            background: isEditing ? 'rgba(201,150,58,0.18)' : 'rgba(255,255,255,0.04)',
+            background: isEditing ? 'rgba(201,150,58,0.18)' : 'var(--surface-2)',
             border: isEditing ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
             color: isEditing ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
             fontFamily: 'var(--font-display)',
@@ -365,6 +368,7 @@ export default function ContactDetail() {
             userId={user.id}
             isEditing={isEditing}
             onExitEdit={() => setIsEditing(false)}
+            onChange={fetchAll}
           />
         )}
         {tab === 'milestones' && <MilestonesTab contact={contact} onPatch={patch} />}
@@ -534,7 +538,7 @@ function StageActions({ contact, onAction, onLogPayment }) {
     padding: '10px 16px',
     borderRadius: 12,
     border: '1px solid var(--rule)',
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--surface-2)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
     fontSize: 13,
@@ -598,7 +602,7 @@ const JOB_TYPES = [
   'Addition'
 ]
 
-function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
+function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit, onChange }) {
   const [form, setForm] = useState({ ...contact })
   const [inviteOpen, setInviteOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -636,8 +640,15 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
         : <OverviewReadCard contact={contact} />
       }
 
+      {/* Time clock — only on jobs that are actually being worked. Hidden
+          for leads / quotes (you don't punch in on a quote) and for
+          closed/lost (no point clocking time on a finished job). */}
+      {(contact.stage === 'job' || contact.stage === 'invoice') && (
+        <TimeClockCard contact={contact} userId={userId} onLogged={onChange} />
+      )}
+
       {/* Inspections toggle — gates the Inspections tab */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>This job requires inspections</div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Enables the Inspections tab for permit-tracked trades</div>
@@ -650,7 +661,7 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit }) {
       </div>
 
       {/* Partner row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
           <span
             aria-hidden="true"
@@ -714,7 +725,7 @@ function OverviewReadCard({ contact }) {
     { label: 'Notes', value: contact.notes, multiline: true }
   ]
   return (
-    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
       {rows.map((r, i) => (
         <div
           key={r.label}
@@ -743,7 +754,7 @@ function OverviewEditForm({ form, set, saving, onCommit, onCancel }) {
     width: '100%',
     padding: '11px 14px',
     borderRadius: 12,
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
@@ -752,7 +763,7 @@ function OverviewEditForm({ form, set, saving, onCommit, onCancel }) {
   }
   const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
   return (
-    <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={labelStyle}>Name</span>
@@ -816,7 +827,7 @@ function OverviewEditForm({ form, set, saving, onCommit, onCancel }) {
           type="button"
           onClick={onCancel}
           disabled={saving}
-          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
         >
           <XIcon size={14} />
           Cancel
@@ -936,9 +947,22 @@ function SubsTab({ contact, subs, userId, onChange }) {
   }
 
   async function remove(id) {
-    await supabase.from('fh_subs').delete().eq('id', id)
+    const snapshot = subs.find((s) => s.id === id)
+    const { error } = await supabase.from('fh_subs').delete().eq('id', id)
+    if (error) { toastError("Couldn't delete", error.message); return }
     await recalcCost(contact.id)
     onChange()
+    toastUndo('Sub removed', {
+      description: snapshot?.name || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_subs').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        await recalcCost(contact.id)
+        onChange()
+        toastSuccess('Restored', snapshot.name || '')
+      }
+    })
   }
 
   return (
@@ -997,7 +1021,7 @@ function SubsTab({ contact, subs, userId, onChange }) {
         {subs.map((s) => (
           <li key={s.id} className="fh-row">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
                 <Wrench size={14} />
               </span>
               <div style={{ minWidth: 0 }}>
@@ -1059,9 +1083,22 @@ function ExpensesTab({ contact, expenses, userId, onChange }) {
   }
 
   async function remove(id) {
-    await supabase.from('fh_expenses').delete().eq('id', id)
+    const snapshot = expenses.find((e) => e.id === id)
+    const { error } = await supabase.from('fh_expenses').delete().eq('id', id)
+    if (error) { toastError("Couldn't delete", error.message); return }
     await recalcCost(contact.id)
     onChange()
+    toastUndo('Expense removed', {
+      description: snapshot ? `${snapshot.description || 'Expense'} · $${Number(snapshot.amount || 0).toLocaleString()}` : 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_expenses').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        await recalcCost(contact.id)
+        onChange()
+        toastSuccess('Restored', snapshot.description || '')
+      }
+    })
   }
 
   return (
@@ -1128,7 +1165,7 @@ function ExpensesTab({ contact, expenses, userId, onChange }) {
         {expenses.map((e) => (
           <li key={e.id} className="fh-row">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--field-gold-bright)' }}>
                 <Receipt size={14} />
               </span>
               <div style={{ minWidth: 0 }}>
@@ -1169,6 +1206,15 @@ function InspectionsTab({ contact, inspections, userId, onChange }) {
       result,
       data: { notes: notes || '' }
     })
+    // Notification — owner sees a trail of inspections in the inbox so
+    // the bell is meaningful even before partner-accept / payment-received
+    // triggers land server-side.
+    notifySelf(userId, {
+      kind: 'inspection_logged',
+      title: `${trade} · ${String(result).toUpperCase()}`,
+      body: contact?.name ? `Inspection logged on ${contact.name}` : 'Inspection logged',
+      link: `/jobs/${contact.id}`
+    }).catch(() => {})
     setActive(null)
     onChange()
   }
@@ -1246,7 +1292,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
                       padding: '12px 8px',
                       borderRadius: 12,
                       border: on ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
-                      background: on ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.03)',
+                      background: on ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                       color: on ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
                       fontFamily: 'var(--font-display)',
                       fontSize: 13,
@@ -1268,7 +1314,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Corrections needed, re-inspection date, inspector name…"
-              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none', resize: 'vertical' }}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none', resize: 'vertical' }}
             />
           </label>
 
@@ -1276,7 +1322,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -1490,8 +1536,19 @@ function UploadList({ jobId, userId, kind }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  // Lightbox carries the full row so it can render caption + edit it.
+  const [lightboxIdx, setLightboxIdx] = useState(-1)
   const [lightboxUrl, setLightboxUrl] = useState('')
   const inputRef = useRef(null)
+  // Track which rows are still waiting on a Vision caption so the thumb
+  // can show a "captioning…" shimmer instead of empty space.
+  const [captioningIds, setCaptioningIds] = useState(() => new Set())
+  // Compare picker state — when active, taps on thumbs select before+after
+  // instead of opening the lightbox. After both are picked, the slider
+  // shows over the grid.
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareBefore, setCompareBefore] = useState(null)
+  const [compareAfter, setCompareAfter] = useState(null)
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
@@ -1513,6 +1570,9 @@ function UploadList({ jobId, userId, kind }) {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
     setUploading(true)
+    // Track newly inserted photo rows so we can fire-and-forget Vision
+    // captioning AFTER the upload UX completes — never block the user.
+    const newPhotoIds = []
     try {
       for (const file of files) {
         // Basic per-file size cap: 25 MB for files, 10 MB for photos
@@ -1539,14 +1599,64 @@ function UploadList({ jobId, userId, kind }) {
           kind
         })
         if (insErr) throw insErr
+        if (kind === 'photo') newPhotoIds.push({ id: rowId, file })
       }
       toastSuccess(kind === 'photo' ? 'Photos uploaded' : 'Files uploaded', `Added ${files.length}`)
       await fetchRows()
+      // Kick off captioning AFTER the user already sees their photos. The
+      // caption update streams into the row asynchronously; if the column
+      // doesn't exist (migration 009 not applied) the update silently
+      // no-ops and the UI just shows uncaptioned thumbs.
+      if (newPhotoIds.length > 0) {
+        setCaptioningIds((prev) => {
+          const next = new Set(prev)
+          for (const { id } of newPhotoIds) next.add(id)
+          return next
+        })
+        for (const { id, file } of newPhotoIds) {
+          captionAndPersist(id, file)
+        }
+      }
     } catch (ex) {
       toast({ kind: 'error', title: 'Upload failed', body: ex?.message || 'Try again' })
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  async function captionAndPersist(rowId, file) {
+    try {
+      const dataUrl = await compressImageToDataUrl(file, 900_000, 1280)
+      const cap = await captionPhoto(dataUrl)
+      if (!cap) return
+      const { error } = await supabase
+        .from('fh_job_files')
+        .update({ caption: cap })
+        .eq('id', rowId)
+      if (error) return // column may not exist yet → silent
+      setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, caption: cap } : r))
+    } catch {
+      // Vision call failed (network/quota). Keep the photo; just no caption.
+    } finally {
+      setCaptioningIds((prev) => {
+        if (!prev.has(rowId)) return prev
+        const next = new Set(prev)
+        next.delete(rowId)
+        return next
+      })
+    }
+  }
+
+  async function saveCaption(rowId, nextCaption) {
+    const trimmed = (nextCaption || '').trim()
+    setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, caption: trimmed || null } : r))
+    const { error } = await supabase
+      .from('fh_job_files')
+      .update({ caption: trimmed || null })
+      .eq('id', rowId)
+    if (error) {
+      toast({ kind: 'error', title: "Couldn't save caption", body: error.message })
     }
   }
 
@@ -1571,10 +1681,34 @@ function UploadList({ jobId, userId, kind }) {
       return
     }
     if (kind === 'photo') {
+      const idx = rows.findIndex((r) => r.id === row.id)
+      setLightboxIdx(idx >= 0 ? idx : 0)
       setLightboxUrl(data.signedUrl)
     } else {
       window.open(data.signedUrl, '_blank', 'noopener')
     }
+  }
+
+  // The lightbox needs to swipe between photos; resolve the active row
+  // from the index so caption edits stay in sync with `rows`.
+  const lightboxRow = lightboxIdx >= 0 && lightboxIdx < rows.length ? rows[lightboxIdx] : null
+
+  function closeLightbox() {
+    setLightboxIdx(-1)
+    setLightboxUrl('')
+  }
+
+  async function goToLightboxIdx(nextIdx) {
+    if (nextIdx < 0 || nextIdx >= rows.length) return
+    const nextRow = rows[nextIdx]
+    if (!nextRow) return
+    setLightboxIdx(nextIdx)
+    setLightboxUrl('')
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(nextRow.storage_path, 60 * 60)
+    if (error || !data?.signedUrl) return
+    setLightboxUrl(data.signedUrl)
   }
 
   function fmtSize(n) {
@@ -1584,23 +1718,77 @@ function UploadList({ jobId, userId, kind }) {
     return `${(n / (1024 * 1024)).toFixed(1)} MB`
   }
 
+  async function urlFor(row) {
+    const { data } = await supabase.storage.from(bucket).createSignedUrl(row.storage_path, 60 * 60)
+    return data?.signedUrl || ''
+  }
+
+  async function handleThumbTap(row) {
+    if (!compareMode) {
+      open(row)
+      return
+    }
+    const url = await urlFor(row)
+    if (!url) return
+    if (!compareBefore) {
+      setCompareBefore({ row, url })
+    } else if (!compareAfter && row.id !== compareBefore.row.id) {
+      setCompareAfter({ row, url })
+    } else {
+      // Reset to a new before
+      setCompareBefore({ row, url })
+      setCompareAfter(null)
+    }
+  }
+
+  function exitCompare() {
+    setCompareMode(false)
+    setCompareBefore(null)
+    setCompareAfter(null)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
           {kind === 'photo' ? `${rows.length} photo${rows.length === 1 ? '' : 's'}` : `${rows.length} file${rows.length === 1 ? '' : 's'}`}
         </span>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.97 }}
-          onClick={pick}
-          disabled={uploading}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: uploading ? 'default' : 'pointer', boxShadow: '0 4px 12px rgba(201,150,58,0.3)', opacity: uploading ? 0.6 : 1 }}
-        >
-          <UploadIcon size={12} />
-          {uploading ? 'UPLOADING…' : (kind === 'photo' ? 'ADD PHOTOS' : 'ADD FILES')}
-        </motion.button>
+        <div style={{ display: 'inline-flex', gap: 6 }}>
+          {kind === 'photo' && rows.length >= 2 && (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { compareMode ? exitCompare() : setCompareMode(true) }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: compareMode ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)', background: compareMode ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)', color: compareMode ? 'var(--field-gold-bright)' : 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
+            >
+              <GitCompareArrows size={12} />
+              {compareMode ? 'EXIT COMPARE' : 'COMPARE'}
+            </motion.button>
+          )}
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={pick}
+            disabled={uploading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: uploading ? 'default' : 'pointer', boxShadow: '0 4px 12px rgba(201,150,58,0.3)', opacity: uploading ? 0.6 : 1 }}
+          >
+            <UploadIcon size={12} />
+            {uploading ? 'UPLOADING…' : (kind === 'photo' ? 'ADD PHOTOS' : 'ADD FILES')}
+          </motion.button>
+        </div>
       </div>
+
+      {/* Compare hint + slider */}
+      {compareMode && kind === 'photo' && (
+        <div style={{ padding: 10, borderRadius: 12, background: 'rgba(201,150,58,0.07)', border: '1px solid rgba(201,150,58,0.22)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: '0.06em' }}>
+            {!compareBefore ? 'Tap the BEFORE photo' : !compareAfter ? 'Now tap the AFTER photo' : 'Drag the slider'}
+          </div>
+          {compareBefore && compareAfter && (
+            <BeforeAfterSlider beforeUrl={compareBefore.url} afterUrl={compareAfter.url} beforeLabel={compareBefore.row.caption} afterLabel={compareAfter.row.caption} />
+          )}
+        </div>
+      )}
       <input ref={inputRef} type="file" accept={accept} multiple hidden onChange={handleFile} />
 
       {loading && <SkeletonList rows={3} card={false} />}
@@ -1610,16 +1798,29 @@ function UploadList({ jobId, userId, kind }) {
 
       {!loading && rows.length > 0 && kind === 'photo' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-          {rows.map((r) => (
-            <PhotoThumb key={r.id} row={r} bucket={bucket} onOpen={() => open(r)} onDelete={() => remove(r)} />
-          ))}
+          {rows.map((r) => {
+            const selected = compareMode && (compareBefore?.row.id === r.id || compareAfter?.row.id === r.id)
+            const compareLabel = compareBefore?.row.id === r.id ? 'BEFORE' : compareAfter?.row.id === r.id ? 'AFTER' : ''
+            return (
+              <PhotoThumb
+                key={r.id}
+                row={r}
+                bucket={bucket}
+                captioning={captioningIds.has(r.id)}
+                selectionLabel={compareLabel}
+                selected={selected}
+                onOpen={() => handleThumbTap(r)}
+                onDelete={() => remove(r)}
+              />
+            )
+          })}
         </div>
       )}
 
       {!loading && rows.length > 0 && kind === 'file' && (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map((r) => (
-            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
               <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
                 <Paperclip size={14} />
               </span>
@@ -1640,21 +1841,24 @@ function UploadList({ jobId, userId, kind }) {
         </ul>
       )}
 
-      {lightboxUrl && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setLightboxUrl('')}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.88)', display: 'grid', placeItems: 'center', padding: 16, cursor: 'zoom-out' }}
-        >
-          <img src={lightboxUrl} alt="Photo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-        </div>
+      {lightboxRow && (
+        <PhotoLightbox
+          url={lightboxUrl}
+          row={lightboxRow}
+          captioning={captioningIds.has(lightboxRow.id)}
+          hasPrev={lightboxIdx > 0}
+          hasNext={lightboxIdx < rows.length - 1}
+          onPrev={() => goToLightboxIdx(lightboxIdx - 1)}
+          onNext={() => goToLightboxIdx(lightboxIdx + 1)}
+          onClose={closeLightbox}
+          onSaveCaption={(text) => saveCaption(lightboxRow.id, text)}
+        />
       )}
     </div>
   )
 }
 
-function PhotoThumb({ row, bucket, onOpen, onDelete }) {
+function PhotoThumb({ row, bucket, captioning, selectionLabel, selected, onOpen, onDelete }) {
   const [url, setUrl] = useState('')
   useEffect(() => {
     let cancelled = false
@@ -1664,22 +1868,48 @@ function PhotoThumb({ row, bucket, onOpen, onDelete }) {
       .then(({ data }) => { if (!cancelled && data?.signedUrl) setUrl(data.signedUrl) })
     return () => { cancelled = true }
   }, [row.storage_path, bucket])
+  const caption = row.caption?.trim()
   return (
-    <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)' }}>
+    <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-2)', border: selected ? '2px solid var(--field-gold-bright)' : '1px solid var(--rule)' }}>
       <button
         type="button"
         onClick={onOpen}
         style={{ position: 'absolute', inset: 0, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }}
-        aria-label={row.filename}
+        aria-label={caption || row.filename}
       >
         {url ? (
-          <img src={url} alt={row.filename} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img src={url} alt={caption || row.filename} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         ) : (
           <span style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', color: 'var(--ink-faint)' }}>
             <ImageIcon size={20} />
           </span>
         )}
       </button>
+      {(caption || captioning) && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: '14px 6px 5px',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.78) 70%)',
+            color: '#fff',
+            fontFamily: 'var(--font-body)',
+            fontSize: 9.5,
+            lineHeight: 1.2,
+            letterSpacing: '0.01em',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            pointerEvents: 'none'
+          }}
+        >
+          {captioning ? <em style={{ opacity: 0.7, fontStyle: 'normal' }}>Captioning…</em> : caption}
+        </div>
+      )}
       <button
         type="button"
         onClick={onDelete}
@@ -1688,6 +1918,402 @@ function PhotoThumb({ row, bucket, onOpen, onDelete }) {
       >
         <Trash2 size={12} />
       </button>
+      {selectionLabel && (
+        <span aria-hidden="true" style={{ position: 'absolute', top: 4, left: 4, padding: '2px 6px', borderRadius: 6, background: 'var(--field-gold-bright)', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.12em' }}>
+          {selectionLabel}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Before/after slider — drag the vertical handle to wipe between two
+// photos. Single touch / mouse, both supported. Used by PhotosTab's
+// Compare mode. Stays inside the parent's content area so the page
+// itself doesn't lock to drag.
+function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }) {
+  const [pct, setPct] = useState(50)
+  const wrapRef = useRef(null)
+  const draggingRef = useRef(false)
+
+  function setFromClientX(clientX) {
+    const el = wrapRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const next = Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100))
+    setPct(next)
+  }
+
+  function onPointerDown(e) {
+    draggingRef.current = true
+    setFromClientX(e.clientX)
+    try { e.target.setPointerCapture(e.pointerId) } catch {}
+  }
+  function onPointerMove(e) {
+    if (!draggingRef.current) return
+    setFromClientX(e.clientX)
+  }
+  function onPointerUp() {
+    draggingRef.current = false
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--rule)', aspectRatio: '4 / 3', userSelect: 'none', touchAction: 'none', cursor: 'ew-resize' }}
+    >
+      <img src={afterUrl} alt={afterLabel || 'After'} draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', clipPath: `inset(0 ${100 - pct}% 0 0)` }}>
+        <img src={beforeUrl} alt={beforeLabel || 'Before'} draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      {/* Labels */}
+      <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.12em' }}>BEFORE</span>
+      <span style={{ position: 'absolute', top: 8, right: 8, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.12em' }}>AFTER</span>
+      {/* Handle line */}
+      <div aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: `${pct}%`, width: 2, background: 'var(--field-gold-bright)', boxShadow: '0 0 12px rgba(201,150,58,0.6)', transform: 'translateX(-1px)', pointerEvents: 'none' }} />
+      {/* Handle knob */}
+      <div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: `${pct}%`, width: 32, height: 32, borderRadius: '50%', background: 'var(--field-gold-bright)', border: '2px solid var(--onyx)', transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.5)', pointerEvents: 'none' }}>
+        <span style={{ color: 'var(--onyx)', fontSize: 9, fontFamily: 'var(--font-display)', letterSpacing: '0.12em' }}>‹›</span>
+      </div>
+    </div>
+  )
+}
+
+// Photo lightbox — pinch-zoom + double-tap zoom + swipe-to-close.
+//
+// Why a hand-rolled gesture handler instead of framer-motion gestures:
+// the PWA viewport disables user-scalable so the browser won't pinch the
+// image on its own, and motion's pinch helper doesn't track per-finger
+// distance — we need raw touch math for two-finger zoom that feels
+// native (anchor zoom on the midpoint between fingers).
+//
+// Behavior:
+//   - 1 finger drag while zoomed: pan
+//   - 1 finger drag while NOT zoomed (vertical >80px): close
+//   - 2 fingers: pinch zoom around midpoint, clamped 1×–4×
+//   - double-tap: toggle 1× ↔ 2.5× zoomed at tap point
+//   - tap (single, non-drag) on backdrop while at 1×: close
+//   - prev/next swipe is intentionally NOT bound to gestures (would
+//     conflict with pan) — use the chevron buttons instead.
+function PhotoLightbox({ url, row, captioning, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption }) {
+  const [scale, setScale] = useState(1)
+  const [tx, setTx] = useState(0)
+  const [ty, setTy] = useState(0)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(row.caption || '')
+
+  // Reset zoom + pan whenever the photo we're showing changes.
+  useEffect(() => {
+    setScale(1); setTx(0); setTy(0)
+    setDraft(row.caption || '')
+    setEditing(false)
+  }, [row.id])
+
+  // ESC closes; arrows nav. Only bound while open (component is mounted
+  // only when lightbox is open, so no extra guard needed).
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowLeft' && hasPrev) onPrev()
+      else if (e.key === 'ArrowRight' && hasNext) onNext()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, onPrev, onNext, hasPrev, hasNext])
+
+  // Touch state lives in refs so re-renders don't reset mid-gesture.
+  const touchRef = useRef({
+    mode: null,           // 'pan' | 'pinch' | 'tap' | null
+    startX: 0, startY: 0, // initial finger position (single-touch)
+    startTx: 0, startTy: 0,
+    startDist: 0,         // distance between two fingers at pinch start
+    startScale: 1,
+    pinchAnchor: { x: 0, y: 0 }, // midpoint in image-local coords
+    lastTapTime: 0,
+    lastTapX: 0, lastTapY: 0,
+    moved: false
+  })
+
+  function dist(t1, t2) {
+    const dx = t2.clientX - t1.clientX
+    const dy = t2.clientY - t1.clientY
+    return Math.hypot(dx, dy)
+  }
+
+  function clampedScale(s) {
+    return Math.min(4, Math.max(1, s))
+  }
+
+  function onTouchStart(e) {
+    const r = touchRef.current
+    if (e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]]
+      r.mode = 'pinch'
+      r.startDist = dist(a, b)
+      r.startScale = scale
+      r.pinchAnchor = { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }
+      r.startTx = tx
+      r.startTy = ty
+      r.moved = true
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0]
+      r.mode = scale > 1 ? 'pan' : 'tap'
+      r.startX = t.clientX
+      r.startY = t.clientY
+      r.startTx = tx
+      r.startTy = ty
+      r.moved = false
+    }
+  }
+
+  function onTouchMove(e) {
+    const r = touchRef.current
+    if (r.mode === 'pinch' && e.touches.length === 2) {
+      e.preventDefault()
+      const [a, b] = [e.touches[0], e.touches[1]]
+      const d = dist(a, b)
+      if (r.startDist > 0) {
+        const next = clampedScale(r.startScale * (d / r.startDist))
+        setScale(next)
+      }
+    } else if (r.mode === 'pan' && e.touches.length === 1) {
+      e.preventDefault()
+      const t = e.touches[0]
+      setTx(r.startTx + (t.clientX - r.startX))
+      setTy(r.startTy + (t.clientY - r.startY))
+      r.moved = true
+    } else if (r.mode === 'tap' && e.touches.length === 1) {
+      const t = e.touches[0]
+      const dx = t.clientX - r.startX
+      const dy = t.clientY - r.startY
+      // Track for swipe-to-close — only react after the gesture ends.
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) r.moved = true
+    }
+  }
+
+  function onTouchEnd(e) {
+    const r = touchRef.current
+    if (r.mode === 'tap' && e.changedTouches.length === 1) {
+      const t = e.changedTouches[0]
+      const dy = t.clientY - r.startY
+      const dx = t.clientX - r.startX
+      if (!r.moved) {
+        // Detect double-tap (within 280ms + close to last tap point).
+        const now = Date.now()
+        const sinceLast = now - r.lastTapTime
+        const closeToLast = Math.hypot(t.clientX - r.lastTapX, t.clientY - r.lastTapY) < 30
+        if (sinceLast < 280 && closeToLast) {
+          // Double-tap: zoom in to 2.5× at the tap point, or back to 1×.
+          if (scale > 1.01) {
+            setScale(1); setTx(0); setTy(0)
+          } else {
+            setScale(2.5)
+            // Anchor the zoom around the tap point so the tapped pixel
+            // stays under the finger (within reason).
+            const cx = window.innerWidth / 2
+            const cy = window.innerHeight / 2
+            setTx((cx - t.clientX) * 1.5)
+            setTy((cy - t.clientY) * 1.5)
+          }
+          r.lastTapTime = 0
+        } else {
+          r.lastTapTime = now
+          r.lastTapX = t.clientX
+          r.lastTapY = t.clientY
+        }
+      } else if (Math.abs(dy) > 80 && Math.abs(dy) > Math.abs(dx) * 1.4 && scale <= 1.01) {
+        // Vertical swipe at 1× → close.
+        onClose()
+      }
+    }
+    if (e.touches.length === 0) {
+      r.mode = null
+      // Snap-back if user zoomed below 1× or dragged way out at 1×.
+      if (scale <= 1.01 && (tx !== 0 || ty !== 0)) {
+        setTx(0); setTy(0)
+      }
+    } else if (e.touches.length === 1 && r.mode === 'pinch') {
+      // Lifted one of two fingers — switch to pan (or tap if zoomed out).
+      const t = e.touches[0]
+      r.mode = scale > 1 ? 'pan' : 'tap'
+      r.startX = t.clientX
+      r.startY = t.clientY
+      r.startTx = tx
+      r.startTy = ty
+    }
+  }
+
+  function onBackdropClick(e) {
+    // Only close on direct backdrop tap when not zoomed (so a click that
+    // happens at the end of a pan doesn't accidentally dismiss).
+    if (e.target === e.currentTarget && scale <= 1.01) onClose()
+  }
+
+  function onImgDoubleClick(e) {
+    // Mouse / trackpad double-click — same toggle as touch double-tap.
+    if (scale > 1.01) {
+      setScale(1); setTx(0); setTy(0)
+    } else {
+      setScale(2.5)
+      const cx = window.innerWidth / 2
+      const cy = window.innerHeight / 2
+      setTx((cx - e.clientX) * 1.5)
+      setTy((cy - e.clientY) * 1.5)
+    }
+  }
+
+  async function handleSave() {
+    await onSaveCaption(draft)
+    setEditing(false)
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onBackdropClick}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 60,
+        background: 'rgba(0,0,0,0.94)',
+        display: 'flex',
+        flexDirection: 'column',
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none'
+      }}
+    >
+      {/* Top bar — close + counter */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', paddingTop: 'calc(14px + env(safe-area-inset-top, 0px))', color: '#fff', fontFamily: 'var(--font-body)' }}>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(0,0,0,0.4)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+        >
+          <XIcon size={18} />
+        </button>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.06em' }}>
+          {scale > 1.01 ? `${scale.toFixed(1)}× — double-tap to reset` : 'Pinch to zoom · double-tap · swipe down to close'}
+        </span>
+        <span style={{ width: 40 }} />
+      </div>
+
+      {/* Image stage */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
+        {url ? (
+          <img
+            src={url}
+            alt={row.caption || row.filename}
+            onDoubleClick={onImgDoubleClick}
+            draggable={false}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+              transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+              transformOrigin: 'center center',
+              transition: touchRef.current.mode ? 'none' : 'transform 220ms cubic-bezier(.2,.8,.2,1)',
+              willChange: 'transform',
+              cursor: scale > 1 ? 'grab' : 'zoom-in',
+              pointerEvents: 'auto'
+            }}
+          />
+        ) : (
+          <span aria-label="Loading" style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.18)', borderTopColor: '#fff', animation: 'fh-spin 700ms linear infinite' }} />
+        )}
+
+        {/* Prev / next arrows — outside the touch area visually so a
+            pan finger doesn't constantly land on them. Hidden on
+            single-photo galleries. */}
+        {hasPrev && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onPrev() }}
+            aria-label="Previous photo"
+            style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: 22, border: 'none', background: 'rgba(0,0,0,0.5)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        {hasNext && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onNext() }}
+            aria-label="Next photo"
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: 22, border: 'none', background: 'rgba(0,0,0,0.5)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', rotate: '180deg' }}
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
+      </div>
+
+      {/* Caption strip — view + inline edit. Tap to edit; the textarea
+          autofocuses and Cmd/Ctrl-Enter saves. */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ padding: '12px 16px calc(14px + env(safe-area-inset-bottom, 0px))', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.7) 40%)', color: '#fff' }}
+      >
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <textarea
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleSave() }
+                if (e.key === 'Escape') { e.preventDefault(); setEditing(false); setDraft(row.caption || '') }
+              }}
+              rows={2}
+              placeholder="Describe what's in this photo…"
+              style={{ width: '100%', resize: 'vertical', minHeight: 44, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'var(--surface-2)', color: '#fff', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.4, boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => { setEditing(false); setDraft(row.caption || '') }}
+                style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12 }}
+              >Cancel</button>
+              <button
+                type="button"
+                onClick={handleSave}
+                style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', cursor: 'pointer', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em' }}
+              >SAVE</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label="Edit caption"
+            style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10 }}
+          >
+            <span aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: 'var(--field-gold-bright)' }}>
+              <Sparkles size={14} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.45 }}>
+              {captioning ? (
+                <em style={{ opacity: 0.7, fontStyle: 'normal' }}>Captioning photo…</em>
+              ) : row.caption ? (
+                row.caption
+              ) : (
+                <em style={{ opacity: 0.6, fontStyle: 'normal' }}>No caption — tap to add one.</em>
+              )}
+            </span>
+            <span aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: 'rgba(255,255,255,0.5)' }}>
+              <Pencil size={12} />
+            </span>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -1742,8 +2368,20 @@ function TodosTab({ jobId, userId }) {
   }
 
   async function remove(rowId) {
+    const snapshot = rows.find((r) => r.id === rowId)
     const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId)
-    if (!error) fetchRows()
+    if (error) { toastError("Couldn't delete", error.message); return }
+    setRows((rs) => rs.filter((r) => r.id !== rowId))
+    toastUndo('Task deleted', {
+      description: (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_job_todos').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        fetchRows()
+        toastSuccess('Restored', '')
+      }
+    })
   }
 
   return (
@@ -1754,7 +2392,7 @@ function TodosTab({ jobId, userId }) {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') add() }}
           placeholder="Add a task…"
-          style={{ flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+          style={{ flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
         />
         <motion.button
           type="button"
@@ -1773,12 +2411,12 @@ function TodosTab({ jobId, userId }) {
       {!loading && rows.length > 0 && (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map((r) => (
-            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
               <button
                 type="button"
                 onClick={() => toggle(r)}
                 aria-label={r.done ? 'Mark not done' : 'Mark done'}
-                style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, border: `1px solid ${r.done ? 'rgba(45,122,79,0.6)' : 'var(--rule)'}`, background: r.done ? 'rgba(45,122,79,0.22)' : 'rgba(255,255,255,0.04)', color: 'var(--signal-green)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, border: `1px solid ${r.done ? 'rgba(45,122,79,0.6)' : 'var(--rule)'}`, background: r.done ? 'rgba(45,122,79,0.22)' : 'var(--surface-2)', color: 'var(--signal-green)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
               >
                 {r.done && <Check size={13} />}
               </button>
@@ -1847,7 +2485,7 @@ function ScheduledTab({ jobId }) {
                 <button
                   type="button"
                   onClick={() => openOnSchedule(e)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)' }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)' }}
                 >
                   <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
                     <Calendar size={14} />

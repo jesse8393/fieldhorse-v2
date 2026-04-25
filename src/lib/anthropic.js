@@ -12,3 +12,54 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }) {
   if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)
   return res.json()
 }
+
+/**
+ * claudeVision — multimodal call. Sends one image + a text prompt.
+ *
+ *   imageData: data URL (data:image/jpeg;base64,...) OR raw base64 string
+ *              with an explicit mediaType.
+ *   mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+ *              (defaults to image/jpeg if data URL doesn't carry one)
+ *
+ * Returns the same shape as claudeMessage — { content: [{ text }, ...], ... }
+ */
+export async function claudeVision({ system, prompt, imageData, mediaType, maxTokens = 1024 }) {
+  // Accept data-URL or raw base64. Strip the data-URL header if present
+  // and pull the media type from it when not provided explicitly.
+  let base64 = imageData
+  let type = mediaType
+  if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+    const [header, payload] = imageData.split(',', 2)
+    base64 = payload
+    if (!type) {
+      const m = header.match(/^data:([^;]+);/)
+      type = m ? m[1] : 'image/jpeg'
+    }
+  }
+  if (!type) type = 'image/jpeg'
+
+  const messages = [{
+    role: 'user',
+    content: [
+      { type: 'image', source: { type: 'base64', media_type: type, data: base64 } },
+      { type: 'text', text: prompt }
+    ]
+  }]
+
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens })
+  })
+  if (!res.ok) throw new Error(`Claude vision request failed: ${res.status}`)
+  return res.json()
+}
+
+// Pull the first JSON object out of a Claude response body. Vision responses
+// often include preamble; this finds the first {...} balanced block.
+export function extractJson(text) {
+  if (!text) return null
+  const match = text.match(/\{[\s\S]*\}/)
+  if (!match) return null
+  try { return JSON.parse(match[0]) } catch { return null }
+}

@@ -6,7 +6,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
-import { toastSuccess } from '../lib/toast.js'
+import { toastSuccess, toastUndo, toastError } from '../lib/toast.js'
 import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import SwipeableRow from '../components/SwipeableRow.jsx'
@@ -35,7 +35,7 @@ function iconTone(note) {
   if (p?.risks?.length) return { fg: 'var(--alert-red)', bg: 'rgba(192,57,43,0.15)', border: 'rgba(192,57,43,0.35)' }
   if (p?.follow_up_date) return { fg: 'var(--field-gold-bright)', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)' }
   if (p?.action_items?.length) return { fg: 'var(--signal-green)', bg: 'rgba(45,122,79,0.14)', border: 'rgba(45,122,79,0.35)' }
-  return { fg: 'var(--ink-muted)', bg: 'rgba(255,255,255,0.05)', border: 'var(--rule)' }
+  return { fg: 'var(--ink-muted)', bg: 'var(--surface-2)', border: 'var(--rule)' }
 }
 
 export default function Notes() {
@@ -153,8 +153,20 @@ export default function Notes() {
   }
 
   async function remove(id) {
-    await supabase.from('fh_notes').delete().eq('id', id)
+    const snapshot = notes.find((n) => n.id === id)
+    const { error } = await supabase.from('fh_notes').delete().eq('id', id)
+    if (error) { toastError("Couldn't delete", error.message); return }
     setNotes((n) => n.filter((x) => x.id !== id))
+    toastUndo('Note deleted', {
+      description: snapshot?.parsed?.summary || (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        const { error: insErr } = await supabase.from('fh_notes').insert(snapshot)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        setNotes((n) => [snapshot, ...n])
+        toastSuccess('Restored', '')
+      }
+    })
   }
 
   const listening = voiceState === 'listening'
@@ -187,7 +199,7 @@ export default function Notes() {
             padding: '10px 14px',
             borderRadius: 12,
             border: listening ? '1px solid rgba(192,57,43,0.4)' : '1px solid var(--rule)',
-            background: listening ? 'rgba(192,57,43,0.14)' : 'rgba(255,255,255,0.04)',
+            background: listening ? 'rgba(192,57,43,0.14)' : 'var(--surface-2)',
             color: listening ? 'var(--alert-red)' : 'var(--ink-strong)',
             fontFamily: 'var(--font-body)',
             fontSize: 13,
@@ -207,7 +219,7 @@ export default function Notes() {
             position: 'relative',
             padding: 14,
             borderRadius: 18,
-            background: 'rgba(255,255,255,0.03)',
+            background: 'var(--surface-2)',
             border: listening ? '1px solid rgba(192,57,43,0.35)' : '1px solid var(--rule)',
             backdropFilter: 'blur(20px)'
           }}
@@ -239,7 +251,7 @@ export default function Notes() {
             <select
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
-              style={{ flex: '1 1 160px', minWidth: 140, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none' }}
+              style={{ flex: '1 1 160px', minWidth: 140, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none' }}
             >
               <option value="">No job link</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -248,7 +260,7 @@ export default function Notes() {
               type="button"
               onClick={parseWithAI}
               disabled={!draft.trim() || parsing}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: parsing || !draft.trim() ? 'var(--ink-faint)' : 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: !draft.trim() || parsing ? 'default' : 'pointer', opacity: !draft.trim() || parsing ? 0.55 : 1 }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: parsing || !draft.trim() ? 'var(--ink-faint)' : 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: !draft.trim() || parsing ? 'default' : 'pointer', opacity: !draft.trim() || parsing ? 0.55 : 1 }}
             >
               <Sparkles size={14} />
               {parsing ? 'Parsing…' : 'AI parse'}
@@ -312,7 +324,7 @@ export default function Notes() {
       <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
         {loading && <SkeletonList rows={3} card={false} />}
         {!loading && notes.length === 0 && (
-          <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+          <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Nothing logged yet.</div>
             <div style={{ fontSize: 12 }}>Speak it. Type it. Drop it mid-drive. AI turns it into action.</div>
           </div>
@@ -355,7 +367,7 @@ export default function Notes() {
                   overflow: 'hidden',
                   padding: '14px 16px 14px 20px',
                   borderRadius: 14,
-                  background: 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 100%)',
+                  background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%)',
                   border: '1px solid var(--rule)'
                 }}
               >

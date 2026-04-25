@@ -207,7 +207,7 @@ export default function ClientDetail() {
                 aria-label="Call"
                 aria-disabled={!client.phone}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
               >
                 <Phone size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Call</span>
@@ -218,7 +218,7 @@ export default function ClientDetail() {
                 aria-label="Text"
                 aria-disabled={!client.phone}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
               >
                 <MessageSquare size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Text</span>
@@ -229,7 +229,7 @@ export default function ClientDetail() {
                 aria-label="Email"
                 aria-disabled={!client.email}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.email ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.email ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.email ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.email ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.email ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.email ? 1 : 0.4 }}
               >
                 <Mail size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Email</span>
@@ -242,7 +242,7 @@ export default function ClientDetail() {
                 aria-label="Map"
                 aria-disabled={!client.address}
                 className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.address ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.address ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.address ? 1 : 0.4 }}
+                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.address ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.address ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.address ? 1 : 0.4 }}
               >
                 <Map size={20} />
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Map</span>
@@ -262,7 +262,7 @@ export default function ClientDetail() {
                 gap: 8,
                 padding: '11px 14px',
                 borderRadius: 12,
-                background: isEditing ? 'rgba(201,150,58,0.18)' : 'rgba(255,255,255,0.04)',
+                background: isEditing ? 'rgba(201,150,58,0.18)' : 'var(--surface-2)',
                 border: isEditing ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
                 color: isEditing ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
                 fontFamily: 'var(--font-display)',
@@ -357,7 +357,7 @@ function BentoCard({ label, children, tone }) {
         borderRadius: 14,
         background: tone === 'alert'
           ? 'linear-gradient(135deg, rgba(192,57,43,0.10), rgba(192,57,43,0.04))'
-          : 'rgba(255,255,255,0.03)',
+          : 'var(--surface-2)',
         border: tone === 'alert'
           ? '1px solid rgba(192,57,43,0.30)'
           : '1px solid var(--rule)',
@@ -443,7 +443,7 @@ function KpiPill({ label, value, gold }) {
         overflow: 'hidden',
         padding: '12px 14px',
         borderRadius: 14,
-        background: gold ? 'linear-gradient(135deg, rgba(30,20,10,0.9), rgba(20,15,10,0.6))' : 'rgba(255,255,255,0.03)',
+        background: gold ? 'linear-gradient(135deg, rgba(30,20,10,0.9), rgba(20,15,10,0.6))' : 'var(--surface-2)',
         border: gold ? '1px solid rgba(201,150,58,0.35)' : '1px solid var(--rule)'
       }}
     >
@@ -468,7 +468,7 @@ function OverviewRead({ client }) {
     { label: 'Notes', value: client.notes, multiline: true }
   ]
   return (
-    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
       {rows.map((r, i) => (
         <div
           key={r.label}
@@ -496,7 +496,7 @@ function OverviewEdit({ client, onCommit, onCancel }) {
   const [form, setForm] = useState({ ...client })
   const [saving, setSaving] = useState(false)
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
-  const fieldStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }
+  const fieldStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }
   const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
   async function commit() {
     const EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
@@ -512,7 +512,7 @@ function OverviewEdit({ client, onCommit, onCancel }) {
     setSaving(false)
   }
   return (
-    <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={labelStyle}>Name</span>
         <input style={fieldStyle} value={form.name || ''} onChange={(e) => set('name', e.target.value)} />
@@ -540,7 +540,7 @@ function OverviewEdit({ client, onCommit, onCancel }) {
         <textarea rows={4} style={{ ...fieldStyle, resize: 'vertical' }} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} />
       </label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-        <button type="button" onClick={onCancel} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+        <button type="button" onClick={onCancel} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
           <XIcon size={14} />
           Cancel
         </button>
@@ -566,7 +566,7 @@ function JobsList({ jobs, onOpen }) {
             <button
               type="button"
               onClick={() => onOpen(j.id)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)', position: 'relative', overflow: 'hidden' }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, var(--surface-2), var(--surface-2))', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)', position: 'relative', overflow: 'hidden' }}
             >
               <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: c, boxShadow: `0 0 10px ${c}66` }} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -597,7 +597,7 @@ function NotesList({ notes }) {
         const body = n.text || n.body || ''
         const title = n.parsed?.summary || (body.split('\n').find((l) => l.trim()) || '').slice(0, 80) || 'Untitled'
         return (
-          <li key={n.id} style={{ position: 'relative', overflow: 'hidden', padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))', border: '1px solid var(--rule)' }}>
+          <li key={n.id} style={{ position: 'relative', overflow: 'hidden', padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, var(--surface-2), var(--surface-2))', border: '1px solid var(--rule)' }}>
             <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: 'linear-gradient(180deg, var(--field-gold-bright), var(--field-gold-deep))' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <h4 style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', overflowWrap: 'anywhere' }}>
@@ -643,7 +643,7 @@ function FilesList({ rows }) {
   return (
     <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
       {rows.map((r) => (
-        <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)' }}>
+        <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
           <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
             {r.kind === 'photo' ? <ImageIcon size={14} /> : <Paperclip size={14} />}
           </span>
@@ -664,7 +664,7 @@ function FilesList({ rows }) {
 
 function EmptyCard({ label }) {
   return (
-    <div style={{ padding: '24px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+    <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
       {label}
     </div>
   )

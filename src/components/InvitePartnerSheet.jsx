@@ -202,7 +202,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
               style={{
                 padding: '12px 14px',
                 borderRadius: 12,
-                background: 'rgba(255,255,255,0.04)',
+                background: 'var(--surface-2)',
                 border: '1px solid var(--rule)',
                 fontFamily: 'var(--font-mono, ui-monospace, monospace)',
                 fontSize: 12,
@@ -224,7 +224,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   padding: '12px 14px', borderRadius: 12,
-                  background: copied ? 'rgba(45,122,79,0.14)' : 'rgba(255,255,255,0.04)',
+                  background: copied ? 'rgba(45,122,79,0.14)' : 'var(--surface-2)',
                   border: copied ? '1px solid rgba(45,122,79,0.4)' : '1px solid var(--rule)',
                   color: copied ? 'var(--signal-green)' : 'var(--ink-strong)',
                   fontFamily: 'var(--font-display)', fontSize: 13, letterSpacing: '0.12em',
@@ -280,7 +280,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="buddy@example.com"
-                  style={{ width: '100%', boxSizing, padding: '12px 14px 12px 40px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                  style={{ width: '100%', boxSizing, padding: '12px 14px 12px 40px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
                 />
               </div>
             </label>
@@ -290,7 +290,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                 type="button"
                 onClick={() => onOpenChange(false)}
                 disabled={sending}
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing }}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing }}
               >
                 <X size={14} />
                 Cancel

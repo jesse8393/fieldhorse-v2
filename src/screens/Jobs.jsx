@@ -197,27 +197,8 @@ export default function Jobs() {
             )}
           </div>
         </div>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.96 }}
-          onClick={() => setAddOpen(true)}
-          aria-label="New lead"
-          style={{
-            flexShrink: 0,
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            border: 'none',
-            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-            color: 'var(--onyx)',
-            cursor: 'pointer',
-            display: 'grid',
-            placeItems: 'center',
-            boxShadow: '0 8px 20px rgba(201,150,58,0.35)'
-          }}
-        >
-          <Plus size={20} strokeWidth={2.5} />
-        </motion.button>
+        {/* Top-right + button removed — moved to a Floating Action Button
+            in thumb reach (bottom-right above BottomNav). See FAB below. */}
       </motion.div>
 
       {/* SEARCH + CMDK HINT */}
@@ -231,9 +212,10 @@ export default function Jobs() {
             placeholder="Search jobs, contacts, numbers…"
             style={{
               width: '100%',
-              padding: '11px 72px 11px 40px',
+              boxSizing: 'border-box',
+              padding: '11px 14px 11px 40px',
               borderRadius: 12,
-              background: 'rgba(255,255,255,0.04)',
+              background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               color: 'var(--ink-strong)',
               fontFamily: 'var(--font-body)',
@@ -241,32 +223,9 @@ export default function Jobs() {
               outline: 'none'
             }}
           />
-          <button
-            type="button"
-            aria-label="Open command palette"
-            onClick={triggerCommandPalette}
-            style={{
-              position: 'absolute',
-              right: 8,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 2,
-              padding: '3px 7px',
-              borderRadius: 6,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid var(--rule)',
-              color: 'var(--ink-muted)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            <kbd style={{ fontFamily: 'inherit' }}>⌘</kbd>
-            <kbd style={{ fontFamily: 'inherit' }}>K</kbd>
-          </button>
+          {/* ⌘K hint removed — mobile-first, the keyboard chord is noise on
+              every viewport. Command palette still triggerable via a real
+              keyboard chord on desktop; just no UI affordance for it. */}
         </div>
       </motion.div>
 
@@ -290,7 +249,7 @@ export default function Jobs() {
                   padding: '7px 12px',
                   borderRadius: 999,
                   border: isActive ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
-                  background: isActive ? 'rgba(201,150,58,0.14)' : 'rgba(255,255,255,0.03)',
+                  background: isActive ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                   color: isActive ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
@@ -449,6 +408,18 @@ export default function Jobs() {
           )
         }}
       />
+
+      {/* FAB — replaces the top-right + button. Bottom-right above the
+          BottomNav puts the action in the natural thumb arc. */}
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.94 }}
+        onClick={() => { hapticMedium(); setAddOpen(true) }}
+        aria-label="New lead"
+        className="fh-fab"
+      >
+        <Plus size={26} strokeWidth={2.6} />
+      </motion.button>
     </motion.div>
   )
 }
@@ -515,7 +486,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
         padding: '14px 14px 12px',
         borderRadius: 16,
         minHeight: 88,
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+        background: 'linear-gradient(135deg, var(--surface-2), var(--surface-2))',
         border: '1px solid var(--rule)',
         backdropFilter: 'blur(20px)',
         cursor: 'pointer',
@@ -587,13 +558,13 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
           </span>
         )}
         <MarginPill pct={m} hasCost={hasCost} />
-        <span style={{ fontSize: 10, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
+        <span style={{ fontSize: 10, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontWeight: 700, letterSpacing: '0.04em' }}>
           {step}/{TOTAL_STAGES} stages
         </span>
       </div>
 
       {/* Progress bar */}
-      <div style={{ position: 'relative', height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', height: 3, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
         <span
           style={{
             position: 'absolute',
@@ -613,7 +584,7 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
 function MarginPill({ pct, hasCost }) {
   if (!hasCost) {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid rgba(255,255,255,0.18)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em' }}>
         No cost yet
       </span>
     )
@@ -630,7 +601,7 @@ function MarginPill({ pct, hasCost }) {
 function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
   const bg = primary
     ? 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))'
-    : 'rgba(255,255,255,0.04)'
+    : 'var(--surface-2)'
   const color = primary ? 'var(--onyx)' : disabled ? 'var(--ink-faint)' : 'var(--ink-strong)'
   const border = primary ? 'none' : '1px solid var(--rule)'
   const style = {
@@ -681,14 +652,14 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
 function EmptyView({ hasFilter, onAdd }) {
   if (hasFilter) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs match that filter.</div>
         <div style={{ fontSize: 12 }}>Clear the search or switch stages to see more.</div>
       </div>
     )
   }
   return (
-    <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+    <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs on the board.</div>
       <div style={{ fontSize: 12, marginBottom: 10 }}>Drop in your first lead. Watch the pipeline fill.</div>
       <button

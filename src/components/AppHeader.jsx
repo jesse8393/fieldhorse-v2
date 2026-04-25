@@ -1,7 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import { NotebookPen } from 'lucide-react'
+import { NotebookPen, Search } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import FieldhorseBadge from './FieldhorseBadge.jsx'
+import NotificationsBell from './NotificationsBell.jsx'
+
+function openPalette() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('fh:open-palette'))
+}
 
 /**
  * AppHeader — the shared top bar.
@@ -66,28 +72,58 @@ export default function AppHeader() {
         <BrandSlot logoSrc={logoSrc} company={company} fullName={fullName} />
       </div>
 
-      <button
-        type="button"
-        aria-label="Notes"
-        onClick={() => navigate('/notes')}
-        className="fh-header-notes-btn"
-        style={{
-          width: 44,
-          height: 44,
-          minWidth: 44,
-          borderRadius: 11,
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid var(--rule)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--ink-strong)',
-          cursor: 'pointer',
-          padding: 0,
-          transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
-        }}
-      >
-        <NotebookPen size={16} />
-      </button>
+      {/* Right slot: search + notifications + notes shortcut.
+          Search opens the universal palette (jobs/clients/notes/events/
+          files in one query, also bound to ⌘K). The bell shows unread
+          count badge + opens the inbox drawer. Notes is a quick jump
+          to /notes. */}
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button
+          type="button"
+          aria-label="Search everything"
+          onClick={openPalette}
+          className="fh-header-search-btn"
+          style={{
+            width: 44,
+            height: 44,
+            minWidth: 44,
+            borderRadius: 11,
+            background: 'var(--surface-2)',
+            border: '1px solid var(--rule)',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'var(--ink-strong)',
+            cursor: 'pointer',
+            padding: 0,
+            transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
+          }}
+        >
+          <Search size={16} />
+        </button>
+        <NotificationsBell />
+        <button
+          type="button"
+          aria-label="Notes"
+          onClick={() => navigate('/notes')}
+          className="fh-header-notes-btn"
+          style={{
+            width: 44,
+            height: 44,
+            minWidth: 44,
+            borderRadius: 11,
+            background: 'var(--surface-2)',
+            border: '1px solid var(--rule)',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'var(--ink-strong)',
+            cursor: 'pointer',
+            padding: 0,
+            transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
+          }}
+        >
+          <NotebookPen size={16} />
+        </button>
+      </div>
     </header>
   )
 }

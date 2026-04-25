@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
-import { toast, toastSuccess } from '../lib/toast.js'
+import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.js'
 import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -60,14 +60,30 @@ export default function Schedule() {
 
   async function deleteEvent(evtId) {
     if (!evtId) return
+    // Snapshot before deletion so Undo can re-insert. Strip generated
+    // fields and the joined relation; only re-insert the source row.
+    const snapshot = events.find((e) => e.id === evtId) || upcoming.find((e) => e.id === evtId)
     const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId)
     if (error) {
-      toast({ kind: 'error', title: "Couldn't delete", body: error.message })
+      toastError("Couldn't delete", error.message)
       return
     }
-    toastSuccess('Event deleted', 'Schedule updated')
-    load()
-    loadUpcoming()
+    // Optimistic local-state removal so the row vanishes immediately
+    setEvents((prev) => prev.filter((e) => e.id !== evtId))
+    setUpcoming((prev) => prev.filter((e) => e.id !== evtId))
+    toastUndo('Event deleted', {
+      description: snapshot?.title || 'Tap Undo to restore',
+      onUndo: async () => {
+        if (!snapshot) return
+        // eslint-disable-next-line no-unused-vars
+        const { fh_contacts, ...row } = snapshot
+        const { error: insErr } = await supabase.from('fh_schedule').insert(row)
+        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        load()
+        loadUpcoming()
+        toastSuccess('Restored', snapshot.title || '')
+      }
+    })
   }
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -209,7 +225,7 @@ export default function Schedule() {
                     width: 180,
                     padding: '12px 14px',
                     borderRadius: 14,
-                    background: 'rgba(255,255,255,0.04)',
+                    background: 'var(--surface-2)',
                     border: `1px solid ${fromQuote ? 'rgba(201,150,58,0.35)' : 'var(--rule)'}`,
                     color: 'var(--ink-strong)',
                     cursor: e.contact_id ? 'pointer' : 'default',
@@ -263,7 +279,7 @@ export default function Schedule() {
           <button
             type="button"
             onClick={() => setCursor(startOfDay(new Date()))}
-            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'rgba(255,255,255,0.04)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
           >
             Today
           </button>
@@ -292,7 +308,7 @@ const iconBtnStyle = {
   height: 36,
   borderRadius: 10,
   border: '1px solid var(--rule)',
-  background: 'rgba(255,255,255,0.04)',
+  background: 'var(--surface-2)',
   color: 'var(--ink-strong)',
   display: 'grid',
   placeItems: 'center',
@@ -302,7 +318,7 @@ const iconBtnStyle = {
 function DayView({ events, onClick, onDelete, onAdd }) {
   if (events.length === 0) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Nothing scheduled.</div>
         <div style={{ fontSize: 12, marginBottom: 10 }}>Queue something up. Crew runs smoother when the day's on the board.</div>
         {onAdd && (
@@ -325,7 +341,7 @@ function DayView({ events, onClick, onDelete, onAdd }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}
         >
           <span style={{ flexShrink: 0, width: 62, fontFamily: 'var(--font-display)', fontSize: 13, letterSpacing: '0.04em', color: 'var(--field-gold-bright)' }}>
             {fmtTime(e.start_at)}

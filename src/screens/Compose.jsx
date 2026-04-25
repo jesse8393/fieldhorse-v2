@@ -137,7 +137,7 @@ export default function Compose() {
                   padding: '10px 12px',
                   borderRadius: 12,
                   border: isOn ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
-                  background: isOn ? 'rgba(201,150,58,0.15)' : 'rgba(255,255,255,0.04)',
+                  background: isOn ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)',
                   color: isOn ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 13,
@@ -273,7 +273,7 @@ export default function Compose() {
               <button
                 type="button"
                 onClick={copy}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
                 {copied ? 'Copied' : 'Copy'}
@@ -282,7 +282,7 @@ export default function Compose() {
                 <button
                   type="button"
                   disabled
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'default' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'default' }}
                 >
                   <Mic size={14} />
                   Voice script
@@ -291,7 +291,7 @@ export default function Compose() {
                 <button
                   type="button"
                   onClick={sendAction}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
                   <Send size={14} />
                   Open {channel === 'email' ? 'email' : 'SMS'}
@@ -316,7 +316,7 @@ const fieldLabelStyle = {
 const selectStyle = {
   padding: '11px 14px',
   borderRadius: 12,
-  background: 'rgba(255,255,255,0.04)',
+  background: 'var(--surface-2)',
   border: '1px solid var(--rule)',
   color: 'var(--ink-strong)',
   fontFamily: 'var(--font-body)',

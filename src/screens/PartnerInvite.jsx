@@ -187,7 +187,7 @@ export default function PartnerInvite() {
               gap: 10,
               padding: 20,
               borderRadius: 18,
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--surface-2)',
               border: '1px solid var(--rule, rgba(255,255,255,0.08))'
             }}
           >
@@ -226,7 +226,7 @@ export default function PartnerInvite() {
                 gap: 8,
                 padding: '14px 18px',
                 borderRadius: 12,
-                background: 'rgba(255,255,255,0.04)',
+                background: 'var(--surface-2)',
                 border: '1px solid var(--rule, rgba(255,255,255,0.08))',
                 color: 'var(--ink-strong, #f4f1ea)',
                 fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)',

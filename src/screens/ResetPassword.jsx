@@ -83,7 +83,7 @@ export default function ResetPassword() {
               marginTop: 12,
               padding: '3px 10px',
               borderRadius: 999,
-              background: ready ? 'rgba(201,150,58,0.12)' : 'rgba(255,255,255,0.05)',
+              background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)',
               border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)',
               color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
               fontFamily: 'var(--font-body)',
@@ -108,7 +108,7 @@ export default function ResetPassword() {
               gap: 12,
               padding: 20,
               borderRadius: 18,
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               backdropFilter: 'blur(20px)'
             }}
@@ -126,7 +126,7 @@ export default function ResetPassword() {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={busy}
                   placeholder="••••••••"
-                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
                 />
               </div>
             </label>
@@ -144,7 +144,7 @@ export default function ResetPassword() {
                   onChange={(e) => setConfirm(e.target.value)}
                   disabled={busy}
                   placeholder="••••••••"
-                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
                 />
               </div>
             </label>
@@ -187,7 +187,7 @@ export default function ResetPassword() {
             style={{
               padding: 20,
               borderRadius: 18,
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               backdropFilter: 'blur(20px)',
               fontSize: 13,
