@@ -1745,7 +1745,16 @@ a {
 .fh-fab:hover { transform: translateY(-2px); box-shadow: 0 16px 32px rgba(201, 150, 58, 0.55); }
 .fh-fab:active { transform: scale(0.94); }
 
-/* AppHeader Notes shortcut — steel at rest, gold on hover/active. */
+/* AppHeader right-slot icon buttons — steel at rest, gold on hover/active.
+   Same visual treatment for both the search and notes shortcuts so they
+   read as a coherent pair. */
+.fh-header-search-btn:hover,
+.fh-header-search-btn:active {
+  color: var(--field-gold-bright) !important;
+  border-color: rgba(201, 150, 58, 0.35) !important;
+  background: rgba(201, 150, 58, 0.08) !important;
+}
+
 .fh-header-notes-btn:hover,
 .fh-header-notes-btn:active {
   color: var(--field-gold-bright) !important;
