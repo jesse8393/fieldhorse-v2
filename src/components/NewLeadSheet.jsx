@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField, haptic } from './ActionSheet.jsx'
 import ClientPicker from './ClientPicker.jsx'
+import DocIntakeButton from './DocIntakeButton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { claudeMessage } from '../lib/anthropic.js'
+import { parseLeadFromImage } from '../lib/docIntelligence.js'
+import { toastSuccess } from '../lib/toast.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
 
 const STAGE_OPTIONS = [
@@ -75,6 +78,33 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   const currentStep = committed ? 3 : 1
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
+
+  // Document intelligence — Phase 19/#1. Hands the captured/pasted image
+  // to Claude Vision, applies the parsed fields on top of whatever the
+  // user already typed (parsed values only fill EMPTY fields so a
+  // half-typed form isn't clobbered). Toast tells the user how many
+  // fields landed so they know to scan the form before submitting.
+  async function parseDoc(dataUrl) {
+    const parsed = await parseLeadFromImage(dataUrl)
+    let landed = 0
+    setForm((prev) => {
+      const next = { ...prev }
+      for (const [k, v] of Object.entries(parsed)) {
+        if (v == null) continue
+        const current = next[k]
+        const isEmpty = current == null || current === '' || (k === 'amount' && Number(current) === 0)
+        if (isEmpty) {
+          next[k] = k === 'amount' ? String(v) : v
+          landed++
+        }
+      }
+      return next
+    })
+    toastSuccess(
+      landed > 0 ? `Filled ${landed} field${landed === 1 ? '' : 's'}` : 'Nothing new to fill',
+      landed > 0 ? 'Review + edit anything before saving.' : 'Form already had what AI extracted.'
+    )
+  }
 
   function startVoice() {
     const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -302,6 +332,18 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
             Voice capture isn't available on this browser. Fill the fields manually.
           </p>
         )}
+      </div>
+
+      {/* Document intelligence — Phase 19/#1. Photo of a paper bid /
+          handwritten estimate / inbound email screenshot → Claude Vision
+          extracts name/phone/email/address/job_title/job_type/amount/
+          notes and fills the empty fields below. */}
+      <div style={{ padding: '0 0 6px' }}>
+        <DocIntakeButton
+          label="Scan a doc"
+          description="Photo of a bid, handwritten estimate, business card, or paste an email screenshot. AI fills the form."
+          onParse={parseDoc}
+        />
       </div>
 
       {/* Client link — optional, picks an existing fh_clients row or
