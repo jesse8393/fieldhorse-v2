@@ -5,6 +5,47 @@
    ================================================================ */
 @import "tailwindcss" prefix(ui);
 
+/* ================================================================
+   A11Y — global focus ring + skip-to-content link.
+   :focus-visible only triggers on keyboard nav, so mouse clicks stay
+   ring-free. Applies to every interactive element unless a more
+   specific rule overrides it.
+   ================================================================ */
+*:focus { outline: none; }
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--field-gold-bright, #e8b04c);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.fh-skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--field-gold-bright, #e8b04c);
+  color: var(--onyx, #121212);
+  font-family: var(--font-display, inherit);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 160ms ease;
+}
+.fh-skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--ink-strong, #fff);
+  outline-offset: 2px;
+}
+
 /* Scan the whole app for Tailwind utility usage (postcss integration
    doesn't auto-detect sources the way @tailwindcss/vite does). */
 @source "../../index.html";

@@ -38,6 +38,10 @@ export default function AppShell() {
 
   return (
     <div className="fh-app" style={{ position: 'relative' }}>
+      {/* Skip-to-content link — only visible when keyboard-focused.
+          Bumps a11y so keyboard users don't have to tab through every
+          header + nav control to reach the screen body. */}
+      <a href="#fh-main" className="fh-skip-link">Skip to content</a>
       <Aurora />
       <GridPattern />
 
@@ -52,6 +56,7 @@ export default function AppShell() {
 
       <AnimatePresence mode="wait">
         <motion.main
+          id="fh-main"
           key={location.pathname}
           className="fh-app__main"
           style={{ position: 'relative', zIndex: 1 }}
