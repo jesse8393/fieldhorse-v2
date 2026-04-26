@@ -62,6 +62,10 @@ export default function Bid() {
         setErr('AI returned no structured bid')
       }
     } catch (e) {
+      // Surface to console so a builder hitting "silent fail" has a
+      // trail in DevTools. The visible error block below the button
+      // also explains it + offers Fill Manually.
+      console.error('[bid] generate failed:', e)
       setErr(e.message || 'Bid generation failed')
     } finally {
       setGenerating(false)
@@ -163,10 +167,50 @@ export default function Bid() {
               opacity: !scope.trim() || generating ? 0.55 : 1
             }}
           >
-            <Sparkles size={16} />
+            {generating ? (
+              <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.25)', borderTopColor: 'var(--onyx)', animation: 'fh-spin 700ms linear infinite' }} />
+            ) : (
+              <Sparkles size={16} />
+            )}
             {generating ? 'CRUNCHING…' : 'GENERATE BID'}
           </motion.button>
-          {err && <p className="fh-err">{err}</p>}
+          {/* Loud + actionable error block instead of a tiny red one-liner.
+              Bid Engine was previously throwing inside generate() with no
+              visible result if the Anthropic key was missing or the API
+              was unreachable. Now: a clear card + "Fill manually" fallback
+              that opens a blank line-item shell, matching Compose's
+              graceful-degradation pattern. */}
+          {err && (
+            <div role="alert" style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.4)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12.5, lineHeight: 1.4 }}>
+              <div style={{ fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>AI unavailable</div>
+              <div style={{ color: 'var(--ink-muted)', marginBottom: 8 }}>{err} — your scope is preserved. Fill in line items manually if you need this bid out the door.</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setErr('')
+                  // Seed a blank bid shell so the line-items table renders
+                  // and the user can edit it. recalcs derive from line_items.
+                  setBid({
+                    summary: scope,
+                    job_type: jobType || 'Renovation',
+                    line_items: (picks.length ? picks : ['gc']).map((trade) => ({
+                      trade,
+                      qty: 1,
+                      unit: RATE_CARD[trade]?.unit || 'lot',
+                      rate_low: RATE_CARD[trade]?.low || 0,
+                      rate_high: RATE_CARD[trade]?.high || 0,
+                      notes: ''
+                    })),
+                    risks: [],
+                    assumptions: []
+                  })
+                }}
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
+              >
+                FILL MANUALLY →
+              </button>
+            </div>
+          )}
         </div>
 
         <AnimatePresence>

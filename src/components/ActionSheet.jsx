@@ -148,7 +148,15 @@ export default function ActionSheet({
               <button
                 type="button"
                 className="fh-asheet__close"
-                onClick={onClose}
+                onClick={(e) => {
+                  // stopPropagation so the click event doesn't bubble
+                  // through the sheet portal and land on whatever's
+                  // underneath (calendar cell, kanban card, etc.) right
+                  // before the sheet unmounts.
+                  e.stopPropagation()
+                  onClose?.(e)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Close"
               >
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

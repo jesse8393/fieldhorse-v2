@@ -40,14 +40,34 @@ export default function ClientDetail() {
   const [jobs, setJobs] = useState([])
   const [notes, setNotes] = useState([])
   const [files, setFiles] = useState([])
+  const [payments, setPayments] = useState([])
 
-  // Derived bento metrics — computed from jobs[] (populated by the loadTabData effect).
-  // Outstanding = sum of amount on jobs in invoice stage (treated as "billed but not yet
-  // closed"). When fh_payments wiring lands, swap to amount - sum(payments).
-  const outstanding = useMemo(
-    () => (jobs || []).filter((j) => j.stage === 'invoice').reduce((s, j) => s + Number(j.amount || 0), 0),
+  // Derived bento metrics — computed from jobs[] + payments[].
+  //
+  // Lifetime previously read client.total_lifetime_value (a column that's
+  // never populated), so MMC-style clients with $61K in active jobs showed
+  // $0. Now: sum of every job amount under this client, all stages. Matches
+  // the user's mental model of "total work I've done with this client."
+  //
+  // Outstanding = sum of (amount - paid) for jobs in the billing pipeline
+  // (job + invoice stages). Closed/lost jobs drop out automatically.
+  const lifetime = useMemo(
+    () => (jobs || []).reduce((s, j) => s + Number(j.amount || 0), 0),
     [jobs]
   )
+  const outstanding = useMemo(() => {
+    const paidByJob = new Map()
+    for (const p of payments || []) {
+      if (!p.contact_id) continue
+      paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
+    }
+    return (jobs || [])
+      .filter((j) => j.stage === 'job' || j.stage === 'invoice')
+      .reduce((s, j) => {
+        const bal = Number(j.amount || 0) - (paidByJob.get(j.id) || 0)
+        return s + Math.max(0, bal)
+      }, 0)
+  }, [jobs, payments])
   const activeCount = useMemo(
     () => (jobs || []).filter((j) => j.stage === 'job' || j.stage === 'quote' || j.stage === 'lead' || j.stage === 'invoice').length,
     [jobs]
@@ -83,9 +103,10 @@ export default function ClientDetail() {
       if (jobIds.length === 0) {
         setNotes([])
         setFiles([])
+        setPayments([])
         return
       }
-      const [{ data: n }, { data: f }] = await Promise.all([
+      const [{ data: n }, { data: f }, { data: p }] = await Promise.all([
         supabase
           .from('fh_notes')
           .select('*, fh_contacts(name)')
@@ -97,11 +118,18 @@ export default function ClientDetail() {
           .select('*, fh_contacts(name)')
           .in('job_id', jobIds)
           .order('uploaded_at', { ascending: false })
-          .limit(60)
+          .limit(60),
+        // Load payments so Outstanding can compute amount - paid per job
+        // instead of falling back to the entire job amount.
+        supabase
+          .from('fh_payments')
+          .select('contact_id, amount')
+          .in('contact_id', jobIds)
       ])
       if (cancelled) return
       setNotes(n || [])
       setFiles(f || [])
+      setPayments(p || [])
     }
     loadTabData()
     return () => { cancelled = true }
@@ -184,7 +212,7 @@ export default function ClientDetail() {
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: 10, marginTop: 14 }}>
             <BentoCard label="Lifetime">
               <span className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 24, lineHeight: 1 }}>
-                {money(client.total_lifetime_value)}
+                {money(lifetime)}
               </span>
             </BentoCard>
             <BentoCard label="Outstanding" tone={outstanding > 0 ? 'alert' : 'muted'}>

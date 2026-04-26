@@ -165,7 +165,17 @@ export default function Analytics() {
                 Active value
               </span>
             </header>
-            <div style={{ height: 120, padding: '6px 0', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
+            <div style={{ height: 120, padding: '6px 0', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', position: 'relative' }}>
+              {/* Skeleton: shown until trendData has at least one point.
+                  Recharts mounts an empty container for a beat, which the
+                  user reads as "chart broken / 1-sec blank flash". */}
+              {(!trendData || trendData.length === 0) && (
+                <div aria-hidden="true" style={{ position: 'absolute', inset: 12, display: 'flex', alignItems: 'flex-end', gap: 6, opacity: 0.35 }}>
+                  {[18, 28, 22, 36, 30, 44, 38, 52, 48, 62, 58, 70].map((h, i) => (
+                    <span key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 2, background: 'linear-gradient(180deg, var(--field-gold-bright), transparent)' }} />
+                  ))}
+                </div>
+              )}
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
                   <defs>
