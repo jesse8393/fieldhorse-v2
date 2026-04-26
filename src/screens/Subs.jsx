@@ -101,7 +101,10 @@ export default function Subs() {
   }, [grouped, q, tradeFilter])
 
   return (
-    <div style={{ padding: '20px 16px 80px', maxWidth: 760, margin: '0 auto' }}>
+    // Full-width container so the heading aligns with every other screen
+    // at the left edge instead of getting centered into a narrow column
+    // on wide viewports.
+    <div style={{ padding: '20px 20px 80px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>

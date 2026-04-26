@@ -12,7 +12,14 @@ import './styles/global.css'
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          // Opt in to v7 behavior now so the warnings stop and we don't
+          // have to scramble when v7 ships.
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
         <ThemeProvider>
           <AuthProvider>
             <ProfileProvider>

@@ -162,7 +162,7 @@ export default function Invoices() {
   }
 
   return (
-    <div style={{ padding: '20px 16px 80px', maxWidth: 920, margin: '0 auto' }}>
+    <div style={{ padding: '20px 20px 80px' }}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
           <Receipt size={12} />

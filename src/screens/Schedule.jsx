@@ -94,9 +94,14 @@ export default function Schedule() {
       const s = addDays(cursor, -cursor.getDay())
       return { start: s, end: addDays(s, 7) }
     }
-    const s = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-    const e = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
-    return { start: s, end: e }
+    // Month view: query a 6-week window so the leading + trailing
+    // calendar cells (which fall in adjacent months) get badges, not
+    // just the days strictly inside the month.
+    const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+    const gridStart = addDays(monthStart, -monthStart.getDay())
+    const gridEnd = addDays(gridStart, 42)
+    return { start: gridStart, end: gridEnd, monthStart, monthEnd }
   }, [view, cursor])
 
   const load = useCallback(async () => {
@@ -444,22 +449,30 @@ function WeekView({ start, events, onClick, onDelete }) {
 }
 
 function MonthView({ cursor, events, onDay }) {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-  const offset = first.getDay()
-  const days = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate()
-  const cells = []
-  for (let i = 0; i < offset; i++) cells.push(null)
-  for (let d = 1; d <= days; d++) cells.push(new Date(cursor.getFullYear(), cursor.getMonth(), d))
-  while (cells.length % 7 !== 0) cells.push(null)
+  // 6-week grid (always 42 cells) so the layout is stable across
+  // months. Days from the prev/next month are rendered dimmed instead
+  // of as blank slots — matches every standard calendar app.
+  const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
+  const gridStart = addDays(monthStart, -monthStart.getDay())
+  const today = startOfDay(new Date())
+  const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
+  const currentMonth = cursor.getMonth()
 
   return (
     <div className="fh-month">
       {['S','M','T','W','T','F','S'].map((d, i) => <span key={i} className="fh-month__dow">{d}</span>)}
-      {cells.map((d, i) => {
-        if (!d) return <div key={i} className="fh-month__cell fh-month__cell--empty" />
+      {cells.map((d) => {
         const dayEvents = events.filter((e) => sameDay(new Date(e.start_at), d))
+        const inMonth = d.getMonth() === currentMonth
+        const isToday = sameDay(d, today)
+        const cls = [
+          'fh-month__cell',
+          dayEvents.length ? 'has-events' : '',
+          inMonth ? '' : 'is-out',
+          isToday ? 'is-today' : ''
+        ].filter(Boolean).join(' ')
         return (
-          <button key={i} type="button" className={`fh-month__cell${dayEvents.length ? ' has-events' : ''}`} onClick={() => onDay(d)}>
+          <button key={d.toISOString()} type="button" className={cls} onClick={() => onDay(d)}>
             <span className="fh-month__num">{d.getDate()}</span>
             {dayEvents.length > 0 && <span className="fh-month__count">{dayEvents.length}</span>}
           </button>

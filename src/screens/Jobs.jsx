@@ -558,8 +558,11 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
           </span>
         )}
         <MarginPill pct={m} hasCost={hasCost} />
+        {/* Pipeline position — was "3/5 stages" which read as "3 of 5
+            milestones complete". This is the stage in the Lead -> Quote
+            -> Job -> Invoice -> Closed flow, not a milestone count. */}
         <span style={{ fontSize: 10, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontWeight: 700, letterSpacing: '0.04em' }}>
-          {step}/{TOTAL_STAGES} stages
+          Stage {step}/{TOTAL_STAGES}
         </span>
       </div>
 

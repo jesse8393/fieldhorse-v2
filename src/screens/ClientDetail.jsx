@@ -481,10 +481,13 @@ function OverviewRead({ client }) {
             borderBottom: i < rows.length - 1 ? '1px solid rgba(201,150,58,0.08)' : 'none'
           }}
         >
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{r.label}</span>
+          {/* For multiline rows the wrapper uses display:block, which made
+              two inline spans run together as "NotesNot set". Force the
+              label to its own line on multiline rows. */}
+          <span style={{ display: r.multiline ? 'block' : 'inline', marginBottom: r.multiline ? 4 : 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{r.label}</span>
           {r.value
-            ? <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink-strong)', wordBreak: 'break-word', whiteSpace: r.multiline ? 'pre-wrap' : 'normal' }}>{r.value}</span>
-            : <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-faint)', fontStyle: 'italic' }}>Not set</span>
+            ? <span style={{ display: r.multiline ? 'block' : 'inline', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink-strong)', wordBreak: 'break-word', whiteSpace: r.multiline ? 'pre-wrap' : 'normal' }}>{r.value}</span>
+            : <span style={{ display: r.multiline ? 'block' : 'inline', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-faint)', fontStyle: 'italic' }}>Not set</span>
           }
         </div>
       ))}

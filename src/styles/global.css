@@ -283,7 +283,9 @@ select:focus-visible,
 .fh-fab {
   position: fixed;
   right: 20px;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  /* Was 96 px; bumped to 112 px so the gold glow has a 16 px gap above
+     the bottom nav and doesn't bleed over the active-tab dot. */
+  bottom: calc(112px + env(safe-area-inset-bottom));
   width: 56px;
   height: 56px;
   border-radius: 18px;
@@ -293,8 +295,10 @@ select:focus-visible,
   color: var(--onyx);
   border: none;
   cursor: pointer;
-  box-shadow: 0 12px 28px rgba(201, 150, 58, 0.45),
-              0 2px 6px rgba(0, 0, 0, 0.35),
+  /* Tighter glow radius (was 28 px) so the halo stops well short of the
+     nav, even on shorter phones where vertical room is tight. */
+  box-shadow: 0 8px 18px rgba(201, 150, 58, 0.38),
+              0 2px 6px rgba(0, 0, 0, 0.4),
               inset 0 1px 0 rgba(255, 255, 255, 0.18);
   z-index: calc(var(--z-nav) - 1);
   transition: transform 80ms var(--ease-mechanical);
@@ -3578,6 +3582,18 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-month__cell.has-events {
   background: color-mix(in srgb, var(--field-gold) 10%, var(--surface-2));
   border-color: color-mix(in srgb, var(--field-gold) 25%, transparent);
+}
+/* Days from the previous/next month — rendered dimmed instead of as
+   blank slots, so the calendar grid always reads as a continuous flow
+   even when the month doesn't start on Sunday. */
+.fh-month__cell.is-out {
+  opacity: 0.32;
+}
+.fh-month__cell.is-out .fh-month__num { color: var(--ink-muted); }
+/* Today gets a clear gold ring so the user can find "now" at a glance. */
+.fh-month__cell.is-today {
+  border-color: var(--field-gold-bright);
+  box-shadow: inset 0 0 0 1px var(--field-gold-bright);
 }
 .fh-month__num {
   font-family: var(--font-display);
