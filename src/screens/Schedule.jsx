@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
@@ -151,38 +151,15 @@ export default function Schedule() {
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 20px 6px' }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-            Calendar
-          </span>
-          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            Run the{' '}
-            day.
-          </h1>
-        </div>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.96 }}
-          onClick={() => { hapticMedium(); setAddOpen(true) }}
-          aria-label="New event"
-          style={{
-            flexShrink: 0,
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            border: 'none',
-            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-            color: 'var(--onyx)',
-            cursor: 'pointer',
-            display: 'grid',
-            placeItems: 'center',
-            boxShadow: '0 8px 20px rgba(201,150,58,0.35)'
-          }}
-        >
-          <Plus size={20} strokeWidth={2.5} />
-        </motion.button>
+      {/* HEADER — top + button removed; the FAB at bottom-right is the
+          single, thumb-reachable add-event control. */}
+      <motion.div variants={item} style={{ padding: '10px 20px 6px' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+          Calendar
+        </span>
+        <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+          Run the day.
+        </h1>
       </motion.div>
 
       {/* WEATHER STRIP */}
@@ -243,8 +220,11 @@ export default function Schedule() {
                   <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {e.title || 'Untitled'}
                   </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: fromQuote ? 'var(--field-gold-bright)' : 'var(--ink-faint)' }}>
-                    {fromQuote ? <MapPin size={10} /> : null}
+                  {/* Subtitle: bumped from 10 -> 12 px and from --ink-faint
+                      to a proper readable color so "FROM QUOTE - DEENA NOLAN"
+                      is legible at a glance, not squinting-bait. */}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', color: fromQuote ? 'var(--field-gold-bright)' : 'var(--ink-strong)' }}>
+                    {fromQuote ? <MapPin size={12} /> : null}
                     {fromQuote ? `From quote · ${e.fh_contacts.name}` : 'Manual event'}
                   </div>
                 </motion.button>
@@ -286,12 +266,30 @@ export default function Schedule() {
         </div>
       </motion.div>
 
-      <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
-        {loading && <SkeletonList rows={5} card={false} />}
-        {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} onAdd={() => setAddOpen(true)} />}
-        {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-        {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
-      </motion.div>
+      {/* Swipe-detector wraps the per-view body. Horizontal pointer drag
+          past 60 px shifts the cursor by 1 (left = next, right = prev),
+          giving phone users the same gesture they expect from native
+          calendar apps. Vertical scroll inside the body still works. */}
+      <SwipeShell onShift={shift}>
+        <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
+          {loading && <SkeletonList rows={5} card={false} />}
+          {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+          {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+          {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+        </motion.div>
+      </SwipeShell>
+
+      {/* FAB — bottom-right, thumb-reachable, clears the bottom nav. The
+          in-empty-state "Add event ->" link was removed; this is the
+          single source of truth for adding events on Schedule. */}
+      <button
+        type="button"
+        onClick={() => { hapticMedium(); setAddOpen(true) }}
+        aria-label="New event"
+        className="fh-fab"
+      >
+        <Plus size={26} strokeWidth={2.5} />
+      </button>
 
       <AddEventSheet
         open={addOpen}
@@ -303,10 +301,40 @@ export default function Schedule() {
   )
 }
 
+// Lightweight pointer-based horizontal swipe wrapper. Plain pointer events
+// because framer-motion's drag swallows the page scroll on mobile. Vertical
+// motion ignores; horizontal past 60 px fires onShift(direction).
+function SwipeShell({ onShift, children }) {
+  const startRef = useRef(null)
+  function onPointerDown(e) {
+    startRef.current = { x: e.clientX, y: e.clientY, time: Date.now() }
+  }
+  function onPointerUp(e) {
+    const start = startRef.current
+    startRef.current = null
+    if (!start) return
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+    const elapsed = Date.now() - start.time
+    if (elapsed > 800) return
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.4) return
+    onShift(dx < 0 ? 1 : -1)
+    hapticTap()
+  }
+  return (
+    <div onPointerDown={onPointerDown} onPointerUp={onPointerUp} style={{ touchAction: 'pan-y' }}>
+      {children}
+    </div>
+  )
+}
+
+// 44 px hits the WCAG / iOS Human Interface tap-target minimum so a work
+// glove or sloppy thumb won't trigger the "Month" pill by accident when
+// shifting day cursor.
 const iconBtnStyle = {
-  width: 36,
-  height: 36,
-  borderRadius: 10,
+  width: 44,
+  height: 44,
+  borderRadius: 11,
   border: '1px solid var(--rule)',
   background: 'var(--surface-2)',
   color: 'var(--ink-strong)',
@@ -315,21 +343,19 @@ const iconBtnStyle = {
   cursor: 'pointer'
 }
 
-function DayView({ events, onClick, onDelete, onAdd }) {
+function DayView({ events, onClick, onDelete }) {
   if (events.length === 0) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Nothing scheduled.</div>
-        <div style={{ fontSize: 12, marginBottom: 10 }}>Queue something up. Crew runs smoother when the day's on the board.</div>
-        {onAdd && (
-          <button
-            type="button"
-            onClick={onAdd}
-            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-          >
-            Add event →
-          </button>
-        )}
+      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', fontFamily: 'var(--font-body)' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', marginBottom: 6 }}>Nothing scheduled.</div>
+        {/* Brighter body so it reads outside in direct sun. Was --ink-muted
+            (~ #6A665E) which fails on Onyx in bright light. */}
+        <div style={{ fontSize: 13, color: 'var(--ink-strong)', opacity: 0.78, lineHeight: 1.4 }}>
+          Queue something up. Crew runs smoother when the day's on the board.
+        </div>
+        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Tap the + below
+        </div>
       </div>
     )
   }

@@ -3999,10 +3999,35 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 
 /* =========================================================================
-   RESPONSIVE — tighten schedule views on phone
+   RESPONSIVE — tighten schedule + bid + settings on phone
    ========================================================================= */
 @media (max-width: 640px) {
-  .fh-week { grid-template-columns: repeat(7, minmax(90px, 1fr)); }
+  /* Week view: kill the 90 px column min so 7 days FIT inside an iPhone
+     viewport instead of forcing a horizontal scroll. Columns become
+     truly fluid; content shrinks via the rules below. */
+  .fh-week {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+    padding: 6px;
+    overflow-x: hidden;
+  }
+  .fh-week__col { min-width: 0; gap: 4px; }
+  .fh-week__head { padding: 4px 0; }
+  .fh-week__dow { font-size: 0.6rem; letter-spacing: 0.06em; }
+  .fh-week__num { font-size: 0.95rem; }
+  .fh-week__body { gap: 3px; min-height: 48px; }
+  .fh-week__evt { padding: 4px 5px; font-size: 0.62rem; border-left-width: 2px; }
+  .fh-week__evt span { font-size: 0.55rem; }
+  .fh-week__evt strong { font-size: 0.65rem; }
+
+  /* Month view: same clip-to-viewport guarantee; cells stay readable
+     because the content already scales. */
+  .fh-month { grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 4px; }
+  .fh-month__cell { padding: 4px; min-height: 44px; }
+  .fh-month__num { font-size: 0.82rem; }
+  .fh-month__count { font-size: 0.55rem; padding: 1px 4px; }
+  .fh-month__dow { font-size: 0.58rem; padding: 4px 0; }
+
   .fh-sched-bar__cur { min-width: 140px; font-size: 0.92rem; }
   .fh-bid__li { grid-template-columns: 1fr; gap: 4px; }
   .fh-bid__li > span { font-size: 0.8rem; }
