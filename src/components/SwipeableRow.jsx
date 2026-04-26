@@ -48,7 +48,7 @@ export default function SwipeableRow({ children, actions = [], openOffset = -120
   }
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 14 }}>
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 14, width: '100%' }}>
       {/* Reveal action layer — sits behind the draggable content */}
       <motion.div
         aria-hidden={!open}

@@ -296,9 +296,11 @@ export default function Jobs() {
         </motion.div>
       )}
 
-      {/* LIST */}
+      {/* LIST — auto-fit grid: 1 column on phone, 2 on tablet+, 3 on
+          wide desktop. minmax(280px, 1fr) keeps every card the same
+          width within a row instead of stretching one and not another. */}
       {view === 'list' && (
-        <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
+        <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', alignItems: 'stretch', gap: 10, padding: '0 20px 20px' }}>
           {loading && <SkeletonList rows={5} />}
           {!loading && filtered.length === 0 && (
             <EmptyView
@@ -485,6 +487,11 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
         gap: 10,
         padding: '14px 14px 12px',
         borderRadius: 16,
+        // Force every card to fill its grid cell so MMC and Jeff Roy
+        // and Lily Grace North all share the exact same width within a
+        // row, regardless of contact-name length or stage-pill count.
+        width: '100%',
+        boxSizing: 'border-box',
         minHeight: 88,
         background: 'linear-gradient(135deg, var(--surface-2), var(--surface-2))',
         border: '1px solid var(--rule)',

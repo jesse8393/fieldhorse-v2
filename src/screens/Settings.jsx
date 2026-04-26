@@ -303,8 +303,25 @@ export default function Settings() {
         </Section>
       )}
 
-      {/* SAVE BAR */}
-      <motion.div variants={item} style={{ padding: '0 20px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+      {/* SAVE BAR — sticky above the bottom nav so a user who scrolls
+          deep into branding/services doesn't have to scroll back to the
+          top to commit. Always visible while there's any chance of
+          dirty state. */}
+      <motion.div
+        variants={item}
+        style={{
+          position: 'sticky',
+          bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
+          zIndex: 5,
+          padding: '12px 20px',
+          margin: '0 -20px',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          background: 'linear-gradient(180deg, rgba(20,20,20,0) 0%, rgba(20,20,20,0.85) 30%, rgba(20,20,20,0.96) 100%)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
+        }}
+      >
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
