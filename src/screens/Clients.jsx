@@ -7,6 +7,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useFhMotion } from '../lib/motion.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { rollupByClient } from '../lib/rollups.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 
 function money(n) {
@@ -26,25 +27,51 @@ export default function Clients() {
   const [filter, setFilter] = useState('all') // 'all' | 'active' | 'recent'
   const [addOpen, setAddOpen] = useState(false)
 
+  // Rollups computed live from jobs + payments instead of trusting the
+  // stale fh_clients.total_lifetime_value / active_jobs_count columns.
+  // Single source of truth shared with Client detail (rollups.js).
+  const [jobs, setJobs] = useState([])
+  const [payments, setPayments] = useState([])
+
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const { data } = await supabase
-      .from('fh_clients')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('last_activity_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-    setRows(data || [])
+    const [{ data: clients }, { data: js }, { data: ps }] = await Promise.all([
+      supabase
+        .from('fh_clients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('last_activity_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('fh_contacts')
+        .select('id, client_id, amount, stage')
+        .eq('user_id', user.id),
+      supabase
+        .from('fh_payments')
+        .select('contact_id, amount')
+        .eq('user_id', user.id)
+    ])
+    setRows(clients || [])
+    setJobs(js || [])
+    setPayments(ps || [])
     setLoading(false)
   }, [user])
 
   useEffect(() => { load() }, [load])
 
+  // Map<client_id, { lifetime, outstanding, activeCount, ... }> — built
+  // once per (jobs|payments) change. Per-row lookup is O(1).
+  const rollupMap = useMemo(() => rollupByClient(jobs, payments), [jobs, payments])
+
+  function rollupFor(clientId) {
+    return rollupMap.get(clientId) || { lifetime: 0, outstanding: 0, activeCount: 0, wonCount: 0, paidTotal: 0 }
+  }
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
     let base = rows
-    if (filter === 'active') base = base.filter((r) => (r.active_jobs_count || 0) > 0)
+    if (filter === 'active') base = base.filter((r) => rollupFor(r.id).activeCount > 0)
     if (filter === 'recent') {
       const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
       base = base.filter((r) => r.last_activity_at && new Date(r.last_activity_at).getTime() > cutoff)
@@ -56,12 +83,15 @@ export default function Clients() {
       || (r.email || '').toLowerCase().includes(needle)
       || (r.phone || '').toLowerCase().includes(needle)
     )
-  }, [rows, q, filter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, q, filter, rollupMap])
 
-  const totalLifetime = useMemo(
-    () => rows.reduce((s, r) => s + Number(r.total_lifetime_value || 0), 0),
-    [rows]
-  )
+  const totalLifetime = useMemo(() => {
+    let total = 0
+    for (const r of rows) total += rollupFor(r.id).lifetime
+    return total
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, rollupMap])
 
   const { stagger, item } = useFhMotion()
 
@@ -173,20 +203,28 @@ export default function Clients() {
                     </div>
                   )}
                 </div>
-                <div style={{ flexShrink: 0, textAlign: 'right', opacity: Number(c.total_lifetime_value || 0) > 0 ? 1 : 0.4 }}>
+                <div style={{ flexShrink: 0, textAlign: 'right', opacity: rollupFor(c.id).lifetime > 0 ? 1 : 0.4 }}>
                   <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1 }}>
-                    {money(c.total_lifetime_value)}
+                    {money(rollupFor(c.id).lifetime)}
                   </div>
                   <div style={{ marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                     LIFETIME
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', opacity: (c.active_jobs_count || 0) > 0 ? 1 : 0.45 }}>
+              {/* "X jobs · $Y outstanding" — what an operator actually
+                  scans for. Pulled from rollup so it stays in sync with
+                  Client detail. */}
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', opacity: rollupFor(c.id).activeCount > 0 ? 1 : 0.45 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <Briefcase size={11} />
-                  {c.active_jobs_count || 0} active {(c.active_jobs_count || 0) === 1 ? 'job' : 'jobs'}
+                  {rollupFor(c.id).activeCount} active {rollupFor(c.id).activeCount === 1 ? 'job' : 'jobs'}
                 </span>
+                {rollupFor(c.id).outstanding > 0 && (
+                  <span style={{ color: 'var(--alert-red)', fontWeight: 700 }}>
+                    {money(rollupFor(c.id).outstanding)} outstanding
+                  </span>
+                )}
               </div>
               {(c.phone || c.email || c.address) && (
                 <div

@@ -46,6 +46,15 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* Notes textarea placeholder — bumped from browser-default opacity
+   (~0.4) to a properly readable token color so the hint passes WCAG
+   AA on the dark surface in direct sunlight. */
+.fh-notes-textarea::placeholder {
+  color: var(--ink-muted, #8a857a);
+  opacity: 0.95;
+}
+.fh-notes-textarea::-webkit-input-placeholder { color: var(--ink-muted, #8a857a); opacity: 0.95; }
+
 /* Scan the whole app for Tailwind utility usage (postcss integration
    doesn't auto-detect sources the way @tailwindcss/vite does). */
 @source "../../index.html";

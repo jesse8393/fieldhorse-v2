@@ -224,12 +224,16 @@ export default function Notes() {
             backdropFilter: 'blur(20px)'
           }}
         >
+          {/* className lets us target ::placeholder via global CSS so the
+              hint is readable in direct sun. Browser default placeholder
+              opacity (~0.4) on dark surface fails WCAG AA. */}
           <textarea
+            className="fh-notes-textarea"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={listening ? 'Listening — speak freely…' : 'Drop the field log. AI parses it for action items, risks, materials.'}
             rows={6}
-            style={{ width: '100%', resize: 'vertical', minHeight: 120, background: 'transparent', border: 'none', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+            style={{ width: '100%', resize: 'vertical', minHeight: 120, background: 'transparent', border: 'none', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.5, outline: 'none' }}
           />
           {listening && (
             <div aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 14, marginTop: 4 }}>
@@ -256,11 +260,29 @@ export default function Notes() {
               <option value="">No job link</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            {/* Active-state lights up gold (border + tinted bg + bright
+                ink) the moment the user has typed something, so it
+                visibly transitions from "disabled" to "tappable". */}
             <button
               type="button"
               onClick={parseWithAI}
               disabled={!draft.trim() || parsing}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: parsing || !draft.trim() ? 'var(--ink-faint)' : 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: !draft.trim() || parsing ? 'default' : 'pointer', opacity: !draft.trim() || parsing ? 0.55 : 1 }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: !draft.trim() || parsing ? 'var(--surface-2)' : 'rgba(201,150,58,0.14)',
+                border: !draft.trim() || parsing ? '1px solid var(--rule)' : '1px solid rgba(201,150,58,0.5)',
+                color: !draft.trim() || parsing ? 'var(--ink-muted)' : 'var(--field-gold-bright)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: !draft.trim() || parsing ? 'default' : 'pointer',
+                opacity: !draft.trim() || parsing ? 0.7 : 1,
+                transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease'
+              }}
             >
               <Sparkles size={14} />
               {parsing ? 'Parsing…' : 'AI parse'}
@@ -395,15 +417,17 @@ export default function Notes() {
                     borderRadius: 6,
                     background: 'transparent',
                     border: 'none',
-                    color: 'var(--ink-faint)',
+                    color: 'var(--ink-muted)',
                     cursor: 'pointer',
                     display: 'grid',
                     placeItems: 'center',
-                    opacity: 0.4,
+                    /* 0.4 -> 0.75 baseline so the user knows it's
+                       interactive without making it shout for attention. */
+                    opacity: 0.75,
                     transition: 'opacity 160ms ease, color 160ms ease'
                   }}
                   onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--alert-red)' }}
-                  onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.4'; ev.currentTarget.style.color = 'var(--ink-faint)' }}
+                  onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.75'; ev.currentTarget.style.color = 'var(--ink-muted)' }}
                 >
                   <Trash2 size={13} />
                 </button>

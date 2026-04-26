@@ -7,7 +7,8 @@ import CountUp from '../components/fx/CountUp.jsx'
 import LogMilesSheet from '../components/LogMilesSheet.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { STAGES, ACTIVE_STAGES, margin } from '../lib/stages.js'
+import { STAGES, ACTIVE_STAGES } from '../lib/stages.js'
+import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn } from '../lib/rollups.js'
 import { toastSuccess } from '../lib/toast.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
@@ -74,18 +75,22 @@ export default function Analytics() {
   }, [contacts])
 
   const stats = useMemo(() => {
+    // Pipeline = sum of all jobs in active stages.
     const pipeline = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage)).reduce((s, c) => s + Number(c.amount || 0), 0)
-    const wonYTD = contacts.filter((c) => c.stage === 'closed').reduce((s, c) => s + Number(c.amount || 0), 0)
-    const costYTD = contacts.filter((c) => c.stage === 'closed').reduce((s, c) => s + Number(c.cost || 0), 0)
-    const profitYTD = wonYTD - costYTD
-    const withMargin = contacts.filter((c) => c.amount > 0 && c.cost > 0)
-    const avgMargin = withMargin.length ? withMargin.reduce((s, c) => s + margin(c), 0) / withMargin.length : 0
+    // Won YTD + Profit YTD now share the rollups.js definition with
+    // Jobs/Clients (won = stage in (invoice, closed)). Was previously
+    // 'closed' only, so any job sitting in 'invoice' read as $0 won.
+    const wonYTD = wonYTDFn(contacts)
+    const profitYTD = profitYTDFn(contacts)
+    // Close rate as 0..1 from the shared helper, * 100 for the %.
+    const closeRate = closeRateFn(contacts) * 100
+    // Avg margin as 0..1 from the shared helper, * 100 for the %.
+    const avgMargin = avgMarginFn(contacts) * 100
     const leads = contacts.filter((c) => c.stage === 'lead').length
     const quotes = contacts.filter((c) => c.stage === 'quote').length
     const jobs = contacts.filter((c) => c.stage === 'job').length
     const closedCount = contacts.filter((c) => c.stage === 'closed').length
     const lostCount = contacts.filter((c) => c.stage === 'lost').length
-    const closeRate = (closedCount + lostCount) > 0 ? (closedCount / (closedCount + lostCount)) * 100 : 0
     const milesYTD = mileage.reduce((s, m) => s + Number(m.miles || 0), 0)
     const mileageDeduction = milesYTD * 0.67
     return { pipeline, wonYTD, profitYTD, avgMargin, leads, quotes, jobs, closedCount, lostCount, closeRate, milesYTD, mileageDeduction }
@@ -166,16 +171,21 @@ export default function Analytics() {
               </span>
             </header>
             <div style={{ height: 120, padding: '6px 0', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', position: 'relative' }}>
-              {/* Skeleton: shown until trendData has at least one point.
-                  Recharts mounts an empty container for a beat, which the
-                  user reads as "chart broken / 1-sec blank flash". */}
-              {(!trendData || trendData.length === 0) && (
-                <div aria-hidden="true" style={{ position: 'absolute', inset: 12, display: 'flex', alignItems: 'flex-end', gap: 6, opacity: 0.35 }}>
-                  {[18, 28, 22, 36, 30, 44, 38, 52, 48, 62, 58, 70].map((h, i) => (
-                    <span key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 2, background: 'linear-gradient(180deg, var(--field-gold-bright), transparent)' }} />
-                  ))}
+              {/* Real empty state for low data — was a misleading
+                  isolated bell curve at the right edge when only one or
+                  two weeks had values. Now: until at least 4 weeks have
+                  non-zero amounts, render a clear "not enough data" hint. */}
+              {trendData.filter((d) => d.amount > 0).length < 4 ? (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 16px', textAlign: 'center' }}>
+                  <div aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32, opacity: 0.18 }}>
+                    {[16, 22, 18, 28, 24, 34].map((h, i) => (
+                      <span key={i} style={{ width: 5, height: `${h}px`, borderRadius: 2, background: 'var(--field-gold-bright)' }} />
+                    ))}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--ink-strong)' }}>Not enough data yet</div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)' }}>The trend lights up once you have 4+ weeks of pipeline.</div>
                 </div>
-              )}
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
                   <defs>
@@ -203,6 +213,7 @@ export default function Analytics() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </motion.section>
 

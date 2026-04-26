@@ -39,7 +39,20 @@ export default function Schedule() {
     }
     return startOfDay(new Date())
   })()
-  const [view, setView] = useState('day')
+  // Persist last-used calendar view per user. Most contractors live in
+  // one mode (Day for the foreman, Week for the owner) and don't want
+  // to keep clicking back to it after every session.
+  const [view, setView] = useState(() => {
+    if (typeof window === 'undefined') return 'day'
+    try {
+      const v = window.localStorage.getItem('fh:schedule:view')
+      return v === 'week' || v === 'month' ? v : 'day'
+    } catch { return 'day' }
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem('fh:schedule:view', view) } catch {}
+  }, [view])
   const [cursor, setCursor] = useState(initialCursor)
   const [events, setEvents] = useState([])
   const [upcoming, setUpcoming] = useState([])
@@ -176,8 +189,12 @@ export default function Schedule() {
         </motion.div>
       )}
 
-      {/* UPCOMING LANE */}
-      {upcoming.length > 0 && (
+      {/* UPCOMING LANE — only on Day view. On Week/Month the grid is
+          already showing the same window, so the upcoming row was
+          pushing the actual calendar past the fold (audit issues #2 +
+          #4: "land on Week and the column headers are below the
+          viewport"). */}
+      {view === 'day' && upcoming.length > 0 && (
         <motion.section variants={item} style={{ padding: '14px 20px 0' }}>
           <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
@@ -424,7 +441,11 @@ function WeekView({ start, events, onClick, onDelete }) {
               {dayEvents.length === 0 && <span className="fh-week__empty">—</span>}
               {dayEvents.map((e) => (
                 <div key={e.id} className="fh-week__evt" style={{ position: 'relative' }}>
-                  <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit' }}>
+                  <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {/* Time + title used to render as inline spans with no
+                        gap, producing "8:00 AMasbestos test". Stack them
+                        vertically with a 2 px gap so the time reads as a
+                        clear caption above the title. */}
                     <span>{fmtTime(e.start_at)}</span>
                     <strong>{e.title}</strong>
                   </button>

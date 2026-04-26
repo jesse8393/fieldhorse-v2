@@ -303,23 +303,25 @@ export default function Settings() {
         </Section>
       )}
 
-      {/* SAVE BAR — sticky above the bottom nav so a user who scrolls
-          deep into branding/services doesn't have to scroll back to the
-          top to commit. Always visible while there's any chance of
-          dirty state. */}
-      <motion.div
-        variants={item}
+      {/* SAVE BAR — fixed strip above the bottom nav. position:sticky
+          previously didn't actually stick because its containing block
+          was the page (not a scroll container with overflow). position:
+          fixed against the viewport works. Sits 96 px above the bottom
+          edge (= bottom nav height) so it never overlaps the nav. */}
+      <div
         style={{
-          position: 'sticky',
+          position: 'fixed',
+          left: 0,
+          right: 0,
           bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
-          zIndex: 5,
+          zIndex: 'calc(var(--z-nav, 40) - 1)',
           padding: '12px 20px',
-          margin: '0 -20px',
           display: 'flex',
           justifyContent: 'flex-end',
-          background: 'linear-gradient(180deg, rgba(20,20,20,0) 0%, rgba(20,20,20,0.85) 30%, rgba(20,20,20,0.96) 100%)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)'
+          background: 'linear-gradient(180deg, rgba(20,20,20,0) 0%, rgba(20,20,20,0.88) 35%, rgba(20,20,20,0.96) 100%)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          pointerEvents: 'none'
         }}
       >
         <motion.button
@@ -328,6 +330,7 @@ export default function Settings() {
           onClick={save} className="fh-press-instant"
           disabled={saving}
           style={{
+            pointerEvents: 'auto',
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
@@ -347,7 +350,7 @@ export default function Settings() {
           <UploadIcon size={16} />
           {saving ? 'SAVING…' : saved ? 'SAVED' : 'SAVE CHANGES'}
         </motion.button>
-      </motion.div>
+      </div>
     </motion.div>
   )
 }
