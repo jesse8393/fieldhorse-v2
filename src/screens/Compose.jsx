@@ -183,7 +183,7 @@ export default function Compose() {
         </label>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={fieldLabelStyle}>Contact{contacts.length > 0 ? ` · ${contacts.length}` : ''}</span>
+          <span style={fieldLabelStyle}>Contact</span>
           <select
             value={contactId}
             onChange={(e) => setContactId(e.target.value)}

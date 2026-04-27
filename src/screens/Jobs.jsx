@@ -355,7 +355,8 @@ export default function Jobs() {
             <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
             <DrawerDescription>
               {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
-              {drawerContact?.amount ? ` · ${money(drawerContact.amount)}` : ''}
+              {' · '}
+              {money(drawerContact?.amount || 0)}
             </DrawerDescription>
           </DrawerHeader>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '8px 20px 8px' }}>

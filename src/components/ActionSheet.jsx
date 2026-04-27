@@ -107,9 +107,12 @@ export default function ActionSheet({
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <AnimatePresence>
+    // mode="wait" + explicit key force AnimatePresence to fully clean up
+    // the exit before any next render, preventing the audit-caught
+    // "DELETE THIS JOB? text fragment remained at bottom" leak.
+    <AnimatePresence mode="wait">
       {open && (
-        <div className="fh-asheet-root">
+        <div className="fh-asheet-root" key="action-sheet">
           <motion.div
             className="fh-asheet__scrim"
             initial={{ opacity: 0 }}

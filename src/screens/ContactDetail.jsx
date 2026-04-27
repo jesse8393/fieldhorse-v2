@@ -222,6 +222,14 @@ export default function ContactDetail() {
               </h1>
             )
           })()}
+          {/* Job title (e.g. "Summer Creek Rail Painting") — was missing
+              from the header even though the audit user expected to see
+              it under the contact name. Render right under the title. */}
+          {contact.job_title && (
+            <div style={{ marginTop: 4, fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.35 }}>
+              {contact.job_title}
+            </div>
+          )}
           {/* CLIENT pill — owner: tappable link. Partner: static, no name. */}
           {contact.client_id && (
             contact.user_id === user.id
