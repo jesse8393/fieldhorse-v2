@@ -211,6 +211,49 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
     if (!form.name.trim()) { setErr('Name is required.'); return }
     setSaving(true)
     setErr('')
+
+    // If the user didn't pick an existing client via the picker, find or
+    // create one from the lead's name/phone/email so the new job shows
+    // up on /clients (audit: "lead created but not visible on Clients").
+    // Match-then-create strategy: phone first (most reliable), email
+    // second, name+empty-phone third.
+    let resolvedClientId = client?.id || null
+    if (!resolvedClientId) {
+      try {
+        const phone = (form.phone || '').trim()
+        const email = (form.email || '').trim().toLowerCase()
+        const nm = form.name.trim()
+        let existing = null
+        if (phone) {
+          const { data } = await supabase
+            .from('fh_clients').select('id').eq('user_id', userId).eq('phone', phone).maybeSingle()
+          existing = data
+        }
+        if (!existing && email) {
+          const { data } = await supabase
+            .from('fh_clients').select('id').eq('user_id', userId).ilike('email', email).maybeSingle()
+          existing = data
+        }
+        if (existing) {
+          resolvedClientId = existing.id
+        } else {
+          const { data: created } = await supabase
+            .from('fh_clients').insert({
+              user_id: userId,
+              name: nm,
+              phone: phone || null,
+              email: email || null,
+              address: form.address || null
+            }).select('id').single()
+          resolvedClientId = created?.id || null
+        }
+      } catch (e) {
+        // Non-fatal — log and proceed with null client_id. The job still
+        // saves; the user can link a client later from the job detail.
+        console.warn('[lead] auto-client upsert failed', e)
+      }
+    }
+
     const payload = {
       user_id: userId,
       name: form.name.trim(),
@@ -223,7 +266,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       notes: form.notes || null,
       referred_by: form.referred_by || null,
       stage: form.stage || 'lead',
-      client_id: client?.id || null
+      client_id: resolvedClientId
     }
     try {
       const { data, error } = await supabase
@@ -313,7 +356,10 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       <div className="fh-voice-hero">
         <div className="fh-voice-hero__head">
           <span className="fh-voice-hero__label">Fast capture</span>
-          <span className="fh-voice-hero__chip">AI · SONNET 4</span>
+          {/* Removed the "AI · SONNET 4" version chip — it implies a
+              specific live model that may not be reachable, and the
+              version detail isn't useful to the user. The voice +
+              parse flow surfaces real errors when AI is down. */}
         </div>
         <p className="fh-voice-hero__desc">One sentence. AI fills every field.</p>
         <button

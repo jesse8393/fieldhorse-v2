@@ -112,37 +112,47 @@ export default function Invoices() {
   }), [profile])
 
   function handleGeneratePDF(row) {
-    const result = generateInvoice({
-      company,
-      contact: {
-        name: row.job.name || row.job.client_name || 'Client',
-        address: row.job.address || '',
-        phone: row.job.phone || '',
-        email: row.job.email || ''
-      },
-      lineItems: [
-        {
-          description: row.job.job_title || 'Construction services per agreement',
-          qty: 1,
-          rate: row.amount,
-          amount: row.amount
+    // Audit caught this as a no-op. Wrap in try/catch so a jsPDF
+    // failure surfaces a real error instead of silently swallowing,
+    // and so the user sees a toast immediately on click instead of
+    // wondering if anything happened.
+    try {
+      const result = generateInvoice({
+        company,
+        contact: {
+          name: row.job.name || row.job.client_name || 'Client',
+          address: row.job.address || '',
+          phone: row.job.phone || '',
+          email: row.job.email || ''
         },
-        ...(row.paid > 0 ? [{
-          description: 'Less: payments received',
-          qty: 1,
-          rate: -row.paid,
-          amount: -row.paid
-        }] : [])
-      ],
-      taxRate: 0,
-      notes: row.paid > 0
-        ? `Balance due reflects ${fmtMoney(row.paid)} previously received.`
-        : '',
-      dueDate: '',
-      invoiceId: row.job.id
-    })
-    downloadPdf(result)
-    toastSuccess('Invoice PDF downloaded', result.filename)
+        lineItems: [
+          {
+            description: row.job.job_title || 'Construction services per agreement',
+            qty: 1,
+            rate: row.amount,
+            amount: row.amount
+          },
+          ...(row.paid > 0 ? [{
+            description: 'Less: payments received',
+            qty: 1,
+            rate: -row.paid,
+            amount: -row.paid
+          }] : [])
+        ],
+        taxRate: 0,
+        notes: row.paid > 0
+          ? `Balance due reflects ${fmtMoney(row.paid)} previously received.`
+          : '',
+        dueDate: '',
+        invoiceId: row.job.id
+      })
+      if (!result?.doc) throw new Error('PDF generator returned no document')
+      downloadPdf(result)
+      toastSuccess('Invoice PDF downloaded', result.filename)
+    } catch (e) {
+      console.error('[invoices] PDF generation failed:', e)
+      toastError("Couldn't generate PDF", e?.message || 'Try again')
+    }
   }
 
   async function handleMarkPaid(row) {

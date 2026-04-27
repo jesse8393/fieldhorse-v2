@@ -634,15 +634,29 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
     textDecoration: 'none'
   }
   if (href && !disabled) {
+    // Plain <a> instead of motion.a — framer-motion was apparently
+    // eating the click on iOS Safari + Vaul drawer combo (audit:
+    // "Text/Email/Call do nothing"). Manual onClick fallback ensures
+    // the deep link fires even when href default is suppressed.
     return (
-      <motion.a
+      <a
         href={href}
-        whileTap={{ scale: 0.97 }}
+        rel="noopener"
+        onClick={(e) => {
+          // Stop the drawer from intercepting the click while still
+          // allowing the deep link to fire.
+          e.stopPropagation()
+          // Force navigation as a backup — some PWA / drawer combos
+          // swallow anchor default before the OS handler runs.
+          if (typeof window !== 'undefined') {
+            setTimeout(() => { window.location.href = href }, 0)
+          }
+        }}
         style={style}
       >
         <I size={18} />
         <span>{label}</span>
-      </motion.a>
+      </a>
     )
   }
   return (

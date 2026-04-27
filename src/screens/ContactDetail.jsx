@@ -9,6 +9,7 @@ import {
   Clock, Sparkles, GitCompareArrows
 } from 'lucide-react'
 import { compressImageToDataUrl, captionPhoto } from '../lib/docIntelligence.js'
+import { formatPhone } from '../lib/utils.js'
 import TimeClockCard from '../components/TimeClockCard.jsx'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
@@ -288,7 +289,14 @@ export default function ContactDetail() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
-          onClick={() => setIsEditing((v) => !v)}
+          onClick={() => {
+            // Edit-mode only renders inside OverviewTab. If the user
+            // is on Milestones / Subs / Files / etc. and clicks EDIT,
+            // jump them to Overview first so the form actually shows
+            // (audit caught this as "EDIT does nothing").
+            setTab('overview')
+            setIsEditing((v) => !v)
+          }}
           aria-pressed={isEditing}
           style={{
             display: 'inline-flex',
@@ -723,7 +731,7 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit, onChange
 function OverviewReadCard({ contact }) {
   const rows = [
     { label: 'Name', value: contact.name },
-    { label: 'Phone', value: contact.phone },
+    { label: 'Phone', value: formatPhone(contact.phone) },
     { label: 'Email', value: contact.email },
     { label: 'Address', value: contact.address },
     { label: 'Job title', value: contact.job_title },
@@ -1034,7 +1042,7 @@ function SubsTab({ contact, subs, userId, onChange }) {
               </span>
               <div style={{ minWidth: 0 }}>
                 <strong>{s.name}</strong>
-                <span className="fh-row__sub">{s.trade || '—'} {s.phone ? ` · ${s.phone}` : ''}</span>
+                <span className="fh-row__sub">{s.trade || '—'} {s.phone ? ` · ${formatPhone(s.phone)}` : ''}</span>
               </div>
             </div>
             <div className="fh-row__right">

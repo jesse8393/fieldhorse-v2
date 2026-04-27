@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Phone, Search, Hammer, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { formatPhone } from '../lib/utils.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -218,7 +219,7 @@ function SubRow({ g, contacts }) {
           </div>
           <div style={{ marginTop: 2, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             {tradeSummary}
-            {g.phone && <> · <a href={`tel:${g.phone}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--ink-muted)', textDecoration: 'none' }}><Phone size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />{g.phone}</a></>}
+            {g.phone && <> · <a href={`tel:${g.phone}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--ink-muted)', textDecoration: 'none' }}><Phone size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />{formatPhone(g.phone)}</a></>}
             {g.totalRate > 0 && <> · <span style={{ color: 'var(--ink-strong)' }}>${g.totalRate.toLocaleString()}</span> billed</>}
           </div>
         </div>

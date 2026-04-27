@@ -48,6 +48,7 @@ export default function Notes() {
   const [saving, setSaving] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parsed, setParsed] = useState(null)
+  const [parseError, setParseError] = useState('')
   const [voiceState, setVoiceState] = useState('idle') // idle | listening | error
   const recognitionRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -107,6 +108,7 @@ export default function Notes() {
   async function parseWithAI() {
     if (!draft.trim()) return
     setParsing(true)
+    setParseError('')
     try {
       const res = await claudeMessage({
         system: SYSTEM,
@@ -115,9 +117,24 @@ export default function Notes() {
       })
       const text = res?.content?.[0]?.text || ''
       const match = text.match(/\{[\s\S]*\}/)
-      if (match) setParsed(JSON.parse(match[0]))
-    } catch {
-      setParsed({ summary: draft.trim().slice(0, 120), action_items: [], risks: [], materials_needed: [], follow_up_date: null })
+      if (!match) throw new Error('AI returned no structured response')
+      const obj = JSON.parse(match[0])
+      setParsed(obj)
+    } catch (e) {
+      // Audit caught the previous fallback returning the user's input
+      // truncated to 120 chars and labeled "AI Summary" — pretending
+      // the parse worked when it didn't. Now: real error state, no
+      // fake parsed object.
+      console.error('[notes] parse failed:', e)
+      setParsed(null)
+      const msg = String(e?.message || '').toLowerCase()
+      if (msg.includes('missing_api_key') || msg.includes('500')) {
+        setParseError('AI not configured. Set ANTHROPIC_API_KEY in your Netlify env vars to enable parsing.')
+      } else if (msg.includes('failed to fetch') || msg.includes('404')) {
+        setParseError('AI endpoint unreachable.')
+      } else {
+        setParseError(e?.message || 'AI parse failed.')
+      }
     } finally {
       setParsing(false)
     }
@@ -312,6 +329,16 @@ export default function Notes() {
               {saving ? 'SAVING…' : 'SAVE NOTE'}
             </motion.button>
           </div>
+
+          {/* Real error state when AI parse fails. Replaces the previous
+              fake-fallback that returned the user's text truncated to
+              120 chars labeled "AI Summary." */}
+          {parseError && !parsed && (
+            <div role="alert" style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.4)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12.5 }}>
+              <span style={{ fontWeight: 700, color: 'var(--alert-red)' }}>AI parse unavailable. </span>
+              <span style={{ color: 'var(--ink-muted)' }}>{parseError} You can still save the note as-is.</span>
+            </div>
+          )}
 
           <AnimatePresence>
             {parsed && (
