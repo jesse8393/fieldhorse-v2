@@ -34,7 +34,13 @@ export default function Settings() {
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
-  const [services, setServices] = useState(profile?.services || [])
+  // Dedupe on read — older onboarding flows wrote duplicates into
+  // profile.services so the count shown ("24 picked") didn't match the
+  // 12 visible chips. We persist the deduped version on next save.
+  const [services, setServices] = useState(() => {
+    const arr = profile?.services || []
+    return Array.from(new Set(arr.map((s) => String(s || '').trim()).filter(Boolean)))
+  })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [wiping, setWiping] = useState(false)
@@ -72,7 +78,7 @@ export default function Settings() {
   useEffect(() => {
     setDisplayName(profile?.full_name || '')
     setCompanyName(profile?.company_name || '')
-    setServices(profile?.services || [])
+    setServices(Array.from(new Set((profile?.services || []).map((s) => String(s || '').trim()).filter(Boolean))))
   }, [profile])
 
   async function saveDisplayName() {

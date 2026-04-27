@@ -345,7 +345,7 @@ export default function Jobs() {
 
       {/* KANBAN — desktop / tablet drag-and-drop */}
       {view === 'kanban' && isWide && (
-        <KanbanBoard contacts={filtered} onStageChange={handleStageChange} />
+        <KanbanBoard contacts={filtered} onStageChange={handleStageChange} onOpen={openDrawer} />
       )}
 
       {/* VAUL DRAWER — quick actions */}

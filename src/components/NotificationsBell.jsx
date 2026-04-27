@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
@@ -25,22 +25,24 @@ export default function NotificationsBell() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState([])
-  const [unread, setUnread] = useState(0)
   const [loading, setLoading] = useState(false)
 
-  // Pull unread count on mount + whenever auth user changes. Realtime
-  // channel below keeps it fresh on every insert/update without polling.
+  // Single source of truth: badge count derives from rows so the
+  // bell badge can't say "1" while the drawer says "All caught up."
+  // Audit caught the divergence — used to be two parallel state vars.
+  const unread = useMemo(() => rows.filter((r) => !r.read_at).length, [rows])
+
+  // Pull inbox on mount + whenever auth user changes. Realtime
+  // channel below keeps rows fresh on every insert/update without polling.
   const refresh = useCallback(async () => {
-    if (!user) { setUnread(0); setRows([]); return }
+    if (!user) { setRows([]); return }
     try {
       const list = await fetchInbox(40)
       setRows(list)
-      setUnread(list.filter((r) => !r.read_at).length)
     } catch {
       // RLS denial / table missing → silently zero out so the bell never
       // throws. Migration 008 may not have been applied yet.
       setRows([])
-      setUnread(0)
     }
   }, [user])
 
@@ -72,9 +74,9 @@ export default function NotificationsBell() {
   async function handleTap(row) {
     hapticTap()
     if (!row.read_at) {
-      // Optimistic update so the badge drops immediately
+      // Optimistic update — badge falls automatically since it's
+      // derived from rows.
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, read_at: new Date().toISOString() } : r))
-      setUnread((n) => Math.max(0, n - 1))
       await markRead(row.id)
     }
     if (row.link) {
@@ -86,7 +88,6 @@ export default function NotificationsBell() {
   async function handleMarkAll() {
     hapticTap()
     setRows((prev) => prev.map((r) => r.read_at ? r : { ...r, read_at: new Date().toISOString() }))
-    setUnread(0)
     await markAllRead()
   }
 

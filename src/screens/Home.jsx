@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getWeather, workWindow, MURFREESBORO } from '../lib/weather.js'
+import { ACTIVE_STAGES } from '../lib/stages.js'
 import Spotlight from '../components/fx/Spotlight.jsx'
 import ShimmerBar from '../components/fx/ShimmerBar.jsx'
 import GreetingTitle from '../components/fx/GreetingTitle.jsx'
@@ -140,8 +141,12 @@ export default function Home() {
       const crewsOnSite = rows.filter(
         (c) => c.stage === 'job' && scheduledContactIds.has(c.id)
       )
+      // Pipeline filter aligned with Analytics — was "any stage that
+      // isn't closed/lost", which counted custom/legacy stage values
+      // that Analytics filtered out. Audit caught the divergence
+      // ($166K Home vs $120K Analytics). Both now use ACTIVE_STAGES.
       const totalPipeline = rows
-        .filter((c) => c.stage !== 'closed' && c.stage !== 'lost')
+        .filter((c) => ACTIVE_STAGES.includes(c.stage))
         .reduce((s, c) => s + Number(c.amount || 0), 0)
       const booked = rows
         .filter((c) => c.stage === 'invoice' || c.stage === 'closed')

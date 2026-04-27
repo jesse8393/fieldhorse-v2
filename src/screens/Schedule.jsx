@@ -54,7 +54,12 @@ export default function Schedule() {
     try { window.localStorage.setItem('fh:schedule:view', view) } catch {}
   }, [view])
   const [cursor, setCursor] = useState(initialCursor)
-  const [events, setEvents] = useState([])
+  // null = haven't fetched yet, [] = fetched but empty. Distinguishes
+  // "first paint, please show skeleton" from "view switched, keep
+  // grid visible while we re-fetch in background." Audit was seeing
+  // the SkeletonList horizontal bars during a view switch and reading
+  // them as a broken Month grid.
+  const [events, setEvents] = useState(null)
   const [upcoming, setUpcoming] = useState([])
   const [loading, setLoading] = useState(true)
   const [weather, setWeather] = useState(null)
@@ -119,7 +124,10 @@ export default function Schedule() {
 
   const load = useCallback(async () => {
     if (!user) return
-    setLoading(true)
+    // Only blank the grid for the very first fetch — subsequent fetches
+    // (after a view switch, after an event delete, after FAB save) keep
+    // the existing events rendered until the new payload lands.
+    setLoading((prev) => events == null ? true : prev)
     const { data } = await supabase
       .from('fh_schedule')
       .select('*, fh_contacts(name, stage)')
@@ -129,6 +137,7 @@ export default function Schedule() {
       .order('start_at', { ascending: true })
     setEvents(data || [])
     setLoading(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, range.start, range.end])
 
   const loadUpcoming = useCallback(async () => {
@@ -294,10 +303,14 @@ export default function Schedule() {
           calendar apps. Vertical scroll inside the body still works. */}
       <SwipeShell onShift={shift}>
         <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
-          {loading && <SkeletonList rows={5} card={false} />}
-          {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-          {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-          {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+          {/* Show skeleton ONLY on the very first load (events still null).
+              On subsequent re-fetches (view switch, day shift) keep the
+              existing grid rendered so the user never sees a flash of
+              empty horizontal bars. */}
+          {loading && events == null && <SkeletonList rows={5} card={false} />}
+          {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+          {events != null && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+          {events != null && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
         </motion.div>
       </SwipeShell>
 
