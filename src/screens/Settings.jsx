@@ -34,7 +34,13 @@ export default function Settings() {
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
-  const [services, setServices] = useState(profile?.services || [])
+  // Dedupe on read — older onboarding flows wrote duplicates into
+  // profile.services so the count shown ("24 picked") didn't match the
+  // 12 visible chips. We persist the deduped version on next save.
+  const [services, setServices] = useState(() => {
+    const arr = profile?.services || []
+    return Array.from(new Set(arr.map((s) => String(s || '').trim()).filter(Boolean)))
+  })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [wiping, setWiping] = useState(false)
@@ -72,7 +78,7 @@ export default function Settings() {
   useEffect(() => {
     setDisplayName(profile?.full_name || '')
     setCompanyName(profile?.company_name || '')
-    setServices(profile?.services || [])
+    setServices(Array.from(new Set((profile?.services || []).map((s) => String(s || '').trim()).filter(Boolean))))
   }, [profile])
 
   async function saveDisplayName() {
@@ -303,14 +309,34 @@ export default function Settings() {
         </Section>
       )}
 
-      {/* SAVE BAR */}
-      <motion.div variants={item} style={{ padding: '0 20px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+      {/* SAVE BAR — fixed strip above the bottom nav. position:sticky
+          previously didn't actually stick because its containing block
+          was the page (not a scroll container with overflow). position:
+          fixed against the viewport works. Sits 96 px above the bottom
+          edge (= bottom nav height) so it never overlaps the nav. */}
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
+          zIndex: 'calc(var(--z-nav, 40) - 1)',
+          padding: '12px 20px',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          background: 'linear-gradient(180deg, rgba(20,20,20,0) 0%, rgba(20,20,20,0.88) 35%, rgba(20,20,20,0.96) 100%)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          pointerEvents: 'none'
+        }}
+      >
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={save} className="fh-press-instant"
           disabled={saving}
           style={{
+            pointerEvents: 'auto',
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
@@ -330,7 +356,7 @@ export default function Settings() {
           <UploadIcon size={16} />
           {saving ? 'SAVING…' : saved ? 'SAVED' : 'SAVE CHANGES'}
         </motion.button>
-      </motion.div>
+      </div>
     </motion.div>
   )
 }

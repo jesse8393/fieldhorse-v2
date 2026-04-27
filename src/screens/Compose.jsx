@@ -39,6 +39,7 @@ export default function Compose() {
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -58,6 +59,7 @@ export default function Compose() {
     const ch = CHANNELS.find((c) => c.id === channel)
     setLoading(true)
     setDraft('')
+    setError('')
     setCopied(false)
     try {
       const contactLine = contact
@@ -69,10 +71,23 @@ export default function Compose() {
         maxTokens: 500
       })
       const text = res?.content?.[0]?.text || ''
+      if (!text) throw new Error('Empty response from AI')
       hapticSuccess(); setDraft(text)
-      if (text) toastSuccess('Draft ready', 'Copy, send, or edit')
+      toastSuccess('Draft ready', 'Copy, send, or edit')
     } catch (e) {
-      setDraft(`AI unavailable. Hand-draft fallback: Hi ${contact?.name || 'there'}, quick note on ${intent.toLowerCase()}. — ${profile?.company_name || ''}`)
+      // Audit caught the previous fallback returning a fake "AI unavailable
+      // — Hi there..." string regardless of input, which read as a real
+      // draft. Now: real error state with clear messaging + a manual
+      // textarea path so the user can still write a draft.
+      console.error('[compose] generate failed:', e)
+      const msg = String(e?.message || '').toLowerCase()
+      if (msg.includes('missing_api_key') || msg.includes('500')) {
+        setError('AI not configured. Set ANTHROPIC_API_KEY in your Netlify env vars to enable drafting.')
+      } else if (msg.includes('404') || msg.includes('failed to fetch')) {
+        setError('AI endpoint unreachable. Check your network or try again in a moment.')
+      } else {
+        setError(e?.message || 'AI generation failed.')
+      }
     } finally {
       setLoading(false)
     }
@@ -168,7 +183,7 @@ export default function Compose() {
         </label>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={fieldLabelStyle}>Contact{contacts.length > 0 ? ` · ${contacts.length}` : ''}</span>
+          <span style={fieldLabelStyle}>Contact</span>
           <select
             value={contactId}
             onChange={(e) => setContactId(e.target.value)}
@@ -225,6 +240,23 @@ export default function Compose() {
           {loading ? 'WRITING…' : 'GENERATE DRAFT'}
         </motion.button>
       </motion.div>
+
+      {/* AI ERROR — replaces the silent fake-fallback. Shows the real
+          reason (key missing / network) + a manual textarea so the user
+          can still write a draft without AI. */}
+      {error && !draft && (
+        <motion.div variants={item} role="alert" style={{ margin: '0 20px 14px', padding: '14px 16px', borderRadius: 14, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.4)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--alert-red)', marginBottom: 6 }}>AI unavailable</div>
+          <div style={{ fontSize: 13, color: 'var(--ink-muted)', marginBottom: 10, lineHeight: 1.4 }}>{error}</div>
+          <button
+            type="button"
+            onClick={() => { setError(''); setDraft(' ') }}
+            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
+          >
+            WRITE MANUALLY →
+          </button>
+        </motion.div>
+      )}
 
       {/* AI RESPONSE CARD */}
       <AnimatePresence>

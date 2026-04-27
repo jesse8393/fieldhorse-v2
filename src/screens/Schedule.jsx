@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
@@ -39,9 +39,27 @@ export default function Schedule() {
     }
     return startOfDay(new Date())
   })()
-  const [view, setView] = useState('day')
+  // Persist last-used calendar view per user. Most contractors live in
+  // one mode (Day for the foreman, Week for the owner) and don't want
+  // to keep clicking back to it after every session.
+  const [view, setView] = useState(() => {
+    if (typeof window === 'undefined') return 'day'
+    try {
+      const v = window.localStorage.getItem('fh:schedule:view')
+      return v === 'week' || v === 'month' ? v : 'day'
+    } catch { return 'day' }
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem('fh:schedule:view', view) } catch {}
+  }, [view])
   const [cursor, setCursor] = useState(initialCursor)
-  const [events, setEvents] = useState([])
+  // null = haven't fetched yet, [] = fetched but empty. Distinguishes
+  // "first paint, please show skeleton" from "view switched, keep
+  // grid visible while we re-fetch in background." Audit was seeing
+  // the SkeletonList horizontal bars during a view switch and reading
+  // them as a broken Month grid.
+  const [events, setEvents] = useState(null)
   const [upcoming, setUpcoming] = useState([])
   const [loading, setLoading] = useState(true)
   const [weather, setWeather] = useState(null)
@@ -94,14 +112,22 @@ export default function Schedule() {
       const s = addDays(cursor, -cursor.getDay())
       return { start: s, end: addDays(s, 7) }
     }
-    const s = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-    const e = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
-    return { start: s, end: e }
+    // Month view: query a 6-week window so the leading + trailing
+    // calendar cells (which fall in adjacent months) get badges, not
+    // just the days strictly inside the month.
+    const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+    const gridStart = addDays(monthStart, -monthStart.getDay())
+    const gridEnd = addDays(gridStart, 42)
+    return { start: gridStart, end: gridEnd, monthStart, monthEnd }
   }, [view, cursor])
 
   const load = useCallback(async () => {
     if (!user) return
-    setLoading(true)
+    // Only blank the grid for the very first fetch — subsequent fetches
+    // (after a view switch, after an event delete, after FAB save) keep
+    // the existing events rendered until the new payload lands.
+    setLoading((prev) => events == null ? true : prev)
     const { data } = await supabase
       .from('fh_schedule')
       .select('*, fh_contacts(name, stage)')
@@ -111,6 +137,7 @@ export default function Schedule() {
       .order('start_at', { ascending: true })
     setEvents(data || [])
     setLoading(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, range.start, range.end])
 
   const loadUpcoming = useCallback(async () => {
@@ -151,38 +178,15 @@ export default function Schedule() {
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 20px 6px' }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-            Calendar
-          </span>
-          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            Run the{' '}
-            day.
-          </h1>
-        </div>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.96 }}
-          onClick={() => { hapticMedium(); setAddOpen(true) }}
-          aria-label="New event"
-          style={{
-            flexShrink: 0,
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            border: 'none',
-            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-            color: 'var(--onyx)',
-            cursor: 'pointer',
-            display: 'grid',
-            placeItems: 'center',
-            boxShadow: '0 8px 20px rgba(201,150,58,0.35)'
-          }}
-        >
-          <Plus size={20} strokeWidth={2.5} />
-        </motion.button>
+      {/* HEADER — top + button removed; the FAB at bottom-right is the
+          single, thumb-reachable add-event control. */}
+      <motion.div variants={item} style={{ padding: '10px 20px 6px' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+          Calendar
+        </span>
+        <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+          Run the day.
+        </h1>
       </motion.div>
 
       {/* WEATHER STRIP */}
@@ -194,8 +198,12 @@ export default function Schedule() {
         </motion.div>
       )}
 
-      {/* UPCOMING LANE */}
-      {upcoming.length > 0 && (
+      {/* UPCOMING LANE — only on Day view. On Week/Month the grid is
+          already showing the same window, so the upcoming row was
+          pushing the actual calendar past the fold (audit issues #2 +
+          #4: "land on Week and the column headers are below the
+          viewport"). */}
+      {view === 'day' && upcoming.length > 0 && (
         <motion.section variants={item} style={{ padding: '14px 20px 0' }}>
           <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
@@ -243,8 +251,11 @@ export default function Schedule() {
                   <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {e.title || 'Untitled'}
                   </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: fromQuote ? 'var(--field-gold-bright)' : 'var(--ink-faint)' }}>
-                    {fromQuote ? <MapPin size={10} /> : null}
+                  {/* Subtitle: bumped from 10 -> 12 px and from --ink-faint
+                      to a proper readable color so "FROM QUOTE - DEENA NOLAN"
+                      is legible at a glance, not squinting-bait. */}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', color: fromQuote ? 'var(--field-gold-bright)' : 'var(--ink-strong)' }}>
+                    {fromQuote ? <MapPin size={12} /> : null}
                     {fromQuote ? `From quote · ${e.fh_contacts.name}` : 'Manual event'}
                   </div>
                 </motion.button>
@@ -286,12 +297,34 @@ export default function Schedule() {
         </div>
       </motion.div>
 
-      <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
-        {loading && <SkeletonList rows={5} card={false} />}
-        {!loading && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} onAdd={() => setAddOpen(true)} />}
-        {!loading && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-        {!loading && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
-      </motion.div>
+      {/* Swipe-detector wraps the per-view body. Horizontal pointer drag
+          past 60 px shifts the cursor by 1 (left = next, right = prev),
+          giving phone users the same gesture they expect from native
+          calendar apps. Vertical scroll inside the body still works. */}
+      <SwipeShell onShift={shift}>
+        <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
+          {/* Show skeleton ONLY on the very first load (events still null).
+              On subsequent re-fetches (view switch, day shift) keep the
+              existing grid rendered so the user never sees a flash of
+              empty horizontal bars. */}
+          {loading && events == null && <SkeletonList rows={5} card={false} />}
+          {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+          {events != null && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+          {events != null && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+        </motion.div>
+      </SwipeShell>
+
+      {/* FAB — bottom-right, thumb-reachable, clears the bottom nav. The
+          in-empty-state "Add event ->" link was removed; this is the
+          single source of truth for adding events on Schedule. */}
+      <button
+        type="button"
+        onClick={() => { hapticMedium(); setAddOpen(true) }}
+        aria-label="New event"
+        className="fh-fab"
+      >
+        <Plus size={26} strokeWidth={2.5} />
+      </button>
 
       <AddEventSheet
         open={addOpen}
@@ -303,10 +336,40 @@ export default function Schedule() {
   )
 }
 
+// Lightweight pointer-based horizontal swipe wrapper. Plain pointer events
+// because framer-motion's drag swallows the page scroll on mobile. Vertical
+// motion ignores; horizontal past 60 px fires onShift(direction).
+function SwipeShell({ onShift, children }) {
+  const startRef = useRef(null)
+  function onPointerDown(e) {
+    startRef.current = { x: e.clientX, y: e.clientY, time: Date.now() }
+  }
+  function onPointerUp(e) {
+    const start = startRef.current
+    startRef.current = null
+    if (!start) return
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+    const elapsed = Date.now() - start.time
+    if (elapsed > 800) return
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.4) return
+    onShift(dx < 0 ? 1 : -1)
+    hapticTap()
+  }
+  return (
+    <div onPointerDown={onPointerDown} onPointerUp={onPointerUp} style={{ touchAction: 'pan-y' }}>
+      {children}
+    </div>
+  )
+}
+
+// 44 px hits the WCAG / iOS Human Interface tap-target minimum so a work
+// glove or sloppy thumb won't trigger the "Month" pill by accident when
+// shifting day cursor.
 const iconBtnStyle = {
-  width: 36,
-  height: 36,
-  borderRadius: 10,
+  width: 44,
+  height: 44,
+  borderRadius: 11,
   border: '1px solid var(--rule)',
   background: 'var(--surface-2)',
   color: 'var(--ink-strong)',
@@ -315,21 +378,19 @@ const iconBtnStyle = {
   cursor: 'pointer'
 }
 
-function DayView({ events, onClick, onDelete, onAdd }) {
+function DayView({ events, onClick, onDelete }) {
   if (events.length === 0) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Nothing scheduled.</div>
-        <div style={{ fontSize: 12, marginBottom: 10 }}>Queue something up. Crew runs smoother when the day's on the board.</div>
-        {onAdd && (
-          <button
-            type="button"
-            onClick={onAdd}
-            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-          >
-            Add event →
-          </button>
-        )}
+      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', fontFamily: 'var(--font-body)' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', marginBottom: 6 }}>Nothing scheduled.</div>
+        {/* Brighter body so it reads outside in direct sun. Was --ink-muted
+            (~ #6A665E) which fails on Onyx in bright light. */}
+        <div style={{ fontSize: 13, color: 'var(--ink-strong)', opacity: 0.78, lineHeight: 1.4 }}>
+          Queue something up. Crew runs smoother when the day's on the board.
+        </div>
+        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Tap the + below
+        </div>
       </div>
     )
   }
@@ -393,7 +454,11 @@ function WeekView({ start, events, onClick, onDelete }) {
               {dayEvents.length === 0 && <span className="fh-week__empty">—</span>}
               {dayEvents.map((e) => (
                 <div key={e.id} className="fh-week__evt" style={{ position: 'relative' }}>
-                  <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit' }}>
+                  <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {/* Time + title used to render as inline spans with no
+                        gap, producing "8:00 AMasbestos test". Stack them
+                        vertically with a 2 px gap so the time reads as a
+                        clear caption above the title. */}
                     <span>{fmtTime(e.start_at)}</span>
                     <strong>{e.title}</strong>
                   </button>
@@ -418,22 +483,30 @@ function WeekView({ start, events, onClick, onDelete }) {
 }
 
 function MonthView({ cursor, events, onDay }) {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-  const offset = first.getDay()
-  const days = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate()
-  const cells = []
-  for (let i = 0; i < offset; i++) cells.push(null)
-  for (let d = 1; d <= days; d++) cells.push(new Date(cursor.getFullYear(), cursor.getMonth(), d))
-  while (cells.length % 7 !== 0) cells.push(null)
+  // 6-week grid (always 42 cells) so the layout is stable across
+  // months. Days from the prev/next month are rendered dimmed instead
+  // of as blank slots — matches every standard calendar app.
+  const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
+  const gridStart = addDays(monthStart, -monthStart.getDay())
+  const today = startOfDay(new Date())
+  const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
+  const currentMonth = cursor.getMonth()
 
   return (
     <div className="fh-month">
       {['S','M','T','W','T','F','S'].map((d, i) => <span key={i} className="fh-month__dow">{d}</span>)}
-      {cells.map((d, i) => {
-        if (!d) return <div key={i} className="fh-month__cell fh-month__cell--empty" />
+      {cells.map((d) => {
         const dayEvents = events.filter((e) => sameDay(new Date(e.start_at), d))
+        const inMonth = d.getMonth() === currentMonth
+        const isToday = sameDay(d, today)
+        const cls = [
+          'fh-month__cell',
+          dayEvents.length ? 'has-events' : '',
+          inMonth ? '' : 'is-out',
+          isToday ? 'is-today' : ''
+        ].filter(Boolean).join(' ')
         return (
-          <button key={i} type="button" className={`fh-month__cell${dayEvents.length ? ' has-events' : ''}`} onClick={() => onDay(d)}>
+          <button key={d.toISOString()} type="button" className={cls} onClick={() => onDay(d)}>
             <span className="fh-month__num">{d.getDate()}</span>
             {dayEvents.length > 0 && <span className="fh-month__count">{dayEvents.length}</span>}
           </button>

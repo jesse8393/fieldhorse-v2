@@ -19,11 +19,19 @@ import { universalSearch } from '../lib/universalSearch.js'
 // Static nav — shown as the "empty state" when the input is blank.
 // When the user starts typing, the data search results take over.
 const QUICK_ACTIONS = [
-  { id: 'newLead', label: 'New lead', hint: 'Open pipeline card', icon: Plus, to: '/jobs?new=1' },
+  { id: 'newLead', label: 'New lead', hint: 'Open Pipeline card', icon: Plus, to: '/jobs?new=1' },
   { id: 'voice', label: 'Voice capture', hint: 'Dictate a note', icon: Mic, to: '/notes?voice=1' }
 ]
+// Home hint adapts to time of day so the palette doesn't say
+// "Morning brief" at 9 PM.
+function homeHint() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Morning brief'
+  if (h < 17) return 'Afternoon brief'
+  return 'Evening brief'
+}
 const NAV_ITEMS = [
-  { id: 'home', label: 'Home', hint: 'Morning brief', icon: Home, to: '/' },
+  { id: 'home', label: 'Home', hint: homeHint(), icon: Home, to: '/' },
   { id: 'jobs', label: 'Jobs', hint: 'Pipeline', icon: Briefcase, to: '/jobs' },
   { id: 'clients', label: 'Clients', hint: 'Directory', icon: Users, to: '/clients' },
   { id: 'notes', label: 'Field notes', hint: 'Capture anything', icon: FileText, to: '/notes' },

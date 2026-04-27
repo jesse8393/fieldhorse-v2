@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getWeather, workWindow, MURFREESBORO } from '../lib/weather.js'
+import { ACTIVE_STAGES } from '../lib/stages.js'
 import Spotlight from '../components/fx/Spotlight.jsx'
 import ShimmerBar from '../components/fx/ShimmerBar.jsx'
 import GreetingTitle from '../components/fx/GreetingTitle.jsx'
@@ -56,13 +57,17 @@ export default function Home() {
   const [weather, setWeather] = useState(null)
   const [weatherErr, setWeatherErr] = useState('')
   const [weatherLoading, setWeatherLoading] = useState(false)
-  const [pipeline, setPipeline] = useState(0)
-  const [activeCount, setActiveCount] = useState(0)
-  const [notesCount, setNotesCount] = useState(0)
-  const [outstanding, setOutstanding] = useState(0)
-  const [todayJobs, setTodayJobs] = useState([])
+  // KPIs default to null (not 0) so the dashboard distinguishes "loading"
+  // from "you actually have $0" — prevents the "Notes count went from 0
+  // to 7 when I tapped focus" perception bug where the user saw the
+  // unloaded zero, then watched it pop in once the query returned.
+  const [pipeline, setPipeline] = useState(null)
+  const [activeCount, setActiveCount] = useState(null)
+  const [notesCount, setNotesCount] = useState(null)
+  const [outstanding, setOutstanding] = useState(null)
+  const [todayJobs, setTodayJobs] = useState(null)
   const [weeklyTarget] = useState(25000)
-  const [weeklyBooked, setWeeklyBooked] = useState(0)
+  const [weeklyBooked, setWeeklyBooked] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -102,7 +107,11 @@ export default function Home() {
       const windowStart = new Date(now); windowStart.setHours(0, 0, 0, 0)
       const windowEnd = new Date(windowStart); windowEnd.setDate(windowEnd.getDate() + 7)
 
-      const [{ data: contacts }, { data: upcomingSchedule }, { data: pays }] = await Promise.all([
+      // Single Promise.all so every KPI lands on the same render frame.
+      // Notes count was previously sequenced AFTER this batch, which made
+      // it appear to "change" a moment after the rest of the dashboard
+      // settled.
+      const [{ data: contacts }, { data: upcomingSchedule }, { data: pays }, notesRes] = await Promise.all([
         supabase
           .from('fh_contacts')
           .select('id, name, amount, stage, job_title, job_type')
@@ -116,7 +125,12 @@ export default function Home() {
         supabase
           .from('fh_payments')
           .select('contact_id, amount')
+          .eq('user_id', user.id),
+        supabase
+          .from('fh_notes')
+          .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
+          .eq('done', false)
       ])
 
       if (cancelled) return
@@ -127,8 +141,12 @@ export default function Home() {
       const crewsOnSite = rows.filter(
         (c) => c.stage === 'job' && scheduledContactIds.has(c.id)
       )
+      // Pipeline filter aligned with Analytics — was "any stage that
+      // isn't closed/lost", which counted custom/legacy stage values
+      // that Analytics filtered out. Audit caught the divergence
+      // ($166K Home vs $120K Analytics). Both now use ACTIVE_STAGES.
       const totalPipeline = rows
-        .filter((c) => c.stage !== 'closed' && c.stage !== 'lost')
+        .filter((c) => ACTIVE_STAGES.includes(c.stage))
         .reduce((s, c) => s + Number(c.amount || 0), 0)
       const booked = rows
         .filter((c) => c.stage === 'invoice' || c.stage === 'closed')
@@ -152,12 +170,7 @@ export default function Home() {
       setActiveCount(crewsOnSite.length)
       setWeeklyBooked(booked)
       setTodayJobs(crewsOnSite.slice(0, 3))
-      const { count } = await supabase
-        .from('fh_notes')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('done', false)
-      if (!cancelled) setNotesCount(count || 0)
+      setNotesCount(notesRes?.count || 0)
     }
     load()
     return () => { cancelled = true }
@@ -212,7 +225,7 @@ export default function Home() {
     }
   }
 
-  const targetPct = weeklyTarget > 0 ? Math.min(100, Math.round((weeklyBooked / weeklyTarget) * 100)) : 0
+  const targetPct = weeklyTarget > 0 ? Math.min(100, Math.round(((weeklyBooked || 0) / weeklyTarget) * 100)) : 0
   const pourStatus = windowRead?.status || (weather ? 'ok' : '—')
   const pourGood = String(pourStatus).toLowerCase().includes('good') || String(pourStatus).toLowerCase().includes('ok')
 
@@ -303,7 +316,7 @@ export default function Home() {
           <ShimmerBar value={targetPct} />
           <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-muted)' }}>
             <span><span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{targetPct}%</span> of ${(weeklyTarget / 1000).toFixed(0)}K</span>
-            <span>{pipeline > 0 ? `$${(pipeline / 1000).toFixed(0)}K in pipeline` : '—'}</span>
+            <span>{pipeline > 0 ? `$${(pipeline / 1000).toFixed(0)}K in Pipeline` : '—'}</span>
           </div>
         </div>
       </motion.div>
@@ -369,7 +382,7 @@ export default function Home() {
         >
           {[
             { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp, gold: true, to: '/jobs' },
-            { label: 'Outstanding', value: outstanding, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: Receipt, alert: outstanding > 0, to: '/invoices' },
+            { label: 'Outstanding', value: outstanding, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: Receipt, alert: (outstanding || 0) > 0, to: '/invoices' },
             { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase, to: '/jobs' },
             { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText, to: '/notes' }
           ].map((kpi) => {
@@ -416,10 +429,19 @@ export default function Home() {
                     letterSpacing: '0.01em',
                     lineHeight: 1,
                     marginTop: 8,
-                    color: kpi.gold ? undefined : kpi.alert && kpi.value > 0 ? 'var(--alert-red)' : 'var(--ink-strong)'
+                    color: kpi.gold ? undefined : kpi.alert && kpi.value > 0 ? 'var(--alert-red)' : 'var(--ink-strong)',
+                    minHeight: 28
                   }}
                 >
-                  <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
+                  {/* While the KPI value is null (still loading) show a
+                      subtle skeleton bar instead of "0" — kills the
+                      perception bug where the user sees a wrong zero
+                      then watches it change a beat later. */}
+                  {kpi.value == null ? (
+                    <span aria-label="Loading" style={{ display: 'inline-block', width: 64, height: 18, borderRadius: 4, background: 'rgba(255,255,255,0.06)' }} />
+                  ) : (
+                    <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
+                  )}
                 </div>
               </Tag>
             )
@@ -436,7 +458,15 @@ export default function Home() {
           </button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 14px' }}>
-          {todayJobs.length === 0 ? (
+          {/* Loading skeleton — was a flash of "No active jobs yet" while
+              the contacts query was still in flight. Now shows two
+              shimmer rows during the first paint. */}
+          {todayJobs == null ? (
+            <>
+              <div style={{ height: 60, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.6 }} />
+              <div style={{ height: 60, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.4 }} />
+            </>
+          ) : todayJobs.length === 0 ? (
             <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12 }}>
               No active jobs yet. <button onClick={() => navigate('/jobs?new=1')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, cursor: 'pointer' }}>Add your first lead →</button>
             </div>

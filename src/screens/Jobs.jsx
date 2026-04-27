@@ -183,7 +183,7 @@ export default function Jobs() {
             style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
           >
             Jobs &{' '}
-            pipeline
+            Pipeline
           </h1>
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             <span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{summary.activeCount}</span>
@@ -296,9 +296,11 @@ export default function Jobs() {
         </motion.div>
       )}
 
-      {/* LIST */}
+      {/* LIST — auto-fit grid: 1 column on phone, 2 on tablet+, 3 on
+          wide desktop. minmax(280px, 1fr) keeps every card the same
+          width within a row instead of stretching one and not another. */}
       {view === 'list' && (
-        <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
+        <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', alignItems: 'stretch', gap: 10, padding: '0 20px 20px' }}>
           {loading && <SkeletonList rows={5} />}
           {!loading && filtered.length === 0 && (
             <EmptyView
@@ -343,7 +345,7 @@ export default function Jobs() {
 
       {/* KANBAN — desktop / tablet drag-and-drop */}
       {view === 'kanban' && isWide && (
-        <KanbanBoard contacts={filtered} onStageChange={handleStageChange} />
+        <KanbanBoard contacts={filtered} onStageChange={handleStageChange} onOpen={openDrawer} />
       )}
 
       {/* VAUL DRAWER — quick actions */}
@@ -353,7 +355,8 @@ export default function Jobs() {
             <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
             <DrawerDescription>
               {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
-              {drawerContact?.amount ? ` · ${money(drawerContact.amount)}` : ''}
+              {' · '}
+              {money(drawerContact?.amount || 0)}
             </DrawerDescription>
           </DrawerHeader>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '8px 20px 8px' }}>
@@ -404,7 +407,7 @@ export default function Jobs() {
           setTimeout(() => setJustAddedId(null), 1200)
           toastSuccess(
             'New lead added',
-            created?.name ? `${created.name} is in your pipeline` : 'In your pipeline'
+            created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
           )
         }}
       />
@@ -485,6 +488,11 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
         gap: 10,
         padding: '14px 14px 12px',
         borderRadius: 16,
+        // Force every card to fill its grid cell so MMC and Jeff Roy
+        // and Lily Grace North all share the exact same width within a
+        // row, regardless of contact-name length or stage-pill count.
+        width: '100%',
+        boxSizing: 'border-box',
         minHeight: 88,
         background: 'linear-gradient(135deg, var(--surface-2), var(--surface-2))',
         border: '1px solid var(--rule)',
@@ -558,8 +566,11 @@ function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
           </span>
         )}
         <MarginPill pct={m} hasCost={hasCost} />
+        {/* Pipeline position — was "3/5 stages" which read as "3 of 5
+            milestones complete". This is the stage in the Lead -> Quote
+            -> Job -> Invoice -> Closed flow, not a milestone count. */}
         <span style={{ fontSize: 10, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontWeight: 700, letterSpacing: '0.04em' }}>
-          {step}/{TOTAL_STAGES} stages
+          Stage {step}/{TOTAL_STAGES}
         </span>
       </div>
 
@@ -624,15 +635,29 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
     textDecoration: 'none'
   }
   if (href && !disabled) {
+    // Plain <a> instead of motion.a — framer-motion was apparently
+    // eating the click on iOS Safari + Vaul drawer combo (audit:
+    // "Text/Email/Call do nothing"). Manual onClick fallback ensures
+    // the deep link fires even when href default is suppressed.
     return (
-      <motion.a
+      <a
         href={href}
-        whileTap={{ scale: 0.97 }}
+        rel="noopener"
+        onClick={(e) => {
+          // Stop the drawer from intercepting the click while still
+          // allowing the deep link to fire.
+          e.stopPropagation()
+          // Force navigation as a backup — some PWA / drawer combos
+          // swallow anchor default before the OS handler runs.
+          if (typeof window !== 'undefined') {
+            setTimeout(() => { window.location.href = href }, 0)
+          }
+        }}
         style={style}
       >
         <I size={18} />
         <span>{label}</span>
-      </motion.a>
+      </a>
     )
   }
   return (
@@ -661,7 +686,7 @@ function EmptyView({ hasFilter, onAdd }) {
   return (
     <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs on the board.</div>
-      <div style={{ fontSize: 12, marginBottom: 10 }}>Drop in your first lead. Watch the pipeline fill.</div>
+      <div style={{ fontSize: 12, marginBottom: 10 }}>Drop in your first lead. Watch the Pipeline fill.</div>
       <button
         type="button"
         onClick={onAdd}

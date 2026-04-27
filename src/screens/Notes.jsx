@@ -48,6 +48,7 @@ export default function Notes() {
   const [saving, setSaving] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parsed, setParsed] = useState(null)
+  const [parseError, setParseError] = useState('')
   const [voiceState, setVoiceState] = useState('idle') // idle | listening | error
   const recognitionRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -107,6 +108,7 @@ export default function Notes() {
   async function parseWithAI() {
     if (!draft.trim()) return
     setParsing(true)
+    setParseError('')
     try {
       const res = await claudeMessage({
         system: SYSTEM,
@@ -115,9 +117,24 @@ export default function Notes() {
       })
       const text = res?.content?.[0]?.text || ''
       const match = text.match(/\{[\s\S]*\}/)
-      if (match) setParsed(JSON.parse(match[0]))
-    } catch {
-      setParsed({ summary: draft.trim().slice(0, 120), action_items: [], risks: [], materials_needed: [], follow_up_date: null })
+      if (!match) throw new Error('AI returned no structured response')
+      const obj = JSON.parse(match[0])
+      setParsed(obj)
+    } catch (e) {
+      // Audit caught the previous fallback returning the user's input
+      // truncated to 120 chars and labeled "AI Summary" — pretending
+      // the parse worked when it didn't. Now: real error state, no
+      // fake parsed object.
+      console.error('[notes] parse failed:', e)
+      setParsed(null)
+      const msg = String(e?.message || '').toLowerCase()
+      if (msg.includes('missing_api_key') || msg.includes('500')) {
+        setParseError('AI not configured. Set ANTHROPIC_API_KEY in your Netlify env vars to enable parsing.')
+      } else if (msg.includes('failed to fetch') || msg.includes('404')) {
+        setParseError('AI endpoint unreachable.')
+      } else {
+        setParseError(e?.message || 'AI parse failed.')
+      }
     } finally {
       setParsing(false)
     }
@@ -224,12 +241,16 @@ export default function Notes() {
             backdropFilter: 'blur(20px)'
           }}
         >
+          {/* className lets us target ::placeholder via global CSS so the
+              hint is readable in direct sun. Browser default placeholder
+              opacity (~0.4) on dark surface fails WCAG AA. */}
           <textarea
+            className="fh-notes-textarea"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={listening ? 'Listening — speak freely…' : 'Drop the field log. AI parses it for action items, risks, materials.'}
             rows={6}
-            style={{ width: '100%', resize: 'vertical', minHeight: 120, background: 'transparent', border: 'none', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+            style={{ width: '100%', resize: 'vertical', minHeight: 120, background: 'transparent', border: 'none', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.5, outline: 'none' }}
           />
           {listening && (
             <div aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 14, marginTop: 4 }}>
@@ -256,11 +277,29 @@ export default function Notes() {
               <option value="">No job link</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            {/* Active-state lights up gold (border + tinted bg + bright
+                ink) the moment the user has typed something, so it
+                visibly transitions from "disabled" to "tappable". */}
             <button
               type="button"
               onClick={parseWithAI}
               disabled={!draft.trim() || parsing}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: parsing || !draft.trim() ? 'var(--ink-faint)' : 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: !draft.trim() || parsing ? 'default' : 'pointer', opacity: !draft.trim() || parsing ? 0.55 : 1 }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: !draft.trim() || parsing ? 'var(--surface-2)' : 'rgba(201,150,58,0.14)',
+                border: !draft.trim() || parsing ? '1px solid var(--rule)' : '1px solid rgba(201,150,58,0.5)',
+                color: !draft.trim() || parsing ? 'var(--ink-muted)' : 'var(--field-gold-bright)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: !draft.trim() || parsing ? 'default' : 'pointer',
+                opacity: !draft.trim() || parsing ? 0.7 : 1,
+                transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease'
+              }}
             >
               <Sparkles size={14} />
               {parsing ? 'Parsing…' : 'AI parse'}
@@ -290,6 +329,16 @@ export default function Notes() {
               {saving ? 'SAVING…' : 'SAVE NOTE'}
             </motion.button>
           </div>
+
+          {/* Real error state when AI parse fails. Replaces the previous
+              fake-fallback that returned the user's text truncated to
+              120 chars labeled "AI Summary." */}
+          {parseError && !parsed && (
+            <div role="alert" style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.4)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12.5 }}>
+              <span style={{ fontWeight: 700, color: 'var(--alert-red)' }}>AI parse unavailable. </span>
+              <span style={{ color: 'var(--ink-muted)' }}>{parseError} You can still save the note as-is.</span>
+            </div>
+          )}
 
           <AnimatePresence>
             {parsed && (
@@ -395,15 +444,17 @@ export default function Notes() {
                     borderRadius: 6,
                     background: 'transparent',
                     border: 'none',
-                    color: 'var(--ink-faint)',
+                    color: 'var(--ink-muted)',
                     cursor: 'pointer',
                     display: 'grid',
                     placeItems: 'center',
-                    opacity: 0.4,
+                    /* 0.4 -> 0.75 baseline so the user knows it's
+                       interactive without making it shout for attention. */
+                    opacity: 0.75,
                     transition: 'opacity 160ms ease, color 160ms ease'
                   }}
                   onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--alert-red)' }}
-                  onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.4'; ev.currentTarget.style.color = 'var(--ink-faint)' }}
+                  onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.75'; ev.currentTarget.style.color = 'var(--ink-muted)' }}
                 >
                   <Trash2 size={13} />
                 </button>

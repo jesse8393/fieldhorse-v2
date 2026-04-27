@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, Check, Zap, Copy, FileSpreadsheet, ChevronDown } from 'lucide-react'
+import { Upload, Check, Zap, Copy, FileSpreadsheet, ChevronDown, Eye, EyeOff } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -65,6 +65,9 @@ export default function Importer() {
   const [done, setDone] = useState(null)
   const [webhookKey, setWebhookKey] = useState('')
   const [copiedWebhook, setCopiedWebhook] = useState(false)
+  // Audit caught the full webhook key rendered in plain text. Default
+  // to masked; user reveals on demand.
+  const [webhookRevealed, setWebhookRevealed] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -135,7 +138,7 @@ export default function Importer() {
     if (!error) {
       setRows([])
       setMapped([])
-      toastSuccess(`Imported ${finalCount} contacts`, 'Now in your pipeline')
+      toastSuccess(`Imported ${finalCount} contacts`, 'Now in your Pipeline')
     }
   }
 
@@ -352,13 +355,23 @@ export default function Importer() {
 
           <div style={{ padding: '4px 14px 16px', borderTop: '1px solid var(--rule)' }}>
             <p style={{ margin: '12px 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-              Send leads from GoHighLevel, Zapier, Make, or any tool that can POST JSON. The endpoint routes new leads straight into your pipeline.
+              Send leads from GoHighLevel, Zapier, Make, or any tool that can POST JSON. The endpoint routes new leads straight into your Pipeline.
             </p>
             {webhookKey ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
                 <code style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {origin}/api/webhook-lead?key={webhookKey}
+                  {origin}/api/webhook-lead?key={webhookRevealed
+                    ? webhookKey
+                    : `${'•'.repeat(Math.max(0, webhookKey.length - 5))}${webhookKey.slice(-5)}`}
                 </code>
+                <button
+                  type="button"
+                  onClick={() => setWebhookRevealed((v) => !v)}
+                  aria-label={webhookRevealed ? 'Hide webhook key' : 'Reveal webhook key'}
+                  style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                >
+                  {webhookRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
                 <button
                   type="button"
                   onClick={copyWebhook}

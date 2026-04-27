@@ -35,11 +35,20 @@ function initials(name) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
 }
 
-function KanbanCard({ contact, dragging }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: contact.id, data: { contact } })
+function KanbanCard({ contact, dragging, onOpen }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: contact.id, data: { contact } })
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : {}
+  // Tap-to-open: PointerSensor activationConstraint.distance=6 means
+  // releases under 6 px of movement never start a drag. Use the
+  // pointerup event (not click — dnd-kit absorbs click) and only
+  // navigate if no drag actually occurred.
+  function handlePointerUp(e) {
+    if (isDragging) return
+    if (e.button !== undefined && e.button !== 0) return
+    onOpen?.(contact)
+  }
   return (
     <div
       ref={setNodeRef}
@@ -57,6 +66,7 @@ function KanbanCard({ contact, dragging }) {
         userSelect: 'none',
         touchAction: 'none'
       }}
+      onPointerUp={handlePointerUp}
       {...listeners}
       {...attributes}
     >
@@ -88,7 +98,7 @@ function KanbanCard({ contact, dragging }) {
   )
 }
 
-function KanbanColumn({ id, label, contacts, isOver }) {
+function KanbanColumn({ id, label, contacts, isOver, onOpen }) {
   const { setNodeRef } = useDroppable({ id })
   const total = contacts.reduce((s, c) => s + Number(c.amount || 0), 0)
   return (
@@ -116,7 +126,7 @@ function KanbanColumn({ id, label, contacts, isOver }) {
       </header>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {contacts.map((c) => (
-          <KanbanCard key={c.id} contact={c} />
+          <KanbanCard key={c.id} contact={c} onOpen={onOpen} />
         ))}
         {contacts.length === 0 && (
           <div style={{ padding: '20px 8px', textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-faint)', border: '1px dashed var(--rule)', borderRadius: 10 }}>
@@ -128,7 +138,7 @@ function KanbanColumn({ id, label, contacts, isOver }) {
   )
 }
 
-export default function KanbanBoard({ contacts, onStageChange }) {
+export default function KanbanBoard({ contacts, onStageChange, onOpen }) {
   const [activeId, setActiveId] = useState(null)
   const [overColumn, setOverColumn] = useState(null)
 
@@ -196,6 +206,7 @@ export default function KanbanBoard({ contacts, onStageChange }) {
             label={col.label}
             contacts={byStage[col.id] || []}
             isOver={overColumn === col.id}
+            onOpen={onOpen}
           />
         ))}
       </motion.div>

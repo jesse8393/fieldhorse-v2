@@ -11,20 +11,23 @@ import GridPattern from './fx/GridPattern.jsx'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
+//
+// Audit found Client detail + Notes feeling broken because the chunk
+// load + initial data fetch combined for ~2-3 s of mostly-empty
+// screen. The fallback now renders a mini skeleton header + 3 row
+// placeholders so the user sees structure instead of a spinner that
+// reads as "broken".
 function RouteFallback() {
   return (
-    <div style={{ minHeight: '40dvh', display: 'grid', placeItems: 'center', padding: 40 }}>
-      <span
-        aria-label="Loading"
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: '50%',
-          border: '2px solid rgba(201,150,58,0.18)',
-          borderTopColor: 'var(--field-gold-bright)',
-          animation: 'fh-spin 700ms linear infinite'
-        }}
-      />
+    <div style={{ padding: '20px 20px 80px' }}>
+      <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <span style={{ width: 100, height: 11, borderRadius: 4, background: 'rgba(255,255,255,0.06)' }} />
+        <span style={{ width: '60%', maxWidth: 280, height: 28, borderRadius: 6, background: 'rgba(255,255,255,0.07)', marginBottom: 6 }} />
+        <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
+        <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.4 }} />
+        <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.28 }} />
+      </div>
+      <span aria-label="Loading" style={{ position: 'absolute', clip: 'rect(0 0 0 0)' }} />
     </div>
   )
 }

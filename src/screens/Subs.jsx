@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Phone, Search, Hammer, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { formatPhone } from '../lib/utils.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -101,7 +102,10 @@ export default function Subs() {
   }, [grouped, q, tradeFilter])
 
   return (
-    <div style={{ padding: '20px 16px 80px', maxWidth: 760, margin: '0 auto' }}>
+    // Full-width container so the heading aligns with every other screen
+    // at the left edge instead of getting centered into a narrow column
+    // on wide viewports.
+    <div style={{ padding: '20px 20px 80px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -215,7 +219,7 @@ function SubRow({ g, contacts }) {
           </div>
           <div style={{ marginTop: 2, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             {tradeSummary}
-            {g.phone && <> · <a href={`tel:${g.phone}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--ink-muted)', textDecoration: 'none' }}><Phone size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />{g.phone}</a></>}
+            {g.phone && <> · <a href={`tel:${g.phone}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--ink-muted)', textDecoration: 'none' }}><Phone size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />{formatPhone(g.phone)}</a></>}
             {g.totalRate > 0 && <> · <span style={{ color: 'var(--ink-strong)' }}>${g.totalRate.toLocaleString()}</span> billed</>}
           </div>
         </div>

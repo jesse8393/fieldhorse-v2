@@ -46,6 +46,15 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* Notes textarea placeholder — bumped from browser-default opacity
+   (~0.4) to a properly readable token color so the hint passes WCAG
+   AA on the dark surface in direct sunlight. */
+.fh-notes-textarea::placeholder {
+  color: var(--ink-muted, #8a857a);
+  opacity: 0.95;
+}
+.fh-notes-textarea::-webkit-input-placeholder { color: var(--ink-muted, #8a857a); opacity: 0.95; }
+
 /* Scan the whole app for Tailwind utility usage (postcss integration
    doesn't auto-detect sources the way @tailwindcss/vite does). */
 @source "../../index.html";
@@ -283,7 +292,9 @@ select:focus-visible,
 .fh-fab {
   position: fixed;
   right: 20px;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  /* Was 96 px; bumped to 112 px so the gold glow has a 16 px gap above
+     the bottom nav and doesn't bleed over the active-tab dot. */
+  bottom: calc(112px + env(safe-area-inset-bottom));
   width: 56px;
   height: 56px;
   border-radius: 18px;
@@ -293,8 +304,10 @@ select:focus-visible,
   color: var(--onyx);
   border: none;
   cursor: pointer;
-  box-shadow: 0 12px 28px rgba(201, 150, 58, 0.45),
-              0 2px 6px rgba(0, 0, 0, 0.35),
+  /* Tighter glow radius (was 28 px) so the halo stops well short of the
+     nav, even on shorter phones where vertical room is tight. */
+  box-shadow: 0 8px 18px rgba(201, 150, 58, 0.38),
+              0 2px 6px rgba(0, 0, 0, 0.4),
               inset 0 1px 0 rgba(255, 255, 255, 0.18);
   z-index: calc(var(--z-nav) - 1);
   transition: transform 80ms var(--ease-mechanical);
@@ -3579,6 +3592,18 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   background: color-mix(in srgb, var(--field-gold) 10%, var(--surface-2));
   border-color: color-mix(in srgb, var(--field-gold) 25%, transparent);
 }
+/* Days from the previous/next month — rendered dimmed instead of as
+   blank slots, so the calendar grid always reads as a continuous flow
+   even when the month doesn't start on Sunday. */
+.fh-month__cell.is-out {
+  opacity: 0.32;
+}
+.fh-month__cell.is-out .fh-month__num { color: var(--ink-muted); }
+/* Today gets a clear gold ring so the user can find "now" at a glance. */
+.fh-month__cell.is-today {
+  border-color: var(--field-gold-bright);
+  box-shadow: inset 0 0 0 1px var(--field-gold-bright);
+}
 .fh-month__num {
   font-family: var(--font-display);
   font-size: 1rem;
@@ -3999,10 +4024,35 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 
 /* =========================================================================
-   RESPONSIVE — tighten schedule views on phone
+   RESPONSIVE — tighten schedule + bid + settings on phone
    ========================================================================= */
 @media (max-width: 640px) {
-  .fh-week { grid-template-columns: repeat(7, minmax(90px, 1fr)); }
+  /* Week view: kill the 90 px column min so 7 days FIT inside an iPhone
+     viewport instead of forcing a horizontal scroll. Columns become
+     truly fluid; content shrinks via the rules below. */
+  .fh-week {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+    padding: 6px;
+    overflow-x: hidden;
+  }
+  .fh-week__col { min-width: 0; gap: 4px; }
+  .fh-week__head { padding: 4px 0; }
+  .fh-week__dow { font-size: 0.6rem; letter-spacing: 0.06em; }
+  .fh-week__num { font-size: 0.95rem; }
+  .fh-week__body { gap: 3px; min-height: 48px; }
+  .fh-week__evt { padding: 4px 5px; font-size: 0.62rem; border-left-width: 2px; }
+  .fh-week__evt span { font-size: 0.55rem; }
+  .fh-week__evt strong { font-size: 0.65rem; }
+
+  /* Month view: same clip-to-viewport guarantee; cells stay readable
+     because the content already scales. */
+  .fh-month { grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 4px; }
+  .fh-month__cell { padding: 4px; min-height: 44px; }
+  .fh-month__num { font-size: 0.82rem; }
+  .fh-month__count { font-size: 0.55rem; padding: 1px 4px; }
+  .fh-month__dow { font-size: 0.58rem; padding: 4px 0; }
+
   .fh-sched-bar__cur { min-width: 140px; font-size: 0.92rem; }
   .fh-bid__li { grid-template-columns: 1fr; gap: 4px; }
   .fh-bid__li > span { font-size: 0.8rem; }

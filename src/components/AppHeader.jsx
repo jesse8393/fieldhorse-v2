@@ -47,10 +47,10 @@ export default function AppHeader() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 12,
-        padding: '22px 20px 18px',
-        paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))',
-        minHeight: 108,
+        gap: 8,
+        padding: '14px 14px 12px',
+        paddingTop: 'calc(14px + env(safe-area-inset-top, 0px))',
+        minHeight: 0,
         background: 'linear-gradient(180deg, rgba(20,20,20,0.88) 0%, rgba(20,20,20,0.72) 82%, rgba(20,20,20,0) 100%)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
@@ -66,7 +66,8 @@ export default function AppHeader() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6
+          gap: 6,
+          overflow: 'hidden'
         }}
       >
         <BrandSlot logoSrc={logoSrc} company={company} fullName={fullName} />
@@ -129,16 +130,19 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }) {
-  // Logo should be the dominant visual. clamp scales between iPhone SE
-  // (~72px) and desktop (~96px) without any breakpoint CSS.
+  // Brand sits between FH badge (left) and the Search/Bell/Notes cluster
+  // (right). Bumped about 3 sizes from the previous "way small" pass —
+  // logo image now scales up to 56 px tall on desktop (was 28), text
+  // fallback to 28 px (was 15). On phone it still clamps at 30 px /
+  // 16 px so it doesn't crowd the right-side buttons.
   if (logoSrc) {
     return (
       <img
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(46px, 7vw, 62px)',
-          maxWidth: 'min(60vw, 380px)',
+          maxHeight: 'clamp(30px, 7vw, 56px)',
+          maxWidth: 'min(50vw, 320px)',
           width: 'auto',
           height: 'auto',
           objectFit: 'contain',
@@ -156,14 +160,14 @@ function BrandSlot({ logoSrc, company, fullName }) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(26px, 5.5vw, 34px)',
-    letterSpacing: '0.12em',
+    fontSize: 'clamp(16px, 4.6vw, 28px)',
+    letterSpacing: '0.1em',
     lineHeight: 1,
     textTransform: 'uppercase',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    maxWidth: 'min(60vw, 380px)'
+    maxWidth: 'min(52vw, 320px)'
   }
   if (company) {
     return (
@@ -184,8 +188,8 @@ function BrandSlot({ logoSrc, company, fullName }) {
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(26px, 5.5vw, 34px)',
-        letterSpacing: '0.14em',
+        fontSize: 'clamp(16px, 4.6vw, 28px)',
+        letterSpacing: '0.12em',
         lineHeight: 1,
         display: 'inline-flex',
         alignItems: 'center',

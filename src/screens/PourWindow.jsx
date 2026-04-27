@@ -32,15 +32,26 @@ function fmtHour(iso) {
     return `${twelve}${ampm}`
   } catch { return '—' }
 }
+// Open-Meteo daily.time is `YYYY-MM-DD` with no zone. `new Date("2026-04-26")`
+// parses as UTC midnight, which lands on the *previous* day in any
+// timezone west of UTC. Append T00:00 so it parses in the local zone.
+function asLocalDate(iso) {
+  if (!iso) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  return new Date(iso)
+}
 function fmtDay(iso) {
   try {
-    const d = new Date(iso)
+    const d = asLocalDate(iso)
     return d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
   } catch { return '—' }
 }
 function fmtDate(iso) {
   try {
-    const d = new Date(iso)
+    const d = asLocalDate(iso)
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   } catch { return '—' }
 }
@@ -111,11 +122,19 @@ useEffect(() => {
     }))
   }, [weather])
 
-  // Per-trade breakdown against *current* snapshot — what can and can't go today
+  // Per-trade breakdown against *current* snapshot — what can and can't go today.
+  // Dedupe services first because the profile.services array can hold duplicates
+  // from older onboarding flows (saw concrete/roofing/paint/framing each twice).
   const tradeRows = useMemo(() => {
     const snap = weather?.current
     if (!snap) return []
-    const list = services.length ? services : ['gc']
+    const seen = new Set()
+    const list = (services.length ? services : ['gc']).filter((t) => {
+      const k = String(t || '').toLowerCase().trim()
+      if (!k || seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
     return list.map((t) => ({ trade: t, ...tradeStatus(t, snap) }))
   }, [weather, services])
 
@@ -311,14 +330,13 @@ useEffect(() => {
                       }}
                     />
                   )}
-                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', letterSpacing: '0.04em' }}>
+                  {/* Single time label per cell. The previous render had
+                      both fmtHour and a markerLabel that printed "12A" /
+                      "6A" / "12P" / "6P" twice, stacked vertically.
+                      Marker hours now just get a slightly bolder color. */}
+                  <span style={{ fontSize: 10, fontWeight: isMarker ? 800 : 700, color: isMarker ? 'var(--field-gold-bright)' : 'var(--ink-muted)', fontFamily: 'var(--font-body)', letterSpacing: '0.04em' }}>
                     {fmtHour(h.time)}
                   </span>
-                  {isMarker && (
-                    <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                      {markerLabel}
-                    </span>
-                  )}
                   <span
                     aria-hidden="true"
                     style={{ width: 8, height: 8, borderRadius: '50%', background: t.fg, boxShadow: `0 0 8px ${t.fg}99` }}

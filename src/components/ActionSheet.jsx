@@ -107,9 +107,12 @@ export default function ActionSheet({
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <AnimatePresence>
+    // mode="wait" + explicit key force AnimatePresence to fully clean up
+    // the exit before any next render, preventing the audit-caught
+    // "DELETE THIS JOB? text fragment remained at bottom" leak.
+    <AnimatePresence mode="wait">
       {open && (
-        <div className="fh-asheet-root">
+        <div className="fh-asheet-root" key="action-sheet">
           <motion.div
             className="fh-asheet__scrim"
             initial={{ opacity: 0 }}
@@ -148,7 +151,15 @@ export default function ActionSheet({
               <button
                 type="button"
                 className="fh-asheet__close"
-                onClick={onClose}
+                onClick={(e) => {
+                  // stopPropagation so the click event doesn't bubble
+                  // through the sheet portal and land on whatever's
+                  // underneath (calendar cell, kanban card, etc.) right
+                  // before the sheet unmounts.
+                  e.stopPropagation()
+                  onClose?.(e)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Close"
               >
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

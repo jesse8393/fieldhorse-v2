@@ -112,37 +112,47 @@ export default function Invoices() {
   }), [profile])
 
   function handleGeneratePDF(row) {
-    const result = generateInvoice({
-      company,
-      contact: {
-        name: row.job.name || row.job.client_name || 'Client',
-        address: row.job.address || '',
-        phone: row.job.phone || '',
-        email: row.job.email || ''
-      },
-      lineItems: [
-        {
-          description: row.job.job_title || 'Construction services per agreement',
-          qty: 1,
-          rate: row.amount,
-          amount: row.amount
+    // Audit caught this as a no-op. Wrap in try/catch so a jsPDF
+    // failure surfaces a real error instead of silently swallowing,
+    // and so the user sees a toast immediately on click instead of
+    // wondering if anything happened.
+    try {
+      const result = generateInvoice({
+        company,
+        contact: {
+          name: row.job.name || row.job.client_name || 'Client',
+          address: row.job.address || '',
+          phone: row.job.phone || '',
+          email: row.job.email || ''
         },
-        ...(row.paid > 0 ? [{
-          description: 'Less: payments received',
-          qty: 1,
-          rate: -row.paid,
-          amount: -row.paid
-        }] : [])
-      ],
-      taxRate: 0,
-      notes: row.paid > 0
-        ? `Balance due reflects ${fmtMoney(row.paid)} previously received.`
-        : '',
-      dueDate: '',
-      invoiceId: row.job.id
-    })
-    downloadPdf(result)
-    toastSuccess('Invoice PDF downloaded', result.filename)
+        lineItems: [
+          {
+            description: row.job.job_title || 'Construction services per agreement',
+            qty: 1,
+            rate: row.amount,
+            amount: row.amount
+          },
+          ...(row.paid > 0 ? [{
+            description: 'Less: payments received',
+            qty: 1,
+            rate: -row.paid,
+            amount: -row.paid
+          }] : [])
+        ],
+        taxRate: 0,
+        notes: row.paid > 0
+          ? `Balance due reflects ${fmtMoney(row.paid)} previously received.`
+          : '',
+        dueDate: '',
+        invoiceId: row.job.id
+      })
+      if (!result?.doc) throw new Error('PDF generator returned no document')
+      downloadPdf(result)
+      toastSuccess('Invoice PDF downloaded', result.filename)
+    } catch (e) {
+      console.error('[invoices] PDF generation failed:', e)
+      toastError("Couldn't generate PDF", e?.message || 'Try again')
+    }
   }
 
   async function handleMarkPaid(row) {
@@ -162,7 +172,7 @@ export default function Invoices() {
   }
 
   return (
-    <div style={{ padding: '20px 16px 80px', maxWidth: 920, margin: '0 auto' }}>
+    <div style={{ padding: '20px 20px 80px' }}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
           <Receipt size={12} />
@@ -209,8 +219,8 @@ export default function Invoices() {
       {loading && <SkeletonList rows={4} />}
       {!loading && filtered.length === 0 && (
         <EmptyState
-          title={filter === 'outstanding' ? 'Nothing outstanding.' : 'No jobs in money pipeline yet.'}
-          body={filter === 'outstanding' ? 'Every active job is paid in full.' : 'Approve a quote to move it into the money pipeline.'}
+          title={filter === 'outstanding' ? 'Nothing outstanding.' : 'No jobs in money Pipeline yet.'}
+          body={filter === 'outstanding' ? 'Every active job is paid in full.' : 'Approve a quote to move it into the money Pipeline.'}
         />
       )}
 

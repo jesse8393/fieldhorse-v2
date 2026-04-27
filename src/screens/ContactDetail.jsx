@@ -9,6 +9,7 @@ import {
   Clock, Sparkles, GitCompareArrows
 } from 'lucide-react'
 import { compressImageToDataUrl, captionPhoto } from '../lib/docIntelligence.js'
+import { formatPhone } from '../lib/utils.js'
 import TimeClockCard from '../components/TimeClockCard.jsx'
 import Icon from '../components/icons/Icon.jsx'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../components/ActionSheet.jsx'
@@ -86,7 +87,11 @@ export default function ContactDetail() {
 
   const fetchAll = useCallback(async () => {
     if (!user || !id) return
-    setLoading(true)
+    // Only show the loading skeleton on the first fetch — subsequent
+    // fetches (after a milestone bump, after a tab refetch trigger) keep
+    // the existing contact rendered so the amount doesn't flicker to $0
+    // and back when the user switches tabs.
+    setLoading((prev) => contact == null ? true : prev)
     const [c, s, e, p, i, n, sch] = await Promise.all([
       supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
       supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
@@ -217,6 +222,14 @@ export default function ContactDetail() {
               </h1>
             )
           })()}
+          {/* Job title (e.g. "Summer Creek Rail Painting") — was missing
+              from the header even though the audit user expected to see
+              it under the contact name. Render right under the title. */}
+          {contact.job_title && (
+            <div style={{ marginTop: 4, fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.35 }}>
+              {contact.job_title}
+            </div>
+          )}
           {/* CLIENT pill — owner: tappable link. Partner: static, no name. */}
           {contact.client_id && (
             contact.user_id === user.id
@@ -284,7 +297,14 @@ export default function ContactDetail() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
-          onClick={() => setIsEditing((v) => !v)}
+          onClick={() => {
+            // Edit-mode only renders inside OverviewTab. If the user
+            // is on Milestones / Subs / Files / etc. and clicks EDIT,
+            // jump them to Overview first so the form actually shows
+            // (audit caught this as "EDIT does nothing").
+            setTab('overview')
+            setIsEditing((v) => !v)
+          }}
           aria-pressed={isEditing}
           style={{
             display: 'inline-flex',
@@ -481,9 +501,13 @@ function SummaryPanel({ contact, paid, balance }) {
     <div className="fh-summary-card" style={{ position: 'relative', overflow: 'hidden' }}>
       <Spotlight style={{ top: -90, right: -90, opacity: 0.55 }} />
       <div className="fh-summary-card__row" style={{ position: 'relative', zIndex: 1 }}>
+        {/* CountUp would re-animate 0 -> amount every time the user
+            switched tabs back to Overview, reading as a "$0 -> $48K"
+            flicker. Render the static formatted value instead — the
+            initial-mount wow effect isn't worth the repeat-mount jank. */}
         <SumItem
           k="Amount"
-          v={<CountUp to={Number(contact.amount || 0)} duration={0.9} formatter={money} />}
+          v={money(contact.amount)}
         />
         <SumItem k="Cost" v={money(contact.cost)} />
         <SumItem k="Margin" v={marginValue} tone={tier} />
@@ -715,7 +739,7 @@ function OverviewTab({ contact, onPatch, userId, isEditing, onExitEdit, onChange
 function OverviewReadCard({ contact }) {
   const rows = [
     { label: 'Name', value: contact.name },
-    { label: 'Phone', value: contact.phone },
+    { label: 'Phone', value: formatPhone(contact.phone) },
     { label: 'Email', value: contact.email },
     { label: 'Address', value: contact.address },
     { label: 'Job title', value: contact.job_title },
@@ -1026,7 +1050,7 @@ function SubsTab({ contact, subs, userId, onChange }) {
               </span>
               <div style={{ minWidth: 0 }}>
                 <strong>{s.name}</strong>
-                <span className="fh-row__sub">{s.trade || '—'} {s.phone ? ` · ${s.phone}` : ''}</span>
+                <span className="fh-row__sub">{s.trade || '—'} {s.phone ? ` · ${formatPhone(s.phone)}` : ''}</span>
               </div>
             </div>
             <div className="fh-row__right">
