@@ -138,7 +138,7 @@ export default function Analytics() {
       {!loading && contacts.length === 0 && (
         <motion.div variants={item} style={{ padding: '32px 20px', margin: '0 20px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Not enough data yet.</div>
-          <div style={{ fontSize: 12 }}>Add a few leads and start closing. Analytics lights up once the pipeline moves.</div>
+          <div style={{ fontSize: 12 }}>Add a few leads and start closing. Analytics lights up once the Pipeline moves.</div>
         </motion.div>
       )}
 
@@ -183,7 +183,7 @@ export default function Analytics() {
                     ))}
                   </div>
                   <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--ink-strong)' }}>Not enough data yet</div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)' }}>The trend lights up once you have 4+ weeks of pipeline.</div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)' }}>The trend lights up once you have 4+ weeks of Pipeline.</div>
                 </div>
               ) : (
               <ResponsiveContainer width="100%" height="100%">

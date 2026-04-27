@@ -316,7 +316,7 @@ export default function Home() {
           <ShimmerBar value={targetPct} />
           <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-muted)' }}>
             <span><span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{targetPct}%</span> of ${(weeklyTarget / 1000).toFixed(0)}K</span>
-            <span>{pipeline > 0 ? `$${(pipeline / 1000).toFixed(0)}K in pipeline` : '—'}</span>
+            <span>{pipeline > 0 ? `$${(pipeline / 1000).toFixed(0)}K in Pipeline` : '—'}</span>
           </div>
         </div>
       </motion.div>

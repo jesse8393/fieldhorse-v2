@@ -138,7 +138,7 @@ export default function Importer() {
     if (!error) {
       setRows([])
       setMapped([])
-      toastSuccess(`Imported ${finalCount} contacts`, 'Now in your pipeline')
+      toastSuccess(`Imported ${finalCount} contacts`, 'Now in your Pipeline')
     }
   }
 
@@ -355,7 +355,7 @@ export default function Importer() {
 
           <div style={{ padding: '4px 14px 16px', borderTop: '1px solid var(--rule)' }}>
             <p style={{ margin: '12px 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-              Send leads from GoHighLevel, Zapier, Make, or any tool that can POST JSON. The endpoint routes new leads straight into your pipeline.
+              Send leads from GoHighLevel, Zapier, Make, or any tool that can POST JSON. The endpoint routes new leads straight into your Pipeline.
             </p>
             {webhookKey ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>

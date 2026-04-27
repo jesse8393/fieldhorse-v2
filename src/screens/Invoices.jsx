@@ -219,8 +219,8 @@ export default function Invoices() {
       {loading && <SkeletonList rows={4} />}
       {!loading && filtered.length === 0 && (
         <EmptyState
-          title={filter === 'outstanding' ? 'Nothing outstanding.' : 'No jobs in money pipeline yet.'}
-          body={filter === 'outstanding' ? 'Every active job is paid in full.' : 'Approve a quote to move it into the money pipeline.'}
+          title={filter === 'outstanding' ? 'Nothing outstanding.' : 'No jobs in money Pipeline yet.'}
+          body={filter === 'outstanding' ? 'Every active job is paid in full.' : 'Approve a quote to move it into the money Pipeline.'}
         />
       )}
 

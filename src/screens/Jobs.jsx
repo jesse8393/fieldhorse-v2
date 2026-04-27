@@ -183,7 +183,7 @@ export default function Jobs() {
             style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
           >
             Jobs &{' '}
-            pipeline
+            Pipeline
           </h1>
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             <span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{summary.activeCount}</span>
@@ -407,7 +407,7 @@ export default function Jobs() {
           setTimeout(() => setJustAddedId(null), 1200)
           toastSuccess(
             'New lead added',
-            created?.name ? `${created.name} is in your pipeline` : 'In your pipeline'
+            created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
           )
         }}
       />
@@ -686,7 +686,7 @@ function EmptyView({ hasFilter, onAdd }) {
   return (
     <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs on the board.</div>
-      <div style={{ fontSize: 12, marginBottom: 10 }}>Drop in your first lead. Watch the pipeline fill.</div>
+      <div style={{ fontSize: 12, marginBottom: 10 }}>Drop in your first lead. Watch the Pipeline fill.</div>
       <button
         type="button"
         onClick={onAdd}
