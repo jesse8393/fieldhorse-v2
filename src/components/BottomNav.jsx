@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun, Hammer, Receipt } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun, Hammer, Receipt, CloudSun } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
@@ -29,6 +29,15 @@ const MORE_GROUPS = [
     label: 'People',
     items: [
       { to: '/subs', label: 'Sub directory', Icon: Hammer }
+    ]
+  },
+  {
+    label: 'Field',
+    items: [
+      // Forecast was unreachable from the nav — only entry was the
+      // weather card on Home. Surface it here so it's discoverable
+      // from any screen.
+      { to: '/pour-window', label: 'Forecast', Icon: CloudSun }
     ]
   },
   {
