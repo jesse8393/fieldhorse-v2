@@ -275,20 +275,23 @@ export default function Home() {
         (paysRes.data || []).map((p) => p.contact_id).filter(Boolean)
       )
       const actions = []
-      // 1. Stale leads/quotes — needs a follow-up call/text
+      // 1. Stale leads/quotes — needs a follow-up call/text. Urgency = warn
+      // (yellow) — opportunity slipping but salvageable.
       for (const c of risky) {
+        const daysCold = Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
         actions.push({
           id: `followup-${c.id}`,
           kind: 'followup',
           contactId: c.id,
           title: `Follow up with ${c.name || 'lead'}`,
-          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} cold for ${
-            Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
-          } days`,
+          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} cold for ${daysCold} days`,
+          urgencyLabel: `${daysCold}d cold`,
+          urgencyTone: daysCold >= 14 ? 'danger' : 'warn',
           urgency: new Date(c.updated_at || c.created_at || 0).getTime()
         })
       }
-      // 2. Overdue jobs — needs a reschedule
+      // 2. Overdue jobs — needs a reschedule. Urgency = danger (red) —
+      // schedule slipped, crew/customer expectations broken.
       for (const c of behind) {
         actions.push({
           id: `reschedule-${c.id}`,
@@ -296,10 +299,13 @@ export default function Home() {
           contactId: c.id,
           title: `Reschedule ${c.name || 'job'}`,
           detail: 'Job behind schedule',
+          urgencyLabel: 'Overdue',
+          urgencyTone: 'danger',
           urgency: 0 // top priority — sort first
         })
       }
-      // 3. Invoiced jobs with no payment yet — needs an invoice send/follow-up
+      // 3. Invoiced jobs with no payment yet. Urgency = success (green) —
+      // money in motion, action results in cash flowing in.
       for (const c of contacts) {
         if (c.stage !== 'invoice') continue
         if (paidContactIds.has(c.id)) continue
@@ -311,6 +317,8 @@ export default function Home() {
           contactId: c.id,
           title: `Chase invoice for ${c.name || 'job'}`,
           detail: c.amount > 0 ? `$${Number(c.amount).toLocaleString()} owed` : 'Awaiting payment',
+          urgencyLabel: 'Invoice pending',
+          urgencyTone: 'success',
           urgency: updated.getTime()
         })
       }
@@ -569,6 +577,37 @@ export default function Home() {
             <div className="v3-caption" style={{ fontSize: 12 }}>vs last 7 days</div>
           </div>
 
+          {/* Inline trend signal — answers "is this number good?" within 1 second.
+              Renders only when we have a comparable previous-week value. */}
+          {trendPct != null && (
+            <div style={{
+              position: 'relative',
+              marginTop: 10,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontFamily: 'var(--font-body)',
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.005em',
+              color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              {trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+              {trendUp ? '+' : ''}{trendPct}% vs last week
+              {!trendUp && (
+                <span style={{
+                  marginLeft: 4,
+                  fontSize: 12, fontWeight: 600,
+                  color: 'var(--v3-text-muted)',
+                  letterSpacing: 0
+                }}>
+                  — needs attention
+                </span>
+              )}
+            </div>
+          )}
+
           <div style={{ position: 'relative', marginTop: 22, marginLeft: -10, marginRight: -10 }}>
             <Sparkline data={sparkData} color="var(--v3-primary)" height={72} />
           </div>
@@ -602,10 +641,40 @@ export default function Home() {
         </motion.div>
       </motion.div>
 
+      {/* ─────────── NEXT ACTIONS ───────────
+          Promoted ABOVE the KPI row (refinement-pass reorder): the
+          operator sees what to DO before what to LOOK AT. Per-job CTAs
+          tagged with urgency (danger/warn/success) so critical work
+          surfaces by color, not just position. */}
+      {nextActions != null && nextActions.length > 0 && (
+        <>
+          <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
+            <SectionHeader
+              label="Next Actions"
+              action={{ label: 'View all', onTap: () => navigate('/jobs') }}
+            />
+          </motion.div>
+          <motion.div
+            variants={item}
+            style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 20px 28px' }}
+          >
+            {nextActions.map((action) => (
+              <NextActionRow
+                key={action.id}
+                action={action}
+                onTap={() => action.contactId
+                  ? navigate(`/jobs/${action.contactId}`)
+                  : navigate('/jobs')
+                }
+              />
+            ))}
+          </motion.div>
+        </>
+      )}
+
       {/* ─────────── TIER 2 — KPI ROW ───────────
-          Compact tiles on --v3-surface (less elevated than hero). Color
-          only on the value + accent bar, never on the whole tile bg, so
-          the hero stays dominant. Hover lift on each tile. */}
+          Compact tiles on --v3-surface. Now demoted below Next Actions:
+          metrics support the work, they don't drive it. */}
       <motion.div
         variants={item}
         style={{
@@ -636,39 +705,6 @@ export default function Home() {
           onTap={() => navigate('/invoices')}
         />
       </motion.div>
-
-      {/* ─────────── NEXT ACTIONS ───────────
-          The bridge between data (KPIs/feed) and operator decision. 3-5
-          per-job CTAs the operator should do TODAY. Distinct from KPI
-          tiles which show counts — these are tappable per-job actions.
-
-          Visually differentiated: gold left-edge accent on each row, no
-          surface tint (rows blend into bg), strong tap target. */}
-      {nextActions != null && nextActions.length > 0 && (
-        <>
-          <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
-            <SectionHeader
-              label="Next Actions"
-              action={{ label: 'View all', onTap: () => navigate('/jobs') }}
-            />
-          </motion.div>
-          <motion.div
-            variants={item}
-            style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 20px 32px' }}
-          >
-            {nextActions.map((action) => (
-              <NextActionRow
-                key={action.id}
-                action={action}
-                onTap={() => action.contactId
-                  ? navigate(`/jobs/${action.contactId}`)
-                  : navigate('/jobs')
-                }
-              />
-            ))}
-          </motion.div>
-        </>
-      )}
 
       {/* ─────────── TIER 3 — QUICK ACTIONS ───────────
           Primary action (Add Lead) gets a subtle gold halo + slightly
@@ -868,15 +904,25 @@ function CompactKpi({ tone = 'primary', value, label, subline, isMoney, onTap })
    that hover-lifts to invite the tap.
    ============================================================ */
 
-const NEXT_ACTION_META = {
-  followup:    { Icon: PhoneCall,     accent: 'var(--v3-primary)' },
-  reschedule:  { Icon: CalendarClock, accent: 'var(--v3-danger-bright)' },
-  invoice:     { Icon: Receipt,       accent: 'var(--v3-success-bright)' }
+// Per-kind icon. The urgency tone (danger/warn/success) drives the row's
+// accent color via URGENCY_TONE below — kind alone no longer picks color
+// (an old lead can be warn OR danger depending on how cold it's gone).
+const NEXT_ACTION_KIND = {
+  followup:   { Icon: PhoneCall },
+  reschedule: { Icon: CalendarClock },
+  invoice:    { Icon: Receipt }
+}
+
+const URGENCY_TONE = {
+  danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
+  warn:    { color: 'var(--v3-primary)',        glow: 'rgba(212, 175, 55, 0.45)' },
+  success: { color: 'var(--v3-success-bright)', glow: 'rgba(46, 204, 113, 0.40)' }
 }
 
 function NextActionRow({ action, onTap }) {
-  const meta = NEXT_ACTION_META[action.kind] || { Icon: Zap, accent: 'var(--v3-primary)' }
-  const { Icon, accent } = meta
+  const kindMeta = NEXT_ACTION_KIND[action.kind] || { Icon: Zap }
+  const { Icon } = kindMeta
+  const tone = URGENCY_TONE[action.urgencyTone] || URGENCY_TONE.warn
 
   return (
     <motion.button
@@ -902,14 +948,16 @@ function NextActionRow({ action, onTap }) {
         overflow: 'hidden'
       }}
     >
-      {/* Left edge accent — the only chromatic signal on the row */}
+      {/* Left edge accent — urgency-tone color + matching glow. THIS is the
+          critical-vs-optional signal. Operator scan: red bar = drop everything,
+          yellow = today, green = money in motion. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
         left: 0, top: 8, bottom: 8,
         width: 3,
-        background: accent,
+        background: tone.color,
         borderRadius: '0 3px 3px 0',
-        boxShadow: `0 0 12px ${accent === 'var(--v3-primary)' ? 'rgba(212, 175, 55, 0.4)' : ''}`
+        boxShadow: `0 0 14px ${tone.glow}`
       }} />
 
       <span aria-hidden="true" style={{
@@ -918,7 +966,7 @@ function NextActionRow({ action, onTap }) {
         borderRadius: 11,
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border-strong)',
-        color: accent,
+        color: tone.color,
         display: 'grid',
         placeItems: 'center'
       }}>
@@ -948,6 +996,35 @@ function NextActionRow({ action, onTap }) {
           {action.detail}
         </div>
       </div>
+
+      {/* Urgency chip — short label that names the urgency in plain words.
+          Color matches the spine. */}
+      {action.urgencyLabel && (
+        <span style={{
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '4px 8px',
+          borderRadius: 999,
+          background: `color-mix(in srgb, ${tone.color} 14%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${tone.color} 35%, transparent)`,
+          color: tone.color,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1.2
+        }}>
+          <span aria-hidden="true" style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: tone.color
+          }} />
+          {action.urgencyLabel}
+        </span>
+      )}
 
       <ChevronRight size={16} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
     </motion.button>

@@ -163,6 +163,19 @@ const JobCard = memo(function JobCard({
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)' // base elevation
       }}
     >
+      {/* Stage-color spine — left-edge accent makes each card feel like a
+          real object identified by its pipeline position. Glow ties it to
+          the progress bar at the bottom (same color, same glow alpha). */}
+      <span aria-hidden="true" style={{
+        position: 'absolute',
+        left: 0, top: 14, bottom: 12,
+        width: 3,
+        background: stageColor,
+        borderRadius: '0 3px 3px 0',
+        boxShadow: `0 0 12px ${stageColor}77`,
+        pointerEvents: 'none'
+      }} />
+
       {/* Top row: photo/initial tile + name block + amount block */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
         <PhotoOrInitialTile
