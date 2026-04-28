@@ -142,10 +142,10 @@
 .v3-btn--lg { padding: 14px 22px; font-size: 15px; min-height: 52px; }
 .v3-btn--icon-only { padding: 0; width: 44px; min-height: 44px; }
 
-/* ---------- Card primitive ---------- */
+/* ---------- Card primitive — premium push ---------- */
 .v3-card {
   background: var(--v3-surface);
-  border: 1px solid var(--v3-border);
+  border: 1px solid var(--v3-border-strong);
   border-radius: var(--v3-radius-card);
   box-shadow: var(--v3-shadow);
   position: relative;
@@ -265,15 +265,15 @@
   .v3-gutter { padding-left: 20px; padding-right: 20px; }
 }
 
-/* ---------- Section primitive (depth + framing) ----------
+/* ---------- Section primitive (depth + framing) — premium push ----------
    Wraps a logical group (header + cards/list/tiles) in a layered
    container that lifts off the page background. Provides:
-     - subtle tonal lift (--v3-section-bg gradient)
-     - 1px hairline border + inset top highlight
-     - low ambient shadow
+     - tonal lift via --v3-section-bg (visible gradient)
+     - 12% white hairline + inset highlight
+     - ambient + key-light shadow stack
      - radial top-left light leak via ::before
-   Use this whenever a section currently floats on pure --v3-bg and
-   feels flat. The card primitive (.v3-card) sits INSIDE this. */
+     - 1px gradient top stroke via ::after (Stripe/Linear premium look)
+   The card primitive (.v3-card) sits INSIDE this. */
 .v3-section {
   background: var(--v3-section-bg);
   border: 1px solid var(--v3-section-border);
@@ -283,13 +283,26 @@
   position: relative;
   overflow: hidden;
 }
+/* Top-left ambient light leak — angled radial for "stage light" feel */
 .v3-section::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, 0.025), transparent 55%);
+  background: radial-gradient(110% 70% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 50%);
+}
+/* Top edge stroke — 1px white gradient that catches the eye and reads
+   as the leading edge of a glass surface. Subtle but premium. */
+.v3-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.16) 50%, transparent 100%);
 }
 .v3-section > * { position: relative; z-index: 1; }
 
@@ -300,16 +313,41 @@
   /* Lower-key variant for secondary zones — no inner highlight,
      reduced shadow. Keeps depth without competing with primary
      sections (hero, KPIs) that should dominate. */
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 14px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 6px 20px rgba(0, 0, 0, 0.28);
 }
 .v3-section--quiet::before { display: none; }
+.v3-section--quiet::after { opacity: 0.5; }
 
-/* When a card sits directly inside a section, its drop-shadow can
-   double up against the section's own elevation. Flatten card shadow
-   slightly so the layering reads as one stack, not two. */
+/* Primary section variant — gold-toned. Use for the most important
+   zone on a screen (Next Actions on Home). Gold-tinted border,
+   gold-tinted ambient shadow, gold gradient top stroke. */
+.v3-section--primary {
+  border-color: rgba(229, 193, 88, 0.28);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 1px 2px rgba(0, 0, 0, 0.32),
+    0 16px 40px rgba(0, 0, 0, 0.34),
+    0 12px 36px rgba(229, 193, 88, 0.14);
+}
+.v3-section--primary::before {
+  background:
+    radial-gradient(110% 70% at 0% 0%, rgba(229, 193, 88, 0.10), transparent 55%),
+    radial-gradient(80% 50% at 100% 100%, rgba(229, 193, 88, 0.06), transparent 60%);
+}
+.v3-section--primary::after {
+  left: 8%;
+  right: 8%;
+  background: linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%);
+  box-shadow: 0 0 8px rgba(229, 193, 88, 0.45);
+}
+
+/* When a card sits directly inside a section, give it a real edge —
+   stronger border + a bit of inset so the card READS as a card, not
+   a tinted block. Hover bumps the surface to surface-3. */
 .v3-section .v3-card {
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 2px 8px rgba(0, 0, 0, 0.20);
   background: var(--v3-surface);
+  border: 1px solid var(--v3-border-strong);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30);
 }
 .v3-section .v3-card--surface-2 { background: var(--v3-surface-2); }
 

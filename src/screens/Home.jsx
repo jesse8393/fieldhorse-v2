@@ -489,47 +489,58 @@ export default function Home() {
             // on the page like a wide command-center bar.
             borderRadius: 24,
             background: `
-              radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.22), transparent 55%),
-              radial-gradient(80% 60% at 0% 100%, rgba(212, 175, 55, 0.10), transparent 60%),
-              linear-gradient(125deg, rgba(212, 175, 55, 0.05) 0%, transparent 38%, transparent 62%, rgba(212, 175, 55, 0.05) 100%),
+              radial-gradient(120% 80% at 100% 0%, rgba(229, 193, 88, 0.32), transparent 55%),
+              radial-gradient(80% 60% at 0% 100%, rgba(229, 193, 88, 0.18), transparent 60%),
+              linear-gradient(125deg, rgba(229, 193, 88, 0.08) 0%, transparent 38%, transparent 62%, rgba(229, 193, 88, 0.08) 100%),
               var(--v3-surface-2)
             `,
-            border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(212, 175, 55, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            border: '1px solid color-mix(in srgb, var(--v3-primary) 42%, transparent)',
+            boxShadow: 'var(--v3-shadow-hero)',
             overflow: 'hidden',
             zIndex: 1
           }}
         >
-          {/* Top-right ambient sweep — bumped 320 → 420 with more peak alpha
-              for the visual-impact pass. Drifts via fh-hero-drift. */}
+          {/* Top-right ambient sweep — bigger + brighter for premium push.
+              Drifts via fh-hero-drift. */}
           <div
             aria-hidden="true"
             className="fh-hero-drift"
             style={{
               position: 'absolute',
-              top: -160, right: -140,
-              width: 420, height: 420,
+              top: -180, right: -160,
+              width: 480, height: 480,
               borderRadius: '50%',
-              background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.16), transparent 65%)',
+              background: 'radial-gradient(circle at center, rgba(229, 193, 88, 0.28), transparent 65%)',
               pointerEvents: 'none'
             }}
           />
 
           {/* Behind-number glow — wider + brighter halo behind the $ amount.
-              440x240 radial with peak 18% alpha + 10px blur for a true
-              "stage spotlight" feel under the headline number. */}
+              Real "stage spotlight" feel under the headline. */}
           <div
             aria-hidden="true"
             style={{
               position: 'absolute',
               top: 72, left: 8,
-              width: 440, height: 240,
+              width: 480, height: 280,
               borderRadius: '50%',
-              background: 'radial-gradient(closest-side, rgba(212, 175, 55, 0.18), transparent 70%)',
+              background: 'radial-gradient(closest-side, rgba(229, 193, 88, 0.30), transparent 70%)',
               pointerEvents: 'none',
-              filter: 'blur(10px)'
+              filter: 'blur(12px)'
             }}
           />
+
+          {/* Top edge stroke — gold gradient catches the leading edge */}
+          <div aria-hidden="true" style={{
+            position: 'absolute',
+            top: 0,
+            left: '6%',
+            right: '6%',
+            height: 1,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.65) 50%, transparent 100%)',
+            boxShadow: '0 0 12px rgba(229, 193, 88, 0.55)',
+            pointerEvents: 'none'
+          }} />
 
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <span style={{
@@ -553,10 +564,12 @@ export default function Home() {
             <div
               className="v3-money"
               style={{
-                fontSize: 'clamp(56px, 14vw, 84px)',
+                fontSize: 'clamp(56px, 14vw, 88px)',
                 lineHeight: 0.95,
                 letterSpacing: '0.005em',
-                textShadow: '0 2px 24px rgba(212, 175, 55, 0.18)'
+                color: '#FFFFFF',
+                textShadow: '0 4px 24px rgba(229, 193, 88, 0.35), 0 1px 0 rgba(255, 255, 255, 0.10)',
+                filter: 'drop-shadow(0 2px 16px rgba(229, 193, 88, 0.18))'
               }}
             >
               {pipeline == null ? (
@@ -694,12 +707,8 @@ export default function Home() {
       {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
-          className="v3-section"
-          style={{
-            margin: '0 var(--v3-gutter) 14px',
-            borderColor: 'rgba(212, 175, 55, 0.20)',
-            boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.20), 0 14px 36px rgba(212, 175, 55, 0.08), 0 14px 36px rgba(0, 0, 0, 0.22)'
-          }}
+          className="v3-section v3-section--primary"
+          style={{ margin: '0 var(--v3-gutter) 14px' }}
         >
           <div className="v3-section-header">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -876,47 +885,51 @@ function PipelineDealRow({ deal, onTap }) {
       type="button"
       onClick={() => { hapticTap(); onTap?.() }}
       whileTap={{ scale: 0.99 }}
-      whileHover={{ y: -1 }}
+      whileHover={{ y: -2 }}
       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
         width: '100%',
-        padding: '12px 14px',
-        borderRadius: 12,
+        padding: '14px 14px',
+        borderRadius: 14,
         background: 'var(--v3-surface)',
-        border: '1px solid var(--v3-border)',
+        border: '1px solid var(--v3-border-strong)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.03) inset',
-        transition: 'border-color 200ms ease, background-color 200ms ease'
+        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+        transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
-        e.currentTarget.style.background = 'var(--v3-surface-2)'
+        e.currentTarget.style.borderColor = `color-mix(in srgb, ${stage.color} 40%, var(--v3-border-strong))`
+        e.currentTarget.style.background = 'var(--v3-surface-3)'
+        e.currentTarget.style.boxShadow = `0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.40), 0 4px 14px ${stage.color}20`
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--v3-border)'
+        e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
         e.currentTarget.style.background = 'var(--v3-surface)'
+        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
       }}
     >
+      {/* Stage spine — fatter (5px) + brighter glow */}
       <span aria-hidden="true" style={{
         flexShrink: 0,
-        width: 4,
-        height: 28,
-        borderRadius: 2,
-        background: stage.color,
-        boxShadow: `0 0 8px ${stage.color}40`
+        width: 5,
+        height: 36,
+        borderRadius: 3,
+        background: `linear-gradient(180deg, ${stage.color}, color-mix(in srgb, ${stage.color} 50%, transparent))`,
+        boxShadow: `0 0 14px ${stage.color}80, 0 0 24px ${stage.color}30`
       }} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: 600,
           color: 'var(--v3-text)',
+          letterSpacing: '-0.005em',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap'
@@ -924,11 +937,11 @@ function PipelineDealRow({ deal, onTap }) {
           {deal.name}
         </div>
         <div style={{
-          marginTop: 2,
+          marginTop: 4,
           fontFamily: 'var(--font-body)',
           fontSize: 10,
           fontWeight: 700,
-          letterSpacing: '0.10em',
+          letterSpacing: '0.14em',
           textTransform: 'uppercase',
           color: stage.color
         }}>
@@ -938,16 +951,17 @@ function PipelineDealRow({ deal, onTap }) {
       <div style={{
         flexShrink: 0,
         fontFamily: 'var(--font-display)',
-        fontSize: 22,
+        fontSize: 26,
         color: 'var(--v3-text)',
         fontVariantNumeric: 'tabular-nums',
-        lineHeight: 1
+        lineHeight: 1,
+        textShadow: '0 1px 0 rgba(255, 255, 255, 0.06)'
       }}>
         ${deal.amount >= 1000
           ? `${(deal.amount / 1000).toFixed(deal.amount >= 10000 ? 0 : 1)}K`
           : deal.amount.toLocaleString()}
       </div>
-      <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+      <ChevronRight size={18} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
     </motion.button>
   )
 }

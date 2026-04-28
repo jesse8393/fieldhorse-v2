@@ -97,30 +97,42 @@
      should reference these names directly; legacy --field-gold /
      --onyx / --ink-* still work for unmigrated screens.
      ============================================================ */
-  /* bg darkened from #0B0B0D → #07070A to lift surfaces 1-step higher
-     against the page (final-polish contrast bump). Surfaces unchanged. */
-  --v3-bg: #07070A;
-  --v3-surface: #141418;
-  --v3-surface-2: #1C1C22;
-  --v3-primary: #D4AF37;        /* spec gold — hotter than --field-gold */
-  --v3-primary-soft: rgba(212,175,55,0.12);
-  --v3-success: #2ECC71;        /* spec green — brighter than --signal-green */
-  --v3-success-soft: rgba(46,204,113,0.12);
-  --v3-danger: #C0392B;         /* matches --alert-red */
-  --v3-danger-soft: rgba(192,57,43,0.12);
+  /* Surface ladder — premium-pass (push #1):
+     Each step jumps ~1.2L* now (was ~0.7) so the layers read as a real
+     stack, not three almost-identical grays. Page floor is the darkest;
+     the rest climb. surface-3 added for hovered/elevated cards. */
+  --v3-bg: #050507;
+  --v3-surface: #16161E;
+  --v3-surface-2: #1F1F2A;
+  --v3-surface-3: #282834;       /* hover/elevated card */
+  --v3-primary: #E5C158;         /* push: hotter, more saturated than #D4AF37 */
+  --v3-primary-hot: #F0D070;     /* hero gradients, neon callouts */
+  --v3-primary-deep: #8C6F30;    /* shadow side of gold gradients */
+  --v3-primary-soft: rgba(229, 193, 88, 0.14);
+  --v3-success: #22C55E;         /* punchier than #2ECC71 */
+  --v3-success-soft: rgba(34, 197, 94, 0.14);
+  --v3-danger: #EF4444;          /* punchier than #C0392B */
+  --v3-danger-soft: rgba(239, 68, 68, 0.14);
   --v3-text: #FFFFFF;
   --v3-text-muted: #A1A1AA;
-  --v3-border: rgba(255,255,255,0.06);
-  --v3-border-strong: rgba(255,255,255,0.10);
+  /* Borders — bumped 5%/10% → 8%/14% so cards/sections actually have
+     edges you can see. Linear / Superhuman tier visibility. */
+  --v3-border: rgba(255, 255, 255, 0.08);
+  --v3-border-strong: rgba(255, 255, 255, 0.14);
 
   /* Spec radii: cards 16, buttons 12, pills 999 */
   --v3-radius-card: 16px;
   --v3-radius-btn: 12px;
   --v3-radius-pill: 999px;
 
-  /* Spec elevation: subtle only */
-  --v3-shadow: 0 8px 24px rgba(0,0,0,0.35);
-  --v3-shadow-lg: 0 16px 48px rgba(0,0,0,0.45);
+  /* Card elevation — premium-pass (push #2):
+     Layered ambient + key-light shadow stack so cards look LIT, not
+     dropped onto a flat plane. Inner highlight reads as a top edge
+     catching ambient light. */
+  --v3-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.32), 0 8px 28px rgba(0, 0, 0, 0.42);
+  --v3-shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 2px 4px rgba(0, 0, 0, 0.40), 0 24px 56px rgba(0, 0, 0, 0.55);
+  /* Hero-specific elevation — gold-tinted ambient + heavy key shadow */
+  --v3-shadow-hero: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 2px 4px rgba(0, 0, 0, 0.45), 0 18px 48px rgba(229, 193, 88, 0.16), 0 32px 80px rgba(0, 0, 0, 0.55);
 
   /* Spec spacing (8pt) — exposed for inline-style consumers */
   --v3-s-1: 4px;
@@ -138,32 +150,36 @@
   --v3-danger-bright: #F47366;
   /* Text color for use ON --v3-primary buttons (deep onyx for AAA contrast). */
   --v3-on-primary: #0B0B0D;
-  /* Reusable gold glow shadows for primary CTAs (large for hero, sm for inline). */
-  --v3-gold-glow: 0 8px 22px rgba(212, 175, 55, 0.32);
-  --v3-gold-glow-sm: 0 6px 18px rgba(212, 175, 55, 0.28);
+  /* Reusable gold glow shadows for primary CTAs — pushed harder so the
+     glow actually reads as light, not as a tinted shadow. */
+  --v3-gold-glow: 0 0 0 1px rgba(229, 193, 88, 0.28), 0 10px 28px rgba(229, 193, 88, 0.42), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+  --v3-gold-glow-sm: 0 0 0 1px rgba(229, 193, 88, 0.22), 0 6px 18px rgba(229, 193, 88, 0.34);
+  /* Gold gradient stroke — used as a 1px top accent on hero/primary
+     sections. Gives the "Stripe" premium top-stroke look. */
+  --v3-gold-stroke: linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%);
   /* Subtle white tracks for progress bars + timeline connectors. */
   --v3-track: rgba(255, 255, 255, 0.06);
   --v3-track-strong: rgba(255, 255, 255, 0.10);
 
   /* ============================================================
-     LAYERED SURFACE SYSTEM (depth pass)
-     Ascending elevation so screens feel like a stack of layers,
-     not flat dark zones. Page → section container → card → raised.
-       --v3-bg          #07070A  (page floor — already defined)
-       --v3-surface-page #0E0E13  (section group background)
-       --v3-surface     #141418  (card — already defined)
-       --v3-surface-2   #1C1C22  (raised/hovered card — already defined)
-     Each layer lifts ~0.7 L*; total range stays subtle but legible.
+     LAYERED SURFACE SYSTEM (premium-pass push)
+     Surface ladder now jumps ~1.2 L* per step — real depth, not
+     three near-identical grays:
+       --v3-bg           #050507  (page floor)
+       --v3-surface-page #11111A  (section group bg — distinct lift)
+       --v3-surface      #16161E  (card)
+       --v3-surface-2    #1F1F2A  (raised/hovered card)
+       --v3-surface-3    #282834  (active/elevated card)
      ============================================================ */
-  --v3-surface-page: #0E0E13;
+  --v3-surface-page: #11111A;
 
-  /* Section container — combines a soft tonal lift, an inner top
-     highlight (mimics light catching the leading edge), and a low
-     shadow so the section reads as elevated off the page floor.
-     Tuned so depth is visible without ever looking decorative. */
-  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.020) 0%, rgba(255, 255, 255, 0.004) 100%), var(--v3-surface-page);
-  --v3-section-border: rgba(255, 255, 255, 0.05);
-  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 2px rgba(0, 0, 0, 0.20), 0 12px 32px rgba(0, 0, 0, 0.18);
+  /* Section container — pushed harder:
+     stronger gradient lift (top-down 4% → 0.8% white) + brighter
+     inner highlight + bigger ambient shadow + 12% white hairline.
+     Reads as visibly elevated off the page floor. */
+  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.040) 0%, rgba(255, 255, 255, 0.008) 100%), var(--v3-surface-page);
+  --v3-section-border: rgba(255, 255, 255, 0.10);
+  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 1px 2px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.34);
   --v3-section-radius: 20px;
 
   /* Standardized vertical rhythm — used by .v3-stack-* helpers and
