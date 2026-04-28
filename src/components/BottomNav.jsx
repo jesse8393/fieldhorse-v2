@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun, Hammer, Receipt, CloudSun, FileText } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { useTheme } from '../contexts/ThemeContext.jsx'
-import { Switch } from '@/components/ui/switch'
 
 const PRIMARY = [
   { to: '/', label: 'Home', icon: 'home', end: true },
@@ -53,7 +51,6 @@ export default function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const navigate = useNavigate()
   const { signOut } = useAuth()
-  const { theme, toggleTheme } = useTheme()
 
   // Lock body scroll and listen for Escape while drawer is open
   useEffect(() => {
@@ -147,14 +144,18 @@ export default function BottomNav() {
               </button>
             </header>
 
-            {/* BODY — each group as a v3-section, items as system-entry tiles */}
+            {/* BODY — each group as a v3-section, items as system-entry
+                tiles. Padding overrides .fh-drawer__body legacy padding;
+                explicit top/bottom values keep the first section from
+                kissing the header and the last from touching the foot. */}
             <div
               className="fh-drawer__body"
               style={{
-                padding: '0 var(--v3-gutter)',
+                padding: '4px var(--v3-gutter) 18px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 14
+                gap: 16,
+                boxSizing: 'border-box'
               }}
             >
               {MORE_GROUPS.map((group, gi) => (
@@ -191,28 +192,10 @@ export default function BottomNav() {
                 gap: 10
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 16px',
-                  borderRadius: 14,
-                  background: 'var(--v3-surface-2)',
-                  border: '1px solid var(--v3-border-strong)',
-                  boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.30)'
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600 }}>
-                  {theme === 'dark' ? <Moon size={16} color="var(--v3-primary)" /> : <Sun size={16} color="var(--v3-primary)" />}
-                  {theme === 'dark' ? 'Dark theme' : 'Light theme'}
-                </span>
-                <Switch
-                  checked={theme === 'dark'}
-                  onCheckedChange={() => toggleTheme()}
-                  aria-label="Toggle dark theme"
-                />
-              </div>
+              {/* Theme toggle hidden during the v3 polish phase. Light
+                  theme is unfinished and shouldn't be exposed to users
+                  until a dedicated light-mode pass lands. Re-render the
+                  switch block when ready. */}
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.97 }}

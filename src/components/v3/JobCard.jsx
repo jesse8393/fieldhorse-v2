@@ -164,15 +164,16 @@ const JobCard = memo(function JobCard({
         boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30)'
       }}
     >
-      {/* Stage-color spine — left-edge accent. Pushed: 4px wide,
-          stronger glow, fades into the card via gradient. */}
+      {/* Stage-color spine — left-edge accent. 4px wide, gradient
+          fade. Glow removed (QA pass): blue/purple stages were
+          bleeding ambient atmosphere onto the card. The spine reads
+          as functional color now, not a halo. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
         left: 0, top: 14, bottom: 12,
         width: 4,
         background: `linear-gradient(180deg, ${stageColor}, color-mix(in srgb, ${stageColor} 55%, transparent))`,
         borderRadius: '0 4px 4px 0',
-        boxShadow: `0 0 16px ${stageColor}AA, 0 0 28px ${stageColor}33`,
         pointerEvents: 'none'
       }} />
 

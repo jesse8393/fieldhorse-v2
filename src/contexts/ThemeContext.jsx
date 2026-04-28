@@ -4,15 +4,10 @@ const ThemeContext = createContext(null)
 const STORAGE_KEY = 'fh:theme'
 
 function initial() {
-  if (typeof window === 'undefined') return 'dark'
-  // Safari Private Mode on older iOS throws SecurityError on localStorage
-  // access. A throw here would crash the whole app. Default to dark on
-  // any failure.
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored === 'dark' || stored === 'light') return stored
-  } catch { /* noop */ }
-  return 'dark' // Fieldhorse ships dark-first
+  // QA polish phase: force dark theme. Light theme tokens are
+  // unfinished and not shippable. Restore localStorage read once a
+  // dedicated light-mode pass lands.
+  return 'dark'
 }
 
 export function ThemeProvider({ children }) {

@@ -243,7 +243,12 @@
 
 /* ---------- Layout helpers ---------- */
 .v3-screen {
-  min-height: 100%;
+  /* min-height: 100dvh ensures the dark page surface ALWAYS reaches
+     the bottom of the viewport even on screens with very little
+     content (or after a filter empties the grid). Otherwise the page
+     ends right after the last card and the body's white default
+     bleeds through, looking like an unfinished module zone. */
+  min-height: 100dvh;
   background: var(--v3-bg);
   color: var(--v3-text);
   padding-bottom: 120px;
@@ -429,6 +434,138 @@
   .fh-hero-drift { animation: none; }
 }
 
+/* ---------- Command Palette (cmdk + shadcn dialog) — v3 polish ----------
+   The shadcn dialog ships with --popover white and a thin gray border
+   that read as a default browser overlay against our dark theme.
+   Override the surface, border, shadow, list, separator, item, scrollbar
+   so the palette feels native to the app. */
+[data-theme='dark'] [data-slot='dialog-content']:has([data-slot='command']) {
+  background: var(--v3-surface) !important;
+  border: 1px solid var(--v3-border-strong) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 4px 16px rgba(0, 0, 0, 0.45),
+    0 32px 80px rgba(0, 0, 0, 0.55) !important;
+  padding: 0 !important;
+  overflow: hidden;
+  position: relative;
+}
+/* Top edge gradient stroke — matches v3-section identity */
+[data-theme='dark'] [data-slot='dialog-content']:has([data-slot='command'])::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.30) 50%, transparent 100%);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  z-index: 2;
+}
+
+[data-theme='dark'] [data-slot='command'] {
+  background: transparent !important;
+  color: var(--v3-text) !important;
+}
+
+/* Input row — bottom hairline matches our --v3-border-strong */
+[data-theme='dark'] [data-slot='command-input-wrapper'] {
+  border-bottom-color: var(--v3-border-strong) !important;
+  padding: 14px 18px !important;
+  height: auto !important;
+  gap: 12px !important;
+}
+[data-theme='dark'] [data-slot='command-input-wrapper'] svg {
+  color: var(--v3-text-muted);
+  opacity: 1 !important;
+}
+[data-theme='dark'] [data-slot='command-input'] {
+  color: var(--v3-text) !important;
+  font-family: var(--font-body);
+  font-size: 15px !important;
+}
+[data-theme='dark'] [data-slot='command-input']::placeholder {
+  color: var(--v3-text-muted) !important;
+}
+
+/* List + scrollbar (dark, subtle) */
+[data-theme='dark'] [data-slot='command-list'] {
+  max-height: 420px !important;
+  padding: 6px 6px 8px !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar {
+  width: 8px;
+}
+[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.20);
+  background-clip: padding-box;
+}
+
+/* Group + heading */
+[data-theme='dark'] [data-slot='command-group'] {
+  padding: 4px 6px !important;
+}
+[data-theme='dark'] [cmdk-group-heading] {
+  font-family: var(--font-body) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase !important;
+  color: var(--v3-text-muted) !important;
+  padding: 10px 10px 6px !important;
+}
+
+/* Items: clean hover, gold-tinted selected */
+[data-theme='dark'] [data-slot='command-item'] {
+  border-radius: 10px !important;
+  padding: 11px 12px !important;
+  color: var(--v3-text) !important;
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+[data-theme='dark'] [data-slot='command-item']:hover,
+[data-theme='dark'] [data-slot='command-item'][data-selected='true'] {
+  background: var(--v3-surface-2) !important;
+  color: var(--v3-text) !important;
+}
+[data-theme='dark'] [data-slot='command-item'] svg {
+  color: var(--v3-primary) !important;
+}
+
+/* Separator hairline */
+[data-theme='dark'] [data-slot='command-separator'] {
+  background: var(--v3-border) !important;
+  margin: 4px 8px !important;
+}
+
+/* Empty state */
+[data-theme='dark'] [data-slot='command-empty'] {
+  color: var(--v3-text-muted) !important;
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 24px 16px !important;
+}
+
+/* Dialog scrim — kill the default white-tinted overlay */
+[data-theme='dark'] [data-slot='dialog-overlay'] {
+  background: rgba(5, 5, 7, 0.74) !important;
+  backdrop-filter: blur(6px);
+}
+
 /* ---------- Schedule day-strip dispatch board ----------
    Single-column timeline. The 7-day strip + Day/Week tabs + time-block
    list match the mockup. Horizontal scroll on the day strip if the
@@ -439,23 +576,23 @@
   gap: 6px;
 }
 
-/* ---------- Page background (premium-pass) ----------
+/* ---------- Page background (QA-pass) ----------
    .v3-screen is the page floor. Two layered effects:
-     1. Subtle gradient mesh at the top — gold "stage light" + a cool
-        balance on the opposite side. Caps at the top zone so it
-        doesn't bleed into the content area.
-     2. SVG noise grain (5% opacity) — gives the dark surface real
-        texture instead of perfectly flat black. Stripe / Linear use
-        this trick at the page level. */
+     1. Top-only gold "stage light" (subtle ambient, capped at 320px)
+     2. SVG noise grain at MUCH lower opacity (was 4.5% → 1.8%) so it
+        kills banding without becoming a visible grid texture
+   Background-attachment: fixed on the noise so scrolling doesn't
+   reveal a tiling seam at the bottom of long screens. */
 .v3-screen {
   position: relative;
+  overflow-x: hidden;
   background:
     /* 1px noise grain — barely perceptible, kills banding */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    /* Top stage light — gold, capped at top 360px */
-    radial-gradient(ellipse 110% 360px at 50% 0%, rgba(229, 193, 88, 0.07), transparent 65%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.018 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* Top stage light — gold, capped at top 320px, alpha lowered */
+    radial-gradient(ellipse 100% 320px at 50% 0%, rgba(229, 193, 88, 0.05), transparent 65%),
     var(--v3-bg);
-  background-attachment: scroll, scroll, scroll;
+  background-attachment: fixed, scroll, scroll;
 }
 /* Page content rides above the bg */
 .v3-screen > * {

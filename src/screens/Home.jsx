@@ -904,9 +904,12 @@ function PipelineDealRow({ deal, onTap }) {
         transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = `color-mix(in srgb, ${stage.color} 40%, var(--v3-border-strong))`
+        // Hover stays neutral — black/charcoal/white. Stage color
+        // shows on the spine + label only (functional). No ambient
+        // blue/purple bleed onto the card's halo.
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
         e.currentTarget.style.background = 'var(--v3-surface-3)'
-        e.currentTarget.style.boxShadow = `0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.40), 0 4px 14px ${stage.color}20`
+        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.40)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
@@ -914,14 +917,15 @@ function PipelineDealRow({ deal, onTap }) {
         e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
       }}
     >
-      {/* Stage spine — fatter (5px) + brighter glow */}
+      {/* Stage spine — 5px gradient. Glow removed (QA pass): blue/
+          purple stages were bleeding ambient atmosphere. Functional
+          color only — chip + spine carry the meaning. */}
       <span aria-hidden="true" style={{
         flexShrink: 0,
         width: 5,
         height: 36,
         borderRadius: 3,
-        background: `linear-gradient(180deg, ${stage.color}, color-mix(in srgb, ${stage.color} 50%, transparent))`,
-        boxShadow: `0 0 14px ${stage.color}80, 0 0 24px ${stage.color}30`
+        background: `linear-gradient(180deg, ${stage.color}, color-mix(in srgb, ${stage.color} 50%, transparent))`
       }} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{
