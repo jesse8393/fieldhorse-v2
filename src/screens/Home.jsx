@@ -127,6 +127,10 @@ export default function Home() {
   const [topPipeline, setTopPipeline] = useState(null)
   // Stage breakdown for Pipeline card footer (mockup: Won / Active / Lead)
   const [stageBreakdown, setStageBreakdown] = useState(null)
+  // Today on Site = schedule entries that start today (or are happening
+  // now). Read-only fetch, no schema change. Joined with fh_contacts so
+  // each row shows the job name + stage at a glance.
+  const [todayOnSite, setTodayOnSite] = useState(null)
   // Next Actions = up to 5 actionable items (stale leads, overdue jobs,
   // unsent invoices) computed from the same contacts/schedule/payments data.
   // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
@@ -161,7 +165,7 @@ export default function Home() {
       const todayStart = new Date(nowD); todayStart.setHours(0, 0, 0, 0)
       const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
 
-      const [contactsRes, overdueSchedRes, paysRes] = await Promise.all([
+      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes] = await Promise.all([
         // Contacts: stages + amounts + last update for at-risk calc.
         // updated_at falls back to created_at if missing.
         supabase
@@ -181,7 +185,17 @@ export default function Home() {
           .from('fh_payments')
           .select('amount, created_at')
           .eq('user_id', user.id)
-          .gte('created_at', wkStart.toISOString())
+          .gte('created_at', wkStart.toISOString()),
+        // Today on Site — schedule entries that start today, joined with
+        // contacts for name+stage. Read-only query, no schema change.
+        supabase
+          .from('fh_schedule')
+          .select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)')
+          .eq('user_id', user.id)
+          .gte('start_at', todayStart.toISOString())
+          .lt('start_at', todayEnd.toISOString())
+          .order('start_at', { ascending: true })
+          .limit(6)
       ])
 
       if (cancelled) return
@@ -287,6 +301,34 @@ export default function Home() {
         lead:   contacts.filter((c) => c.stage === 'lead' || c.stage === 'quote').length
       }
 
+      // Quotes Needing Attention — quotes with no update in 7+ days
+      // (separate KPI from leads needing follow-up; the mockup splits
+      // them into 3 distinct priority signals).
+      const quotesAttention = contacts.filter((c) => {
+        if (c.stage !== 'quote') return false
+        const last = new Date(c.updated_at || c.created_at || 0)
+        return last < sevenDaysAgo
+      }).length
+
+      // Follow-ups — leads (only) with no update in 7+ days.
+      const followUps = contacts.filter((c) => {
+        if (c.stage !== 'lead') return false
+        const last = new Date(c.updated_at || c.created_at || 0)
+        return last < sevenDaysAgo
+      }).length
+
+      // Today on Site — derive the rows. fh_contacts() join may be null
+      // when the schedule entry has no linked contact.
+      const todayRows = (todaySchedRes.data || []).map((s) => ({
+        id: s.id,
+        contactId: s.contact_id,
+        title: s.title || s.fh_contacts?.name || 'Scheduled visit',
+        clientName: s.fh_contacts?.name || null,
+        stage: s.fh_contacts?.stage || null,
+        startAt: s.start_at,
+        endAt: s.end_at
+      }))
+
       // Top pipeline = highest-value active deals. Used by the Pipeline
       // Preview section. Capped at 3 to keep the home screen scannable —
       // operators tap "View all" to drill into the full board.
@@ -303,11 +345,12 @@ export default function Home() {
 
       setPipeline(totalPipeline)
       setPipelinePrev(prevPipeline)
-      setDealsAtRisk({ count: risky.length, value: riskValue })
+      setDealsAtRisk({ count: risky.length, value: riskValue, followUps, quotesAttention })
       setJobsBehind(behind.length)
       setInvoicingWeek(weekTotal)
       setTopPipeline(topActiveDeals)
       setStageBreakdown(stageCounts)
+      setTodayOnSite(todayRows)
       setNextActions(topActions)
     }
     load()
@@ -529,34 +572,11 @@ export default function Home() {
           <Sparkline data={sparkData} color="var(--v3-primary)" height={48} />
         </div>
 
-        {/* Stage breakdown — Won / Active / Lead per mockup */}
-        <div style={{
-          marginTop: 14,
-          paddingTop: 14,
-          borderTop: '1px solid var(--v3-border)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 12
-        }}>
-          {[
-            { label: 'Won',    count: stageBreakdown?.won    ?? null, tone: 'var(--v3-success-bright)' },
-            { label: 'Active', count: stageBreakdown?.active ?? null, tone: 'var(--v3-primary)' },
-            { label: 'Lead',   count: stageBreakdown?.lead   ?? null, tone: 'var(--v3-text-muted)' }
-          ].map((s) => (
-            <div key={s.label}>
-              <div style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 22,
-                lineHeight: 1,
-                color: s.tone,
-                fontVariantNumeric: 'tabular-nums'
-              }}>
-                {s.count == null ? '—' : s.count}
-              </div>
-              <div className="v3-eyebrow" style={{ marginTop: 4 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
+        {/* Stage breakdown — Won / Active / Lead as a stacked bar
+            visualization. Mockup-tier financial dashboard treatment:
+            single horizontal bar with 3 colored segments + a numbers
+            row underneath. Replaces the prior 3-column number grid. */}
+        <PipelineStackedBreakdown breakdown={stageBreakdown} />
 
         <button
           type="button"
@@ -646,24 +666,68 @@ export default function Home() {
         >
           <CompactKpi
             tone="danger"
-            value={dealsAtRisk?.count}
-            label="Calls to Leads"
-            subline={dealsAtRisk?.value > 0 ? `$${dealsAtRisk.value.toLocaleString()}` : null}
-            onTap={() => navigate('/jobs')}
+            value={dealsAtRisk?.followUps}
+            label="Follow-ups"
+            subline={dealsAtRisk?.followUps > 0 ? 'Leads gone cold' : null}
+            onTap={() => navigate('/jobs?filter=lead')}
+          />
+          <CompactKpi
+            tone="primary"
+            value={dealsAtRisk?.quotesAttention}
+            label="Quotes"
+            subline={dealsAtRisk?.quotesAttention > 0 ? 'Need attention' : null}
+            onTap={() => navigate('/jobs?filter=quote')}
           />
           <CompactKpi
             tone="primary"
             value={jobsBehind}
             label="Jobs Behind"
+            subline={jobsBehind > 0 ? 'Reschedule' : null}
             onTap={() => navigate('/schedule')}
           />
-          <CompactKpi
-            tone="success"
-            value={invoicingWeek}
-            label="Invoicing This Week"
-            isMoney
-            onTap={() => navigate('/invoices')}
-          />
+        </div>
+      </motion.div>
+
+      {/* ─────────── TODAY ON SITE ───────────
+          Schedule entries that start today, sourced from a safe
+          read-only fh_schedule query (no schema change). Polished
+          empty state if no events scheduled — never shows a blank
+          panel. Tap a row to jump to the linked job. */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader
+          label="Today on Site"
+          action={{ label: 'View schedule', onTap: () => navigate('/schedule') }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+          {todayOnSite == null ? (
+            <>
+              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 12 }} />
+              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 12, opacity: 0.65 }} />
+            </>
+          ) : todayOnSite.length === 0 ? (
+            <div className="v3-empty">
+              <CalendarClock size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+                Nothing scheduled today.
+              </div>
+              <div style={{ fontSize: 12 }}>Open Schedule to plan crew visits.</div>
+            </div>
+          ) : (
+            todayOnSite.map((row) => (
+              <TodayOnSiteRow
+                key={row.id}
+                row={row}
+                onTap={() => row.contactId
+                  ? navigate(`/jobs/${row.contactId}`)
+                  : navigate('/schedule')
+                }
+              />
+            ))
+          )}
         </div>
       </motion.div>
 
@@ -733,6 +797,170 @@ export default function Home() {
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+/* ============================================================
+   PipelineStackedBreakdown — Won / Active / Lead as a stacked
+   horizontal bar with a numbers row underneath. Mockup-tier
+   financial dashboard treatment. Renders an empty bar with
+   "—" labels while data is loading so layout doesn't shift.
+   ============================================================ */
+function PipelineStackedBreakdown({ breakdown }) {
+  const won    = breakdown?.won    ?? 0
+  const active = breakdown?.active ?? 0
+  const lead   = breakdown?.lead   ?? 0
+  const total  = won + active + lead
+  const segments = [
+    { id: 'won',    label: 'Won',    count: won,    tone: 'var(--v3-success-bright)' },
+    { id: 'active', label: 'Active', count: active, tone: 'var(--v3-primary)' },
+    { id: 'lead',   label: 'Lead',   count: lead,   tone: 'var(--v3-text-muted)' }
+  ]
+  return (
+    <div style={{
+      marginTop: 14,
+      paddingTop: 14,
+      borderTop: '1px solid var(--v3-border)'
+    }}>
+      {/* Stacked bar */}
+      <div
+        aria-hidden="true"
+        style={{
+          height: 8,
+          borderRadius: 999,
+          background: 'var(--v3-track)',
+          overflow: 'hidden',
+          display: 'flex',
+          gap: 2
+        }}
+      >
+        {total > 0 ? segments.map((s) => (
+          <div
+            key={s.id}
+            style={{
+              width: `${(s.count / total) * 100}%`,
+              background: s.tone,
+              transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+            }}
+          />
+        )) : (
+          <div style={{ width: '100%', background: 'transparent' }} />
+        )}
+      </div>
+
+      {/* Numbers row underneath */}
+      <div style={{
+        marginTop: 10,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 12
+      }}>
+        {segments.map((s) => (
+          <div key={s.id}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontFamily: 'var(--font-display)',
+              fontSize: 22,
+              lineHeight: 1,
+              color: s.tone,
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              <span aria-hidden="true" style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: s.tone
+              }} />
+              {breakdown == null ? '—' : s.count}
+            </div>
+            <div className="v3-eyebrow" style={{ marginTop: 4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   TodayOnSiteRow — single schedule row in Today on Site.
+   Time + job/title + stage chip + chevron. Tap → linked job.
+   ============================================================ */
+function TodayOnSiteRow({ row, onTap }) {
+  const stage = row.stage ? STAGE_DISPLAY[row.stage] : null
+  const startTime = row.startAt
+    ? new Date(row.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : ''
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -1 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        padding: '12px 14px',
+        borderRadius: 12,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border-strong)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset'
+      }}
+    >
+      {/* Time slot */}
+      <div style={{
+        flexShrink: 0,
+        minWidth: 56,
+        textAlign: 'center',
+        padding: '4px 8px',
+        borderRadius: 8,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
+        fontFamily: 'var(--font-display)',
+        fontSize: 13,
+        color: 'var(--v3-text)',
+        fontVariantNumeric: 'tabular-nums',
+        letterSpacing: '0.02em',
+        lineHeight: 1.4
+      }}>
+        {startTime || '—'}
+      </div>
+      {/* Title + client */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'var(--v3-text)',
+          letterSpacing: '-0.005em',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          {row.title}
+        </div>
+        {stage && (
+          <div style={{
+            marginTop: 3,
+            fontFamily: 'var(--font-body)',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.10em',
+            textTransform: 'uppercase',
+            color: stage.color
+          }}>
+            {stage.label}
+          </div>
+        )}
+      </div>
+      <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+    </motion.button>
   )
 }
 

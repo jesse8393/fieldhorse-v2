@@ -111,7 +111,8 @@ const JobCard = memo(function JobCard({
   isNew = false,
   viewerUserId,
   onOpen,
-  photoUrl // optional — backend wiring to fh_photos comes later
+  photoUrl, // optional — backend wiring to fh_photos comes later
+  featured = false // top-value/most-urgent: gold border + TOP DEAL chip
 }) {
   const stageMeta = STAGE_MAP[contact.stage]
   const stageColor = stageMeta?.color || '#5C5C5C'
@@ -122,6 +123,12 @@ const JobCard = memo(function JobCard({
   const isSharedIn = !!viewerUserId && !!contact.user_id && contact.user_id !== viewerUserId
 
   const nextHint = NEXT_ACTION_HINT[contact.stage]
+
+  // Photo banner mode — when a photo is present, render it as a
+  // full-width 140px cover banner at the top of the card instead of
+  // a 56x56 thumbnail in the body row. Mockup-tier: photo earns
+  // its space when present.
+  const hasPhotoBanner = !!photoUrl
 
   return (
     <motion.button
@@ -136,66 +143,175 @@ const JobCard = memo(function JobCard({
         : { duration: 0.22, delay: Math.min(index * 0.035, 0.22), ease: [0.2, 0.8, 0.2, 1] }
       }
       whileTap={{ scale: 0.97 }}
-      // Hover lift + surface elevation (#141418 → #1C1C22) + heavier shadow
-      // for "trustworthy object" depth. Confidence pass: shadow now
-      // 0 18px 48px / 0.6 (was 14px / 36 / 0.45) so the lift reads as
-      // weight, not just float. Framer animates literal hex values.
       whileHover={{
         y: -4,
         backgroundColor: '#2A2620',
-        boxShadow: '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
+        boxShadow: featured
+          ? '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(229, 193, 88, 0.22)'
+          : '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
       }}
       style={{
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
+        gap: hasPhotoBanner ? 12 : 14,
         width: '100%',
         boxSizing: 'border-box',
-        padding: '18px 18px 18px 22px',
+        // Photo banner sits flush at the top, so banner mode skips
+        // top padding. Spine moves to the left edge of the card body.
+        padding: hasPhotoBanner ? '0 18px 18px' : '18px 18px 18px 22px',
         borderRadius: 'var(--v3-radius-card)',
         background: '#171511', // literal so framer hover transition is smooth
-        border: '1px solid rgba(255, 255, 255, 0.22)',
+        border: featured
+          ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
+          : '1px solid rgba(255, 255, 255, 0.22)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
         overflow: 'hidden',
-        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30)'
+        boxShadow: featured
+          ? '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30), 0 4px 16px rgba(229, 193, 88, 0.14)'
+          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30)'
       }}
     >
-      {/* Stage-color spine — left-edge accent. 4px wide, gradient
-          fade. Glow removed (QA pass): blue/purple stages were
-          bleeding ambient atmosphere onto the card. The spine reads
-          as functional color now, not a halo. */}
+      {/* Photo cover banner (only when photo present). Renders flush
+          at the top of the card with overlays: TOP DEAL chip if
+          featured + initial chip + stage spine running down the
+          left edge of the card body below. */}
+      {hasPhotoBanner && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: 140,
+            overflow: 'hidden',
+            background: 'var(--v3-surface-2)'
+          }}
+        >
+          <img
+            src={photoUrl}
+            alt=""
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+          {/* Bottom gradient — keeps overlays + name below readable */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(180deg, transparent 40%, rgba(11, 10, 8, 0.85) 100%)',
+            pointerEvents: 'none'
+          }} />
+          {/* Initial chip overlay */}
+          <span style={{
+            position: 'absolute',
+            left: 10,
+            top: 10,
+            minWidth: 26,
+            height: 26,
+            padding: '0 8px',
+            borderRadius: 8,
+            background: `linear-gradient(135deg, ${stageColor}EE, ${stageColor}CC)`,
+            color: 'var(--v3-on-primary)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 13,
+            letterSpacing: '0.04em',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.40)'
+          }}>
+            {initials(contact.name)}
+          </span>
+          {/* TOP DEAL chip when featured */}
+          {featured && (
+            <span style={{
+              position: 'absolute',
+              right: 10,
+              top: 10,
+              padding: '4px 10px',
+              borderRadius: 999,
+              background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+              color: 'var(--v3-on-primary)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 9,
+              fontWeight: 800,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              lineHeight: 1.2,
+              boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.18), 0 4px 10px rgba(229, 193, 88, 0.35), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+            }}>
+              Top Deal
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Stage-color spine — left-edge accent. Adjusted for banner
+          mode (sits below the banner) vs no-banner mode (full height). */}
       <span aria-hidden="true" style={{
         position: 'absolute',
-        left: 0, top: 14, bottom: 12,
+        left: 0,
+        top: hasPhotoBanner ? 152 : 14,
+        bottom: 12,
         width: 4,
         background: `linear-gradient(180deg, ${stageColor}, color-mix(in srgb, ${stageColor} 55%, transparent))`,
         borderRadius: '0 4px 4px 0',
         pointerEvents: 'none'
       }} />
 
-      {/* Top edge gradient stroke — gives each card its own lit leading edge.
-          Same Stripe/Linear premium identity as v3 sections, scaled down. */}
-      <span aria-hidden="true" style={{
-        position: 'absolute',
-        top: 0,
-        left: '14%',
-        right: '14%',
-        height: 1,
-        background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.20) 50%, transparent 100%)',
-        pointerEvents: 'none'
-      }} />
+      {/* Top edge gradient stroke — only in non-banner mode (the
+          banner has its own visual leading edge). */}
+      {!hasPhotoBanner && (
+        <span aria-hidden="true" style={{
+          position: 'absolute',
+          top: 0,
+          left: '14%',
+          right: '14%',
+          height: 1,
+          background: featured
+            ? 'linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.20) 50%, transparent 100%)',
+          pointerEvents: 'none'
+        }} />
+      )}
 
-      {/* Top row: photo/initial tile + name block + amount block */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
-        <PhotoOrInitialTile
-          photoUrl={photoUrl}
-          name={contact.name}
-          stageColor={stageColor}
-        />
+      {/* TOP DEAL chip for non-banner cards — sits in the corner */}
+      {featured && !hasPhotoBanner && (
+        <span style={{
+          position: 'absolute',
+          right: 12,
+          top: 12,
+          padding: '3px 9px',
+          borderRadius: 999,
+          background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+          color: 'var(--v3-on-primary)',
+          fontFamily: 'var(--font-body)',
+          fontSize: 9,
+          fontWeight: 800,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          lineHeight: 1.2,
+          boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.18), 0 4px 10px rgba(229, 193, 88, 0.35), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
+          pointerEvents: 'none'
+        }}>
+          Top Deal
+        </span>
+      )}
+
+      {/* Top row: photo/initial tile + name block + amount block.
+          When the banner is rendered, the inline photo tile is
+          omitted and the name/amount sit at the top of the body. */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0, marginTop: hasPhotoBanner ? 14 : 0 }}>
+        {!hasPhotoBanner && (
+          <PhotoOrInitialTile
+            photoUrl={photoUrl}
+            name={contact.name}
+            stageColor={stageColor}
+          />
+        )}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{
             fontFamily: 'var(--font-body)',

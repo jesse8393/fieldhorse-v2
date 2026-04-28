@@ -131,6 +131,23 @@ export default function Jobs() {
     return out
   }, [contacts])
 
+  // Featured deal id — highest-value job in the currently filtered list.
+  // Only applied when the filtered set has 2+ jobs (no point featuring
+  // the only card on screen) and the top deal has a non-zero amount.
+  const featuredId = useMemo(() => {
+    if (filtered.length < 2) return null
+    let topId = null
+    let topAmount = 0
+    for (const c of filtered) {
+      const amt = Number(c.amount || 0)
+      if (amt > topAmount) {
+        topAmount = amt
+        topId = c.id
+      }
+    }
+    return topAmount > 0 ? topId : null
+  }, [filtered])
+
   function openDrawer(contact) {
     setDrawerContact(contact)
   }
@@ -328,6 +345,7 @@ export default function Jobs() {
                   isNew={c.id === justAddedId}
                   viewerUserId={user?.id}
                   photoUrl={photoUrlByJob[c.id]}
+                  featured={c.id === featuredId}
                   onOpen={openDrawer}
                 />
               </SwipeableRow>
