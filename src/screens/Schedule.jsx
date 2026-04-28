@@ -177,14 +177,14 @@ export default function Schedule() {
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+    <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
       {/* HEADER — top + button removed; the FAB at bottom-right is the
           single, thumb-reachable add-event control. */}
-      <motion.div variants={item} style={{ padding: '10px 20px 6px' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+      <motion.div variants={item} style={{ padding: '12px 20px 6px' }}>
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>
           Calendar
         </span>
-        <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+        <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px, 6vw, 32px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
           Run the day.
         </h1>
       </motion.div>
@@ -290,7 +290,7 @@ export default function Schedule() {
           <button
             type="button"
             onClick={() => setCursor(startOfDay(new Date()))}
-            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--v3-border-strong)', background: 'var(--v3-surface)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
           >
             Today
           </button>
@@ -308,7 +308,7 @@ export default function Schedule() {
               existing grid rendered so the user never sees a flash of
               empty horizontal bars. */}
           {loading && events == null && <SkeletonList rows={5} card={false} />}
-          {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+          {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} onAdd={() => setAddOpen(true)} />}
           {events != null && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
           {events != null && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
         </motion.div>
@@ -370,27 +370,81 @@ const iconBtnStyle = {
   width: 44,
   height: 44,
   borderRadius: 11,
-  border: '1px solid var(--rule)',
-  background: 'var(--surface-2)',
-  color: 'var(--ink-strong)',
+  border: '1px solid var(--v3-border-strong)',
+  background: 'var(--v3-surface)',
+  color: 'var(--v3-text)',
   display: 'grid',
   placeItems: 'center',
-  cursor: 'pointer'
+  cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent'
 }
 
-function DayView({ events, onClick, onDelete }) {
+function DayView({ events, onClick, onDelete, onAdd }) {
   if (events.length === 0) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', fontFamily: 'var(--font-body)' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', marginBottom: 6 }}>Nothing scheduled.</div>
-        {/* Brighter body so it reads outside in direct sun. Was --ink-muted
-            (~ #6A665E) which fails on Onyx in bright light. */}
-        <div style={{ fontSize: 13, color: 'var(--ink-strong)', opacity: 0.78, lineHeight: 1.4 }}>
-          Queue something up. Crew runs smoother when the day's on the board.
+      <div style={{
+        padding: '40px 28px',
+        borderRadius: 18,
+        background: `
+          radial-gradient(120% 80% at 50% 0%, rgba(212, 175, 55, 0.08), transparent 60%),
+          var(--v3-surface)
+        `,
+        border: '1px solid var(--v3-border-strong)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        textAlign: 'center',
+        fontFamily: 'var(--font-body)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 16
+      }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 14,
+          background: 'var(--v3-primary-soft)',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+          display: 'grid', placeItems: 'center',
+          color: 'var(--v3-primary)'
+        }}>
+          <CalendarIcon size={22} aria-hidden="true" />
         </div>
-        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Tap the + below
+        <div>
+          <h3 style={{
+            margin: 0,
+            fontFamily: 'var(--font-serif)',
+            fontSize: 22, fontWeight: 500, letterSpacing: '-0.01em',
+            color: 'var(--v3-text)'
+          }}>
+            Nothing scheduled — fill your day.
+          </h3>
+          <p style={{
+            margin: '8px 0 0',
+            fontSize: 13,
+            color: 'var(--v3-text-muted)',
+            lineHeight: 1.5,
+            maxWidth: 320
+          }}>
+            Crew runs smoother when the day's on the board. Queue up the first job.
+          </p>
         </div>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          whileHover={{ y: -2 }}
+          transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+          onClick={() => { hapticTap(); onAdd?.() }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '11px 18px', borderRadius: 12, border: 'none',
+            background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
+            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+            letterSpacing: '0.04em', cursor: 'pointer',
+            boxShadow: 'var(--v3-gold-glow)',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+        >
+          <Plus size={14} />
+          Schedule a job
+        </motion.button>
       </div>
     )
   }
@@ -401,22 +455,75 @@ function DayView({ events, onClick, onDelete }) {
           key={e.id}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}
+          whileHover={{ y: -2, backgroundColor: '#1A1A20' }}
+          transition={{
+            opacity: { delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
+            y: { type: 'spring', stiffness: 620, damping: 28 },
+            backgroundColor: { type: 'spring', stiffness: 620, damping: 28 }
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '13px 14px',
+            borderRadius: 12,
+            background: '#141418',
+            border: '1px solid var(--v3-border-strong)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
         >
-          <span style={{ flexShrink: 0, width: 62, fontFamily: 'var(--font-display)', fontSize: 13, letterSpacing: '0.04em', color: 'var(--field-gold-bright)' }}>
-            {fmtTime(e.start_at)}
+          {/* Time block — left "object handle" with subtle gold accent */}
+          <span style={{
+            flexShrink: 0,
+            width: 68,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+            paddingRight: 10,
+            borderRight: '1px solid var(--v3-border)'
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 14,
+              letterSpacing: '0.04em',
+              color: 'var(--v3-primary)',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1
+            }}>
+              {fmtTime(e.start_at)}
+            </span>
           </span>
           <button
             type="button"
             onClick={() => e.contact_id && onClick(e.contact_id)}
-            style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: e.contact_id ? 'pointer' : 'default', color: 'var(--ink-strong)' }}
+            style={{
+              flex: 1, minWidth: 0,
+              background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
+              cursor: e.contact_id ? 'pointer' : 'default',
+              color: 'var(--v3-text)',
+              WebkitTapHighlightColor: 'transparent'
+            }}
           >
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 14, fontWeight: 700,
+              color: 'var(--v3-text)',
+              letterSpacing: '-0.005em',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+            }}>
               {e.title || 'Untitled'}
             </div>
             {e.fh_contacts?.name && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 3, padding: '2px 8px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                marginTop: 4,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: 'var(--v3-primary-soft)',
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+                color: 'var(--v3-primary)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.08em', textTransform: 'uppercase'
+              }}>
                 <MapPin size={9} />
                 {e.fh_contacts.name}
               </span>
@@ -426,9 +533,16 @@ function DayView({ events, onClick, onDelete }) {
             type="button"
             onClick={(ev) => { ev.stopPropagation(); if (onDelete && window.confirm('Delete this event?')) onDelete(e.id) }}
             aria-label="Delete event"
-            style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.7 }}
-            onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--alert-red)' }}
-            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.7'; ev.currentTarget.style.color = 'var(--ink-faint)' }}
+            style={{
+              flexShrink: 0, width: 30, height: 30, borderRadius: 8,
+              border: 'none', background: 'transparent',
+              color: 'var(--v3-text-muted)',
+              cursor: 'pointer', display: 'grid', placeItems: 'center',
+              opacity: 0.7,
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
+            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.7'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
           >
             <Trash2 size={14} />
           </button>
