@@ -10,7 +10,6 @@ import {
   FileText,
   ArrowUpRight,
   ArrowDownRight,
-  Activity,
   PhoneCall,
   CalendarClock,
   ChevronRight,
@@ -23,7 +22,7 @@ import { getWeather, MURFREESBORO } from '../lib/weather.js'
 import { ACTIVE_STAGES } from '../lib/stages.js'
 import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
-import { Card, KpiTile, QuickAction, Sparkline, SectionHeader, FeedRow, Pill } from '../components/v3'
+import { Card, KpiTile, QuickAction, Sparkline, SectionHeader, Pill } from '../components/v3'
 import { hapticTap } from '../lib/haptics.js'
 
 /* ----------------- helpers ----------------- */
@@ -121,7 +120,10 @@ export default function Home() {
   const [dealsAtRisk, setDealsAtRisk] = useState(null) // { count, value }
   const [jobsBehind, setJobsBehind] = useState(null)
   const [invoicingWeek, setInvoicingWeek] = useState(null)
-  const [feed, setFeed] = useState(null)
+  // Pipeline Preview = top 3 active deals by value (lead/quote/job/invoice).
+  // Renders as a glanceable list at the bottom of Home so the operator sees
+  // their highest-value open work without leaving the screen.
+  const [topPipeline, setTopPipeline] = useState(null)
   // Next Actions = up to 5 actionable items (stale leads, overdue jobs,
   // unsent invoices) computed from the same contacts/schedule/payments data.
   // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
@@ -156,7 +158,7 @@ export default function Home() {
       const todayStart = new Date(nowD); todayStart.setHours(0, 0, 0, 0)
       const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
 
-      const [contactsRes, overdueSchedRes, paysRes, recentSchedRes, recentPaysRes] = await Promise.all([
+      const [contactsRes, overdueSchedRes, paysRes] = await Promise.all([
         // Contacts: stages + amounts + last update for at-risk calc.
         // updated_at falls back to created_at if missing.
         supabase
@@ -176,28 +178,12 @@ export default function Home() {
           .from('fh_payments')
           .select('amount, created_at')
           .eq('user_id', user.id)
-          .gte('created_at', wkStart.toISOString()),
-        // Live Feed source #1: recent schedule entries (today ± a bit).
-        supabase
-          .from('fh_schedule')
-          .select('id, contact_id, start_at, title')
-          .eq('user_id', user.id)
-          .gte('start_at', sevenDaysAgo.toISOString())
-          .order('start_at', { ascending: false })
-          .limit(4),
-        // Live Feed source #2: most recent payments.
-        supabase
-          .from('fh_payments')
-          .select('id, contact_id, amount, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(4)
+          .gte('created_at', wkStart.toISOString())
       ])
 
       if (cancelled) return
 
       const contacts = contactsRes.data || []
-      const contactById = new Map(contacts.map((c) => [c.id, c]))
 
       // Pipeline = sum of $ across active stages.
       const totalPipeline = contacts
@@ -231,45 +217,6 @@ export default function Home() {
 
       // Invoicing this week = sum of payments collected since Sunday.
       const weekTotal = (paysRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-
-      // Live Feed = merge recent schedule + payment events, newest first.
-      const schedFeed = (recentSchedRes.data || []).map((s) => {
-        const c = contactById.get(s.contact_id)
-        const startMs = s.start_at ? new Date(s.start_at).getTime() : 0
-        const onSite = startMs && startMs <= nowD.getTime() && (nowD.getTime() - startMs) < 12 * 60 * 60 * 1000
-        return {
-          id: `sched-${s.id}`,
-          ts: startMs,
-          type: 'crew-on-site',
-          title: c?.name || s.title || 'Scheduled job',
-          detail: onSite ? 'Crew on site' : 'Scheduled visit',
-          timestamp: s.start_at,
-          pillTone: onSite ? 'success' : 'neutral',
-          pillLabel: onSite ? 'On Site' : 'Upcoming',
-          contactId: s.contact_id
-        }
-      })
-      const payFeed = (recentPaysRes.data || []).map((p) => {
-        const c = contactById.get(p.contact_id)
-        return {
-          id: `pay-${p.id}`,
-          ts: p.created_at ? new Date(p.created_at).getTime() : 0,
-          type: 'invoice',
-          title: c?.name || 'Payment received',
-          detail: `Payment $${Math.round(Number(p.amount || 0)).toLocaleString()}`,
-          timestamp: p.created_at,
-          pillTone: 'success',
-          pillLabel: 'Paid',
-          contactId: p.contact_id
-        }
-      })
-      // Trim to 2 visible — Live Feed is informational, not action-driving.
-      // Reduce noise; "View all" link in section header gets the operator
-      // to the full list when needed.
-      const feedRows = [...schedFeed, ...payFeed]
-        .filter((r) => r.ts > 0)
-        .sort((a, b) => b.ts - a.ts)
-        .slice(0, 2)
 
       // Next Actions — compose 3 source streams + sort by urgency (oldest
       // last-touch wins). Capped at 5 so the section stays scannable.
@@ -329,12 +276,26 @@ export default function Home() {
       actions.sort((a, b) => a.urgency - b.urgency)
       const topActions = actions.slice(0, 5)
 
+      // Top pipeline = highest-value active deals. Used by the Pipeline
+      // Preview section. Capped at 3 to keep the home screen scannable —
+      // operators tap "View all" to drill into the full board.
+      const topActiveDeals = contacts
+        .filter((c) => ACTIVE_STAGES.includes(c.stage))
+        .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
+        .slice(0, 3)
+        .map((c) => ({
+          id: c.id,
+          name: c.name || 'Untitled',
+          amount: Number(c.amount || 0),
+          stage: c.stage
+        }))
+
       setPipeline(totalPipeline)
       setPipelinePrev(prevPipeline)
       setDealsAtRisk({ count: risky.length, value: riskValue })
       setJobsBehind(behind.length)
       setInvoicingWeek(weekTotal)
-      setFeed(feedRows)
+      setTopPipeline(topActiveDeals)
       setNextActions(topActions)
     }
     load()
@@ -409,7 +370,10 @@ export default function Home() {
       animate="show"
       style={{ paddingBottom: 120, background: 'var(--v3-bg)' }}
     >
-      {/* ─────────── GREETING + WEATHER CHIP ─────────── */}
+      {/* ─────────── GREETING + WEATHER CHIP ───────────
+          Tightened bottom padding 24 → 14 so the hero rides higher into
+          the viewport. The greeting reads as a single beat with the
+          hero, not a separate top zone. */}
       <motion.div
         variants={item}
         style={{
@@ -417,7 +381,7 @@ export default function Home() {
           alignItems: 'flex-start',
           justifyContent: 'space-between',
           gap: 16,
-          padding: '12px 20px 24px'
+          padding: '12px 16px 14px'
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -501,7 +465,7 @@ export default function Home() {
           entire width, breaking the column completely and dominating the
           screen. Bottom reflection blob spills below the card for cinematic
           depth. Heavier shadow + gold-tinted border gain. */}
-      <motion.div variants={item} style={{ padding: '0 0 40px', position: 'relative' }}>
+      <motion.div variants={item} style={{ padding: '0 0 20px', position: 'relative' }}>
         {/* BELOW-CARD REFLECTION — gold spill that bleeds out of the card's
             bottom edge. Reads as depth, not glow. */}
         <div aria-hidden="true" style={{
@@ -722,21 +686,53 @@ export default function Home() {
         </motion.div>
       </motion.div>
 
-      {/* ─────────── NEXT ACTIONS ───────────
-          Promoted ABOVE the KPI row (refinement-pass reorder): the
-          operator sees what to DO before what to LOOK AT. Per-job CTAs
-          tagged with urgency (danger/warn/success) so critical work
-          surfaces by color, not just position. */}
+      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
+          Strongest section on the screen after the hero. Gold-tinted
+          border + raised shadow + count badge in the eyebrow tells the
+          operator: this is what to DO. Per-job CTAs tagged with urgency
+          (danger/warn/success) so critical work surfaces by color. */}
       {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
           className="v3-section"
-          style={{ margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)' }}
+          style={{
+            margin: '0 var(--v3-gutter) 14px',
+            borderColor: 'rgba(212, 175, 55, 0.20)',
+            boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.20), 0 14px 36px rgba(212, 175, 55, 0.08), 0 14px 36px rgba(0, 0, 0, 0.22)'
+          }}
         >
-          <SectionHeader
-            label="Next Actions"
-            action={{ label: 'View all', onTap: () => navigate('/jobs') }}
-          />
+          <div className="v3-section-header">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+                Next Actions
+              </span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 20,
+                height: 20,
+                padding: '0 7px',
+                borderRadius: 999,
+                background: 'var(--v3-primary)',
+                color: 'var(--v3-on-primary)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 11,
+                letterSpacing: '0.04em',
+                lineHeight: 1
+              }}>
+                {nextActions.length}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => { hapticTap(); navigate('/jobs') }}
+              className="v3-section-link"
+            >
+              View all
+              <ChevronRight size={12} aria-hidden="true" />
+            </button>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
             {nextActions.map((action) => (
               <NextActionRow
@@ -752,128 +748,207 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* ─────────── TIER 2 — KPI ROW ───────────
-          Compact tiles on --v3-surface. Now demoted below Next Actions:
-          metrics support the work, they don't drive it. */}
+      {/* ─────────── CRITICAL INSIGHTS — KPIs ───────────
+          What needs attention but isn't an explicit action. Compact
+          tiles on the quiet section variant — supports the actions
+          above without competing for the eye. */}
       <motion.div
         variants={item}
         className="v3-section v3-section--quiet"
-        style={{
-          margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 10
-        }}
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
       >
-        <CompactKpi
-          tone="danger"
-          value={dealsAtRisk?.count}
-          label="Deals At Risk"
-          subline={dealsAtRisk?.value > 0 ? `$${dealsAtRisk.value.toLocaleString()}` : null}
-          onTap={() => navigate('/jobs')}
-        />
-        <CompactKpi
-          tone="primary"
-          value={jobsBehind}
-          label="Jobs Behind"
-          onTap={() => navigate('/schedule')}
-        />
-        <CompactKpi
-          tone="success"
-          value={invoicingWeek}
-          label="Invoicing This Week"
-          isMoney
-          onTap={() => navigate('/invoices')}
-        />
-      </motion.div>
-
-      {/* ─────────── TIER 3 — QUICK ACTIONS ───────────
-          Primary action (Add Lead) gets a subtle gold halo + slightly
-          larger icon to break the rigid 4-col into 1-primary + 3-secondary
-          without restructuring. */}
-      <motion.div
-        variants={item}
-        className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)' }}
-      >
-        <SectionHeader
-          label="Quick Actions"
-          action={{ label: 'Edit', onTap: () => navigate('/settings'), showChevron: false }}
-        />
-        {/* Quick Actions — asymmetric: primary "Add Lead" gets 2/5 of the row,
-            other 3 share the remaining 3/5. The eye lands on the primary
-            action immediately. Reads as "do this, or one of these three". */}
+        <SectionHeader label="Critical Insights" />
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '2fr 1fr 1fr 1fr',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 10,
+            marginTop: 4
+          }}
+        >
+          <CompactKpi
+            tone="danger"
+            value={dealsAtRisk?.count}
+            label="Deals At Risk"
+            subline={dealsAtRisk?.value > 0 ? `$${dealsAtRisk.value.toLocaleString()}` : null}
+            onTap={() => navigate('/jobs')}
+          />
+          <CompactKpi
+            tone="primary"
+            value={jobsBehind}
+            label="Jobs Behind"
+            onTap={() => navigate('/schedule')}
+          />
+          <CompactKpi
+            tone="success"
+            value={invoicingWeek}
+            label="Invoicing This Week"
+            isMoney
+            onTap={() => navigate('/invoices')}
+          />
+        </div>
+      </motion.div>
+
+      {/* ─────────── PIPELINE PREVIEW ───────────
+          Top 3 active deals by value. Replaces the old Live Feed:
+          forward-looking ("what's open and worth most") instead of
+          backward-looking ("what just happened"). Tap a row to drill
+          into the contact, or "View all" to open the board. */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader
+          label="Pipeline Preview"
+          action={{ label: 'View all', onTap: () => navigate('/jobs') }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+          {topPipeline == null ? (
+            <>
+              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 12 }} />
+              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 12, opacity: 0.65 }} />
+            </>
+          ) : topPipeline.length === 0 ? (
+            <div className="v3-empty">
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+                No active deals.
+              </div>
+              <div style={{ fontSize: 12 }}>Add your first lead to start the pipeline.</div>
+            </div>
+          ) : (
+            topPipeline.map((deal) => (
+              <PipelineDealRow
+                key={deal.id}
+                deal={deal}
+                onTap={() => navigate(`/jobs/${deal.id}`)}
+              />
+            ))
+          )}
+        </div>
+      </motion.div>
+
+      {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
+          Demoted to the bottom of the screen as a tools toolbar.
+          Equal-width tight tiles (no asymmetric primary) — the eye
+          treats this as a launcher, not a CTA. Save Note / Schedule /
+          Invoice / Estimate read as parallel power tools. */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--tight"
+        style={{ margin: '0 var(--v3-gutter) 32px' }}
+      >
+        <SectionHeader label="Quick Tools" />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
             gap: 8,
             marginTop: 4
           }}
         >
-          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
-          <QuickAction icon={CalendarRange} label="Schedule Crew" onTap={() => navigate('/schedule')} />
-          <QuickAction icon={Receipt} label="Send Invoice" onTap={() => navigate('/invoices')} />
-          <QuickAction icon={FileText} label="New Estimate" onTap={() => navigate('/bid')} />
-        </div>
-      </motion.div>
-
-      {/* ─────────── TIER 3 — LIVE FEED ───────────
-          Rows on --v3-surface (matches KPIs, lower than hero). Hover lift
-          to invite the tap. Empty state lives quietly below. */}
-      <motion.div
-        variants={item}
-        className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) 40px' }}
-      >
-        <SectionHeader
-          label="Live Feed"
-          action={{ label: 'View all', onTap: () => navigate('/jobs') }}
-        />
-        <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}
-        >
-        {feed == null ? (
-          <>
-            <div className="v3-skeleton" style={{ height: 60, width: '100%', borderRadius: 16 }} />
-            <div className="v3-skeleton" style={{ height: 60, width: '100%', borderRadius: 16, opacity: 0.6 }} />
-          </>
-        ) : feed.length === 0 ? (
-          <div className="v3-empty">
-            <Activity size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div className="v3-caption" style={{ marginBottom: 12 }}>
-              Quiet right now. No recent activity yet.
-            </div>
-            <button
-              type="button"
-              className="v3-btn v3-btn--secondary v3-btn--sm"
-              onClick={() => navigate('/jobs?new=1')}
-            >
-              Add your first lead
-            </button>
-          </div>
-        ) : (
-          feed.map((row) => (
-            <motion.div
-              key={row.id}
-              whileHover={{ y: -1 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            >
-              <FeedRow
-                type={row.type}
-                title={row.title}
-                detail={row.detail}
-                timestamp={row.timestamp}
-                pillTone={row.pillTone}
-                pillLabel={row.pillLabel}
-                onTap={() => row.contactId ? navigate(`/jobs/${row.contactId}`) : navigate('/jobs')}
-              />
-            </motion.div>
-          ))
-        )}
+          <QuickAction icon={Plus} label="Add Lead" onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
+          <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
+          <QuickAction icon={FileText} label="Estimate" onTap={() => navigate('/bid')} />
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+/* ============================================================
+   PipelineDealRow — single deal row inside Pipeline Preview.
+   Stage chip on the left + name + amount in Bebas. Hover lifts
+   border/background, tap navigates to the contact.
+   ============================================================ */
+const STAGE_DISPLAY = {
+  lead:    { label: 'Lead',    color: '#60A5FA' },
+  quote:   { label: 'Quote',   color: '#A78BFA' },
+  job:     { label: 'Job',     color: 'var(--v3-success-bright)' },
+  invoice: { label: 'Invoice', color: 'var(--v3-primary)' }
+}
+
+function PipelineDealRow({ deal, onTap }) {
+  const stage = STAGE_DISPLAY[deal.stage] || { label: deal.stage, color: 'var(--v3-text-muted)' }
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -1 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        padding: '12px 14px',
+        borderRadius: 12,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.03) inset',
+        transition: 'border-color 200ms ease, background-color 200ms ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
+        e.currentTarget.style.background = 'var(--v3-surface-2)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--v3-border)'
+        e.currentTarget.style.background = 'var(--v3-surface)'
+      }}
+    >
+      <span aria-hidden="true" style={{
+        flexShrink: 0,
+        width: 4,
+        height: 28,
+        borderRadius: 2,
+        background: stage.color,
+        boxShadow: `0 0 8px ${stage.color}40`
+      }} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'var(--v3-text)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}>
+          {deal.name}
+        </div>
+        <div style={{
+          marginTop: 2,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.10em',
+          textTransform: 'uppercase',
+          color: stage.color
+        }}>
+          {stage.label}
+        </div>
+      </div>
+      <div style={{
+        flexShrink: 0,
+        fontFamily: 'var(--font-display)',
+        fontSize: 22,
+        color: 'var(--v3-text)',
+        fontVariantNumeric: 'tabular-nums',
+        lineHeight: 1
+      }}>
+        ${deal.amount >= 1000
+          ? `${(deal.amount / 1000).toFixed(deal.amount >= 10000 ? 0 : 1)}K`
+          : deal.amount.toLocaleString()}
+      </div>
+      <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+    </motion.button>
   )
 }
 
