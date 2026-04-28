@@ -8,6 +8,7 @@ import { ProfileProvider } from './contexts/ProfileContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import './styles/tokens.css'
 import './styles/global.css'
+import './styles/v3.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -89,6 +89,45 @@
   --z-modal: 80;
   --z-toast: 120;
   --z-cmdk: 140;
+
+  /* ============================================================
+     v3 SPEC TOKENS — canonical names from FieldHorse v3 design
+     system. Aliased to existing tokens where values match; new
+     where the spec calls for a different value. New v3 code
+     should reference these names directly; legacy --field-gold /
+     --onyx / --ink-* still work for unmigrated screens.
+     ============================================================ */
+  --v3-bg: #0B0B0D;
+  --v3-surface: #141418;
+  --v3-surface-2: #1C1C22;
+  --v3-primary: #D4AF37;        /* spec gold — hotter than --field-gold */
+  --v3-primary-soft: rgba(212,175,55,0.12);
+  --v3-success: #2ECC71;        /* spec green — brighter than --signal-green */
+  --v3-success-soft: rgba(46,204,113,0.12);
+  --v3-danger: #C0392B;         /* matches --alert-red */
+  --v3-danger-soft: rgba(192,57,43,0.12);
+  --v3-text: #FFFFFF;
+  --v3-text-muted: #A1A1AA;
+  --v3-border: rgba(255,255,255,0.06);
+  --v3-border-strong: rgba(255,255,255,0.10);
+
+  /* Spec radii: cards 16, buttons 12, pills 999 */
+  --v3-radius-card: 16px;
+  --v3-radius-btn: 12px;
+  --v3-radius-pill: 999px;
+
+  /* Spec elevation: subtle only */
+  --v3-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  --v3-shadow-lg: 0 16px 48px rgba(0,0,0,0.45);
+
+  /* Spec spacing (8pt) — exposed for inline-style consumers */
+  --v3-s-1: 4px;
+  --v3-s-2: 8px;
+  --v3-s-3: 16px;
+  --v3-s-4: 24px;
+  --v3-s-5: 32px;
+  --v3-s-6: 48px;
+  --v3-s-7: 64px;
 }
 
 /* Explicit dark theme — set on <html data-theme="dark"> OR via prefers-color-scheme */
