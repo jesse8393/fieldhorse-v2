@@ -578,32 +578,72 @@ export default function Home() {
           </div>
 
           {/* Inline trend signal — answers "is this number good?" within 1 second.
-              Renders only when we have a comparable previous-week value. */}
-          {trendPct != null && (
+              Renders only when we have a comparable previous-week value.
+              Trend + attention-count read together: revenue → trend → action. */}
+          {(trendPct != null || (nextActions && nextActions.length > 0)) && (
             <div style={{
               position: 'relative',
               marginTop: 10,
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              fontFamily: 'var(--font-body)',
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: '0.005em',
-              color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
-              fontVariantNumeric: 'tabular-nums'
+              gap: 12,
+              flexWrap: 'wrap'
             }}>
-              {trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-              {trendUp ? '+' : ''}{trendPct}% vs last week
-              {!trendUp && (
-                <span style={{
-                  marginLeft: 4,
-                  fontSize: 12, fontWeight: 600,
-                  color: 'var(--v3-text-muted)',
-                  letterSpacing: 0
+              {trendPct != null && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  letterSpacing: '0.005em',
+                  color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
+                  fontVariantNumeric: 'tabular-nums'
                 }}>
-                  — needs attention
-                </span>
+                  {trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                  {trendUp ? '+' : ''}{trendPct}% vs last week
+                  {!trendUp && (
+                    <span style={{
+                      marginLeft: 4,
+                      fontSize: 12, fontWeight: 600,
+                      color: 'var(--v3-text-muted)',
+                      letterSpacing: 0
+                    }}>
+                      — needs attention
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Attention-count signal — connects the hero number to the
+                  Next Actions section directly below. Subtle: muted text +
+                  small gold dot. Visible: tabular nums, tight gap. */}
+              {nextActions && nextActions.length > 0 && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--v3-text-muted)',
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
+                  <span aria-hidden="true" style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: 'var(--v3-primary)',
+                    boxShadow: '0 0 8px rgba(212, 175, 55, 0.6)'
+                  }} />
+                  <strong style={{
+                    color: 'var(--v3-primary)',
+                    fontWeight: 700,
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    {nextActions.length}
+                  </strong>
+                  {nextActions.length === 1 ? 'action needs' : 'actions need'} attention today
+                </div>
               )}
             </div>
           )}
@@ -938,11 +978,17 @@ function NextActionRow({ action, onTap }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        padding: '10px 14px 10px 16px',
+        // Tighter again: 9/12/9/14 saves ~6px height per row.
+        padding: '9px 12px 9px 14px',
         borderRadius: 12,
-        background: 'var(--v3-surface)',
+        // Subtle linear top-light overlay + slightly raised surface mix
+        // so each row reads as a metal plate, not a list item.
+        background: `
+          linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 40%),
+          var(--v3-surface)
+        `,
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.25)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         width: '100%',

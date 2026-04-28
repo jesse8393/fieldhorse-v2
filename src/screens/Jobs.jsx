@@ -251,8 +251,11 @@ export default function Jobs() {
         </div>
       </motion.div>
 
-      {/* LIST — auto-fit grid: 1 col on phone, 2 on tablet+, 3 on wide desktop */}
-      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', alignItems: 'stretch', gap: 10, padding: '0 20px 32px' }}>
+      {/* LIST — auto-fit grid. Density bumped: minmax 300 → 260, gap 10 → 8.
+          Net effect: 1 col on phone (≤520), 2 cols on tablet (520-820),
+          3 cols on small desktop (820-1080), 4 cols on wide (≥1080).
+          Was capping at 3 cols even on wide screens — left empty space. */}
+      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 20px 32px' }}>
         {loading && <SkeletonList rows={5} />}
         {!loading && filtered.length === 0 && (
           <EmptyView
