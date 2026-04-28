@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calculator, Sparkles } from 'lucide-react'
+import { Calculator, Sparkles, Copy, Check, FileText } from 'lucide-react'
 import { RATE_CARD, TRADE_LABELS } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
@@ -8,6 +8,7 @@ import { toastSuccess } from '../lib/toast.js'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
+import SectionHeader from '../components/v3/SectionHeader.jsx'
 
 const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Return ONLY JSON.`
 
@@ -24,6 +25,7 @@ export default function Bid() {
   const [err, setErr] = useState('')
   const [picks, setPicks] = useState([])
   const [jobType, setJobType] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const total = useMemo(() => {
     if (!bid) return null
@@ -57,16 +59,13 @@ export default function Bid() {
         const low = parsedBid.total_low || parsedBid.line_items?.reduce((s, li) => s + (li.rate_low * (li.qty || 1)), 0) || 0
         const high = parsedBid.total_high || parsedBid.line_items?.reduce((s, li) => s + (li.rate_high * (li.qty || 1)), 0) || 0
         const withMargin = ((low + high) / 2) / (1 - marginPct / 100)
-        hapticSuccess(); toastSuccess('Bid ready', money(Math.round(withMargin)))
+        hapticSuccess(); toastSuccess('Estimate ready', money(Math.round(withMargin)))
       } else {
-        setErr('AI returned no structured bid')
+        setErr('AI returned no structured estimate')
       }
     } catch (e) {
-      // Surface to console so a builder hitting "silent fail" has a
-      // trail in DevTools. The visible error block below the button
-      // also explains it + offers Fill Manually.
       console.error('[bid] generate failed:', e)
-      setErr(e.message || 'Bid generation failed')
+      setErr(e.message || 'Estimate generation failed')
     } finally {
       setGenerating(false)
     }
@@ -76,124 +75,223 @@ export default function Bid() {
     setPicks((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
   }
 
+  async function copyEstimate() {
+    if (!bid || !total) return
+    const lines = [
+      `${bid.summary || (jobType ? `${jobType} estimate` : 'Estimate')}`,
+      '',
+      `Recommended price (${marginPct}% margin): ${money(Math.round(total.withMargin))}`,
+      `Raw range: ${money(total.low)} – ${money(total.high)}`,
+      '',
+      'Line items:',
+      ...(bid.line_items || []).map((li) => `  • ${li.name}${li.notes ? ` — ${li.notes}` : ''} (${li.qty || 1} ${li.unit}: ${money((li.rate_low || 0) * (li.qty || 1))} – ${money((li.rate_high || 0) * (li.qty || 1))})`),
+      ...(bid.assumptions?.length ? ['', 'Assumptions:', ...bid.assumptions.map((a) => `  • ${a}`)] : []),
+      ...(bid.risks?.length ? ['', 'Risks:', ...bid.risks.map((r) => `  • ${r}`)] : [])
+    ]
+    await navigator.clipboard.writeText(lines.join('\n'))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+    toastSuccess('Estimate copied', 'Ready to paste into a proposal')
+  }
+
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 14px' }}>
+    <motion.div
+      className="v3-screen"
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+    >
+      {/* HEADER — premium estimating workspace identity */}
+      <motion.div
+        variants={item}
+        style={{
+          padding: '12px var(--v3-gutter) 18px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16
+        }}
+      >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Calculator size={11} />
             Estimates
           </span>
-          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            Build a clean{' '}
-            estimate.
+          <h1 className="v3-h1" style={{ marginTop: 6 }}>
+            Build a clean <em>estimate.</em>
           </h1>
-        </div>
-        <div
-          aria-hidden="true"
-          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}
-        >
-          <Calculator size={20} />
+          <p className="v3-caption" style={{ marginTop: 6, lineHeight: 1.5 }}>
+            Describe the scope. AI turns it into a structured bid with line items, ranges, and a recommended price.
+          </p>
         </div>
       </motion.div>
 
-      {/* FORM */}
-      <motion.div variants={item} className="fh-bid">
-        <div className="fh-bid__scope">
-          <label className="fh-field">
-            <span className="fh-field__k">Scope description</span>
-            <textarea
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-              rows={5}
-              placeholder="1,800 sqft rambler. Demo kitchen + two baths. New cabinets, LVP throughout, tile surrounds, electrical rough-in for island. Permit pulled."
-            />
-          </label>
-          <div className="fh-bid__trades">
-            <span className="fh-eye">Job type</span>
-            <div className="fh-chips">
+      {/* SCOPE INPUT CARD — primary workspace */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader label="Scope" />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 4 }}>
+          {/* Scope textarea */}
+          <textarea
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            rows={5}
+            placeholder="1,800 sqft rambler. Demo kitchen + two baths. New cabinets, LVP throughout, tile surrounds, electrical rough-in for island. Permit pulled."
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: 12,
+              background: 'var(--v3-surface-2)',
+              border: '1px solid var(--v3-border-strong)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 14,
+              lineHeight: 1.5,
+              outline: 'none',
+              resize: 'vertical',
+              minHeight: 120,
+              boxSizing: 'border-box'
+            }}
+          />
+
+          {/* Job type chips */}
+          <div>
+            <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Job type</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {JOB_TYPES.map((jt) => (
-                <button
+                <ChipButton
                   key={jt.value}
-                  type="button"
-                  className={`fh-chip${jobType === jt.value ? ' is-active' : ''}`}
+                  active={jobType === jt.value}
                   onClick={() => setJobType(jt.value === jobType ? '' : jt.value)}
-                >
-                  {jt.label}
-                </button>
+                  label={jt.label}
+                />
               ))}
             </div>
           </div>
-          <div className="fh-bid__trades">
-            <span className="fh-eye">Trades on job</span>
-            <div className="fh-chips">
+
+          {/* Trades chips */}
+          <div>
+            <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Trades on job</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {TRADES.map((t) => (
-                <button key={t} type="button" className={`fh-chip${picks.includes(t) ? ' is-active' : ''}`} onClick={() => togglePick(t)}>
-                  {TRADE_LABELS[t] || t}
-                </button>
+                <ChipButton
+                  key={t}
+                  active={picks.includes(t)}
+                  onClick={() => togglePick(t)}
+                  label={TRADE_LABELS[t] || t}
+                />
               ))}
             </div>
           </div>
-          <div className="fh-bid__margin">
-            <label className="fh-field">
-              <span className="fh-field__k">Target margin %</span>
-              <input type="range" min={10} max={50} step={1} value={marginPct} onChange={(e) => setMarginPct(Number(e.target.value))} />
-              <span className="fh-bid__marginval">{marginPct}%</span>
-            </label>
+
+          {/* Target margin slider */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span className="v3-eyebrow">Target margin</span>
+              <span style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 18,
+                color: 'var(--v3-primary)',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {marginPct}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={10}
+              max={50}
+              step={1}
+              value={marginPct}
+              onChange={(e) => setMarginPct(Number(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--v3-primary)' }}
+            />
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.10em',
+              color: 'var(--v3-text-muted)',
+              marginTop: 4
+            }}>
+              <span>10%</span>
+              <span>30%</span>
+              <span>50%</span>
+            </div>
           </div>
+
+          {/* Primary CTA */}
           <motion.button
             type="button"
-            whileTap={{ scale: 0.97 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => { hapticMedium(); generate() }}
             disabled={!scope.trim() || generating}
             style={{
-              marginTop: 8,
-              padding: '12px 18px',
+              marginTop: 4,
+              padding: '13px 18px',
               borderRadius: 12,
-              border: 'none',
-              background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-              color: 'var(--onyx)',
-              fontFamily: 'var(--font-display)',
-              fontSize: 15,
-              letterSpacing: '0.14em',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
+              background: !scope.trim() || generating
+                ? 'var(--v3-surface-2)'
+                : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+              color: !scope.trim() || generating ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
               cursor: !scope.trim() || generating ? 'default' : 'pointer',
-              boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
+              boxShadow: !scope.trim() || generating
+                ? 'none'
+                : '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              opacity: !scope.trim() || generating ? 0.55 : 1
+              minHeight: 48,
+              WebkitTapHighlightColor: 'transparent'
             }}
           >
             {generating ? (
-              <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.25)', borderTopColor: 'var(--onyx)', animation: 'fh-spin 700ms linear infinite' }} />
+              <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.25)', borderTopColor: 'var(--v3-on-primary)', animation: 'fh-spin 700ms linear infinite' }} />
             ) : (
               <Sparkles size={16} />
             )}
-            {generating ? 'CRUNCHING…' : 'GENERATE BID'}
+            {generating ? 'Generating estimate…' : 'Generate Estimate'}
           </motion.button>
-          {/* Loud + actionable error block instead of a tiny red one-liner.
-              Bid Engine was previously throwing inside generate() with no
-              visible result if the Anthropic key was missing or the API
-              was unreachable. Now: a clear card + "Fill manually" fallback
-              that opens a blank line-item shell, matching Compose's
-              graceful-degradation pattern. */}
+
+          {/* Error block — graceful degradation */}
           {err && (
-            <div role="alert" style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.4)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12.5, lineHeight: 1.4 }}>
-              <div style={{ fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>AI unavailable</div>
-              <div style={{ color: 'var(--ink-muted)', marginBottom: 8 }}>{err} — your scope is preserved. Fill in line items manually if you need this bid out the door.</div>
+            <div role="alert" style={{
+              padding: '12px 14px',
+              borderRadius: 12,
+              background: 'var(--v3-danger-soft)',
+              border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 12.5,
+              lineHeight: 1.5
+            }}>
+              <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
+              <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>
+                {err} — your scope is preserved. Fill in line items manually if you need this estimate out the door.
+              </div>
               <button
                 type="button"
                 onClick={() => {
                   setErr('')
-                  // Seed a blank bid shell so the line-items table renders
-                  // and the user can edit it. recalcs derive from line_items.
                   setBid({
                     summary: scope,
                     job_type: jobType || 'Renovation',
                     line_items: (picks.length ? picks : ['gc']).map((trade) => ({
+                      name: TRADE_LABELS[trade] || trade,
                       trade,
                       qty: 1,
                       unit: RATE_CARD[trade]?.unit || 'lot',
@@ -205,71 +303,267 @@ export default function Bid() {
                     assumptions: []
                   })
                 }}
-                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
+                style={{
+                  padding: '7px 13px',
+                  borderRadius: 10,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface-2)',
+                  color: 'var(--v3-text)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
               >
-                FILL MANUALLY →
+                Fill manually →
               </button>
             </div>
           )}
         </div>
+      </motion.div>
 
-        <AnimatePresence>
-          {bid && total && (
-            <motion.div
-              className="fh-bid__reveal"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
-            >
-              <div className="fh-bid__big">
-                <span className="fh-eye">With margin ({marginPct}%)</span>
-                <motion.span
-                  className="fh-bid__num"
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, type: 'spring', stiffness: 240, damping: 22 }}
-                >
-                  <CountUp to={Math.round(total.withMargin)} duration={0.9} prefix="$" formatter={formatThousands} />
-                </motion.span>
-                <span className="fh-bid__range">Raw: {money(total.low)} – {money(total.high)}</span>
-              </div>
+      {/* OUTPUT CARD — empty state OR generated estimate */}
+      <AnimatePresence mode="wait">
+        {bid && total ? (
+          <motion.div
+            key="result"
+            variants={item}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+            className="v3-section v3-section--primary"
+            style={{ margin: '0 var(--v3-gutter) 28px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={11} />
+                Recommended Price · {marginPct}% margin
+              </span>
+              <button
+                type="button"
+                onClick={copyEstimate}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface-2)',
+                  color: 'var(--v3-text)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
 
-              <div className="fh-bid__items">
-                <span className="fh-eye">Line items</span>
+            {/* Headline price */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+              <motion.div
+                className="v3-money"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 240, damping: 22 }}
+                style={{
+                  fontSize: 'clamp(40px, 9vw, 56px)',
+                  lineHeight: 0.95,
+                  letterSpacing: '-0.005em',
+                  color: 'var(--v3-text)'
+                }}
+              >
+                <CountUp to={Math.round(total.withMargin)} duration={0.9} prefix="$" formatter={formatThousands} />
+              </motion.div>
+              <span className="v3-caption" style={{ fontSize: 11 }}>
+                Raw range: {money(total.low)} – {money(total.high)}
+              </span>
+            </div>
+
+            {/* Summary line if present */}
+            {bid.summary && (
+              <p style={{
+                margin: '12px 0 0',
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: 'var(--v3-surface-2)',
+                border: '1px solid var(--v3-border)',
+                color: 'var(--v3-text)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 13,
+                lineHeight: 1.5
+              }}>
+                {bid.summary}
+              </p>
+            )}
+
+            {/* Line items */}
+            <div style={{
+              marginTop: 14,
+              paddingTop: 14,
+              borderTop: '1px solid var(--v3-border)'
+            }}>
+              <SectionHeader label="Line Items" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                 {bid.line_items?.map((li, i) => (
                   <motion.div
                     key={i}
-                    className="fh-bid__li"
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.15 + i * 0.04 }}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: 'var(--v3-surface)',
+                      border: '1px solid var(--v3-border)'
+                    }}
                   >
-                    <div>
-                      <strong>{li.name}</strong>
-                      {li.notes && <span className="fh-bid__li-note">{li.notes}</span>}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: 'var(--v3-text)'
+                      }}>
+                        {li.name}
+                      </div>
+                      {li.notes && (
+                        <div style={{ marginTop: 2, fontSize: 11, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
+                          {li.notes}
+                        </div>
+                      )}
                     </div>
-                    <span>{li.qty || 1} {li.unit}</span>
-                    <span>{money((li.rate_low || 0) * (li.qty || 1))} – {money((li.rate_high || 0) * (li.qty || 1))}</span>
+                    <span style={{
+                      flexShrink: 0,
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 11,
+                      color: 'var(--v3-text-muted)',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      {li.qty || 1} {li.unit}
+                    </span>
+                    <span style={{
+                      flexShrink: 0,
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 13,
+                      color: 'var(--v3-text)',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      {money((li.rate_low || 0) * (li.qty || 1))} – {money((li.rate_high || 0) * (li.qty || 1))}
+                    </span>
                   </motion.div>
                 ))}
               </div>
+            </div>
 
-              {bid.assumptions?.length > 0 && (
-                <div className="fh-bid__block">
-                  <span className="fh-eye">Assumptions</span>
-                  <ul>{bid.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>
-                </div>
-              )}
-              {bid.risks?.length > 0 && (
-                <div className="fh-bid__block fh-bid__block--warn">
-                  <span className="fh-eye">Risks</span>
-                  <ul>{bid.risks.map((r, i) => <li key={i}>{r}</li>)}</ul>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+            {/* Assumptions */}
+            {bid.assumptions?.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--v3-border)' }}>
+                <SectionHeader label="Assumptions" />
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.55 }}>
+                  {bid.assumptions.map((a, i) => <li key={i} style={{ marginBottom: 4 }}>{a}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {/* Risks */}
+            {bid.risks?.length > 0 && (
+              <div style={{
+                marginTop: 14,
+                padding: '12px 14px',
+                borderRadius: 10,
+                background: 'var(--v3-danger-soft)',
+                border: '1px solid color-mix(in srgb, var(--v3-danger) 30%, transparent)'
+              }}>
+                <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>Risks</span>
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.55 }}>
+                  {bid.risks.map((r, i) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
+                </ul>
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          /* Empty state — polished */
+          <motion.div
+            key="empty"
+            variants={item}
+            className="v3-section"
+            style={{ margin: '0 var(--v3-gutter) 28px' }}
+          >
+            <div style={{
+              padding: '32px 20px',
+              textAlign: 'center',
+              color: 'var(--v3-text-muted)',
+              fontFamily: 'var(--font-body)'
+            }}>
+              <div style={{
+                margin: '0 auto 14px',
+                width: 48,
+                height: 48,
+                borderRadius: 14,
+                background: 'var(--v3-primary-soft)',
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'var(--v3-primary)'
+              }}>
+                <FileText size={20} />
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+                Your estimate will appear here.
+              </div>
+              <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                Describe the scope above, pick a job type and trades, then tap <strong style={{ color: 'var(--v3-primary)' }}>Generate Estimate</strong>.
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
+  )
+}
+
+/* ============================================================
+   ChipButton — gold-gradient when active, surface when inactive.
+   Matches Jobs / Invoices / Subs filter pills app-wide.
+   ============================================================ */
+function ChipButton({ active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '7px 12px',
+        borderRadius: 999,
+        border: active
+          ? '1px solid color-mix(in srgb, var(--v3-primary) 70%, transparent)'
+          : '1px solid var(--v3-border-strong)',
+        background: active
+          ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+          : 'var(--v3-surface-2)',
+        color: active ? 'var(--v3-on-primary)' : 'var(--v3-text)',
+        fontFamily: 'var(--font-body)',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        boxShadow: active
+          ? '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+          : 'none',
+        transition: 'background 160ms ease, color 160ms ease, border-color 160ms ease'
+      }}
+    >
+      {label}
+    </button>
   )
 }

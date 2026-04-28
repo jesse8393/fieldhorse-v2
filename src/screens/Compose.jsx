@@ -8,8 +8,7 @@ import { claudeMessage } from '../lib/anthropic.js'
 import { toastSuccess } from '../lib/toast.js'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import ScanLine from '../components/fx/ScanLine.jsx'
+import SectionHeader from '../components/v3/SectionHeader.jsx'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -75,10 +74,6 @@ export default function Compose() {
       hapticSuccess(); setDraft(text)
       toastSuccess('Draft ready', 'Copy, send, or edit')
     } catch (e) {
-      // Audit caught the previous fallback returning a fake "AI unavailable
-      // — Hi there..." string regardless of input, which read as a real
-      // draft. Now: real error state with clear messaging + a manual
-      // textarea path so the user can still write a draft.
       console.error('[compose] generate failed:', e)
       const msg = String(e?.message || '').toLowerCase()
       if (msg.includes('missing_api_key') || msg.includes('500')) {
@@ -108,227 +103,363 @@ export default function Compose() {
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+    <motion.div
+      className="v3-screen"
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+    >
       {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 14px' }}>
+      <motion.div
+        variants={item}
+        style={{
+          padding: '12px var(--v3-gutter) 18px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16
+        }}
+      >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <PenLine size={11} />
             Compose
           </span>
-          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            Draft client{' '}
-            communication.
+          <h1 className="v3-h1" style={{ marginTop: 6 }}>
+            Draft client <em>communication.</em>
           </h1>
-        </div>
-        <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }} aria-hidden="true">
-          <PenLine size={20} />
+          <p className="v3-caption" style={{ marginTop: 6, lineHeight: 1.5 }}>
+            Clear, professional messages for leads, clients, and subs — drafted in seconds.
+          </p>
         </div>
       </motion.div>
 
-      {/* CHANNEL TOGGLE GROUP — inline-styled active state because Tailwind v4
-          alpha modifiers don't resolve on our @theme var()-based brand tokens. */}
-      <motion.div variants={item} style={{ padding: '0 20px 12px' }}>
-        <ToggleGroup
-          type="single"
-          value={channel}
-          onValueChange={(v) => { if (v) setChannel(v) }}
-          aria-label="Message channel"
-          style={{ display: 'flex', width: '100%', gap: 8 }}
-        >
-          {CHANNELS.map((ch) => {
-            const I = ch.Icon
-            const isOn = channel === ch.id
-            return (
-              <ToggleGroupItem
-                key={ch.id}
-                value={ch.id}
-                aria-label={ch.label}
-                style={{
-                  flex: 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  padding: '10px 12px',
-                  borderRadius: 12,
-                  border: isOn ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
-                  background: isOn ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)',
-                  color: isOn ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 160ms ease'
-                }}
+      {/* INPUT WORKSPACE */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader label="Draft a Message" />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 4 }}>
+          {/* Channel selector — matches Jobs filter pill style */}
+          <div>
+            <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Channel</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {CHANNELS.map((ch) => {
+                const I = ch.Icon
+                const isOn = channel === ch.id
+                return (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => setChannel(ch.id)}
+                    aria-pressed={isOn}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      padding: '10px 12px',
+                      borderRadius: 12,
+                      border: isOn
+                        ? '1px solid color-mix(in srgb, var(--v3-primary) 70%, transparent)'
+                        : '1px solid var(--v3-border-strong)',
+                      background: isOn
+                        ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+                        : 'var(--v3-surface-2)',
+                      color: isOn ? 'var(--v3-on-primary)' : 'var(--v3-text)',
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                      WebkitTapHighlightColor: 'transparent',
+                      boxShadow: isOn
+                        ? '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                        : 'none',
+                      transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease'
+                    }}
+                  >
+                    <I size={14} />
+                    {ch.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Intent + Contact row (responsive) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
+            <Field label="Intent">
+              <select
+                value={intent}
+                onChange={(e) => setIntent(e.target.value)}
+                style={selectStyle}
               >
-                <I size={14} />
-                {ch.label}
-              </ToggleGroupItem>
-            )
-          })}
-        </ToggleGroup>
-      </motion.div>
+                {INTENTS.map((i) => <option key={i} value={i}>{i}</option>)}
+              </select>
+            </Field>
 
-      {/* FORM */}
-      <motion.div variants={item} style={{ padding: '0 20px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={fieldLabelStyle}>Intent</span>
-          <select
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            style={selectStyle}
-          >
-            {INTENTS.map((i) => <option key={i} value={i}>{i}</option>)}
-          </select>
-        </label>
+            <Field label="Contact">
+              <select
+                value={contactId}
+                onChange={(e) => setContactId(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">No contact (generic message)</option>
+                {contacts.map((c) => {
+                  const tail = c.job_title || c.job_type || c.stage || ''
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{tail ? ` — ${tail}` : ''}
+                    </option>
+                  )
+                })}
+              </select>
+            </Field>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={fieldLabelStyle}>Contact</span>
-          <select
-            value={contactId}
-            onChange={(e) => setContactId(e.target.value)}
-            style={selectStyle}
-          >
-            <option value="">No contact (generic)</option>
-            {contacts.map((c) => {
-              const tail = c.job_title || c.job_type || c.stage || ''
-              return (
-                <option key={c.id} value={c.id}>
-                  {c.name}{tail ? ` — ${tail}` : ''}
-                </option>
-              )
-            })}
-          </select>
-        </label>
+            <Field label="Extra context">
+              <textarea
+                rows={3}
+                value={context}
+                onChange={(e) => setContext(e.target.value)}
+                placeholder="Anything to highlight — price change, delay reason, specific material…"
+                style={{ ...selectStyle, resize: 'vertical', minHeight: 80, fontFamily: 'var(--font-body)' }}
+              />
+            </Field>
+          </div>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={fieldLabelStyle}>Extra context</span>
-          <textarea
-            rows={3}
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            placeholder="Anything to highlight — price change, delay reason, specific material…"
-            style={{ ...selectStyle, resize: 'vertical', minHeight: 80 }}
-          />
-        </label>
-
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.97 }}
-          onClick={() => { hapticMedium(); generate() }}
-          disabled={loading}
-          style={{
-            marginTop: 4,
-            padding: '12px 16px',
-            borderRadius: 12,
-            border: 'none',
-            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-            color: 'var(--onyx)',
-            fontFamily: 'var(--font-display)',
-            fontSize: 15,
-            letterSpacing: '0.14em',
-            cursor: loading ? 'default' : 'pointer',
-            boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            opacity: loading ? 0.65 : 1
-          }}
-        >
-          <Sparkles size={16} />
-          {loading ? 'WRITING…' : 'GENERATE DRAFT'}
-        </motion.button>
-      </motion.div>
-
-      {/* AI ERROR — replaces the silent fake-fallback. Shows the real
-          reason (key missing / network) + a manual textarea so the user
-          can still write a draft without AI. */}
-      {error && !draft && (
-        <motion.div variants={item} role="alert" style={{ margin: '0 20px 14px', padding: '14px 16px', borderRadius: 14, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.4)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--alert-red)', marginBottom: 6 }}>AI unavailable</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-muted)', marginBottom: 10, lineHeight: 1.4 }}>{error}</div>
-          <button
+          {/* Primary CTA */}
+          <motion.button
             type="button"
-            onClick={() => { setError(''); setDraft(' ') }}
-            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
-          >
-            WRITE MANUALLY →
-          </button>
-        </motion.div>
-      )}
-
-      {/* AI RESPONSE CARD */}
-      <AnimatePresence>
-        {draft && (
-          <motion.div
-            key="draft"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => { hapticMedium(); generate() }}
+            disabled={loading}
             style={{
-              position: 'relative',
-              margin: '0 20px 20px',
-              padding: '14px 16px 12px',
-              borderRadius: 16,
-              background: 'linear-gradient(135deg, rgba(201,150,58,0.08), rgba(201,150,58,0.02))',
-              border: '1px solid rgba(201,150,58,0.3)',
-              overflow: 'hidden'
+              marginTop: 4,
+              padding: '13px 18px',
+              borderRadius: 12,
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
+              background: loading
+                ? 'var(--v3-surface-2)'
+                : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+              color: loading ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              cursor: loading ? 'default' : 'pointer',
+              boxShadow: loading
+                ? 'none'
+                : '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              minHeight: 48,
+              WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <ScanLine />
-            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-                <Sparkles size={12} />
-                Draft
+            {loading ? (
+              <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.25)', borderTopColor: 'var(--v3-on-primary)', animation: 'fh-spin 700ms linear infinite' }} />
+            ) : (
+              <Sparkles size={16} />
+            )}
+            {loading ? 'Drafting…' : 'Generate Draft'}
+          </motion.button>
+
+          {/* Error block */}
+          {error && !draft && (
+            <div role="alert" style={{
+              padding: '12px 14px',
+              borderRadius: 12,
+              background: 'var(--v3-danger-soft)',
+              border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 12.5,
+              lineHeight: 1.5
+            }}>
+              <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
+              <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>{error}</div>
+              <button
+                type="button"
+                onClick={() => { setError(''); setDraft(' ') }}
+                style={{
+                  padding: '7px 13px',
+                  borderRadius: 10,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface-2)',
+                  color: 'var(--v3-text)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Write manually →
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* OUTPUT CARD — empty state OR generated draft */}
+      <AnimatePresence mode="wait">
+        {draft ? (
+          <motion.div
+            key="draft"
+            variants={item}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+            className="v3-section v3-section--primary"
+            style={{ margin: '0 var(--v3-gutter) 28px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={11} />
+                Draft · {CHANNELS.find((c) => c.id === channel)?.label}
               </span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: 'var(--v3-text-muted)',
+                fontFamily: 'var(--font-body)',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
                 {draft.length} chars
               </span>
-            </header>
+            </div>
+
             <pre
               style={{
                 margin: 0,
-                padding: 0,
+                padding: '14px 16px',
+                borderRadius: 12,
+                background: 'var(--v3-surface-2)',
+                border: '1px solid var(--v3-border)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 14,
-                lineHeight: 1.5,
-                color: 'var(--ink-strong)',
+                lineHeight: 1.55,
+                color: 'var(--v3-text)',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}
             >
               {draft}
             </pre>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+
+            {/* Action row */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <button
                 type="button"
                 onClick={copy}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '9px 14px',
+                  borderRadius: 10,
+                  background: 'var(--v3-surface-2)',
+                  border: '1px solid var(--v3-border-strong)',
+                  color: 'var(--v3-text)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
               >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? <Check size={13} /> : <Copy size={13} />}
                 {copied ? 'Copied' : 'Copy'}
               </button>
               {channel === 'voice' ? (
                 <button
                   type="button"
                   disabled
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'default' }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '9px 14px',
+                    borderRadius: 10,
+                    background: 'var(--v3-surface-2)',
+                    border: '1px solid var(--v3-border)',
+                    color: 'var(--v3-text-muted)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'default'
+                  }}
                 >
-                  <Mic size={14} />
-                  Voice script
+                  <Mic size={13} />
+                  Voicemail script
                 </button>
               ) : contact && (
                 <button
                   type="button"
                   onClick={sendAction}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '9px 14px',
+                    borderRadius: 10,
+                    border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
+                    background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                    color: 'var(--v3-on-primary)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 4px 12px rgba(229, 193, 88, 0.30), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                  }}
                 >
-                  <Send size={14} />
+                  <Send size={13} />
                   Open {channel === 'email' ? 'email' : 'SMS'}
                 </button>
               )}
+            </div>
+          </motion.div>
+        ) : (
+          /* Empty state */
+          <motion.div
+            key="empty"
+            variants={item}
+            className="v3-section"
+            style={{ margin: '0 var(--v3-gutter) 28px' }}
+          >
+            <div style={{
+              padding: '32px 20px',
+              textAlign: 'center',
+              color: 'var(--v3-text-muted)',
+              fontFamily: 'var(--font-body)'
+            }}>
+              <div style={{
+                margin: '0 auto 14px',
+                width: 48,
+                height: 48,
+                borderRadius: 14,
+                background: 'var(--v3-primary-soft)',
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'var(--v3-primary)'
+              }}>
+                <PenLine size={20} />
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+                Your draft will appear here.
+              </div>
+              <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                Pick a channel + intent above, then tap <strong style={{ color: 'var(--v3-primary)' }}>Generate Draft</strong>.
+              </div>
             </div>
           </motion.div>
         )}
@@ -337,21 +468,28 @@ export default function Compose() {
   )
 }
 
-const fieldLabelStyle = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-  color: 'var(--ink-muted)'
+/* ============================================================
+   Field — labelled input wrapper. Uses v3-eyebrow label style
+   for consistency with the rest of the app's form fields.
+   ============================================================ */
+function Field({ label, children }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span className="v3-eyebrow">{label}</span>
+      {children}
+    </label>
+  )
 }
 
 const selectStyle = {
   padding: '11px 14px',
   borderRadius: 12,
-  background: 'var(--surface-2)',
-  border: '1px solid var(--rule)',
-  color: 'var(--ink-strong)',
+  background: 'var(--v3-surface-2)',
+  border: '1px solid var(--v3-border-strong)',
+  color: 'var(--v3-text)',
   fontFamily: 'var(--font-body)',
   fontSize: 13,
-  outline: 'none'
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box'
 }
