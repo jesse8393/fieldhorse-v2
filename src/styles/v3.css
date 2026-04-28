@@ -292,17 +292,19 @@
   pointer-events: none;
   background: radial-gradient(110% 70% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 50%);
 }
-/* Top edge stroke — 1px white gradient that catches the eye and reads
-   as the leading edge of a glass surface. Subtle but premium. */
+/* Top edge stroke — 1px gradient with subtle glow. Pushed brighter
+   (16% → 28% white) + a 6px ambient glow so it reads as a real lit
+   leading edge, not a hairline. Linear/Stripe premium tier. */
 .v3-section::after {
   content: '';
   position: absolute;
   top: 0;
-  left: 12%;
-  right: 12%;
+  left: 10%;
+  right: 10%;
   height: 1px;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.16) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.32) 50%, transparent 100%);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.18);
 }
 .v3-section > * { position: relative; z-index: 1; }
 
@@ -318,27 +320,31 @@
 .v3-section--quiet::before { display: none; }
 .v3-section--quiet::after { opacity: 0.5; }
 
-/* Primary section variant — gold-toned. Use for the most important
-   zone on a screen (Next Actions on Home). Gold-tinted border,
-   gold-tinted ambient shadow, gold gradient top stroke. */
+/* Primary section variant — gold-toned, pushed harder.
+   Border 28% → 48% gold; ambient gold halo bumped 14% → 22% peak;
+   top stroke now genuinely bright with a real glow. */
 .v3-section--primary {
-  border-color: rgba(229, 193, 88, 0.28);
+  border-color: rgba(229, 193, 88, 0.48);
+  background:
+    linear-gradient(180deg, rgba(229, 193, 88, 0.06) 0%, transparent 60%),
+    var(--v3-section-bg);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.08) inset,
-    0 1px 2px rgba(0, 0, 0, 0.32),
-    0 16px 40px rgba(0, 0, 0, 0.34),
-    0 12px 36px rgba(229, 193, 88, 0.14);
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 1px 2px rgba(0, 0, 0, 0.42),
+    0 24px 56px rgba(0, 0, 0, 0.48),
+    0 18px 48px rgba(229, 193, 88, 0.22);
 }
 .v3-section--primary::before {
   background:
-    radial-gradient(110% 70% at 0% 0%, rgba(229, 193, 88, 0.10), transparent 55%),
-    radial-gradient(80% 50% at 100% 100%, rgba(229, 193, 88, 0.06), transparent 60%);
+    radial-gradient(110% 70% at 0% 0%, rgba(229, 193, 88, 0.20), transparent 55%),
+    radial-gradient(80% 50% at 100% 100%, rgba(229, 193, 88, 0.10), transparent 60%);
 }
 .v3-section--primary::after {
-  left: 8%;
-  right: 8%;
-  background: linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%);
-  box-shadow: 0 0 8px rgba(229, 193, 88, 0.45);
+  left: 6%;
+  right: 6%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.85) 50%, transparent 100%);
+  box-shadow: 0 0 14px rgba(229, 193, 88, 0.65);
 }
 
 /* When a card sits directly inside a section, give it a real edge —
@@ -439,32 +445,25 @@
   gap: 6px;
 }
 
-/* ---------- Cinematic page vignette ----------
-   Page-level radial overlays that frame the content like a stage. Two
-   layers: top-center gold "stage light" (subtle ambient) + corner
-   vignette (4 darkening blobs at the screen corners) so the eye is
-   pulled toward the active middle. Fixed positioning so it doesn't
-   move when the user scrolls; pointer-events disabled.
-
-   Effect is intentionally restrained — peak alpha 4-6%. Visible as
-   "depth", invisible as "decoration". */
+/* ---------- Page background (premium-pass) ----------
+   .v3-screen is the page floor. Two layered effects:
+     1. Subtle gradient mesh at the top — gold "stage light" + a cool
+        balance on the opposite side. Caps at the top zone so it
+        doesn't bleed into the content area.
+     2. SVG noise grain (5% opacity) — gives the dark surface real
+        texture instead of perfectly flat black. Stripe / Linear use
+        this trick at the page level. */
 .v3-screen {
   position: relative;
-}
-.v3-screen::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
   background:
-    /* Top-center stage light — gold, very subtle */
-    radial-gradient(ellipse 90% 50% at 50% -8%, rgba(212, 175, 55, 0.05), transparent 60%),
-    /* Corner darkening — vignette */
-    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(0, 0, 0, 0.45), transparent 55%),
-    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0, 0, 0, 0.45), transparent 55%);
+    /* 1px noise grain — barely perceptible, kills banding */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* Top stage light — gold, capped at top 360px */
+    radial-gradient(ellipse 110% 360px at 50% 0%, rgba(229, 193, 88, 0.07), transparent 65%),
+    var(--v3-bg);
+  background-attachment: scroll, scroll, scroll;
 }
-/* Page content rides above the vignette */
+/* Page content rides above the bg */
 .v3-screen > * {
   position: relative;
   z-index: 1;

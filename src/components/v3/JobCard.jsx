@@ -141,9 +141,9 @@ const JobCard = memo(function JobCard({
       // 0 18px 48px / 0.6 (was 14px / 36 / 0.45) so the lift reads as
       // weight, not just float. Framer animates literal hex values.
       whileHover={{
-        y: -3,
-        backgroundColor: '#1C1C22',
-        boxShadow: '0 18px 48px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3)'
+        y: -4,
+        backgroundColor: '#282834',
+        boxShadow: '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
       }}
       style={{
         position: 'relative',
@@ -152,28 +152,39 @@ const JobCard = memo(function JobCard({
         gap: 14,
         width: '100%',
         boxSizing: 'border-box',
-        padding: '16px',
+        padding: '18px 18px 18px 22px',
         borderRadius: 'var(--v3-radius-card)',
-        background: '#141418', // literal so framer hover transition is smooth
-        border: '1px solid var(--v3-border)',
+        background: '#16161E', // literal so framer hover transition is smooth
+        border: '1px solid rgba(255, 255, 255, 0.22)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
         overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)' // base elevation
+        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30)'
       }}
     >
-      {/* Stage-color spine — left-edge accent makes each card feel like a
-          real object identified by its pipeline position. Glow ties it to
-          the progress bar at the bottom (same color, same glow alpha). */}
+      {/* Stage-color spine — left-edge accent. Pushed: 4px wide,
+          stronger glow, fades into the card via gradient. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
         left: 0, top: 14, bottom: 12,
-        width: 3,
-        background: stageColor,
-        borderRadius: '0 3px 3px 0',
-        boxShadow: `0 0 12px ${stageColor}77`,
+        width: 4,
+        background: `linear-gradient(180deg, ${stageColor}, color-mix(in srgb, ${stageColor} 55%, transparent))`,
+        borderRadius: '0 4px 4px 0',
+        boxShadow: `0 0 16px ${stageColor}AA, 0 0 28px ${stageColor}33`,
+        pointerEvents: 'none'
+      }} />
+
+      {/* Top edge gradient stroke — gives each card its own lit leading edge.
+          Same Stripe/Linear premium identity as v3 sections, scaled down. */}
+      <span aria-hidden="true" style={{
+        position: 'absolute',
+        top: 0,
+        left: '14%',
+        right: '14%',
+        height: 1,
+        background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.20) 50%, transparent 100%)',
         pointerEvents: 'none'
       }} />
 
@@ -260,11 +271,14 @@ const JobCard = memo(function JobCard({
         }}>
           <div style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 22,
-            letterSpacing: '0.01em',
+            fontSize: 26,
+            letterSpacing: '-0.005em',
             color: Number(contact.amount || 0) > 0 ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
             fontVariantNumeric: 'tabular-nums',
-            lineHeight: 1
+            lineHeight: 1,
+            textShadow: Number(contact.amount || 0) > 0
+              ? '0 2px 12px rgba(229, 193, 88, 0.32)'
+              : 'none'
           }}>
             {money(contact.amount)}
           </div>

@@ -115,10 +115,14 @@
   --v3-danger-soft: rgba(239, 68, 68, 0.14);
   --v3-text: #FFFFFF;
   --v3-text-muted: #A1A1AA;
-  /* Borders — bumped 5%/10% → 8%/14% so cards/sections actually have
-     edges you can see. Linear / Superhuman tier visibility. */
-  --v3-border: rgba(255, 255, 255, 0.08);
-  --v3-border-strong: rgba(255, 255, 255, 0.14);
+  /* Borders — push #3: pushed again to 11%/22%. Cards now read with
+     real edges instead of disappearing into the surface. The strong
+     variant approaches Linear's selected-state border alpha. */
+  --v3-border: rgba(255, 255, 255, 0.11);
+  --v3-border-strong: rgba(255, 255, 255, 0.22);
+  /* Translucent glass tint — used over surfaces for the "Apple glass"
+     layered look (toolbars, hero overlays). Pair with backdrop-filter. */
+  --v3-glass-tint: rgba(255, 255, 255, 0.04);
 
   /* Spec radii: cards 16, buttons 12, pills 999 */
   --v3-radius-card: 16px;
@@ -173,13 +177,16 @@
      ============================================================ */
   --v3-surface-page: #11111A;
 
-  /* Section container — pushed harder:
-     stronger gradient lift (top-down 4% → 0.8% white) + brighter
-     inner highlight + bigger ambient shadow + 12% white hairline.
-     Reads as visibly elevated off the page floor. */
-  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.040) 0%, rgba(255, 255, 255, 0.008) 100%), var(--v3-surface-page);
-  --v3-section-border: rgba(255, 255, 255, 0.10);
-  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 1px 2px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.34);
+  /* Section container — push #3:
+     - gradient lift bumped 4→6% white at top
+     - inner highlight bumped 8→14% white
+     - border bumped 10→16% white (real edge)
+     - shadow stack deeper (key shadow 34→48% black) so sections
+       cast against the page like real surfaces
+     Tuned at the Linear/Superhuman selected-state visibility level. */
+  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.060) 0%, rgba(255, 255, 255, 0.012) 100%), var(--v3-surface-page);
+  --v3-section-border: rgba(255, 255, 255, 0.16);
+  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 1px 2px rgba(0, 0, 0, 0.42), 0 24px 56px rgba(0, 0, 0, 0.48);
   --v3-section-radius: 20px;
 
   /* Standardized vertical rhythm — used by .v3-stack-* helpers and

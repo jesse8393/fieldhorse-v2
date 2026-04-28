@@ -489,12 +489,12 @@ export default function Home() {
             // on the page like a wide command-center bar.
             borderRadius: 24,
             background: `
-              radial-gradient(120% 80% at 100% 0%, rgba(229, 193, 88, 0.32), transparent 55%),
-              radial-gradient(80% 60% at 0% 100%, rgba(229, 193, 88, 0.18), transparent 60%),
-              linear-gradient(125deg, rgba(229, 193, 88, 0.08) 0%, transparent 38%, transparent 62%, rgba(229, 193, 88, 0.08) 100%),
+              radial-gradient(120% 80% at 100% 0%, rgba(229, 193, 88, 0.42), transparent 55%),
+              radial-gradient(80% 60% at 0% 100%, rgba(229, 193, 88, 0.22), transparent 60%),
+              linear-gradient(125deg, rgba(229, 193, 88, 0.12) 0%, transparent 38%, transparent 62%, rgba(229, 193, 88, 0.12) 100%),
               var(--v3-surface-2)
             `,
-            border: '1px solid color-mix(in srgb, var(--v3-primary) 42%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
             boxShadow: 'var(--v3-shadow-hero)',
             overflow: 'hidden',
             zIndex: 1
@@ -564,12 +564,12 @@ export default function Home() {
             <div
               className="v3-money"
               style={{
-                fontSize: 'clamp(56px, 14vw, 88px)',
-                lineHeight: 0.95,
-                letterSpacing: '0.005em',
+                fontSize: 'clamp(64px, 16vw, 104px)',
+                lineHeight: 0.92,
+                letterSpacing: '-0.005em',
                 color: '#FFFFFF',
-                textShadow: '0 4px 24px rgba(229, 193, 88, 0.35), 0 1px 0 rgba(255, 255, 255, 0.10)',
-                filter: 'drop-shadow(0 2px 16px rgba(229, 193, 88, 0.18))'
+                textShadow: '0 6px 32px rgba(229, 193, 88, 0.45), 0 1px 0 rgba(255, 255, 255, 0.14)',
+                filter: 'drop-shadow(0 4px 22px rgba(229, 193, 88, 0.26))'
               }}
             >
               {pipeline == null ? (

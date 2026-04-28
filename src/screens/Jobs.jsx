@@ -241,27 +241,46 @@ export default function Jobs() {
                   flexShrink: 0,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
+                  gap: 8,
+                  padding: '9px 16px',
                   borderRadius: 999,
                   border: isActive
-                    ? '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)'
-                    : '1px solid var(--v3-border)',
+                    ? '1px solid color-mix(in srgb, var(--v3-primary) 75%, transparent)'
+                    : '1px solid var(--v3-border-strong)',
                   background: isActive
-                    ? 'var(--v3-primary-soft)'
-                    : 'transparent',
-                  color: isActive ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+                    ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+                    : 'var(--v3-surface)',
+                  color: isActive ? 'var(--v3-on-primary)' : 'var(--v3-text)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
                   fontWeight: 700,
                   letterSpacing: '0.04em',
                   cursor: 'pointer',
                   WebkitTapHighlightColor: 'transparent',
-                  transition: 'background-color 160ms ease, border-color 160ms ease, color 160ms ease'
+                  boxShadow: isActive
+                    ? '0 0 0 3px rgba(229, 193, 88, 0.18), 0 6px 18px rgba(229, 193, 88, 0.36), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                    : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 2px 8px rgba(0, 0, 0, 0.20)',
+                  transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 200ms ease'
                 }}
               >
                 {t.label}
-                <span style={{ fontSize: 10, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 18,
+                  height: 18,
+                  padding: '0 5px',
+                  borderRadius: 999,
+                  background: isActive
+                    ? 'rgba(11, 11, 13, 0.22)'
+                    : 'var(--v3-surface-2)',
+                  color: isActive ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums',
+                  lineHeight: 1
+                }}>
                   {tabCounts[t.id] ?? 0}
                 </span>
               </button>
