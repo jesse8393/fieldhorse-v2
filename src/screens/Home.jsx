@@ -516,15 +516,36 @@ export default function Home() {
           }}
         >
           {/* Top-right ambient sweep — adds the "command center" feel without
-              reading as a flashy gradient. ~5% gold, blends out to nothing. */}
-          <div aria-hidden="true" style={{
-            position: 'absolute',
-            top: -120, right: -100,
-            width: 320, height: 320,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.12), transparent 65%)',
-            pointerEvents: 'none'
-          }} />
+              reading as a flashy gradient. ~5% gold, blends out to nothing.
+              `fh-hero-drift` translates -22px/+10px over 22s so the hero
+              feels alive without anyone consciously noticing the motion. */}
+          <div
+            aria-hidden="true"
+            className="fh-hero-drift"
+            style={{
+              position: 'absolute',
+              top: -120, right: -100,
+              width: 320, height: 320,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.12), transparent 65%)',
+              pointerEvents: 'none'
+            }}
+          />
+
+          {/* Behind-number glow — sits beneath the $ amount specifically so
+              the eye lands on it first. Wider, lower-opacity radial. */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: 64, left: 0,
+              width: 360, height: 200,
+              borderRadius: '50%',
+              background: 'radial-gradient(closest-side, rgba(212, 175, 55, 0.13), transparent 70%)',
+              pointerEvents: 'none',
+              filter: 'blur(8px)'
+            }}
+          />
 
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <span style={{
@@ -969,10 +990,18 @@ function NextActionRow({ action, onTap }) {
       type="button"
       onClick={() => { hapticTap(); onTap?.() }}
       whileTap={{ scale: 0.97 }}
-      whileHover={{ y: -2 }}
-      // Snappier spring (stiffness 620 / damping 28) so tap reads as an
-      // immediate key-press, not a soft squish. Hover lift still smooth.
-      transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+      // Hover: lift + shift right 2px + brighter surface. Reads as a control
+      // being depressed/highlighted. Surface bump #141418 → #1A1A20 (subtle
+      // brighten — never approaching --v3-surface-2 territory which would
+      // collide with the card hover treatment elsewhere).
+      whileHover={{
+        y: -2,
+        x: 2,
+        backgroundColor: '#1A1A20'
+      }}
+      // Snappier spring (stiffness 720 / damping 26) so tap + hover both
+      // read as immediate key-presses, not soft squishes.
+      transition={{ type: 'spring', stiffness: 720, damping: 26 }}
       style={{
         position: 'relative',
         display: 'flex',

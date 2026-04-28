@@ -97,7 +97,9 @@
      should reference these names directly; legacy --field-gold /
      --onyx / --ink-* still work for unmigrated screens.
      ============================================================ */
-  --v3-bg: #0B0B0D;
+  /* bg darkened from #0B0B0D → #07070A to lift surfaces 1-step higher
+     against the page (final-polish contrast bump). Surfaces unchanged. */
+  --v3-bg: #07070A;
   --v3-surface: #141418;
   --v3-surface-2: #1C1C22;
   --v3-primary: #D4AF37;        /* spec gold — hotter than --field-gold */

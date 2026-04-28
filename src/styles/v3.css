@@ -270,3 +270,19 @@
   outline: 2px solid var(--v3-primary);
   outline-offset: 2px;
 }
+
+/* ---------- Hero ambient drift ----------
+   Very slow translate on the hero's gold corner blob — gives the card a
+   barely-perceptible "alive" quality without ever drawing the eye.
+   22s round-trip; opacity dips slightly mid-cycle so it breathes. */
+@keyframes fh-hero-drift {
+  0%, 100% { transform: translate(0, 0); opacity: 1; }
+  50%      { transform: translate(-22px, 10px); opacity: 0.82; }
+}
+.fh-hero-drift {
+  animation: fh-hero-drift 22s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fh-hero-drift { animation: none; }
+}

@@ -136,13 +136,14 @@ const JobCard = memo(function JobCard({
         : { duration: 0.22, delay: Math.min(index * 0.035, 0.22), ease: [0.2, 0.8, 0.2, 1] }
       }
       whileTap={{ scale: 0.97 }}
-      // Hover lift + surface elevation (#141418 → #1C1C22) + heavier shadow.
-      // Framer animates between literal color values so we use the hex
-      // literals matching --v3-surface / --v3-surface-2.
+      // Hover lift + surface elevation (#141418 → #1C1C22) + heavier shadow
+      // for "trustworthy object" depth. Confidence pass: shadow now
+      // 0 18px 48px / 0.6 (was 14px / 36 / 0.45) so the lift reads as
+      // weight, not just float. Framer animates literal hex values.
       whileHover={{
         y: -3,
         backgroundColor: '#1C1C22',
-        boxShadow: '0 14px 36px rgba(0, 0, 0, 0.45)'
+        boxShadow: '0 18px 48px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3)'
       }}
       style={{
         position: 'relative',
