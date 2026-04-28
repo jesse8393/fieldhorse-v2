@@ -6,7 +6,6 @@ import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIc
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
-import { Switch } from '@/components/ui/switch'
 
 const PRIMARY = [
   { to: '/', label: 'Home', icon: 'home', end: true },
@@ -37,8 +36,9 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const navigate = useNavigate()
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const userEmail = user?.email || ''
 
   // Lock body scroll and listen for Escape while drawer is open
   useEffect(() => {
@@ -91,53 +91,61 @@ export default function BottomNav() {
             aria-label="More tools"
           >
             <div className="fh-drawer__grip" aria-hidden="true" />
-            {/* HEADER — Command Center identity */}
+            {/* HEADER — small FH wordmark + close. Was an h1 + eyebrow
+                that ate too much vertical space; the drawer is for
+                navigation, not branding. */}
             <header
-              className="fh-drawer__head"
               style={{
                 display: 'flex',
-                alignItems: 'flex-end',
+                alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: 10,
-                padding: '6px 20px 18px'
+                padding: '4px 18px 12px'
               }}
             >
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
-                  Navigation
-                </span>
-                <h2 className="v3-h1" style={{ marginTop: 6 }}>
-                  Field<em>horse.</em>
-                </h2>
-              </div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'baseline',
+                  gap: 0,
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 18,
+                  letterSpacing: '0.16em',
+                  lineHeight: 1
+                }}
+              >
+                <span style={{ color: 'var(--v3-primary)' }}>FIELD</span>
+                <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
+              </span>
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}
                 aria-label="Close"
                 style={{
                   flexShrink: 0,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
                   border: '1px solid var(--v3-border-strong)',
-                  background: 'var(--v3-surface-2)',
-                  color: 'var(--v3-text)',
+                  background: 'transparent',
+                  color: 'var(--v3-text-muted)',
                   display: 'grid',
                   placeItems: 'center',
                   cursor: 'pointer',
                   WebkitTapHighlightColor: 'transparent'
                 }}
               >
-                <X size={16} />
+                <X size={14} />
               </button>
             </header>
 
-            {/* BODY — flat nav list per v3 mockup. One row per
-                destination, hairline separators, no stacked cards. */}
+            {/* BODY — flat nav list. Tighter rows, no per-row dividers.
+                Spacing alone separates items. */}
             <nav
-              className="fh-drawer__body"
               style={{
-                padding: '4px var(--v3-gutter) 18px',
+                flex: 1,
+                overflowY: 'auto',
+                padding: '4px 10px 12px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 0,
@@ -145,73 +153,108 @@ export default function BottomNav() {
               }}
               aria-label="Navigation"
             >
-              {NAV_ITEMS.map((it, i) => (
-                <NavRow
-                  key={it.to}
-                  item={it}
-                  onTap={() => go(it.to)}
-                  showDivider={i < NAV_ITEMS.length - 1}
-                />
+              {NAV_ITEMS.map((it) => (
+                <NavRow key={it.to} item={it} onTap={() => go(it.to)} />
               ))}
             </nav>
 
-            {/* FOOT — theme + sign out, v3 surfaces */}
+            {/* ACCOUNT BLOCK — single inline row at the bottom.
+                email · theme toggle (icon button) · sign out (icon button)
+                Replaces the prior bulky two-card foot. */}
             <div
-              className="fh-drawer__foot"
               style={{
-                padding: '18px var(--v3-gutter) 24px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: 10
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 18px calc(14px + env(safe-area-inset-bottom, 0px))',
+                borderTop: '1px solid var(--v3-border)',
+                background: 'transparent'
               }}
             >
               <div
                 style={{
+                  flex: 1,
+                  minWidth: 0,
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 16px',
-                  borderRadius: 14,
-                  background: 'var(--v3-surface-2)',
-                  border: '1px solid var(--v3-border-strong)',
-                  boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.18)'
+                  flexDirection: 'column',
+                  gap: 2
                 }}
               >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600 }}>
-                  {theme === 'dark' ? <Moon size={16} color="var(--v3-primary)" /> : <Sun size={16} color="var(--v3-primary)" />}
-                  {theme === 'dark' ? 'Dark theme' : 'Light theme'}
+                <span
+                  className="v3-eyebrow"
+                  style={{ color: 'var(--v3-text-muted)' }}
+                >
+                  Account
                 </span>
-                <Switch
-                  checked={theme === 'dark'}
-                  onCheckedChange={() => toggleTheme()}
-                  aria-label="Toggle theme"
-                />
+                {userEmail && (
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--v3-text)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {userEmail}
+                  </span>
+                )}
               </div>
-              <motion.button
+
+              <button
                 type="button"
-                whileTap={{ scale: 0.97 }}
-                onClick={handleSignOut}
+                onClick={() => toggleTheme()}
+                aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '14px 16px',
-                  borderRadius: 14,
-                  background: 'var(--v3-danger-soft)',
-                  border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
-                  color: 'var(--v3-danger-bright)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 14,
-                  fontWeight: 700,
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface)',
+                  color: 'var(--v3-primary)',
+                  display: 'grid',
+                  placeItems: 'center',
                   cursor: 'pointer',
-                  minHeight: 48,
                   WebkitTapHighlightColor: 'transparent'
                 }}
               >
-                <LogOut size={16} />
-                Sign out
-              </motion.button>
+                {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSignOut}
+                aria-label="Sign out"
+                title="Sign out"
+                style={{
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface)',
+                  color: 'var(--v3-text-muted)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'color 140ms ease, border-color 140ms ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--v3-danger-bright)'
+                  e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger) 50%, transparent)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--v3-text-muted)'
+                  e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
+                }}
+              >
+                <LogOut size={15} />
+              </button>
             </div>
           </motion.div>
         </div>
@@ -265,12 +308,13 @@ export default function BottomNav() {
 }
 
 /* ============================================================
-   NavRow — single line in the flat navigation drawer.
-   Per v3 mockup: gold icon, label, chevron, hairline divider.
-   No card chrome, no caption, no per-item border — the whole
-   list reads as a clean nav, not stacked tiles.
+   NavRow — premium navigation row.
+   Tight 44px row, 28px gold icon tile, label, chevron.
+   Hover paints a rounded surface-2 wash so the whole row reads
+   as a tappable target. No per-row dividers — spacing alone
+   separates items in the new compact drawer.
    ============================================================ */
-function NavRow({ item, onTap, showDivider }) {
+function NavRow({ item, onTap }) {
   const I = item.Icon
   return (
     <button
@@ -279,16 +323,16 @@ function NavRow({ item, onTap, showDivider }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
+        gap: 12,
         width: '100%',
-        padding: '14px 4px',
+        padding: '8px 10px',
         background: 'transparent',
         border: 'none',
-        borderBottom: showDivider ? '1px solid var(--v3-border)' : 'none',
+        borderRadius: 10,
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
-        minHeight: 56,
+        minHeight: 44,
         WebkitTapHighlightColor: 'transparent',
         transition: 'background-color 140ms ease'
       }}
@@ -303,8 +347,8 @@ function NavRow({ item, onTap, showDivider }) {
         aria-hidden="true"
         style={{
           flexShrink: 0,
-          width: 32,
-          height: 32,
+          width: 28,
+          height: 28,
           borderRadius: 8,
           display: 'grid',
           placeItems: 'center',
@@ -312,19 +356,19 @@ function NavRow({ item, onTap, showDivider }) {
           color: 'var(--v3-primary)'
         }}
       >
-        <I size={16} />
+        <I size={14} />
       </span>
       <span style={{
         flex: 1,
         fontFamily: 'var(--font-body)',
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: 500,
         color: 'var(--v3-text)',
         letterSpacing: '-0.005em'
       }}>
         {item.label}
       </span>
-      <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+      <ChevronRight size={14} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
     </button>
   )
 }
