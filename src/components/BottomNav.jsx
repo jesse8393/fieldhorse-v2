@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun, Hammer, Receipt, CloudSun } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun, Hammer, Receipt, CloudSun, FileText } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
@@ -15,41 +15,36 @@ const PRIMARY = [
   { to: '/schedule', label: 'Schedule', icon: 'schedule' }
 ]
 
+/* Command-center grouping — by INTENT, not category. Each item carries
+   a one-line caption so the drawer reads as a tour of systems, not a
+   list of links. Order: revenue/work first → people → field → system. */
 const MORE_GROUPS = [
   {
-    label: 'Money tools',
+    label: 'Run Your Business',
     items: [
-      { to: '/bid', label: 'AI Bid Engine', Icon: Calculator },
-      { to: '/invoices', label: 'Invoices', Icon: Receipt },
-      { to: '/compose', label: 'AI Compose', Icon: MessageSquare },
-      { to: '/analytics', label: 'Analytics', Icon: BarChart3 }
+      { to: '/bid',       label: 'AI Bid Engine', Icon: Calculator, caption: 'Build estimates with AI' },
+      { to: '/invoices',  label: 'Invoices',      Icon: Receipt,    caption: 'Send and chase payments' },
+      { to: '/analytics', label: 'Analytics',     Icon: BarChart3,  caption: 'Pipeline + revenue trends' }
     ]
   },
   {
-    label: 'People',
+    label: 'People & Operations',
     items: [
-      { to: '/subs', label: 'Sub directory', Icon: Hammer }
+      { to: '/subs',    label: 'Sub Directory', Icon: Hammer,         caption: 'Subs, trades, contacts' },
+      { to: '/compose', label: 'AI Compose',    Icon: MessageSquare,  caption: 'Draft client messages' }
     ]
   },
   {
-    label: 'Field',
+    label: 'Field & Planning',
     items: [
-      // Forecast was unreachable from the nav — only entry was the
-      // weather card on Home. Surface it here so it's discoverable
-      // from any screen.
-      { to: '/pour-window', label: 'Forecast', Icon: CloudSun }
+      { to: '/pour-window', label: 'Forecast', Icon: CloudSun, caption: 'Weather-aware pour windows' }
     ]
   },
   {
-    label: 'Data',
+    label: 'System',
     items: [
-      { to: '/import', label: 'Import Data', Icon: Upload }
-    ]
-  },
-  {
-    label: 'App',
-    items: [
-      { to: '/settings', label: 'Settings', Icon: SettingsIcon }
+      { to: '/import',   label: 'Import Data', Icon: Upload,       caption: 'Bring in jobs, clients, sheets' },
+      { to: '/settings', label: 'Settings',    Icon: SettingsIcon, caption: 'Profile, billing, theme' }
     ]
   }
 ]
@@ -111,81 +106,105 @@ export default function BottomNav() {
             aria-label="More tools"
           >
             <div className="fh-drawer__grip" aria-hidden="true" />
-            <header className="fh-drawer__head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, padding: '4px 20px 16px' }}>
+            {/* HEADER — Command Center identity */}
+            <header
+              className="fh-drawer__head"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                gap: 10,
+                padding: '6px 20px 18px'
+              }}
+            >
               <div style={{ minWidth: 0, flex: 1 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-                  Shortcuts
+                <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+                  Command Center
                 </span>
-                <h2
-                  className="fh-font-serif"
-                  style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
-                >
-                  More{' '}
-                  <em className="fh-font-serif-italic fh-text-gradient-gold">tools.</em>
+                <h2 className="v3-h1" style={{ marginTop: 6 }}>
+                  Run your <em>company.</em>
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}
                 aria-label="Close"
-                style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+                style={{
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface-2)',
+                  color: 'var(--v3-text)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
               >
                 <X size={16} />
               </button>
             </header>
 
-            <div className="fh-drawer__body" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {MORE_GROUPS.map((group) => (
-                <section key={group.label}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: 8 }}>
-                    {group.label}
+            {/* BODY — each group as a v3-section, items as system-entry tiles */}
+            <div
+              className="fh-drawer__body"
+              style={{
+                padding: '0 var(--v3-gutter)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14
+              }}
+            >
+              {MORE_GROUPS.map((group, gi) => (
+                <section
+                  key={group.label}
+                  className={gi === 0 ? 'v3-section v3-section--primary' : 'v3-section'}
+                >
+                  <div className="v3-section-header">
+                    <span className="v3-eyebrow" style={gi === 0 ? { color: 'var(--v3-primary)' } : undefined}>
+                      {group.label}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {group.items.map((it) => {
-                      const I = it.Icon
-                      return (
-                        <button
-                          key={it.to}
-                          type="button"
-                          onClick={() => go(it.to)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            padding: '12px 14px',
-                            borderRadius: 12,
-                            background: 'var(--surface-2)',
-                            border: '1px solid var(--rule)',
-                            color: 'var(--ink-strong)',
-                            fontFamily: 'var(--font-body)',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            minHeight: 44,
-                            width: '100%'
-                          }}
-                        >
-                          <span
-                            aria-hidden="true"
-                            style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)' }}
-                          >
-                            <I size={16} />
-                          </span>
-                          <span style={{ flex: 1 }}>{it.label}</span>
-                          <ChevronRight size={14} color="var(--ink-faint)" />
-                        </button>
-                      )
-                    })}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {group.items.map((it) => (
+                      <SystemEntryTile
+                        key={it.to}
+                        item={it}
+                        emphasized={gi === 0}
+                        onTap={() => go(it.to)}
+                      />
+                    ))}
                   </div>
                 </section>
               ))}
             </div>
 
-            <div className="fh-drawer__foot" style={{ padding: '18px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600 }}>
-                  {theme === 'dark' ? <Moon size={16} color="var(--field-gold-bright)" /> : <Sun size={16} color="var(--field-gold-bright)" />}
+            {/* FOOT — theme + sign out, v3 surfaces */}
+            <div
+              className="fh-drawer__foot"
+              style={{
+                padding: '18px var(--v3-gutter) 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 16px',
+                  borderRadius: 14,
+                  background: 'var(--v3-surface-2)',
+                  border: '1px solid var(--v3-border-strong)',
+                  boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.30)'
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600 }}>
+                  {theme === 'dark' ? <Moon size={16} color="var(--v3-primary)" /> : <Sun size={16} color="var(--v3-primary)" />}
                   {theme === 'dark' ? 'Dark theme' : 'Light theme'}
                 </span>
                 <Switch
@@ -203,16 +222,17 @@ export default function BottomNav() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 8,
-                  padding: '12px 14px',
-                  borderRadius: 12,
-                  background: 'rgba(192,57,43,0.12)',
-                  border: '1px solid rgba(192,57,43,0.35)',
-                  color: 'var(--alert-red)',
+                  padding: '14px 16px',
+                  borderRadius: 14,
+                  background: 'var(--v3-danger-soft)',
+                  border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
+                  color: 'var(--v3-danger-bright)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 14,
                   fontWeight: 700,
                   cursor: 'pointer',
-                minHeight: 44
+                  minHeight: 48,
+                  WebkitTapHighlightColor: 'transparent'
                 }}
               >
                 <LogOut size={16} />
@@ -267,5 +287,118 @@ export default function BottomNav() {
 
       {typeof document !== 'undefined' && createPortal(drawer, document.body)}
     </>
+  )
+}
+
+/* ============================================================
+   SystemEntryTile — single item inside the Command Center drawer.
+   Reads as an entry point into a system (large gold icon tile, label,
+   one-line caption explaining what it does), not a list row.
+
+     [▤]  AI Bid Engine                                          ›
+          Build estimates with AI
+
+   Hover lifts the surface to surface-3 + tints the border + bumps
+   the icon halo. Emphasized = stronger gold treatment for the
+   "Run Your Business" group.
+   ============================================================ */
+function SystemEntryTile({ item, emphasized = false, onTap }) {
+  const I = item.Icon
+  return (
+    <motion.button
+      type="button"
+      onClick={onTap}
+      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -1 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        width: '100%',
+        padding: '14px 14px',
+        borderRadius: 14,
+        background: 'var(--v3-surface)',
+        border: emphasized
+          ? '1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))'
+          : '1px solid var(--v3-border-strong)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        minHeight: 64,
+        WebkitTapHighlightColor: 'transparent',
+        boxShadow: emphasized
+          ? '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 4px 14px rgba(0, 0, 0, 0.32), 0 4px 16px rgba(229, 193, 88, 0.10)'
+          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+        transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = emphasized
+          ? 'color-mix(in srgb, var(--v3-primary) 40%, transparent)'
+          : 'rgba(255, 255, 255, 0.20)'
+        e.currentTarget.style.background = 'var(--v3-surface-3)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = emphasized
+          ? 'color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))'
+          : 'var(--v3-border-strong)'
+        e.currentTarget.style.background = 'var(--v3-surface)'
+      }}
+    >
+      {/* Icon tile — big, gold-tinted, premium glass */}
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 44,
+          height: 44,
+          borderRadius: 12,
+          display: 'grid',
+          placeItems: 'center',
+          background: emphasized
+            ? 'linear-gradient(135deg, rgba(229, 193, 88, 0.22), rgba(229, 193, 88, 0.06))'
+            : 'var(--v3-primary-soft)',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+          color: 'var(--v3-primary)',
+          boxShadow: emphasized
+            ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18)'
+            : 'inset 0 1px 0 rgba(255, 255, 255, 0.06)'
+        }}
+      >
+        <I size={20} />
+      </span>
+
+      {/* Label + caption stack */}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 15,
+            fontWeight: 600,
+            color: 'var(--v3-text)',
+            letterSpacing: '-0.005em',
+            lineHeight: 1.25
+          }}
+        >
+          {item.label}
+        </div>
+        {item.caption ? (
+          <div
+            style={{
+              marginTop: 3,
+              fontFamily: 'var(--font-body)',
+              fontSize: 12,
+              fontWeight: 400,
+              color: 'var(--v3-text-muted)',
+              lineHeight: 1.35
+            }}
+          >
+            {item.caption}
+          </div>
+        ) : null}
+      </div>
+
+      <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+    </motion.button>
   )
 }
