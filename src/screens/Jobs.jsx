@@ -15,6 +15,7 @@ import { ACTIVE_STAGES } from '../lib/stages.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { toastSuccess } from '../lib/toast.js'
 import { useFhMotion } from '../lib/motion.js'
+import { fetchCoverPhotosByJob } from '../lib/photos.js'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
 // Tabs collapse 6 raw stages to 5 honest groupings.
@@ -52,18 +53,28 @@ export default function Jobs() {
   const [addOpen, setAddOpen] = useState(false)
   const [justAddedId, setJustAddedId] = useState(null)
   const [drawerContact, setDrawerContact] = useState(null)
+  // Cover photos by job_id. Populated alongside contacts; ONE batch query
+  // + ONE batch signed-URL call (see lib/photos.js). Empty map = fall back
+  // to JobCard's stage-tinted initial tile.
+  const [photoUrlByJob, setPhotoUrlByJob] = useState({})
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('fh_contacts')
-      .select('*, fh_clients(name)')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-    if (!error) setContacts(data || [])
+    // Run contacts + cover-photos in parallel. Photos failure is non-fatal
+    // (we just keep the existing photo map / fall back to initials).
+    const [contactsRes, photoMap] = await Promise.all([
+      supabase
+        .from('fh_contacts')
+        .select('*, fh_clients(name)')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false }),
+      fetchCoverPhotosByJob(user.id).catch(() => ({}))
+    ])
+    if (!contactsRes.error) setContacts(contactsRes.data || [])
+    setPhotoUrlByJob(photoMap || {})
     setLoading(false)
   }, [user, refreshTick])
 
@@ -275,6 +286,7 @@ export default function Jobs() {
                   index={i}
                   isNew={c.id === justAddedId}
                   viewerUserId={user?.id}
+                  photoUrl={photoUrlByJob[c.id]}
                   onOpen={openDrawer}
                 />
               </SwipeableRow>
