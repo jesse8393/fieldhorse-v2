@@ -187,20 +187,11 @@ export default function OverviewTab({
       />
 
       {/* RECENT ACTIVITY */}
-      <div>
+      <div className="v3-section">
         <SectionHeader title="Recent Activity" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
           {activityRows.length === 0 ? (
-            <div style={{
-              padding: '20px 18px',
-              borderRadius: 16,
-              background: 'var(--v3-surface)',
-              border: '1px dashed var(--v3-border-strong)',
-              textAlign: 'center',
-              color: 'var(--v3-text-muted)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 13
-            }}>
+            <div className="v3-empty">
               Nothing logged yet. Crew check-ins, payments, and schedule changes appear here.
             </div>
           ) : (

@@ -144,6 +144,42 @@
   /* Subtle white tracks for progress bars + timeline connectors. */
   --v3-track: rgba(255, 255, 255, 0.06);
   --v3-track-strong: rgba(255, 255, 255, 0.10);
+
+  /* ============================================================
+     LAYERED SURFACE SYSTEM (depth pass)
+     Ascending elevation so screens feel like a stack of layers,
+     not flat dark zones. Page → section container → card → raised.
+       --v3-bg          #07070A  (page floor — already defined)
+       --v3-surface-page #0E0E13  (section group background)
+       --v3-surface     #141418  (card — already defined)
+       --v3-surface-2   #1C1C22  (raised/hovered card — already defined)
+     Each layer lifts ~0.7 L*; total range stays subtle but legible.
+     ============================================================ */
+  --v3-surface-page: #0E0E13;
+
+  /* Section container — combines a soft tonal lift, an inner top
+     highlight (mimics light catching the leading edge), and a low
+     shadow so the section reads as elevated off the page floor.
+     Tuned so depth is visible without ever looking decorative. */
+  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.020) 0%, rgba(255, 255, 255, 0.004) 100%), var(--v3-surface-page);
+  --v3-section-border: rgba(255, 255, 255, 0.05);
+  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 2px rgba(0, 0, 0, 0.20), 0 12px 32px rgba(0, 0, 0, 0.18);
+  --v3-section-radius: 20px;
+
+  /* Standardized vertical rhythm — used by .v3-stack-* helpers and
+     screen padding so we stop reaching for ad-hoc 24/28/32 values. */
+  --v3-rhythm-screen: 20px;     /* between top-level sections */
+  --v3-rhythm-section: 16px;    /* between rows inside a section */
+  --v3-rhythm-tight: 10px;      /* related items */
+  --v3-rhythm-loose: 32px;      /* major zone breaks (hero → grid) */
+
+  /* Section interior padding (use on .v3-section variants) */
+  --v3-pad-section: 18px;
+  --v3-pad-section-tight: 14px;
+
+  /* Screen edge gutter — single source of truth for L/R page padding.
+     Was hardcoded as 20px in many screens; now token-driven. */
+  --v3-gutter: 16px;
 }
 
 /* Explicit dark theme — set on <html data-theme="dark"> OR via prefers-color-scheme */

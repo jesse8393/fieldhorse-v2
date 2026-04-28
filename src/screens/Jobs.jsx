@@ -462,16 +462,7 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
 function EmptyView({ hasFilter, onAdd }) {
   if (hasFilter) {
     return (
-      <div style={{
-        gridColumn: '1 / -1',
-        padding: '32px 20px',
-        borderRadius: 14,
-        background: 'var(--v3-surface)',
-        border: '1px dashed var(--v3-border-strong)',
-        textAlign: 'center',
-        color: 'var(--v3-text-muted)',
-        fontFamily: 'var(--font-body)'
-      }}>
+      <div className="v3-empty" style={{ gridColumn: '1 / -1' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
           No jobs match that filter.
         </div>
@@ -480,16 +471,7 @@ function EmptyView({ hasFilter, onAdd }) {
     )
   }
   return (
-    <div style={{
-      gridColumn: '1 / -1',
-      padding: '32px 20px',
-      borderRadius: 14,
-      background: 'var(--v3-surface)',
-      border: '1px dashed var(--v3-border-strong)',
-      textAlign: 'center',
-      color: 'var(--v3-text-muted)',
-      fontFamily: 'var(--font-body)'
-    }}>
+    <div className="v3-empty" style={{ gridColumn: '1 / -1' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
         No jobs on the board.
       </div>

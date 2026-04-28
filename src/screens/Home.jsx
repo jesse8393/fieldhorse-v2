@@ -728,17 +728,16 @@ export default function Home() {
           tagged with urgency (danger/warn/success) so critical work
           surfaces by color, not just position. */}
       {nextActions != null && nextActions.length > 0 && (
-        <>
-          <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
-            <SectionHeader
-              label="Next Actions"
-              action={{ label: 'View all', onTap: () => navigate('/jobs') }}
-            />
-          </motion.div>
-          <motion.div
-            variants={item}
-            style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 20px 28px' }}
-          >
+        <motion.div
+          variants={item}
+          className="v3-section"
+          style={{ margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)' }}
+        >
+          <SectionHeader
+            label="Next Actions"
+            action={{ label: 'View all', onTap: () => navigate('/jobs') }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
             {nextActions.map((action) => (
               <NextActionRow
                 key={action.id}
@@ -749,8 +748,8 @@ export default function Home() {
                 }
               />
             ))}
-          </motion.div>
-        </>
+          </div>
+        </motion.div>
       )}
 
       {/* ─────────── TIER 2 — KPI ROW ───────────
@@ -758,11 +757,12 @@ export default function Home() {
           metrics support the work, they don't drive it. */}
       <motion.div
         variants={item}
+        className="v3-section v3-section--quiet"
         style={{
+          margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)',
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 10,
-          padding: '0 20px 28px'
+          gap: 10
         }}
       >
         <CompactKpi
@@ -791,58 +791,55 @@ export default function Home() {
           Primary action (Add Lead) gets a subtle gold halo + slightly
           larger icon to break the rigid 4-col into 1-primary + 3-secondary
           without restructuring. */}
-      <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)' }}
+      >
         <SectionHeader
           label="Quick Actions"
           action={{ label: 'Edit', onTap: () => navigate('/settings'), showChevron: false }}
         />
-      </motion.div>
-      {/* Quick Actions — asymmetric: primary "Add Lead" gets 2/5 of the row,
-          other 3 share the remaining 3/5. The eye lands on the primary
-          action immediately. Reads as "do this, or one of these three". */}
-      <motion.div
-        variants={item}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr 1fr 1fr',
-          gap: 8,
-          padding: '0 20px 28px'
-        }}
-      >
-        <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
-        <QuickAction icon={CalendarRange} label="Schedule Crew" onTap={() => navigate('/schedule')} />
-        <QuickAction icon={Receipt} label="Send Invoice" onTap={() => navigate('/invoices')} />
-        <QuickAction icon={FileText} label="New Estimate" onTap={() => navigate('/bid')} />
+        {/* Quick Actions — asymmetric: primary "Add Lead" gets 2/5 of the row,
+            other 3 share the remaining 3/5. The eye lands on the primary
+            action immediately. Reads as "do this, or one of these three". */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '2fr 1fr 1fr 1fr',
+            gap: 8,
+            marginTop: 4
+          }}
+        >
+          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={CalendarRange} label="Schedule Crew" onTap={() => navigate('/schedule')} />
+          <QuickAction icon={Receipt} label="Send Invoice" onTap={() => navigate('/invoices')} />
+          <QuickAction icon={FileText} label="New Estimate" onTap={() => navigate('/bid')} />
+        </div>
       </motion.div>
 
       {/* ─────────── TIER 3 — LIVE FEED ───────────
           Rows on --v3-surface (matches KPIs, lower than hero). Hover lift
           to invite the tap. Empty state lives quietly below. */}
-      <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 40px' }}
+      >
         <SectionHeader
           label="Live Feed"
           action={{ label: 'View all', onTap: () => navigate('/jobs') }}
         />
-      </motion.div>
-      <motion.div
-        variants={item}
-        style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 40px' }}
-      >
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}
+        >
         {feed == null ? (
           <>
             <div className="v3-skeleton" style={{ height: 60, width: '100%', borderRadius: 16 }} />
             <div className="v3-skeleton" style={{ height: 60, width: '100%', borderRadius: 16, opacity: 0.6 }} />
           </>
         ) : feed.length === 0 ? (
-          <div
-            style={{
-              padding: '24px 20px',
-              borderRadius: 'var(--v3-radius-card)',
-              background: 'var(--v3-surface)',
-              border: '1px dashed var(--v3-border-strong)',
-              textAlign: 'center'
-            }}
-          >
+          <div className="v3-empty">
             <Activity size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
             <div className="v3-caption" style={{ marginBottom: 12 }}>
               Quiet right now. No recent activity yet.
@@ -874,6 +871,7 @@ export default function Home() {
             </motion.div>
           ))
         )}
+        </div>
       </motion.div>
     </motion.div>
   )

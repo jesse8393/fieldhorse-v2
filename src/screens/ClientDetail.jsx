@@ -1073,18 +1073,7 @@ function FilesList({ rows }) {
 
 function EmptyCard({ label }) {
   return (
-    <div style={{
-      margin: '12px 0 24px',
-      padding: '32px 24px',
-      borderRadius: 14,
-      background: 'var(--v3-surface)',
-      border: '1px dashed var(--v3-border-strong)',
-      textAlign: 'center',
-      color: 'var(--v3-text-muted)',
-      fontSize: 13,
-      fontFamily: 'var(--font-body)',
-      lineHeight: 1.5
-    }}>
+    <div className="v3-empty" style={{ margin: '12px 0 24px' }}>
       {label}
     </div>
   )

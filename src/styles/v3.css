@@ -251,6 +251,110 @@
 .v3-stack > * + * { margin-top: 16px; }
 .v3-stack-sm > * + * { margin-top: 8px; }
 
+/* ---------- System rhythm helpers ----------
+   Standardized vertical spacing — replaces ad-hoc padding-bottom
+   per group. Apply to a wrapping <div> around stacked sections. */
+.v3-stack-screen > * + * { margin-top: var(--v3-rhythm-screen); }
+.v3-stack-section > * + * { margin-top: var(--v3-rhythm-section); }
+.v3-stack-tight > * + * { margin-top: var(--v3-rhythm-tight); }
+.v3-stack-loose > * + * { margin-top: var(--v3-rhythm-loose); }
+
+/* Screen gutter — token-driven L/R padding for page content */
+.v3-gutter { padding-left: var(--v3-gutter); padding-right: var(--v3-gutter); }
+@media (min-width: 480px) {
+  .v3-gutter { padding-left: 20px; padding-right: 20px; }
+}
+
+/* ---------- Section primitive (depth + framing) ----------
+   Wraps a logical group (header + cards/list/tiles) in a layered
+   container that lifts off the page background. Provides:
+     - subtle tonal lift (--v3-section-bg gradient)
+     - 1px hairline border + inset top highlight
+     - low ambient shadow
+     - radial top-left light leak via ::before
+   Use this whenever a section currently floats on pure --v3-bg and
+   feels flat. The card primitive (.v3-card) sits INSIDE this. */
+.v3-section {
+  background: var(--v3-section-bg);
+  border: 1px solid var(--v3-section-border);
+  border-radius: var(--v3-section-radius);
+  box-shadow: var(--v3-section-shadow);
+  padding: var(--v3-pad-section);
+  position: relative;
+  overflow: hidden;
+}
+.v3-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, 0.025), transparent 55%);
+}
+.v3-section > * { position: relative; z-index: 1; }
+
+/* Section variants */
+.v3-section--tight { padding: var(--v3-pad-section-tight); }
+.v3-section--flush { padding: 0; }
+.v3-section--quiet {
+  /* Lower-key variant for secondary zones — no inner highlight,
+     reduced shadow. Keeps depth without competing with primary
+     sections (hero, KPIs) that should dominate. */
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 14px rgba(0, 0, 0, 0.16);
+}
+.v3-section--quiet::before { display: none; }
+
+/* When a card sits directly inside a section, its drop-shadow can
+   double up against the section's own elevation. Flatten card shadow
+   slightly so the layering reads as one stack, not two. */
+.v3-section .v3-card {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 2px 8px rgba(0, 0, 0, 0.20);
+  background: var(--v3-surface);
+}
+.v3-section .v3-card--surface-2 { background: var(--v3-surface-2); }
+
+/* Section header inside a section reads tighter — bottom-pad only */
+.v3-section > .v3-section-header { padding: 0 0 12px; }
+
+/* Section group — container of multiple .v3-section blocks with
+   standardized rhythm between them. Apply as the screen's main
+   content wrapper. */
+.v3-section-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v3-rhythm-screen);
+  padding: 0 var(--v3-gutter);
+}
+@media (min-width: 480px) {
+  .v3-section-group { padding: 0 20px; }
+}
+
+/* Empty state — framed dashed surface so empty zones stop reading
+   as flat dead space. Use anywhere you currently render a bare
+   "Nothing yet" caption on the page background. */
+.v3-empty {
+  background: var(--v3-section-bg);
+  border: 1px dashed var(--v3-border-strong);
+  border-radius: var(--v3-section-radius);
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--v3-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  position: relative;
+  overflow: hidden;
+}
+.v3-empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(80% 60% at 50% 0%, rgba(212, 175, 55, 0.04), transparent 60%);
+}
+.v3-empty > * { position: relative; z-index: 1; }
+
 /* ---------- Skeleton ---------- */
 @keyframes v3-skeleton {
   0% { opacity: 0.5; }

@@ -234,12 +234,7 @@ export default function Clients() {
           </div>
         )}
         {!loading && rows.length > 0 && filtered.length === 0 && (
-          <div style={{
-            gridColumn: '1 / -1',
-            padding: '24px 20px', borderRadius: 14,
-            background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
-            textAlign: 'center', color: 'var(--v3-text-muted)', fontSize: 12
-          }}>
+          <div className="v3-empty" style={{ gridColumn: '1 / -1' }}>
             No clients match that search.
           </div>
         )}
