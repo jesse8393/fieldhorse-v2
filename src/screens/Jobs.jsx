@@ -226,7 +226,7 @@ export default function Jobs() {
       </motion.div>
 
       {/* STAGE TABS — horizontal scroll on overflow */}
-      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist">
           {TABS.map((t) => {
             const isActive = filter === t.id
@@ -293,7 +293,7 @@ export default function Jobs() {
           Net effect: 1 col on phone (≤520), 2 cols on tablet (520-820),
           3 cols on small desktop (820-1080), 4 cols on wide (≥1080).
           Was capping at 3 cols even on wide screens — left empty space. */}
-      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 20px 32px' }}>
+      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
         {loading && <SkeletonList rows={5} />}
         {!loading && filtered.length === 0 && (
           <EmptyView
@@ -421,7 +421,7 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
   const bg = primary
     ? 'var(--v3-primary)'
     : 'var(--v3-surface-2)'
-  const color = primary ? '#0B0B0D' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)'
+  const color = primary ? 'var(--v3-on-primary)' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)'
   const border = primary ? 'none' : '1px solid var(--v3-border)'
   const style = {
     display: 'flex',

@@ -125,7 +125,7 @@ export default function FilesSection({ jobId, userId }) {
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '8px 14px', borderRadius: 10, border: 'none',
-            background: 'var(--v3-primary)', color: '#0B0B0D',
+            background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
             letterSpacing: '0.06em',
             cursor: uploading ? 'wait' : 'pointer',

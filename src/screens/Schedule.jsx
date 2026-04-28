@@ -318,7 +318,7 @@ export default function Schedule() {
 
       {/* WEEK STRIP — 7 cells anchored to Monday. Highlighted cell = cursor;
           ring around today (when not selected). Tap any day to jump. */}
-      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <div className="fh-week-strip">
           {Array.from({ length: 7 }, (_, i) => {
             const today = startOfDay(new Date())
@@ -382,7 +382,7 @@ export default function Schedule() {
       </motion.div>
 
       {/* DAY / WEEK TABS — narrower, sits above the timeline */}
-      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <SpecTabs
           options={VIEWS}
           value={view}
@@ -397,7 +397,7 @@ export default function Schedule() {
           calendar apps. Vertical scroll inside the body still works. */}
       {/* DAY HEADER — "TUE, APR 28" eyebrow that titles the timeline */}
       {view === 'day' && (
-        <motion.div variants={item} style={{ padding: '0 20px 8px' }}>
+        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 8px' }}>
           <span style={{
             fontFamily: 'var(--font-body)',
             fontSize: 11,
@@ -414,7 +414,7 @@ export default function Schedule() {
       {/* TIMELINE — vertical time-block list. Matches mockup: each row
           is a job block with time, name, sub, status pill, avatar group. */}
       <SwipeShell onShift={shift}>
-        <motion.div variants={item} style={{ padding: '0 20px 24px' }}>
+        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 24px' }}>
           {loading && events == null && <SkeletonList rows={5} card={false} />}
           {events != null && view === 'day' && (
             <DayView
@@ -646,7 +646,7 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, init
     <motion.li
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={isClickable ? { y: -2, backgroundColor: '#1A1A20' } : undefined}
+      whileHover={isClickable ? { y: -2, backgroundColor: '#282834' } : undefined}
       transition={{
         opacity: { delay: Math.min(index * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
         y: { type: 'spring', stiffness: 620, damping: 28 },
@@ -826,7 +826,7 @@ function WeekView({ start, events, onClick, onDelete }) {
                       type="button"
                       onClick={(ev) => { ev.stopPropagation(); if (window.confirm('Delete this event?')) onDelete(e.id) }}
                       aria-label="Delete event"
-                      style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.6 }}
+                      style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--v3-text-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.6 }}
                     >
                       <Trash2 size={11} />
                     </button>

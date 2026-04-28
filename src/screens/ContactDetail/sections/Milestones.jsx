@@ -108,7 +108,7 @@ export default function MilestonesSection({ contact, patch }) {
             borderRadius: 12,
             border: 'none',
             background: 'var(--v3-primary)',
-            color: '#0B0B0D',
+            color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)',
             fontSize: 12,
             fontWeight: 700,

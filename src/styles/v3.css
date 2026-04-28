@@ -261,9 +261,6 @@
 
 /* Screen gutter — token-driven L/R padding for page content */
 .v3-gutter { padding-left: var(--v3-gutter); padding-right: var(--v3-gutter); }
-@media (min-width: 480px) {
-  .v3-gutter { padding-left: 20px; padding-right: 20px; }
-}
 
 /* ---------- Section primitive (depth + framing) — premium push ----------
    Wraps a logical group (header + cards/list/tiles) in a layered
@@ -368,9 +365,6 @@
   flex-direction: column;
   gap: var(--v3-rhythm-screen);
   padding: 0 var(--v3-gutter);
-}
-@media (min-width: 480px) {
-  .v3-section-group { padding: 0 20px; }
 }
 
 /* Empty state — framed dashed surface so empty zones stop reading

@@ -393,7 +393,7 @@ function PhotoOrInitialTile({ photoUrl, name, stageColor }) {
           padding: '0 6px',
           borderRadius: 6,
           background: `linear-gradient(135deg, ${stageColor}EE, ${stageColor}CC)`,
-          color: '#0B0B0D',
+          color: 'var(--v3-on-primary)',
           fontFamily: 'var(--font-display)',
           fontSize: 11,
           letterSpacing: '0.04em',

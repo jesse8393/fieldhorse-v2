@@ -138,7 +138,7 @@ export default function Clients() {
         </div>
       </motion.div>
 
-      <motion.div variants={item} style={{ padding: '0 20px 12px' }}>
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
@@ -186,7 +186,7 @@ export default function Clients() {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
           gap: 14,
-          padding: '0 20px 24px',
+          padding: '0 var(--v3-gutter) 24px',
           alignItems: 'stretch'
         }}
       >
@@ -327,8 +327,8 @@ function ClientTile({ client: c, rollup: r, lastActivityRel, index, onOpen }) {
       transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.2), ease: [0.2, 0.8, 0.2, 1] }}
       whileHover={{
         y: -4,
-        backgroundColor: '#1C1C22',
-        boxShadow: '0 22px 56px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.35)'
+        backgroundColor: '#282834',
+        boxShadow: '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
       }}
       whileTap={{ scale: 0.985 }}
       onClick={() => { hapticTap(); onOpen() }}
@@ -340,7 +340,7 @@ function ClientTile({ client: c, rollup: r, lastActivityRel, index, onOpen }) {
         gap: 14,
         padding: '20px 20px 16px 24px',
         borderRadius: 18,
-        background: '#141418',
+        background: '#16161E',
         border: '1px solid var(--v3-border-strong)',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
         textAlign: 'left',

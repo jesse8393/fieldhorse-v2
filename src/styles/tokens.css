@@ -201,8 +201,10 @@
   --v3-pad-section-tight: 14px;
 
   /* Screen edge gutter — single source of truth for L/R page padding.
-     Was hardcoded as 20px in many screens; now token-driven. */
-  --v3-gutter: 16px;
+     Bumped 16 → 20px to match the existing inline 20px padding used
+     across older v3 screens. Single value (no responsive bump) so
+     section margins read consistently on every viewport. */
+  --v3-gutter: 20px;
 }
 
 /* Explicit dark theme — set on <html data-theme="dark"> OR via prefers-color-scheme */

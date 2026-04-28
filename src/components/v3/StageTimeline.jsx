@@ -121,7 +121,7 @@ export default function StageTimeline({ currentStage }) {
                 fontFamily: 'var(--font-body)',
                 fontSize: 11,
                 fontWeight: 700,
-                color: isComplete || isCurrent ? '#0B0B0D' : 'var(--v3-text-muted)',
+                color: isComplete || isCurrent ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
                 fontVariantNumeric: 'tabular-nums',
                 position: 'relative',
                 zIndex: 1,

@@ -138,7 +138,7 @@ export default function TodosSection({ jobId, userId }) {
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             padding: '0 16px', borderRadius: 12, border: 'none',
-            background: 'var(--v3-primary)', color: '#0B0B0D',
+            background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: '0.04em',
             cursor: draft.trim() ? 'pointer' : 'default',

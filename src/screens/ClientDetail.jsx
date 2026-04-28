@@ -198,7 +198,7 @@ export default function ClientDetail() {
       </div>
 
       {/* HERO — large avatar + name + active badge + company */}
-      <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+      <div style={{ padding: '0 var(--v3-gutter) 16px', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
         <div aria-hidden="true" style={{
           flexShrink: 0,
           width: 76, height: 76,
@@ -271,7 +271,7 @@ export default function ClientDetail() {
       </div>
 
       {/* ACTION ROW — Call · Text · Email · Map (4 equal columns) */}
-      <div style={{ padding: '0 20px 18px' }}>
+      <div style={{ padding: '0 var(--v3-gutter) 18px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           <ActionTile
             icon={Phone}
@@ -824,7 +824,7 @@ function ProjectsList({ jobs, onOpen }) {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.99 }}
-                whileHover={{ y: -2, backgroundColor: '#1A1A20' }}
+                whileHover={{ y: -2, backgroundColor: '#282834' }}
                 transition={{ type: 'spring', stiffness: 620, damping: 28 }}
                 onClick={() => { hapticTap(); onOpen(j.id) }}
                 style={{
@@ -833,7 +833,7 @@ function ProjectsList({ jobs, onOpen }) {
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '14px 14px 14px 20px',
                   borderRadius: 14,
-                  background: '#141418',
+                  background: '#16161E',
                   border: '1px solid var(--v3-border-strong)',
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
                   textAlign: 'left',
@@ -919,7 +919,7 @@ function NotesList({ notes }) {
               position: 'relative',
               padding: '14px 14px 14px 20px',
               borderRadius: 14,
-              background: '#141418',
+              background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border-strong)',
               boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
               overflow: 'hidden'

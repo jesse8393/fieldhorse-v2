@@ -274,7 +274,7 @@ export default function ContactDetail() {
             <button type="button" className="fh-sheet-error__dismiss" aria-label="Dismiss" onClick={() => setDeleteErr('')}>×</button>
           </div>
         )}
-        <p style={{ margin: 0, color: 'var(--ink-strong)', fontSize: '1rem', lineHeight: 1.45 }}>
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
           Removing <strong>{contact?.name || 'this job'}</strong> cascades to everything attached.
         </p>
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -286,7 +286,7 @@ export default function ContactDetail() {
           <DeleteCascadeRow label="Notes" count={notes.length} detail="detached + archived" />
         </ul>
         <p style={{
-          margin: 0, color: 'var(--alert-red)', fontFamily: 'var(--font-body)',
+          margin: 0, color: 'var(--v3-danger-bright)', fontFamily: 'var(--font-body)',
           fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', fontWeight: 700
         }}>
           This cannot be undone.
@@ -664,7 +664,7 @@ function V3PaymentSheet({ contact, balance, onClose, onLogged }) {
               disabled={saving}
               style={{
                 flex: 2, padding: '12px', borderRadius: 12,
-                background: 'var(--v3-primary)', border: 'none', color: '#0B0B0D',
+                background: 'var(--v3-primary)', border: 'none', color: 'var(--v3-on-primary)',
                 cursor: saving ? 'wait' : 'pointer',
                 fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
                 letterSpacing: '0.04em',

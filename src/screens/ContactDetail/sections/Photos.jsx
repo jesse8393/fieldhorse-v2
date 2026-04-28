@@ -276,7 +276,7 @@ export default function PhotosSection({ jobId, userId }) {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '8px 14px', borderRadius: 10, border: 'none',
-              background: 'var(--v3-primary)', color: '#0B0B0D',
+              background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
               fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
               letterSpacing: '0.06em',
               cursor: uploading ? 'wait' : 'pointer',
@@ -379,7 +379,7 @@ export default function PhotosSection({ jobId, userId }) {
                   <div style={{
                     position: 'absolute', top: 4, left: 4,
                     padding: '3px 7px', borderRadius: 6,
-                    background: 'var(--v3-primary)', color: '#0B0B0D',
+                    background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
                     fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
                     letterSpacing: '0.1em'
                   }}>
@@ -643,7 +643,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }) {
         width: 32, height: 32, borderRadius: 999,
         background: 'var(--v3-primary)',
         display: 'grid', placeItems: 'center',
-        color: '#0B0B0D', boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        color: 'var(--v3-on-primary)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
         pointerEvents: 'none'
       }}>
         <GitCompareArrows size={14} aria-hidden="true" />

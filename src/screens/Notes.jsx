@@ -747,18 +747,18 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           padding: '14px 14px 14px 18px',
           borderRadius: 14,
           background: 'var(--v3-surface)',
-          border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 2px 8px rgba(0, 0, 0, 0.20)',
+          border: '1px solid var(--v3-border-strong)',
+          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
           cursor: onTap ? 'pointer' : 'default',
           WebkitTapHighlightColor: 'transparent',
           transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
-          e.currentTarget.style.background = 'var(--v3-surface-2)'
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
+          e.currentTarget.style.background = 'var(--v3-surface-3)'
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--v3-border)'
+          e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
           e.currentTarget.style.background = 'var(--v3-surface)'
         }}
       >

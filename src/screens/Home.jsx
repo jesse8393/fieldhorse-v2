@@ -454,7 +454,7 @@ export default function Home() {
         )}
       </motion.div>
       {weatherErr && !hasCoords ? (
-        <div className="v3-caption" style={{ padding: '0 20px 12px', color: 'var(--v3-danger)' }}>
+        <div className="v3-caption" style={{ padding: '0 var(--v3-gutter) 12px', color: 'var(--v3-danger)' }}>
           {weatherErr}
         </div>
       ) : null}
@@ -1100,14 +1100,13 @@ function NextActionRow({ action, onTap }) {
       type="button"
       onClick={() => { hapticTap(); onTap?.() }}
       whileTap={{ scale: 0.97 }}
-      // Hover: lift + shift right 2px + brighter surface. Reads as a control
-      // being depressed/highlighted. Surface bump #141418 → #1A1A20 (subtle
-      // brighten — never approaching --v3-surface-2 territory which would
-      // collide with the card hover treatment elsewhere).
+      // Hover: lift + shift right 2px + brighter surface. Reads as a
+      // control being depressed/highlighted. Hex literal so framer can
+      // interpolate the colour smoothly (matches --v3-surface-2 token).
       whileHover={{
         y: -2,
         x: 2,
-        backgroundColor: '#1A1A20'
+        backgroundColor: '#1F1F2A'
       }}
       // Snappier spring (stiffness 720 / damping 26) so tap + hover both
       // read as immediate key-presses, not soft squishes.

@@ -85,7 +85,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
               marginTop: 4,
               width: '100%',
               padding: '12px 16px', borderRadius: 12,
-              background: 'var(--v3-primary)', color: '#0B0B0D', border: 'none',
+              background: 'var(--v3-primary)', color: 'var(--v3-on-primary)', border: 'none',
               fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
               letterSpacing: '0.04em', cursor: 'pointer',
               boxShadow: '0 8px 22px rgba(212, 175, 55, 0.32)',

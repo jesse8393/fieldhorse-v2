@@ -87,7 +87,7 @@ export default function NextActionCard({
               padding: '12px 16px',
               borderRadius: 12,
               background: 'var(--v3-primary)',
-              color: '#0B0B0D',
+              color: 'var(--v3-on-primary)',
               border: 'none',
               fontFamily: 'var(--font-body)',
               fontSize: 13,

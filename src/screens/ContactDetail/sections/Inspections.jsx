@@ -298,7 +298,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
               onClick={commit}
               style={{
                 padding: '12px 14px', borderRadius: 12, border: 'none',
-                background: 'var(--v3-primary)', color: '#0B0B0D',
+                background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
                 letterSpacing: '0.04em', cursor: 'pointer',
                 boxShadow: '0 6px 18px rgba(212, 175, 55, 0.3)'
