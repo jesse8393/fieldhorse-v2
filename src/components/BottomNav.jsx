@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
@@ -15,38 +15,23 @@ const PRIMARY = [
   { to: '/schedule', label: 'Schedule', icon: 'schedule' }
 ]
 
-/* Command-center grouping — by INTENT, not category. Each item carries
-   a one-line caption so the drawer reads as a tour of systems, not a
-   list of links. Order: revenue/work first → people → field → system. */
-const MORE_GROUPS = [
-  {
-    label: 'Run Your Business',
-    items: [
-      { to: '/bid',       label: 'AI Bid Engine', Icon: Calculator, caption: 'Build estimates with AI' },
-      { to: '/invoices',  label: 'Invoices',      Icon: Receipt,    caption: 'Send and chase payments' },
-      { to: '/analytics', label: 'Analytics',     Icon: BarChart3,  caption: 'Pipeline + revenue trends' }
-    ]
-  },
-  {
-    label: 'People & Operations',
-    items: [
-      { to: '/subs',    label: 'Sub Directory', Icon: Hammer,         caption: 'Subs, trades, contacts' },
-      { to: '/compose', label: 'AI Compose',    Icon: MessageSquare,  caption: 'Draft client messages' }
-    ]
-  },
-  {
-    label: 'Field & Planning',
-    items: [
-      { to: '/pour-window', label: 'Forecast', Icon: CloudSun, caption: 'Weather-aware pour windows' }
-    ]
-  },
-  {
-    label: 'System',
-    items: [
-      { to: '/import',   label: 'Import Data', Icon: Upload,       caption: 'Bring in jobs, clients, sheets' },
-      { to: '/settings', label: 'Settings',    Icon: SettingsIcon, caption: 'Profile, billing, theme' }
-    ]
-  }
+/* Flat navigation list per v3 mockup — reads as a clean nav drawer,
+   not stacked group cards. Order matches mockup primary nav. Items
+   pointing to non-existent routes (Files & Documents, Team, Help)
+   are intentionally omitted; reintroduce them when those routes ship. */
+const NAV_ITEMS = [
+  { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
+  { to: '/jobs',        label: 'Jobs & Pipeline',     Icon: Briefcase },
+  { to: '/clients',     label: 'Clients',             Icon: Users },
+  { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
+  { to: '/bid',         label: 'Estimates',           Icon: Calculator },
+  { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
+  { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 },
+  { to: '/subs',        label: 'Sub Directory',       Icon: Hammer },
+  { to: '/compose',     label: 'AI Compose',          Icon: MessageSquare },
+  { to: '/import',      label: 'Import Data',         Icon: Upload },
+  { to: '/pour-window', label: 'Forecast',            Icon: CloudSun },
+  { to: '/settings',    label: 'Settings',            Icon: SettingsIcon }
 ]
 
 export default function BottomNav() {
@@ -119,10 +104,10 @@ export default function BottomNav() {
             >
               <div style={{ minWidth: 0, flex: 1 }}>
                 <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
-                  Command Center
+                  Navigation
                 </span>
                 <h2 className="v3-h1" style={{ marginTop: 6 }}>
-                  Run your <em>company.</em>
+                  Field<em>horse.</em>
                 </h2>
               </div>
               <button
@@ -147,43 +132,28 @@ export default function BottomNav() {
               </button>
             </header>
 
-            {/* BODY — each group as a v3-section, items as system-entry
-                tiles. Padding overrides .fh-drawer__body legacy padding;
-                explicit top/bottom values keep the first section from
-                kissing the header and the last from touching the foot. */}
-            <div
+            {/* BODY — flat nav list per v3 mockup. One row per
+                destination, hairline separators, no stacked cards. */}
+            <nav
               className="fh-drawer__body"
               style={{
                 padding: '4px var(--v3-gutter) 18px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 16,
+                gap: 0,
                 boxSizing: 'border-box'
               }}
+              aria-label="Navigation"
             >
-              {MORE_GROUPS.map((group, gi) => (
-                <section
-                  key={group.label}
-                  className={gi === 0 ? 'v3-section v3-section--primary' : 'v3-section'}
-                >
-                  <div className="v3-section-header">
-                    <span className="v3-eyebrow" style={gi === 0 ? { color: 'var(--v3-primary)' } : undefined}>
-                      {group.label}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {group.items.map((it) => (
-                      <SystemEntryTile
-                        key={it.to}
-                        item={it}
-                        emphasized={gi === 0}
-                        onTap={() => go(it.to)}
-                      />
-                    ))}
-                  </div>
-                </section>
+              {NAV_ITEMS.map((it, i) => (
+                <NavRow
+                  key={it.to}
+                  item={it}
+                  onTap={() => go(it.to)}
+                  showDivider={i < NAV_ITEMS.length - 1}
+                />
               ))}
-            </div>
+            </nav>
 
             {/* FOOT — theme + sign out, v3 surfaces */}
             <div
@@ -295,114 +265,66 @@ export default function BottomNav() {
 }
 
 /* ============================================================
-   SystemEntryTile — single item inside the Command Center drawer.
-   Reads as an entry point into a system (large gold icon tile, label,
-   one-line caption explaining what it does), not a list row.
-
-     [▤]  AI Bid Engine                                          ›
-          Build estimates with AI
-
-   Hover lifts the surface to surface-3 + tints the border + bumps
-   the icon halo. Emphasized = stronger gold treatment for the
-   "Run Your Business" group.
+   NavRow — single line in the flat navigation drawer.
+   Per v3 mockup: gold icon, label, chevron, hairline divider.
+   No card chrome, no caption, no per-item border — the whole
+   list reads as a clean nav, not stacked tiles.
    ============================================================ */
-function SystemEntryTile({ item, emphasized = false, onTap }) {
+function NavRow({ item, onTap, showDivider }) {
   const I = item.Icon
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onTap}
-      whileTap={{ scale: 0.99 }}
-      whileHover={{ y: -1 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 14,
         width: '100%',
-        padding: '14px 14px',
-        borderRadius: 14,
-        background: 'var(--v3-surface)',
-        border: emphasized
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))'
-          : '1px solid var(--v3-border-strong)',
+        padding: '14px 4px',
+        background: 'transparent',
+        border: 'none',
+        borderBottom: showDivider ? '1px solid var(--v3-border)' : 'none',
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
-        minHeight: 64,
+        minHeight: 56,
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: emphasized
-          ? '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 4px 14px rgba(0, 0, 0, 0.32), 0 4px 16px rgba(229, 193, 88, 0.10)'
-          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
-        transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
+        transition: 'background-color 140ms ease'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = emphasized
-          ? 'color-mix(in srgb, var(--v3-primary) 40%, transparent)'
-          : 'rgba(255, 255, 255, 0.20)'
-        e.currentTarget.style.background = 'var(--v3-surface-3)'
+        e.currentTarget.style.background = 'var(--v3-surface-2)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = emphasized
-          ? 'color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))'
-          : 'var(--v3-border-strong)'
-        e.currentTarget.style.background = 'var(--v3-surface)'
+        e.currentTarget.style.background = 'transparent'
       }}
     >
-      {/* Icon tile — big, gold-tinted, premium glass */}
       <span
         aria-hidden="true"
         style={{
           flexShrink: 0,
-          width: 44,
-          height: 44,
-          borderRadius: 12,
+          width: 32,
+          height: 32,
+          borderRadius: 8,
           display: 'grid',
           placeItems: 'center',
-          background: emphasized
-            ? 'linear-gradient(135deg, rgba(229, 193, 88, 0.22), rgba(229, 193, 88, 0.06))'
-            : 'var(--v3-primary-soft)',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)',
-          boxShadow: emphasized
-            ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18)'
-            : 'inset 0 1px 0 rgba(255, 255, 255, 0.06)'
+          background: 'var(--v3-primary-soft)',
+          color: 'var(--v3-primary)'
         }}
       >
-        <I size={20} />
+        <I size={16} />
       </span>
-
-      {/* Label + caption stack */}
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div
-          style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 15,
-            fontWeight: 600,
-            color: 'var(--v3-text)',
-            letterSpacing: '-0.005em',
-            lineHeight: 1.25
-          }}
-        >
-          {item.label}
-        </div>
-        {item.caption ? (
-          <div
-            style={{
-              marginTop: 3,
-              fontFamily: 'var(--font-body)',
-              fontSize: 12,
-              fontWeight: 400,
-              color: 'var(--v3-text-muted)',
-              lineHeight: 1.35
-            }}
-          >
-            {item.caption}
-          </div>
-        ) : null}
-      </div>
-
+      <span style={{
+        flex: 1,
+        fontFamily: 'var(--font-body)',
+        fontSize: 15,
+        fontWeight: 500,
+        color: 'var(--v3-text)',
+        letterSpacing: '-0.005em'
+      }}>
+        {item.label}
+      </span>
       <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
-    </motion.button>
+    </button>
   )
 }

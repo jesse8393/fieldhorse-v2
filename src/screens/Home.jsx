@@ -13,7 +13,8 @@ import {
   PhoneCall,
   CalendarClock,
   ChevronRight,
-  Zap
+  Zap,
+  Mic
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -124,6 +125,8 @@ export default function Home() {
   // Renders as a glanceable list at the bottom of Home so the operator sees
   // their highest-value open work without leaving the screen.
   const [topPipeline, setTopPipeline] = useState(null)
+  // Stage breakdown for Pipeline card footer (mockup: Won / Active / Lead)
+  const [stageBreakdown, setStageBreakdown] = useState(null)
   // Next Actions = up to 5 actionable items (stale leads, overdue jobs,
   // unsent invoices) computed from the same contacts/schedule/payments data.
   // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
@@ -276,6 +279,14 @@ export default function Home() {
       actions.sort((a, b) => a.urgency - b.urgency)
       const topActions = actions.slice(0, 5)
 
+      // Stage breakdown for the Pipeline card footer (mockup: Won/Active/Lead).
+      // Won = closed, Active = job + invoice, Lead = lead + quote.
+      const stageCounts = {
+        won:    contacts.filter((c) => c.stage === 'closed').length,
+        active: contacts.filter((c) => c.stage === 'job' || c.stage === 'invoice').length,
+        lead:   contacts.filter((c) => c.stage === 'lead' || c.stage === 'quote').length
+      }
+
       // Top pipeline = highest-value active deals. Used by the Pipeline
       // Preview section. Capped at 3 to keep the home screen scannable —
       // operators tap "View all" to drill into the full board.
@@ -296,6 +307,7 @@ export default function Home() {
       setJobsBehind(behind.length)
       setInvoicingWeek(weekTotal)
       setTopPipeline(topActiveDeals)
+      setStageBreakdown(stageCounts)
       setNextActions(topActions)
     }
     load()
@@ -465,238 +477,95 @@ export default function Home() {
           entire width, breaking the column completely and dominating the
           screen. Bottom reflection blob spills below the card for cinematic
           depth. Heavier shadow + gold-tinted border gain. */}
-      <motion.div variants={item} style={{ padding: '0 0 20px', position: 'relative' }}>
-        {/* BELOW-CARD REFLECTION — gold spill that bleeds out of the card's
-            bottom edge. Reads as depth, not glow. */}
-        <div aria-hidden="true" style={{
-          position: 'absolute',
-          left: '50%', bottom: 8,
-          transform: 'translateX(-50%)',
-          width: '70%', height: 80,
-          borderRadius: '50%',
-          background: 'radial-gradient(closest-side, rgba(212, 175, 55, 0.16), transparent 70%)',
-          filter: 'blur(20px)',
-          pointerEvents: 'none',
-          zIndex: 0
-        }} />
-        <motion.div
-          whileHover={{ y: -3 }}
-          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-          style={{
-            position: 'relative',
-            padding: '36px 28px 28px',
-            // Hero is full-bleed; only the corners get rounded so it floats
-            // on the page like a wide command-center bar.
-            borderRadius: 24,
-            background: `
-              radial-gradient(120% 80% at 100% 0%, rgba(229, 193, 88, 0.42), transparent 55%),
-              radial-gradient(80% 60% at 0% 100%, rgba(229, 193, 88, 0.22), transparent 60%),
-              linear-gradient(125deg, rgba(229, 193, 88, 0.12) 0%, transparent 38%, transparent 62%, rgba(229, 193, 88, 0.12) 100%),
-              var(--v3-surface-2)
-            `,
-            border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
-            boxShadow: 'var(--v3-shadow-hero)',
-            overflow: 'hidden',
-            zIndex: 1
-          }}
-        >
-          {/* Top-right ambient sweep — bigger + brighter for premium push.
-              Drifts via fh-hero-drift. */}
+      {/* PIPELINE CARD — compact per v3 mockup. Was the giant 100px-money
+          hero with stretched ambient blobs. Now: framed v3 section
+          card with modest pipeline value, trend, sparkline + bottom
+          breakdown row (Won / Active / Lead). */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--primary"
+        style={{ margin: '0 var(--v3-gutter) 14px', padding: '18px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
+          {trendPct != null ? (
+            <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
+              {trendUp ? '+' : ''}{trendPct}%
+            </Pill>
+          ) : null}
+        </div>
+
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
           <div
-            aria-hidden="true"
-            className="fh-hero-drift"
+            className="v3-money"
             style={{
-              position: 'absolute',
-              top: -180, right: -160,
-              width: 480, height: 480,
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at center, rgba(229, 193, 88, 0.28), transparent 65%)',
-              pointerEvents: 'none'
+              fontSize: 'clamp(40px, 9vw, 56px)',
+              lineHeight: 0.95,
+              letterSpacing: '-0.005em',
+              color: '#FFFFFF'
             }}
-          />
-
-          {/* Behind-number glow — wider + brighter halo behind the $ amount.
-              Real "stage spotlight" feel under the headline. */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              top: 72, left: 8,
-              width: 480, height: 280,
-              borderRadius: '50%',
-              background: 'radial-gradient(closest-side, rgba(229, 193, 88, 0.30), transparent 70%)',
-              pointerEvents: 'none',
-              filter: 'blur(12px)'
-            }}
-          />
-
-          {/* Top edge stroke — gold gradient catches the leading edge */}
-          <div aria-hidden="true" style={{
-            position: 'absolute',
-            top: 0,
-            left: '6%',
-            right: '6%',
-            height: 1,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.65) 50%, transparent 100%)',
-            boxShadow: '0 0 12px rgba(229, 193, 88, 0.55)',
-            pointerEvents: 'none'
-          }} />
-
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <span style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)'
-            }}>
-              Today's Revenue Opportunity
-            </span>
-            {trendPct != null ? (
-              <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
-                {trendUp ? '+' : ''}{trendPct}%
-              </Pill>
-            ) : null}
-          </div>
-
-          <div style={{ position: 'relative', marginTop: 22, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-            <div
-              className="v3-money"
-              style={{
-                fontSize: 'clamp(64px, 16vw, 104px)',
-                lineHeight: 0.92,
-                letterSpacing: '-0.005em',
-                color: '#FFFFFF',
-                textShadow: '0 6px 32px rgba(229, 193, 88, 0.45), 0 1px 0 rgba(255, 255, 255, 0.14)',
-                filter: 'drop-shadow(0 4px 22px rgba(229, 193, 88, 0.26))'
-              }}
-            >
-              {pipeline == null ? (
-                <span className="v3-skeleton" style={{ width: 220, height: 64, borderRadius: 6 }} />
-              ) : (
-                <>
-                  <span style={{
-                    fontSize: 'clamp(28px, 7vw, 38px)',
-                    color: 'var(--v3-text-muted)',
-                    verticalAlign: 'top',
-                    marginRight: 4,
-                    lineHeight: 1
-                  }}>
-                    $
-                  </span>
-                  <CountUp
-                    to={pipeline}
-                    formatter={(n) => n.toLocaleString()}
-                  />
-                </>
-              )}
-            </div>
-            <div className="v3-caption" style={{ fontSize: 12 }}>vs last 7 days</div>
-          </div>
-
-          {/* Inline trend signal — answers "is this number good?" within 1 second.
-              Renders only when we have a comparable previous-week value.
-              Trend + attention-count read together: revenue → trend → action. */}
-          {(trendPct != null || (nextActions && nextActions.length > 0)) && (
-            <div style={{
-              position: 'relative',
-              marginTop: 10,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              flexWrap: 'wrap'
-            }}>
-              {trendPct != null && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  letterSpacing: '0.005em',
-                  color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
-                  fontVariantNumeric: 'tabular-nums'
-                }}>
-                  {trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                  {trendUp ? '+' : ''}{trendPct}% vs last week
-                  {!trendUp && (
-                    <span style={{
-                      marginLeft: 4,
-                      fontSize: 12, fontWeight: 600,
-                      color: 'var(--v3-text-muted)',
-                      letterSpacing: 0
-                    }}>
-                      — needs attention
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Attention-count signal — connects the hero number to the
-                  Next Actions section directly below. Subtle: muted text +
-                  small gold dot. Visible: tabular nums, tight gap. */}
-              {nextActions && nextActions.length > 0 && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 12,
-                  fontWeight: 600,
+          >
+            {pipeline == null ? (
+              <span className="v3-skeleton" style={{ width: 180, height: 48, borderRadius: 6 }} />
+            ) : (
+              <>
+                <span style={{
+                  fontSize: 'clamp(20px, 4.5vw, 28px)',
                   color: 'var(--v3-text-muted)',
-                  fontVariantNumeric: 'tabular-nums'
+                  verticalAlign: 'top',
+                  marginRight: 3,
+                  lineHeight: 1
                 }}>
-                  <span aria-hidden="true" style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: 'var(--v3-primary)',
-                    boxShadow: '0 0 8px rgba(212, 175, 55, 0.6)'
-                  }} />
-                  <strong style={{
-                    color: 'var(--v3-primary)',
-                    fontWeight: 700,
-                    fontVariantNumeric: 'tabular-nums'
-                  }}>
-                    {nextActions.length}
-                  </strong>
-                  {nextActions.length === 1 ? 'action needs' : 'actions need'} attention today
-                </div>
-              )}
+                  $
+                </span>
+                <CountUp to={pipeline} formatter={(n) => n.toLocaleString()} />
+              </>
+            )}
+          </div>
+          <div className="v3-caption" style={{ fontSize: 11 }}>vs last 7 days</div>
+        </div>
+
+        <div style={{ marginTop: 14, marginLeft: -8, marginRight: -8 }}>
+          <Sparkline data={sparkData} color="var(--v3-primary)" height={48} />
+        </div>
+
+        {/* Stage breakdown — Won / Active / Lead per mockup */}
+        <div style={{
+          marginTop: 14,
+          paddingTop: 14,
+          borderTop: '1px solid var(--v3-border)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 12
+        }}>
+          {[
+            { label: 'Won',    count: stageBreakdown?.won    ?? null, tone: 'var(--v3-success-bright)' },
+            { label: 'Active', count: stageBreakdown?.active ?? null, tone: 'var(--v3-primary)' },
+            { label: 'Lead',   count: stageBreakdown?.lead   ?? null, tone: 'var(--v3-text-muted)' }
+          ].map((s) => (
+            <div key={s.label}>
+              <div style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 22,
+                lineHeight: 1,
+                color: s.tone,
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {s.count == null ? '—' : s.count}
+              </div>
+              <div className="v3-eyebrow" style={{ marginTop: 4 }}>{s.label}</div>
             </div>
-          )}
+          ))}
+        </div>
 
-          <div style={{ position: 'relative', marginTop: 22, marginLeft: -10, marginRight: -10 }}>
-            <Sparkline data={sparkData} color="var(--v3-primary)" height={72} />
-          </div>
-
-          <div style={{
-            position: 'relative',
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: '1px solid var(--v3-border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)'
-            }}>
-              Total Pipeline
-            </span>
-            <button
-              type="button"
-              onClick={() => { hapticTap(); navigate('/jobs') }}
-              className="v3-section-link"
-              style={{ fontSize: 11 }}
-            >
-              View all jobs →
-            </button>
-          </div>
-        </motion.div>
+        <button
+          type="button"
+          onClick={() => { hapticTap(); navigate('/jobs') }}
+          className="v3-section-link"
+          style={{ fontSize: 11, marginTop: 12 }}
+        >
+          View all jobs →
+        </button>
       </motion.div>
 
       {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
@@ -757,16 +626,16 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* ─────────── CRITICAL INSIGHTS — KPIs ───────────
-          What needs attention but isn't an explicit action. Compact
-          tiles on the quiet section variant — supports the actions
-          above without competing for the eye. */}
+      {/* ─────────── TODAY'S PRIORITIES — KPIs (mockup) ───────────
+          Per v3 mockup: 3 compact KPI cards stating what needs the
+          operator's attention today. Renamed from "Critical Insights"
+          per the mockup spec. */}
       <motion.div
         variants={item}
         className="v3-section v3-section--quiet"
         style={{ margin: '0 var(--v3-gutter) 14px' }}
       >
-        <SectionHeader label="Critical Insights" />
+        <SectionHeader label="Today's Priorities" />
         <div
           style={{
             display: 'grid',
@@ -778,7 +647,7 @@ export default function Home() {
           <CompactKpi
             tone="danger"
             value={dealsAtRisk?.count}
-            label="Deals At Risk"
+            label="Calls to Leads"
             subline={dealsAtRisk?.value > 0 ? `$${dealsAtRisk.value.toLocaleString()}` : null}
             onTap={() => navigate('/jobs')}
           />
@@ -847,19 +716,20 @@ export default function Home() {
         className="v3-section v3-section--tight"
         style={{ margin: '0 var(--v3-gutter) 32px' }}
       >
-        <SectionHeader label="Quick Tools" />
+        <SectionHeader label="Quick Actions" />
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
+            gridTemplateColumns: 'repeat(5, 1fr)',
             gap: 8,
             marginTop: 4
           }}
         >
           <QuickAction icon={Plus} label="Add Lead" onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1')} />
           <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
           <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
-          <QuickAction icon={FileText} label="Estimate" onTap={() => navigate('/bid')} />
+          <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
         </div>
       </motion.div>
     </motion.div>
