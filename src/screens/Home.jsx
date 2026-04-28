@@ -314,16 +314,32 @@ export default function Home() {
 
   const { stagger, item } = useFhMotion()
 
-  /* ----- Render ----- */
+  /* ----- Render -----
+     v3 hierarchy refactor (3-tier):
+       TIER 1 — HERO: dominant card on --v3-surface-2 (#1C1C22 elevated),
+                 oversized money + sparkline, hover lift, deep shadow
+       TIER 2 — PRIMARY KPIs: compact tiles on --v3-surface (#141418),
+                 muted body + colored accent only, smaller numerics
+       TIER 3 — SECONDARY: Quick Actions (primary tile gets gold halo,
+                 others sit flat) + Live Feed (rows with hover lift)
+
+     Asymmetric spacing breaks the rigid grid:
+       - Greeting: 12px top → 24px bottom (more air below)
+       - Hero: 28px below (most elevated → most room)
+       - KPI row: 24px below
+       - Section headers: 4px below
+       - Quick Actions: 28px below
+       - Live Feed: 40px below
+  */
   return (
     <motion.div
       className="v3-screen"
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120 }}
+      style={{ paddingBottom: 120, background: 'var(--v3-bg)' }}
     >
-      {/* GREETING + WEATHER CHIP */}
+      {/* ─────────── GREETING + WEATHER CHIP ─────────── */}
       <motion.div
         variants={item}
         style={{
@@ -331,7 +347,7 @@ export default function Home() {
           alignItems: 'flex-start',
           justifyContent: 'space-between',
           gap: 16,
-          padding: '8px 20px 16px'
+          padding: '12px 20px 24px'
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -347,6 +363,8 @@ export default function Home() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.96 }}
+            whileHover={{ y: -1 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             onClick={() => { hapticTap(); navigate('/pour-window') }}
             aria-label="Open weather forecast"
             style={{
@@ -355,7 +373,7 @@ export default function Home() {
               gap: 10,
               padding: '10px 12px',
               borderRadius: 'var(--v3-radius-btn)',
-              background: 'var(--v3-surface-2)',
+              background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border)',
               color: 'var(--v3-text)',
               cursor: 'pointer',
@@ -386,8 +404,8 @@ export default function Home() {
               gap: 6,
               padding: '10px 12px',
               borderRadius: 'var(--v3-radius-btn)',
-              background: 'rgba(212,175,55,0.08)',
-              border: '1px solid rgba(212,175,55,0.25)',
+              background: 'var(--v3-primary-soft)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
               color: 'var(--v3-primary)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
@@ -407,11 +425,39 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* HERO — TODAY'S REVENUE OPPORTUNITY */}
-      <motion.div variants={item} style={{ padding: '0 20px 16px' }}>
-        <Card padding="lg" accent="hero">
+      {/* ─────────── TIER 1 — HERO (TODAY'S REVENUE OPPORTUNITY) ───────────
+          Elevated --v3-surface-2 surface + radial gold inner glow + heavy
+          shadow + hover lift. Money number scales to 64px on tablet+.
+          Asymmetric outdent: 16px horizontal padding (vs 20px elsewhere)
+          so the hero reads as a heavier object that breaks the column. */}
+      <motion.div variants={item} style={{ padding: '0 16px 28px' }}>
+        <motion.div
+          whileHover={{ y: -2 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          style={{
+            position: 'relative',
+            padding: '24px 22px 20px',
+            borderRadius: 20,
+            background: `
+              radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.14), transparent 55%),
+              var(--v3-surface-2)
+            `,
+            border: '1px solid color-mix(in srgb, var(--v3-primary) 18%, transparent)',
+            boxShadow: 'var(--v3-shadow-lg)',
+            overflow: 'hidden'
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <span className="v3-eyebrow">Today's Revenue Opportunity</span>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--v3-text-muted)'
+            }}>
+              Today's Revenue Opportunity
+            </span>
             {trendPct != null ? (
               <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
                 {trendUp ? '+' : ''}{trendPct}%
@@ -419,13 +465,24 @@ export default function Home() {
             ) : null}
           </div>
 
-          <div style={{ marginTop: 12, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            <div className="v3-money" style={{ fontSize: 44, lineHeight: 1 }}>
+          <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+            <div
+              className="v3-money"
+              style={{ fontSize: 'clamp(48px, 12vw, 64px)', lineHeight: 1, letterSpacing: '0.005em' }}
+            >
               {pipeline == null ? (
-                <span className="v3-skeleton" style={{ width: 140, height: 36 }} />
+                <span className="v3-skeleton" style={{ width: 180, height: 52, borderRadius: 6 }} />
               ) : (
                 <>
-                  <span style={{ fontSize: 22, color: 'var(--v3-text-muted)', verticalAlign: 'top', marginRight: 2 }}>$</span>
+                  <span style={{
+                    fontSize: 'clamp(24px, 6vw, 30px)',
+                    color: 'var(--v3-text-muted)',
+                    verticalAlign: 'top',
+                    marginRight: 3,
+                    lineHeight: 1
+                  }}>
+                    $
+                  </span>
                   <CountUp
                     to={pipeline}
                     formatter={(n) => n.toLocaleString()}
@@ -433,15 +490,27 @@ export default function Home() {
                 </>
               )}
             </div>
-            <div className="v3-caption">vs last 7 days</div>
+            <div className="v3-caption" style={{ fontSize: 12 }}>vs last 7 days</div>
           </div>
 
-          <div style={{ marginTop: 14, marginLeft: -8, marginRight: -8 }}>
-            <Sparkline data={sparkData} color="#D4AF37" height={56} />
+          <div style={{ marginTop: 18, marginLeft: -10, marginRight: -10 }}>
+            <Sparkline data={sparkData} color="var(--v3-primary)" height={68} />
           </div>
 
-          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span className="v3-caption" style={{ fontSize: 11 }}>
+          <div style={{
+            marginTop: 10,
+            paddingTop: 12,
+            borderTop: '1px solid var(--v3-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--v3-text-muted)'
+            }}>
               Total Pipeline
             </span>
             <button
@@ -453,33 +522,36 @@ export default function Home() {
               View all jobs →
             </button>
           </div>
-        </Card>
+        </motion.div>
       </motion.div>
 
-      {/* 3-TILE KPI GRID */}
+      {/* ─────────── TIER 2 — KPI ROW ───────────
+          Compact tiles on --v3-surface (less elevated than hero). Color
+          only on the value + accent bar, never on the whole tile bg, so
+          the hero stays dominant. Hover lift on each tile. */}
       <motion.div
         variants={item}
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 8,
-          padding: '0 20px 20px'
+          gap: 10,
+          padding: '0 20px 28px'
         }}
       >
-        <KpiTile
+        <CompactKpi
           tone="danger"
           value={dealsAtRisk?.count}
           label="Deals At Risk"
           subline={dealsAtRisk?.value > 0 ? `$${dealsAtRisk.value.toLocaleString()}` : null}
           onTap={() => navigate('/jobs')}
         />
-        <KpiTile
+        <CompactKpi
           tone="primary"
           value={jobsBehind}
-          label="Jobs Behind Schedule"
+          label="Jobs Behind"
           onTap={() => navigate('/schedule')}
         />
-        <KpiTile
+        <CompactKpi
           tone="success"
           value={invoicingWeek}
           label="Invoicing This Week"
@@ -488,8 +560,11 @@ export default function Home() {
         />
       </motion.div>
 
-      {/* QUICK ACTIONS */}
-      <motion.div variants={item} style={{ padding: '0 20px 4px' }}>
+      {/* ─────────── TIER 3 — QUICK ACTIONS ───────────
+          Primary action (Add Lead) gets a subtle gold halo + slightly
+          larger icon to break the rigid 4-col into 1-primary + 3-secondary
+          without restructuring. */}
+      <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
         <SectionHeader
           label="Quick Actions"
           action={{ label: 'Edit', onTap: () => navigate('/settings'), showChevron: false }}
@@ -501,7 +576,7 @@ export default function Home() {
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 8,
-          padding: '0 20px 22px'
+          padding: '0 20px 28px'
         }}
       >
         <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
@@ -510,8 +585,10 @@ export default function Home() {
         <QuickAction icon={FileText} label="New Estimate" onTap={() => navigate('/bid')} />
       </motion.div>
 
-      {/* LIVE FEED */}
-      <motion.div variants={item} style={{ padding: '0 20px 4px' }}>
+      {/* ─────────── TIER 3 — LIVE FEED ───────────
+          Rows on --v3-surface (matches KPIs, lower than hero). Hover lift
+          to invite the tap. Empty state lives quietly below. */}
+      <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
         <SectionHeader
           label="Live Feed"
           action={{ label: 'View all', onTap: () => navigate('/jobs') }}
@@ -519,7 +596,7 @@ export default function Home() {
       </motion.div>
       <motion.div
         variants={item}
-        style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 32px' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 40px' }}
       >
         {feed == null ? (
           <>
@@ -529,15 +606,15 @@ export default function Home() {
         ) : feed.length === 0 ? (
           <div
             style={{
-              padding: '20px',
+              padding: '24px 20px',
               borderRadius: 'var(--v3-radius-card)',
-              background: 'var(--v3-surface-2)',
+              background: 'var(--v3-surface)',
               border: '1px dashed var(--v3-border-strong)',
               textAlign: 'center'
             }}
           >
-            <Activity size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 6px' }} />
-            <div className="v3-caption" style={{ marginBottom: 10 }}>
+            <Activity size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+            <div className="v3-caption" style={{ marginBottom: 12 }}>
               Quiet right now. No recent activity yet.
             </div>
             <button
@@ -550,19 +627,127 @@ export default function Home() {
           </div>
         ) : (
           feed.map((row) => (
-            <FeedRow
+            <motion.div
               key={row.id}
-              type={row.type}
-              title={row.title}
-              detail={row.detail}
-              timestamp={row.timestamp}
-              pillTone={row.pillTone}
-              pillLabel={row.pillLabel}
-              onTap={() => row.contactId ? navigate(`/jobs/${row.contactId}`) : navigate('/jobs')}
-            />
+              whileHover={{ y: -1 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            >
+              <FeedRow
+                type={row.type}
+                title={row.title}
+                detail={row.detail}
+                timestamp={row.timestamp}
+                pillTone={row.pillTone}
+                pillLabel={row.pillLabel}
+                onTap={() => row.contactId ? navigate(`/jobs/${row.contactId}`) : navigate('/jobs')}
+              />
+            </motion.div>
           ))
         )}
       </motion.div>
     </motion.div>
+  )
+}
+
+/* ============================================================
+   CompactKpi — Tier-2 KPI tile. Smaller than v3 KpiTile primitive,
+   color confined to the value + 1px top accent bar. Hover lift.
+   Internal CountUp from the v3 primitive is replaced here with the
+   home's own CountUp wiring (already imported above) so we control
+   the size + skeleton state.
+   ============================================================ */
+
+const COMPACT_TONE = {
+  primary: { color: 'var(--v3-primary)',         soft: 'rgba(212, 175, 55, 0.10)' },
+  success: { color: 'var(--v3-success-bright)',  soft: 'rgba(46, 204, 113, 0.10)' },
+  danger:  { color: 'var(--v3-danger-bright)',   soft: 'rgba(192, 57, 43, 0.10)'  }
+}
+
+function CompactKpi({ tone = 'primary', value, label, subline, isMoney, onTap }) {
+  const t = COMPACT_TONE[tone] || COMPACT_TONE.primary
+
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.97 }}
+      whileHover={{ y: -2 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        position: 'relative',
+        textAlign: 'left',
+        padding: '14px 12px 12px',
+        borderRadius: 14,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        color: 'var(--v3-text)',
+        cursor: 'pointer',
+        minHeight: 88,
+        WebkitTapHighlightColor: 'transparent',
+        overflow: 'hidden'
+      }}
+    >
+      {/* 2px accent bar at top — the only chromatic signal on the tile */}
+      <span aria-hidden="true" style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+        background: t.color, opacity: 0.85
+      }} />
+
+      <div style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 26,
+        color: t.color,
+        lineHeight: 1,
+        marginBottom: 8,
+        minHeight: 26,
+        fontVariantNumeric: 'tabular-nums'
+      }}>
+        {value == null ? (
+          <span className="v3-skeleton" style={{ width: 44, height: 22, borderRadius: 4 }} />
+        ) : isMoney ? (
+          <>
+            <span style={{
+              fontSize: 14, color: 'var(--v3-text-muted)',
+              verticalAlign: 'top', marginRight: 1
+            }}>
+              $
+            </span>
+            <CountUp
+              to={Number(value) || 0}
+              formatter={(n) => {
+                if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`
+                return n.toLocaleString()
+              }}
+            />
+          </>
+        ) : (
+          <CountUp to={Number(value) || 0} />
+        )}
+      </div>
+
+      <div style={{
+        fontFamily: 'var(--font-body)',
+        fontSize: 11,
+        fontWeight: 600,
+        color: 'var(--v3-text)',
+        lineHeight: 1.3,
+        letterSpacing: '-0.005em'
+      }}>
+        {label}
+      </div>
+
+      {subline ? (
+        <div style={{
+          marginTop: 4,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 700,
+          color: t.color,
+          fontVariantNumeric: 'tabular-nums'
+        }}>
+          {subline}
+        </div>
+      ) : null}
+    </motion.button>
   )
 }
