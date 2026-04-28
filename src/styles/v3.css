@@ -287,49 +287,14 @@
   .fh-hero-drift { animation: none; }
 }
 
-/* ---------- Schedule 2-zone layout (desktop ≥1024px) ----------
-   Mobile: stacked single column (queue above timeline).
-   Desktop: 280px left queue + flex right timeline, side by side. */
-.fh-schedule-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 0 20px 20px;
-}
-@media (min-width: 1024px) {
-  .fh-schedule-grid {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    align-items: start;
-  }
-}
-
-/* Upcoming queue: horizontal scroll on mobile, vertical column on desktop. */
-.fh-schedule-queue {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  -webkit-overflow-scrolling: touch;
-}
-@media (min-width: 1024px) {
-  .fh-schedule-queue {
-    flex-direction: column;
-    overflow-x: visible;
-    overflow-y: auto;
-    padding-bottom: 0;
-    max-height: 70vh;
-  }
-}
-.fh-schedule-queue > * {
-  flex-shrink: 0;
-  width: 180px;
-}
-@media (min-width: 1024px) {
-  .fh-schedule-queue > * {
-    width: 100%;
-  }
+/* ---------- Schedule day-strip dispatch board ----------
+   Single-column timeline. The 7-day strip + Day/Week tabs + time-block
+   list match the mockup. Horizontal scroll on the day strip if the
+   viewport can't fit 7 cells side-by-side comfortably. */
+.fh-week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
 }
 
 /* ---------- Cinematic page vignette ----------

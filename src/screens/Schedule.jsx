@@ -16,8 +16,7 @@ import { useFhMotion } from '../lib/motion.js'
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' }
+  { value: 'week', label: 'Week' }
 ]
 
 function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x }
@@ -165,8 +164,21 @@ export default function Schedule() {
 
   function shift(n) {
     if (view === 'day') setCursor((d) => addDays(d, n))
-    else if (view === 'week') setCursor((d) => addDays(d, 7 * n))
-    else setCursor((d) => new Date(d.getFullYear(), d.getMonth() + n, 1))
+    else setCursor((d) => addDays(d, 7 * n))
+  }
+
+  // Month nav (header chevrons) shifts the cursor by N months while
+  // keeping the day-of-month if it exists in the new month, else the last
+  // day. The week strip below the nav re-anchors automatically because
+  // cursor changed.
+  function shiftMonth(n) {
+    setCursor((d) => {
+      const next = new Date(d.getFullYear(), d.getMonth() + n, 1)
+      const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
+      next.setDate(Math.min(d.getDate(), lastDay))
+      next.setHours(0, 0, 0, 0)
+      return next
+    })
   }
 
   const windowRead = useMemo(
@@ -252,149 +264,175 @@ export default function Schedule() {
         </motion.div>
       )}
 
-      {/* Upcoming queue moved INSIDE the .fh-schedule-grid two-zone wrapper
-          below — mobile stacks queue above timeline, desktop puts queue
-          on the left as a persistent sidebar. */}
-
-      {/* VIEW TABS + NAV */}
-      <motion.div variants={item} style={{ padding: '14px 20px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <SpecTabs
-          options={VIEWS}
-          value={view}
-          onChange={setView}
-          ariaLabel="Calendar view"
-        />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type="button" onClick={() => shift(-1)} aria-label="Previous" style={iconBtnStyle}>
-            <ChevronLeft size={16} />
-          </button>
-          <span style={{ flex: 1, fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', textAlign: 'center' }}>
-            {view === 'month'
-              ? cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-              : view === 'week'
-                ? `Week of ${fmtDate(addDays(cursor, -cursor.getDay()))}`
-                : fmtDate(cursor)}
-          </span>
-          <button type="button" onClick={() => shift(1)} aria-label="Next" style={iconBtnStyle}>
-            <ChevronRight size={16} />
-          </button>
+      {/* MONTH NAV — chevron-prev · "April 2025" · chevron-next · Today */}
+      <motion.div variants={item} style={{ padding: '4px 20px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              aria-label="Previous month"
+              style={chevBtnStyle}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              color: 'var(--v3-text)',
+              fontVariantNumeric: 'tabular-nums',
+              minWidth: 130,
+              textAlign: 'center'
+            }}>
+              {cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+            </span>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              aria-label="Next month"
+              style={chevBtnStyle}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setCursor(startOfDay(new Date()))}
-            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--v3-border-strong)', background: 'var(--v3-surface)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+            style={{
+              padding: '8px 14px', borderRadius: 10,
+              border: '1px solid var(--v3-border-strong)',
+              background: 'var(--v3-surface)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent'
+            }}
           >
             Today
           </button>
         </div>
       </motion.div>
 
+      {/* WEEK STRIP — 7 cells anchored to Monday. Highlighted cell = cursor;
+          ring around today (when not selected). Tap any day to jump. */}
+      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+        <div className="fh-week-strip">
+          {Array.from({ length: 7 }, (_, i) => {
+            const today = startOfDay(new Date())
+            const cursorDow = (cursor.getDay() + 6) % 7
+            const day = addDays(cursor, i - cursorDow)
+            const isSelected = sameDay(day, cursor)
+            const isToday = sameDay(day, today)
+            const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase().slice(0, 3)
+            const dayNum = day.getDate()
+            return (
+              <motion.button
+                key={day.toISOString()}
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                onClick={() => { hapticTap(); setCursor(startOfDay(day)); setView('day') }}
+                aria-pressed={isSelected}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: 4,
+                  padding: '10px 4px',
+                  borderRadius: 12,
+                  background: isSelected ? 'var(--v3-primary-soft)' : 'var(--v3-surface)',
+                  border: isSelected
+                    ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
+                    : isToday
+                      ? '1px solid color-mix(in srgb, var(--v3-primary) 25%, transparent)'
+                      : '1px solid var(--v3-border-strong)',
+                  boxShadow: isSelected
+                    ? '0 6px 18px rgba(212, 175, 55, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.06)'
+                    : 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text)',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                <span style={{
+                  fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
+                  letterSpacing: '0.14em',
+                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                }}>
+                  {dayName}
+                </span>
+                <span style={{
+                  fontFamily: 'var(--font-display)', fontSize: 18,
+                  letterSpacing: '0.02em',
+                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text)',
+                  fontVariantNumeric: 'tabular-nums', lineHeight: 1
+                }}>
+                  {dayNum}
+                </span>
+                {isToday && !isSelected && (
+                  <span aria-hidden="true" style={{
+                    width: 4, height: 4, borderRadius: '50%',
+                    background: 'var(--v3-primary)', marginTop: 1
+                  }} />
+                )}
+              </motion.button>
+            )
+          })}
+        </div>
+      </motion.div>
+
+      {/* DAY / WEEK TABS — narrower, sits above the timeline */}
+      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+        <SpecTabs
+          options={VIEWS}
+          value={view}
+          onChange={setView}
+          ariaLabel="Calendar view"
+        />
+      </motion.div>
+
       {/* Swipe-detector wraps the per-view body. Horizontal pointer drag
           past 60 px shifts the cursor by 1 (left = next, right = prev),
           giving phone users the same gesture they expect from native
           calendar apps. Vertical scroll inside the body still works. */}
-      <SwipeShell onShift={shift}>
-        {/* TWO-ZONE LAYOUT (desktop ≥1024px):
-            - Left zone (280px): Upcoming queue — vertical, persistent,
-              max-height 70vh with scroll. Always visible regardless of
-              which view tab is active.
-            - Right zone (1fr): Main timeline panel.
-            Mobile (<1024px): stacks vertically — queue (horizontal scroll)
-            above timeline. */}
-        <motion.div variants={item} className="fh-schedule-grid">
-
-          {/* ZONE 1 — Upcoming Queue */}
-          <div>
-            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
-                <CalendarIcon size={12} />
-                Upcoming · 7 days
-              </span>
-              {upcoming.length > 0 && (
-                <span style={{ padding: '3px 9px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)', color: 'var(--v3-primary)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', fontVariantNumeric: 'tabular-nums' }}>
-                  {upcoming.length}
-                </span>
-              )}
-            </header>
-            {upcoming.length === 0 ? (
-              <div style={{
-                padding: '20px 16px', borderRadius: 14,
-                background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
-                color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-                fontSize: 12, textAlign: 'center', lineHeight: 1.5
-              }}>
-                No upcoming work in the next 7 days.
-              </div>
-            ) : (
-              <div className="fh-schedule-queue">
-                {upcoming.map((e, i) => {
-                  const fromQuote = Boolean(e.contact_id && e.fh_contacts?.name)
-                  const accent = fromQuote ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
-                  return (
-                    <motion.button
-                      key={e.id}
-                      type="button"
-                      initial={{ opacity: 0, x: 12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: Math.min(i * 0.04, 0.24), duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
-                      whileHover={{ y: -2, backgroundColor: '#1A1A20' }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => e.contact_id && navigate(`/jobs/${e.contact_id}`)}
-                      style={{
-                        position: 'relative',
-                        padding: '12px 14px',
-                        borderRadius: 12,
-                        background: 'var(--v3-surface)',
-                        border: `1px solid ${fromQuote ? 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' : 'var(--v3-border-strong)'}`,
-                        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.2)',
-                        color: 'var(--v3-text)',
-                        cursor: e.contact_id ? 'pointer' : 'default',
-                        textAlign: 'left',
-                        WebkitTapHighlightColor: 'transparent'
-                      }}
-                    >
-                      <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accent, boxShadow: `0 0 10px ${fromQuote ? 'rgba(212, 175, 55, 0.4)' : 'transparent'}` }} />
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--v3-text-muted)', marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
-                        <CalendarIcon size={11} />
-                        {new Date(e.start_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        <span aria-hidden="true">·</span>
-                        <Clock size={11} />
-                        {fmtTime(e.start_at)}
-                      </div>
-                      <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--v3-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {e.title || 'Untitled'}
-                      </div>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600, letterSpacing: '0.02em', color: fromQuote ? 'var(--v3-primary)' : 'var(--v3-text-muted)' }}>
-                        {fromQuote ? <MapPin size={11} /> : null}
-                        {fromQuote ? e.fh_contacts.name : 'Manual event'}
-                      </div>
-                    </motion.button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* ZONE 2 — Main timeline panel */}
-          <div style={{
-            padding: 14,
-            borderRadius: 18,
-            background: `
-              linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 30%),
-              var(--v3-surface)
-            `,
-            border: '1px solid var(--v3-border-strong)',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.3)',
-            minHeight: 200
+      {/* DAY HEADER — "TUE, APR 28" eyebrow that titles the timeline */}
+      {view === 'day' && (
+        <motion.div variants={item} style={{ padding: '0 20px 8px' }}>
+          <span style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--v3-text-muted)'
           }}>
-            {/* Show skeleton ONLY on the very first load (events still null).
-                On subsequent re-fetches (view switch, day shift) keep the
-                existing grid rendered so the user never sees a flash of
-                empty horizontal bars. */}
-            {loading && events == null && <SkeletonList rows={5} card={false} />}
-            {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} onAdd={() => setAddOpen(true)} />}
-            {events != null && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-            {events != null && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
-          </div>
+            {cursor.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
+        </motion.div>
+      )}
+
+      {/* TIMELINE — vertical time-block list. Matches mockup: each row
+          is a job block with time, name, sub, status pill, avatar group. */}
+      <SwipeShell onShift={shift}>
+        <motion.div variants={item} style={{ padding: '0 20px 24px' }}>
+          {loading && events == null && <SkeletonList rows={5} card={false} />}
+          {events != null && view === 'day' && (
+            <DayView
+              events={events}
+              now={new Date()}
+              onClick={(id) => navigate(`/jobs/${id}`)}
+              onDelete={deleteEvent}
+              onAdd={() => setAddOpen(true)}
+            />
+          )}
+          {events != null && view === 'week' && (
+            <WeekView
+              start={addDays(cursor, -((cursor.getDay() + 6) % 7))}
+              events={events}
+              onClick={(id) => navigate(`/jobs/${id}`)}
+              onDelete={deleteEvent}
+            />
+          )}
         </motion.div>
       </SwipeShell>
 
@@ -454,6 +492,21 @@ const iconBtnStyle = {
   width: 44,
   height: 44,
   borderRadius: 11,
+  border: '1px solid var(--v3-border-strong)',
+  background: 'var(--v3-surface)',
+  color: 'var(--v3-text)',
+  display: 'grid',
+  placeItems: 'center',
+  cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent'
+}
+
+// Smaller chevron button used in the month nav header. Same surface
+// system as iconBtnStyle but 36x36 so the row reads tighter.
+const chevBtnStyle = {
+  width: 36,
+  height: 36,
+  borderRadius: 10,
   border: '1px solid var(--v3-border-strong)',
   background: 'var(--v3-surface)',
   color: 'var(--v3-text)',
@@ -534,105 +587,213 @@ function DayView({ events, onClick, onDelete, onAdd }) {
   }
   return (
     <ul className="fh-timeline" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {events.map((e, i) => (
-        <motion.li
-          key={e.id}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileHover={{ y: -2, backgroundColor: '#1A1A20' }}
-          transition={{
-            opacity: { delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
-            y: { type: 'spring', stiffness: 620, damping: 28 },
-            backgroundColor: { type: 'spring', stiffness: 620, damping: 28 }
-          }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '13px 14px',
-            borderRadius: 12,
-            background: '#141418',
-            border: '1px solid var(--v3-border-strong)',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Time block — left "object handle" with subtle gold accent */}
-          <span style={{
-            flexShrink: 0,
-            width: 68,
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-            paddingRight: 10,
-            borderRight: '1px solid var(--v3-border)'
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 14,
-              letterSpacing: '0.04em',
-              color: 'var(--v3-primary)',
-              fontVariantNumeric: 'tabular-nums',
-              lineHeight: 1
-            }}>
-              {fmtTime(e.start_at)}
-            </span>
-          </span>
-          <button
-            type="button"
+      {events.map((e, i) => {
+        const status = deriveStatus(e, now)
+        const start = fmtTime(e.start_at)
+        const end = e.end_at ? fmtTime(e.end_at) : null
+        const primary = e.fh_contacts?.name || e.title || 'Untitled'
+        const secondary = e.fh_contacts?.name && e.title ? e.title : (e.description || (e.contact_id ? '' : 'Manual event'))
+        const initial = (primary || '·').trim().charAt(0).toUpperCase()
+        return (
+          <ScheduleRow
+            key={e.id}
+            index={i}
+            primary={primary}
+            secondary={secondary}
+            startStr={start}
+            endStr={end}
+            status={status}
+            initial={initial}
             onClick={() => e.contact_id && onClick(e.contact_id)}
-            style={{
-              flex: 1, minWidth: 0,
-              background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
-              cursor: e.contact_id ? 'pointer' : 'default',
-              color: 'var(--v3-text)',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            <div style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 14, fontWeight: 700,
-              color: 'var(--v3-text)',
-              letterSpacing: '-0.005em',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-            }}>
-              {e.title || 'Untitled'}
-            </div>
-            {e.fh_contacts?.name && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                marginTop: 4,
-                padding: '3px 8px',
-                borderRadius: 999,
-                background: 'var(--v3-primary-soft)',
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-                color: 'var(--v3-primary)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.08em', textTransform: 'uppercase'
-              }}>
-                <MapPin size={9} />
-                {e.fh_contacts.name}
-              </span>
-            )}
-          </button>
+            onDelete={() => onDelete && window.confirm('Delete this event?') && onDelete(e.id)}
+            isClickable={Boolean(e.contact_id)}
+          />
+        )
+      })}
+    </ul>
+  )
+}
+
+/* Status taxonomy mirrors the mockup pill colors:
+     On Site     — currently happening, has a job (contact_id) → green
+     In Progress — currently happening, no contact (office/admin) → blue
+     Upcoming    — future today → gold
+     Scheduled   — future, not today → gray
+     Done        — past → muted gray (mockup doesn't show this; quiet) */
+const STATUS_TONE = {
+  'On Site':     { color: '#4ADE80', soft: 'rgba(46, 204, 113, 0.14)',  border: 'rgba(46, 204, 113, 0.40)' },
+  'In Progress': { color: '#60A5FA', soft: 'rgba(96, 165, 250, 0.14)',  border: 'rgba(96, 165, 250, 0.40)' },
+  'Upcoming':    { color: '#E8C25A', soft: 'rgba(212, 175, 55, 0.14)',  border: 'rgba(212, 175, 55, 0.40)' },
+  'Scheduled':   { color: '#A1A1AA', soft: 'rgba(255, 255, 255, 0.04)', border: 'rgba(255, 255, 255, 0.10)' },
+  'Done':        { color: '#A1A1AA', soft: 'rgba(255, 255, 255, 0.03)', border: 'rgba(255, 255, 255, 0.08)' }
+}
+
+function deriveStatus(e, now) {
+  const start = e.start_at ? new Date(e.start_at).getTime() : null
+  const end = e.end_at ? new Date(e.end_at).getTime() : null
+  const t = now.getTime()
+  if (end && end < t) return 'Done'
+  if (start && start <= t && end && t <= end) {
+    return e.contact_id ? 'On Site' : 'In Progress'
+  }
+  if (start && start > t && sameDay(new Date(start), now)) return 'Upcoming'
+  return 'Scheduled'
+}
+
+function ScheduleRow({ index, primary, secondary, startStr, endStr, status, initial, onClick, onDelete, isClickable }) {
+  const tone = STATUS_TONE[status] || STATUS_TONE.Scheduled
+  return (
+    <motion.li
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={isClickable ? { y: -2, backgroundColor: '#1A1A20' } : undefined}
+      transition={{
+        opacity: { delay: Math.min(index * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
+        y: { type: 'spring', stiffness: 620, damping: 28 },
+        backgroundColor: { type: 'spring', stiffness: 620, damping: 28 }
+      }}
+      style={{
+        position: 'relative',
+        display: 'flex', alignItems: 'stretch', gap: 14,
+        padding: '14px 14px',
+        borderRadius: 14,
+        background: '#141418',
+        border: '1px solid var(--v3-border-strong)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Status-color spine — drives the at-a-glance dispatch read */}
+      <span aria-hidden="true" style={{
+        position: 'absolute',
+        left: 0, top: 12, bottom: 12,
+        width: 3,
+        borderRadius: '0 3px 3px 0',
+        background: tone.color,
+        boxShadow: `0 0 10px ${tone.color}55`
+      }} />
+
+      {/* Time column — start over end, narrow handle on the left */}
+      <div style={{
+        flexShrink: 0,
+        width: 64,
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+        justifyContent: 'center',
+        paddingLeft: 6,
+        paddingRight: 12,
+        borderRight: '1px solid var(--v3-border)'
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 15,
+          letterSpacing: '0.02em',
+          color: 'var(--v3-text)',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1.05
+        }}>
+          {startStr}
+        </span>
+        {endStr && (
+          <span style={{
+            marginTop: 3,
+            fontFamily: 'var(--font-body)',
+            fontSize: 10,
+            color: 'var(--v3-text-muted)',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '0.04em'
+          }}>
+            {endStr}
+          </span>
+        )}
+      </div>
+
+      {/* Body — primary (job/client) + secondary (description) */}
+      <button
+        type="button"
+        onClick={isClickable ? onClick : undefined}
+        style={{
+          flex: 1, minWidth: 0,
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          gap: 3,
+          background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
+          cursor: isClickable ? 'pointer' : 'default',
+          color: 'var(--v3-text)',
+          WebkitTapHighlightColor: 'transparent'
+        }}
+      >
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 14, fontWeight: 700,
+          letterSpacing: '-0.01em',
+          color: 'var(--v3-text)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+        }}>
+          {primary}
+        </div>
+        {secondary && (
+          <div style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 11,
+            color: 'var(--v3-text-muted)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+          }}>
+            {secondary}
+          </div>
+        )}
+      </button>
+
+      {/* Right cluster — status pill + avatar (single, contact initial) */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '4px 10px',
+          borderRadius: 999,
+          background: tone.soft,
+          border: `1px solid ${tone.border}`,
+          color: tone.color,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap'
+        }}>
+          <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: tone.color }} />
+          {status}
+        </span>
+        <div aria-hidden="true" style={{
+          width: 30, height: 30,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--v3-primary-soft), rgba(212, 175, 55, 0.05))',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+          display: 'grid', placeItems: 'center',
+          fontFamily: 'var(--font-display)',
+          fontSize: 13,
+          letterSpacing: '0.04em',
+          color: 'var(--v3-primary)'
+        }}>
+          {initial}
+        </div>
+        {onDelete && (
           <button
             type="button"
-            onClick={(ev) => { ev.stopPropagation(); if (onDelete && window.confirm('Delete this event?')) onDelete(e.id) }}
+            onClick={(ev) => { ev.stopPropagation(); onDelete() }}
             aria-label="Delete event"
             style={{
-              flexShrink: 0, width: 30, height: 30, borderRadius: 8,
+              width: 28, height: 28, borderRadius: 8,
               border: 'none', background: 'transparent',
               color: 'var(--v3-text-muted)',
               cursor: 'pointer', display: 'grid', placeItems: 'center',
-              opacity: 0.7,
+              opacity: 0.55,
               WebkitTapHighlightColor: 'transparent'
             }}
             onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
-            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.7'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
+            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.55'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
-        </motion.li>
-      ))}
-    </ul>
+        )}
+      </div>
+    </motion.li>
   )
 }
 
