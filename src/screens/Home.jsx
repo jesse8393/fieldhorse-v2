@@ -656,7 +656,7 @@ export default function Home() {
           </motion.div>
           <motion.div
             variants={item}
-            style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 20px 28px' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 20px 28px' }}
           >
             {nextActions.map((action) => (
               <NextActionRow
@@ -928,18 +928,21 @@ function NextActionRow({ action, onTap }) {
     <motion.button
       type="button"
       onClick={() => { hapticTap(); onTap?.() }}
-      whileTap={{ scale: 0.985 }}
+      whileTap={{ scale: 0.97 }}
       whileHover={{ y: -2 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      // Snappier spring (stiffness 620 / damping 28) so tap reads as an
+      // immediate key-press, not a soft squish. Hover lift still smooth.
+      transition={{ type: 'spring', stiffness: 620, damping: 28 }}
       style={{
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
-        padding: '14px 16px 14px 18px',
-        borderRadius: 14,
+        gap: 10,
+        padding: '10px 14px 10px 16px',
+        borderRadius: 12,
         background: 'var(--v3-surface)',
-        border: '1px solid var(--v3-border)',
+        border: '1px solid var(--v3-border-strong)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         width: '100%',
@@ -953,33 +956,34 @@ function NextActionRow({ action, onTap }) {
           yellow = today, green = money in motion. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
-        left: 0, top: 8, bottom: 8,
+        left: 0, top: 7, bottom: 7,
         width: 3,
         background: tone.color,
         borderRadius: '0 3px 3px 0',
-        boxShadow: `0 0 14px ${tone.glow}`
+        boxShadow: `0 0 12px ${tone.glow}`
       }} />
 
       <span aria-hidden="true" style={{
         flexShrink: 0,
-        width: 38, height: 38,
-        borderRadius: 11,
+        width: 32, height: 32,
+        borderRadius: 9,
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border-strong)',
         color: tone.color,
         display: 'grid',
         placeItems: 'center'
       }}>
-        <Icon size={16} />
+        <Icon size={14} />
       </span>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: 700,
           color: 'var(--v3-text)',
-          letterSpacing: '-0.005em',
+          letterSpacing: '-0.01em',
+          lineHeight: 1.25,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis'
@@ -987,9 +991,10 @@ function NextActionRow({ action, onTap }) {
           {action.title}
         </div>
         <div style={{
-          marginTop: 3,
+          marginTop: 1,
           fontFamily: 'var(--font-body)',
           fontSize: 11,
+          lineHeight: 1.3,
           color: 'var(--v3-text-muted)',
           fontVariantNumeric: 'tabular-nums'
         }}>
@@ -1005,7 +1010,7 @@ function NextActionRow({ action, onTap }) {
           display: 'inline-flex',
           alignItems: 'center',
           gap: 4,
-          padding: '4px 8px',
+          padding: '3px 7px',
           borderRadius: 999,
           background: `color-mix(in srgb, ${tone.color} 14%, transparent)`,
           border: `1px solid color-mix(in srgb, ${tone.color} 35%, transparent)`,
@@ -1026,7 +1031,7 @@ function NextActionRow({ action, onTap }) {
         </span>
       )}
 
-      <ChevronRight size={16} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
+      <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
     </motion.button>
   )
 }
