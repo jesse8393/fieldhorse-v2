@@ -145,7 +145,7 @@ export default function Subs() {
             Sub Directory
           </span>
           <h1 className="v3-h1" style={{ marginTop: 6 }}>
-            Your <em>trade bench.</em>
+            Trade <em>network.</em>
           </h1>
           <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 18 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>

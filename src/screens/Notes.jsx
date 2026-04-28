@@ -239,7 +239,7 @@ export default function Notes() {
             Notes, <em>fast.</em>
           </h1>
           <div className="v3-caption" style={{ marginTop: 6 }}>
-            Speak it, type it, drop it mid-drive. AI turns it into action.
+            Speak or type a note. AI organizes it into action items, risks, and materials.
           </div>
         </div>
 
@@ -271,7 +271,7 @@ export default function Notes() {
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={listening ? 'Listening — speak freely…' : 'Drop the field log. AI parses it for action items, risks, materials.'}
+          placeholder={listening ? 'Listening — speak freely…' : 'Capture a note from the jobsite. AI parses it for action items, risks, materials.'}
           rows={5}
           style={{
             width: '100%',

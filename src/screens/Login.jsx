@@ -1,12 +1,9 @@
-import { useEffect, useState } from 'react'
-import { hapticMedium, hapticSuccess, hapticError } from '../lib/haptics.js'
+import { useState } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, Lock, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
-import Aurora from '../components/fx/Aurora.jsx'
-import GridPattern from '../components/fx/GridPattern.jsx'
 
 export default function Login() {
   const { signIn, signUp, sendPasswordReset, session, loading } = useAuth()
@@ -80,69 +77,100 @@ export default function Login() {
 
   const isSignIn = mode === 'signin'
   const firstName = profile?.full_name?.trim().split(/\s+/)[0]
-  const heroPrefix = firstName ? 'Welcome back,' : 'Welcome,'
-  const heroName = firstName || 'operator'
+  // Voice: premium business owner, not field operator. "Welcome back."
+  // for returning users, "Built for builders." for new accounts. Once
+  // the profile name is known we personalize the sign-in line.
+  const headline = isSignIn
+    ? (firstName ? `Welcome back, ${firstName}.` : 'Welcome back.')
+    : 'Built for builders.'
+  const subline = isSignIn
+    ? 'Run your business with clarity.'
+    : 'Manage jobs, clients, and revenue in one place.'
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'var(--surface-0)', color: 'var(--ink-strong)', overflow: 'hidden' }}>
-      <Aurora />
-      <GridPattern />
+    <div
+      style={{
+        position: 'relative',
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+        background: 'var(--v3-bg)',
+        color: 'var(--v3-text)',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Subtle warm radial behind the card — not aurora, not grid. Just
+          a single soft gold halo to add depth without atmosphere. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(229, 193, 88, 0.06), transparent 70%)'
+        }}
+      />
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
-        style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}
+        style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 400 }}
       >
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, letterSpacing: '0.14em', lineHeight: 1 }}>
-            <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
-            <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, letterSpacing: '0.14em', lineHeight: 1 }}>
+            <span style={{ color: 'var(--v3-primary)' }}>FIELD</span>
+            <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
           </div>
           <h1
-            className="fh-font-serif"
-            style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', marginTop: 28, marginBottom: 0, fontWeight: 400 }}
+            className="v3-h1"
+            style={{ fontSize: 'clamp(24px, 6vw, 30px)', marginTop: 24, lineHeight: 1.15 }}
           >
-            {isSignIn ? heroPrefix : 'Sign up,'}
-            <br />
-            {isSignIn ? `${heroName}.` : 'operator.'}
+            {headline}
           </h1>
+          <p
+            className="v3-caption"
+            style={{ marginTop: 8, fontSize: 13, lineHeight: 1.45 }}
+          >
+            {subline}
+          </p>
         </div>
 
+        {/* Card — v3 surface + premium gold top-edge stroke */}
         <form
           onSubmit={onSubmit}
           noValidate
           style={{
+            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            gap: 12,
-            padding: 20,
+            gap: 14,
+            padding: 22,
             borderRadius: 18,
-            background: 'var(--surface-2)',
-            border: '1px solid var(--rule)',
-            backdropFilter: 'blur(20px)'
+            background: 'var(--v3-surface)',
+            border: '1px solid var(--v3-border-strong)',
+            boxShadow: '0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 4px 14px rgba(0, 0, 0, 0.30), 0 16px 40px rgba(0, 0, 0, 0.32)',
+            overflow: 'hidden'
           }}
         >
           <span
+            aria-hidden="true"
             style={{
-              alignSelf: 'flex-start',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--field-gold-bright)',
-              padding: '3px 10px',
-              borderRadius: 999,
-              background: 'rgba(201,150,58,0.1)',
-              border: '1px solid rgba(201,150,58,0.2)'
+              position: 'absolute',
+              top: 0,
+              left: '14%',
+              right: '14%',
+              height: 1,
+              background: 'linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%)',
+              pointerEvents: 'none'
             }}
-          >
-            {isSignIn ? 'Authenticate' : 'Provision account'}
-          </span>
+          />
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Email</span>
+            <span className="v3-eyebrow">Email</span>
             <div style={{ position: 'relative' }}>
-              <Mail size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
+              <Mail size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
               <input
                 type="email"
                 required
@@ -152,15 +180,26 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={busy}
                 placeholder="you@company.com"
-                style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px 12px 38px',
+                  borderRadius: 12,
+                  background: 'var(--v3-surface-2)',
+                  border: '1px solid var(--v3-border-strong)',
+                  color: 'var(--v3-text)',
+                  fontSize: 14,
+                  fontFamily: 'var(--font-body)',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
               />
             </div>
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Password</span>
+            <span className="v3-eyebrow">Password</span>
             <div style={{ position: 'relative' }}>
-              <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
+              <Lock size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
               <input
                 type="password"
                 required
@@ -170,18 +209,29 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={busy}
                 placeholder="••••••••"
-                style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px 12px 38px',
+                  borderRadius: 12,
+                  background: 'var(--v3-surface-2)',
+                  border: '1px solid var(--v3-border-strong)',
+                  color: 'var(--v3-text)',
+                  fontSize: 14,
+                  fontFamily: 'var(--font-body)',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
               />
             </div>
           </label>
 
           {error && (
-            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--alert-red)', fontFamily: 'var(--font-body)' }}>
+            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-bright)', fontFamily: 'var(--font-body)' }}>
               {error}
             </p>
           )}
           {notice && (
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--signal-green)', fontFamily: 'var(--font-body)' }}>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--v3-success-bright)', fontFamily: 'var(--font-body)' }}>
               {notice}
             </p>
           )}
@@ -192,26 +242,28 @@ export default function Login() {
             whileTap={{ scale: 0.98 }}
             style={{
               marginTop: 6,
-              padding: '14px 18px',
+              padding: '13px 18px',
               borderRadius: 12,
-              background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-              color: 'var(--onyx)',
-              fontFamily: 'var(--font-display)',
-              fontSize: 18,
-              letterSpacing: '0.15em',
-              border: 'none',
+              background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+              color: 'var(--v3-on-primary)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
               cursor: busy ? 'default' : 'pointer',
-              boxShadow: '0 8px 24px rgba(201,150,58,0.35)',
+              boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
+              minHeight: 48,
               opacity: busy ? 0.6 : 1
             }}
           >
             {busy
-              ? (isSignIn ? 'SIGNING IN…' : 'CREATING…')
-              : (<>{isSignIn ? 'SIGN IN' : 'CREATE ACCOUNT'}<ArrowRight size={18} /></>)}
+              ? (isSignIn ? 'Signing in…' : 'Creating account…')
+              : (<>{isSignIn ? 'Sign in' : 'Create account'}<ArrowRight size={16} /></>)}
           </motion.button>
 
           <button
@@ -222,9 +274,9 @@ export default function Login() {
               setMode(isSignIn ? 'signup' : 'signin')
             }}
             disabled={busy}
-            style={{ background: 'none', border: 'none', padding: 0, marginTop: 6, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center' }}
+            style={{ background: 'none', border: 'none', padding: 0, marginTop: 6, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center' }}
           >
-            {isSignIn ? 'New here? Create an account' : 'Already on Fieldhorse? Sign in'}
+            {isSignIn ? 'New to Fieldhorse? Create an account' : 'Already have an account? Sign in'}
           </button>
 
           {isSignIn && (
@@ -232,7 +284,7 @@ export default function Login() {
               type="button"
               onClick={handleForgotPassword}
               disabled={busy}
-              style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center' }}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center', opacity: 0.75 }}
             >
               Forgot password?
             </button>

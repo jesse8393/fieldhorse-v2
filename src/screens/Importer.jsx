@@ -162,8 +162,8 @@ export default function Importer() {
             Import
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            Bring it{' '}
-            all in.
+            Import your{' '}
+            data.
           </h1>
         </div>
         <div

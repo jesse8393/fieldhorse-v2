@@ -200,10 +200,10 @@ export default function Schedule() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>
-              Time Control
+              Schedule
             </span>
             <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-serif)', fontSize: 'clamp(26px, 7vw, 36px)', lineHeight: 1.05, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
-              Run the day.
+              Today, planned.
             </h1>
             {events && events.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>

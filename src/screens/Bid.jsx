@@ -84,11 +84,11 @@ export default function Bid() {
       <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 14px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-            AI bid engine
+            Estimates
           </span>
           <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            Bid it,{' '}
-            clean.
+            Build a clean{' '}
+            estimate.
           </h1>
         </div>
         <div
