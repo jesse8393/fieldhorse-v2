@@ -56,7 +56,7 @@ export default function ContactDetail() {
   const data = useJobData(id, user?.id)
   const {
     contact, subs, expenses, payments, inspections, notes,
-    scheduleItems, scheduleCount, clientSummary,
+    scheduleItems, scheduleCount, todos, clientSummary,
     paid, balance, loading, fetchAll, patch
   } = data
 
@@ -176,7 +176,7 @@ export default function ContactDetail() {
             notes={notes}
             payments={payments}
             scheduleItems={scheduleItems}
-            todos={[]}
+            todos={todos}
             paid={paid}
             balance={balance}
             userId={user?.id}

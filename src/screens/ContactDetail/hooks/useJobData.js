@@ -32,18 +32,23 @@ export function useJobData(id, userId) {
   // The legacy fetchAll only pulled a head-only count for the delete sheet's
   // "X schedule items" cascade display — we keep that count derived below.
   const [scheduleItems, setScheduleItems] = useState([])
+  // Todos at the parent level so the NextAction priority chain can resolve
+  // step 3 (open todo). TodosSection still owns its own fetch for live CRUD;
+  // this parent fetch is a snapshot used only by NextAction.
+  const [todos, setTodos] = useState([])
   const [clientSummary, setClientSummary] = useState(null)
 
   const fetchAll = useCallback(async () => {
     if (!userId || !id) return
-    const [c, s, e, p, i, n, sch] = await Promise.all([
+    const [c, s, e, p, i, n, sch, td] = await Promise.all([
       supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
       supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
       supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
       supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-      supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true })
+      supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
+      supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: false })
     ])
 
     const contactRow = c.data || null
@@ -54,6 +59,7 @@ export function useJobData(id, userId) {
     setInspections(i.data || [])
     setNotes(n.data || [])
     setScheduleItems(sch.data || [])
+    setTodos(td.data || [])
 
     // Multi-tenant guard preserved: migration 007 RLS denies partner reads on
     // fh_clients, but the JS guard avoids issuing a guaranteed-empty request.
@@ -92,11 +98,20 @@ export function useJobData(id, userId) {
   // Optimistic patch — flip locally, sync, toast on success. Failure leaves
   // optimistic state in place silently (matches legacy behavior; we can add
   // rollback here in a follow-up without touching callers).
+  //
+  // Defense-in-depth: filter on user_id alongside id. Supabase RLS already
+  // enforces the same constraint, but a JS-layer guard prevents accidental
+  // writes if RLS ever has a gap (service-role bypass during tests, migration
+  // ordering bug, etc.). Project memory documents a $160K pipeline leak from
+  // a multi-tenant gap — this guard is the cheap belt-and-suspenders.
   const patch = useCallback(async (update) => {
     setContact((c) => ({ ...c, ...update }))
-    const { error } = await supabase.from('fh_contacts').update(update).eq('id', id)
+    const { error } = await supabase.from('fh_contacts')
+      .update(update)
+      .eq('id', id)
+      .eq('user_id', userId)
     if (!error) toastSuccess('Saved', 'Changes synced')
-  }, [id])
+  }, [id, userId])
 
   // Derived — payments aggregate + balance + legacy scheduleCount kept as a
   // memoized read so nothing in the delete-cascade UI breaks.
@@ -120,6 +135,7 @@ export function useJobData(id, userId) {
     notes,
     scheduleItems,
     scheduleCount,
+    todos,
     clientSummary,
     // derived
     paid,

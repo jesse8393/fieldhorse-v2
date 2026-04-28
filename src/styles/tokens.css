@@ -128,6 +128,20 @@
   --v3-s-5: 32px;
   --v3-s-6: 48px;
   --v3-s-7: 64px;
+
+  /* Semantic outcome shades (brighter than --v3-success/--v3-danger so they
+     read clearly against onyx in tier indicators: HealthDonut tiers, margin
+     pills, "all clear" / "behind" labels). */
+  --v3-success-bright: #4ADE80;
+  --v3-danger-bright: #F47366;
+  /* Text color for use ON --v3-primary buttons (deep onyx for AAA contrast). */
+  --v3-on-primary: #0B0B0D;
+  /* Reusable gold glow shadows for primary CTAs (large for hero, sm for inline). */
+  --v3-gold-glow: 0 8px 22px rgba(212, 175, 55, 0.32);
+  --v3-gold-glow-sm: 0 6px 18px rgba(212, 175, 55, 0.28);
+  /* Subtle white tracks for progress bars + timeline connectors. */
+  --v3-track: rgba(255, 255, 255, 0.06);
+  --v3-track-strong: rgba(255, 255, 255, 0.10);
 }
 
 /* Explicit dark theme — set on <html data-theme="dark"> OR via prefers-color-scheme */

@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil, X as XIcon } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import {
   startQuote, approveQuote, markComplete, reopen
 } from '../../../lib/pipeline.js'
 import { toastSuccess, toastError } from '../../../lib/toast.js'
-import { hapticTap } from '../../../lib/haptics.js'
+import { hapticTap, hapticStageChange } from '../../../lib/haptics.js'
 import {
   NextActionCard,
   HealthDonut,
@@ -17,6 +17,7 @@ import {
 import TimeClockCard from '../../../components/TimeClockCard.jsx'
 import { computeJobHealth } from '../lib/jobHealth.js'
 import { resolveNextAction } from '../lib/jobNextAction.js'
+import { money } from '../lib/format.js'
 
 /**
  * v3 OVERVIEW tab — the "money screen" of the Job Detail.
@@ -47,6 +48,8 @@ export default function OverviewTab({
   userId,
   fetchAll,
   patch,
+  isEditing,
+  onExitEdit,
   onOpenAddEvent,
   onOpenLogPayment,
   onOpenInvitePartner
@@ -117,6 +120,11 @@ export default function OverviewTab({
         case 'stage': {
           const fn = STAGE_FN_MAP[nextAction.pipelineFn]
           if (fn) {
+            // Heavier haptic on stage boundary — matches haptics.js convention
+            // that lead→quote→job→invoice transitions get hapticStageChange.
+            // pipeline.js fires its own commit haptic; this one announces the
+            // boundary BEFORE the network call.
+            hapticStageChange()
             await fn(contact)
             await fetchAll()
           } else if (nextAction.pipelineFn === 'logPayment') {
@@ -143,6 +151,17 @@ export default function OverviewTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '8px 20px 32px' }}>
+
+      {/* EDIT FIELDS — only shown when header EDIT toggle is on. Renders ABOVE
+          the dashboard so the operator's eye lands on the form. Cancel/Save
+          collapses back to the read-only Overview. */}
+      {isEditing && (
+        <EditFieldsCard
+          contact={contact}
+          patch={patch}
+          onExitEdit={onExitEdit}
+        />
+      )}
 
       {/* PRIMARY ROW — NextAction + HealthDonut. Stacks on mobile, side-by-side ≥768px. */}
       <div className="v3-overview-grid">
@@ -343,5 +362,210 @@ function SecondaryAction({ icon: Icon, label, onClick }) {
       <Icon size={13} aria-hidden="true" />
       {label}
     </motion.button>
+  )
+}
+
+/* ============================================================
+   EditFieldsCard — controlled form for the 9 editable fh_contacts
+   fields. Save patches only the diff (matches legacy commit() behavior
+   so we don't write fields the user didn't touch). Cancel exits edit
+   mode without saving.
+
+   Rebuilt v3 from the legacy OverviewEditForm at lines 776-888 of the
+   pre-Drop-3 ContactDetail.jsx (since deleted in Drop 3.3).
+   ============================================================ */
+
+const EDITABLE_FIELDS = [
+  { key: 'name',        label: 'Name',        kind: 'text',     placeholder: 'Client or job name', col: 1 },
+  { key: 'phone',       label: 'Phone',       kind: 'tel',      placeholder: '(555) 555-5555',    col: 2 },
+  { key: 'email',       label: 'Email',       kind: 'email',    placeholder: 'name@example.com',  col: 1 },
+  { key: 'address',     label: 'Address',     kind: 'text',     placeholder: 'Job site address',  col: 1 },
+  { key: 'job_title',   label: 'Job title',   kind: 'text',     placeholder: 'e.g. Bath remodel', col: 1 },
+  { key: 'job_type',    label: 'Job type',    kind: 'text',     placeholder: 'e.g. Concrete',     col: 2 },
+  { key: 'amount',      label: 'Amount',      kind: 'number',   placeholder: '0',                 col: 1 },
+  { key: 'referred_by', label: 'Referred by', kind: 'text',     placeholder: 'Source',            col: 2 },
+  { key: 'notes',       label: 'Notes',       kind: 'textarea', placeholder: 'Anything else…',    col: 1 }
+]
+
+function EditFieldsCard({ contact, patch, onExitEdit }) {
+  const [form, setForm] = useState(() => buildForm(contact))
+  const [saving, setSaving] = useState(false)
+
+  // Reset form whenever the underlying contact changes (e.g. a partner edit
+  // streams in via realtime mid-edit). Keeps the form authoritative for
+  // changed fields while reflecting truth for untouched ones.
+  useEffect(() => { setForm(buildForm(contact)) }, [contact?.id])
+
+  function set(key, value) {
+    setForm((f) => ({ ...f, [key]: value }))
+  }
+
+  async function commit() {
+    if (saving) return
+    // Diff: only patch keys whose value differs from the contact row.
+    const diff = {}
+    for (const f of EDITABLE_FIELDS) {
+      const next = f.kind === 'number' ? (form[f.key] === '' ? null : Number(form[f.key])) : form[f.key]
+      const cur = contact[f.key]
+      const normalizedCur = cur ?? (f.kind === 'number' ? null : '')
+      const normalizedNext = next ?? (f.kind === 'number' ? null : '')
+      if (normalizedNext !== normalizedCur) diff[f.key] = next
+    }
+    if (Object.keys(diff).length === 0) {
+      onExitEdit?.()
+      return
+    }
+    setSaving(true)
+    await patch(diff)
+    setSaving(false)
+    onExitEdit?.()
+  }
+
+  return (
+    <div style={{
+      padding: '18px 18px 16px',
+      borderRadius: 16,
+      background: 'var(--v3-surface)',
+      border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+      display: 'flex', flexDirection: 'column', gap: 14
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: 'var(--v3-primary)'
+        }}>
+          <Pencil size={12} aria-hidden="true" />
+          Editing job fields
+        </div>
+        <button
+          type="button"
+          onClick={onExitEdit}
+          aria-label="Cancel edit"
+          style={{
+            width: 32, height: 32, borderRadius: 9,
+            background: 'transparent', border: '1px solid var(--v3-border)',
+            color: 'var(--v3-text-muted)', cursor: 'pointer',
+            display: 'grid', placeItems: 'center'
+          }}
+        >
+          <XIcon size={14} aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="v3-edit-grid">
+        {EDITABLE_FIELDS.map((f) => (
+          <EditField
+            key={f.key}
+            label={f.label}
+            value={form[f.key]}
+            onChange={(v) => set(f.key, v)}
+            kind={f.kind}
+            placeholder={f.placeholder}
+            spanFull={f.kind === 'textarea' || f.key === 'address'}
+          />
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 8, marginTop: 4 }}>
+        <button
+          type="button"
+          onClick={onExitEdit}
+          style={{
+            padding: '12px', borderRadius: 12,
+            background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
+            color: 'var(--v3-text)', cursor: 'pointer',
+            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600
+          }}
+        >
+          Cancel
+        </button>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.98 }}
+          onClick={commit}
+          disabled={saving}
+          style={{
+            padding: '12px', borderRadius: 12, border: 'none',
+            background: 'var(--v3-primary)',
+            color: 'var(--v3-on-primary)',
+            cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1,
+            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+            letterSpacing: '0.04em',
+            boxShadow: 'var(--v3-gold-glow)',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </motion.button>
+      </div>
+
+      <style>{`
+        .v3-edit-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        @media (min-width: 540px) {
+          .v3-edit-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .v3-edit-grid > .v3-edit-field--full {
+            grid-column: 1 / -1;
+          }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function buildForm(contact) {
+  const out = {}
+  for (const f of EDITABLE_FIELDS) {
+    const v = contact?.[f.key]
+    out[f.key] = v == null ? '' : String(v)
+  }
+  return out
+}
+
+function EditField({ label, value, onChange, kind, placeholder, spanFull }) {
+  const className = spanFull ? 'v3-edit-field--full' : ''
+  const sharedInputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '11px 13px', borderRadius: 10,
+    background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
+    color: 'var(--v3-text)',
+    fontFamily: 'var(--font-body)', fontSize: 14,
+    outline: 'none'
+  }
+  return (
+    <label className={className} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{
+        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+        letterSpacing: '0.16em', textTransform: 'uppercase',
+        color: 'var(--v3-text-muted)'
+      }}>
+        {label}
+      </span>
+      {kind === 'textarea' ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={3}
+          style={{ ...sharedInputStyle, resize: 'vertical', minHeight: 64 }}
+        />
+      ) : (
+        <input
+          type={kind === 'number' ? 'number' : kind === 'tel' ? 'tel' : kind === 'email' ? 'email' : 'text'}
+          inputMode={kind === 'number' ? 'decimal' : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          style={sharedInputStyle}
+        />
+      )}
+    </label>
   )
 }
