@@ -142,7 +142,7 @@ const JobCard = memo(function JobCard({
       // weight, not just float. Framer animates literal hex values.
       whileHover={{
         y: -4,
-        backgroundColor: '#282834',
+        backgroundColor: '#2A2620',
         boxShadow: '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
       }}
       style={{
@@ -154,7 +154,7 @@ const JobCard = memo(function JobCard({
         boxSizing: 'border-box',
         padding: '18px 18px 18px 22px',
         borderRadius: 'var(--v3-radius-card)',
-        background: '#16161E', // literal so framer hover transition is smooth
+        background: '#171511', // literal so framer hover transition is smooth
         border: '1px solid rgba(255, 255, 255, 0.22)',
         color: 'var(--v3-text)',
         textAlign: 'left',

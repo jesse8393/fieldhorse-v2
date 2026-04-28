@@ -1745,9 +1745,9 @@ a {
 .fh-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   z-index: var(--z-modal);
 }
 
@@ -1871,9 +1871,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-drawer__scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   /* Force GPU layer so background text doesn't smear on backdrop-filter. */
   transform: translateZ(0);
   will-change: backdrop-filter;
@@ -2103,9 +2103,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   position: fixed;
   inset: 0;
   z-index: var(--z-cmdk);
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   padding: 12vh 16px 16px;
   display: flex;
   justify-content: center;
@@ -4486,9 +4486,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-asheet__scrim {
   position: fixed;
   inset: 0;
-  background: rgba(6, 6, 6, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 [data-theme='light'] .fh-asheet__scrim,
 :root:not([data-theme='dark']) .fh-asheet__scrim {
@@ -5196,8 +5196,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
 }
 .fh-toast__dot {

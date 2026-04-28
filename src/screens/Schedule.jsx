@@ -646,7 +646,7 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, init
     <motion.li
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={isClickable ? { y: -2, backgroundColor: '#282834' } : undefined}
+      whileHover={isClickable ? { y: -2, backgroundColor: '#2A2620' } : undefined}
       transition={{
         opacity: { delay: Math.min(index * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
         y: { type: 'spring', stiffness: 620, damping: 28 },
@@ -657,7 +657,7 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, init
         display: 'flex', alignItems: 'stretch', gap: 14,
         padding: '14px 14px',
         borderRadius: 14,
-        background: '#141418',
+        background: '#171511',
         border: '1px solid var(--v3-border-strong)',
         boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
         overflow: 'hidden'

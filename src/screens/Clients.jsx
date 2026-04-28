@@ -327,7 +327,7 @@ function ClientTile({ client: c, rollup: r, lastActivityRel, index, onOpen }) {
       transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.2), ease: [0.2, 0.8, 0.2, 1] }}
       whileHover={{
         y: -4,
-        backgroundColor: '#282834',
+        backgroundColor: '#2A2620',
         boxShadow: '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
       }}
       whileTap={{ scale: 0.985 }}
@@ -340,7 +340,7 @@ function ClientTile({ client: c, rollup: r, lastActivityRel, index, onOpen }) {
         gap: 14,
         padding: '20px 20px 16px 24px',
         borderRadius: 18,
-        background: '#16161E',
+        background: '#171511',
         border: '1px solid var(--v3-border-strong)',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
         textAlign: 'left',

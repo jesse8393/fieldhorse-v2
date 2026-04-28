@@ -97,14 +97,15 @@
      should reference these names directly; legacy --field-gold /
      --onyx / --ink-* still work for unmigrated screens.
      ============================================================ */
-  /* Surface ladder — premium-pass (push #1):
-     Each step jumps ~1.2L* now (was ~0.7) so the layers read as a real
-     stack, not three almost-identical grays. Page floor is the darkest;
-     the rest climb. surface-3 added for hovered/elevated cards. */
-  --v3-bg: #050507;
-  --v3-surface: #16161E;
-  --v3-surface-2: #1F1F2A;
-  --v3-surface-3: #282834;       /* hover/elevated card */
+  /* Surface ladder — WARM CHARCOAL (no cool blue/purple).
+     Every value satisfies R >= G >= B (red-leaning warmth) instead of
+     the prior slate ladder where blue exceeded red on every step. The
+     visible difference: surfaces now read as warm black/charcoal +
+     gold, not as fintech-blue dark mode. */
+  --v3-bg: #0B0A08;              /* page floor — warm black */
+  --v3-surface: #171511;          /* card — warm charcoal */
+  --v3-surface-2: #211E18;        /* raised/hovered card — warm */
+  --v3-surface-3: #2A2620;       /* active/elevated card — warm */
   --v3-primary: #E5C158;         /* push: hotter, more saturated than #D4AF37 */
   --v3-primary-hot: #F0D070;     /* hero gradients, neon callouts */
   --v3-primary-deep: #8C6F30;    /* shadow side of gold gradients */
@@ -166,16 +167,15 @@
   --v3-track-strong: rgba(255, 255, 255, 0.10);
 
   /* ============================================================
-     LAYERED SURFACE SYSTEM (premium-pass push)
-     Surface ladder now jumps ~1.2 L* per step — real depth, not
-     three near-identical grays:
-       --v3-bg           #050507  (page floor)
-       --v3-surface-page #11111A  (section group bg — distinct lift)
-       --v3-surface      #16161E  (card)
-       --v3-surface-2    #1F1F2A  (raised/hovered card)
-       --v3-surface-3    #282834  (active/elevated card)
+     LAYERED SURFACE SYSTEM — WARM CHARCOAL
+     Every value satisfies R >= G >= B so surfaces stay warm:
+       --v3-bg           #0B0A08  (page floor — warm black)
+       --v3-surface-page #11100D  (section group bg)
+       --v3-surface      #171511  (card)
+       --v3-surface-2    #211E18  (raised/hovered card)
+       --v3-surface-3    #2A2620  (active/elevated card)
      ============================================================ */
-  --v3-surface-page: #11111A;
+  --v3-surface-page: #11100D;
 
   /* Section container — push #3:
      - gradient lift bumped 4→6% white at top

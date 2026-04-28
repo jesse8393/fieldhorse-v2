@@ -565,10 +565,12 @@
   padding: 24px 16px !important;
 }
 
-/* Dialog scrim — kill the default white-tinted overlay */
+/* Dialog scrim — pure black at 72% so the page dims cleanly without
+   any cool tint. Minimal blur (2px). */
 [data-slot='dialog-overlay'] {
-  background: rgba(5, 5, 7, 0.74) !important;
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.72) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
 }
 
 /* ---------- Schedule day-strip dispatch board ----------
