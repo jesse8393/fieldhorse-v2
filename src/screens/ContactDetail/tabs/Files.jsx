@@ -32,20 +32,22 @@ export default function FilesTab({ contact, notes = [], userId, fetchAll }) {
         />
       </div>
 
-      {sub === 'photos' && (
-        <PhotosSection jobId={contact?.id} userId={userId} />
-      )}
-      {sub === 'files' && (
-        <FilesSection jobId={contact?.id} userId={userId} />
-      )}
-      {sub === 'messages' && (
-        <MessagesSection
-          contactId={contact?.id}
-          userId={userId}
-          notes={notes}
-          fetchAll={fetchAll}
-        />
-      )}
+      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+        {sub === 'photos' && (
+          <PhotosSection jobId={contact?.id} userId={userId} />
+        )}
+        {sub === 'files' && (
+          <FilesSection jobId={contact?.id} userId={userId} />
+        )}
+        {sub === 'messages' && (
+          <MessagesSection
+            contactId={contact?.id}
+            userId={userId}
+            notes={notes}
+            fetchAll={fetchAll}
+          />
+        )}
+      </div>
     </div>
   )
 }

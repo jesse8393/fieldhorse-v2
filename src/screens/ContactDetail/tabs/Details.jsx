@@ -68,33 +68,35 @@ export default function DetailsTab({
         />
       </div>
 
-      {sub === 'milestones' && (
-        <MilestonesSection contact={contact} patch={patch} />
-      )}
-      {sub === 'todos' && (
-        <TodosSection jobId={contact?.id} userId={userId} />
-      )}
-      {sub === 'scheduled' && (
-        <ScheduledSection
-          scheduleItems={scheduleItems}
-          onOpenAddEvent={onOpenAddEvent}
-        />
-      )}
-      {sub === 'inspections' && (
-        <InspectionsSection
-          contact={contact}
-          inspections={inspections}
-          userId={userId}
-          fetchAll={fetchAll}
-          patch={patch}
-        />
-      )}
-      {sub === 'partner' && (
-        <InvitePartnerSection
-          contact={contact}
-          onOpenInvitePartner={onOpenInvitePartner}
-        />
-      )}
+      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+        {sub === 'milestones' && (
+          <MilestonesSection contact={contact} patch={patch} />
+        )}
+        {sub === 'todos' && (
+          <TodosSection jobId={contact?.id} userId={userId} />
+        )}
+        {sub === 'scheduled' && (
+          <ScheduledSection
+            scheduleItems={scheduleItems}
+            onOpenAddEvent={onOpenAddEvent}
+          />
+        )}
+        {sub === 'inspections' && (
+          <InspectionsSection
+            contact={contact}
+            inspections={inspections}
+            userId={userId}
+            fetchAll={fetchAll}
+            patch={patch}
+          />
+        )}
+        {sub === 'partner' && (
+          <InvitePartnerSection
+            contact={contact}
+            onOpenInvitePartner={onOpenInvitePartner}
+          />
+        )}
+      </div>
     </div>
   )
 }

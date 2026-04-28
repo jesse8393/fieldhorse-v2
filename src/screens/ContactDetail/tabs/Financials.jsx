@@ -52,21 +52,23 @@ export default function FinancialsTab({
         />
       </div>
 
-      {sub === 'subs' && (
-        <SubsSection contact={contact} subs={subs} userId={userId} fetchAll={fetchAll} />
-      )}
-      {sub === 'expenses' && (
-        <ExpensesSection contact={contact} expenses={expenses} userId={userId} fetchAll={fetchAll} />
-      )}
-      {sub === 'invoice' && (
-        <InvoiceSection
-          contact={contact}
-          payments={payments}
-          paid={paid}
-          balance={balance}
-          onOpenLogPayment={onOpenLogPayment}
-        />
-      )}
+      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+        {sub === 'subs' && (
+          <SubsSection contact={contact} subs={subs} userId={userId} fetchAll={fetchAll} />
+        )}
+        {sub === 'expenses' && (
+          <ExpensesSection contact={contact} expenses={expenses} userId={userId} fetchAll={fetchAll} />
+        )}
+        {sub === 'invoice' && (
+          <InvoiceSection
+            contact={contact}
+            payments={payments}
+            paid={paid}
+            balance={balance}
+            onOpenLogPayment={onOpenLogPayment}
+          />
+        )}
+      </div>
     </div>
   )
 }

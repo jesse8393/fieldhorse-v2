@@ -1,34 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Receipt, FileDown, DollarSign, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react'
+import { Receipt, FileDown, DollarSign, ExternalLink } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { generateInvoice, downloadPdf } from '../lib/pdf.js'
 import { logPayment } from '../lib/pipeline.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
+import { hapticTap } from '../lib/haptics.js'
+import { useFhMotion } from '../lib/motion.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
-import EmptyState from '../components/EmptyState.jsx'
+import SectionHeader from '../components/v3/SectionHeader.jsx'
 
-// Invoices / AR screen — Phase 19 / Upgrade Move #A3+#A4.
+// Invoices / AR — v3 money command screen.
 //
 // Aggregates jobs in the active money pipeline (stage in ['job',
-// 'invoice']) and computes outstanding balance per job by subtracting
-// paid totals from contract amount. Auto-buckets by aging.
+// 'invoice', 'closed']) and computes outstanding balance per job by
+// subtracting paid totals from contract amount. Auto-buckets by aging.
 //
-// V1 simplifications (flag for future):
-//   - Aging anchor is the contact's created_at since we don't track
-//     `invoiced_at` history. A future migration can add that column +
-//     this screen will switch to it.
-//   - "Generate invoice PDF" pulls a single line item from the job's
-//     contract amount; line-item invoicing per change order is deferred.
-//   - "Mark paid" inserts a single fh_payment for the FULL balance.
-//     Partial-payment UI is deferred.
+// Pure presentation refactor (Session A): every business calculation,
+// PDF generation call, mark-paid flow, and Supabase query is unchanged.
 
 const AGING_BUCKETS = [
-  { id: '0-30',  label: 'Current (0–30 d)',   max: 30,  color: 'var(--ink-muted)' },
-  { id: '31-60', label: 'Late (31–60 d)',     max: 60,  color: 'var(--field-gold-bright)' },
-  { id: '60+',   label: 'Overdue (60+ d)',    max: Infinity, color: 'var(--alert-red)' }
+  { id: '0-30',  label: 'Current',  short: '0–30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'rgba(255, 255, 255, 0.18)' },
+  { id: '31-60', label: 'Late',     short: '31–60 d', max: 60,        color: 'var(--v3-primary)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
+  { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-bright)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
 
 function bucketFor(days) {
@@ -171,83 +168,175 @@ export default function Invoices() {
     await refresh()
   }
 
+  const { stagger, item } = useFhMotion()
+  const allCaughtUp = !loading && totals.count === 0
+
   return (
-    <div style={{ padding: '20px 20px 80px' }}>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-          <Receipt size={12} />
-          Money owed
+    <motion.div
+      className="v3-screen"
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+    >
+      {/* HEADER — premium money command bar */}
+      <motion.div
+        variants={item}
+        style={{
+          padding: '12px var(--v3-gutter) 18px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Receipt size={11} />
+            Money Owed
+          </span>
+          <h1 className="v3-h1" style={{ marginTop: 6 }}>
+            {totals.count > 0 ? <>Outstanding <em>balance.</em></> : <>All <em>caught up.</em></>}
+          </h1>
+          <p className="v3-caption" style={{ marginTop: 6 }}>
+            {totals.count > 0
+              ? `${totals.count} job${totals.count === 1 ? '' : 's'} with a balance to collect.`
+              : 'No jobs with an outstanding balance right now.'}
+          </p>
         </div>
-        <h1 className="fh-font-serif" style={{ margin: '6px 0 0', fontSize: 'clamp(28px, 7vw, 36px)', lineHeight: 1.05, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-          {totals.count > 0 ? (
-            <>
-              {fmtMoney(totals.total)} <em className="fh-font-serif-italic fh-text-gradient-gold">outstanding.</em>
-            </>
-          ) : (
-            <>All <em className="fh-font-serif-italic fh-text-gradient-gold">caught up.</em></>
-          )}
-        </h1>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-          {totals.count > 0
-            ? `${totals.count} job${totals.count === 1 ? '' : 's'} with a balance. Tap any row to download the invoice PDF or mark paid.`
-            : 'No jobs with an outstanding balance right now.'}
-        </p>
-      </div>
+      </motion.div>
 
-      {/* Aging buckets */}
-      {totals.total > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 }}>
-          {AGING_BUCKETS.map((b) => (
-            <div key={b.id} style={{ padding: '12px 10px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: b.color, marginBottom: 4 }}>
-                {b.label}
+      {/* MONEY HEADER CARD — primary money signal */}
+      <motion.div
+        variants={item}
+        className={`v3-section ${totals.count > 0 ? 'v3-section--primary' : ''}`}
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <div className="v3-money" style={{
+            fontSize: 'clamp(40px, 9vw, 56px)',
+            lineHeight: 0.95,
+            letterSpacing: '-0.005em',
+            color: 'var(--v3-text)'
+          }}>
+            {loading ? (
+              <span className="v3-skeleton" style={{ width: 200, height: 48, borderRadius: 6 }} />
+            ) : (
+              fmtMoney(totals.total)
+            )}
+          </div>
+          <span className="v3-eyebrow">Total Outstanding</span>
+        </div>
+
+        {/* Aging breakdown — Current / Late / Overdue */}
+        {!loading && (
+          <div style={{
+            marginTop: 14,
+            paddingTop: 14,
+            borderTop: '1px solid var(--v3-border)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 12
+          }}>
+            {AGING_BUCKETS.map((b) => (
+              <div key={b.id}>
+                <div style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 22,
+                  lineHeight: 1,
+                  color: b.color,
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
+                  {fmtMoney(totals[b.id])}
+                </div>
+                <div className="v3-eyebrow" style={{ marginTop: 4 }}>
+                  {b.label} <span style={{ opacity: 0.55 }}>· {b.short}</span>
+                </div>
               </div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(18px, 4.5vw, 22px)', color: 'var(--ink-strong)' }}>
-                {fmtMoney(totals[b.id])}
-              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* FILTER + LIST SECTION */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 28px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+          <SectionHeader label={filter === 'outstanding' ? 'Outstanding' : 'All money jobs'} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <FilterPill active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }} label="Outstanding" />
+            <FilterPill active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }} label="All" />
+          </div>
+        </div>
+
+        {loading && <SkeletonList rows={3} />}
+
+        {!loading && filtered.length === 0 && (
+          <div className="v3-empty">
+            <Receipt size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+              {filter === 'outstanding' ? 'Nothing outstanding.' : 'No money jobs yet.'}
             </div>
-          ))}
-        </div>
-      )}
+            <div style={{ fontSize: 12 }}>
+              {filter === 'outstanding'
+                ? 'Every active job is paid in full.'
+                : 'Approve a quote to move it into the money pipeline.'}
+            </div>
+          </div>
+        )}
 
-      {/* Filter */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        <FilterPill active={filter === 'outstanding'} onClick={() => setFilter('outstanding')} label="Outstanding" />
-        <FilterPill active={filter === 'all'} onClick={() => setFilter('all')} label="All money jobs" />
-      </div>
-
-      {loading && <SkeletonList rows={4} />}
-      {!loading && filtered.length === 0 && (
-        <EmptyState
-          title={filter === 'outstanding' ? 'Nothing outstanding.' : 'No jobs in money Pipeline yet.'}
-          body={filter === 'outstanding' ? 'Every active job is paid in full.' : 'Approve a quote to move it into the money Pipeline.'}
-        />
-      )}
-
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {filtered.map((r) => (
-          <InvoiceRow key={r.job.id} row={r} onPDF={() => handleGeneratePDF(r)} onPaid={() => handleMarkPaid(r)} />
-        ))}
-      </ul>
-    </div>
+        {!loading && filtered.length > 0 && (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {filtered.map((r) => (
+              <PaymentCard
+                key={r.job.id}
+                row={r}
+                onPDF={() => handleGeneratePDF(r)}
+                onPaid={() => handleMarkPaid(r)}
+              />
+            ))}
+          </ul>
+        )}
+      </motion.div>
+    </motion.div>
   )
 }
 
+/* ============================================================
+   FilterPill — outstanding / all toggle. Active uses gold gradient
+   matching Jobs filter pills.
+   ============================================================ */
 function FilterPill({ active, onClick, label }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        padding: '7px 12px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '7px 13px',
         borderRadius: 999,
-        border: active ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)',
-        background: active ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)',
-        color: active ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
+        border: active
+          ? '1px solid color-mix(in srgb, var(--v3-primary) 75%, transparent)'
+          : '1px solid var(--v3-border-strong)',
+        background: active
+          ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+          : 'var(--v3-surface)',
+        color: active ? 'var(--v3-on-primary)' : 'var(--v3-text)',
         fontFamily: 'var(--font-body)',
-        fontSize: 12,
-        fontWeight: active ? 700 : 500,
-        cursor: 'pointer'
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        boxShadow: active
+          ? '0 0 0 3px rgba(229, 193, 88, 0.18), 0 4px 12px rgba(229, 193, 88, 0.30), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 2px 8px rgba(0, 0, 0, 0.20)',
+        transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease'
       }}
     >
       {label}
@@ -255,61 +344,215 @@ function FilterPill({ active, onClick, label }) {
   )
 }
 
-function InvoiceRow({ row, onPDF, onPaid }) {
+/* ============================================================
+   PaymentCard — premium v3 invoice card.
+   Layout:
+     ┌──────────────────────────────────────────────────┐
+     │  [spine]  Job name          $24,400  ›           │
+     │           Project type      45 d · LATE          │
+     │           ▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░ 42% paid     │
+     │           [Invoice PDF]    [MARK PAID]           │
+     └──────────────────────────────────────────────────┘
+   Functions preserved: PDF generation + mark paid via parent props.
+   ============================================================ */
+function PaymentCard({ row, onPDF, onPaid }) {
   const { job, amount, paid, balance, ageDays, bucket, isOutstanding } = row
   const bucketMeta = AGING_BUCKETS.find((b) => b.id === bucket) || AGING_BUCKETS[0]
   const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0
+  const isOverdue = bucket === '60+'
+
   return (
-    <li style={{ borderRadius: 12, background: 'var(--surface-2)', border: isOutstanding ? `1px solid ${bucket === '60+' ? 'rgba(192,57,43,0.35)' : 'var(--rule)'}` : '1px solid var(--rule)', padding: '14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Link to={`/jobs/${job.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-strong)', textDecoration: 'none' }}>
-            <span style={{ fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 14 }}>{job.name || 'Unnamed job'}</span>
-            <ExternalLink size={11} color="var(--ink-faint)" />
-          </Link>
-          {job.job_title && <div style={{ marginTop: 2, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>{job.job_title}</div>}
-        </div>
-        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(18px, 4.5vw, 22px)', color: balance > 0 ? 'var(--ink-strong)' : 'var(--signal-green)' }}>
-            {balance > 0 ? fmtMoney(balance) : 'PAID'}
+    <li>
+      <motion.article
+        whileHover={{ y: -2 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+        style={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          padding: '14px 14px 14px 22px',
+          borderRadius: 14,
+          background: 'var(--v3-surface)',
+          border: isOverdue
+            ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
+            : '1px solid var(--v3-border-strong)',
+          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Aging-color spine — left edge */}
+        <span aria-hidden="true" style={{
+          position: 'absolute',
+          left: 0, top: 12, bottom: 12,
+          width: 4,
+          background: `linear-gradient(180deg, ${bucketMeta.color}, color-mix(in srgb, ${bucketMeta.color} 40%, transparent))`,
+          borderRadius: '0 4px 4px 0',
+          pointerEvents: 'none'
+        }} />
+
+        {/* Top row: name/project + amount/age */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Link
+              to={`/jobs/${job.id}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--v3-text)',
+                textDecoration: 'none'
+              }}
+            >
+              <span style={{
+                fontFamily: 'var(--font-body)',
+                fontWeight: 700,
+                fontSize: 15,
+                letterSpacing: '-0.005em'
+              }}>
+                {job.name || 'Unnamed job'}
+              </span>
+              <ExternalLink size={11} color="var(--v3-text-muted)" />
+            </Link>
+            {job.job_title && (
+              <div style={{
+                marginTop: 2,
+                fontSize: 12,
+                color: 'var(--v3-text-muted)',
+                fontFamily: 'var(--font-body)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%'
+              }}>
+                {job.job_title}
+              </div>
+            )}
           </div>
-          {isOutstanding && (
-            <div style={{ marginTop: 2, fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: bucketMeta.color }}>
-              {ageDays} d · {bucketMeta.label.split(' ')[0]}
+          <div style={{ flexShrink: 0, textAlign: 'right' }}>
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(20px, 5vw, 26px)',
+              lineHeight: 1,
+              color: balance > 0 ? 'var(--v3-text)' : 'var(--v3-success-bright)',
+              fontVariantNumeric: 'tabular-nums',
+              textShadow: balance > 0 ? '0 1px 0 rgba(255, 255, 255, 0.06)' : 'none'
+            }}>
+              {balance > 0 ? fmtMoney(balance) : 'PAID'}
             </div>
-          )}
+            {isOutstanding && (
+              <div style={{
+                marginTop: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: `color-mix(in srgb, ${bucketMeta.color} 12%, transparent)`,
+                border: `1px solid ${bucketMeta.accent}`,
+                color: bucketMeta.color,
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                lineHeight: 1.4
+              }}>
+                {ageDays} d · {bucketMeta.label}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Paid progress */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', marginBottom: 4 }}>
-          <span>{fmtMoney(paid)} paid of {fmtMoney(amount)}</span>
-          <span>{Math.round(pctPaid)}%</span>
+        {/* Paid progress — visible payment momentum */}
+        <div>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 11,
+            color: 'var(--v3-text-muted)',
+            fontFamily: 'var(--font-body)',
+            marginBottom: 5
+          }}>
+            <span>{fmtMoney(paid)} paid of {fmtMoney(amount)}</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--v3-text)' }}>
+              {Math.round(pctPaid)}%
+            </span>
+          </div>
+          <div style={{
+            height: 6,
+            borderRadius: 999,
+            background: 'var(--v3-track)',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${pctPaid}%`,
+              height: '100%',
+              background: pctPaid >= 100
+                ? 'var(--v3-success-bright)'
+                : 'linear-gradient(90deg, var(--v3-primary-deep), var(--v3-primary))',
+              borderRadius: 999,
+              transition: 'width 220ms ease',
+              boxShadow: pctPaid >= 100
+                ? '0 0 8px rgba(74, 222, 128, 0.40)'
+                : 'none'
+            }} />
+          </div>
         </div>
-        <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-2)', overflow: 'hidden' }}>
-          <div style={{ width: `${pctPaid}%`, height: '100%', background: pctPaid >= 100 ? 'var(--signal-green)' : 'linear-gradient(90deg, var(--field-gold-deep), var(--field-gold-bright))', transition: 'width 220ms ease' }} />
-        </div>
-      </div>
 
-      {isOutstanding && (
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={onPDF}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-          >
-            <FileDown size={12} /> Invoice PDF
-          </button>
-          <button
-            type="button"
-            onClick={onPaid}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.12em', cursor: 'pointer' }}
-          >
-            <DollarSign size={12} /> MARK PAID
-          </button>
-        </div>
-      )}
+        {/* Action row: PDF + Mark Paid (only on outstanding) */}
+        {isOutstanding && (
+          <div style={{
+            display: 'flex',
+            gap: 8,
+            justifyContent: 'flex-end',
+            paddingTop: 4
+          }}>
+            <button
+              type="button"
+              onClick={onPDF}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '9px 14px',
+                borderRadius: 10,
+                border: '1px solid var(--v3-border-strong)',
+                background: 'var(--v3-surface-2)',
+                color: 'var(--v3-text)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              <FileDown size={13} /> Invoice PDF
+            </button>
+            <button
+              type="button"
+              onClick={onPaid}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '9px 14px',
+                borderRadius: 10,
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
+                background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                color: 'var(--v3-on-primary)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 4px 12px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+              }}
+            >
+              <DollarSign size={13} /> Mark Paid
+            </button>
+          </div>
+        )}
+      </motion.article>
     </li>
   )
 }
