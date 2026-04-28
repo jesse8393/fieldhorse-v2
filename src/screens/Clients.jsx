@@ -97,13 +97,43 @@ export default function Clients() {
 
   return (
     <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px', position: 'sticky', top: 0, zIndex: 10, background: 'linear-gradient(180deg, var(--v3-bg) 70%, transparent 100%)', backdropFilter: 'blur(10px)' }}>
+      {/* HEADER — relationship value bar. Lifetime $ promoted to Bebas
+          Neue display so the operator sees the BUSINESS WEIGHT of their
+          book of work, not just a label. */}
+      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 10px', position: 'sticky', top: 0, zIndex: 10, background: 'linear-gradient(180deg, var(--v3-bg) 70%, transparent 100%)', backdropFilter: 'blur(10px)' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px, 7vw, 34px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
             Clients
           </h1>
-          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
-            <span style={{ color: 'var(--v3-primary)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totalLifetime)}</span>{' '}lifetime
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 18, fontFamily: 'var(--font-body)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 26, lineHeight: 1, letterSpacing: '0.02em',
+                color: 'var(--v3-primary)',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {money(totalLifetime)}
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                Lifetime
+              </span>
+            </div>
+            {rows.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+                  color: 'var(--v3-text)',
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
+                  {rows.length}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                  {rows.length === 1 ? 'Account' : 'Accounts'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>

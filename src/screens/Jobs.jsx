@@ -153,8 +153,10 @@ export default function Jobs() {
       animate="show"
       style={{ position: 'relative' }}
     >
-      {/* HEADER — editorial serif title + sub-line summary */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 20px 6px' }}>
+      {/* HEADER — pipeline command bar. Numerics promoted: active count
+          and total $ now render as Bebas Neue display sizes (28/22) so
+          the operator's eye lands on the WORK STATE, not the title. */}
+      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1
             className="v3-h1"
@@ -163,19 +165,36 @@ export default function Jobs() {
             Jobs &{' '}
             <em style={{ fontStyle: 'italic', color: 'var(--v3-primary)' }}>Pipeline</em>
           </h1>
-          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
-            <span style={{ color: 'var(--v3-primary)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-              {summary.activeCount}
-            </span>
-            {' '}active
+          {/* Command bar — large numerics, muted labels. The operator
+              scans the numbers, not the words. */}
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 18, fontFamily: 'var(--font-body)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 26, lineHeight: 1, letterSpacing: '0.02em',
+                color: 'var(--v3-primary)',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {summary.activeCount}
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                Active
+              </span>
+            </div>
             {summary.pipeline > 0 && (
-              <>
-                {' · '}
-                <span style={{ color: 'var(--v3-primary)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+                  color: 'var(--v3-text)',
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
                   {kFormat(summary.pipeline)}
                 </span>
-                {' total'}
-              </>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                  Total
+                </span>
+              </div>
             )}
           </div>
         </div>

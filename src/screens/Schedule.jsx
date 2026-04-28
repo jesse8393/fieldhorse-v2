@@ -180,13 +180,33 @@ export default function Schedule() {
     <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
       {/* HEADER — top + button removed; the FAB at bottom-right is the
           single, thumb-reachable add-event control. */}
-      <motion.div variants={item} style={{ padding: '12px 20px 6px' }}>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>
-          Calendar
+      {/* HEADER — time-control bar. Eyebrow promotes "TIME CONTROL"
+          identity (not just "Calendar"), event count next to title gives
+          the operator the day's workload signal at a glance. */}
+      <motion.div variants={item} style={{ padding: '12px 20px 8px' }}>
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>
+          Time Control
         </span>
-        <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px, 6vw, 32px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
-          Run the day.
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginTop: 4 }}>
+          <h1 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 'clamp(26px, 7vw, 36px)', lineHeight: 1.05, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
+            Run the day.
+          </h1>
+          {events && events.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexShrink: 0 }}>
+              <span style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+                color: 'var(--v3-primary)',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {events.length}
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                {events.length === 1 ? 'Event' : 'Events'}
+              </span>
+            </div>
+          )}
+        </div>
       </motion.div>
 
       {/* WEATHER STRIP */}

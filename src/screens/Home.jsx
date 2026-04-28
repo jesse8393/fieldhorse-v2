@@ -263,10 +263,13 @@ export default function Home() {
           contactId: p.contact_id
         }
       })
+      // Trim to 2 visible — Live Feed is informational, not action-driving.
+      // Reduce noise; "View all" link in section header gets the operator
+      // to the full list when needed.
       const feedRows = [...schedFeed, ...payFeed]
         .filter((r) => r.ts > 0)
         .sort((a, b) => b.ts - a.ts)
-        .slice(0, 3)
+        .slice(0, 2)
 
       // Next Actions — compose 3 source streams + sort by urgency (oldest
       // last-touch wins). Capped at 5 so the section stays scannable.
@@ -794,11 +797,14 @@ export default function Home() {
           action={{ label: 'Edit', onTap: () => navigate('/settings'), showChevron: false }}
         />
       </motion.div>
+      {/* Quick Actions — asymmetric: primary "Add Lead" gets 2/5 of the row,
+          other 3 share the remaining 3/5. The eye lands on the primary
+          action immediately. Reads as "do this, or one of these three". */}
       <motion.div
         variants={item}
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: '2fr 1fr 1fr 1fr',
           gap: 8,
           padding: '0 20px 28px'
         }}
