@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
-import { Users as UsersIcon } from 'lucide-react'
+import { Users as UsersIcon, ArrowUpRight } from 'lucide-react'
 import { STAGE_MAP, margin, marginTier } from '../../lib/stages.js'
 import { hapticTap } from '../../lib/haptics.js'
 
@@ -8,6 +8,18 @@ import { hapticTap } from '../../lib/haptics.js'
 // has used; centralized here so JobCard owns the per-card visual maths.
 const STAGE_STEP = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
 const TOTAL_STAGES = 5
+
+// Stage-driven "next action" hint shown beneath the stage pill. Mirrors the
+// pipeline.js stage default suggestions so the operator sees the same
+// primary action they'd see in the Job Detail NextActionCard.
+const NEXT_ACTION_HINT = {
+  lead:    'Send a quote',
+  quote:   'Get approval',
+  job:     'Job in progress',
+  invoice: 'Awaiting payment',
+  closed:  null,
+  lost:    null
+}
 
 function money(n) {
   const v = Number(n || 0)
@@ -109,6 +121,8 @@ const JobCard = memo(function JobCard({
   const hasCost = Number(contact.cost || 0) > 0
   const isSharedIn = !!viewerUserId && !!contact.user_id && contact.user_id !== viewerUserId
 
+  const nextHint = NEXT_ACTION_HINT[contact.stage]
+
   return (
     <motion.button
       type="button"
@@ -121,23 +135,32 @@ const JobCard = memo(function JobCard({
         ? { duration: 0.55, ease: [0.16, 1, 0.3, 1] }
         : { duration: 0.22, delay: Math.min(index * 0.035, 0.22), ease: [0.2, 0.8, 0.2, 1] }
       }
-      whileTap={{ scale: 0.99 }}
+      whileTap={{ scale: 0.97 }}
+      // Hover lift + surface elevation (#141418 → #1C1C22) + heavier shadow.
+      // Framer animates between literal color values so we use the hex
+      // literals matching --v3-surface / --v3-surface-2.
+      whileHover={{
+        y: -3,
+        backgroundColor: '#1C1C22',
+        boxShadow: '0 14px 36px rgba(0, 0, 0, 0.45)'
+      }}
       style={{
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 14,
         width: '100%',
         boxSizing: 'border-box',
-        padding: '14px',
+        padding: '16px',
         borderRadius: 'var(--v3-radius-card)',
-        background: 'var(--v3-surface)',
+        background: '#141418', // literal so framer hover transition is smooth
         border: '1px solid var(--v3-border)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)' // base elevation
       }}
     >
       {/* Top row: photo/initial tile + name block + amount block */}
@@ -223,7 +246,7 @@ const JobCard = memo(function JobCard({
         }}>
           <div style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 19,
+            fontSize: 22,
             letterSpacing: '0.01em',
             color: Number(contact.amount || 0) > 0 ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
             fontVariantNumeric: 'tabular-nums',
@@ -234,6 +257,37 @@ const JobCard = memo(function JobCard({
           <MarginBadge pct={m} hasCost={hasCost} />
         </div>
       </div>
+
+      {/* NEXT ACTION HINT — stage-driven hint that mirrors what JobDetail's
+          NextActionCard would surface. Helps the operator scan the list and
+          see "what's blocking this job?" without opening it. */}
+      {nextHint && (
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '5px 10px',
+          borderRadius: 8,
+          background: 'var(--v3-primary-soft)',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
+          alignSelf: 'flex-start',
+          maxWidth: '100%'
+        }}>
+          <ArrowUpRight size={11} color="var(--v3-primary)" aria-hidden="true" />
+          <span style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            color: 'var(--v3-primary)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            Next: {nextHint}
+          </span>
+        </div>
+      )}
 
       {/* Bottom row: stage pill + stage X/5 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -250,13 +304,13 @@ const JobCard = memo(function JobCard({
         </span>
       </div>
 
-      {/* Progress bar — thin, stage-colored. Matches the v2 visual treatment
-          but reads quieter (no glow) so the pill carries the stage signal. */}
+      {/* Progress bar — thicker (4px) + subtle stage-colored glow so the
+          progression is readable at a glance from across a 3-col grid. */}
       <div style={{
         position: 'relative',
-        height: 3,
+        height: 4,
         borderRadius: 999,
-        background: 'rgba(255, 255, 255, 0.05)',
+        background: 'var(--v3-track)',
         overflow: 'hidden'
       }}>
         <span style={{
@@ -265,7 +319,8 @@ const JobCard = memo(function JobCard({
           width: `${progressPct}%`,
           background: stageColor,
           borderRadius: 999,
-          transition: 'width 240ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+          boxShadow: `0 0 10px ${stageColor}66`,
+          transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
         }} />
       </div>
     </motion.button>

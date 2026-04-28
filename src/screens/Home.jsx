@@ -10,7 +10,11 @@ import {
   FileText,
   ArrowUpRight,
   ArrowDownRight,
-  Activity
+  Activity,
+  PhoneCall,
+  CalendarClock,
+  ChevronRight,
+  Zap
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -118,6 +122,10 @@ export default function Home() {
   const [jobsBehind, setJobsBehind] = useState(null)
   const [invoicingWeek, setInvoicingWeek] = useState(null)
   const [feed, setFeed] = useState(null)
+  // Next Actions = up to 5 actionable items (stale leads, overdue jobs,
+  // unsent invoices) computed from the same contacts/schedule/payments data.
+  // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
+  const [nextActions, setNextActions] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -260,12 +268,63 @@ export default function Home() {
         .sort((a, b) => b.ts - a.ts)
         .slice(0, 3)
 
+      // Next Actions — compose 3 source streams + sort by urgency (oldest
+      // last-touch wins). Capped at 5 so the section stays scannable.
+      const fiveDaysAgo = new Date(nowD); fiveDaysAgo.setDate(nowD.getDate() - 5)
+      const paidContactIds = new Set(
+        (paysRes.data || []).map((p) => p.contact_id).filter(Boolean)
+      )
+      const actions = []
+      // 1. Stale leads/quotes — needs a follow-up call/text
+      for (const c of risky) {
+        actions.push({
+          id: `followup-${c.id}`,
+          kind: 'followup',
+          contactId: c.id,
+          title: `Follow up with ${c.name || 'lead'}`,
+          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} cold for ${
+            Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
+          } days`,
+          urgency: new Date(c.updated_at || c.created_at || 0).getTime()
+        })
+      }
+      // 2. Overdue jobs — needs a reschedule
+      for (const c of behind) {
+        actions.push({
+          id: `reschedule-${c.id}`,
+          kind: 'reschedule',
+          contactId: c.id,
+          title: `Reschedule ${c.name || 'job'}`,
+          detail: 'Job behind schedule',
+          urgency: 0 // top priority — sort first
+        })
+      }
+      // 3. Invoiced jobs with no payment yet — needs an invoice send/follow-up
+      for (const c of contacts) {
+        if (c.stage !== 'invoice') continue
+        if (paidContactIds.has(c.id)) continue
+        const updated = new Date(c.updated_at || c.created_at || 0)
+        if (updated > fiveDaysAgo) continue // give it 5 days to land naturally
+        actions.push({
+          id: `invoice-${c.id}`,
+          kind: 'invoice',
+          contactId: c.id,
+          title: `Chase invoice for ${c.name || 'job'}`,
+          detail: c.amount > 0 ? `$${Number(c.amount).toLocaleString()} owed` : 'Awaiting payment',
+          urgency: updated.getTime()
+        })
+      }
+      // Sort: lowest urgency value first (overdue=0 wins, then oldest last-touch)
+      actions.sort((a, b) => a.urgency - b.urgency)
+      const topActions = actions.slice(0, 5)
+
       setPipeline(totalPipeline)
       setPipelinePrev(prevPipeline)
       setDealsAtRisk({ count: risky.length, value: riskValue })
       setJobsBehind(behind.length)
       setInvoicingWeek(weekTotal)
       setFeed(feedRows)
+      setNextActions(topActions)
     }
     load()
     return () => { cancelled = true }
@@ -426,33 +485,45 @@ export default function Home() {
       ) : null}
 
       {/* ─────────── TIER 1 — HERO (TODAY'S REVENUE OPPORTUNITY) ───────────
-          Elevated --v3-surface-2 surface + radial gold inner glow + heavy
-          shadow + hover lift. Money number scales to 64px on tablet+.
-          Asymmetric outdent: 16px horizontal padding (vs 20px elsewhere)
-          so the hero reads as a heavier object that breaks the column. */}
-      <motion.div variants={item} style={{ padding: '0 16px 28px' }}>
+          Refinement pass: padding bumped ~30%, money scales clamp(56–84),
+          radial glow + low-opacity diagonal sweep stack as the depth layer,
+          stronger outdent (12px vs 20px elsewhere) so the hero reads as
+          the most isolated object on the screen. Hover lift -3 (was -2). */}
+      <motion.div variants={item} style={{ padding: '0 12px 36px' }}>
         <motion.div
-          whileHover={{ y: -2 }}
+          whileHover={{ y: -3 }}
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           style={{
             position: 'relative',
-            padding: '24px 22px 20px',
-            borderRadius: 20,
+            padding: '32px 26px 26px',
+            borderRadius: 22,
             background: `
-              radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.14), transparent 55%),
+              radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.18), transparent 55%),
+              linear-gradient(125deg, rgba(212, 175, 55, 0.045) 0%, transparent 38%, transparent 62%, rgba(212, 175, 55, 0.04) 100%),
               var(--v3-surface-2)
             `,
-            border: '1px solid color-mix(in srgb, var(--v3-primary) 18%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
             boxShadow: 'var(--v3-shadow-lg)',
             overflow: 'hidden'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          {/* Top-right ambient sweep — adds the "command center" feel without
+              reading as a flashy gradient. ~5% gold, blends out to nothing. */}
+          <div aria-hidden="true" style={{
+            position: 'absolute',
+            top: -120, right: -100,
+            width: 320, height: 320,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.12), transparent 65%)',
+            pointerEvents: 'none'
+          }} />
+
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <span style={{
               fontFamily: 'var(--font-body)',
               fontSize: 11,
               fontWeight: 700,
-              letterSpacing: '0.18em',
+              letterSpacing: '0.2em',
               textTransform: 'uppercase',
               color: 'var(--v3-text-muted)'
             }}>
@@ -465,20 +536,25 @@ export default function Home() {
             ) : null}
           </div>
 
-          <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', marginTop: 22, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
             <div
               className="v3-money"
-              style={{ fontSize: 'clamp(48px, 12vw, 64px)', lineHeight: 1, letterSpacing: '0.005em' }}
+              style={{
+                fontSize: 'clamp(56px, 14vw, 84px)',
+                lineHeight: 0.95,
+                letterSpacing: '0.005em',
+                textShadow: '0 2px 24px rgba(212, 175, 55, 0.18)'
+              }}
             >
               {pipeline == null ? (
-                <span className="v3-skeleton" style={{ width: 180, height: 52, borderRadius: 6 }} />
+                <span className="v3-skeleton" style={{ width: 220, height: 64, borderRadius: 6 }} />
               ) : (
                 <>
                   <span style={{
-                    fontSize: 'clamp(24px, 6vw, 30px)',
+                    fontSize: 'clamp(28px, 7vw, 38px)',
                     color: 'var(--v3-text-muted)',
                     verticalAlign: 'top',
-                    marginRight: 3,
+                    marginRight: 4,
                     lineHeight: 1
                   }}>
                     $
@@ -493,13 +569,14 @@ export default function Home() {
             <div className="v3-caption" style={{ fontSize: 12 }}>vs last 7 days</div>
           </div>
 
-          <div style={{ marginTop: 18, marginLeft: -10, marginRight: -10 }}>
-            <Sparkline data={sparkData} color="var(--v3-primary)" height={68} />
+          <div style={{ position: 'relative', marginTop: 22, marginLeft: -10, marginRight: -10 }}>
+            <Sparkline data={sparkData} color="var(--v3-primary)" height={72} />
           </div>
 
           <div style={{
-            marginTop: 10,
-            paddingTop: 12,
+            position: 'relative',
+            marginTop: 14,
+            paddingTop: 14,
             borderTop: '1px solid var(--v3-border)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
           }}>
@@ -559,6 +636,39 @@ export default function Home() {
           onTap={() => navigate('/invoices')}
         />
       </motion.div>
+
+      {/* ─────────── NEXT ACTIONS ───────────
+          The bridge between data (KPIs/feed) and operator decision. 3-5
+          per-job CTAs the operator should do TODAY. Distinct from KPI
+          tiles which show counts — these are tappable per-job actions.
+
+          Visually differentiated: gold left-edge accent on each row, no
+          surface tint (rows blend into bg), strong tap target. */}
+      {nextActions != null && nextActions.length > 0 && (
+        <>
+          <motion.div variants={item} style={{ padding: '0 20px 6px' }}>
+            <SectionHeader
+              label="Next Actions"
+              action={{ label: 'View all', onTap: () => navigate('/jobs') }}
+            />
+          </motion.div>
+          <motion.div
+            variants={item}
+            style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 20px 32px' }}
+          >
+            {nextActions.map((action) => (
+              <NextActionRow
+                key={action.id}
+                action={action}
+                onTap={() => action.contactId
+                  ? navigate(`/jobs/${action.contactId}`)
+                  : navigate('/jobs')
+                }
+              />
+            ))}
+          </motion.div>
+        </>
+      )}
 
       {/* ─────────── TIER 3 — QUICK ACTIONS ───────────
           Primary action (Add Lead) gets a subtle gold halo + slightly
@@ -671,7 +781,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, isMoney, onTap })
       type="button"
       onClick={() => { hapticTap(); onTap?.() }}
       whileTap={{ scale: 0.97 }}
-      whileHover={{ y: -2 }}
+      whileHover={{ y: -3 }}
       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
       style={{
         position: 'relative',
@@ -748,6 +858,98 @@ function CompactKpi({ tone = 'primary', value, label, subline, isMoney, onTap })
           {subline}
         </div>
       ) : null}
+    </motion.button>
+  )
+}
+
+/* ============================================================
+   NextActionRow — per-job CTA shown in the Next Actions section.
+   Icon + tone driven by `kind`. Gold left-edge accent; flat row
+   that hover-lifts to invite the tap.
+   ============================================================ */
+
+const NEXT_ACTION_META = {
+  followup:    { Icon: PhoneCall,     accent: 'var(--v3-primary)' },
+  reschedule:  { Icon: CalendarClock, accent: 'var(--v3-danger-bright)' },
+  invoice:     { Icon: Receipt,       accent: 'var(--v3-success-bright)' }
+}
+
+function NextActionRow({ action, onTap }) {
+  const meta = NEXT_ACTION_META[action.kind] || { Icon: Zap, accent: 'var(--v3-primary)' }
+  const { Icon, accent } = meta
+
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.985 }}
+      whileHover={{ y: -2 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '14px 16px 14px 18px',
+        borderRadius: 14,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        width: '100%',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Left edge accent — the only chromatic signal on the row */}
+      <span aria-hidden="true" style={{
+        position: 'absolute',
+        left: 0, top: 8, bottom: 8,
+        width: 3,
+        background: accent,
+        borderRadius: '0 3px 3px 0',
+        boxShadow: `0 0 12px ${accent === 'var(--v3-primary)' ? 'rgba(212, 175, 55, 0.4)' : ''}`
+      }} />
+
+      <span aria-hidden="true" style={{
+        flexShrink: 0,
+        width: 38, height: 38,
+        borderRadius: 11,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border-strong)',
+        color: accent,
+        display: 'grid',
+        placeItems: 'center'
+      }}>
+        <Icon size={16} />
+      </span>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 14,
+          fontWeight: 700,
+          color: 'var(--v3-text)',
+          letterSpacing: '-0.005em',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          {action.title}
+        </div>
+        <div style={{
+          marginTop: 3,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          color: 'var(--v3-text-muted)',
+          fontVariantNumeric: 'tabular-nums'
+        }}>
+          {action.detail}
+        </div>
+      </div>
+
+      <ChevronRight size={16} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
     </motion.button>
   )
 }
