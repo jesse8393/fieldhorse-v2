@@ -1,13 +1,51 @@
-import StubTab from './_StubTab.jsx'
+import { useState } from 'react'
+import { SegmentedTabs } from '../../../components/v3'
+import PhotosSection from '../sections/Photos.jsx'
+import FilesSection from '../sections/Files.jsx'
+import MessagesSection from '../sections/Messages.jsx'
 
 /**
- * FILES tab — sub-tab router.
+ * FILES tab — sub-tab router for media + comms.
  *
- * Sub-sections (to be built in Drop 3.3):
- *   - Photos (fh_job_files where kind=photo + upload + Vision auto-caption)
- *   - Files (fh_job_files where kind=file + upload + download)
- *   - Messages (fh_notes log + inline add)
+ * Sub-tabs: Photos · Files · Messages
+ *
+ * Default sub: Photos (highest-frequency for jobsite documentation).
  */
-export default function FilesTab(props) {
-  return <StubTab name="Files" upcoming={['Photos', 'Files', 'Messages']} />
+const SUB_TABS = [
+  { id: 'photos',   label: 'Photos' },
+  { id: 'files',    label: 'Files' },
+  { id: 'messages', label: 'Messages' }
+]
+
+export default function FilesTab({ contact, notes = [], userId, fetchAll }) {
+  const [sub, setSub] = useState('photos')
+
+  return (
+    <div>
+      <div style={{ paddingTop: 12 }}>
+        <SegmentedTabs
+          value={sub}
+          onChange={setSub}
+          tabs={SUB_TABS}
+          variant="pill"
+          ariaLabel="Files sub-tabs"
+        />
+      </div>
+
+      {sub === 'photos' && (
+        <PhotosSection jobId={contact?.id} userId={userId} />
+      )}
+      {sub === 'files' && (
+        <FilesSection jobId={contact?.id} userId={userId} />
+      )}
+      {sub === 'messages' && (
+        <MessagesSection
+          contactId={contact?.id}
+          userId={userId}
+          notes={notes}
+          fetchAll={fetchAll}
+        />
+      )}
+    </div>
+  )
 }
