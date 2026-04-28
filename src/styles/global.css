@@ -1650,16 +1650,22 @@ a {
 .fh-app__main {
   flex: 1;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  /* Mobile-first frame — full width on phones (≤640px). On tablet/
-     desktop, cap the content column at 720px and center it so screens
-     read as expanded versions of the mobile mockups instead of
-     stretched-out wide tables. */
+  /* Stepped responsive frame — content reads as intentional at every
+     viewport size. Mobile = full width; tablet = 760px; desktop =
+     1080px; large desktop = 1180px (cap). Jobs/Clients grids fill the
+     frame and adapt their own column count via auto-fill / minmax. */
   width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
 @media (min-width: 720px) {
-  .fh-app__main { max-width: 720px; }
+  .fh-app__main { max-width: 760px; }
+}
+@media (min-width: 1024px) {
+  .fh-app__main { max-width: 1080px; }
+}
+@media (min-width: 1440px) {
+  .fh-app__main { max-width: 1180px; }
 }
 
 /* =========================================================================
