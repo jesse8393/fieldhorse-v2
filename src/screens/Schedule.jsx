@@ -180,32 +180,66 @@ export default function Schedule() {
     <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
       {/* HEADER — top + button removed; the FAB at bottom-right is the
           single, thumb-reachable add-event control. */}
-      {/* HEADER — time-control bar. Eyebrow promotes "TIME CONTROL"
-          identity (not just "Calendar"), event count next to title gives
-          the operator the day's workload signal at a glance. */}
-      <motion.div variants={item} style={{ padding: '12px 20px 8px' }}>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>
-          Time Control
-        </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginTop: 4 }}>
-          <h1 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 'clamp(26px, 7vw, 36px)', lineHeight: 1.05, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
-            Run the day.
-          </h1>
-          {events && events.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexShrink: 0 }}>
-              <span style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
-                color: 'var(--v3-primary)',
-                fontVariantNumeric: 'tabular-nums'
-              }}>
-                {events.length}
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
-                {events.length === 1 ? 'Event' : 'Events'}
-              </span>
-            </div>
-          )}
+      {/* HEADER — time-control bar with inline Schedule Job CTA.
+          Top-right CTA matches Hero command-center pattern; FAB at the
+          bottom-right stays for thumb-reach on mobile. Both wired to
+          the same setAddOpen handler. */}
+      <motion.div variants={item} style={{ padding: '12px 20px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>
+              Time Control
+            </span>
+            <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-serif)', fontSize: 'clamp(26px, 7vw, 36px)', lineHeight: 1.05, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
+              Run the day.
+            </h1>
+            {events && events.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
+                <span style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+                  color: 'var(--v3-primary)',
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
+                  {events.length}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                  {events.length === 1 ? 'Event' : 'Events'}
+                </span>
+              </div>
+            )}
+          </div>
+          {/* Inline Schedule Job CTA — primary action surface for desktop
+              users who don't reach for the FAB. Mobile users get both. */}
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ y: -2 }}
+            transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+            onClick={() => { hapticTap(); setAddOpen(true) }}
+            aria-label="Schedule a job"
+            style={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '11px 16px',
+              borderRadius: 12,
+              border: 'none',
+              background: 'var(--v3-primary)',
+              color: 'var(--v3-on-primary)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+              boxShadow: 'var(--v3-gold-glow-sm)',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Plus size={14} aria-hidden="true" />
+            Schedule Job
+          </motion.button>
         </div>
       </motion.div>
 
@@ -218,72 +252,9 @@ export default function Schedule() {
         </motion.div>
       )}
 
-      {/* UPCOMING LANE — only on Day view. On Week/Month the grid is
-          already showing the same window, so the upcoming row was
-          pushing the actual calendar past the fold (audit issues #2 +
-          #4: "land on Week and the column headers are below the
-          viewport"). */}
-      {view === 'day' && upcoming.length > 0 && (
-        <motion.section variants={item} style={{ padding: '14px 20px 0' }}>
-          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-              <CalendarIcon size={12} />
-              Upcoming · 7 days
-            </span>
-            <span style={{ padding: '2px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>
-              {upcoming.length}
-            </span>
-          </header>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' }}>
-            {upcoming.map((e, i) => {
-              const fromQuote = Boolean(e.contact_id && e.fh_contacts?.name)
-              const accent = fromQuote ? 'var(--field-gold-bright)' : 'var(--steel)'
-              return (
-                <motion.button
-                  key={e.id}
-                  type="button"
-                  initial={{ opacity: 0, x: 12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: Math.min(i * 0.04, 0.24), duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => e.contact_id && navigate(`/jobs/${e.contact_id}`)}
-                  style={{
-                    flexShrink: 0,
-                    position: 'relative',
-                    width: 180,
-                    padding: '12px 14px',
-                    borderRadius: 14,
-                    background: 'var(--surface-2)',
-                    border: `1px solid ${fromQuote ? 'rgba(201,150,58,0.35)' : 'var(--rule)'}`,
-                    color: 'var(--ink-strong)',
-                    cursor: e.contact_id ? 'pointer' : 'default',
-                    textAlign: 'left'
-                  }}
-                >
-                  <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accent, boxShadow: `0 0 8px ${accent}66` }} />
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: 4 }}>
-                    <CalendarIcon size={11} />
-                    {new Date(e.start_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    <span aria-hidden="true">·</span>
-                    <Clock size={11} />
-                    {fmtTime(e.start_at)}
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {e.title || 'Untitled'}
-                  </div>
-                  {/* Subtitle: bumped from 10 -> 12 px and from --ink-faint
-                      to a proper readable color so "FROM QUOTE - DEENA NOLAN"
-                      is legible at a glance, not squinting-bait. */}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', color: fromQuote ? 'var(--field-gold-bright)' : 'var(--ink-strong)' }}>
-                    {fromQuote ? <MapPin size={12} /> : null}
-                    {fromQuote ? `From quote · ${e.fh_contacts.name}` : 'Manual event'}
-                  </div>
-                </motion.button>
-              )
-            })}
-          </div>
-        </motion.section>
-      )}
+      {/* Upcoming queue moved INSIDE the .fh-schedule-grid two-zone wrapper
+          below — mobile stacks queue above timeline, desktop puts queue
+          on the left as a persistent sidebar. */}
 
       {/* VIEW TABS + NAV */}
       <motion.div variants={item} style={{ padding: '14px 20px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -322,12 +293,88 @@ export default function Schedule() {
           giving phone users the same gesture they expect from native
           calendar apps. Vertical scroll inside the body still works. */}
       <SwipeShell onShift={shift}>
-        <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
-          {/* Timeline panel — wraps the active view in a contained control
-              surface (subtle inset highlight + base shadow) so the timeline
-              reads as a tool you operate, not a blank scroll area. Empty
-              state in DayView already has its own panel — when shown it
-              sits inside this outer panel, doubling the depth. */}
+        {/* TWO-ZONE LAYOUT (desktop ≥1024px):
+            - Left zone (280px): Upcoming queue — vertical, persistent,
+              max-height 70vh with scroll. Always visible regardless of
+              which view tab is active.
+            - Right zone (1fr): Main timeline panel.
+            Mobile (<1024px): stacks vertically — queue (horizontal scroll)
+            above timeline. */}
+        <motion.div variants={item} className="fh-schedule-grid">
+
+          {/* ZONE 1 — Upcoming Queue */}
+          <div>
+            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                <CalendarIcon size={12} />
+                Upcoming · 7 days
+              </span>
+              {upcoming.length > 0 && (
+                <span style={{ padding: '3px 9px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)', color: 'var(--v3-primary)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', fontVariantNumeric: 'tabular-nums' }}>
+                  {upcoming.length}
+                </span>
+              )}
+            </header>
+            {upcoming.length === 0 ? (
+              <div style={{
+                padding: '20px 16px', borderRadius: 14,
+                background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
+                color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
+                fontSize: 12, textAlign: 'center', lineHeight: 1.5
+              }}>
+                No upcoming work in the next 7 days.
+              </div>
+            ) : (
+              <div className="fh-schedule-queue">
+                {upcoming.map((e, i) => {
+                  const fromQuote = Boolean(e.contact_id && e.fh_contacts?.name)
+                  const accent = fromQuote ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                  return (
+                    <motion.button
+                      key={e.id}
+                      type="button"
+                      initial={{ opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: Math.min(i * 0.04, 0.24), duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
+                      whileHover={{ y: -2, backgroundColor: '#1A1A20' }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => e.contact_id && navigate(`/jobs/${e.contact_id}`)}
+                      style={{
+                        position: 'relative',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: 'var(--v3-surface)',
+                        border: `1px solid ${fromQuote ? 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' : 'var(--v3-border-strong)'}`,
+                        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.2)',
+                        color: 'var(--v3-text)',
+                        cursor: e.contact_id ? 'pointer' : 'default',
+                        textAlign: 'left',
+                        WebkitTapHighlightColor: 'transparent'
+                      }}
+                    >
+                      <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accent, boxShadow: `0 0 10px ${fromQuote ? 'rgba(212, 175, 55, 0.4)' : 'transparent'}` }} />
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--v3-text-muted)', marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
+                        <CalendarIcon size={11} />
+                        {new Date(e.start_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        <span aria-hidden="true">·</span>
+                        <Clock size={11} />
+                        {fmtTime(e.start_at)}
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--v3-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {e.title || 'Untitled'}
+                      </div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600, letterSpacing: '0.02em', color: fromQuote ? 'var(--v3-primary)' : 'var(--v3-text-muted)' }}>
+                        {fromQuote ? <MapPin size={11} /> : null}
+                        {fromQuote ? e.fh_contacts.name : 'Manual event'}
+                      </div>
+                    </motion.button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ZONE 2 — Main timeline panel */}
           <div style={{
             padding: 14,
             borderRadius: 18,
