@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, Pencil, X as XIcon, Save as SaveIcon, Briefcase, FileText, Paperclip, Image as ImageIcon, Download, Phone, Mail, MapPin, Trash2, MessageSquare } from 'lucide-react'
+import {
+  ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
+  Briefcase, Paperclip, Image as ImageIcon, Download,
+  Phone, Mail, MapPin, Trash2, MessageSquare, Users
+} from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.js'
-import Aurora from '../components/fx/Aurora.jsx'
-import GridPattern from '../components/fx/GridPattern.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SegmentedTabs } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
@@ -20,11 +22,19 @@ function money(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
+function fmtPhone(n) {
+  if (!n) return ''
+  const digits = String(n).replace(/\D/g, '')
+  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  if (digits.length === 11 && digits.startsWith('1')) return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
+  return n
+}
+
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'jobs', label: 'Jobs' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'files', label: 'Files' }
+  { id: 'projects', label: 'Projects' },
+  { id: 'files',    label: 'Files' },
+  { id: 'notes',    label: 'Notes' }
 ]
 
 export default function ClientDetail() {
@@ -35,21 +45,15 @@ export default function ClientDetail() {
   const [client, setClient] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('overview')
-
   const [isEditing, setIsEditing] = useState(false)
   const [jobs, setJobs] = useState([])
   const [notes, setNotes] = useState([])
   const [files, setFiles] = useState([])
   const [payments, setPayments] = useState([])
 
-  // Derived bento metrics — computed from jobs[] + payments[].
-  //
-  // Lifetime previously read client.total_lifetime_value (a column that's
-  // never populated), so MMC-style clients with $61K in active jobs showed
-  // $0. Now: sum of every job amount under this client, all stages. Matches
-  // the user's mental model of "total work I've done with this client."
-  //
-  // Outstanding = sum of (amount - paid) for jobs in the billing pipeline
+  // Derived metrics — computed from jobs[] + payments[].
+  // Lifetime: sum of every job amount under this client, all stages.
+  // Outstanding: sum of (amount - paid) for jobs in billing pipeline
   // (job + invoice stages). Closed/lost jobs drop out automatically.
   const lifetime = useMemo(
     () => (jobs || []).reduce((s, j) => s + Number(j.amount || 0), 0),
@@ -69,7 +73,7 @@ export default function ClientDetail() {
       }, 0)
   }, [jobs, payments])
   const activeCount = useMemo(
-    () => (jobs || []).filter((j) => j.stage === 'job' || j.stage === 'quote' || j.stage === 'lead' || j.stage === 'invoice').length,
+    () => (jobs || []).filter((j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage)).length,
     [jobs]
   )
 
@@ -119,8 +123,6 @@ export default function ClientDetail() {
           .in('job_id', jobIds)
           .order('uploaded_at', { ascending: false })
           .limit(60),
-        // Load payments so Outstanding can compute amount - paid per job
-        // instead of falling back to the entire job amount.
         supabase
           .from('fh_payments')
           .select('contact_id, amount')
@@ -134,13 +136,6 @@ export default function ClientDetail() {
     loadTabData()
     return () => { cancelled = true }
   }, [client?.id])
-
-  async function patch(update) {
-    if (!client?.id) return
-    setClient((c) => ({ ...c, ...update }))
-    const { error } = await supabase.from('fh_clients').update(update).eq('id', client.id)
-    if (!error) toastSuccess('Saved', 'Client updated')
-  }
 
   async function handleDelete() {
     if (!client?.id) return
@@ -156,7 +151,7 @@ export default function ClientDetail() {
 
   if (loading) {
     return (
-      <div className="fh-screen" style={{ paddingBottom: 120, padding: '10px 20px 120px' }}>
+      <div className="v3-screen" style={{ paddingBottom: 120, padding: '20px 20px 120px', background: 'var(--v3-bg)' }}>
         <SkeletonList rows={4} card={false} />
       </div>
     )
@@ -164,371 +159,579 @@ export default function ClientDetail() {
 
   if (!client) {
     return (
-      <div className="fh-screen" style={{ padding: '10px 20px 120px' }}>
-        <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
-        <p style={{ color: 'var(--ink-muted)', marginTop: 12 }}>Client not found.</p>
+      <div className="v3-screen" style={{ padding: '20px 20px 120px', background: 'var(--v3-bg)' }}>
+        <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--v3-primary)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
+        <p style={{ color: 'var(--v3-text-muted)', marginTop: 12 }}>Client not found.</p>
       </div>
     )
   }
 
+  const initial = (client.name || '·').trim().charAt(0).toUpperCase()
+
   return (
     <motion.div
-      className="fh-screen"
+      className="v3-screen"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-      style={{ paddingBottom: 120, position: 'relative' }}
+      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
-      {/* HERO */}
-      <div style={{ position: 'relative', padding: '10px 20px 16px', overflow: 'hidden' }}>
-        <Aurora />
-        <GridPattern />
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <button
-            type="button"
-            onClick={() => navigate('/clients')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 0', background: 'transparent', border: 'none', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: 'pointer' }}
+
+      {/* TOP BAR — back chevron + edit + delete in the chrome row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 16px 8px' }}>
+        <IconBtn onClick={() => navigate('/clients')} ariaLabel="Back to clients">
+          <ChevronLeft size={18} />
+        </IconBtn>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <IconBtn
+            onClick={() => { hapticTap(); setIsEditing((v) => !v) }}
+            ariaLabel={isEditing ? 'Stop editing' : 'Edit client'}
+            ariaPressed={isEditing}
+            tone={isEditing ? 'primary' : undefined}
           >
-            <ChevronLeft size={14} />
-            Clients
-          </button>
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-                Client
+            <Pencil size={16} />
+          </IconBtn>
+          <IconBtn onClick={() => { hapticError(); handleDelete() }} ariaLabel="Delete client" tone="danger">
+            <Trash2 size={16} />
+          </IconBtn>
+        </div>
+      </div>
+
+      {/* HERO — large avatar + name + active badge + company */}
+      <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <div aria-hidden="true" style={{
+          flexShrink: 0,
+          width: 76, height: 76,
+          borderRadius: 22,
+          background: 'linear-gradient(135deg, var(--v3-primary-soft), rgba(212, 175, 55, 0.04))',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+          display: 'grid', placeItems: 'center',
+          fontFamily: 'var(--font-display)',
+          fontSize: 34,
+          letterSpacing: '0.04em',
+          color: 'var(--v3-primary)',
+          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(212, 175, 55, 0.16)'
+        }}>
+          {initial}
+        </div>
+        <div style={{ minWidth: 0, flex: 1, paddingTop: 4 }}>
+          <h1 style={{
+            margin: 0,
+            fontFamily: 'var(--font-serif)',
+            fontSize: 'clamp(24px, 6vw, 32px)',
+            lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            fontWeight: 400,
+            color: 'var(--v3-text)'
+          }}>
+            {client.name}
+          </h1>
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {activeCount > 0 ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '3px 9px', borderRadius: 999,
+                background: 'rgba(46, 204, 113, 0.14)',
+                border: '1px solid rgba(46, 204, 113, 0.40)',
+                color: '#4ADE80',
+                fontFamily: 'var(--font-body)',
+                fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.1em', textTransform: 'uppercase',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80' }} />
+                Active · {activeCount}
               </span>
-              <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(24px, 7vw, 34px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-                
-                  {client.name}.
-                
-              </h1>
-              {client.company_name && (
-                <div style={{ marginTop: 6, fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-                  {client.company_name}
-                </div>
-              )}
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: 10, marginTop: 14 }}>
-            <BentoCard label="Lifetime">
-              <span className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 24, lineHeight: 1 }}>
-                {money(lifetime)}
+            ) : (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '3px 9px', borderRadius: 999,
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid var(--v3-border-strong)',
+                color: 'var(--v3-text-muted)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.1em', textTransform: 'uppercase'
+              }}>
+                Inactive
               </span>
-            </BentoCard>
-            <BentoCard label="Outstanding" tone={outstanding > 0 ? 'alert' : 'muted'}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, lineHeight: 1, color: outstanding > 0 ? 'var(--alert-red)' : 'var(--ink-faint)', fontWeight: 800, letterSpacing: '-0.01em' }}>
-                {money(outstanding)}
+            )}
+            {client.company_name && (
+              <span style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: 13,
+                color: 'var(--v3-text-muted)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}>
+                {client.company_name}
               </span>
-            </BentoCard>
-            <BentoCard label="Active">
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, lineHeight: 1, color: activeCount > 0 ? 'var(--ink-strong)' : 'var(--ink-faint)', fontWeight: 800 }}>
-                {activeCount}
-              </span>
-            </BentoCard>
-          </div>
-          {/* COMMAND CENTER — quick-access action row */}
-          {(client.phone || client.email || client.address) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 14 }}>
-              <a
-                href={client.phone ? `tel:${client.phone}` : '#'}
-                onClick={(e) => { if (!client.phone) { e.preventDefault(); return } hapticMedium() }}
-                aria-label="Call"
-                aria-disabled={!client.phone}
-                className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
-              >
-                <Phone size={20} />
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Call</span>
-              </a>
-              <a
-                href={client.phone ? `sms:${client.phone}` : '#'}
-                onClick={(e) => { if (!client.phone) { e.preventDefault(); return } hapticMedium() }}
-                aria-label="Text"
-                aria-disabled={!client.phone}
-                className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.phone ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.phone ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.phone ? 1 : 0.4 }}
-              >
-                <MessageSquare size={20} />
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Text</span>
-              </a>
-              <a
-                href={client.email ? `mailto:${client.email}` : '#'}
-                onClick={(e) => { if (!client.email) { e.preventDefault(); return } hapticMedium() }}
-                aria-label="Email"
-                aria-disabled={!client.email}
-                className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.email ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.email ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.email ? 1 : 0.4 }}
-              >
-                <Mail size={20} />
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Email</span>
-              </a>
-              <a
-                href={client.address ? `https://maps.apple.com/?address=${encodeURIComponent(client.address)}` : '#'}
-                target={client.address ? '_blank' : undefined}
-                rel={client.address ? 'noopener noreferrer' : undefined}
-                onClick={(e) => { if (!client.address) { e.preventDefault(); return } hapticMedium() }}
-                aria-label="Map"
-                aria-disabled={!client.address}
-                className="fh-press-instant"
-                style={{ display: 'grid', placeItems: 'center', gap: 4, padding: '10px 4px', borderRadius: 12, background: client.address ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--rule-bold)', color: client.address ? 'var(--ink-strong)' : 'var(--ink-faint)', textDecoration: 'none', minHeight: 56, opacity: client.address ? 1 : 0.4 }}
-              >
-                <Map size={20} />
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Map</span>
-              </a>
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { hapticTap(); setIsEditing((v) => !v) }}
-              aria-pressed={isEditing}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '11px 14px',
-                borderRadius: 12,
-                background: isEditing ? 'rgba(201,150,58,0.18)' : 'var(--surface-2)',
-                border: isEditing ? '1px solid rgba(201,150,58,0.5)' : '1px solid var(--rule)',
-                color: isEditing ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 12,
-                letterSpacing: '0.14em',
-                cursor: 'pointer'
-              }}
-            >
-              <Pencil size={14} />
-              {isEditing ? 'EDITING' : 'EDIT'}
-            </motion.button>
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { hapticError(); handleDelete() }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '11px 14px',
-                borderRadius: 12,
-                background: 'rgba(192,57,43,0.10)',
-                border: '1px solid rgba(192,57,43,0.35)',
-                color: 'var(--alert-red)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 12,
-                letterSpacing: '0.14em',
-                cursor: 'pointer'
-              }}
-            >
-              <Trash2 size={14} />
-              DELETE
-            </motion.button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* TABS */}
-      <div className="fh-tabs-wrap" style={{ padding: '6px 20px 12px' }}>
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList
-            aria-label="Client tabs"
-            className="ui:flex ui:w-full ui:gap-1 ui:overflow-x-auto ui:bg-white/[0.03] ui:border ui:border-border ui:rounded-xl ui:p-1"
-          >
-            {TABS.map((t) => (
-              <TabsTrigger
-                key={t.id}
-                value={t.id}
-                className="ui:flex-shrink-0 ui:px-3 ui:py-1.5 ui:rounded-lg ui:text-xs ui:font-bold ui:uppercase ui:tracking-wider ui:text-muted-foreground ui:data-[state=active]:bg-white/[0.08] ui:data-[state=active]:text-foreground"
-              >
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+      {/* ACTION ROW — Call · Text · Email · Map (4 equal columns) */}
+      <div style={{ padding: '0 20px 18px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          <ActionTile
+            icon={Phone}
+            label="Call"
+            href={client.phone ? `tel:${client.phone}` : null}
+          />
+          <ActionTile
+            icon={MessageSquare}
+            label="Text"
+            href={client.phone ? `sms:${client.phone}` : null}
+          />
+          <ActionTile
+            icon={Mail}
+            label="Email"
+            href={client.email ? `mailto:${client.email}` : null}
+          />
+          <ActionTile
+            icon={MapPin}
+            label="Map"
+            href={client.address ? `https://maps.apple.com/?address=${encodeURIComponent(client.address)}` : null}
+            external
+          />
+        </div>
       </div>
 
+      {/* TABS — v3 segmented underline (Overview · Projects · Files · Notes) */}
+      <SegmentedTabs
+        value={tab}
+        onChange={setTab}
+        tabs={TABS}
+        ariaLabel="Client tabs"
+      />
+
+      {/* TAB CONTENT */}
       <div style={{ padding: '0 20px' }}>
         {tab === 'overview' && (
           isEditing
             ? <OverviewEdit client={client} onCommit={async (patch) => { await supabase.from('fh_clients').update(patch).eq('id', client.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
-            : <OverviewRead client={client} />
+            : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} />
         )}
-        {tab === 'jobs' && (
-          <>
-            <JobsList jobs={jobs} onOpen={(jobId) => navigate(`/jobs/${jobId}`)} />
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--rule)' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-                Activity
-              </span>
-              <ActivityTimeline jobs={jobs} notes={notes} />
-            </div>
-          </>
+        {tab === 'projects' && (
+          <ProjectsList jobs={jobs} onOpen={(jobId) => navigate(`/jobs/${jobId}`)} />
         )}
-        {tab === 'notes' && <NotesList notes={notes} onOpen={() => navigate('/notes')} />}
         {tab === 'files' && <FilesList rows={files} />}
+        {tab === 'notes' && <NotesList notes={notes} />}
       </div>
     </motion.div>
   )
 }
 
+/* ============================================================
+   IconBtn — chrome icon button (back / edit / more / delete)
+   ============================================================ */
 
-function BentoCard({ label, children, tone }) {
+function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }) {
+  const palette = {
+    primary: { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 45%, transparent)', color: 'var(--v3-primary)' },
+    danger:  { bg: 'rgba(192, 57, 43, 0.10)', border: 'color-mix(in srgb, var(--v3-danger) 35%, transparent)', color: 'var(--v3-danger-bright)' }
+  }
+  const p = (tone && palette[tone]) || { bg: 'var(--v3-surface)', border: 'var(--v3-border-strong)', color: 'var(--v3-text)' }
   return (
-    <div
-      className="fh-card-raised"
+    <motion.button
+      type="button"
+      whileTap={disabled ? undefined : { scale: 0.94 }}
+      onClick={() => { if (!disabled) { hapticTap(); onClick?.() } }}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      aria-pressed={ariaPressed}
       style={{
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '12px 14px',
-        borderRadius: 14,
-        background: tone === 'alert'
-          ? 'linear-gradient(135deg, rgba(192,57,43,0.10), rgba(192,57,43,0.04))'
-          : 'var(--surface-2)',
-        border: tone === 'alert'
-          ? '1px solid rgba(192,57,43,0.30)'
-          : '1px solid var(--rule)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        minHeight: 64
+        width: 40, height: 40, borderRadius: 12,
+        display: 'grid', placeItems: 'center',
+        background: p.bg,
+        border: `1px solid ${p.border}`,
+        color: p.color,
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+        WebkitTapHighlightColor: 'transparent'
       }}
     >
-      <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: tone === 'alert' ? 'var(--alert-red)' : 'var(--ink-muted)' }}>
-        {label}
-      </span>
       {children}
-    </div>
+    </motion.button>
   )
 }
 
+/* ============================================================
+   ActionTile — Call / Text / Email / Map quick-action button.
+   Plain <a> + setTimeout fallback for iOS Safari (audit-batch-6 pattern).
+   ============================================================ */
 
-function ActivityTimeline({ jobs, notes }) {
-  // Merge stage transitions (from jobs[].updated_at) and recent notes into a single sorted list.
-  // Each event gets a status color: gray (past), gold (pending follow-up), green (completed).
-  const events = []
-  for (const j of jobs || []) {
-    const stage = j.stage
-    let tone = 'past'
-    if (stage === 'invoice' || stage === 'quote') tone = 'pending'
-    if (stage === 'closed') tone = 'done'
-    if (stage === 'lost') tone = 'lost'
-    events.push({
-      id: 'job-' + j.id,
-      iso: j.updated_at || j.created_at,
-      title: (j.job_title || j.name || 'Job') + (stage ? ' · ' + stage.toUpperCase() : ''),
-      sub: j.amount ? '$' + Math.round(Number(j.amount) || 0).toLocaleString() : null,
-      tone
-    })
+function ActionTile({ icon: Icon, label, href, external }) {
+  const enabled = !!href
+  const baseStyle = {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 6,
+    padding: '14px 4px',
+    borderRadius: 14,
+    background: enabled ? 'var(--v3-surface)' : 'rgba(255, 255, 255, 0.02)',
+    border: `1px solid ${enabled ? 'var(--v3-border-strong)' : 'var(--v3-border)'}`,
+    boxShadow: enabled ? 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.2)' : 'none',
+    color: enabled ? 'var(--v3-text)' : 'var(--v3-text-muted)',
+    textDecoration: 'none',
+    minHeight: 64,
+    opacity: enabled ? 1 : 0.4,
+    cursor: enabled ? 'pointer' : 'default',
+    WebkitTapHighlightColor: 'transparent'
   }
-  for (const n of (notes || []).slice(0, 8)) {
-    events.push({
-      id: 'note-' + n.id,
-      iso: n.created_at,
-      title: 'Note',
-      sub: (n.text || '').slice(0, 80),
-      tone: 'past'
-    })
-  }
-  events.sort((a, b) => new Date(b.iso || 0) - new Date(a.iso || 0))
-  if (events.length === 0) {
+
+  if (!enabled) {
     return (
-      <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13, fontFamily: 'var(--font-body)' }}>
-        No activity yet.
+      <div aria-disabled="true" style={baseStyle}>
+        <Icon size={20} aria-hidden="true" />
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
       </div>
     )
   }
-  const colorFor = (t) => t === 'done' ? 'var(--signal-green)' : t === 'pending' ? 'var(--field-gold-bright)' : t === 'lost' ? 'var(--alert-red)' : 'var(--steel)'
+
   return (
-    <div style={{ position: 'relative', paddingLeft: 20, marginTop: 12 }}>
-      <div aria-hidden="true" style={{ position: 'absolute', left: 7, top: 4, bottom: 4, width: 1, background: 'var(--rule-bold)' }} />
-      {events.slice(0, 12).map((e, i) => (
-        <div key={e.id} style={{ position: 'relative', marginBottom: 14 }}>
-          <span aria-hidden="true" style={{ position: 'absolute', left: -16, top: 4, width: 9, height: 9, borderRadius: '50%', background: colorFor(e.tone), boxShadow: '0 0 8px ' + colorFor(e.tone) + '99' }} />
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', lineHeight: 1.3 }}>
-            {e.title}
+    <a
+      href={href}
+      target={external ? '_blank' : undefined}
+      rel={external ? 'noopener noreferrer' : undefined}
+      onClick={(e) => {
+        hapticMedium()
+        if (!external) {
+          e.stopPropagation()
+          if (typeof window !== 'undefined') {
+            setTimeout(() => { window.location.href = href }, 0)
+          }
+        }
+      }}
+      aria-label={label}
+      style={baseStyle}
+    >
+      <Icon size={20} aria-hidden="true" />
+      <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
+    </a>
+  )
+}
+
+/* ============================================================
+   OverviewRead — Contact Info card + Map block + Financial Summary
+   ============================================================ */
+
+function OverviewRead({ client, lifetime, outstanding, activeCount }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 0 24px' }}>
+
+      {/* FINANCIAL SUMMARY — large lifetime + outstanding + active */}
+      <div style={{
+        padding: '20px 20px 18px',
+        borderRadius: 18,
+        background: `
+          radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.10), transparent 55%),
+          var(--v3-surface)
+        `,
+        border: '1px solid color-mix(in srgb, var(--v3-primary) 18%, transparent)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 16px rgba(0, 0, 0, 0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+            textTransform: 'uppercase', color: 'var(--v3-text-muted)'
+          }}>
+            Lifetime value
+          </span>
+        </div>
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(40px, 10vw, 56px)',
+            lineHeight: 1,
+            letterSpacing: '0.005em',
+            color: 'var(--v3-primary)',
+            fontVariantNumeric: 'tabular-nums',
+            textShadow: '0 2px 18px rgba(212, 175, 55, 0.16)'
+          }}>
+            {money(lifetime)}
+          </span>
+        </div>
+
+        {/* Sub-metrics row */}
+        <div style={{
+          marginTop: 16, paddingTop: 14,
+          borderTop: '1px solid var(--v3-border)',
+          display: 'flex', alignItems: 'baseline', gap: 22, flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+              color: outstanding > 0 ? 'var(--v3-danger-bright)' : 'var(--v3-text)',
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              {money(outstanding)}
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
+              textTransform: 'uppercase', color: 'var(--v3-text-muted)'
+            }}>
+              Outstanding
+            </span>
           </div>
-          {e.sub && (
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {e.sub}
-            </div>
-          )}
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 10, color: 'var(--ink-faint)', marginTop: 2, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            {e.iso ? new Date(e.iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+              color: activeCount > 0 ? 'var(--v3-text)' : 'var(--v3-text-muted)',
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              {activeCount}
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
+              textTransform: 'uppercase', color: 'var(--v3-text-muted)'
+            }}>
+              {activeCount === 1 ? 'Active job' : 'Active jobs'}
+            </span>
           </div>
         </div>
-      ))}
+      </div>
+
+      {/* CONTACT INFO CARD — phone / email / address as separate rows */}
+      <div style={{
+        padding: '6px 0',
+        borderRadius: 16,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border-strong)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)',
+        overflow: 'hidden'
+      }}>
+        <div style={{ padding: '14px 18px 8px' }}>
+          <span style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+            textTransform: 'uppercase', color: 'var(--v3-text-muted)'
+          }}>
+            Contact info
+          </span>
+        </div>
+        <ContactRow icon={Phone} label="Phone" value={fmtPhone(client.phone)} href={client.phone ? `tel:${client.phone}` : null} />
+        <ContactRow icon={Mail} label="Email" value={client.email} href={client.email ? `mailto:${client.email}` : null} />
+        <ContactRow icon={MapPin} label="Address" value={client.address} multiline isLast />
+      </div>
+
+      {/* MAP BLOCK — only render when address present */}
+      {client.address && (
+        <div style={{
+          borderRadius: 16,
+          overflow: 'hidden',
+          background: 'var(--v3-surface)',
+          border: '1px solid var(--v3-border-strong)',
+          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+        }}>
+          <a
+            href={`https://maps.apple.com/?address=${encodeURIComponent(client.address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => hapticTap()}
+            style={{
+              display: 'block',
+              position: 'relative',
+              height: 160,
+              background: `
+                linear-gradient(180deg, transparent 0%, transparent 60%, rgba(7, 7, 10, 0.7) 100%),
+                radial-gradient(60% 60% at 50% 50%, rgba(212, 175, 55, 0.10), transparent 70%),
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
+                repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
+                var(--v3-surface-2)
+              `,
+              color: 'var(--v3-text)',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            {/* Center pin */}
+            <div style={{
+              position: 'absolute', left: '50%', top: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 4
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%',
+                background: 'var(--v3-primary)',
+                display: 'grid', placeItems: 'center',
+                color: 'var(--v3-on-primary)',
+                boxShadow: '0 8px 24px rgba(212, 175, 55, 0.45)'
+              }}>
+                <MapPin size={20} aria-hidden="true" />
+              </div>
+              <div aria-hidden="true" style={{
+                width: 8, height: 8,
+                background: 'var(--v3-primary)',
+                clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
+                marginTop: -2
+              }} />
+            </div>
+
+            {/* Bottom address strip */}
+            <div style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              padding: '12px 16px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--v3-text)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}>
+                {client.address}
+              </span>
+              <span style={{
+                flexShrink: 0,
+                fontFamily: 'var(--font-body)',
+                fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: 'var(--v3-primary)'
+              }}>
+                Open in Maps →
+              </span>
+            </div>
+          </a>
+        </div>
+      )}
+
+      {/* OPTIONAL — internal notes from the client record */}
+      {client.notes && (
+        <div style={{
+          padding: '14px 18px',
+          borderRadius: 14,
+          background: 'var(--v3-surface)',
+          border: '1px solid var(--v3-border-strong)',
+          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+            textTransform: 'uppercase', color: 'var(--v3-text-muted)',
+            marginBottom: 8
+          }}>
+            Internal Notes
+          </div>
+          <div style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 14, lineHeight: 1.5,
+            color: 'var(--v3-text)',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+          }}>
+            {client.notes}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function KpiPill({ label, value, gold }) {
-  return (
-    <div
-      style={{
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '12px 14px',
-        borderRadius: 14,
-        background: gold ? 'linear-gradient(135deg, rgba(30,20,10,0.9), rgba(20,15,10,0.6))' : 'var(--surface-2)',
-        border: gold ? '1px solid rgba(201,150,58,0.35)' : '1px solid var(--rule)'
-      }}
-    >
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</div>
-      <div
-        className={gold ? 'fh-text-gradient-gold' : undefined}
-        style={{ fontFamily: 'var(--font-display)', fontSize: 26, letterSpacing: '0.01em', lineHeight: 1, marginTop: 8, color: gold ? undefined : 'var(--ink-strong)' }}
-      >
-        {value}
+function ContactRow({ icon: Icon, label, value, href, multiline, isLast }) {
+  const hasValue = !!value
+  const inner = (
+    <div style={{
+      display: 'flex',
+      alignItems: multiline ? 'flex-start' : 'center',
+      gap: 14,
+      padding: '14px 18px',
+      borderTop: '1px solid var(--v3-border)',
+      borderBottom: isLast ? 'none' : 'none',
+      background: 'transparent',
+      color: 'var(--v3-text)',
+      textDecoration: 'none',
+      cursor: hasValue && href ? 'pointer' : 'default',
+      WebkitTapHighlightColor: 'transparent'
+    }}>
+      <span aria-hidden="true" style={{
+        flexShrink: 0,
+        width: 36, height: 36, borderRadius: 10,
+        background: hasValue ? 'var(--v3-primary-soft)' : 'rgba(255, 255, 255, 0.04)',
+        border: hasValue
+          ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)'
+          : '1px solid var(--v3-border)',
+        color: hasValue ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+        display: 'grid', placeItems: 'center'
+      }}>
+        <Icon size={15} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: 'var(--v3-text-muted)',
+          marginBottom: 4
+        }}>
+          {label}
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 15,
+          fontWeight: hasValue ? 600 : 400,
+          color: hasValue ? 'var(--v3-text)' : 'var(--v3-text-muted)',
+          fontStyle: hasValue ? 'normal' : 'italic',
+          lineHeight: 1.4,
+          wordBreak: 'break-word',
+          whiteSpace: multiline ? 'pre-wrap' : 'normal'
+        }}>
+          {value || 'Not set'}
+        </div>
       </div>
     </div>
   )
+
+  if (hasValue && href) {
+    return (
+      <a
+        href={href}
+        onClick={(e) => {
+          hapticTap()
+          e.stopPropagation()
+          if (typeof window !== 'undefined') {
+            setTimeout(() => { window.location.href = href }, 0)
+          }
+        }}
+        style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}
+      >
+        {inner}
+      </a>
+    )
+  }
+  return inner
 }
 
-function OverviewRead({ client }) {
-  const rows = [
-    { label: 'Name', value: client.name },
-    { label: 'Company', value: client.company_name },
-    { label: 'Phone', value: client.phone, icon: Phone },
-    { label: 'Email', value: client.email, icon: Mail },
-    { label: 'Address', value: client.address, icon: MapPin },
-    { label: 'Notes', value: client.notes, multiline: true }
-  ]
-  return (
-    <div style={{ padding: '4px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-      {rows.map((r, i) => (
-        <div
-          key={r.label}
-          style={{
-            display: r.multiline ? 'block' : 'grid',
-            gridTemplateColumns: r.multiline ? undefined : '110px 1fr',
-            gap: r.multiline ? 4 : 12,
-            alignItems: 'baseline',
-            padding: '12px 0',
-            borderBottom: i < rows.length - 1 ? '1px solid rgba(201,150,58,0.08)' : 'none'
-          }}
-        >
-          {/* For multiline rows the wrapper uses display:block, which made
-              two inline spans run together as "NotesNot set". Force the
-              label to its own line on multiline rows. */}
-          <span style={{ display: r.multiline ? 'block' : 'inline', marginBottom: r.multiline ? 4 : 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{r.label}</span>
-          {r.value
-            ? <span style={{ display: r.multiline ? 'block' : 'inline', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink-strong)', wordBreak: 'break-word', whiteSpace: r.multiline ? 'pre-wrap' : 'normal' }}>{r.value}</span>
-            : <span style={{ display: r.multiline ? 'block' : 'inline', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-faint)', fontStyle: 'italic' }}>Not set</span>
-          }
-        </div>
-      ))}
-    </div>
-  )
-}
+/* ============================================================
+   OverviewEdit — controlled form, v3 surface
+   ============================================================ */
 
 function OverviewEdit({ client, onCommit, onCancel }) {
   const [form, setForm] = useState({ ...client })
   const [saving, setSaving] = useState(false)
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
-  const fieldStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const fieldStyle = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '11px 14px', borderRadius: 12,
+    background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
+    color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
+    fontSize: 14, outline: 'none'
+  }
+  const labelStyle = {
+    fontFamily: 'var(--font-body)',
+    fontSize: 10, fontWeight: 700,
+    letterSpacing: '0.16em', textTransform: 'uppercase',
+    color: 'var(--v3-text-muted)'
+  }
   async function commit() {
     const EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
     const patch = {}
@@ -543,7 +746,15 @@ function OverviewEdit({ client, onCommit, onCancel }) {
     setSaving(false)
   }
   return (
-    <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{
+      padding: 18,
+      borderRadius: 16,
+      background: 'var(--v3-surface)',
+      border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.25)',
+      display: 'flex', flexDirection: 'column', gap: 12,
+      margin: '12px 0 24px'
+    }}>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={labelStyle}>Name</span>
         <input style={fieldStyle} value={form.name || ''} onChange={(e) => set('name', e.target.value)} />
@@ -570,89 +781,215 @@ function OverviewEdit({ client, onCommit, onCancel }) {
         <span style={labelStyle}>Notes</span>
         <textarea rows={4} style={{ ...fieldStyle, resize: 'vertical' }} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} />
       </label>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-        <button type="button" onClick={onCancel} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-          <XIcon size={14} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 10, marginTop: 4 }}>
+        <button type="button" onClick={onCancel} disabled={saving} style={{
+          padding: '12px 14px', borderRadius: 12,
+          background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
+          color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
+          fontSize: 13, fontWeight: 700, cursor: 'pointer'
+        }}>
           Cancel
         </button>
-        <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={commit} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em', cursor: saving ? 'default' : 'pointer', boxShadow: '0 6px 16px rgba(201,150,58,0.3)', opacity: saving ? 0.6 : 1 }}>
-          <SaveIcon size={14} />
-          {saving ? 'SAVING…' : 'SAVE'}
+        <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={commit} disabled={saving} style={{
+          padding: '12px 14px', borderRadius: 12, border: 'none',
+          background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
+          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+          letterSpacing: '0.04em',
+          cursor: saving ? 'wait' : 'pointer',
+          boxShadow: 'var(--v3-gold-glow)',
+          opacity: saving ? 0.7 : 1
+        }}>
+          {saving ? 'Saving…' : 'Save changes'}
         </motion.button>
       </div>
     </div>
   )
 }
 
-function JobsList({ jobs, onOpen }) {
+/* ============================================================
+   ProjectsList — jobs linked to this client
+   ============================================================ */
+
+function ProjectsList({ jobs, onOpen }) {
   if (jobs.length === 0) {
-    return <EmptyCard label="No jobs linked to this client yet." />
+    return <EmptyCard label="No projects linked to this client yet." />
   }
   return (
-    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {jobs.map((j) => {
-        const c = stageColor(j.stage)
-        return (
-          <li key={j.id}>
-            <button
-              type="button"
-              onClick={() => onOpen(j.id)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, var(--surface-2), var(--surface-2))', border: '1px solid var(--rule)', textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)', position: 'relative', overflow: 'hidden' }}
-            >
-              <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: c, boxShadow: `0 0 10px ${c}66` }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {j.name || 'Untitled'}
+    <div style={{ padding: '12px 0 24px' }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {jobs.map((j) => {
+          const c = stageColor(j.stage)
+          return (
+            <li key={j.id}>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.99 }}
+                whileHover={{ y: -2, backgroundColor: '#1A1A20' }}
+                transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+                onClick={() => { hapticTap(); onOpen(j.id) }}
+                style={{
+                  width: '100%',
+                  position: 'relative',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '14px 14px 14px 20px',
+                  borderRadius: 14,
+                  background: '#141418',
+                  border: '1px solid var(--v3-border-strong)',
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  color: 'var(--v3-text)',
+                  overflow: 'hidden',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                <span aria-hidden="true" style={{
+                  position: 'absolute',
+                  left: 0, top: 12, bottom: 12,
+                  width: 3,
+                  borderRadius: '0 3px 3px 0',
+                  background: c,
+                  boxShadow: `0 0 12px ${c}66`
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 14, fontWeight: 700,
+                    letterSpacing: '-0.005em',
+                    color: 'var(--v3-text)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                  }}>
+                    {j.name || 'Untitled'}
+                  </div>
+                  <div style={{
+                    marginTop: 3,
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 11,
+                    color: 'var(--v3-text-muted)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                  }}>
+                    {j.job_title || j.job_type || '—'}
+                  </div>
                 </div>
-                <div style={{ marginTop: 2, fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {j.job_title || j.job_type || '—'}
+                <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                  <div style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 16,
+                    color: 'var(--v3-primary)',
+                    letterSpacing: '0.02em',
+                    fontVariantNumeric: 'tabular-nums',
+                    lineHeight: 1
+                  }}>
+                    {money(j.amount)}
+                  </div>
+                  <div style={{
+                    marginTop: 4,
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.16em', textTransform: 'uppercase',
+                    color: c
+                  }}>
+                    {j.stage}
+                  </div>
                 </div>
-              </div>
-              <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--field-gold-bright)', letterSpacing: '0.02em' }}>{money(j.amount)}</div>
-                <div style={{ marginTop: 2, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: c, fontWeight: 700 }}>{j.stage}</div>
-              </div>
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+              </motion.button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 
+/* ============================================================
+   NotesList — communication log across all the client's jobs
+   ============================================================ */
+
 function NotesList({ notes }) {
-  if (notes.length === 0) return <EmptyCard label="No notes on this client's jobs." />
+  if (notes.length === 0) return <EmptyCard label="No notes on this client's jobs yet." />
   return (
-    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {notes.map((n) => {
-        const body = n.text || n.body || ''
-        const title = n.parsed?.summary || (body.split('\n').find((l) => l.trim()) || '').slice(0, 80) || 'Untitled'
-        return (
-          <li key={n.id} style={{ position: 'relative', overflow: 'hidden', padding: '12px 14px 12px 20px', borderRadius: 12, background: 'linear-gradient(180deg, var(--surface-2), var(--surface-2))', border: '1px solid var(--rule)' }}>
-            <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: 'linear-gradient(180deg, var(--field-gold-bright), var(--field-gold-deep))' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <h4 style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', overflowWrap: 'anywhere' }}>
-                {title}
-              </h4>
-              <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
-                {new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-            {body && body !== title && (
-              <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', whiteSpace: 'pre-wrap' }}>{body}</p>
-            )}
-            {n.fh_contacts?.name && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '2px 8px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.28)', color: 'var(--field-gold-bright)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                <Briefcase size={10} />
-                {n.fh_contacts.name}
-              </span>
-            )}
-          </li>
-        )
-      })}
-    </ul>
+    <div style={{ padding: '12px 0 24px' }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {notes.map((n) => {
+          const body = n.text || n.body || ''
+          const title = n.parsed?.summary || (body.split('\n').find((l) => l.trim()) || '').slice(0, 80) || 'Untitled'
+          return (
+            <li key={n.id} style={{
+              position: 'relative',
+              padding: '14px 14px 14px 20px',
+              borderRadius: 14,
+              background: '#141418',
+              border: '1px solid var(--v3-border-strong)',
+              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+              overflow: 'hidden'
+            }}>
+              <span aria-hidden="true" style={{
+                position: 'absolute',
+                left: 0, top: 12, bottom: 12,
+                width: 3,
+                borderRadius: '0 3px 3px 0',
+                background: 'var(--v3-primary)',
+                boxShadow: '0 0 12px rgba(212, 175, 55, 0.45)'
+              }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <h4 style={{
+                  margin: 0,
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 14, fontWeight: 700,
+                  color: 'var(--v3-text)',
+                  letterSpacing: '-0.005em',
+                  overflowWrap: 'anywhere'
+                }}>
+                  {title}
+                </h4>
+                <span style={{
+                  flexShrink: 0,
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 10,
+                  color: 'var(--v3-text-muted)',
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
+                  {new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+              {body && body !== title && (
+                <p style={{
+                  margin: '6px 0 0',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  color: 'var(--v3-text-muted)',
+                  whiteSpace: 'pre-wrap'
+                }}>{body}</p>
+              )}
+              {n.fh_contacts?.name && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  marginTop: 8,
+                  padding: '3px 9px',
+                  borderRadius: 999,
+                  background: 'var(--v3-primary-soft)',
+                  border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
+                  color: 'var(--v3-primary)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 10, fontWeight: 700,
+                  letterSpacing: '0.08em', textTransform: 'uppercase'
+                }}>
+                  <Briefcase size={10} />
+                  {n.fh_contacts.name}
+                </span>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
+
+/* ============================================================
+   FilesList — files + photos across the client's jobs
+   ============================================================ */
 
 function FilesList({ rows }) {
   if (rows.length === 0) return <EmptyCard label="No files or photos across this client's jobs." />
@@ -672,30 +1009,82 @@ function FilesList({ rows }) {
     window.open(data.signedUrl, '_blank', 'noopener')
   }
   return (
-    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {rows.map((r) => (
-        <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-          <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center' }}>
-            {r.kind === 'photo' ? <ImageIcon size={14} /> : <Paperclip size={14} />}
-          </span>
-          <button type="button" onClick={() => open(r)} style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'var(--ink-strong)' }}>
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.filename}</div>
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)' }}>
-              {fmtSize(r.size_bytes)} · {r.fh_contacts?.name || 'job'} · {new Date(r.uploaded_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </div>
-          </button>
-          <button type="button" onClick={() => open(r)} aria-label="Open" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-            <Download size={14} />
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div style={{ padding: '12px 0 24px' }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {rows.map((r) => (
+          <li key={r.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: 'var(--v3-surface)',
+            border: '1px solid var(--v3-border-strong)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)'
+          }}>
+            <span aria-hidden="true" style={{
+              flexShrink: 0,
+              width: 34, height: 34, borderRadius: 9,
+              background: 'var(--v3-primary-soft)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+              color: 'var(--v3-primary)',
+              display: 'grid', placeItems: 'center'
+            }}>
+              {r.kind === 'photo' ? <ImageIcon size={15} /> : <Paperclip size={15} />}
+            </span>
+            <button type="button" onClick={() => open(r)} style={{
+              flex: 1, minWidth: 0,
+              background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
+              cursor: 'pointer', color: 'var(--v3-text)',
+              WebkitTapHighlightColor: 'transparent'
+            }}>
+              <div style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: 13, fontWeight: 700,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}>
+                {r.filename}
+              </div>
+              <div style={{
+                marginTop: 2,
+                fontFamily: 'var(--font-body)',
+                fontSize: 11,
+                color: 'var(--v3-text-muted)',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {fmtSize(r.size_bytes)} · {r.fh_contacts?.name || 'job'} · {new Date(r.uploaded_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </div>
+            </button>
+            <button type="button" onClick={() => open(r)} aria-label="Open" style={{
+              flexShrink: 0,
+              width: 32, height: 32, borderRadius: 9,
+              border: '1px solid var(--v3-border-strong)',
+              background: 'transparent',
+              color: 'var(--v3-text-muted)',
+              cursor: 'pointer',
+              display: 'grid', placeItems: 'center'
+            }}>
+              <Download size={14} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
 function EmptyCard({ label }) {
   return (
-    <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+    <div style={{
+      margin: '12px 0 24px',
+      padding: '32px 24px',
+      borderRadius: 14,
+      background: 'var(--v3-surface)',
+      border: '1px dashed var(--v3-border-strong)',
+      textAlign: 'center',
+      color: 'var(--v3-text-muted)',
+      fontSize: 13,
+      fontFamily: 'var(--font-body)',
+      lineHeight: 1.5
+    }}>
       {label}
     </div>
   )
