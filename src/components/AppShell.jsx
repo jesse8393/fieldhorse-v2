@@ -6,8 +6,6 @@ import AppHeader from './AppHeader.jsx'
 import BottomNav from './BottomNav.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import Toaster from './Toaster.jsx'
-import Aurora from './fx/Aurora.jsx'
-import GridPattern from './fx/GridPattern.jsx'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
@@ -45,15 +43,13 @@ export default function AppShell() {
           Bumps a11y so keyboard users don't have to tab through every
           header + nav control to reach the screen body. */}
       <a href="#fh-main" className="fh-skip-link">Skip to content</a>
-      <Aurora />
-      <GridPattern />
-
-      <div className="fh-page-corners" aria-hidden="true">
-        <span className="fh-corner fh-corner--tl" />
-        <span className="fh-corner fh-corner--tr" />
-        <span className="fh-corner fh-corner--bl" />
-        <span className="fh-corner fh-corner--br" />
-      </div>
+      {/* Removed for v3:
+          - <Aurora />          three large gold radial blobs (atmosphere)
+          - <GridPattern />     drifting 40px white grid (the "grid texture")
+          - <div .fh-page-corners> four gold corner brackets — the
+            bottom-left bracket was reading as a stray gold "+" once
+            legacy gold tokens were aliased to the v3 (brighter) gold.
+          v3 page atmosphere is provided by .v3-screen background only. */}
 
       <AppHeader />
 

@@ -158,7 +158,7 @@ export default function Analytics() {
 
           {/* PIPELINE BY STAGE */}
           {/* PIPELINE TREND — 12-week area chart */}
-          <motion.section variants={item} style={{ padding: '0 20px 18px' }}>
+          <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
             <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 10 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <TrendingUp size={13} color="var(--field-gold-bright)" />
@@ -217,7 +217,7 @@ export default function Analytics() {
             </div>
           </motion.section>
 
-          <motion.section variants={item} style={{ padding: '0 20px 20px' }}>
+          <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
             <header style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
               <BarChart3 size={13} color="var(--field-gold-bright)" />
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
@@ -260,7 +260,7 @@ export default function Analytics() {
           </motion.section>
 
           {/* MILEAGE LOG */}
-          <motion.section variants={item} style={{ padding: '0 20px 24px' }}>
+          <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
             <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Car size={13} color="var(--field-gold-bright)" />

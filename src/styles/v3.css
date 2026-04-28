@@ -242,6 +242,11 @@
 }
 
 /* ---------- Layout helpers ---------- */
+/* .fh-screen (legacy) inherits the v3 screen treatment so older
+   screens like Settings, Bid, Compose, Invoices, Analytics, Importer,
+   Subs, PourWindow get the same page bg / min-height / padding as
+   v3 screens without a per-file rewrite. */
+.fh-screen,
 .v3-screen {
   /* min-height: 100dvh ensures the dark page surface ALWAYS reaches
      the bottom of the viewport even on screens with very little
@@ -439,7 +444,7 @@
    that read as a default browser overlay against our dark theme.
    Override the surface, border, shadow, list, separator, item, scrollbar
    so the palette feels native to the app. */
-[data-theme='dark'] [data-slot='dialog-content']:has([data-slot='command']) {
+[data-slot='dialog-content']:has([data-slot='command']) {
   background: var(--v3-surface) !important;
   border: 1px solid var(--v3-border-strong) !important;
   border-radius: 18px !important;
@@ -452,7 +457,7 @@
   position: relative;
 }
 /* Top edge gradient stroke — matches v3-section identity */
-[data-theme='dark'] [data-slot='dialog-content']:has([data-slot='command'])::before {
+[data-slot='dialog-content']:has([data-slot='command'])::before {
   content: '';
   position: absolute;
   top: 0;
@@ -465,60 +470,60 @@
   z-index: 2;
 }
 
-[data-theme='dark'] [data-slot='command'] {
+[data-slot='command'] {
   background: transparent !important;
   color: var(--v3-text) !important;
 }
 
 /* Input row — bottom hairline matches our --v3-border-strong */
-[data-theme='dark'] [data-slot='command-input-wrapper'] {
+[data-slot='command-input-wrapper'] {
   border-bottom-color: var(--v3-border-strong) !important;
   padding: 14px 18px !important;
   height: auto !important;
   gap: 12px !important;
 }
-[data-theme='dark'] [data-slot='command-input-wrapper'] svg {
+[data-slot='command-input-wrapper'] svg {
   color: var(--v3-text-muted);
   opacity: 1 !important;
 }
-[data-theme='dark'] [data-slot='command-input'] {
+[data-slot='command-input'] {
   color: var(--v3-text) !important;
   font-family: var(--font-body);
   font-size: 15px !important;
 }
-[data-theme='dark'] [data-slot='command-input']::placeholder {
+[data-slot='command-input']::placeholder {
   color: var(--v3-text-muted) !important;
 }
 
 /* List + scrollbar (dark, subtle) */
-[data-theme='dark'] [data-slot='command-list'] {
+[data-slot='command-list'] {
   max-height: 420px !important;
   padding: 6px 6px 8px !important;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
-[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar {
+[data-slot='command-list']::-webkit-scrollbar {
   width: 8px;
 }
-[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar-track {
+[data-slot='command-list']::-webkit-scrollbar-track {
   background: transparent;
 }
-[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar-thumb {
+[data-slot='command-list']::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.10);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-[data-theme='dark'] [data-slot='command-list']::-webkit-scrollbar-thumb:hover {
+[data-slot='command-list']::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.20);
   background-clip: padding-box;
 }
 
 /* Group + heading */
-[data-theme='dark'] [data-slot='command-group'] {
+[data-slot='command-group'] {
   padding: 4px 6px !important;
 }
-[data-theme='dark'] [cmdk-group-heading] {
+[cmdk-group-heading] {
   font-family: var(--font-body) !important;
   font-size: 10px !important;
   font-weight: 700 !important;
@@ -529,7 +534,7 @@
 }
 
 /* Items: clean hover, gold-tinted selected */
-[data-theme='dark'] [data-slot='command-item'] {
+[data-slot='command-item'] {
   border-radius: 10px !important;
   padding: 11px 12px !important;
   color: var(--v3-text) !important;
@@ -537,23 +542,23 @@
   font-size: 14px;
   transition: background-color 140ms ease, color 140ms ease;
 }
-[data-theme='dark'] [data-slot='command-item']:hover,
-[data-theme='dark'] [data-slot='command-item'][data-selected='true'] {
+[data-slot='command-item']:hover,
+[data-slot='command-item'][data-selected='true'] {
   background: var(--v3-surface-2) !important;
   color: var(--v3-text) !important;
 }
-[data-theme='dark'] [data-slot='command-item'] svg {
+[data-slot='command-item'] svg {
   color: var(--v3-primary) !important;
 }
 
 /* Separator hairline */
-[data-theme='dark'] [data-slot='command-separator'] {
+[data-slot='command-separator'] {
   background: var(--v3-border) !important;
   margin: 4px 8px !important;
 }
 
 /* Empty state */
-[data-theme='dark'] [data-slot='command-empty'] {
+[data-slot='command-empty'] {
   color: var(--v3-text-muted) !important;
   font-family: var(--font-body);
   font-size: 13px;
@@ -561,7 +566,7 @@
 }
 
 /* Dialog scrim — kill the default white-tinted overlay */
-[data-theme='dark'] [data-slot='dialog-overlay'] {
+[data-slot='dialog-overlay'] {
   background: rgba(5, 5, 7, 0.74) !important;
   backdrop-filter: blur(6px);
 }
@@ -583,18 +588,21 @@
         kills banding without becoming a visible grid texture
    Background-attachment: fixed on the noise so scrolling doesn't
    reveal a tiling seam at the bottom of long screens. */
+.fh-screen,
 .v3-screen {
   position: relative;
   overflow-x: hidden;
   background:
-    /* 1px noise grain — barely perceptible, kills banding */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.018 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    /* Top stage light — gold, capped at top 320px, alpha lowered */
-    radial-gradient(ellipse 100% 320px at 50% 0%, rgba(229, 193, 88, 0.05), transparent 65%),
+    /* Noise grain — only enough to kill banding on dark gradients.
+       0.6% alpha + finer frequency so it never reads as a grid/texture. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.006 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* Top stage light — gold, capped at top 280px */
+    radial-gradient(ellipse 100% 280px at 50% 0%, rgba(229, 193, 88, 0.04), transparent 70%),
     var(--v3-bg);
   background-attachment: fixed, scroll, scroll;
 }
 /* Page content rides above the bg */
+.fh-screen > *,
 .v3-screen > * {
   position: relative;
   z-index: 1;

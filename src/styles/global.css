@@ -393,17 +393,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Film-grain noise overlay — industrial premium, 5% opacity, overlay blend. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  mix-blend-mode: overlay;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
+/* Film-grain overlay removed in v3 QA pass.
+   The mix-blend-mode: overlay against near-black surfaces was lifting
+   blacks toward a subtle blue cast (the "foggy haze" the user kept
+   seeing). v3 page texture lives in .v3-screen at a much lower
+   alpha and without overlay blending. */
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
@@ -1878,8 +1872,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   /* Force GPU layer so background text doesn't smear on backdrop-filter. */
   transform: translateZ(0);
   will-change: backdrop-filter;
@@ -1901,26 +1895,28 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   max-height: min(86dvh, calc(100vh - env(safe-area-inset-top) - 40px));
   overflow: hidden;
 }
-[data-theme='dark'] .fh-drawer {
-  /* Drawer rides on the v3 page floor with a subtle gradient lift +
-     gold gradient top stroke (premium command-center identity). */
+/* Drawer base — works for both themes via tokens */
+.fh-drawer {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 200px),
+    linear-gradient(180deg, var(--v3-glass-tint, rgba(255, 255, 255, 0.025)) 0%, transparent 200px),
     var(--v3-bg);
   border-top: 1px solid var(--v3-border-strong);
-  box-shadow: 0 -28px 80px -8px rgba(0, 0, 0, 0.70);
+  box-shadow: 0 -28px 80px -8px rgba(0, 0, 0, 0.40);
   position: relative;
 }
-[data-theme='dark'] .fh-drawer::before {
+.fh-drawer::before {
   content: '';
   position: absolute;
   top: 0;
   left: 18%;
   right: 18%;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%);
-  box-shadow: 0 0 12px rgba(229, 193, 88, 0.45);
+  background: var(--v3-gold-stroke, linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%));
+  box-shadow: 0 0 12px rgba(229, 193, 88, 0.30);
   pointer-events: none;
+}
+[data-theme='light'] .fh-drawer {
+  box-shadow: 0 -28px 80px -8px rgba(60, 50, 30, 0.20);
 }
 @media (min-width: 720px) {
   .fh-drawer {
@@ -4491,8 +4487,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   position: fixed;
   inset: 0;
   background: rgba(6, 6, 6, 0.65);
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 [data-theme='light'] .fh-asheet__scrim,
 :root:not([data-theme='dark']) .fh-asheet__scrim {

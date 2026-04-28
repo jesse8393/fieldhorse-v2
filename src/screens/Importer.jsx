@@ -175,7 +175,7 @@ export default function Importer() {
       </motion.div>
 
       {/* CSV UPLOAD SECTION */}
-      <motion.section variants={item} style={{ padding: '0 20px 18px' }}>
+      <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
         <header style={{ marginBottom: 10 }}>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
             CSV upload
@@ -331,7 +331,7 @@ export default function Importer() {
 
       {/* ADVANCED INTEGRATIONS — collapsed by default so contractors aren't
           greeted with dev-speak. Webhook endpoint + POST JSON shape live here. */}
-      <motion.section variants={item} style={{ padding: '0 20px 24px' }}>
+      <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
         <details style={{ borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
           <summary
             style={{

@@ -207,6 +207,117 @@
   --v3-gutter: 20px;
 }
 
+/* ============================================================
+   LIGHT THEME — premium warm off-white system
+   Not an inverted dark theme. Real intentional tokens:
+     bg            warm off-white #F8F5EE (raw linen, deeper)
+     surface-page  ivory          #FBF8F1
+     surface       paper          #FFFFFF
+     surface-2     warm card      #F4EFE6
+     surface-3     hover wash     #EDE7DA
+   Text: deep charcoal, not pure black; muted: warm steel
+   Borders: warm rules, not cool grays
+   Gold: muted slightly so it doesn't burn on light bg
+   Shadows: warm low-alpha (warm shadow not blue shadow)
+   ============================================================ */
+[data-theme='light'] {
+  /* v3 surfaces */
+  --v3-bg: #F8F5EE;
+  --v3-surface-page: #FBF8F1;
+  --v3-surface: #FFFFFF;
+  --v3-surface-2: #F4EFE6;
+  --v3-surface-3: #EDE7DA;
+  /* v3 text */
+  --v3-text: #1A1814;
+  --v3-text-muted: #6B6A66;
+  --v3-on-primary: #1A1814;
+  /* v3 borders — warm rules */
+  --v3-border: rgba(20, 20, 18, 0.10);
+  --v3-border-strong: rgba(20, 20, 18, 0.18);
+  /* v3 brand — slightly muted on light so the gold doesn't burn */
+  --v3-primary: #B68A2E;
+  --v3-primary-hot: #D4A640;
+  --v3-primary-deep: #6E5320;
+  --v3-primary-soft: rgba(182, 138, 46, 0.10);
+  --v3-success: #1F8F4A;
+  --v3-success-bright: #178A3A;
+  --v3-success-soft: rgba(31, 143, 74, 0.10);
+  --v3-danger: #B5301F;
+  --v3-danger-bright: #B5301F;
+  --v3-danger-soft: rgba(181, 48, 31, 0.08);
+  /* Elevation — warm low-alpha shadows (no cool blue) */
+  --v3-shadow: 0 1px 0 rgba(255, 255, 255, 0.50) inset, 0 1px 2px rgba(60, 50, 30, 0.06), 0 8px 24px rgba(60, 50, 30, 0.08);
+  --v3-shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.60) inset, 0 2px 4px rgba(60, 50, 30, 0.08), 0 24px 48px rgba(60, 50, 30, 0.12);
+  --v3-shadow-hero: 0 1px 0 rgba(255, 255, 255, 0.60) inset, 0 2px 4px rgba(60, 50, 30, 0.10), 0 18px 40px rgba(182, 138, 46, 0.18), 0 28px 64px rgba(60, 50, 30, 0.10);
+  /* Section primitive — warm tonal lift */
+  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.70) 0%, rgba(255, 255, 255, 0.30) 100%), var(--v3-surface-page);
+  --v3-section-border: rgba(20, 20, 18, 0.12);
+  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.60) inset, 0 1px 2px rgba(60, 50, 30, 0.06), 0 12px 28px rgba(60, 50, 30, 0.08);
+  /* Gold glow — subdued on light */
+  --v3-gold-glow: 0 0 0 1px rgba(182, 138, 46, 0.22), 0 8px 22px rgba(182, 138, 46, 0.28), 0 1px 0 rgba(255, 255, 255, 0.50) inset;
+  --v3-gold-glow-sm: 0 0 0 1px rgba(182, 138, 46, 0.20), 0 4px 12px rgba(182, 138, 46, 0.22);
+  --v3-gold-stroke: linear-gradient(90deg, transparent 0%, rgba(182, 138, 46, 0.45) 50%, transparent 100%);
+  /* Track + glass */
+  --v3-track: rgba(20, 20, 18, 0.06);
+  --v3-track-strong: rgba(20, 20, 18, 0.10);
+  --v3-glass-tint: rgba(255, 255, 255, 0.50);
+
+  /* Legacy aliases — warm warm warm */
+  --surface-0: var(--v3-bg);
+  --surface-1: var(--v3-surface);
+  --surface-2: var(--v3-surface-2);
+  --surface-elev: var(--v3-surface);
+  --ink-strong: var(--v3-text);
+  --ink-muted: var(--v3-text-muted);
+  --ink-inverse: #FFFFFF;
+  --ink-faint: rgba(20, 20, 18, 0.55);
+  --rule: var(--v3-border);
+  --rule-bold: var(--v3-border-strong);
+  --field-gold: var(--v3-primary);
+  --field-gold-hot: var(--v3-primary-hot);
+  --field-gold-bright: var(--v3-primary);
+  --field-gold-deep: var(--v3-primary-deep);
+  --alert-red: var(--v3-danger);
+  --signal-green: var(--v3-success);
+  --onyx: #1A1814;
+  --onyx-2: var(--v3-surface-2);
+  --onyx-card: var(--v3-surface);
+  --onyx-border: var(--v3-border-strong);
+  /* Card shadows — warm */
+  --shadow-card: 0 1px 2px rgba(60, 50, 30, 0.06), 0 14px 40px rgba(60, 50, 30, 0.08);
+  --shadow-pop: 0 18px 50px rgba(60, 50, 30, 0.12), 0 2px 8px rgba(60, 50, 30, 0.08);
+  --shadow-raised: var(--v3-shadow);
+}
+
+/* Light-theme overrides for atmospheric primitives — kill dark-only
+   gradients/glows that don't translate to the warm system. */
+[data-theme='light'] .fh-screen,
+[data-theme='light'] .v3-screen {
+  background:
+    radial-gradient(ellipse 100% 280px at 50% 0%, rgba(182, 138, 46, 0.06), transparent 70%),
+    var(--v3-bg);
+  background-attachment: fixed, scroll;
+}
+[data-theme='light'] .v3-section::after {
+  background: linear-gradient(90deg, transparent 0%, rgba(20, 20, 18, 0.10) 50%, transparent 100%);
+  box-shadow: 0 0 4px rgba(60, 50, 30, 0.06);
+}
+[data-theme='light'] .v3-section--primary::after {
+  background: linear-gradient(90deg, transparent 0%, rgba(182, 138, 46, 0.55) 50%, transparent 100%);
+  box-shadow: 0 0 8px rgba(182, 138, 46, 0.40);
+}
+[data-theme='light'] .v3-section--primary {
+  border-color: rgba(182, 138, 46, 0.40);
+  background:
+    linear-gradient(180deg, rgba(182, 138, 46, 0.06) 0%, rgba(255, 255, 255, 0.30) 60%),
+    var(--v3-surface-page);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.70) inset,
+    0 1px 2px rgba(60, 50, 30, 0.06),
+    0 16px 36px rgba(60, 50, 30, 0.10),
+    0 12px 28px rgba(182, 138, 46, 0.14);
+}
+
 /* Explicit dark theme — set on <html data-theme="dark"> OR via
    prefers-color-scheme. Legacy tokens (used by older screens like
    Settings, Bid, Invoices, Analytics, PourWindow, Compose, Importer,
