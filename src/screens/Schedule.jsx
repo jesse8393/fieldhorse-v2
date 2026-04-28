@@ -303,14 +303,31 @@ export default function Schedule() {
           calendar apps. Vertical scroll inside the body still works. */}
       <SwipeShell onShift={shift}>
         <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
-          {/* Show skeleton ONLY on the very first load (events still null).
-              On subsequent re-fetches (view switch, day shift) keep the
-              existing grid rendered so the user never sees a flash of
-              empty horizontal bars. */}
-          {loading && events == null && <SkeletonList rows={5} card={false} />}
-          {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} onAdd={() => setAddOpen(true)} />}
-          {events != null && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-          {events != null && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+          {/* Timeline panel — wraps the active view in a contained control
+              surface (subtle inset highlight + base shadow) so the timeline
+              reads as a tool you operate, not a blank scroll area. Empty
+              state in DayView already has its own panel — when shown it
+              sits inside this outer panel, doubling the depth. */}
+          <div style={{
+            padding: 14,
+            borderRadius: 18,
+            background: `
+              linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 30%),
+              var(--v3-surface)
+            `,
+            border: '1px solid var(--v3-border-strong)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.3)',
+            minHeight: 200
+          }}>
+            {/* Show skeleton ONLY on the very first load (events still null).
+                On subsequent re-fetches (view switch, day shift) keep the
+                existing grid rendered so the user never sees a flash of
+                empty horizontal bars. */}
+            {loading && events == null && <SkeletonList rows={5} card={false} />}
+            {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} onAdd={() => setAddOpen(true)} />}
+            {events != null && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
+            {events != null && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+          </div>
         </motion.div>
       </SwipeShell>
 

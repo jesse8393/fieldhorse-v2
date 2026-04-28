@@ -148,7 +148,7 @@ export default function Clients() {
         </div>
       </motion.div>
 
-      <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
+      <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 20px 20px' }}>
         {loading && <SkeletonList rows={4} card={false} />}
         {!loading && rows.length === 0 && (
           <div style={{
@@ -215,7 +215,25 @@ export default function Clients() {
                   boxShadow: '0 0 12px rgba(212, 175, 55, 0.45)'
                 }} />
 
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
+                  {/* Avatar tile — 48x48 gold-tinted with first initial.
+                      Gives each client visual identity (an account, not a row). */}
+                  <div aria-hidden="true" style={{
+                    flexShrink: 0,
+                    width: 48, height: 48,
+                    borderRadius: 14,
+                    background: 'linear-gradient(135deg, var(--v3-primary-soft), rgba(212, 175, 55, 0.05))',
+                    border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 19,
+                    letterSpacing: '0.04em',
+                    color: 'var(--v3-primary)',
+                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.06)'
+                  }}>
+                    {(c.name || '·').trim().charAt(0).toUpperCase()}
+                  </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <h3 style={{
                       margin: 0,

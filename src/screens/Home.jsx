@@ -493,57 +493,74 @@ export default function Home() {
       ) : null}
 
       {/* ─────────── TIER 1 — HERO (TODAY'S REVENUE OPPORTUNITY) ───────────
-          Refinement pass: padding bumped ~30%, money scales clamp(56–84),
-          radial glow + low-opacity diagonal sweep stack as the depth layer,
-          stronger outdent (12px vs 20px elsewhere) so the hero reads as
-          the most isolated object on the screen. Hover lift -3 (was -2). */}
-      <motion.div variants={item} style={{ padding: '0 12px 36px' }}>
+          Visual-impact pass: edge-to-edge full bleed (0px horizontal padding
+          inside the screen, vs 20px elsewhere) — the hero now spans the
+          entire width, breaking the column completely and dominating the
+          screen. Bottom reflection blob spills below the card for cinematic
+          depth. Heavier shadow + gold-tinted border gain. */}
+      <motion.div variants={item} style={{ padding: '0 0 40px', position: 'relative' }}>
+        {/* BELOW-CARD REFLECTION — gold spill that bleeds out of the card's
+            bottom edge. Reads as depth, not glow. */}
+        <div aria-hidden="true" style={{
+          position: 'absolute',
+          left: '50%', bottom: 8,
+          transform: 'translateX(-50%)',
+          width: '70%', height: 80,
+          borderRadius: '50%',
+          background: 'radial-gradient(closest-side, rgba(212, 175, 55, 0.16), transparent 70%)',
+          filter: 'blur(20px)',
+          pointerEvents: 'none',
+          zIndex: 0
+        }} />
         <motion.div
           whileHover={{ y: -3 }}
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           style={{
             position: 'relative',
-            padding: '32px 26px 26px',
-            borderRadius: 22,
+            padding: '36px 28px 28px',
+            // Hero is full-bleed; only the corners get rounded so it floats
+            // on the page like a wide command-center bar.
+            borderRadius: 24,
             background: `
-              radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.18), transparent 55%),
-              linear-gradient(125deg, rgba(212, 175, 55, 0.045) 0%, transparent 38%, transparent 62%, rgba(212, 175, 55, 0.04) 100%),
+              radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.22), transparent 55%),
+              radial-gradient(80% 60% at 0% 100%, rgba(212, 175, 55, 0.10), transparent 60%),
+              linear-gradient(125deg, rgba(212, 175, 55, 0.05) 0%, transparent 38%, transparent 62%, rgba(212, 175, 55, 0.05) 100%),
               var(--v3-surface-2)
             `,
-            border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
-            boxShadow: 'var(--v3-shadow-lg)',
-            overflow: 'hidden'
+            border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(212, 175, 55, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            overflow: 'hidden',
+            zIndex: 1
           }}
         >
-          {/* Top-right ambient sweep — adds the "command center" feel without
-              reading as a flashy gradient. ~5% gold, blends out to nothing.
-              `fh-hero-drift` translates -22px/+10px over 22s so the hero
-              feels alive without anyone consciously noticing the motion. */}
+          {/* Top-right ambient sweep — bumped 320 → 420 with more peak alpha
+              for the visual-impact pass. Drifts via fh-hero-drift. */}
           <div
             aria-hidden="true"
             className="fh-hero-drift"
             style={{
               position: 'absolute',
-              top: -120, right: -100,
-              width: 320, height: 320,
+              top: -160, right: -140,
+              width: 420, height: 420,
               borderRadius: '50%',
-              background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.12), transparent 65%)',
+              background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.16), transparent 65%)',
               pointerEvents: 'none'
             }}
           />
 
-          {/* Behind-number glow — sits beneath the $ amount specifically so
-              the eye lands on it first. Wider, lower-opacity radial. */}
+          {/* Behind-number glow — wider + brighter halo behind the $ amount.
+              440x240 radial with peak 18% alpha + 10px blur for a true
+              "stage spotlight" feel under the headline number. */}
           <div
             aria-hidden="true"
             style={{
               position: 'absolute',
-              top: 64, left: 0,
-              width: 360, height: 200,
+              top: 72, left: 8,
+              width: 440, height: 240,
               borderRadius: '50%',
-              background: 'radial-gradient(closest-side, rgba(212, 175, 55, 0.13), transparent 70%)',
+              background: 'radial-gradient(closest-side, rgba(212, 175, 55, 0.18), transparent 70%)',
               pointerEvents: 'none',
-              filter: 'blur(8px)'
+              filter: 'blur(10px)'
             }}
           />
 

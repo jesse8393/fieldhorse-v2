@@ -286,3 +286,34 @@
 @media (prefers-reduced-motion: reduce) {
   .fh-hero-drift { animation: none; }
 }
+
+/* ---------- Cinematic page vignette ----------
+   Page-level radial overlays that frame the content like a stage. Two
+   layers: top-center gold "stage light" (subtle ambient) + corner
+   vignette (4 darkening blobs at the screen corners) so the eye is
+   pulled toward the active middle. Fixed positioning so it doesn't
+   move when the user scrolls; pointer-events disabled.
+
+   Effect is intentionally restrained — peak alpha 4-6%. Visible as
+   "depth", invisible as "decoration". */
+.v3-screen {
+  position: relative;
+}
+.v3-screen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    /* Top-center stage light — gold, very subtle */
+    radial-gradient(ellipse 90% 50% at 50% -8%, rgba(212, 175, 55, 0.05), transparent 60%),
+    /* Corner darkening — vignette */
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(0, 0, 0, 0.45), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0, 0, 0, 0.45), transparent 55%);
+}
+/* Page content rides above the vignette */
+.v3-screen > * {
+  position: relative;
+  z-index: 1;
+}
