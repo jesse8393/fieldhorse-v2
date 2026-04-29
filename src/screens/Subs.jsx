@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Phone, Search, Hammer, ChevronRight, MessageSquare } from 'lucide-react'
+import { Phone, Plus, Search, Hammer, ChevronRight, MessageSquare } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { formatPhone } from '../lib/utils.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { hapticTap } from '../lib/haptics.js'
+import { hapticTap, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
+import { toastSuccess, toastError } from '../lib/toast.js'
+import {
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription
+} from '@/components/ui/drawer'
 
 // Subs directory — v3 rebuild. Aggregates fh_subs rows by (name + phone)
 // so the same sub appearing on 5 jobs shows as ONE entry with 5-job
@@ -51,25 +55,23 @@ export default function Subs() {
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [tradeFilter, setTradeFilter] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!user) return
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      const [{ data: subs }, { data: cs }] = await Promise.all([
-        supabase.from('fh_subs').select('*').order('created_at', { ascending: false }),
-        supabase.from('fh_contacts').select('id, name, job_title, stage')
-      ])
-      if (cancelled) return
-      setRows(subs || [])
-      const map = {}
-      for (const c of cs || []) map[c.id] = c
-      setContacts(map)
-      setLoading(false)
-    })()
-    return () => { cancelled = true }
+    setLoading(true)
+    const [{ data: subs }, { data: cs }] = await Promise.all([
+      supabase.from('fh_subs').select('*').order('created_at', { ascending: false }),
+      supabase.from('fh_contacts').select('id, name, job_title, stage')
+    ])
+    setRows(subs || [])
+    const map = {}
+    for (const c of cs || []) map[c.id] = c
+    setContacts(map)
+    setLoading(false)
   }, [user])
+
+  useEffect(() => { load() }, [load])
 
   // Roll up by sub identity. Phone wins (unique) when present; falls
   // back to lowercased name. Subs with neither name nor phone get
@@ -172,19 +174,47 @@ export default function Subs() {
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
         }}>
-          {/* Header row: section eyebrow + state chip */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          {/* Header row: section eyebrow + state chip + Add sub action */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
             <Eyebrow tone="gold">
               <Hammer size={11} aria-hidden="true" />
               Sub Directory
             </Eyebrow>
-            {!loading && (
-              <SubsStateChip
-                activeRecent={screenStats.activeRecent}
-                tradesCount={allTrades.length}
-                totalSubs={grouped.length}
-              />
-            )}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {!loading && (
+                <SubsStateChip
+                  activeRecent={screenStats.activeRecent}
+                  tradesCount={allTrades.length}
+                  totalSubs={grouped.length}
+                />
+              )}
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                onClick={() => { hapticTap(); setAddOpen(true) }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 11px 5px 9px',
+                  borderRadius: 999,
+                  border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
+                  background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                  color: 'var(--v3-on-primary)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)'
+                }}
+              >
+                <Plus size={12} strokeWidth={2.6} />
+                Add sub
+              </motion.button>
+            </div>
           </div>
 
           {/* KPI strip — Total billed | Subs · Trades */}
@@ -316,6 +346,17 @@ export default function Subs() {
           </ul>
         )}
       </motion.div>
+
+      {/* Add Sub drawer — schema-honest fields only */}
+      <AddSubDrawer
+        open={addOpen}
+        userId={user?.id}
+        onClose={() => setAddOpen(false)}
+        onCreated={async () => {
+          setAddOpen(false)
+          await load()
+        }}
+      />
     </motion.div>
   )
 }
@@ -620,6 +661,169 @@ function SubCard({ g, contacts, isTop }) {
         )}
       </motion.article>
     </li>
+  )
+}
+
+/* ============================================================
+   AddSubDrawer — directory-level vendor creation. Inserts into
+   fh_subs with contact_id=null so the new sub appears in the
+   directory roll-up immediately and can be linked to a job
+   later via the per-job SubsSection.
+
+   Schema-honest fields only (fh_subs columns: name, trade,
+   phone). Rate stays at the schema default 0; status stays at
+   the schema default 'scheduled'. Both are meaningless without
+   a job, so they're not surfaced here.
+   ============================================================ */
+function AddSubDrawer({ open, userId, onClose, onCreated }) {
+  const [form, setForm] = useState({ name: '', trade: '', phone: '' })
+  const [saving, setSaving] = useState(false)
+
+  // Reset whenever the drawer closes so a re-open starts fresh.
+  useEffect(() => {
+    if (!open) setForm({ name: '', trade: '', phone: '' })
+  }, [open])
+
+  async function save(e) {
+    e?.preventDefault?.()
+    if (saving) return
+    const name = form.name.trim()
+    if (!name) return
+    setSaving(true)
+    const { error } = await supabase.from('fh_subs').insert({
+      user_id: userId,
+      contact_id: null,
+      name,
+      trade: form.trade.trim() || null,
+      phone: form.phone.trim() || null
+    })
+    if (error) {
+      toastError("Couldn't add sub", error.message)
+      setSaving(false)
+      return
+    }
+    hapticSuccess()
+    toastSuccess('Sub added', name)
+    setSaving(false)
+    onCreated?.()
+  }
+
+  const fieldStyle = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '12px 14px', borderRadius: 12,
+    background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
+    color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
+    fontSize: 14, outline: 'none'
+  }
+  const labelStyle = {
+    fontFamily: 'var(--font-body)',
+    fontSize: 10, fontWeight: 700,
+    letterSpacing: '0.16em', textTransform: 'uppercase',
+    color: 'var(--v3-text-muted)'
+  }
+
+  return (
+    <Drawer open={open} onOpenChange={(v) => { if (!v) onClose?.() }}>
+      <DrawerContent>
+        <DrawerHeader>
+          <Eyebrow tone="gold">
+            <Hammer size={11} aria-hidden="true" />
+            New sub
+          </Eyebrow>
+          <DrawerTitle asChild>
+            <h2 style={{
+              margin: '6px 0 0',
+              fontFamily: 'var(--font-body)',
+              fontSize: 'clamp(20px, 5.5vw, 24px)',
+              lineHeight: 1.1,
+              letterSpacing: '-0.01em',
+              fontWeight: 700,
+              color: 'var(--v3-text)'
+            }}>
+              Add to the trade directory
+            </h2>
+          </DrawerTitle>
+          <DrawerDescription style={{
+            margin: '6px 0 0',
+            fontFamily: 'var(--font-body)',
+            fontSize: 12, color: 'var(--v3-text-muted)', lineHeight: 1.5
+          }}>
+            Name is enough to start. Trade and phone help when you assign them to a job later.
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <form onSubmit={save} style={{ padding: '4px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={labelStyle}>Name</span>
+            <input
+              autoFocus
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Crew lead or company"
+              style={fieldStyle}
+              required
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={labelStyle}>Trade</span>
+            <input
+              value={form.trade}
+              onChange={(e) => setForm({ ...form, trade: e.target.value })}
+              placeholder="Framer, electrician, roofer…"
+              style={fieldStyle}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={labelStyle}>Phone</span>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="(615) 555-0000"
+              style={fieldStyle}
+            />
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 10, marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              style={{
+                padding: '12px 14px', borderRadius: 12,
+                background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
+                color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <motion.button
+              type="submit"
+              whileTap={{ scale: 0.98 }}
+              disabled={saving || !form.name.trim()}
+              style={{
+                padding: '12px 14px', borderRadius: 12,
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                background: !form.name.trim() || saving
+                  ? 'var(--v3-surface-2)'
+                  : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                color: !form.name.trim() || saving ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
+                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                cursor: !form.name.trim() || saving ? 'default' : 'pointer',
+                boxShadow: !form.name.trim() || saving
+                  ? 'none'
+                  : '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+              }}
+            >
+              {saving ? 'Saving…' : 'Add sub'}
+            </motion.button>
+          </div>
+        </form>
+      </DrawerContent>
+    </Drawer>
   )
 }
 
