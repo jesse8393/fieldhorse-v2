@@ -19,7 +19,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
-import { StageTimeline, SegmentedTabs } from '../../components/v3'
+import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.js'
 import OverviewTab from './tabs/Overview.jsx'
 import DetailsTab from './tabs/Details.jsx'
@@ -59,6 +59,25 @@ export default function ContactDetail() {
     scheduleItems, scheduleCount, todos, clientSummary,
     paid, balance, loading, fetchAll, patch
   } = data
+
+  // Top open todo surfaces in the cockpit "Next action" row. Sorted by the
+  // hook (done asc, created desc), so [0] is the most recent open item.
+  const nextTodo = useMemo(() => (todos || []).find((t) => !t.done) || null, [todos])
+
+  async function markTodoDone(todoId) {
+    if (!todoId) return
+    hapticTap()
+    const { error } = await supabase
+      .from('fh_job_todos')
+      .update({ done: true, completed_at: new Date().toISOString() })
+      .eq('id', todoId)
+    if (error) {
+      toastError("Couldn't mark done", error.message || 'Try again')
+      return
+    }
+    toastSuccess('Done', 'Action cleared')
+    fetchAll()
+  }
 
   // URL-synced tab state. Default to overview if the param is absent or invalid.
   const tabParam = searchParams.get('tab')
@@ -146,6 +165,9 @@ export default function ContactDetail() {
         clientSummary={clientSummary}
         viewerUserId={user?.id}
         isEditing={isEditing}
+        paid={paid}
+        balance={balance}
+        nextTodo={nextTodo}
         onBack={() => navigate('/jobs')}
         onEdit={handleEditClick}
         onMarkLost={async () => {
@@ -156,6 +178,7 @@ export default function ContactDetail() {
         }}
         onDelete={() => setDeleteOpen(true)}
         onClientNav={(cid) => navigate(`/clients/${cid}`)}
+        onTodoDone={markTodoDone}
       />
 
       <StageTimeline currentStage={contact.stage} />
@@ -302,11 +325,21 @@ export default function ContactDetail() {
 
 function Header({
   contact, clientSummary, viewerUserId, isEditing,
-  onBack, onEdit, onMarkLost, onDelete, onClientNav
+  paid, balance, nextTodo,
+  onBack, onEdit, onMarkLost, onDelete, onClientNav, onTodoDone
 }) {
   const isOwnerView = !!viewerUserId && contact.user_id === viewerUserId
   const phoneHref = contact.phone ? `tel:${contact.phone}` : null
   const smsHref = contact.phone ? `sms:${contact.phone}` : null
+
+  const contractValue = Number(contact?.amount || 0)
+  const showMetrics = contractValue > 0
+  // Owner-view eyebrow shows the resolved client name; partner view still
+  // shows the static CLIENT label so the chrome doesn't go blank when RLS
+  // hides clientSummary.
+  const clientLabel = contact.client_id
+    ? (isOwnerView ? (clientSummary?.name || 'Client') : 'Client')
+    : null
 
   return (
     <div style={{ padding: '8px 16px 14px' }}>
@@ -367,10 +400,46 @@ function Header({
         </div>
       </div>
 
-      {/* Title block */}
-      <div>
+      {/* Cockpit — eyebrow client / serif title / job_title / metrics / next action */}
+      <div style={{
+        padding: '14px 16px 4px',
+        borderRadius: 16,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+      }}>
+        {clientLabel && (isOwnerView && contact.client_id ? (
+          <button
+            type="button"
+            onClick={() => onClientNav(contact.client_id)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: 0,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--v3-text-muted)'
+            }}
+          >
+            <Users size={10} aria-hidden="true" />
+            {clientLabel}
+          </button>
+        ) : (
+          <Eyebrow as="span" aria-label="Shared job — client visible only to owner">
+            <Users size={10} aria-hidden="true" />
+            {clientLabel}
+          </Eyebrow>
+        ))}
+
         <h1 style={{
-          margin: 0,
+          margin: clientLabel ? '6px 0 0' : 0,
           fontFamily: 'var(--font-serif)',
           fontSize: 'clamp(26px, 7vw, 34px)',
           lineHeight: 1.1,
@@ -392,57 +461,102 @@ function Header({
           </div>
         )}
 
-        {/* Client pill OR static "Client" pill in partner view */}
-        {contact.client_id && (isOwnerView ? (
-          <button
-            type="button"
-            onClick={() => onClientNav(contact.client_id)}
-            style={{
-              marginTop: 8,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '4px 10px',
-              borderRadius: 999,
-              background: 'var(--v3-primary-soft)',
-              border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-              color: 'var(--v3-primary)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              cursor: 'pointer'
-            }}
-          >
-            <Users size={10} aria-hidden="true" />
-            Client · {clientSummary?.name || '…'}
-          </button>
-        ) : (
-          <span
-            aria-label="Shared job — client visible only to owner"
-            style={{
-              marginTop: 8,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '4px 10px',
-              borderRadius: 999,
-              background: 'var(--v3-surface-2)',
-              border: '1px solid var(--v3-border)',
-              color: 'var(--v3-text-muted)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase'
-            }}
-          >
-            <Users size={10} aria-hidden="true" />
-            Client
-          </span>
-        ))}
+        {showMetrics && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr' : '1fr',
+            alignItems: 'end',
+            gap: 12,
+            marginTop: 14,
+            paddingTop: 12,
+            borderTop: '1px solid var(--v3-border)'
+          }}>
+            <CockpitMetric label="Value" tone="gold">
+              {kMoney(contractValue)}
+            </CockpitMetric>
+            {paid > 0 && (
+              <>
+                <CockpitMetric label="Paid" tone="success">
+                  {kMoney(paid)}
+                </CockpitMetric>
+                <CockpitMetric label="Balance">
+                  {kMoney(balance)}
+                </CockpitMetric>
+              </>
+            )}
+          </div>
+        )}
+
+        {nextTodo && (
+          <div style={{
+            marginTop: 12,
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: 'var(--v3-surface-2)',
+            border: '1px solid var(--v3-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Eyebrow tone="gold">Next action</Eyebrow>
+              <div style={{
+                marginTop: 4,
+                fontFamily: 'var(--font-body)',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--v3-text)',
+                lineHeight: 1.35,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {nextTodo.text || 'Open todo'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onTodoDone?.(nextTodo.id)}
+              style={{
+                flexShrink: 0,
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
+                background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                color: 'var(--v3-on-primary)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)'
+              }}
+            >
+              Mark done
+            </button>
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+/* Compact money formatter — $46K / $1.2M for cockpit metrics. Falls back to
+   full dollars under 1k. */
+function kMoney(n) {
+  const v = Number(n || 0)
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
+  return `$${Math.round(v).toLocaleString()}`
+}
+
+function CockpitMetric({ label, tone = 'default', children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+      <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
+      <StampNumber size="lg" tone={tone}>{children}</StampNumber>
     </div>
   )
 }
