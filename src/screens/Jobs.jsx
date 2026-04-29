@@ -8,7 +8,7 @@ import {
 import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SwipeableRow from '../components/SwipeableRow.jsx'
-import { JobCard } from '../components/v3'
+import { JobCard, FilterPill } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { ACTIVE_STAGES } from '../lib/stages.js'
@@ -245,64 +245,16 @@ export default function Jobs() {
       {/* STAGE TABS — horizontal scroll on overflow */}
       <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist">
-          {TABS.map((t) => {
-            const isActive = filter === t.id
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => { hapticTap(); setFilter(t.id) }}
-                style={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '9px 16px',
-                  borderRadius: 999,
-                  border: isActive
-                    ? '1px solid color-mix(in srgb, var(--v3-primary) 75%, transparent)'
-                    : '1px solid var(--v3-border-strong)',
-                  background: isActive
-                    ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-                    : 'var(--v3-surface)',
-                  color: isActive ? 'var(--v3-on-primary)' : 'var(--v3-text)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                  cursor: 'pointer',
-                  WebkitTapHighlightColor: 'transparent',
-                  boxShadow: isActive
-                    ? '0 0 0 3px rgba(229, 193, 88, 0.18), 0 6px 18px rgba(229, 193, 88, 0.36), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
-                    : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 2px 8px rgba(0, 0, 0, 0.20)',
-                  transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 200ms ease'
-                }}
-              >
-                {t.label}
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: 18,
-                  height: 18,
-                  padding: '0 5px',
-                  borderRadius: 999,
-                  background: isActive
-                    ? 'rgba(11, 11, 13, 0.22)'
-                    : 'var(--v3-surface-2)',
-                  color: isActive ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  fontVariantNumeric: 'tabular-nums',
-                  lineHeight: 1
-                }}>
-                  {tabCounts[t.id] ?? 0}
-                </span>
-              </button>
-            )
-          })}
+          {TABS.map((t) => (
+            <FilterPill
+              key={t.id}
+              active={filter === t.id}
+              count={tabCounts[t.id] ?? 0}
+              onClick={() => { hapticTap(); setFilter(t.id) }}
+            >
+              {t.label}
+            </FilterPill>
+          ))}
         </div>
       </motion.div>
 
