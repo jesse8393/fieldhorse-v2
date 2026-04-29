@@ -15,13 +15,18 @@
   --steel-lt: #8B8782;
   --steel-xlt: #C4BFB8;
 
-  /* Stage palette (badges, borders only) */
-  --stage-lead: #2563EB;
-  --stage-quote: #7C5CBF;
-  --stage-job: #2D7A4F;
-  --stage-invoice: #C7A45A;
-  --stage-closed: #5C5C5C;
-  --stage-lost: #C0392B;
+  /* Stage palette — Phase 1C-1: repointed to muted-jewel v3-stage-*
+     tokens. Legacy callers (STAGES in lib/stages.js, .fh-stage-pill--*
+     CSS, every JobCard StagePill / StageTimeline consumer) now resolve
+     to the prototype-aligned stage colors with a single change here.
+     Note: --v3-stage-* is defined in :root below; in light theme these
+     mid-tones still read fine on warm off-white surfaces. */
+  --stage-lead:    var(--v3-stage-lead);     /* #6B7CA8 steel-blue */
+  --stage-quote:   var(--v3-stage-quote);    /* #B07A4A burnished bronze */
+  --stage-job:     var(--v3-stage-active);   /* #4F8C5E moss green */
+  --stage-invoice: var(--v3-stage-won);      /* gold */
+  --stage-closed:  var(--v3-stage-closed);   /* #5C5C5C steel */
+  --stage-lost:    var(--v3-danger);         /* brick red */
 
   /* Light theme (default surfaces) */
   --surface-0: var(--raw-linen);
@@ -91,55 +96,91 @@
   --z-cmdk: 140;
 
   /* ============================================================
-     v3 SPEC TOKENS — canonical names from FieldHorse v3 design
-     system. Aliased to existing tokens where values match; new
-     where the spec calls for a different value. New v3 code
-     should reference these names directly; legacy --field-gold /
-     --onyx / --ink-* still work for unmigrated screens.
-     ============================================================ */
-  /* Surface ladder — WARM CHARCOAL (no cool blue/purple).
-     Every value satisfies R >= G >= B (red-leaning warmth) instead of
-     the prior slate ladder where blue exceeded red on every step. The
-     visible difference: surfaces now read as warm black/charcoal +
-     gold, not as fintech-blue dark mode. */
-  --v3-bg: #0B0A08;              /* page floor — warm black */
-  --v3-surface: #171511;          /* card — warm charcoal */
-  --v3-surface-2: #211E18;        /* raised/hovered card — warm */
-  --v3-surface-3: #2A2620;       /* active/elevated card — warm */
-  --v3-primary: #E5C158;         /* push: hotter, more saturated than #D4AF37 */
-  --v3-primary-hot: #F0D070;     /* hero gradients, neon callouts */
-  --v3-primary-deep: #8C6F30;    /* shadow side of gold gradients */
-  --v3-primary-soft: rgba(229, 193, 88, 0.14);
-  --v3-success: #22C55E;         /* punchier than #2ECC71 */
-  --v3-success-soft: rgba(34, 197, 94, 0.14);
-  --v3-danger: #EF4444;          /* punchier than #C0392B */
-  --v3-danger-soft: rgba(239, 68, 68, 0.14);
-  --v3-text: #FFFFFF;
-  --v3-text-muted: #A1A1AA;
-  /* Borders — push #3: pushed again to 11%/22%. Cards now read with
-     real edges instead of disappearing into the surface. The strong
-     variant approaches Linear's selected-state border alpha. */
-  --v3-border: rgba(255, 255, 255, 0.11);
-  --v3-border-strong: rgba(255, 255, 255, 0.22);
-  /* Translucent glass tint — used over surfaces for the "Apple glass"
-     layered look (toolbars, hero overlays). Pair with backdrop-filter. */
-  --v3-glass-tint: rgba(255, 255, 255, 0.04);
+     v3 SPEC TOKENS — Phase 1A: prototype-aligned dark tokens.
+     Sourced from /tmp/fh-v3-prototype/.../project/tokens.css.
+     Light theme block ([data-theme='light']) is INTENTIONALLY
+     untouched in this pass.
 
-  /* Spec radii: cards 16, buttons 12, pills 999 */
-  --v3-radius-card: 16px;
-  --v3-radius-btn: 12px;
+     What changed (Phase 1A):
+       - Surfaces shifted slightly warmer (#0B0907 / #141110 / #1C1814 / #252019)
+       - Text moved off pure white to warm linen #F2EDE4
+       - Hairlines retinted from rgba(255,255,255,X) to warm
+         rgba(255, 240, 210, X) at lower alphas (06 / 10 / 18)
+       - Gold cooled from #E5C158 → canonical #C9963A
+       - New stage palette: muted jewel tones (steel-blue / bronze /
+         moss / gold / steel) replacing the bright cool stage colors
+         that were applied via inline literals in prior screens
+       - Shadows simplified to the prototype's restrained 2-layer
+         warm-inset stack
+       - New supporting tokens added: surface-glass, text-faint,
+         border-mid, border-gold, primary-bright, primary-glow,
+         stage-{lead,quote,active,won,closed}, warn
+
+     Backward-compat: every existing v3-* token NAME is preserved
+     (Option B). Production call-sites continue to work; values
+     just resolve to warmer / cooler equivalents.
+     ============================================================ */
+
+  /* ---------- Surfaces — warm onyx ---------- */
+  --v3-bg:           #0B0907;     /* page floor */
+  --v3-surface:      #141110;     /* card */
+  --v3-surface-2:    #1C1814;     /* raised / inner */
+  --v3-surface-3:    #252019;     /* hover / pressed */
+  --v3-surface-page: #100E0C;     /* section group bg (between bg and surface) */
+  --v3-surface-glass: rgba(28, 24, 20, 0.72); /* NEW — backdrop-filter pairing */
+
+  /* ---------- Text — warm linen, not pure white ---------- */
+  --v3-text:        #F2EDE4;
+  --v3-text-muted:  rgba(242, 237, 228, 0.55);
+  --v3-text-faint:  rgba(242, 237, 228, 0.38); /* NEW — captions, metadata */
+
+  /* ---------- Hairlines — warm-tinted, lower alpha ---------- */
+  --v3-border:        rgba(255, 240, 210, 0.06);
+  --v3-border-mid:    rgba(255, 240, 210, 0.10); /* NEW intermediate */
+  --v3-border-strong: rgba(255, 240, 210, 0.18);
+  --v3-border-gold:   rgba(201, 150, 58, 0.28);  /* NEW — gold hairline */
+  --v3-glass-tint:    rgba(255, 240, 210, 0.04); /* warm-tinted now */
+
+  /* ---------- Brand gold — cooled to canonical ---------- */
+  --v3-primary:        #C9963A;
+  --v3-primary-hot:    #E4BE6F;
+  --v3-primary-bright: #E8B865; /* NEW — icon glyph gold */
+  --v3-primary-deep:   #8C6F30;
+  --v3-primary-soft:   rgba(201, 150, 58, 0.14);
+  --v3-primary-glow:   rgba(228, 190, 111, 0.22); /* NEW — gold ambient halo */
+
+  /* ---------- Stage palette — muted jewel (NEW token set) ----------
+     Lead = steel-blue, Quote = burnished bronze, Active = moss green,
+     Won = gold, Closed = steel. Replaces the prior bright-cool stage
+     colors that were applied via inline literals (#60A5FA bright blue,
+     #A78BFA bright purple, #4ADE80 bright green) in screen primitives.
+     Reference these tokens going forward; inline literals stay until
+     migration. */
+  --v3-stage-lead:    #6B7CA8;
+  --v3-stage-quote:   #B07A4A;
+  --v3-stage-active:  #4F8C5E;
+  --v3-stage-won:     var(--v3-primary);
+  --v3-stage-closed:  #5C5C5C;
+
+  /* ---------- Semantic — moss good / warm warn / brick alert ---------- */
+  --v3-success:        #4F8C5E;
+  --v3-success-bright: #6FAF7C; /* slightly lifted for tier indicators */
+  --v3-success-soft:   rgba(79, 140, 94, 0.16);
+  --v3-warn:           #D4A042; /* NEW */
+  --v3-warn-soft:      rgba(212, 160, 66, 0.14); /* NEW */
+  --v3-danger:         #C0392B;
+  --v3-danger-bright:  #D85D4A;
+  --v3-danger-soft:    rgba(192, 57, 43, 0.16);
+
+  /* ---------- Text on primary (gold) — high-contrast warm dark ---------- */
+  --v3-on-primary: #1A1208;
+
+  /* ---------- Spec radii ---------- */
+  --v3-radius-card: 18px; /* aligned to prototype --r-lg */
+  --v3-radius-btn:  12px;
   --v3-radius-pill: 999px;
 
-  /* Card elevation — premium-pass (push #2):
-     Layered ambient + key-light shadow stack so cards look LIT, not
-     dropped onto a flat plane. Inner highlight reads as a top edge
-     catching ambient light. */
-  --v3-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.32), 0 8px 28px rgba(0, 0, 0, 0.42);
-  --v3-shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 2px 4px rgba(0, 0, 0, 0.40), 0 24px 56px rgba(0, 0, 0, 0.55);
-  /* Hero-specific elevation — gold-tinted ambient + heavy key shadow */
-  --v3-shadow-hero: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 2px 4px rgba(0, 0, 0, 0.45), 0 18px 48px rgba(229, 193, 88, 0.16), 0 32px 80px rgba(0, 0, 0, 0.55);
-
-  /* Spec spacing (8pt) — exposed for inline-style consumers */
+  /* ---------- Spec spacing (8pt) ---------- */
   --v3-s-1: 4px;
   --v3-s-2: 8px;
   --v3-s-3: 16px;
@@ -148,45 +189,39 @@
   --v3-s-6: 48px;
   --v3-s-7: 64px;
 
-  /* Semantic outcome shades (brighter than --v3-success/--v3-danger so they
-     read clearly against onyx in tier indicators: HealthDonut tiers, margin
-     pills, "all clear" / "behind" labels). */
-  --v3-success-bright: #4ADE80;
-  --v3-danger-bright: #F47366;
-  /* Text color for use ON --v3-primary buttons (deep onyx for AAA contrast). */
-  --v3-on-primary: #0B0B0D;
-  /* Reusable gold glow shadows for primary CTAs — pushed harder so the
-     glow actually reads as light, not as a tinted shadow. */
-  --v3-gold-glow: 0 0 0 1px rgba(229, 193, 88, 0.28), 0 10px 28px rgba(229, 193, 88, 0.42), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
-  --v3-gold-glow-sm: 0 0 0 1px rgba(229, 193, 88, 0.22), 0 6px 18px rgba(229, 193, 88, 0.34);
-  /* Gold gradient stroke — used as a 1px top accent on hero/primary
-     sections. Gives the "Stripe" premium top-stroke look. */
-  --v3-gold-stroke: linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%);
-  /* Subtle white tracks for progress bars + timeline connectors. */
-  --v3-track: rgba(255, 255, 255, 0.06);
-  --v3-track-strong: rgba(255, 255, 255, 0.10);
+  /* ---------- Shadows — restrained, warm-inset (prototype 2-layer) ---------- */
+  --v3-shadow:    0 1px 0 rgba(255, 240, 210, 0.04) inset,
+                  0 4px 14px rgba(0, 0, 0, 0.45);
+  --v3-shadow-lg: 0 1px 0 rgba(255, 240, 210, 0.06) inset,
+                  0 14px 36px rgba(0, 0, 0, 0.55),
+                  0 4px 10px rgba(0, 0, 0, 0.35);
+  --v3-shadow-hero: 0 1px 0 rgba(255, 240, 210, 0.08) inset,
+                    0 8px 24px rgba(201, 150, 58, 0.18),
+                    0 18px 48px rgba(0, 0, 0, 0.55);
 
-  /* ============================================================
-     LAYERED SURFACE SYSTEM — WARM CHARCOAL
-     Every value satisfies R >= G >= B so surfaces stay warm:
-       --v3-bg           #0B0A08  (page floor — warm black)
-       --v3-surface-page #11100D  (section group bg)
-       --v3-surface      #171511  (card)
-       --v3-surface-2    #211E18  (raised/hovered card)
-       --v3-surface-3    #2A2620  (active/elevated card)
-     ============================================================ */
-  --v3-surface-page: #11100D;
+  /* ---------- Gold glows ---------- */
+  --v3-gold-glow:    0 0 0 1px rgba(228, 190, 111, 0.40) inset,
+                     0 8px 24px rgba(201, 150, 58, 0.32);
+  --v3-gold-glow-sm: 0 0 0 1px rgba(228, 190, 111, 0.28) inset,
+                     0 4px 12px rgba(201, 150, 58, 0.24);
+  --v3-gold-stroke:  linear-gradient(90deg,
+                       transparent 0%,
+                       rgba(228, 190, 111, 0.55) 50%,
+                       transparent 100%);
 
-  /* Section container — push #3:
-     - gradient lift bumped 4→6% white at top
-     - inner highlight bumped 8→14% white
-     - border bumped 10→16% white (real edge)
-     - shadow stack deeper (key shadow 34→48% black) so sections
-       cast against the page like real surfaces
-     Tuned at the Linear/Superhuman selected-state visibility level. */
-  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.060) 0%, rgba(255, 255, 255, 0.012) 100%), var(--v3-surface-page);
-  --v3-section-border: rgba(255, 255, 255, 0.16);
-  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 1px 2px rgba(0, 0, 0, 0.42), 0 24px 56px rgba(0, 0, 0, 0.48);
+  /* ---------- Tracks — warm-tinted ---------- */
+  --v3-track:        rgba(255, 240, 210, 0.06);
+  --v3-track-strong: rgba(255, 240, 210, 0.10);
+
+  /* ---------- Section primitive — warm-tinted gradient + warm-inset ---------- */
+  --v3-section-bg: linear-gradient(180deg,
+                     rgba(255, 240, 210, 0.040) 0%,
+                     rgba(255, 240, 210, 0.008) 100%),
+                   var(--v3-surface-page);
+  --v3-section-border: rgba(255, 240, 210, 0.14);
+  --v3-section-shadow: 0 1px 0 rgba(255, 240, 210, 0.08) inset,
+                       0 1px 2px rgba(0, 0, 0, 0.36),
+                       0 14px 36px rgba(0, 0, 0, 0.42);
   --v3-section-radius: 20px;
 
   /* Standardized vertical rhythm — used by .v3-stack-* helpers and
