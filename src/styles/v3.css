@@ -327,31 +327,37 @@
 .v3-section--quiet::before { display: none; }
 .v3-section--quiet::after { opacity: 0.5; }
 
-/* Primary section variant — gold-toned, pushed harder.
-   Border 28% → 48% gold; ambient gold halo bumped 14% → 22% peak;
-   top stroke now genuinely bright with a real glow. */
+/* Primary section variant — gold-accented (Phase 1A-2: refactored to
+   consume the gold tokens so future restraint is single-source).
+   Was hardcoded with raw rgba (48% gold border + 22% gold shadow +
+   20% radial blob + 85% top stroke), which combined to read as a
+   gold WASH on Home. Now: token-driven, tuned for accent-not-wash. */
 .v3-section--primary {
-  border-color: rgba(229, 193, 88, 0.48);
+  border-color: var(--v3-border-gold);   /* now 0.18 (was 0.48 raw) */
   background:
-    linear-gradient(180deg, rgba(229, 193, 88, 0.06) 0%, transparent 60%),
+    linear-gradient(180deg, var(--v3-primary-soft) 0%, transparent 60%),
     var(--v3-section-bg);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 1px 0 rgba(255, 240, 210, 0.10) inset,
     0 1px 2px rgba(0, 0, 0, 0.42),
-    0 24px 56px rgba(0, 0, 0, 0.48),
-    0 18px 48px rgba(229, 193, 88, 0.22);
+    0 22px 56px rgba(0, 0, 0, 0.50),
+    0 12px 36px var(--v3-primary-glow);   /* now 0.12 (was 0.22 raw) */
 }
 .v3-section--primary::before {
+  /* Subtle warm gold light-leak — peaks dropped from 20%/10% to 8%/4%
+     so it reads as ambient "glass catching light", not a tinted overlay. */
   background:
-    radial-gradient(110% 70% at 0% 0%, rgba(229, 193, 88, 0.20), transparent 55%),
-    radial-gradient(80% 50% at 100% 100%, rgba(229, 193, 88, 0.10), transparent 60%);
+    radial-gradient(110% 70% at 0% 0%, rgba(201, 150, 58, 0.08), transparent 55%),
+    radial-gradient(80% 50% at 100% 100%, rgba(201, 150, 58, 0.04), transparent 60%);
 }
 .v3-section--primary::after {
   left: 6%;
   right: 6%;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.85) 50%, transparent 100%);
-  box-shadow: 0 0 14px rgba(229, 193, 88, 0.65);
+  /* Top stroke restrained — driven by --v3-gold-stroke (0.55) +
+     softened ambient glow (was 14px @ 0.65 → 8px @ 0.30). */
+  background: var(--v3-gold-stroke);
+  box-shadow: 0 0 8px rgba(201, 150, 58, 0.30);
 }
 
 /* When a card sits directly inside a section, give it a real edge —

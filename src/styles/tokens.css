@@ -138,7 +138,7 @@
   --v3-border:        rgba(255, 240, 210, 0.06);
   --v3-border-mid:    rgba(255, 240, 210, 0.10); /* NEW intermediate */
   --v3-border-strong: rgba(255, 240, 210, 0.18);
-  --v3-border-gold:   rgba(201, 150, 58, 0.28);  /* NEW — gold hairline */
+  --v3-border-gold:   rgba(201, 150, 58, 0.18);  /* gold hairline (1A-2: 0.28→0.18) */
   --v3-glass-tint:    rgba(255, 240, 210, 0.04); /* warm-tinted now */
 
   /* ---------- Brand gold — cooled to canonical ---------- */
@@ -147,7 +147,7 @@
   --v3-primary-bright: #E8B865; /* NEW — icon glyph gold */
   --v3-primary-deep:   #8C6F30;
   --v3-primary-soft:   rgba(201, 150, 58, 0.14);
-  --v3-primary-glow:   rgba(228, 190, 111, 0.22); /* NEW — gold ambient halo */
+  --v3-primary-glow:   rgba(228, 190, 111, 0.12); /* gold ambient halo (1A-2: 0.22→0.12) */
 
   /* ---------- Stage palette — muted jewel (NEW token set) ----------
      Lead = steel-blue, Quote = burnished bronze, Active = moss green,
@@ -195,9 +195,12 @@
   --v3-shadow-lg: 0 1px 0 rgba(255, 240, 210, 0.06) inset,
                   0 14px 36px rgba(0, 0, 0, 0.55),
                   0 4px 10px rgba(0, 0, 0, 0.35);
-  --v3-shadow-hero: 0 1px 0 rgba(255, 240, 210, 0.08) inset,
-                    0 8px 24px rgba(201, 150, 58, 0.18),
-                    0 18px 48px rgba(0, 0, 0, 0.55);
+  /* Hero shadow — gold ambient layer restrained (1A-2: 0.18→0.10);
+     black ambient deepened slightly so the hero still lifts off the
+     page without reading as a gold wash. */
+  --v3-shadow-hero: 0 1px 0 rgba(255, 240, 210, 0.06) inset,
+                    0 6px 18px rgba(201, 150, 58, 0.10),
+                    0 22px 56px rgba(0, 0, 0, 0.60);
 
   /* ---------- Gold glows ---------- */
   --v3-gold-glow:    0 0 0 1px rgba(228, 190, 111, 0.40) inset,
@@ -213,13 +216,20 @@
   --v3-track:        rgba(255, 240, 210, 0.06);
   --v3-track-strong: rgba(255, 240, 210, 0.10);
 
-  /* ---------- Section primitive — warm-tinted gradient + warm-inset ---------- */
+  /* ---------- Section primitive — restrained warm tint (1A-2) ----------
+     Linen wash dialed back so default sections read as smoked-glass
+     dark surfaces, not warm-amber panels. Gold accent is reserved for
+     the --primary variant (which itself was retuned to consume tokens
+     in v3.css; see refactor in same commit).
+       --v3-section-bg     gradient stops 0.040/0.008 → 0.025/0.005
+       --v3-section-border 0.14 → 0.10
+       --v3-section-shadow inset highlight 0.08 → 0.05; dark layers kept */
   --v3-section-bg: linear-gradient(180deg,
-                     rgba(255, 240, 210, 0.040) 0%,
-                     rgba(255, 240, 210, 0.008) 100%),
+                     rgba(255, 240, 210, 0.025) 0%,
+                     rgba(255, 240, 210, 0.005) 100%),
                    var(--v3-surface-page);
-  --v3-section-border: rgba(255, 240, 210, 0.14);
-  --v3-section-shadow: 0 1px 0 rgba(255, 240, 210, 0.08) inset,
+  --v3-section-border: rgba(255, 240, 210, 0.10);
+  --v3-section-shadow: 0 1px 0 rgba(255, 240, 210, 0.05) inset,
                        0 1px 2px rgba(0, 0, 0, 0.36),
                        0 14px 36px rgba(0, 0, 0, 0.42);
   --v3-section-radius: 20px;
