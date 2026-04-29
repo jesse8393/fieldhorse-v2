@@ -327,37 +327,38 @@
 .v3-section--quiet::before { display: none; }
 .v3-section--quiet::after { opacity: 0.5; }
 
-/* Primary section variant — gold-accented (Phase 1A-2: refactored to
-   consume the gold tokens so future restraint is single-source).
-   Was hardcoded with raw rgba (48% gold border + 22% gold shadow +
-   20% radial blob + 85% top stroke), which combined to read as a
-   gold WASH on Home. Now: token-driven, tuned for accent-not-wash. */
+/* Primary section variant — smoked black glass with gold trim
+   (Phase 1A-3: pulled the warm-amber bg gradient (was 14% gold) down
+   to a barely-there 4% wash, dropped the radial blobs to nearly
+   invisible, halved the top-stroke glow). The gold IDENTITY of the
+   section now lives in the top stroke alone — border, ambient and
+   glow all read as restrained accent on a black-glass surface. */
 .v3-section--primary {
-  border-color: var(--v3-border-gold);   /* now 0.18 (was 0.48 raw) */
+  border-color: var(--v3-border-gold);            /* now 0.10 — hairline */
   background:
-    linear-gradient(180deg, var(--v3-primary-soft) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(201, 150, 58, 0.04) 0%, transparent 60%),
     var(--v3-section-bg);
   box-shadow:
-    0 1px 0 rgba(255, 240, 210, 0.10) inset,
-    0 1px 2px rgba(0, 0, 0, 0.42),
-    0 22px 56px rgba(0, 0, 0, 0.50),
-    0 12px 36px var(--v3-primary-glow);   /* now 0.12 (was 0.22 raw) */
+    0 1px 0 rgba(255, 240, 210, 0.08) inset,
+    0 1px 2px rgba(0, 0, 0, 0.46),
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 10px 28px var(--v3-primary-glow);           /* now 0.06 */
 }
 .v3-section--primary::before {
-  /* Subtle warm gold light-leak — peaks dropped from 20%/10% to 8%/4%
-     so it reads as ambient "glass catching light", not a tinted overlay. */
+  /* Light-leak now nearly invisible — 8%/4% → 4%/0%. The remaining
+     top-left peak just keeps the section from feeling flat. */
   background:
-    radial-gradient(110% 70% at 0% 0%, rgba(201, 150, 58, 0.08), transparent 55%),
-    radial-gradient(80% 50% at 100% 100%, rgba(201, 150, 58, 0.04), transparent 60%);
+    radial-gradient(110% 70% at 0% 0%, rgba(201, 150, 58, 0.04), transparent 55%);
 }
 .v3-section--primary::after {
   left: 6%;
   right: 6%;
   height: 1px;
-  /* Top stroke restrained — driven by --v3-gold-stroke (0.55) +
-     softened ambient glow (was 14px @ 0.65 → 8px @ 0.30). */
+  /* Gold "trim" — kept legible (the section's identity moment) but
+     glow halved again: 8px @ 0.30 → 6px @ 0.18. Stroke alpha from
+     the token (now 0.55) carries the line; glow is just a hint. */
   background: var(--v3-gold-stroke);
-  box-shadow: 0 0 8px rgba(201, 150, 58, 0.30);
+  box-shadow: 0 0 6px rgba(201, 150, 58, 0.18);
 }
 
 /* When a card sits directly inside a section, give it a real edge —
