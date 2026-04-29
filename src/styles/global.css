@@ -288,36 +288,6 @@ select:focus-visible,
 .fh-stage-pill--closed  { background: var(--stage-closed); }
 .fh-stage-pill--lost    { background: var(--stage-lost); color: #FAF7F1; }
 
-/* Floating action button — bottom-right, clears bottom nav + iOS home bar. */
-.fh-fab {
-  position: fixed;
-  right: 20px;
-  /* Was 96 px; bumped to 112 px so the gold glow has a 16 px gap above
-     the bottom nav and doesn't bleed over the active-tab dot. */
-  bottom: calc(112px + env(safe-area-inset-bottom));
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  background: var(--field-gold);
-  color: var(--onyx);
-  border: none;
-  cursor: pointer;
-  /* Tighter glow radius (was 28 px) so the halo stops well short of the
-     nav, even on shorter phones where vertical room is tight. */
-  box-shadow: 0 8px 18px rgba(201, 150, 58, 0.38),
-              0 2px 6px rgba(0, 0, 0, 0.4),
-              inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  z-index: calc(var(--z-nav) - 1);
-  transition: transform 80ms var(--ease-mechanical);
-  -webkit-tap-highlight-color: transparent;
-}
-.fh-fab:active { transform: translateY(1px) scale(0.96); }
-@media (prefers-reduced-motion: reduce) {
-  .fh-fab { transition: none; }
-}
-
 /* Aceternity-style animated moving border. Wrap any container and the gradient ring
    orbits its perimeter. Adds "premium shimmer" without affecting layout. */
 @keyframes fh-moving-border {
@@ -1797,12 +1767,12 @@ a {
   display: grid;
   place-items: center;
   cursor: pointer;
-  /* Tighter glow — radius 28→18, alpha 45→32 — so the halo stays
-     adjacent to the button instead of spilling toward the page
-     centerline. Also the inner highlight reads as a control surface. */
+  /* Restrained halo — alpha 32→18 resting, 42→26 hover — so the FAB
+     reads as a primary CTA without dominating the screen. The button
+     itself remains gold; the surrounding glow is just a hint. */
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.25) inset,
-    0 6px 16px rgba(229, 193, 88, 0.32),
+    0 4px 12px rgba(229, 193, 88, 0.18),
     0 2px 6px rgba(0, 0, 0, 0.40);
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
@@ -1810,7 +1780,7 @@ a {
   transform: translateY(-2px);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.28) inset,
-    0 10px 22px rgba(229, 193, 88, 0.42),
+    0 8px 18px rgba(229, 193, 88, 0.26),
     0 3px 8px rgba(0, 0, 0, 0.45);
 }
 .fh-fab:active { transform: scale(0.94); }

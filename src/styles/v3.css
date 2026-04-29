@@ -144,10 +144,14 @@
 
 /* ---------- Card primitive — premium push ---------- */
 .v3-card {
-  background: var(--v3-surface);
+  background: var(--v3-surface-glass);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
   border: 1px solid var(--v3-border-strong);
   border-radius: var(--v3-radius-card);
-  box-shadow: var(--v3-shadow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    var(--v3-shadow);
   position: relative;
   overflow: hidden;
 }
@@ -361,11 +365,37 @@
   box-shadow: 0 0 6px rgba(201, 150, 58, 0.18);
 }
 
+/* Quiet variant of the primary section — same black-glass surface, but
+   the gold IDENTITY is dialed down for non-revenue zones (e.g. next-actions
+   on Home). Border alpha drops, ambient gold glow goes away, top-stroke
+   reads as a faint white hairline instead of gold. Use for sections that
+   need structure without claiming "this is a money moment". */
+.v3-section--primary-quiet {
+  border-color: rgba(201, 150, 58, 0.06);
+  background:
+    linear-gradient(180deg, rgba(201, 150, 58, 0.015) 0%, transparent 60%),
+    var(--v3-section-bg);
+  box-shadow:
+    0 1px 0 rgba(255, 240, 210, 0.05) inset,
+    0 1px 2px rgba(0, 0, 0, 0.40),
+    0 18px 48px rgba(0, 0, 0, 0.45);
+}
+.v3-section--primary-quiet::before {
+  background:
+    radial-gradient(110% 70% at 0% 0%, rgba(255, 255, 255, 0.04), transparent 55%);
+}
+.v3-section--primary-quiet::after {
+  left: 10%;
+  right: 10%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.20) 50%, transparent 100%);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.08);
+}
+
 /* When a card sits directly inside a section, give it a real edge —
    stronger border + a bit of inset so the card READS as a card, not
    a tinted block. Hover bumps the surface to surface-3. */
 .v3-section .v3-card {
-  background: var(--v3-surface);
+  background: var(--v3-surface-glass);
   border: 1px solid var(--v3-border-strong);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30);
 }

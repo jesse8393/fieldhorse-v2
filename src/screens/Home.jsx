@@ -596,7 +596,7 @@ export default function Home() {
       {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
-          className="v3-section v3-section--primary"
+          className="v3-section v3-section--primary-quiet"
           style={{ margin: '0 var(--v3-gutter) 14px' }}
         >
           <div className="v3-section-header">

@@ -306,6 +306,7 @@
   --v3-track: rgba(20, 20, 18, 0.06);
   --v3-track-strong: rgba(20, 20, 18, 0.10);
   --v3-glass-tint: rgba(255, 255, 255, 0.50);
+  --v3-surface-glass: rgba(255, 255, 255, 0.78);
 
   /* Legacy aliases — warm warm warm */
   --surface-0: var(--v3-bg);
@@ -361,6 +362,20 @@
     0 1px 2px rgba(60, 50, 30, 0.06),
     0 16px 36px rgba(60, 50, 30, 0.10),
     0 12px 28px rgba(182, 138, 46, 0.14);
+}
+[data-theme='light'] .v3-section--primary-quiet {
+  border-color: rgba(20, 20, 18, 0.10);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.50) 0%, rgba(255, 255, 255, 0.20) 100%),
+    var(--v3-surface-page);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.60) inset,
+    0 1px 2px rgba(60, 50, 30, 0.05),
+    0 12px 28px rgba(60, 50, 30, 0.06);
+}
+[data-theme='light'] .v3-section--primary-quiet::after {
+  background: linear-gradient(90deg, transparent 0%, rgba(20, 20, 18, 0.08) 50%, transparent 100%);
+  box-shadow: none;
 }
 
 /* Explicit dark theme — set on <html data-theme="dark"> OR via
