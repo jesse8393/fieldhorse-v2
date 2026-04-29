@@ -798,7 +798,7 @@ function ProjectsList({ jobs, onOpen }) {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.99 }}
-                whileHover={{ y: -2, backgroundColor: '#2A2620' }}
+                whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
                 transition={{ type: 'spring', stiffness: 620, damping: 28 }}
                 onClick={() => { hapticTap(); onOpen(j.id) }}
                 style={{

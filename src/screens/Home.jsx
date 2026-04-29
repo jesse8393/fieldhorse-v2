@@ -1208,7 +1208,7 @@ function NextActionRow({ action, onTap }) {
       whileHover={{
         y: -2,
         x: 2,
-        backgroundColor: '#211E18'
+        backgroundColor: 'var(--v3-surface-3)'
       }}
       // Snappier spring (stiffness 720 / damping 26) so tap + hover both
       // read as immediate key-presses, not soft squishes.

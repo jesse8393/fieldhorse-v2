@@ -149,7 +149,7 @@ const JobCard = memo(function JobCard({
       whileTap={{ scale: 0.97 }}
       whileHover={{
         y: -4,
-        backgroundColor: '#2A2620',
+        backgroundColor: 'var(--v3-surface-3)',
         boxShadow: featured
           ? '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(229, 193, 88, 0.22)'
           : '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'

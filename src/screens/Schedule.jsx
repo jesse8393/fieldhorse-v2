@@ -646,7 +646,7 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, init
     <motion.li
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={isClickable ? { y: -2, backgroundColor: '#2A2620' } : undefined}
+      whileHover={isClickable ? { y: -2, backgroundColor: 'var(--v3-surface-3)' } : undefined}
       transition={{
         opacity: { delay: Math.min(index * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
         y: { type: 'spring', stiffness: 620, damping: 28 },
