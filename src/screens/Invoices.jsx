@@ -12,7 +12,7 @@ import { hapticTap } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
-import { FilterPill } from '../components/v3'
+import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 
 // Invoices / AR — v3 money command screen.
 //
@@ -180,83 +180,80 @@ export default function Invoices() {
       animate="show"
       style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
-      {/* HEADER — premium money command bar */}
-      <motion.div
-        variants={item}
-        style={{
-          padding: '12px var(--v3-gutter) 18px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 16
-        }}
-      >
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Receipt size={11} />
-            Money Owed
-          </span>
-          <h1 className="v3-h1" style={{ marginTop: 6 }}>
-            {totals.count > 0 ? <>Outstanding <em>balance.</em></> : <>All <em>caught up.</em></>}
-          </h1>
-          <p className="v3-caption" style={{ marginTop: 6 }}>
-            {totals.count > 0
-              ? `${totals.count} job${totals.count === 1 ? '' : 's'} with a balance to collect.`
-              : 'No jobs with an outstanding balance right now.'}
-          </p>
-        </div>
-      </motion.div>
-
-      {/* MONEY HEADER CARD — primary money signal */}
-      <motion.div
-        variants={item}
-        className={`v3-section ${totals.count > 0 ? 'v3-section--primary' : ''}`}
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-          <div className="v3-money" style={{
-            fontSize: 'clamp(40px, 9vw, 56px)',
-            lineHeight: 0.95,
-            letterSpacing: '-0.005em',
-            color: 'var(--v3-text)'
-          }}>
-            {loading ? (
-              <span className="v3-skeleton" style={{ width: 200, height: 48, borderRadius: 6 }} />
-            ) : (
-              fmtMoney(totals.total)
+      {/* COCKPIT — single black-glass A/R panel: title eyebrow + total
+          + aging bar + 3-cell aging breakdown */}
+      <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
+        <div style={{
+          padding: '14px 16px',
+          borderRadius: 16,
+          background: 'var(--v3-surface)',
+          border: '1px solid var(--v3-border)',
+          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+        }}>
+          {/* Top row: count eyebrow (alert when overdue exists) + Money Owed eyebrow */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <Eyebrow tone="gold">
+              <Receipt size={11} aria-hidden="true" />
+              Money Owed
+            </Eyebrow>
+            {!loading && (
+              <Eyebrow tone={totals['60+'] > 0 ? 'alert' : 'default'}>
+                {totals.count === 0
+                  ? 'All caught up'
+                  : totals['60+'] > 0
+                    ? `${totals.count} outstanding · overdue`
+                    : `${totals.count} outstanding`}
+              </Eyebrow>
             )}
           </div>
-          <span className="v3-eyebrow">Total Outstanding</span>
-        </div>
 
-        {/* Aging breakdown — Current / Late / Overdue */}
-        {!loading && (
-          <div style={{
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: '1px solid var(--v3-border)',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 12
-          }}>
-            {AGING_BUCKETS.map((b) => (
-              <div key={b.id}>
-                <div style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 22,
-                  lineHeight: 1,
-                  color: b.color,
-                  fontVariantNumeric: 'tabular-nums'
-                }}>
-                  {fmtMoney(totals[b.id])}
-                </div>
-                <div className="v3-eyebrow" style={{ marginTop: 4 }}>
-                  {b.label} <span style={{ opacity: 0.55 }}>· {b.short}</span>
-                </div>
-              </div>
-            ))}
+          {/* Headline total — the hero number */}
+          <div style={{ marginTop: 8 }}>
+            {loading ? (
+              <span className="v3-skeleton" style={{ display: 'inline-block', width: 200, height: 48, borderRadius: 6 }} />
+            ) : (
+              <StampNumber
+                size="2xl"
+                tone={totals['60+'] > 0 ? 'gold' : 'default'}
+                style={{ display: 'block', lineHeight: 0.95 }}
+              >
+                {fmtMoney(totals.total)}
+              </StampNumber>
+            )}
+            <Eyebrow as="div" style={{ marginTop: 6 }}>Total Outstanding</Eyebrow>
           </div>
-        )}
+
+          {/* Aging visualization + 3-cell breakdown */}
+          {!loading && totals.total > 0 && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--v3-border)' }}>
+              <AgingBar totals={totals} />
+              <div style={{
+                marginTop: 10,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 10
+              }}>
+                {AGING_BUCKETS.map((b) => {
+                  const value = totals[b.id]
+                  const isOverdueCell = b.id === '60+'
+                  const tone = isOverdueCell && value > 0
+                    ? 'danger'
+                    : value > 0
+                      ? 'default'
+                      : 'muted'
+                  return (
+                    <div key={b.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                      <StampNumber size="md" tone={tone}>{fmtMoney(value)}</StampNumber>
+                      <Eyebrow>
+                        {b.label} <span style={{ opacity: 0.55, marginLeft: 2 }}>· {b.short}</span>
+                      </Eyebrow>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </motion.div>
 
       {/* FILTER + LIST SECTION */}
@@ -307,6 +304,47 @@ export default function Invoices() {
 }
 
 /* ============================================================
+   AgingBar — single 6px segmented pill showing Current / Late /
+   Overdue proportions of total outstanding. Mirrors the prototype
+   owed-aging__bar pattern; segments collapse to zero-width when
+   their bucket is empty.
+   ============================================================ */
+function AgingBar({ totals }) {
+  const total = totals.total || 0
+  if (total <= 0) return null
+  const pct = (n) => (Number(n) / total) * 100
+  return (
+    <div
+      role="img"
+      aria-label="Outstanding balance by age"
+      style={{
+        display: 'flex',
+        height: 6,
+        borderRadius: 999,
+        background: 'var(--v3-track, rgba(255, 240, 210, 0.05))',
+        overflow: 'hidden'
+      }}
+    >
+      {AGING_BUCKETS.map((b) => {
+        const w = pct(totals[b.id])
+        if (w <= 0) return null
+        return (
+          <span
+            key={b.id}
+            aria-hidden="true"
+            style={{
+              width: `${w}%`,
+              background: b.color,
+              transition: 'width 220ms ease'
+            }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+/* ============================================================
    PaymentCard — premium v3 invoice card.
    Layout:
      ┌──────────────────────────────────────────────────┐
@@ -339,7 +377,7 @@ function PaymentCard({ row, onPDF, onPaid }) {
           border: isOverdue
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
           overflow: 'hidden'
         }}
       >
