@@ -9,6 +9,7 @@ import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
+import { FilterPill } from '../components/v3'
 
 const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Return ONLY JSON.`
 
@@ -166,12 +167,14 @@ export default function Bid() {
             <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Job type</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {JOB_TYPES.map((jt) => (
-                <ChipButton
+                <FilterPill
                   key={jt.value}
+                  size="sm"
                   active={jobType === jt.value}
                   onClick={() => setJobType(jt.value === jobType ? '' : jt.value)}
-                  label={jt.label}
-                />
+                >
+                  {jt.label}
+                </FilterPill>
               ))}
             </div>
           </div>
@@ -181,12 +184,14 @@ export default function Bid() {
             <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Trades on job</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {TRADES.map((t) => (
-                <ChipButton
+                <FilterPill
                   key={t}
+                  size="sm"
                   active={picks.includes(t)}
                   onClick={() => togglePick(t)}
-                  label={TRADE_LABELS[t] || t}
-                />
+                >
+                  {TRADE_LABELS[t] || t}
+                </FilterPill>
               ))}
             </div>
           </div>
@@ -530,40 +535,3 @@ export default function Bid() {
   )
 }
 
-/* ============================================================
-   ChipButton — gold-gradient when active, surface when inactive.
-   Matches Jobs / Invoices / Subs filter pills app-wide.
-   ============================================================ */
-function ChipButton({ active, onClick, label }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '7px 12px',
-        borderRadius: 999,
-        border: active
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 70%, transparent)'
-          : '1px solid var(--v3-border-strong)',
-        background: active
-          ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-          : 'var(--v3-surface-2)',
-        color: active ? 'var(--v3-on-primary)' : 'var(--v3-text)',
-        fontFamily: 'var(--font-body)',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.04em',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        boxShadow: active
-          ? '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
-          : 'none',
-        transition: 'background 160ms ease, color 160ms ease, border-color 160ms ease'
-      }}
-    >
-      {label}
-    </button>
-  )
-}

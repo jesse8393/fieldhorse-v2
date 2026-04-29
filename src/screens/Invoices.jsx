@@ -12,6 +12,7 @@ import { hapticTap } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
+import { FilterPill } from '../components/v3'
 
 // Invoices / AR — v3 money command screen.
 //
@@ -267,8 +268,8 @@ export default function Invoices() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
           <SectionHeader label={filter === 'outstanding' ? 'Outstanding' : 'All money jobs'} />
           <div style={{ display: 'flex', gap: 6 }}>
-            <FilterPill active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }} label="Outstanding" />
-            <FilterPill active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }} label="All" />
+            <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
+            <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
           </div>
         </div>
 
@@ -302,45 +303,6 @@ export default function Invoices() {
         )}
       </motion.div>
     </motion.div>
-  )
-}
-
-/* ============================================================
-   FilterPill — outstanding / all toggle. Active uses gold gradient
-   matching Jobs filter pills.
-   ============================================================ */
-function FilterPill({ active, onClick, label }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '7px 13px',
-        borderRadius: 999,
-        border: active
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 75%, transparent)'
-          : '1px solid var(--v3-border-strong)',
-        background: active
-          ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-          : 'var(--v3-surface)',
-        color: active ? 'var(--v3-on-primary)' : 'var(--v3-text)',
-        fontFamily: 'var(--font-body)',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.04em',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        boxShadow: active
-          ? '0 0 0 3px rgba(229, 193, 88, 0.18), 0 4px 12px rgba(229, 193, 88, 0.30), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
-          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 2px 8px rgba(0, 0, 0, 0.20)',
-        transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease'
-      }}
-    >
-      {label}
-    </button>
   )
 }
 

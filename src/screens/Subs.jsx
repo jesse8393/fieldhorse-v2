@@ -9,6 +9,7 @@ import { hapticTap } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
+import { FilterPill } from '../components/v3'
 
 // Subs directory — v3 rebuild. Aggregates fh_subs rows by (name + phone)
 // so the same sub appearing on 5 jobs shows as ONE entry with 5-job
@@ -219,14 +220,16 @@ export default function Subs() {
             gap: 6,
             marginTop: 10
           }}>
-            <TradePill active={!tradeFilter} onClick={() => { hapticTap(); setTradeFilter('') }} label="All" />
+            <FilterPill size="sm" active={!tradeFilter} onClick={() => { hapticTap(); setTradeFilter('') }}>All</FilterPill>
             {allTrades.map((t) => (
-              <TradePill
+              <FilterPill
                 key={t}
+                size="sm"
                 active={tradeFilter === t}
                 onClick={() => { hapticTap(); setTradeFilter(t) }}
-                label={t}
-              />
+              >
+                {t}
+              </FilterPill>
             ))}
           </div>
         )}
@@ -276,45 +279,6 @@ export default function Subs() {
         )}
       </motion.div>
     </motion.div>
-  )
-}
-
-/* ============================================================
-   TradePill — gold-gradient when active, surface when inactive.
-   Same pattern as Jobs filter pills + Invoices FilterPill.
-   ============================================================ */
-function TradePill({ active, onClick, label }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '7px 13px',
-        borderRadius: 999,
-        border: active
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 75%, transparent)'
-          : '1px solid var(--v3-border-strong)',
-        background: active
-          ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-          : 'var(--v3-surface)',
-        color: active ? 'var(--v3-on-primary)' : 'var(--v3-text)',
-        fontFamily: 'var(--font-body)',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.04em',
-        cursor: 'pointer',
-        whiteSpace: 'nowrap',
-        WebkitTapHighlightColor: 'transparent',
-        boxShadow: active
-          ? '0 0 0 3px rgba(229, 193, 88, 0.16), 0 4px 12px rgba(229, 193, 88, 0.30), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
-          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 2px 8px rgba(0, 0, 0, 0.20)',
-        transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease'
-      }}
-    >
-      {label}
-    </button>
   )
 }
 
