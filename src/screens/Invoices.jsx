@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Receipt, FileDown, DollarSign, ExternalLink } from 'lucide-react'
+import { Receipt, FileDown, DollarSign, ExternalLink, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -190,31 +190,23 @@ export default function Invoices() {
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
         }}>
-          {/* Top row: count eyebrow (alert when overdue exists) + Money Owed eyebrow */}
+          {/* Top row: section eyebrow + state chip (urgency lives here, not in the total) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <Eyebrow tone="gold">
               <Receipt size={11} aria-hidden="true" />
               Money Owed
             </Eyebrow>
-            {!loading && (
-              <Eyebrow tone={totals['60+'] > 0 ? 'alert' : 'default'}>
-                {totals.count === 0
-                  ? 'All caught up'
-                  : totals['60+'] > 0
-                    ? `${totals.count} outstanding · overdue`
-                    : `${totals.count} outstanding`}
-              </Eyebrow>
-            )}
+            {!loading && <BalanceStateChip totals={totals} />}
           </div>
 
-          {/* Headline total — the hero number */}
+          {/* Headline total — always linen. Magnitude is the noun; state lives
+              in the chip above. Stripe / Mercury pattern. */}
           <div style={{ marginTop: 8 }}>
             {loading ? (
               <span className="v3-skeleton" style={{ display: 'inline-block', width: 200, height: 48, borderRadius: 6 }} />
             ) : (
               <StampNumber
                 size="2xl"
-                tone={totals['60+'] > 0 ? 'gold' : 'default'}
                 style={{ display: 'block', lineHeight: 0.95 }}
               >
                 {fmtMoney(totals.total)}
@@ -300,6 +292,72 @@ export default function Invoices() {
         )}
       </motion.div>
     </motion.div>
+  )
+}
+
+/* ============================================================
+   BalanceStateChip — small premium state pill that lives in the
+   cockpit top-right. Carries the urgency signal so the headline
+   total can stay calm linen. Three variants:
+     - none:    muted "All caught up" with check (zero outstanding)
+     - collect: gold-tinted "Collect · N" (outstanding, no overdue)
+     - overdue: danger-tinted "Overdue · N" (60+ exists)
+   ============================================================ */
+function BalanceStateChip({ totals }) {
+  const overdueCount = totals['60+'] > 0 ? totals.count : 0
+  // Variant selection — overdue beats collect beats none.
+  let variant
+  if (totals.count === 0) variant = 'none'
+  else if (totals['60+'] > 0) variant = 'overdue'
+  else variant = 'collect'
+
+  const styles = {
+    none: {
+      bg: 'var(--v3-surface-2)',
+      border: 'var(--v3-border-strong)',
+      color: 'var(--v3-text-muted)'
+    },
+    collect: {
+      bg: 'var(--v3-primary-soft)',
+      border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+      color: 'var(--v3-primary)'
+    },
+    overdue: {
+      bg: 'var(--v3-danger-soft)',
+      border: 'color-mix(in srgb, var(--v3-danger) 38%, transparent)',
+      color: 'var(--v3-danger-bright)'
+    }
+  }[variant]
+
+  const label = variant === 'none'
+    ? 'All caught up'
+    : variant === 'overdue'
+      ? `Overdue · ${overdueCount}`
+      : `Collect · ${totals.count}`
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '3px 9px',
+        borderRadius: 999,
+        background: styles.bg,
+        border: `1px solid ${styles.border}`,
+        color: styles.color,
+        fontFamily: 'var(--font-body)',
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        lineHeight: 1,
+        fontVariantNumeric: 'tabular-nums'
+      }}
+    >
+      {variant === 'none' && <Check size={10} aria-hidden="true" strokeWidth={2.4} />}
+      {label}
+    </span>
   )
 }
 
