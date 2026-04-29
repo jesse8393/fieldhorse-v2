@@ -15,7 +15,11 @@ export default function ProgressMeter({
   height = 8
 }) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0))
-  const color = safe >= 80 ? '#4ADE80' : safe >= 50 ? 'var(--v3-primary)' : '#F47366'
+  const color = safe >= 80
+    ? 'var(--v3-success-bright)'
+    : safe >= 50
+      ? 'var(--v3-primary)'
+      : 'var(--v3-danger-bright)'
 
   return (
     <div style={{

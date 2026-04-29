@@ -231,15 +231,15 @@ export default function ClientDetail() {
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 padding: '3px 9px', borderRadius: 999,
-                background: 'rgba(46, 204, 113, 0.14)',
-                border: '1px solid rgba(46, 204, 113, 0.40)',
-                color: '#4ADE80',
+                background: 'var(--v3-success-soft)',
+                border: '1px solid rgba(79, 140, 94, 0.40)',
+                color: 'var(--v3-success-bright)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 10, fontWeight: 700,
                 letterSpacing: '0.1em', textTransform: 'uppercase',
                 fontVariantNumeric: 'tabular-nums'
               }}>
-                <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80' }} />
+                <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-success-bright)' }} />
                 Active · {activeCount}
               </span>
             ) : (

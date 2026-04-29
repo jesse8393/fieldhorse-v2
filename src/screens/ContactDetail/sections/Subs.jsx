@@ -17,9 +17,9 @@ const SUB_STATUSES = [
 
 const STATUS_COLOR = {
   scheduled: 'var(--v3-text-muted)',
-  onsite:    '#4ADE80',
+  onsite:    'var(--v3-success-bright)',
   complete:  'var(--v3-primary)',
-  paid:      '#4ADE80'
+  paid:      'var(--v3-success-bright)'
 }
 
 function money(n) {

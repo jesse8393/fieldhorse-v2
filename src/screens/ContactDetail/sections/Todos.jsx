@@ -106,7 +106,7 @@ export default function TodosSection({ jobId, userId }) {
             fontFamily: 'var(--font-body)',
             fontSize: 11,
             fontWeight: 700,
-            color: undoneCount === 0 ? '#4ADE80' : 'var(--v3-primary)',
+            color: undoneCount === 0 ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums'
           }}>
             {undoneCount === 0 ? 'All clear' : `${undoneCount} pending`}
@@ -188,10 +188,10 @@ export default function TodosSection({ jobId, userId }) {
                   style={{
                     flexShrink: 0, width: 22, height: 22, borderRadius: 7,
                     border: r.done
-                      ? '1px solid color-mix(in srgb, #4ADE80 60%, transparent)'
+                      ? '1px solid color-mix(in srgb, var(--v3-success-bright) 60%, transparent)'
                       : '1px solid var(--v3-border-strong)',
                     background: r.done ? 'rgba(46, 204, 113, 0.18)' : 'transparent',
-                    color: '#4ADE80',
+                    color: 'var(--v3-success-bright)',
                     cursor: 'pointer',
                     display: 'grid', placeItems: 'center',
                     transition: 'background 160ms ease, border-color 160ms ease'

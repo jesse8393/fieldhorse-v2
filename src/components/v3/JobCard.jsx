@@ -48,7 +48,11 @@ function MarginBadge({ pct, hasCost }) {
     )
   }
   const tier = marginTier(pct)
-  const color = tier === 'good' ? '#4ADE80' : tier === 'warn' ? '#E8C25A' : '#F47366'
+  const color = tier === 'good'
+    ? 'var(--v3-success-bright)'
+    : tier === 'warn'
+      ? 'var(--v3-warn)'
+      : 'var(--v3-danger-bright)'
   return (
     <span style={{
       fontFamily: 'var(--font-body)',

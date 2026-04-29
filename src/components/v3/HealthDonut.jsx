@@ -20,9 +20,9 @@ import { useMemo } from 'react'
 export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0))
   const tier = useMemo(() => {
-    if (safe >= 80) return { name: 'Good', color: '#4ADE80', soft: 'rgba(46, 204, 113, 0.18)' }
-    if (safe >= 50) return { name: 'At Risk', color: '#E8C25A', soft: 'rgba(212, 175, 55, 0.18)' }
-    return { name: 'Behind', color: '#F47366', soft: 'rgba(192, 57, 43, 0.18)' }
+    if (safe >= 80) return { name: 'Good',    color: 'var(--v3-success-bright)', soft: 'var(--v3-success-soft)' }
+    if (safe >= 50) return { name: 'At Risk', color: 'var(--v3-warn)',            soft: 'var(--v3-warn-soft)' }
+    return                  { name: 'Behind',  color: 'var(--v3-danger-bright)',  soft: 'var(--v3-danger-soft)' }
   }, [safe])
 
   const radius = (size - stroke) / 2

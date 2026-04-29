@@ -11,11 +11,11 @@ const ICONS = {
   default: Activity
 }
 const TONE = {
-  'crew-on-site': { color: '#4ADE80', bg: 'rgba(46,204,113,0.12)' },
-  'photos': { color: '#D4AF37', bg: 'rgba(212,175,55,0.10)' },
-  'invoice': { color: '#D4AF37', bg: 'rgba(212,175,55,0.10)' },
-  'note': { color: '#A1A1AA', bg: 'rgba(255,255,255,0.05)' },
-  default: { color: '#A1A1AA', bg: 'rgba(255,255,255,0.05)' }
+  'crew-on-site': { color: 'var(--v3-stage-active)', bg: 'rgba(79, 140, 94, 0.14)' },
+  'photos':       { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
+  'invoice':      { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
+  'note':         { color: 'var(--v3-text-muted)',   bg: 'var(--v3-glass-tint)' },
+  default:        { color: 'var(--v3-text-muted)',   bg: 'var(--v3-glass-tint)' }
 }
 
 function formatTime(iso) {

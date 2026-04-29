@@ -326,7 +326,7 @@ export default function Jobs() {
                 icon: <PhoneIcon size={18} />,
                 label: `Call ${c.name || 'contact'}`,
                 color: 'rgba(46, 204, 113, 0.22)',
-                fg: '#4ADE80',
+                fg: 'var(--v3-success-bright)',
                 onClick: () => { window.location.href = `tel:${c.phone}` }
               })
               swipeActions.push({

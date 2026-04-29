@@ -205,7 +205,7 @@
 }
 .v3-pill--success {
   background: var(--v3-success-soft);
-  color: #4ADE80;
+  color: var(--v3-success-bright);
   border-color: rgba(46, 204, 113, 0.30);
 }
 .v3-pill--danger {

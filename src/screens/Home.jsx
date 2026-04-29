@@ -970,10 +970,10 @@ function TodayOnSiteRow({ row, onTap }) {
    border/background, tap navigates to the contact.
    ============================================================ */
 const STAGE_DISPLAY = {
-  lead:    { label: 'Lead',    color: '#60A5FA' },
-  quote:   { label: 'Quote',   color: '#A78BFA' },
-  job:     { label: 'Job',     color: 'var(--v3-success-bright)' },
-  invoice: { label: 'Invoice', color: 'var(--v3-primary)' }
+  lead:    { label: 'Lead',    color: 'var(--v3-stage-lead)' },
+  quote:   { label: 'Quote',   color: 'var(--v3-stage-quote)' },
+  job:     { label: 'Job',     color: 'var(--v3-stage-active)' },
+  invoice: { label: 'Invoice', color: 'var(--v3-stage-won)' }
 }
 
 function PipelineDealRow({ deal, onTap }) {

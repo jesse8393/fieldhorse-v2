@@ -65,7 +65,7 @@ export default function MilestonesSection({ contact, patch }) {
             fontFamily: 'var(--font-body)',
             fontSize: 11,
             fontWeight: 700,
-            color: doneCount === list.length ? '#4ADE80' : 'var(--v3-primary)',
+            color: doneCount === list.length ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums'
           }}>
             {doneCount} / {list.length}
@@ -158,10 +158,10 @@ export default function MilestonesSection({ contact, patch }) {
                     height: 22,
                     borderRadius: 7,
                     border: m.done
-                      ? '1px solid color-mix(in srgb, #4ADE80 60%, transparent)'
+                      ? '1px solid color-mix(in srgb, var(--v3-success-bright) 60%, transparent)'
                       : '1px solid var(--v3-border-strong)',
                     background: m.done ? 'rgba(46, 204, 113, 0.18)' : 'transparent',
-                    color: '#4ADE80',
+                    color: 'var(--v3-success-bright)',
                     cursor: 'pointer',
                     display: 'grid',
                     placeItems: 'center',

@@ -10,16 +10,16 @@ const TONE = {
     glow: '0 0 0 1px rgba(212,175,55,0.05) inset'
   },
   success: {
-    bg: 'linear-gradient(180deg, rgba(46,204,113,0.10), rgba(46,204,113,0.02))',
-    border: 'rgba(46,204,113,0.30)',
-    accent: '#4ADE80',
-    glow: '0 0 0 1px rgba(46,204,113,0.05) inset'
+    bg: 'linear-gradient(180deg, rgba(79, 140, 94, 0.10), rgba(79, 140, 94, 0.02))',
+    border: 'rgba(79, 140, 94, 0.30)',
+    accent: 'var(--v3-success-bright)',
+    glow: '0 0 0 1px rgba(79, 140, 94, 0.05) inset'
   },
   danger: {
-    bg: 'linear-gradient(180deg, rgba(192,57,43,0.12), rgba(192,57,43,0.02))',
-    border: 'rgba(192,57,43,0.40)',
-    accent: '#F47366',
-    glow: '0 0 0 1px rgba(192,57,43,0.06) inset'
+    bg: 'linear-gradient(180deg, rgba(192, 57, 43, 0.12), rgba(192, 57, 43, 0.02))',
+    border: 'rgba(192, 57, 43, 0.40)',
+    accent: 'var(--v3-danger-bright)',
+    glow: '0 0 0 1px rgba(192, 57, 43, 0.06) inset'
   }
 }
 

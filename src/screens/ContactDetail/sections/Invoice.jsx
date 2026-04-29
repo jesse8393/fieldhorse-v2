@@ -27,7 +27,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
         borderRadius: 16,
         background: 'var(--v3-surface)',
         border: isClosed
-          ? '1px solid color-mix(in srgb, #4ADE80 30%, transparent)'
+          ? '1px solid color-mix(in srgb, var(--v3-success-bright) 30%, transparent)'
           : '1px solid var(--v3-border)',
         display: 'flex',
         flexDirection: 'column',
@@ -39,7 +39,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
           fontFamily: 'var(--font-body)',
           fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
           textTransform: 'uppercase',
-          color: isClosed ? '#4ADE80' : 'var(--v3-text-muted)'
+          color: isClosed ? 'var(--v3-success-bright)' : 'var(--v3-text-muted)'
         }}>
           {isClosed ? 'Paid in full' : 'Balance due'}
         </span>
@@ -47,7 +47,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
           <div style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(36px, 9vw, 52px)',
-            color: isClosed ? '#4ADE80' : 'var(--v3-primary)',
+            color: isClosed ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
             lineHeight: 1, letterSpacing: '0.01em',
             fontVariantNumeric: 'tabular-nums'
           }}>
@@ -70,7 +70,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
         }}>
           <span style={{
             position: 'absolute', inset: 0, width: `${pct}%`,
-            background: isClosed ? '#4ADE80' : 'var(--v3-primary)',
+            background: isClosed ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
             borderRadius: 999,
             transition: 'width 500ms cubic-bezier(0.2, 0.8, 0.2, 1)'
           }} />
@@ -140,8 +140,8 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
                 <span aria-hidden="true" style={{
                   flexShrink: 0, width: 32, height: 32, borderRadius: 9,
                   background: 'rgba(46, 204, 113, 0.14)',
-                  border: '1px solid color-mix(in srgb, #4ADE80 30%, transparent)',
-                  color: '#4ADE80',
+                  border: '1px solid color-mix(in srgb, var(--v3-success-bright) 30%, transparent)',
+                  color: 'var(--v3-success-bright)',
                   display: 'grid', placeItems: 'center'
                 }}>
                   <DollarSign size={14} />

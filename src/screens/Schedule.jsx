@@ -621,11 +621,11 @@ function DayView({ events, onClick, onDelete, onAdd }) {
      Scheduled   — future, not today → gray
      Done        — past → muted gray (mockup doesn't show this; quiet) */
 const STATUS_TONE = {
-  'On Site':     { color: '#4ADE80', soft: 'rgba(46, 204, 113, 0.14)',  border: 'rgba(46, 204, 113, 0.40)' },
-  'In Progress': { color: '#60A5FA', soft: 'rgba(96, 165, 250, 0.14)',  border: 'rgba(96, 165, 250, 0.40)' },
-  'Upcoming':    { color: '#E8C25A', soft: 'rgba(212, 175, 55, 0.14)',  border: 'rgba(212, 175, 55, 0.40)' },
-  'Scheduled':   { color: '#A1A1AA', soft: 'rgba(255, 255, 255, 0.04)', border: 'rgba(255, 255, 255, 0.10)' },
-  'Done':        { color: '#A1A1AA', soft: 'rgba(255, 255, 255, 0.03)', border: 'rgba(255, 255, 255, 0.08)' }
+  'On Site':     { color: 'var(--v3-stage-active)', soft: 'rgba(79, 140, 94, 0.16)',   border: 'rgba(79, 140, 94, 0.40)' },
+  'In Progress': { color: 'var(--v3-stage-lead)',   soft: 'rgba(107, 124, 168, 0.14)', border: 'rgba(107, 124, 168, 0.40)' },
+  'Upcoming':    { color: 'var(--v3-primary)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
+  'Scheduled':   { color: 'var(--v3-text-muted)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border-mid)' },
+  'Done':        { color: 'var(--v3-text-faint)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border)' }
 }
 
 function deriveStatus(e, now) {

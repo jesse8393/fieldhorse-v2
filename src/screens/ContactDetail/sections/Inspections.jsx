@@ -15,9 +15,9 @@ const TRADES = [
 ]
 
 const RESULT_META = {
-  pass: { label: 'Pass',   color: '#4ADE80', soft: 'rgba(46, 204, 113, 0.14)', icon: CheckCircle2 },
-  fail: { label: 'Fail',   color: '#F47366', soft: 'rgba(192, 57, 43, 0.14)',  icon: XCircle },
-  na:   { label: 'N/A',    color: 'var(--v3-text-muted)', soft: 'rgba(255, 255, 255, 0.05)', icon: MinusCircle }
+  pass: { label: 'Pass', color: 'var(--v3-success-bright)', soft: 'var(--v3-success-soft)', icon: CheckCircle2 },
+  fail: { label: 'Fail', color: 'var(--v3-danger-bright)',  soft: 'var(--v3-danger-soft)',  icon: XCircle },
+  na:   { label: 'N/A',  color: 'var(--v3-text-muted)',     soft: 'var(--v3-glass-tint)',   icon: MinusCircle }
 }
 
 /**
