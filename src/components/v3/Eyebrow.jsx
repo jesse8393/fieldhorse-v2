@@ -42,7 +42,7 @@ export default function Eyebrow({
         fontFamily: 'var(--font-body)',
         fontSize: 10,
         fontWeight: 700,
-        letterSpacing: '0.16em',
+        letterSpacing: '0.10em',
         textTransform: 'uppercase',
         lineHeight: 1,
         color: TONE_COLOR[tone] || TONE_COLOR.default,

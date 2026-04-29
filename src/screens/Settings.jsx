@@ -125,7 +125,7 @@ export default function Settings() {
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
           Profile
         </span>
-        <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+        <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
           Your business,{' '}
           organized.
         </h1>
@@ -373,8 +373,7 @@ function Section({ variants, title, sub, meta, metaTone, children }) {
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sub ? 4 : 10, gap: 10 }}>
         <h2
-          className="fh-font-serif"
-          style={{ margin: 0, fontSize: 18, lineHeight: 1.15, letterSpacing: '-0.01em', fontWeight: 500, color: 'var(--v3-text)' }}
+          style={{ margin: 0, fontSize: 18, lineHeight: 1.15, letterSpacing: '-0.01em', fontWeight: 600, color: 'var(--v3-text)' }}
         >
           {renderSectionTitle(title)}
         </h2>
