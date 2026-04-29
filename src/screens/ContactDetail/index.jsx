@@ -342,9 +342,9 @@ function Header({
     : null
 
   return (
-    <div style={{ padding: '8px 16px 14px' }}>
+    <div style={{ padding: '8px 20px 12px' }}>
       {/* Top row: back · spacer · more */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
         <IconButton onClick={onBack} ariaLabel="Back">
           <ChevronLeft size={18} aria-hidden="true" />
         </IconButton>
@@ -402,7 +402,7 @@ function Header({
 
       {/* Cockpit — eyebrow client / serif title / job_title / metrics / next action */}
       <div style={{
-        padding: '14px 16px 4px',
+        padding: '12px 14px',
         borderRadius: 16,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
@@ -416,7 +416,8 @@ function Header({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              padding: 0,
+              padding: '4px 6px',
+              marginLeft: -6,
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
@@ -425,7 +426,8 @@ function Header({
               fontWeight: 700,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)'
+              color: 'var(--v3-text-muted)',
+              WebkitTapHighlightColor: 'transparent'
             }}
           >
             <Users size={10} aria-hidden="true" />
@@ -439,10 +441,10 @@ function Header({
         ))}
 
         <h1 style={{
-          margin: clientLabel ? '6px 0 0' : 0,
+          margin: clientLabel ? '4px 0 0' : 0,
           fontFamily: 'var(--font-serif)',
-          fontSize: 'clamp(26px, 7vw, 34px)',
-          lineHeight: 1.1,
+          fontSize: 'clamp(24px, 6.5vw, 30px)',
+          lineHeight: 1.08,
           letterSpacing: '-0.02em',
           fontWeight: 400,
           color: 'var(--v3-text)'
@@ -451,11 +453,11 @@ function Header({
         </h1>
         {contact.job_title && (
           <div style={{
-            marginTop: 4,
+            marginTop: 2,
             fontFamily: 'var(--font-body)',
-            fontSize: 13,
+            fontSize: 12,
             color: 'var(--v3-text-muted)',
-            lineHeight: 1.35
+            lineHeight: 1.3
           }}>
             {contact.job_title}
           </div>
@@ -466,20 +468,20 @@ function Header({
             display: 'grid',
             gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr' : '1fr',
             alignItems: 'end',
-            gap: 12,
-            marginTop: 14,
-            paddingTop: 12,
+            gap: 10,
+            marginTop: 10,
+            paddingTop: 10,
             borderTop: '1px solid var(--v3-border)'
           }}>
-            <CockpitMetric label="Value" tone="gold">
+            <CockpitMetric label="Value" tone="gold" size="lg">
               {kMoney(contractValue)}
             </CockpitMetric>
             {paid > 0 && (
               <>
-                <CockpitMetric label="Paid" tone="success">
+                <CockpitMetric label="Paid" tone="success" size="md">
                   {kMoney(paid)}
                 </CockpitMetric>
-                <CockpitMetric label="Balance">
+                <CockpitMetric label="Balance" size="md">
                   {kMoney(balance)}
                 </CockpitMetric>
               </>
@@ -489,9 +491,9 @@ function Header({
 
         {nextTodo && (
           <div style={{
-            marginTop: 12,
-            padding: '10px 12px',
-            borderRadius: 12,
+            marginTop: 10,
+            padding: '8px 10px 8px 12px',
+            borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border)',
             display: 'flex',
@@ -501,12 +503,12 @@ function Header({
             <div style={{ flex: 1, minWidth: 0 }}>
               <Eyebrow tone="gold">Next action</Eyebrow>
               <div style={{
-                marginTop: 4,
+                marginTop: 2,
                 fontFamily: 'var(--font-body)',
                 fontSize: 13,
                 fontWeight: 600,
                 color: 'var(--v3-text)',
-                lineHeight: 1.35,
+                lineHeight: 1.3,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap'
@@ -519,22 +521,22 @@ function Header({
               onClick={() => onTodoDone?.(nextTodo.id)}
               style={{
                 flexShrink: 0,
-                padding: '8px 12px',
-                borderRadius: 10,
+                padding: '6px 10px',
+                borderRadius: 8,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
                 background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: '0.06em',
+                letterSpacing: '0.08em',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)'
+                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.12), 0 3px 8px rgba(201, 150, 58, 0.24)'
               }}
             >
-              Mark done
+              Done
             </button>
           </div>
         )}
@@ -552,11 +554,11 @@ function kMoney(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function CockpitMetric({ label, tone = 'default', children }) {
+function CockpitMetric({ label, tone = 'default', size = 'lg', children }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
-      <StampNumber size="lg" tone={tone}>{children}</StampNumber>
+      <StampNumber size={size} tone={tone}>{children}</StampNumber>
     </div>
   )
 }
