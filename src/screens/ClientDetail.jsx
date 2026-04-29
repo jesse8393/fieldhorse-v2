@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
-import { SegmentedTabs } from '../components/v3'
+import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
@@ -178,7 +178,7 @@ export default function ClientDetail() {
     >
 
       {/* TOP BAR — back chevron + edit + delete in the chrome row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 16px 8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 20px 10px' }}>
         <IconBtn onClick={() => navigate('/clients')} ariaLabel="Back to clients">
           <ChevronLeft size={18} />
         </IconBtn>
@@ -197,103 +197,140 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* HERO — large avatar + name + active badge + company */}
-      <div style={{ padding: '0 var(--v3-gutter) 16px', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-        <div aria-hidden="true" style={{
-          flexShrink: 0,
-          width: 76, height: 76,
-          borderRadius: 22,
-          background: 'linear-gradient(135deg, var(--v3-primary-soft), rgba(212, 175, 55, 0.04))',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          display: 'grid', placeItems: 'center',
-          fontFamily: 'var(--font-display)',
-          fontSize: 34,
-          letterSpacing: '0.04em',
-          color: 'var(--v3-primary)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(212, 175, 55, 0.16)'
+      {/* COCKPIT — black-glass panel: hero + metrics + action row */}
+      <div style={{ padding: '0 20px 14px' }}>
+        <div style={{
+          padding: '12px 14px',
+          borderRadius: 16,
+          background: 'var(--v3-surface)',
+          border: '1px solid var(--v3-border)',
+          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
         }}>
-          {initial}
-        </div>
-        <div style={{ minWidth: 0, flex: 1, paddingTop: 4 }}>
-          <h1 style={{
-            margin: 0,
-            fontFamily: 'var(--font-serif)',
-            fontSize: 'clamp(24px, 6vw, 32px)',
-            lineHeight: 1.1,
-            letterSpacing: '-0.02em',
-            fontWeight: 400,
-            color: 'var(--v3-text)'
-          }}>
-            {client.name}
-          </h1>
-          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {activeCount > 0 ? (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '3px 9px', borderRadius: 999,
-                background: 'var(--v3-success-soft)',
-                border: '1px solid rgba(79, 140, 94, 0.40)',
-                color: 'var(--v3-success-bright)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.1em', textTransform: 'uppercase',
-                fontVariantNumeric: 'tabular-nums'
+          {/* Hero row — restrained avatar + name + active/company */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div aria-hidden="true" style={{
+              flexShrink: 0,
+              width: 56, height: 56,
+              borderRadius: 16,
+              background: 'var(--v3-surface-2)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
+              display: 'grid', placeItems: 'center',
+              fontFamily: 'var(--font-display)',
+              fontSize: 26,
+              letterSpacing: '0.04em',
+              color: 'var(--v3-primary)',
+              boxShadow: 'inset 0 1px 0 rgba(255, 240, 210, 0.05)'
+            }}>
+              {initial}
+            </div>
+            <div style={{ minWidth: 0, flex: 1, paddingTop: 2 }}>
+              <h1 style={{
+                margin: 0,
+                fontFamily: 'var(--font-serif)',
+                fontSize: 'clamp(22px, 5.5vw, 28px)',
+                lineHeight: 1.08,
+                letterSpacing: '-0.02em',
+                fontWeight: 400,
+                color: 'var(--v3-text)'
               }}>
-                <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-success-bright)' }} />
-                Active · {activeCount}
-              </span>
-            ) : (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '3px 9px', borderRadius: 999,
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid var(--v3-border-strong)',
-                color: 'var(--v3-text-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.1em', textTransform: 'uppercase'
-              }}>
-                Inactive
-              </span>
-            )}
-            {client.company_name && (
-              <span style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: 13,
-                color: 'var(--v3-text-muted)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-              }}>
-                {client.company_name}
-              </span>
-            )}
+                {client.name}
+              </h1>
+              <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {activeCount > 0 ? (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '2px 8px', borderRadius: 999,
+                    background: 'var(--v3-success-soft)',
+                    border: '1px solid rgba(79, 140, 94, 0.40)',
+                    color: 'var(--v3-success-bright)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 10, fontWeight: 700,
+                    letterSpacing: '0.1em', textTransform: 'uppercase',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-success-bright)' }} />
+                    Active · {activeCount}
+                  </span>
+                ) : (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '2px 8px', borderRadius: 999,
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid var(--v3-border-strong)',
+                    color: 'var(--v3-text-muted)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 10, fontWeight: 700,
+                    letterSpacing: '0.1em', textTransform: 'uppercase'
+                  }}>
+                    Inactive
+                  </span>
+                )}
+                {client.company_name && (
+                  <span style={{
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 12,
+                    color: 'var(--v3-text-muted)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    minWidth: 0
+                  }}>
+                    {client.company_name}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* ACTION ROW — Call · Text · Email · Map (4 equal columns) */}
-      <div style={{ padding: '0 var(--v3-gutter) 18px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          <ActionTile
-            icon={Phone}
-            label="Call"
-            href={client.phone ? `tel:${client.phone}` : null}
-          />
-          <ActionTile
-            icon={MessageSquare}
-            label="Text"
-            href={client.phone ? `sms:${client.phone}` : null}
-          />
-          <ActionTile
-            icon={Mail}
-            label="Email"
-            href={client.email ? `mailto:${client.email}` : null}
-          />
-          <ActionTile
-            icon={MapPin}
-            label="Map"
-            href={client.address ? `https://maps.apple.com/?address=${encodeURIComponent(client.address)}` : null}
-            external
-          />
+          {/* Metrics row — surfaces lifetime / outstanding / active */}
+          {(lifetime > 0 || outstanding > 0 || activeCount > 0) && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              alignItems: 'end',
+              gap: 10,
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: '1px solid var(--v3-border)'
+            }}>
+              <CockpitMetric label="Lifetime" tone="gold" size="lg">
+                {money(lifetime)}
+              </CockpitMetric>
+              <CockpitMetric
+                label="Outstanding"
+                tone={outstanding > 0 ? 'danger' : 'default'}
+                size="md"
+              >
+                {money(outstanding)}
+              </CockpitMetric>
+              <CockpitMetric label="Active" size="md">
+                {activeCount}
+              </CockpitMetric>
+            </div>
+          )}
+
+          {/* Action row — Call · Text · Email · Map (4 equal columns) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 12 }}>
+            <ActionTile
+              icon={Phone}
+              label="Call"
+              href={client.phone ? `tel:${client.phone}` : null}
+            />
+            <ActionTile
+              icon={MessageSquare}
+              label="Text"
+              href={client.phone ? `sms:${client.phone}` : null}
+            />
+            <ActionTile
+              icon={Mail}
+              label="Email"
+              href={client.email ? `mailto:${client.email}` : null}
+            />
+            <ActionTile
+              icon={MapPin}
+              label="Map"
+              href={client.address ? `https://maps.apple.com/?address=${encodeURIComponent(client.address)}` : null}
+              external
+            />
+          </div>
         </div>
       </div>
 
@@ -365,15 +402,14 @@ function ActionTile({ icon: Icon, label, href, external }) {
   const enabled = !!href
   const baseStyle = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    gap: 6,
-    padding: '14px 4px',
-    borderRadius: 14,
-    background: enabled ? 'var(--v3-surface)' : 'rgba(255, 255, 255, 0.02)',
-    border: `1px solid ${enabled ? 'var(--v3-border-strong)' : 'var(--v3-border)'}`,
-    boxShadow: enabled ? 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.2)' : 'none',
+    gap: 4,
+    padding: '10px 4px',
+    borderRadius: 12,
+    background: enabled ? 'var(--v3-surface-2)' : 'rgba(255, 255, 255, 0.02)',
+    border: `1px solid ${enabled ? 'var(--v3-border)' : 'var(--v3-border)'}`,
     color: enabled ? 'var(--v3-text)' : 'var(--v3-text-muted)',
     textDecoration: 'none',
-    minHeight: 64,
+    minHeight: 52,
     opacity: enabled ? 1 : 0.4,
     cursor: enabled ? 'pointer' : 'default',
     WebkitTapHighlightColor: 'transparent'
@@ -382,7 +418,7 @@ function ActionTile({ icon: Icon, label, href, external }) {
   if (!enabled) {
     return (
       <div aria-disabled="true" style={baseStyle}>
-        <Icon size={20} aria-hidden="true" />
+        <Icon size={18} aria-hidden="true" />
         <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
       </div>
     )
@@ -412,89 +448,27 @@ function ActionTile({ icon: Icon, label, href, external }) {
 }
 
 /* ============================================================
-   OverviewRead — Contact Info card + Map block + Financial Summary
+   CockpitMetric — eyebrow + StampNumber column. Mirrors the
+   Job Detail cockpit helper so both detail screens share scale.
+   ============================================================ */
+
+function CockpitMetric({ label, tone = 'default', size = 'md', children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+      <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
+      <StampNumber size={size} tone={tone}>{children}</StampNumber>
+    </div>
+  )
+}
+
+/* ============================================================
+   OverviewRead — Contact Info card + Map block (metrics now
+   live in the cockpit header above)
    ============================================================ */
 
 function OverviewRead({ client, lifetime, outstanding, activeCount }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 0 24px' }}>
-
-      {/* FINANCIAL SUMMARY — large lifetime + outstanding + active */}
-      <div style={{
-        padding: '20px 20px 18px',
-        borderRadius: 18,
-        background: `
-          radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.10), transparent 55%),
-          var(--v3-surface)
-        `,
-        border: '1px solid color-mix(in srgb, var(--v3-primary) 18%, transparent)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 16px rgba(0, 0, 0, 0.3)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-          }}>
-            Lifetime value
-          </span>
-        </div>
-        <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(40px, 10vw, 56px)',
-            lineHeight: 1,
-            letterSpacing: '0.005em',
-            color: 'var(--v3-primary)',
-            fontVariantNumeric: 'tabular-nums',
-            textShadow: '0 2px 18px rgba(212, 175, 55, 0.16)'
-          }}>
-            {money(lifetime)}
-          </span>
-        </div>
-
-        {/* Sub-metrics row */}
-        <div style={{
-          marginTop: 16, paddingTop: 14,
-          borderTop: '1px solid var(--v3-border)',
-          display: 'flex', alignItems: 'baseline', gap: 22, flexWrap: 'wrap'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
-              color: outstanding > 0 ? 'var(--v3-danger-bright)' : 'var(--v3-text)',
-              fontVariantNumeric: 'tabular-nums'
-            }}>
-              {money(outstanding)}
-            </span>
-            <span style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-              textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-            }}>
-              Outstanding
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
-              color: activeCount > 0 ? 'var(--v3-text)' : 'var(--v3-text-muted)',
-              fontVariantNumeric: 'tabular-nums'
-            }}>
-              {activeCount}
-            </span>
-            <span style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-              textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-            }}>
-              {activeCount === 1 ? 'Active job' : 'Active jobs'}
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* CONTACT INFO CARD — phone / email / address as separate rows */}
       <div style={{
