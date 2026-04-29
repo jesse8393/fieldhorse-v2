@@ -12,3 +12,9 @@ export { default as SegmentedTabs } from './SegmentedTabs.jsx'
 export { default as NextActionCard } from './NextActionCard.jsx'
 export { default as HealthDonut } from './HealthDonut.jsx'
 export { default as ProgressMeter } from './ProgressMeter.jsx'
+
+/* Phase 1B canonical primitives — added but not yet migrated to. */
+export { default as Eyebrow } from './Eyebrow.jsx'
+export { default as StampNumber } from './StampNumber.jsx'
+export { default as FilterPill } from './FilterPill.jsx'
+export { default as IconButton } from './IconButton.jsx'
