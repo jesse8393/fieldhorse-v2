@@ -195,8 +195,10 @@ export default function Subs() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 5,
-                  padding: '5px 11px 5px 9px',
+                  justifyContent: 'center',
+                  gap: 6,
+                  minHeight: 44,
+                  padding: '0 14px 0 12px',
                   borderRadius: 999,
                   border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
                   background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
@@ -211,7 +213,7 @@ export default function Subs() {
                   boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)'
                 }}
               >
-                <Plus size={12} strokeWidth={2.6} />
+                <Plus size={13} strokeWidth={2.6} />
                 Add sub
               </motion.button>
             </div>
