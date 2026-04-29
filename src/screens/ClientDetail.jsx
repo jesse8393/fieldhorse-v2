@@ -210,7 +210,7 @@ export default function ClientDetail() {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <div aria-hidden="true" style={{
               flexShrink: 0,
-              width: 56, height: 56,
+              width: 60, height: 60,
               borderRadius: 16,
               background: 'var(--v3-surface-2)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
@@ -249,7 +249,7 @@ export default function ClientDetail() {
                     fontVariantNumeric: 'tabular-nums'
                   }}>
                     <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-success-bright)' }} />
-                    Active · {activeCount}
+                    Active
                   </span>
                 ) : (
                   <span style={{
