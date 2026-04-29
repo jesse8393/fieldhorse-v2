@@ -526,7 +526,7 @@ export default function Home() {
           breakdown row (Won / Active / Lead). */}
       <motion.div
         variants={item}
-        className="v3-section v3-section--primary"
+        className="v3-section v3-section--primary-quiet"
         style={{ margin: '0 var(--v3-gutter) 14px', padding: '18px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
