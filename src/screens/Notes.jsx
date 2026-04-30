@@ -185,6 +185,31 @@ export default function Notes() {
   // Recent Activity = top 6 chronologically, regardless of linkage
   const recent = useMemo(() => notes.slice(0, 6), [notes])
 
+  // Cockpit summary stats — derived from already-loaded notes; no extra
+  // queries. recent24 = notes created in the last 24h; parsedCount =
+  // notes with any parsed signal; riskCount = notes flagged with any
+  // parsed risk. The risk count is the urgent/triage read.
+  const cockpitStats = useMemo(() => {
+    const now = Date.now()
+    const day = 24 * 60 * 60 * 1000
+    let recent24 = 0
+    let parsedCount = 0
+    let riskCount = 0
+    for (const n of notes) {
+      const ts = n?.created_at ? new Date(n.created_at).getTime() : 0
+      if (ts && now - ts < day) recent24++
+      if (n?.parsed && (
+        n.parsed.summary ||
+        n.parsed.action_items?.length ||
+        n.parsed.risks?.length ||
+        n.parsed.follow_up_date ||
+        n.parsed.materials_needed?.length
+      )) parsedCount++
+      if (n?.parsed?.risks?.length) riskCount++
+    }
+    return { total: notes.length, recent24, parsedCount, riskCount }
+  }, [notes])
+
   // Linked to Jobs = notes WITH contact_id, grouped by contact name
   const linkedGroups = useMemo(() => {
     const linked = notes.filter((n) => n.contact_id)
@@ -222,28 +247,45 @@ export default function Notes() {
       animate="show"
       style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
-      {/* ─────────── HEADER ─────────── */}
+      {/* ─────────── COCKPIT PANEL ───────────
+          Black-glass summary card. Surfaces total / 24h / AI-parsed /
+          risks above the fold so the operator gets a triage read on
+          entry. Risks chip turns red when > 0. */}
       <motion.div
         variants={item}
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 16,
-          padding: '12px 20px 18px'
-        }}
+        className="v3-section v3-section--primary-quiet"
+        style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 18px' }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Capture</span>
-          <h1 className="v3-h1" style={{ marginTop: 6 }}>
-            Notes, <em>fast.</em>
-          </h1>
-          <div className="v3-caption" style={{ marginTop: 6 }}>
-            Speak or type a note. AI organizes it into action items, risks, and materials.
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Field Notes</span>
+            <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}>
+              Notes, fast.
+            </h1>
+            <div className="v3-caption" style={{ marginTop: 6 }}>
+              Speak or type a note. AI organizes it into action items, risks, and materials.
+            </div>
           </div>
+          <VoiceButton listening={listening} onStart={startVoice} onStop={stopVoice} />
         </div>
 
-        <VoiceButton listening={listening} onStart={startVoice} onStop={stopVoice} />
+        {/* Stat row — only render once we've loaded (notes can be empty
+            but loading=true initially, in which case skip the row). */}
+        {!loading && (cockpitStats.total > 0 || cockpitStats.recent24 > 0) && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginTop: 14, flexWrap: 'wrap' }}>
+            <CockpitStat label="Total" value={cockpitStats.total} />
+            <CockpitDivider />
+            <CockpitStat label="24h" value={cockpitStats.recent24} />
+            <CockpitDivider />
+            <CockpitStat label="AI" value={cockpitStats.parsedCount} tone="gold" />
+            {cockpitStats.riskCount > 0 && (
+              <>
+                <CockpitDivider />
+                <CockpitStat label="Risks" value={cockpitStats.riskCount} tone="alert" />
+              </>
+            )}
+          </div>
+        )}
       </motion.div>
 
       {/* ─────────── CAPTURE ─────────── */}
@@ -252,8 +294,9 @@ export default function Notes() {
         className="v3-section"
         style={{
           margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)',
-          // gold-tinted border bump on focus or listening — capture is the
-          // primary tool, the container reflects that with state.
+          // Gold thin border on focus = "thin line, not wash". Listening
+          // border red. Focus shadow is now neutral inner highlight only,
+          // no gold halo bleed.
           borderColor: listening
             ? 'rgba(192, 57, 43, 0.40)'
             : focused
@@ -261,7 +304,7 @@ export default function Notes() {
               : 'var(--v3-section-border)',
           transition: 'border-color 200ms ease, box-shadow 200ms ease',
           boxShadow: focused
-            ? '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 28px rgba(212, 175, 55, 0.12), 0 1px 2px rgba(0, 0, 0, 0.20)'
+            ? '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.30), 0 6px 20px rgba(0, 0, 0, 0.35)'
             : 'var(--v3-section-shadow)'
         }}
       >
@@ -411,8 +454,8 @@ export default function Notes() {
                 marginTop: 14,
                 padding: 14,
                 borderRadius: 14,
-                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.10), rgba(212, 175, 55, 0.02))',
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)'
+                background: 'var(--v3-surface-2)',
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 25%, transparent)'
               }}
             >
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -513,8 +556,8 @@ export default function Notes() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <span style={{
                       width: 28, height: 28, borderRadius: 8,
-                      background: 'var(--v3-primary-soft)',
-                      border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+                      background: 'var(--v3-surface-2)',
+                      border: '1px solid var(--v3-border-strong)',
                       display: 'grid', placeItems: 'center', flexShrink: 0
                     }}>
                       <Briefcase size={14} color="var(--v3-primary)" />
@@ -806,7 +849,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                   color: 'var(--v3-primary)',
                   fontFamily: 'var(--font-display)',
                   fontSize: 9,
-                  letterSpacing: '0.14em'
+                  letterSpacing: '0.08em'
                 }}>
                   <Sparkles size={9} />
                   AI
@@ -857,16 +900,16 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                 gap: 5,
                 padding: '3px 9px',
                 borderRadius: 999,
-                background: 'var(--v3-primary-soft)',
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-                color: 'var(--v3-primary)',
+                background: 'var(--v3-surface-2)',
+                border: '1px solid var(--v3-border-strong)',
+                color: 'var(--v3-text-muted)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase'
               }}>
-                <Briefcase size={10} />
+                <Briefcase size={10} color="var(--v3-primary)" />
                 {contact.name}
               </span>
             )}
@@ -917,7 +960,7 @@ function ParsedList({ title, items, Icon, tone }) {
         marginBottom: 6,
         fontSize: 10,
         fontWeight: 700,
-        letterSpacing: '0.14em',
+        letterSpacing: '0.10em',
         textTransform: 'uppercase',
         color
       }}>
@@ -929,6 +972,38 @@ function ParsedList({ title, items, Icon, tone }) {
       </ul>
     </div>
   )
+}
+
+/* ============================================================
+   CockpitStat / CockpitDivider — compact triage display for the
+   summary panel. Display number over a small uppercase label.
+   tone "gold" for AI count, "alert" for non-zero risks.
+   ============================================================ */
+function CockpitStat({ label, value, tone = 'default' }) {
+  const color = tone === 'gold'
+    ? 'var(--v3-primary)'
+    : tone === 'alert'
+      ? 'var(--v3-danger-bright)'
+      : 'var(--v3-text)'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+      <span style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+        color,
+        fontVariantNumeric: 'tabular-nums'
+      }}>
+        {value}
+      </span>
+      <span className="v3-eyebrow" style={tone === 'alert' ? { color: 'var(--v3-danger-bright)' } : undefined}>
+        {label}
+      </span>
+    </span>
+  )
+}
+
+function CockpitDivider() {
+  return <span aria-hidden="true" style={{ width: 1, height: 18, background: 'var(--v3-border)' }} />
 }
 
 /* ============================================================
