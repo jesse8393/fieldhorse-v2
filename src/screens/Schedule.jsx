@@ -824,7 +824,7 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, init
             onClick={(ev) => { ev.stopPropagation(); onDelete() }}
             aria-label="Delete event"
             style={{
-              width: 28, height: 28, borderRadius: 8,
+              width: 40, height: 40, borderRadius: 10,
               border: 'none', background: 'transparent',
               color: 'var(--v3-text-muted)',
               cursor: 'pointer', display: 'grid', placeItems: 'center',
