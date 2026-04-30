@@ -226,11 +226,10 @@ export default function ClientDetail() {
             <div style={{ minWidth: 0, flex: 1, paddingTop: 2 }}>
               <h1 style={{
                 margin: 0,
-                fontFamily: 'var(--font-serif)',
                 fontSize: 'clamp(22px, 5.5vw, 28px)',
                 lineHeight: 1.08,
-                letterSpacing: '-0.02em',
-                fontWeight: 400,
+                letterSpacing: '-0.015em',
+                fontWeight: 600,
                 color: 'var(--v3-text)'
               }}>
                 {client.name}
@@ -513,7 +512,6 @@ function OverviewRead({ client, lifetime, outstanding, activeCount }) {
               height: 160,
               background: `
                 linear-gradient(180deg, transparent 0%, transparent 60%, rgba(7, 7, 10, 0.7) 100%),
-                radial-gradient(60% 60% at 50% 50%, rgba(212, 175, 55, 0.10), transparent 70%),
                 repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
                 repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
                 var(--v3-surface-2)

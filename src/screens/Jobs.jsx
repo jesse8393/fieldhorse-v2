@@ -176,11 +176,9 @@ export default function Jobs() {
       <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1
-            className="v3-h1"
-            style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px, 6vw, 32px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400 }}
+            style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}
           >
-            Jobs &{' '}
-            <em style={{ fontStyle: 'italic', color: 'var(--v3-primary)' }}>Pipeline</em>
+            Jobs & Pipeline
           </h1>
           {/* Command bar — large numerics, muted labels. The operator
               scans the numbers, not the words. */}
