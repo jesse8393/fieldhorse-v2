@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Receipt, FileDown, DollarSign, ExternalLink, Check } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { generateInvoice, downloadPdf } from '../lib/pdf.js'
-import { logPayment } from '../lib/pipeline.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticTap } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
+import V3PaymentSheet from '../components/V3PaymentSheet.jsx'
 
 // Invoices / AR — v3 money command screen.
 //
@@ -46,6 +46,9 @@ export default function Invoices() {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('outstanding') // 'outstanding' | 'all'
+  // Row whose Mark Paid sheet is open. null = closed. Stores the full row
+  // so the sheet can prefill amount=balance and pass the contact (job).
+  const [payingRow, setPayingRow] = useState(null)
 
   const refresh = async () => {
     if (!user) return
@@ -153,20 +156,11 @@ export default function Invoices() {
     }
   }
 
-  async function handleMarkPaid(row) {
-    if (!window.confirm(`Mark ${fmtMoney(row.balance)} as paid for ${row.job.name}?`)) return
-    const { error } = await logPayment(row.job, {
-      amount: row.balance,
-      method: 'check',
-      reference: '',
-      paid_on: new Date().toISOString().slice(0, 10)
-    })
-    if (error) {
-      toastError("Couldn't record payment", error.message)
-      return
-    }
-    toastSuccess('Payment recorded', `${fmtMoney(row.balance)} for ${row.job.name}`)
-    await refresh()
+  // Mark Paid now opens the shared V3PaymentSheet. The sheet handles
+  // method / reference / paid_on / partial amount and calls logPayment
+  // through the existing pipeline (auto-close cascade preserved).
+  function openPaymentSheet(row) {
+    setPayingRow(row)
   }
 
   const { stagger, item } = useFhMotion()
@@ -289,12 +283,27 @@ export default function Invoices() {
                 key={r.job.id}
                 row={r}
                 onPDF={() => handleGeneratePDF(r)}
-                onPaid={() => handleMarkPaid(r)}
+                onPaid={() => openPaymentSheet(r)}
               />
             ))}
           </ul>
         )}
       </motion.div>
+
+      {/* Payment sheet — shared V3PaymentSheet from ContactDetail.
+          Opens when the operator taps Mark Paid on a row, prefilled with
+          that row's balance. On submit, logPayment cascades through
+          pipeline.js (auto-close on overpayment) and we refresh. */}
+      <AnimatePresence>
+        {payingRow && (
+          <V3PaymentSheet
+            contact={payingRow.job}
+            balance={payingRow.balance}
+            onClose={() => setPayingRow(null)}
+            onLogged={() => { setPayingRow(null); refresh() }}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

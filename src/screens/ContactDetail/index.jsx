@@ -3,11 +3,11 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, Phone, MessageSquare, Pencil, MoreHorizontal,
-  XCircle, Trash2, Users, X
+  XCircle, Trash2, Users
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import { supabase } from '../../lib/supabase.js'
-import { markLost, logPayment } from '../../lib/pipeline.js'
+import { markLost } from '../../lib/pipeline.js'
 import { stageColor } from '../../lib/stages.js'
 import { toastSuccess, toastInfo, toastError } from '../../lib/toast.js'
 import { hapticTap, hapticError } from '../../lib/haptics.js'
@@ -15,6 +15,7 @@ import { SkeletonBlock, SkeletonList } from '../../components/Skeleton.jsx'
 import ActionSheet from '../../components/ActionSheet.jsx'
 import AddEventSheet from '../../components/AddEventSheet.jsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.jsx'
+import V3PaymentSheet from '../../components/V3PaymentSheet.jsx'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
@@ -662,173 +663,3 @@ function DeleteCascadeRow({ label, count, detail = 'deleted' }) {
   )
 }
 
-/* ============================================================
-   V3 PAYMENT SHEET — minimal v3 surface for logging payments.
-   Wraps logPayment() from pipeline.js (preserves auto-close-when-paid-in-full
-   cascade + haptic + toast).
-   ============================================================ */
-
-function V3PaymentSheet({ contact, balance, onClose, onLogged }) {
-  const [amount, setAmount] = useState(balance > 0 ? balance : '')
-  const [method, setMethod] = useState('check')
-  const [reference, setReference] = useState('')
-  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
-  const [saving, setSaving] = useState(false)
-
-  async function submit(e) {
-    e.preventDefault()
-    if (saving) return
-    setSaving(true)
-    try {
-      await logPayment(contact, { amount, method, reference, paid_on: paidOn })
-      toastSuccess('Payment logged', `${money(amount)} recorded`)
-      onLogged()
-    } catch (err) {
-      toastError("Couldn't log payment", err?.message || 'Unknown error')
-      setSaving(false)
-    }
-  }
-
-  return (
-    <>
-      <motion.div
-        onClick={onClose}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(8px)', zIndex: 80
-        }}
-      />
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 12, opacity: 0 }}
-        style={{
-          position: 'fixed',
-          left: 16, right: 16, bottom: 'max(16px, env(safe-area-inset-bottom))',
-          maxWidth: 480, margin: '0 auto',
-          background: 'var(--v3-surface-2)', borderRadius: 18,
-          border: '1px solid var(--v3-border)', padding: 20, zIndex: 81,
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.18em', textTransform: 'uppercase',
-            color: 'var(--v3-primary)'
-          }}>
-            Log Payment
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              width: 32, height: 32, borderRadius: 10, border: '1px solid var(--v3-border)',
-              background: 'transparent', color: 'var(--v3-text-muted)', cursor: 'pointer',
-              display: 'grid', placeItems: 'center'
-            }}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <SheetField label="Amount">
-            <input
-              autoFocus
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-          </SheetField>
-          <SheetField label="Method">
-            <select value={method} onChange={(e) => setMethod(e.target.value)}>
-              <option value="check">Check</option>
-              <option value="card">Card</option>
-              <option value="cash">Cash</option>
-              <option value="ach">ACH</option>
-            </select>
-          </SheetField>
-          {method === 'check' && (
-            <SheetField label="Check number">
-              <input value={reference} onChange={(e) => setReference(e.target.value)} />
-            </SheetField>
-          )}
-          <SheetField label="Paid on">
-            <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
-          </SheetField>
-          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                flex: 1, padding: '12px', borderRadius: 12,
-                background: 'transparent', border: '1px solid var(--v3-border)',
-                color: 'var(--v3-text)', cursor: 'pointer',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                flex: 2, padding: '12px', borderRadius: 12,
-                background: 'var(--v3-primary)', border: 'none', color: 'var(--v3-on-primary)',
-                cursor: saving ? 'wait' : 'pointer',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-                letterSpacing: '0.04em',
-                boxShadow: '0 8px 22px rgba(212, 175, 55, 0.32)'
-              }}
-            >
-              {saving ? 'Saving…' : 'Log Payment'}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </>
-  )
-}
-
-function SheetField({ label, children }) {
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
-        {label}
-      </span>
-      <div className="v3-sheet-field">
-        {children}
-      </div>
-      <style>{`
-        .v3-sheet-field input,
-        .v3-sheet-field select {
-          width: 100%;
-          box-sizing: border-box;
-          padding: 12px 14px;
-          background: var(--v3-surface);
-          border: 1px solid var(--v3-border);
-          border-radius: 10px;
-          color: var(--v3-text);
-          font-family: var(--font-body);
-          font-size: 14px;
-          outline: none;
-          transition: border-color 160ms ease;
-        }
-        .v3-sheet-field input:focus,
-        .v3-sheet-field select:focus {
-          border-color: var(--v3-primary);
-        }
-      `}</style>
-    </label>
-  )
-}
