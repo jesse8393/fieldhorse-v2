@@ -9,6 +9,7 @@ import { compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligen
 import { toastError, toastSuccess } from '../../../lib/toast.js'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.js'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
+import ActionSheet from '../../../components/ActionSheet.jsx'
 
 const BUCKET = 'job-photos'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per photo
@@ -33,6 +34,9 @@ export default function PhotosSection({ jobId, userId }) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [captioningIds, setCaptioningIds] = useState(() => new Set())
+  // Destructive-confirm sheet state for delete photo.
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [lightboxIdx, setLightboxIdx] = useState(-1)
   const [lightboxUrl, setLightboxUrl] = useState('')
@@ -170,8 +174,17 @@ export default function PhotosSection({ jobId, userId }) {
     if (error) toastError("Couldn't save caption", error.message)
   }
 
-  async function remove(row) {
-    if (!window.confirm(`Delete "${row.filename}"?`)) return
+  // Open the destructive-confirm sheet for this photo. The actual
+  // storage + db delete happens in confirmRemove on commit.
+  function remove(row) {
+    if (!row) return
+    setPendingDelete(row)
+  }
+
+  async function confirmRemove() {
+    const row = pendingDelete
+    if (!row || deleting) return
+    setDeleting(true)
     try {
       await supabase.storage.from(BUCKET).remove([row.storage_path])
       await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
@@ -179,6 +192,9 @@ export default function PhotosSection({ jobId, userId }) {
       await fetchRows()
     } catch (ex) {
       toastError('Delete failed', ex?.message || 'Try again')
+    } finally {
+      setDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -425,6 +441,27 @@ export default function PhotosSection({ jobId, userId }) {
           />
         )}
       </AnimatePresence>
+
+      {/* Destructive-confirm sheet for delete photo. Storage + db
+          delete + refresh happen in confirmRemove on commit. */}
+      <ActionSheet
+        open={!!pendingDelete}
+        title="Delete this photo?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deleting ? 'Deleting…' : 'Delete photo'}
+        commitBusy={deleting}
+        commitDisabled={deleting}
+        destructive
+        onClose={() => { if (!deleting) setPendingDelete(null) }}
+        onCommit={confirmRemove}
+      >
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{pendingDelete?.filename || 'this photo'}</strong> from storage and the job record. This can't be undone.
+        </p>
+      </ActionSheet>
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.js'
-import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
+import ActionSheet from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SpecTabs from '../components/SpecTabs.jsx'
@@ -63,6 +63,11 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true)
   const [weather, setWeather] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
+  // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
+  // event row being deleted (for title display); deletingEvt is the
+  // commit-in-flight flag.
+  const [pendingDeleteEvt, setPendingDeleteEvt] = useState(null)
+  const [deletingEvt, setDeletingEvt] = useState(false)
 
   // If the URL had ?d=YYYY-MM-DD, consume it once so the back button
   // doesn't keep forcing the cursor back to that day.
@@ -74,6 +79,17 @@ export default function Schedule() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Resolve the event row from id and open the destructive-confirm sheet.
+  // Both DayView and WeekView delete affordances funnel through here so
+  // the confirm UX is consistent and lifted out of the row components.
+  function requestDeleteEvent(evtId) {
+    if (!evtId) return
+    const row = (events || []).find((e) => e.id === evtId)
+      || (upcoming || []).find((e) => e.id === evtId)
+      || { id: evtId, title: 'this event' }
+    setPendingDeleteEvt(row)
+  }
 
   async function deleteEvent(evtId) {
     if (!evtId) return
@@ -394,7 +410,7 @@ export default function Schedule() {
               events={events}
               now={new Date()}
               onClick={(id) => navigate(`/jobs/${id}`)}
-              onDelete={deleteEvent}
+              onDelete={requestDeleteEvent}
               onAdd={() => setAddOpen(true)}
             />
           )}
@@ -403,7 +419,7 @@ export default function Schedule() {
               start={addDays(cursor, -((cursor.getDay() + 6) % 7))}
               events={events}
               onClick={(id) => navigate(`/jobs/${id}`)}
-              onDelete={deleteEvent}
+              onDelete={requestDeleteEvent}
             />
           )}
         </motion.div>
@@ -427,6 +443,38 @@ export default function Schedule() {
         onClose={() => setAddOpen(false)}
         onSaved={() => { setAddOpen(false); load() }}
       />
+
+      {/* Destructive-confirm sheet for delete event. The actual delete
+          flow (snapshot + optimistic removal + Undo toast + Supabase
+          delete with user_id guard + refresh) lives in deleteEvent;
+          this sheet only gates execution behind a confirm step. */}
+      <ActionSheet
+        open={!!pendingDeleteEvt}
+        title="Delete this event?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deletingEvt ? 'Deleting…' : 'Delete event'}
+        commitBusy={deletingEvt}
+        commitDisabled={deletingEvt}
+        destructive
+        onClose={() => { if (!deletingEvt) setPendingDeleteEvt(null) }}
+        onCommit={async () => {
+          if (!pendingDeleteEvt) return
+          setDeletingEvt(true)
+          try {
+            await deleteEvent(pendingDeleteEvt.id)
+          } finally {
+            setDeletingEvt(false)
+            setPendingDeleteEvt(null)
+          }
+        }}
+      >
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{pendingDeleteEvt?.title || 'this event'}</strong> from your schedule. You'll get an Undo toast right after — tap it to restore.
+        </p>
+      </ActionSheet>
     </motion.div>
   )
 }
@@ -598,7 +646,7 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
             status={status}
             initial={initial}
             onClick={() => e.contact_id && onClick(e.contact_id)}
-            onDelete={() => onDelete && window.confirm('Delete this event?') && onDelete(e.id)}
+            onDelete={onDelete ? () => onDelete(e.id) : undefined}
             isClickable={Boolean(e.contact_id)}
           />
         )
@@ -821,7 +869,7 @@ function WeekView({ start, events, onClick, onDelete }) {
                   {onDelete && (
                     <button
                       type="button"
-                      onClick={(ev) => { ev.stopPropagation(); if (window.confirm('Delete this event?')) onDelete(e.id) }}
+                      onClick={(ev) => { ev.stopPropagation(); onDelete(e.id) }}
                       aria-label="Delete event"
                       style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--v3-text-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.6 }}
                     >

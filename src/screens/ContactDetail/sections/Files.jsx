@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase.js'
 import { toastError, toastSuccess } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
+import ActionSheet from '../../../components/ActionSheet.jsx'
 
 const BUCKET = 'job-files'
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB per file
@@ -24,6 +25,9 @@ export default function FilesSection({ jobId, userId }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  // Destructive-confirm sheet state for delete file.
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const inputRef = useRef(null)
 
   const fetchRows = useCallback(async () => {
@@ -95,8 +99,17 @@ export default function FilesSection({ jobId, userId }) {
     window.open(data.signedUrl, '_blank', 'noopener')
   }
 
-  async function remove(row) {
-    if (!window.confirm(`Delete "${row.filename}"?`)) return
+  // Open the destructive-confirm sheet for this file. Storage + db
+  // delete happens in confirmRemove on commit.
+  function remove(row) {
+    if (!row) return
+    setPendingDelete(row)
+  }
+
+  async function confirmRemove() {
+    const row = pendingDelete
+    if (!row || deleting) return
+    setDeleting(true)
     try {
       await supabase.storage.from(BUCKET).remove([row.storage_path])
       await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
@@ -104,6 +117,9 @@ export default function FilesSection({ jobId, userId }) {
       await fetchRows()
     } catch (ex) {
       toastError('Delete failed', ex?.message || 'Try again')
+    } finally {
+      setDeleting(false)
+      setPendingDelete(null)
     }
   }
 
@@ -225,6 +241,27 @@ export default function FilesSection({ jobId, userId }) {
           ))}
         </ul>
       )}
+
+      {/* Destructive-confirm sheet for delete file. Storage + db delete
+          + refresh happen in confirmRemove on commit. */}
+      <ActionSheet
+        open={!!pendingDelete}
+        title="Delete this file?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deleting ? 'Deleting…' : 'Delete file'}
+        commitBusy={deleting}
+        commitDisabled={deleting}
+        destructive
+        onClose={() => { if (!deleting) setPendingDelete(null) }}
+        onCommit={confirmRemove}
+      >
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{pendingDelete?.filename || 'this file'}</strong> from storage and the job record. This can't be undone.
+        </p>
+      </ActionSheet>
     </div>
   )
 }

@@ -7,6 +7,7 @@ import {
   Phone, Mail, MapPin, Trash2, MessageSquare, Users
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.js'
+import ActionSheet from '../components/ActionSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
@@ -50,6 +51,9 @@ export default function ClientDetail() {
   const [notes, setNotes] = useState([])
   const [files, setFiles] = useState([])
   const [payments, setPayments] = useState([])
+  // Destructive-confirm sheet state for delete client.
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Derived metrics — computed from jobs[] + payments[].
   // Lifetime: sum of every job amount under this client, all stages.
@@ -141,11 +145,19 @@ export default function ClientDetail() {
     return () => { cancelled = true }
   }, [client?.id, user?.id])
 
-  async function handleDelete() {
+  // Open the destructive-confirm sheet. The header trash button hits this.
+  function requestDelete() {
     if (!client?.id) return
-    if (!window.confirm(`Delete ${client.name}? Jobs keep running (they just lose the client link).`)) return
+    setDeleteOpen(true)
+  }
+
+  async function confirmDelete() {
+    if (!client?.id || deleting) return
+    setDeleting(true)
     const { error } = await supabase.from('fh_clients').delete().eq('id', client.id).eq('user_id', user.id)
     if (error) {
+      setDeleting(false)
+      setDeleteOpen(false)
       toast({ kind: 'error', title: "Couldn't delete", body: error.message })
       return
     }
@@ -195,7 +207,7 @@ export default function ClientDetail() {
           >
             <Pencil size={16} />
           </IconBtn>
-          <IconBtn onClick={() => { hapticError(); handleDelete() }} ariaLabel="Delete client" tone="danger">
+          <IconBtn onClick={() => { hapticError(); requestDelete() }} ariaLabel="Delete client" tone="danger">
             <Trash2 size={16} />
           </IconBtn>
         </div>
@@ -358,6 +370,28 @@ export default function ClientDetail() {
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
       </div>
+
+      {/* Destructive-confirm sheet for delete client. Body preserves the
+          existing nuance from the prior native confirm: jobs keep
+          running but lose the client link. */}
+      <ActionSheet
+        open={deleteOpen}
+        title="Delete this client?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deleting ? 'Deleting…' : 'Delete client'}
+        commitBusy={deleting}
+        commitDisabled={deleting}
+        destructive
+        onClose={() => { if (!deleting) setDeleteOpen(false) }}
+        onCommit={confirmDelete}
+      >
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running — they just lose the client link.
+        </p>
+      </ActionSheet>
     </motion.div>
   )
 }
