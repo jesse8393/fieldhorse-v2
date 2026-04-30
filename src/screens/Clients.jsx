@@ -599,7 +599,7 @@ function ClientTile({ client: c, rollup: r, lastActivityRel, index, isTop, onOpe
 
 const contactBtnStyle = {
   display: 'grid', placeItems: 'center',
-  width: 34, height: 34, borderRadius: 9,
+  width: 42, height: 42, borderRadius: 11,
   background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
   color: 'var(--v3-text)', textDecoration: 'none',
   WebkitTapHighlightColor: 'transparent'

@@ -1027,7 +1027,7 @@ function FilesList({ rows }) {
             </button>
             <button type="button" onClick={() => open(r)} aria-label="Open" style={{
               flexShrink: 0,
-              width: 32, height: 32, borderRadius: 9,
+              width: 40, height: 40, borderRadius: 10,
               border: '1px solid var(--v3-border-strong)',
               background: 'transparent',
               color: 'var(--v3-text-muted)',
