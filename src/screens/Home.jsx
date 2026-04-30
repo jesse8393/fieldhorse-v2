@@ -35,10 +35,6 @@ function greetingPrefix() {
   return 'Good evening,'
 }
 
-function formatLongDate(d) {
-  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
-}
-
 function emailFirstToken(email) {
   if (!email) return ''
   const raw = email.split('@')[0].split(/[._-]/).filter(Boolean)[0] || ''
@@ -440,12 +436,12 @@ export default function Home() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 className="v3-h1">
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
+            {now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
+          <h1 className="v3-h1" style={{ marginTop: 6 }}>
             {greetingPrefix()} <em>{firstName}.</em>
           </h1>
-          <div className="v3-caption" style={{ marginTop: 6 }}>
-            {formatLongDate(now)}
-          </div>
         </div>
 
         {hasCoords ? (
@@ -515,12 +511,52 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* ─────────── TIER 1 — HERO (TODAY'S REVENUE OPPORTUNITY) ───────────
-          Visual-impact pass: edge-to-edge full bleed (0px horizontal padding
-          inside the screen, vs 20px elsewhere) — the hero now spans the
-          entire width, breaking the column completely and dominating the
-          screen. Bottom reflection blob spills below the card for cinematic
-          depth. Heavier shadow + gold-tinted border gain. */}
+      {/* ─────────── TODAY'S PRIORITIES — KPIs (mockup) ───────────
+          Per v3 mockup: 3 compact KPI cards stating what needs the
+          operator's attention today. Mockup leads with this BEFORE
+          the pipeline value so the operator sees the triage read
+          first; Pipeline follows. */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--quiet"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader label="Today's Priorities" />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 10,
+            marginTop: 4
+          }}
+        >
+          <CompactKpi
+            tone="success"
+            icon={PhoneCall}
+            value={dealsAtRisk?.followUps}
+            label="Follow-ups"
+            subline={dealsAtRisk?.followUps > 0 ? 'Calls to leads' : null}
+            onTap={() => navigate('/jobs?filter=lead')}
+          />
+          <CompactKpi
+            tone="lead"
+            icon={FileText}
+            value={dealsAtRisk?.quotesAttention}
+            label="Quotes"
+            subline={dealsAtRisk?.quotesAttention > 0 ? 'Need follow up' : null}
+            onTap={() => navigate('/jobs?filter=quote')}
+          />
+          <CompactKpi
+            tone="warn"
+            icon={CalendarClock}
+            value={jobsBehind}
+            label="Jobs Behind"
+            subline={jobsBehind > 0 ? 'Reschedule' : null}
+            onTap={() => navigate('/schedule')}
+          />
+        </div>
+      </motion.div>
+
       {/* PIPELINE CARD — compact per v3 mockup. Was the giant 100px-money
           hero with stretched ambient blobs. Now: framed v3 section
           card with modest pipeline value, trend, sparkline + bottom
@@ -647,48 +683,6 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* ─────────── TODAY'S PRIORITIES — KPIs (mockup) ───────────
-          Per v3 mockup: 3 compact KPI cards stating what needs the
-          operator's attention today. Renamed from "Critical Insights"
-          per the mockup spec. */}
-      <motion.div
-        variants={item}
-        className="v3-section v3-section--quiet"
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
-      >
-        <SectionHeader label="Today's Priorities" />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 10,
-            marginTop: 4
-          }}
-        >
-          <CompactKpi
-            tone="danger"
-            value={dealsAtRisk?.followUps}
-            label="Follow-ups"
-            subline={dealsAtRisk?.followUps > 0 ? 'Leads gone cold' : null}
-            onTap={() => navigate('/jobs?filter=lead')}
-          />
-          <CompactKpi
-            tone="primary"
-            value={dealsAtRisk?.quotesAttention}
-            label="Quotes"
-            subline={dealsAtRisk?.quotesAttention > 0 ? 'Need attention' : null}
-            onTap={() => navigate('/jobs?filter=quote')}
-          />
-          <CompactKpi
-            tone="primary"
-            value={jobsBehind}
-            label="Jobs Behind"
-            subline={jobsBehind > 0 ? 'Reschedule' : null}
-            onTap={() => navigate('/schedule')}
-          />
-        </div>
-      </motion.div>
-
       {/* ─────────── TODAY ON SITE ───────────
           Schedule entries that start today, sourced from a safe
           read-only fh_schedule query (no schema change). Polished
@@ -790,7 +784,7 @@ export default function Home() {
             marginTop: 4
           }}
         >
-          <QuickAction icon={Plus} label="Add Lead" onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
           <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1')} />
           <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
           <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
@@ -891,6 +885,10 @@ function TodayOnSiteRow({ row, onTap }) {
   const startTime = row.startAt
     ? new Date(row.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
     : ''
+  const endTime = row.endAt
+    ? new Date(row.endAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : ''
+  const timeLabel = startTime && endTime ? `${startTime} – ${endTime}` : (startTime || '—')
   return (
     <motion.button
       type="button"
@@ -914,10 +912,10 @@ function TodayOnSiteRow({ row, onTap }) {
         boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset'
       }}
     >
-      {/* Time slot */}
+      {/* Time slot — start–end range when both are known */}
       <div style={{
         flexShrink: 0,
-        minWidth: 56,
+        minWidth: endTime ? 100 : 56,
         textAlign: 'center',
         padding: '4px 8px',
         borderRadius: 8,
@@ -928,9 +926,10 @@ function TodayOnSiteRow({ row, onTap }) {
         color: 'var(--v3-text)',
         fontVariantNumeric: 'tabular-nums',
         letterSpacing: '0.02em',
-        lineHeight: 1.4
+        lineHeight: 1.4,
+        whiteSpace: 'nowrap'
       }}>
-        {startTime || '—'}
+        {timeLabel}
       </div>
       {/* Title + client */}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1078,12 +1077,18 @@ function PipelineDealRow({ deal, onTap }) {
    ============================================================ */
 
 const COMPACT_TONE = {
-  primary: { color: 'var(--v3-primary)',         soft: 'rgba(212, 175, 55, 0.10)' },
-  success: { color: 'var(--v3-success-bright)',  soft: 'rgba(46, 204, 113, 0.10)' },
-  danger:  { color: 'var(--v3-danger-bright)',   soft: 'rgba(192, 57, 43, 0.10)'  }
+  primary: { color: 'var(--v3-primary)' },
+  success: { color: 'var(--v3-success-bright)' },
+  danger:  { color: 'var(--v3-danger-bright)' },
+  // warn — bronze/amber from the stage-quote token; reads as "needs attention
+  // soon" without claiming the urgency of danger.
+  warn:    { color: 'var(--v3-stage-quote)' },
+  // lead — steel-blue from the stage-lead token; the closest token-native
+  // option to the mockup's lavender for the Quotes tile.
+  lead:    { color: 'var(--v3-stage-lead)' }
 }
 
-function CompactKpi({ tone = 'primary', value, label, subline, isMoney, onTap }) {
+function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }) {
   const t = COMPACT_TONE[tone] || COMPACT_TONE.primary
 
   return (
@@ -1112,6 +1117,19 @@ function CompactKpi({ tone = 'primary', value, label, subline, isMoney, onTap })
         position: 'absolute', top: 0, left: 0, right: 0, height: 2,
         background: t.color, opacity: 0.85
       }} />
+
+      {Icon ? (
+        <span aria-hidden="true" style={{
+          display: 'inline-grid', placeItems: 'center',
+          width: 28, height: 28, borderRadius: 8,
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border-strong)',
+          color: t.color,
+          marginBottom: 10
+        }}>
+          <Icon size={14} strokeWidth={2.2} />
+        </span>
+      ) : null}
 
       <div style={{
         fontFamily: 'var(--font-display)',
