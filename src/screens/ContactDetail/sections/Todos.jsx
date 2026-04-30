@@ -10,7 +10,10 @@ import { SkeletonList } from '../../../components/Skeleton.jsx'
  * To-dos section — backed by fh_job_todos. Owns its own fetch (independent of
  * the parent useJobData lifecycle since the per-tab refresh cost is tiny).
  *
- * Schema: { id, user_id, job_id, text, done, completed_at, created_at }
+ * Schema: { id, user_id, job_id, text, done, completed_at, created_at, due_at }
+ *   due_at (migration 010) is nullable. NextAction sorting + UI are
+ *   wired in later phases (2H-3 / 2H-4). For now the column exists,
+ *   flows through SELECT *, and is preserved by the snapshot+undo path.
  *
  * Delete uses toastUndo so a stray tap can be reversed within 6s.
  */
