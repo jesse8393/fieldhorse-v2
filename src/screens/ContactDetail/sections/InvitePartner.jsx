@@ -42,8 +42,7 @@ export default function InvitePartnerSection({ contact, onOpenInvitePartner }) {
         <div>
           <h3 style={{
             margin: 0,
-            fontFamily: 'var(--font-serif)',
-            fontSize: 22, fontWeight: 500, letterSpacing: '-0.01em',
+            fontSize: 20, fontWeight: 600, letterSpacing: '-0.015em',
             color: 'var(--v3-text)'
           }}>
             Share this job with another contractor.

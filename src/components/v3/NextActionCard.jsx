@@ -95,7 +95,7 @@ export default function NextActionCard({
               letterSpacing: '0.04em',
               cursor: loading ? 'wait' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              boxShadow: '0 8px 22px rgba(212, 175, 55, 0.32)',
+              boxShadow: '0 4px 14px rgba(212, 175, 55, 0.20)',
               WebkitTapHighlightColor: 'transparent'
             }}
           >

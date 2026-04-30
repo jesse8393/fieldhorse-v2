@@ -204,11 +204,11 @@ function InspectionLog({ open, trade, onOpenChange, onSave }) {
           </div>
           <DrawerTitle asChild>
             <h2 style={{
-              margin: '6px 0 0', fontFamily: 'var(--font-serif)',
-              fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1,
-              letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)'
+              margin: '6px 0 0',
+              fontSize: 'clamp(20px, 5.5vw, 26px)', lineHeight: 1.1,
+              letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)'
             }}>
-              Log <em style={{ fontStyle: 'italic', color: 'var(--v3-primary)' }}>{trade || 'inspection'}.</em>
+              Log {trade || 'inspection'}
             </h2>
           </DrawerTitle>
           <DrawerDescription style={{

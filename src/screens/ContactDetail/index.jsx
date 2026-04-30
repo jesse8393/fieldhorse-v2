@@ -442,11 +442,10 @@ function Header({
 
         <h1 style={{
           margin: clientLabel ? '4px 0 0' : 0,
-          fontFamily: 'var(--font-serif)',
-          fontSize: 'clamp(24px, 6.5vw, 30px)',
-          lineHeight: 1.08,
-          letterSpacing: '-0.02em',
-          fontWeight: 400,
+          fontSize: 'clamp(22px, 6vw, 28px)',
+          lineHeight: 1.1,
+          letterSpacing: '-0.015em',
+          fontWeight: 600,
           color: 'var(--v3-text)'
         }}>
           {contact.name || 'Untitled'}
@@ -533,7 +532,7 @@ function Header({
                 textTransform: 'uppercase',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.12), 0 3px 8px rgba(201, 150, 58, 0.24)'
+                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.10), 0 3px 8px rgba(201, 150, 58, 0.16)'
               }}
             >
               Done
