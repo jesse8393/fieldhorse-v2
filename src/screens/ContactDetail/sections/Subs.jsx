@@ -73,7 +73,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
   async function remove(id) {
     hapticTap()
     const snapshot = subs.find((s) => s.id === id)
-    const { error } = await supabase.from('fh_subs').delete().eq('id', id)
+    const { error } = await supabase.from('fh_subs').delete().eq('id', id).eq('user_id', userId)
     if (error) { toastError("Couldn't delete", error.message); return }
     await recalcCost(contact.id)
     fetchAll?.()

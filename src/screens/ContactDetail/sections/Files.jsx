@@ -27,17 +27,18 @@ export default function FilesSection({ jobId, userId }) {
   const inputRef = useRef(null)
 
   const fetchRows = useCallback(async () => {
-    if (!jobId) return
+    if (!jobId || !userId) return
     setLoading(true)
     const { data } = await supabase
       .from('fh_job_files')
       .select('*')
       .eq('job_id', jobId)
+      .eq('user_id', userId)
       .eq('kind', 'file')
       .order('uploaded_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
-  }, [jobId])
+  }, [jobId, userId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -98,7 +99,7 @@ export default function FilesSection({ jobId, userId }) {
     if (!window.confirm(`Delete "${row.filename}"?`)) return
     try {
       await supabase.storage.from(BUCKET).remove([row.storage_path])
-      await supabase.from('fh_job_files').delete().eq('id', row.id)
+      await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
       toastSuccess('Deleted', row.filename)
       await fetchRows()
     } catch (ex) {

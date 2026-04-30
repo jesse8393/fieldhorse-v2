@@ -80,7 +80,7 @@ export default function Schedule() {
     // Snapshot before deletion so Undo can re-insert. Strip generated
     // fields and the joined relation; only re-insert the source row.
     const snapshot = events.find((e) => e.id === evtId) || upcoming.find((e) => e.id === evtId)
-    const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId)
+    const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId).eq('user_id', user.id)
     if (error) {
       toastError("Couldn't delete", error.message)
       return

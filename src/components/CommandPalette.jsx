@@ -15,6 +15,7 @@ import {
   Paperclip
 } from 'lucide-react'
 import { universalSearch } from '../lib/universalSearch.js'
+import { useAuth } from '../contexts/AuthContext.jsx'
 
 // Static nav — shown as the "empty state" when the input is blank.
 // When the user starts typing, the data search results take over.
@@ -62,6 +63,7 @@ export default function CommandPalette() {
   const [results, setResults] = useState({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
   const [searching, setSearching] = useState(false)
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   // Open with ⌘K / Ctrl+K. Listens at the window level so it works
   // from anywhere — including focused inputs (preventDefault keeps
@@ -108,14 +110,14 @@ export default function CommandPalette() {
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const data = await universalSearch(q)
+        const data = await universalSearch(q, user?.id)
         if (!cancelled) setResults(data)
       } finally {
         if (!cancelled) setSearching(false)
       }
     }, 200)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [query, open])
+  }, [query, open, user?.id])
 
   function go(to) {
     setOpen(false)

@@ -65,12 +65,13 @@ export default function ContactDetail() {
   const nextTodo = useMemo(() => (todos || []).find((t) => !t.done) || null, [todos])
 
   async function markTodoDone(todoId) {
-    if (!todoId) return
+    if (!todoId || !user) return
     hapticTap()
     const { error } = await supabase
       .from('fh_job_todos')
       .update({ done: true, completed_at: new Date().toISOString() })
       .eq('id', todoId)
+      .eq('user_id', user.id)
     if (error) {
       toastError("Couldn't mark done", error.message || 'Try again')
       return
@@ -107,7 +108,7 @@ export default function ContactDetail() {
     setDeleteErr('')
     try {
       const deletedName = contact?.name || 'this job'
-      const { error } = await supabase.from('fh_contacts').delete().eq('id', id)
+      const { error } = await supabase.from('fh_contacts').delete().eq('id', id).eq('user_id', user.id)
       if (error) throw error
       toastSuccess('Deleted', `${deletedName} and cascading rows removed`)
       navigate('/jobs')

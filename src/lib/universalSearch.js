@@ -34,18 +34,21 @@ function fmtDateTime(iso) {
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
 }
 
-export async function universalSearch(query) {
+export async function universalSearch(query, userId) {
   const q = String(query || '').trim()
-  if (!q) return { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
+  if (!q || !userId) return { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
 
   const like = pat(q)
 
   // Parallel — independent queries, no transactional concern.
   // Each .or() searches the most useful columns for that table.
+  // Every query carries .eq('user_id', userId) for tenant isolation
+  // defense-in-depth alongside RLS.
   const [jobsRes, clientsRes, notesRes, eventsRes, filesRes] = await Promise.all([
     supabase
       .from('fh_contacts')
       .select('id, name, job_title, job_type, stage, amount')
+      .eq('user_id', userId)
       .or(`name.ilike.${like},job_title.ilike.${like},job_type.ilike.${like},phone.ilike.${like},email.ilike.${like},address.ilike.${like}`)
       .order('updated_at', { ascending: false })
       .limit(PER_KIND),
@@ -53,6 +56,7 @@ export async function universalSearch(query) {
     supabase
       .from('fh_clients')
       .select('id, name, company_name, phone, email, active_jobs_count')
+      .eq('user_id', userId)
       .or(`name.ilike.${like},company_name.ilike.${like},phone.ilike.${like},email.ilike.${like}`)
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .limit(PER_KIND),
@@ -60,6 +64,7 @@ export async function universalSearch(query) {
     supabase
       .from('fh_notes')
       .select('id, text, contact_id, created_at, fh_contacts(name)')
+      .eq('user_id', userId)
       .ilike('text', like)
       .order('created_at', { ascending: false })
       .limit(PER_KIND),
@@ -67,6 +72,7 @@ export async function universalSearch(query) {
     supabase
       .from('fh_schedule')
       .select('id, title, start_at, contact_id, fh_contacts(name)')
+      .eq('user_id', userId)
       .ilike('title', like)
       .order('start_at', { ascending: false })
       .limit(PER_KIND),
@@ -74,6 +80,7 @@ export async function universalSearch(query) {
     supabase
       .from('fh_job_files')
       .select('id, filename, kind, job_id, fh_contacts(name)')
+      .eq('user_id', userId)
       .ilike('filename', like)
       .order('uploaded_at', { ascending: false })
       .limit(PER_KIND)

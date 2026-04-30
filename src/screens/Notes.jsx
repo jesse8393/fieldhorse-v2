@@ -156,13 +156,15 @@ export default function Notes() {
   }
 
   async function markDone(id) {
-    await supabase.from('fh_notes').update({ done: true }).eq('id', id)
+    if (!user) return
+    await supabase.from('fh_notes').update({ done: true }).eq('id', id).eq('user_id', user.id)
     setNotes((n) => n.filter((x) => x.id !== id))
   }
 
   async function remove(id) {
+    if (!user) return
     const snapshot = notes.find((n) => n.id === id)
-    const { error } = await supabase.from('fh_notes').delete().eq('id', id)
+    const { error } = await supabase.from('fh_notes').delete().eq('id', id).eq('user_id', user.id)
     if (error) { toastError("Couldn't delete", error.message); return }
     setNotes((n) => n.filter((x) => x.id !== id))
     toastUndo('Note deleted', {

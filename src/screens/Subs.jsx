@@ -61,8 +61,8 @@ export default function Subs() {
     if (!user) return
     setLoading(true)
     const [{ data: subs }, { data: cs }] = await Promise.all([
-      supabase.from('fh_subs').select('*').order('created_at', { ascending: false }),
-      supabase.from('fh_contacts').select('id, name, job_title, stage')
+      supabase.from('fh_subs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('fh_contacts').select('id, name, job_title, stage').eq('user_id', user.id)
     ])
     setRows(subs || [])
     const map = {}

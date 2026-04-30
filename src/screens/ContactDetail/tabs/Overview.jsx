@@ -96,6 +96,7 @@ export default function OverviewTab({
             .from('fh_job_todos')
             .update({ done: true, completed_at: new Date().toISOString() })
             .eq('id', nextAction.sourceId)
+            .eq('user_id', userId)
           if (error) {
             toastError("Couldn't mark to-do done", error.message)
           } else {

@@ -44,12 +44,13 @@ export default function PhotosSection({ jobId, userId }) {
   const inputRef = useRef(null)
 
   const fetchRows = useCallback(async () => {
-    if (!jobId) return
+    if (!jobId || !userId) return
     setLoading(true)
     const { data } = await supabase
       .from('fh_job_files')
       .select('*')
       .eq('job_id', jobId)
+      .eq('user_id', userId)
       .eq('kind', 'photo')
       .order('uploaded_at', { ascending: false })
     const list = data || []
@@ -75,7 +76,7 @@ export default function PhotosSection({ jobId, userId }) {
     } else {
       setThumbUrls({})
     }
-  }, [jobId])
+  }, [jobId, userId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -143,6 +144,7 @@ export default function PhotosSection({ jobId, userId }) {
         .from('fh_job_files')
         .update({ caption: cap })
         .eq('id', rowId)
+        .eq('user_id', userId)
       if (error) return
       setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, caption: cap } : r))
     } catch {
@@ -164,6 +166,7 @@ export default function PhotosSection({ jobId, userId }) {
       .from('fh_job_files')
       .update({ caption: trimmed || null })
       .eq('id', rowId)
+      .eq('user_id', userId)
     if (error) toastError("Couldn't save caption", error.message)
   }
 
@@ -171,7 +174,7 @@ export default function PhotosSection({ jobId, userId }) {
     if (!window.confirm(`Delete "${row.filename}"?`)) return
     try {
       await supabase.storage.from(BUCKET).remove([row.storage_path])
-      await supabase.from('fh_job_files').delete().eq('id', row.id)
+      await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
       toastSuccess('Deleted', row.filename)
       await fetchRows()
     } catch (ex) {

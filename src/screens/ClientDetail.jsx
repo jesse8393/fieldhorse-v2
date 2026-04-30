@@ -99,6 +99,7 @@ export default function ClientDetail() {
       const { data: j } = await supabase
         .from('fh_contacts')
         .select('id, name, stage, job_title, job_type, amount, updated_at')
+        .eq('user_id', user.id)
         .eq('client_id', client.id)
         .order('updated_at', { ascending: false })
       if (cancelled) return
@@ -114,18 +115,21 @@ export default function ClientDetail() {
         supabase
           .from('fh_notes')
           .select('*, fh_contacts(name)')
+          .eq('user_id', user.id)
           .in('contact_id', jobIds)
           .order('created_at', { ascending: false })
           .limit(40),
         supabase
           .from('fh_job_files')
           .select('*, fh_contacts(name)')
+          .eq('user_id', user.id)
           .in('job_id', jobIds)
           .order('uploaded_at', { ascending: false })
           .limit(60),
         supabase
           .from('fh_payments')
           .select('contact_id, amount')
+          .eq('user_id', user.id)
           .in('contact_id', jobIds)
       ])
       if (cancelled) return
@@ -135,12 +139,12 @@ export default function ClientDetail() {
     }
     loadTabData()
     return () => { cancelled = true }
-  }, [client?.id])
+  }, [client?.id, user?.id])
 
   async function handleDelete() {
     if (!client?.id) return
     if (!window.confirm(`Delete ${client.name}? Jobs keep running (they just lose the client link).`)) return
-    const { error } = await supabase.from('fh_clients').delete().eq('id', client.id)
+    const { error } = await supabase.from('fh_clients').delete().eq('id', client.id).eq('user_id', user.id)
     if (error) {
       toast({ kind: 'error', title: "Couldn't delete", body: error.message })
       return
@@ -345,7 +349,7 @@ export default function ClientDetail() {
       <div style={{ padding: '0 20px' }}>
         {tab === 'overview' && (
           isEditing
-            ? <OverviewEdit client={client} onCommit={async (patch) => { await supabase.from('fh_clients').update(patch).eq('id', client.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
+            ? <OverviewEdit client={client} onCommit={async (patch) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
             : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} />
         )}
         {tab === 'projects' && (

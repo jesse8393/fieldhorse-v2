@@ -41,14 +41,14 @@ export function useJobData(id, userId) {
   const fetchAll = useCallback(async () => {
     if (!userId || !id) return
     const [c, s, e, p, i, n, sch, td] = await Promise.all([
-      supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
-      supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-      supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
-      supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
-      supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-      supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-      supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
-      supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: false })
+      supabase.from('fh_contacts').select('*').eq('id', id).eq('user_id', userId).maybeSingle(),
+      supabase.from('fh_subs').select('*').eq('contact_id', id).eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('fh_expenses').select('*').eq('contact_id', id).eq('user_id', userId).order('expense_date', { ascending: false }),
+      supabase.from('fh_payments').select('*').eq('contact_id', id).eq('user_id', userId).order('paid_on', { ascending: false }),
+      supabase.from('fh_inspections').select('*').eq('contact_id', id).eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('fh_notes').select('*').eq('contact_id', id).eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('fh_schedule').select('*').eq('contact_id', id).eq('user_id', userId).order('start_at', { ascending: true }),
+      supabase.from('fh_job_todos').select('*').eq('job_id', id).eq('user_id', userId).order('done', { ascending: true }).order('created_at', { ascending: false })
     ])
 
     const contactRow = c.data || null

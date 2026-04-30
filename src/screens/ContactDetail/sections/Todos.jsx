@@ -20,17 +20,18 @@ export default function TodosSection({ jobId, userId }) {
   const [draft, setDraft] = useState('')
 
   const fetchRows = useCallback(async () => {
-    if (!jobId) return
+    if (!jobId || !userId) return
     setLoading(true)
     const { data } = await supabase
       .from('fh_job_todos')
       .select('*')
       .eq('job_id', jobId)
+      .eq('user_id', userId)
       .order('done', { ascending: true })
       .order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
-  }, [jobId])
+  }, [jobId, userId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -61,6 +62,7 @@ export default function TodosSection({ jobId, userId }) {
       .from('fh_job_todos')
       .update({ done: next, completed_at: next ? new Date().toISOString() : null })
       .eq('id', row.id)
+      .eq('user_id', userId)
     if (error) {
       toastError("Couldn't update", error.message)
       fetchRows() // rollback to truth
@@ -71,7 +73,7 @@ export default function TodosSection({ jobId, userId }) {
     hapticTap()
     const snapshot = rows.find((r) => r.id === rowId)
     setRows((rs) => rs.filter((r) => r.id !== rowId)) // optimistic
-    const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId)
+    const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId).eq('user_id', userId)
     if (error) { toastError("Couldn't delete", error.message); fetchRows(); return }
     toastUndo('Task deleted', {
       description: (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',

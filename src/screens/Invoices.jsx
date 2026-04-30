@@ -51,8 +51,8 @@ export default function Invoices() {
     if (!user) return
     setLoading(true)
     const [{ data: js }, { data: ps }] = await Promise.all([
-      supabase.from('fh_contacts').select('*').in('stage', ['job', 'invoice', 'closed']).order('created_at', { ascending: false }),
-      supabase.from('fh_payments').select('*')
+      supabase.from('fh_contacts').select('*').eq('user_id', user.id).in('stage', ['job', 'invoice', 'closed']).order('created_at', { ascending: false }),
+      supabase.from('fh_payments').select('*').eq('user_id', user.id)
     ])
     setJobs(js || [])
     setPayments(ps || [])

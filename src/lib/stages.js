@@ -29,6 +29,7 @@ export async function transitionStage(contact, nextStage) {
     .from('fh_contacts')
     .update(patch)
     .eq('id', contact.id)
+    .eq('user_id', contact.user_id)
     .select()
     .single()
   return { data, error }
@@ -90,9 +91,10 @@ export async function logPayment(contact, { amount, method, reference, paid_on }
     .from('fh_payments')
     .select('amount')
     .eq('contact_id', contact.id)
+    .eq('user_id', contact.user_id)
   const total = (pays || []).reduce((s, p) => s + Number(p.amount || 0), 0)
   if (total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
-    await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id)
+    await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
   }
   return { total }
 }
