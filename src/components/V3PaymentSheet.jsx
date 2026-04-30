@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useId, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { logPayment } from '../lib/pipeline.js'
@@ -31,6 +32,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
   const [reference, setReference] = useState('')
   const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
+  const titleId = useId()
 
   async function submit(e) {
     e.preventDefault()
@@ -46,12 +48,12 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
     }
   }
 
-  // Defensive close — swallow the click so nothing behind the sheet
-  // (PaymentCard title <Link>, etc.) can interpret the gesture as a
-  // navigation. The sheet renders over a fixed backdrop, but rapid
-  // taps near the edge can land on underlying handlers when the
-  // backdrop animates in.
-  function handleClose(e) {
+  // Close on the gesture START — fires before iOS Safari can synthesize
+  // a delayed click at the same coordinates. Combined with the portal
+  // (below) and explicit preventDefault, this is the proven recipe to
+  // stop "ghost click" navigations to elements that appear under the
+  // user's finger after the sheet unmounts.
+  function handleClosePointer(e) {
     if (e) {
       e.preventDefault?.()
       e.stopPropagation?.()
@@ -59,25 +61,53 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
     onClose?.()
   }
 
-  return (
+  // Escape-to-close — small low-risk a11y win. Listener attached to
+  // window so it works regardless of which element has focus inside
+  // the dialog.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose?.()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Render via portal so the sheet's DOM node lives in <body>, outside
+  // the Invoices / ContactDetail screen tree. Eliminates the React-tree
+  // bubble path that could let a ghost-click reach a PaymentCard or
+  // Job Detail link rendered behind the sheet.
+  if (typeof document === 'undefined') return null
+
+  const sheet = (
     <>
       <motion.div
-        onClick={handleClose}
+        onPointerDown={handleClosePointer}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(8px)', zIndex: 80
+          backdropFilter: 'blur(8px)', zIndex: 80,
+          touchAction: 'none'
         }}
       />
       <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        // Stop pointer-down inside the sheet from reaching the backdrop
+        // or any underlying element. Without this, taps on Cancel /
+        // input fields could bleed through.
+        onPointerDown={(e) => e.stopPropagation()}
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 12, opacity: 0 }}
-        // Cap height so the sheet never overflows the viewport. Body
-        // scrolls; header + footer stay pinned. Bottom offset clears
-        // the BottomNav and the safe-area inset.
+        // 100dvh-aware height cap so iPhone Safari (URL bar collapse)
+        // doesn't push the footer below the visible viewport. vh
+        // fallback covers older browsers.
         style={{
           position: 'fixed',
           left: 16, right: 16, bottom: 'max(16px, env(safe-area-inset-bottom))',
@@ -94,16 +124,19 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
           padding: '20px 20px 14px',
           flexShrink: 0
         }}>
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.18em', textTransform: 'uppercase',
-            color: 'var(--v3-primary)'
-          }}>
+          <span
+            id={titleId}
+            style={{
+              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.18em', textTransform: 'uppercase',
+              color: 'var(--v3-primary)'
+            }}
+          >
             Log Payment
           </span>
           <button
             type="button"
-            onClick={handleClose}
+            onPointerDown={handleClosePointer}
             aria-label="Close"
             style={{
               width: 32, height: 32, borderRadius: 10, border: '1px solid var(--v3-border)',
@@ -121,12 +154,10 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
             flex: 1, minHeight: 0
           }}
         >
-          {/* Scrollable body — fields live here. flex:1 + minHeight:0
-              + overflowY:auto is the standard recipe to make a flex
-              child scroll inside a capped flex parent. */}
           <div style={{
             flex: 1, minHeight: 0,
             overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
             padding: '0 20px',
             display: 'flex', flexDirection: 'column', gap: 14
           }}>
@@ -157,8 +188,6 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
               <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
             </SheetField>
           </div>
-          {/* Sticky footer — always visible. Top hairline separates
-              from the scrolling body. */}
           <div style={{
             display: 'flex', gap: 8,
             padding: '14px 20px 20px',
@@ -168,7 +197,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
           }}>
             <button
               type="button"
-              onClick={handleClose}
+              onPointerDown={handleClosePointer}
               style={{
                 flex: 1, padding: '12px', borderRadius: 12,
                 background: 'transparent', border: '1px solid var(--v3-border)',
@@ -197,6 +226,8 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
       </motion.div>
     </>
   )
+
+  return createPortal(sheet, document.body)
 }
 
 function SheetField({ label, children }) {
