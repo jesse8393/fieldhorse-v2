@@ -3,14 +3,32 @@
 
 const MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
 
+// Hard ceiling so a stuck /api/claude call never leaves the UI in an
+// indefinite "parsing…" or "drafting…" state. 15s is comfortably above
+// typical Sonnet response time for our Notes / Compose / Bid / Vision
+// payload sizes; tune via this constant if real usage exceeds it.
+const REQUEST_TIMEOUT_MS = 15000
+
 export async function claudeMessage({ system, messages, maxTokens = 1024 }) {
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens })
-  })
-  if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)
-  return res.json()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens }),
+      signal: controller.signal
+    })
+    if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Claude request timed out (15s)')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 /**
@@ -46,13 +64,25 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
     ]
   }]
 
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens })
-  })
-  if (!res.ok) throw new Error(`Claude vision request failed: ${res.status}`)
-  return res.json()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens }),
+      signal: controller.signal
+    })
+    if (!res.ok) throw new Error(`Claude vision request failed: ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Claude vision request timed out (15s)')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 // Pull the first JSON object out of a Claude response body. Vision responses
