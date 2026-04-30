@@ -169,6 +169,7 @@ export default function OverviewTab({
         <NextActionCard
           title={nextAction.kind === 'idle' ? null : nextAction.title}
           date={nextAction.date}
+          dueIso={nextAction.kind === 'todo' ? nextAction.dueAt : null}
           cta={nextAction.ctaLabel}
           onComplete={handleNextActionComplete}
           onSchedule={handleNextActionSchedule}

@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Calendar } from 'lucide-react'
 import { hapticTap } from '../../lib/haptics.js'
+import { dueStatus } from '../../lib/dueDate.js'
 
 /**
  * Next Action card — the most important thing on the Job Detail Overview.
@@ -21,13 +22,16 @@ import { hapticTap } from '../../lib/haptics.js'
  */
 export default function NextActionCard({
   title,
-  date, // optional: ISO string or Date or formatted string
+  date, // optional: ISO string or Date or formatted string (schedule entries)
+  dueIso, // optional: ISO timestamptz from a todo's due_at — renders a
+          // tone-aware chip via dueStatus(). Null/undefined hides it.
   cta = 'Mark Complete',
   onComplete,
   onSchedule,
   loading
 }) {
   const hasAction = !!title
+  const due = dueStatus(dueIso)
 
   return (
     <div style={{
@@ -76,6 +80,7 @@ export default function NextActionCard({
               {formatDate(date)}
             </div>
           )}
+          {due && <DueStatusChip status={due} />}
           <motion.button
             type="button"
             whileTap={{ scale: 0.98 }}
@@ -138,6 +143,52 @@ export default function NextActionCard({
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * DueStatusChip — same three-tone palette as the cockpit NextTodoDueChip
+ * and the per-row DueChipButton. Keeps the chip vocabulary consistent
+ * everywhere a due_at surfaces.
+ */
+function DueStatusChip({ status }) {
+  const palette = status.tone === 'danger'
+    ? {
+        bg: 'var(--v3-danger-soft)',
+        border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
+        color: 'var(--v3-danger-bright)'
+      }
+    : status.tone === 'warn'
+      ? {
+          bg: 'var(--v3-primary-soft)',
+          border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+          color: 'var(--v3-primary)'
+        }
+      : {
+          bg: 'var(--v3-surface-2)',
+          border: 'var(--v3-border)',
+          color: 'var(--v3-text-muted)'
+        }
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      padding: '3px 9px',
+      borderRadius: 999,
+      background: palette.bg,
+      border: `1px solid ${palette.border}`,
+      color: palette.color,
+      fontFamily: 'var(--font-body)',
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+      lineHeight: 1.4
+    }}>
+      {status.label}
+    </span>
   )
 }
 

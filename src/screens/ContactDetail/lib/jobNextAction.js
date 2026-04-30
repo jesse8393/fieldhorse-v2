@@ -1,13 +1,14 @@
+import { dueStatus } from '../../../lib/dueDate.js'
+
 /**
  * Job Next Action — resolve "what should the operator do next?" via priority
  * chain (Q2 decision):
  *
  *   1. Next upcoming fh_schedule entry  (start_at >= now, soonest first)
  *   2. Next undone milestone            (contact.milestones[].done = false)
- *   3. Next undone fh_job_todos         (todos.done = false, oldest first
- *                                         — todos table has no due_at column
- *                                         per current schema, so we fall back
- *                                         to created_at order)
+ *   3. Next undone fh_job_todos         (due-aware: overdue > today > soonest
+ *                                         future > undated, undated preserves
+ *                                         upstream created_at-newest-first order)
  *   4. Stage-driven default suggestion  (per pipeline stage)
  *
  * When chain item 4 fires, the suggestion's `pipelineFn` advances the stage
@@ -16,11 +17,11 @@
  * row — same backend cascade, single primary action per screen.
  *
  * Pure function. Returns one of these shapes (always { kind, title, ctaLabel }
- * plus optional date/pipelineFn/sourceId):
+ * plus optional date/pipelineFn/sourceId/dueAt):
  *
  *   { kind: 'schedule',  title, date, ctaLabel: 'Mark Complete',  sourceId }
  *   { kind: 'milestone', title,       ctaLabel: 'Mark Complete',  sourceId: index }
- *   { kind: 'todo',      title,       ctaLabel: 'Mark Complete',  sourceId }
+ *   { kind: 'todo',      title, dueAt, ctaLabel: 'Mark Complete', sourceId }
  *   { kind: 'stage',     title,       ctaLabel: <stage cta>,      pipelineFn }
  *   { kind: 'idle',      title: 'No next action.', ctaLabel: '+ Schedule next step' }
  *
@@ -74,15 +75,17 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] } = 
     }
   }
 
-  // 3. TODOS — first undone. Schema has no due_at; rely on natural order
-  // (TodosTab sorts done ASC, created_at DESC, so the first undone in the
-  // array is "newest pending", which is what an operator typically thinks
-  // of as "what I added most recently").
-  const nextTodo = todos.find((t) => t && !t.done)
+  // 3. TODOS — due-aware selection (migration 010 added due_at). Inside
+  // the todos branch we rank: overdue (oldest first) > today > soonest
+  // future > undated. Undated rows fall back to upstream array order
+  // (TodosTab fetches done ASC, created_at DESC), preserving the prior
+  // "newest pending" behavior for operators not using deadlines.
+  const nextTodo = pickPriorityTodo(todos)
   if (nextTodo) {
     return {
       kind: 'todo',
-      title: nextTodo.title || nextTodo.label || 'Next to-do',
+      title: nextTodo.text || 'Next to-do',
+      dueAt: nextTodo.due_at || null,
       ctaLabel: 'Mark Complete',
       sourceId: nextTodo.id
     }
@@ -97,4 +100,31 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] } = 
     ctaLabel: fallback.ctaLabel,
     pipelineFn: fallback.pipelineFn
   }
+}
+
+// Bucket undone todos by dueStatus tone, then sort by due_at ascending
+// within each bucket. danger (overdue, oldest first) > warn (today)
+// > muted (soonest future) > undated (preserves upstream order).
+const TODO_BUCKET_RANK = { danger: 0, warn: 1, muted: 2 }
+
+function pickPriorityTodo(todos) {
+  if (!Array.isArray(todos) || todos.length === 0) return null
+  let firstUndated = null
+  const dated = []
+  for (const t of todos) {
+    if (!t || t.done) continue
+    if (t.due_at) {
+      dated.push(t)
+    } else if (!firstUndated) {
+      firstUndated = t
+    }
+  }
+  if (dated.length === 0) return firstUndated
+  dated.sort((a, b) => {
+    const ra = TODO_BUCKET_RANK[dueStatus(a.due_at)?.tone] ?? 3
+    const rb = TODO_BUCKET_RANK[dueStatus(b.due_at)?.tone] ?? 3
+    if (ra !== rb) return ra - rb
+    return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
+  })
+  return dated[0]
 }
