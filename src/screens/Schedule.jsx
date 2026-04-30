@@ -871,9 +871,19 @@ function WeekView({ start, events, onClick, onDelete }) {
                       type="button"
                       onClick={(ev) => { ev.stopPropagation(); onDelete(e.id) }}
                       aria-label="Delete event"
-                      style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--v3-text-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.6 }}
+                      style={{
+                        position: 'absolute', top: 0, right: 0,
+                        width: 40, height: 40, borderRadius: 10,
+                        border: 'none', background: 'transparent',
+                        color: 'var(--v3-text-muted)',
+                        cursor: 'pointer', display: 'grid', placeItems: 'center',
+                        opacity: 0.6,
+                        WebkitTapHighlightColor: 'transparent'
+                      }}
+                      onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
+                      onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.6'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
                     >
-                      <Trash2 size={11} />
+                      <Trash2 size={13} />
                     </button>
                   )}
                 </div>
