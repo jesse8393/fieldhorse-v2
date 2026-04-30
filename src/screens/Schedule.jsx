@@ -196,33 +196,24 @@ export default function Schedule() {
           Top-right CTA matches Hero command-center pattern; FAB at the
           bottom-right stays for thumb-reach on mobile. Both wired to
           the same setAddOpen handler. */}
-      <motion.div variants={item} style={{ padding: '12px 20px 10px' }}>
+      {/* SUMMARY PANEL — black-glass cockpit. Eyebrow + title + today/
+          upcoming counts surfaced inline + Schedule Job CTA. Replaces the
+          previous naked-title row. Uses --primary-quiet (smoked black
+          glass + thin gold trim, no gold wash). */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--primary-quiet"
+        style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 18px' }}
+      >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>
+            <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
               Schedule
             </span>
-            <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-serif)', fontSize: 'clamp(26px, 7vw, 36px)', lineHeight: 1.05, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--v3-text)' }}>
+            <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}>
               Today, planned.
             </h1>
-            {events && events.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
-                <span style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
-                  color: 'var(--v3-primary)',
-                  fontVariantNumeric: 'tabular-nums'
-                }}>
-                  {events.length}
-                </span>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
-                  {events.length === 1 ? 'Event' : 'Events'}
-                </span>
-              </div>
-            )}
           </div>
-          {/* Inline Schedule Job CTA — primary action surface for desktop
-              users who don't reach for the FAB. Mobile users get both. */}
           <motion.button
             type="button"
             whileTap={{ scale: 0.96 }}
@@ -253,6 +244,17 @@ export default function Schedule() {
             Schedule Job
           </motion.button>
         </div>
+        {/* Today + Upcoming summary — surfaces the already-loaded upcoming
+            7-day window so the operator gets a forward read without
+            scrolling. Hidden until at least one stream has data so the
+            panel doesn't render an empty stat row. */}
+        {(events || upcoming.length > 0) && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, marginTop: 14, flexWrap: 'wrap' }}>
+            <SummaryStat label={view === 'day' ? 'Today' : view === 'week' ? 'This week' : 'Visible'} value={events ? events.length : '—'} tone="gold" />
+            <span aria-hidden="true" style={{ width: 1, height: 18, background: 'var(--v3-border)' }} />
+            <SummaryStat label="Upcoming · 7d" value={upcoming.length} tone="muted" />
+          </div>
+        )}
       </motion.div>
 
       {/* WEATHER STRIP */}
@@ -336,19 +338,18 @@ export default function Schedule() {
                 onClick={() => { hapticTap(); setCursor(startOfDay(day)); setView('day') }}
                 aria-pressed={isSelected}
                 style={{
+                  position: 'relative',
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                   gap: 4,
                   padding: '10px 4px',
                   borderRadius: 12,
-                  background: isSelected ? 'var(--v3-primary-soft)' : 'var(--v3-surface)',
+                  background: isSelected ? 'var(--v3-surface-2)' : 'var(--v3-surface)',
                   border: isSelected
-                    ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
+                    ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
                     : isToday
-                      ? '1px solid color-mix(in srgb, var(--v3-primary) 25%, transparent)'
+                      ? '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)'
                       : '1px solid var(--v3-border-strong)',
-                  boxShadow: isSelected
-                    ? '0 6px 18px rgba(212, 175, 55, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.06)'
-                    : 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
                   color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text)',
                   cursor: 'pointer',
                   WebkitTapHighlightColor: 'transparent'
@@ -373,6 +374,15 @@ export default function Schedule() {
                   <span aria-hidden="true" style={{
                     width: 4, height: 4, borderRadius: '50%',
                     background: 'var(--v3-primary)', marginTop: 1
+                  }} />
+                )}
+                {isSelected && (
+                  <span aria-hidden="true" style={{
+                    position: 'absolute',
+                    left: '20%', right: '20%', bottom: 4,
+                    height: 2, borderRadius: 2,
+                    background: 'var(--v3-primary)',
+                    boxShadow: '0 0 6px rgba(201, 150, 58, 0.35)'
                   }} />
                 )}
               </motion.button>
@@ -402,7 +412,7 @@ export default function Schedule() {
             fontFamily: 'var(--font-body)',
             fontSize: 11,
             fontWeight: 700,
-            letterSpacing: '0.18em',
+            letterSpacing: '0.10em',
             textTransform: 'uppercase',
             color: 'var(--v3-text-muted)'
           }}>
@@ -455,6 +465,28 @@ export default function Schedule() {
         onSaved={() => { setAddOpen(false); load() }}
       />
     </motion.div>
+  )
+}
+
+// Compact stat for the cockpit summary panel — tabular display number
+// over a small uppercase label. Tone "gold" for the primary today figure,
+// "muted" for secondary reads.
+function SummaryStat({ label, value, tone = 'muted' }) {
+  const valueColor = tone === 'gold' ? 'var(--v3-primary)' : 'var(--v3-text)'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+      <span style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+        color: valueColor,
+        fontVariantNumeric: 'tabular-nums'
+      }}>
+        {value}
+      </span>
+      <span className="v3-eyebrow">
+        {label}
+      </span>
+    </span>
   )
 }
 
@@ -522,12 +554,11 @@ function DayView({ events, onClick, onDelete, onAdd }) {
       <div style={{
         padding: '40px 28px',
         borderRadius: 18,
-        background: `
-          radial-gradient(120% 80% at 50% 0%, rgba(212, 175, 55, 0.08), transparent 60%),
-          var(--v3-surface)
-        `,
+        background: 'var(--v3-surface-glass)',
+        backdropFilter: 'blur(14px) saturate(1.1)',
+        WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
         textAlign: 'center',
         fontFamily: 'var(--font-body)',
         display: 'flex',
@@ -537,8 +568,8 @@ function DayView({ events, onClick, onDelete, onAdd }) {
       }}>
         <div style={{
           width: 52, height: 52, borderRadius: 14,
-          background: 'var(--v3-primary-soft)',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+          background: 'var(--v3-surface-2)',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
           display: 'grid', placeItems: 'center',
           color: 'var(--v3-primary)'
         }}>
@@ -547,8 +578,7 @@ function DayView({ events, onClick, onDelete, onAdd }) {
         <div>
           <h3 style={{
             margin: 0,
-            fontFamily: 'var(--font-serif)',
-            fontSize: 22, fontWeight: 500, letterSpacing: '-0.01em',
+            fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em',
             color: 'var(--v3-text)'
           }}>
             Nothing scheduled — fill your day.
@@ -657,20 +687,24 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, init
         display: 'flex', alignItems: 'stretch', gap: 14,
         padding: '14px 14px',
         borderRadius: 14,
-        background: '#171511',
+        background: 'var(--v3-surface-glass)',
+        backdropFilter: 'blur(14px) saturate(1.1)',
+        WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
         border: '1px solid var(--v3-border-strong)',
         boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
         overflow: 'hidden'
       }}
     >
-      {/* Status-color spine — drives the at-a-glance dispatch read */}
+      {/* Status-color spine — drives the at-a-glance dispatch read.
+          Glow softened from 55 to 33 hex alpha so the spine stays a
+          thin accent line rather than a full halo across the row. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
         left: 0, top: 12, bottom: 12,
         width: 3,
         borderRadius: '0 3px 3px 0',
         background: tone.color,
-        boxShadow: `0 0 10px ${tone.color}55`
+        boxShadow: `0 0 8px ${tone.color}33`
       }} />
 
       {/* Time column — start over end, narrow handle on the left */}
@@ -763,13 +797,13 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, init
         <div aria-hidden="true" style={{
           width: 30, height: 30,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--v3-primary-soft), rgba(212, 175, 55, 0.05))',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border-strong)',
           display: 'grid', placeItems: 'center',
           fontFamily: 'var(--font-display)',
           fontSize: 13,
           letterSpacing: '0.04em',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-text)'
         }}>
           {initial}
         </div>
