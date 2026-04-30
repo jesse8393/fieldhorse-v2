@@ -96,6 +96,55 @@ export async function compressImageToDataUrl(file, maxBytes = 1_200_000, maxDim 
   return canvas.toDataURL('image/jpeg', 0.5)
 }
 
+// Compress an image to a Blob via canvas re-encode. Side effect of the
+// re-encode: ALL EXIF metadata is dropped (GPS coordinates, camera
+// make/model, timestamps, orientation tag). The pixel orientation is
+// preserved because modern browsers auto-rotate per EXIF orientation
+// when loading via <img>/createObjectURL — by the time canvas.drawImage
+// fires, pixels are already right-side-up, so the dropped orientation
+// tag is functionally irrelevant.
+//
+// Used by the photo upload path so jobsite photos don't ship GPS or
+// device fingerprints into Supabase storage. Larger ceiling than the
+// caption path (which targets Vision payload size) — storage is okay
+// to keep more detail.
+export async function compressImageToBlob(file, maxBytes = 1_500_000, maxDim = 1800) {
+  if (!file) throw new Error('compressImageToBlob: file required')
+
+  const objUrl = URL.createObjectURL(file)
+  const img = new Image()
+  await new Promise((resolve, reject) => {
+    img.onload = resolve
+    img.onerror = () => reject(new Error('Could not decode image'))
+    img.src = objUrl
+  })
+
+  let { width, height } = img
+  const scale = Math.min(1, maxDim / Math.max(width, height))
+  width = Math.round(width * scale)
+  height = Math.round(height * scale)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0, width, height)
+  URL.revokeObjectURL(objUrl)
+
+  // Walk down quality until we fit maxBytes. canvas.toBlob is callback-
+  // based; wrap in Promise. Quality floor is 0.5 so we never end up with
+  // a near-unreadable photo even on a comically large input.
+  for (const quality of [0.92, 0.85, 0.78, 0.7, 0.6, 0.5]) {
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
+    })
+    if (blob && (blob.size <= maxBytes || quality <= 0.5)) return blob
+  }
+  return await new Promise((resolve) => {
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.5)
+  })
+}
+
 // Read a clipboard event for an image and return a File. Returns null
 // if the paste didn't contain an image. Used by NewLeadSheet's paste
 // handler so the user can screenshot an email and Cmd-V into the form.

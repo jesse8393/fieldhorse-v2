@@ -5,7 +5,7 @@ import {
   X, Trash2, Sparkles, Image as ImageIcon
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
-import { compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.js'
+import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.js'
 import { toastError, toastSuccess } from '../../../lib/toast.js'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.js'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
@@ -97,12 +97,23 @@ export default function PhotosSection({ jobId, userId }) {
           toastError('Photo too large', `${file.name} exceeds 10 MB`)
           continue
         }
-        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        // Re-encode through canvas to strip EXIF metadata before upload.
+        // Drops GPS coordinates, camera identity, and timestamps from
+        // jobsite photos. Orientation is preserved because the browser
+        // auto-rotates pixels at <img> decode time. Storage gets a
+        // ~1.5MB JPEG instead of the original 3-8MB raw file.
+        let uploadBlob
+        try {
+          uploadBlob = await compressImageToBlob(file, 1_500_000, 1800)
+        } catch (ex) {
+          toastError("Couldn't process photo", ex?.message || `${file.name} skipped`)
+          continue
+        }
         const rowId = crypto.randomUUID()
-        const path = `${userId}/${jobId}/${rowId}.${ext}`
+        const path = `${userId}/${jobId}/${rowId}.jpg`
         const { error: upErr } = await supabase.storage
           .from(BUCKET)
-          .upload(path, file, { upsert: false, contentType: file.type })
+          .upload(path, uploadBlob, { upsert: false, contentType: 'image/jpeg' })
         if (upErr) throw upErr
         const { error: insErr } = await supabase.from('fh_job_files').insert({
           id: rowId,
@@ -110,12 +121,12 @@ export default function PhotosSection({ jobId, userId }) {
           job_id: jobId,
           filename: file.name,
           storage_path: path,
-          mime_type: file.type || null,
-          size_bytes: file.size,
+          mime_type: 'image/jpeg',
+          size_bytes: uploadBlob.size,
           kind: 'photo'
         })
         if (insErr) throw insErr
-        newPhotoIds.push({ id: rowId, file })
+        newPhotoIds.push({ id: rowId, file: uploadBlob })
       }
       hapticSuccess()
       toastSuccess('Photos uploaded', `Added ${files.length}`)
