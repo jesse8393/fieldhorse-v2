@@ -165,7 +165,7 @@ const JobCard = memo(function JobCard({
         // top padding. Spine moves to the left edge of the card body.
         padding: hasPhotoBanner ? '0 18px 18px' : '18px 18px 18px 22px',
         borderRadius: 'var(--v3-radius-card)',
-        background: '#171511', // literal so framer hover transition is smooth
+        background: 'var(--v3-surface)',
         border: featured
           ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
           : '1px solid rgba(255, 255, 255, 0.22)',
@@ -417,8 +417,8 @@ const JobCard = memo(function JobCard({
           gap: 6,
           padding: '5px 10px',
           borderRadius: 8,
-          background: 'var(--v3-primary-soft)',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
+          background: 'var(--v3-surface-2)',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
           alignSelf: 'flex-start',
           maxWidth: '100%'
         }}>

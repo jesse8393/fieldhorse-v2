@@ -170,9 +170,10 @@ export default function Jobs() {
       animate="show"
       style={{ position: 'relative' }}
     >
-      {/* HEADER — pipeline command bar. Numerics promoted: active count
-          and total $ now render as Bebas Neue display sizes (28/22) so
-          the operator's eye lands on the WORK STATE, not the title. */}
+      {/* HEADER — title + caption subline. Mockup uses a quiet
+          "{count} active · ${total} total" caption rather than a
+          display-font command bar; the count + total still surface,
+          just in a calmer hierarchy that lets the cards lead. */}
       <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1
@@ -180,36 +181,15 @@ export default function Jobs() {
           >
             Jobs & Pipeline
           </h1>
-          {/* Command bar — large numerics, muted labels. The operator
-              scans the numbers, not the words. */}
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 18, fontFamily: 'var(--font-body)' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 26, lineHeight: 1, letterSpacing: '0.02em',
-                color: 'var(--v3-primary)',
-                fontVariantNumeric: 'tabular-nums'
-              }}>
-                {summary.activeCount}
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
-                Active
-              </span>
-            </div>
+          <div className="v3-caption" style={{ marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{summary.activeCount}</span>
+            <span> active</span>
             {summary.pipeline > 0 && (
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
-                  color: 'var(--v3-text)',
-                  fontVariantNumeric: 'tabular-nums'
-                }}>
-                  {kFormat(summary.pipeline)}
-                </span>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
-                  Total
-                </span>
-              </div>
+              <>
+                <span style={{ margin: '0 6px', color: 'var(--v3-text-faint)' }}>·</span>
+                <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{kFormat(summary.pipeline)}</span>
+                <span> total</span>
+              </>
             )}
           </div>
         </div>
