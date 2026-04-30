@@ -1,23 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion'
-import { Plus, Search, MessageSquare, Mail, Phone, ExternalLink, Users as UsersIcon } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Plus, Search, MessageSquare, Mail, Phone, ExternalLink,
+  Phone as PhoneIcon, MessageSquare as MsgIcon
+} from 'lucide-react'
 import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
+import SwipeableRow from '../components/SwipeableRow.jsx'
+import { JobCard, FilterPill } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { STAGE_MAP, ACTIVE_STAGES, margin, marginTier } from '../lib/stages.js'
+import { ACTIVE_STAGES } from '../lib/stages.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
-import KanbanBoard from '../components/KanbanBoard.jsx'
-import SwipeableRow from '../components/SwipeableRow.jsx'
-import { Phone as PhoneIcon, MessageSquare as MsgIcon } from 'lucide-react'
 import { toastSuccess } from '../lib/toast.js'
 import { useFhMotion } from '../lib/motion.js'
+import { fetchCoverPhotosByJob } from '../lib/photos.js'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
-
-// Stage progression for the pipeline progress bar (pure visual; lost collapses to zero).
-const STAGE_STEP = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
-const TOTAL_STAGES = 5
 
 // Tabs collapse 6 raw stages to 5 honest groupings.
 const TABS = [
@@ -44,16 +43,6 @@ function kFormat(n) {
   return money(v)
 }
 
-function initials(name) {
-  if (!name) return ''
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
-}
-
-function triggerCommandPalette() {
-  // CommandPalette listens for Cmd/Ctrl+K at the window level.
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }))
-}
-
 export default function Jobs() {
   const { user } = useAuth()
   const [contacts, setContacts] = useState([])
@@ -61,23 +50,31 @@ export default function Jobs() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [view, setView] = useState('list') // 'list' | 'kanban'
-  const [isWide, setIsWide] = useState(typeof window !== 'undefined' && window.innerWidth >= 768)
   const [addOpen, setAddOpen] = useState(false)
   const [justAddedId, setJustAddedId] = useState(null)
   const [drawerContact, setDrawerContact] = useState(null)
+  // Cover photos by job_id. Populated alongside contacts; ONE batch query
+  // + ONE batch signed-URL call (see lib/photos.js). Empty map = fall back
+  // to JobCard's stage-tinted initial tile.
+  const [photoUrlByJob, setPhotoUrlByJob] = useState({})
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('fh_contacts')
-      .select('*, fh_clients(name)')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-    if (!error) setContacts(data || [])
+    // Run contacts + cover-photos in parallel. Photos failure is non-fatal
+    // (we just keep the existing photo map / fall back to initials).
+    const [contactsRes, photoMap] = await Promise.all([
+      supabase
+        .from('fh_contacts')
+        .select('*, fh_clients(name)')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false }),
+      fetchCoverPhotosByJob(user.id).catch(() => ({}))
+    ])
+    if (!contactsRes.error) setContacts(contactsRes.data || [])
+    setPhotoUrlByJob(photoMap || {})
     setLoading(false)
   }, [user, refreshTick])
 
@@ -104,18 +101,6 @@ export default function Jobs() {
       setSearchParams(searchParams, { replace: true })
     }
   }, [searchParams, setSearchParams])
-
-  // Resize listener — Kanban is desktop/tablet only (≥768px). Falls back to list on mobile.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    function onResize() {
-      const wide = window.innerWidth >= 768
-      setIsWide(wide)
-      if (!wide) setView('list')
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   const activeTab = TABS.find((t) => t.id === filter) || TABS[0]
 
@@ -146,18 +131,22 @@ export default function Jobs() {
     return out
   }, [contacts])
 
-  async function handleStageChange(contactId, nextStage) {
-    // Optimistic update — flip the stage locally first so the kanban card
-    // moves immediately, then write through to Supabase. Realtime listener
-    // will reconcile if anything else changes server-side.
-    setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, stage: nextStage } : c))
-    const { error } = await supabase.from('fh_contacts').update({ stage: nextStage }).eq('id', contactId)
-    if (error) {
-      // Rollback on failure
-      setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, stage: c.stage } : c))
-      console.warn('Stage change failed:', error.message)
+  // Featured deal id — highest-value job in the currently filtered list.
+  // Only applied when the filtered set has 2+ jobs (no point featuring
+  // the only card on screen) and the top deal has a non-zero amount.
+  const featuredId = useMemo(() => {
+    if (filtered.length < 2) return null
+    let topId = null
+    let topAmount = 0
+    for (const c of filtered) {
+      const amt = Number(c.amount || 0)
+      if (amt > topAmount) {
+        topAmount = amt
+        topId = c.id
+      }
     }
-  }
+    return topAmount > 0 ? topId : null
+  }, [filtered])
 
   function openDrawer(contact) {
     setDrawerContact(contact)
@@ -174,37 +163,42 @@ export default function Jobs() {
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 20px 6px' }}>
+    <motion.div
+      className="v3-screen"
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      style={{ position: 'relative' }}
+    >
+      {/* HEADER — title + caption subline. Mockup uses a quiet
+          "{count} active · ${total} total" caption rather than a
+          display-font command bar; the count + total still surface,
+          just in a calmer hierarchy that lets the cards lead. */}
+      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1
-            className="fh-font-serif"
-            style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+            style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}
           >
-            Jobs &{' '}
-            Pipeline
+            Jobs & Pipeline
           </h1>
-          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-            <span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{summary.activeCount}</span>
-            {' '}active
+          <div className="v3-caption" style={{ marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{summary.activeCount}</span>
+            <span> active</span>
             {summary.pipeline > 0 && (
               <>
-                {' · '}
-                <span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{kFormat(summary.pipeline)}</span>
-                {' total'}
+                <span style={{ margin: '0 6px', color: 'var(--v3-text-faint)' }}>·</span>
+                <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{kFormat(summary.pipeline)}</span>
+                <span> total</span>
               </>
             )}
           </div>
         </div>
-        {/* Top-right + button removed — moved to a Floating Action Button
-            in thumb reach (bottom-right above BottomNav). See FAB below. */}
       </motion.div>
 
-      {/* SEARCH + CMDK HINT */}
+      {/* SEARCH */}
       <motion.div variants={item} style={{ padding: '12px 20px 10px' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Search size={16} style={{ position: 'absolute', left: 14, color: 'var(--ink-muted)', pointerEvents: 'none' }} />
+          <Search size={16} style={{ position: 'absolute', left: 14, color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
             type="search"
             value={search}
@@ -213,140 +207,82 @@ export default function Jobs() {
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: '11px 14px 11px 40px',
+              padding: '12px 14px 12px 40px',
               borderRadius: 12,
-              background: 'var(--surface-2)',
-              border: '1px solid var(--rule)',
-              color: 'var(--ink-strong)',
+              background: 'var(--v3-surface)',
+              border: '1px solid var(--v3-border)',
+              color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
               fontSize: 13,
               outline: 'none'
             }}
           />
-          {/* ⌘K hint removed — mobile-first, the keyboard chord is noise on
-              every viewport. Command palette still triggerable via a real
-              keyboard chord on desktop; just no UI affordance for it. */}
         </div>
       </motion.div>
 
-      {/* STAGE TABS */}
-      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
+      {/* STAGE TABS — horizontal scroll on overflow */}
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist">
-          {TABS.map((t) => {
-            const isActive = filter === t.id
+          {TABS.map((t) => (
+            <FilterPill
+              key={t.id}
+              active={filter === t.id}
+              count={tabCounts[t.id] ?? 0}
+              onClick={() => { hapticTap(); setFilter(t.id) }}
+            >
+              {t.label}
+            </FilterPill>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* LIST — auto-fit grid. Density bumped: minmax 300 → 260, gap 10 → 8.
+          Net effect: 1 col on phone (≤520), 2 cols on tablet (520-820),
+          3 cols on small desktop (820-1080), 4 cols on wide (≥1080).
+          Was capping at 3 cols even on wide screens — left empty space. */}
+      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+        {loading && <SkeletonList rows={5} />}
+        {!loading && filtered.length === 0 && (
+          <EmptyView
+            hasFilter={filter !== 'all' || !!search}
+            onAdd={() => setAddOpen(true)}
+          />
+        )}
+        <AnimatePresence>
+          {filtered.map((c, i) => {
+            const swipeActions = []
+            if (c.phone) {
+              swipeActions.push({
+                icon: <PhoneIcon size={18} />,
+                label: `Call ${c.name || 'contact'}`,
+                color: 'rgba(46, 204, 113, 0.22)',
+                fg: 'var(--v3-success-bright)',
+                onClick: () => { window.location.href = `tel:${c.phone}` }
+              })
+              swipeActions.push({
+                icon: <MsgIcon size={18} />,
+                label: `Text ${c.name || 'contact'}`,
+                color: 'rgba(212, 175, 55, 0.18)',
+                fg: 'var(--v3-primary)',
+                onClick: () => { window.location.href = `sms:${c.phone}` }
+              })
+            }
             return (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setFilter(t.id)}
-                style={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '7px 12px',
-                  borderRadius: 999,
-                  border: isActive ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
-                  background: isActive ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
-                  color: isActive ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                  cursor: 'pointer',
-                  transition: 'all 160ms ease'
-                }}
-              >
-                {t.label}
-                <span style={{ fontSize: 10, opacity: 0.8 }}>{tabCounts[t.id] ?? 0}</span>
-              </button>
+              <SwipeableRow key={c.id} actions={swipeActions} disabled={!c.phone}>
+                <JobCard
+                  contact={c}
+                  index={i}
+                  isNew={c.id === justAddedId}
+                  viewerUserId={user?.id}
+                  photoUrl={photoUrlByJob[c.id]}
+                  featured={c.id === featuredId}
+                  onOpen={openDrawer}
+                />
+              </SwipeableRow>
             )
           })}
-        </div>
+        </AnimatePresence>
       </motion.div>
-
-      {/* VIEW TOGGLE — only on tablet+ where kanban is usable */}
-      {isWide && (
-        <motion.div variants={item} style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 20px 8px', gap: 6 }}>
-          {[{ id: 'list', label: 'List' }, { id: 'kanban', label: 'Kanban' }].map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => { hapticTap(); setView(v.id) }}
-              className="fh-press-instant"
-              style={{
-                padding: '6px 12px',
-                borderRadius: 999,
-                border: view === v.id ? '1px solid var(--field-gold)' : '1px solid var(--rule)',
-                background: view === v.id ? 'rgba(201,150,58,0.14)' : 'transparent',
-                color: view === v.id ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                cursor: 'pointer'
-              }}
-            >
-              {v.label}
-            </button>
-          ))}
-        </motion.div>
-      )}
-
-      {/* LIST — auto-fit grid: 1 column on phone, 2 on tablet+, 3 on
-          wide desktop. minmax(280px, 1fr) keeps every card the same
-          width within a row instead of stretching one and not another. */}
-      {view === 'list' && (
-        <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', alignItems: 'stretch', gap: 10, padding: '0 20px 20px' }}>
-          {loading && <SkeletonList rows={5} />}
-          {!loading && filtered.length === 0 && (
-            <EmptyView
-              hasFilter={filter !== 'all' || !!search}
-              onAdd={() => setAddOpen(true)}
-            />
-          )}
-          <AnimatePresence>
-            {filtered.map((c, i) => {
-              const swipeActions = []
-              if (c.phone) {
-                swipeActions.push({
-                  icon: <PhoneIcon size={18} />,
-                  label: `Call ${c.name || 'contact'}`,
-                  color: 'rgba(45, 122, 79, 0.22)',
-                  fg: 'var(--signal-green)',
-                  onClick: () => { window.location.href = `tel:${c.phone}` }
-                })
-                swipeActions.push({
-                  icon: <MsgIcon size={18} />,
-                  label: `Text ${c.name || 'contact'}`,
-                  color: 'rgba(199, 164, 90, 0.18)',
-                  fg: 'var(--field-gold-bright)',
-                  onClick: () => { window.location.href = `sms:${c.phone}` }
-                })
-              }
-              return (
-                <SwipeableRow key={c.id} actions={swipeActions} disabled={!c.phone}>
-                  <JobCard
-                    contact={c}
-                    index={i}
-                    isNew={c.id === justAddedId}
-                    viewerUserId={user?.id}
-                    onOpen={openDrawer}
-                  />
-                </SwipeableRow>
-              )
-            })}
-          </AnimatePresence>
-        </motion.div>
-      )}
-
-      {/* KANBAN — desktop / tablet drag-and-drop */}
-      {view === 'kanban' && isWide && (
-        <KanbanBoard contacts={filtered} onStageChange={handleStageChange} onOpen={openDrawer} />
-      )}
 
       {/* VAUL DRAWER — quick actions */}
       <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>
@@ -389,7 +325,7 @@ export default function Jobs() {
               }}
             />
           </div>
-          <div style={{ padding: '14px 20px 28px', color: 'var(--ink-faint)', fontSize: 11, fontFamily: 'var(--font-body)', textAlign: 'center' }}>
+          <div style={{ padding: '14px 20px 28px', color: 'var(--v3-text-muted)', fontSize: 11, fontFamily: 'var(--font-body)', textAlign: 'center' }}>
             Swipe down to dismiss
           </div>
         </DrawerContent>
@@ -412,8 +348,8 @@ export default function Jobs() {
         }}
       />
 
-      {/* FAB — replaces the top-right + button. Bottom-right above the
-          BottomNav puts the action in the natural thumb arc. */}
+      {/* FAB — bottom-right above BottomNav. Thumb-reach primary action.
+          Per ruleset: "Max 1 primary action per screen" — this is it. */}
       <motion.button
         type="button"
         whileTap={{ scale: 0.94 }}
@@ -427,194 +363,14 @@ export default function Jobs() {
   )
 }
 
-// Cache the hover-capability check across cards — matchMedia is cheap but
-// running it 30 times per render (once per card) is wasteful.
-const SUPPORTS_HOVER = typeof window !== 'undefined'
-  && typeof window.matchMedia === 'function'
-  && window.matchMedia('(hover: hover)').matches
-
-function JobCard({ contact, index, isNew, viewerUserId, onOpen }) {
-  const stageMeta = STAGE_MAP[contact.stage]
-  const stageColor = stageMeta?.color || 'var(--steel)'
-  const step = STAGE_STEP[contact.stage] ?? 0
-  const progressPct = (step / TOTAL_STAGES) * 100
-  const m = margin(contact)
-  const hasCost = Number(contact.cost || 0) > 0
-  // Shared-in job: row's user_id doesn't match the viewer — via fh_job_partners
-  // RLS (latent until migration 004 runs; always false today).
-  const isSharedIn = !!viewerUserId && !!contact.user_id && contact.user_id !== viewerUserId
-
-  // 3D tilt — desktop/mouse only. Motion values are created regardless so
-  // hook order stays stable; they just never receive non-zero input on touch.
-  const mx = useMotionValue(0)
-  const my = useMotionValue(0)
-  const springX = useSpring(mx, { stiffness: 260, damping: 26 })
-  const springY = useSpring(my, { stiffness: 260, damping: 26 })
-  const rotateY = useTransform(springX, [-80, 80], [-6, 6])
-  const rotateX = useTransform(springY, [-80, 80], [5, -5])
-
-  function handleMouseMove(e) {
-    if (!SUPPORTS_HOVER) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    mx.set(e.clientX - (rect.left + rect.width / 2))
-    my.set(e.clientY - (rect.top + rect.height / 2))
-  }
-  function handleMouseLeave() {
-    mx.set(0)
-    my.set(0)
-  }
-
-  return (
-    <motion.button
-      type="button"
-      layout
-      onClick={() => { hapticTap(); onOpen(contact) }}
-      onMouseMove={SUPPORTS_HOVER ? handleMouseMove : undefined}
-      onMouseLeave={SUPPORTS_HOVER ? handleMouseLeave : undefined}
-      initial={isNew ? { opacity: 0, scale: 0.9 } : { opacity: 0, y: 10 }}
-      animate={isNew ? { opacity: 1, scale: [0.9, 1.02, 1] } : { opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={isNew
-        ? { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
-        : { duration: 0.22, delay: Math.min(index * 0.04, 0.25), ease: [0.2, 0.8, 0.2, 1] }
-      }
-      whileTap={{ scale: 0.99 }}
-      className="fh-card-raised fh-tap-flash"
-      style={{
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        padding: '14px 14px 12px',
-        borderRadius: 16,
-        // Force every card to fill its grid cell so MMC and Jeff Roy
-        // and Lily Grace North all share the exact same width within a
-        // row, regardless of contact-name length or stage-pill count.
-        width: '100%',
-        boxSizing: 'border-box',
-        minHeight: 88,
-        background: 'linear-gradient(135deg, var(--surface-2), var(--surface-2))',
-        border: '1px solid var(--rule)',
-        backdropFilter: 'blur(20px)',
-        cursor: 'pointer',
-        textAlign: 'left',
-        color: 'var(--ink-strong)',
-        transformPerspective: SUPPORTS_HOVER ? 1000 : undefined,
-        rotateX: SUPPORTS_HOVER ? rotateX : 0,
-        rotateY: SUPPORTS_HOVER ? rotateY : 0
-      }}
-    >
-      {/* Accent spine */}
-      <span style={{ position: 'absolute', left: 0, top: 14, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: stageColor, boxShadow: `0 0 10px ${stageColor}66` }} />
-
-      {/* Top row: avatar + name + amount */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 11,
-            display: 'grid',
-            placeItems: 'center',
-            fontFamily: 'var(--font-display)',
-            fontSize: 15,
-            letterSpacing: '0.04em',
-            background: `linear-gradient(135deg, ${stageColor}33, ${stageColor}11)`,
-            color: stageColor,
-            border: `1px solid ${stageColor}33`
-          }}
-        >
-          {initials(contact.name) || '—'}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {contact.name || 'Untitled'}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {contact.job_title || contact.job_type || 'No job title'}
-          </div>
-          {contact.fh_clients?.name && !isSharedIn && (
-            <div style={{ marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-              <UsersIcon size={10} />
-              {contact.fh_clients.name}
-            </div>
-          )}
-        </div>
-        <div style={{ textAlign: 'right', opacity: Number(contact.amount || 0) > 0 ? 1 : 0.4 }}>
-          <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1 }}>
-            {money(contact.amount)}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom row: stage badge + margin pill + stages count */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {stageMeta && (
-          <span className={`fh-stage-pill fh-stage-pill--${contact.stage || 'lead'}`}>
-            {stageMeta.label.toUpperCase()}
-          </span>
-        )}
-        {isSharedIn && (
-          <span
-            title="Shared with you"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.1)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
-          >
-            <UsersIcon size={10} />
-            Shared
-          </span>
-        )}
-        <MarginPill pct={m} hasCost={hasCost} />
-        {/* Pipeline position — was "3/5 stages" which read as "3 of 5
-            milestones complete". This is the stage in the Lead -> Quote
-            -> Job -> Invoice -> Closed flow, not a milestone count. */}
-        <span style={{ fontSize: 10, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontWeight: 700, letterSpacing: '0.04em' }}>
-          Stage {step}/{TOTAL_STAGES}
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div style={{ position: 'relative', height: 3, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
-        <span
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: `${progressPct}%`,
-            background: `linear-gradient(90deg, ${stageColor}, ${stageColor}cc)`,
-            boxShadow: `0 0 8px ${stageColor}99`,
-            borderRadius: 999,
-            transition: 'width 240ms ease'
-          }}
-        />
-      </div>
-    </motion.button>
-  )
-}
-
-function MarginPill({ pct, hasCost }) {
-  if (!hasCost) {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid rgba(255,255,255,0.18)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em' }}>
-        No cost yet
-      </span>
-    )
-  }
-  const tier = marginTier(pct)
-  const color = tier === 'good' ? 'var(--signal-green)' : tier === 'warn' ? 'var(--field-gold-bright)' : 'var(--alert-red)'
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: `${color}1A`, border: `1px solid ${color}44`, color, fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700 }}>
-      {pct.toFixed(0)}% margin
-    </span>
-  )
-}
+/* ----------- helpers (small enough to live inline) ----------- */
 
 function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
   const bg = primary
-    ? 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))'
-    : 'var(--surface-2)'
-  const color = primary ? 'var(--onyx)' : disabled ? 'var(--ink-faint)' : 'var(--ink-strong)'
-  const border = primary ? 'none' : '1px solid var(--rule)'
+    ? 'var(--v3-primary)'
+    : 'var(--v3-surface-2)'
+  const color = primary ? 'var(--v3-on-primary)' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)'
+  const border = primary ? 'none' : '1px solid var(--v3-border)'
   const style = {
     display: 'flex',
     alignItems: 'center',
@@ -625,30 +381,26 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
     background: bg,
     border,
     color,
-    fontFamily: primary ? 'var(--font-display)' : 'var(--font-body)',
-    fontSize: primary ? 15 : 13,
-    letterSpacing: primary ? '0.12em' : '0',
-    fontWeight: primary ? 400 : 600,
+    fontFamily: 'var(--font-body)',
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: primary ? '0.04em' : '0',
     cursor: disabled ? 'default' : 'pointer',
     opacity: disabled ? 0.45 : 1,
-    boxShadow: primary ? '0 8px 20px rgba(201,150,58,0.35)' : 'none',
-    textDecoration: 'none'
+    boxShadow: primary ? '0 8px 22px rgba(212, 175, 55, 0.32)' : 'none',
+    textDecoration: 'none',
+    WebkitTapHighlightColor: 'transparent'
   }
   if (href && !disabled) {
-    // Plain <a> instead of motion.a — framer-motion was apparently
-    // eating the click on iOS Safari + Vaul drawer combo (audit:
-    // "Text/Email/Call do nothing"). Manual onClick fallback ensures
-    // the deep link fires even when href default is suppressed.
+    // Plain <a> — framer-motion + Vaul drawer was eating clicks on iOS Safari.
+    // Fallback setTimeout ensures the deep link fires even when href default
+    // gets suppressed by the drawer.
     return (
       <a
         href={href}
         rel="noopener"
         onClick={(e) => {
-          // Stop the drawer from intercepting the click while still
-          // allowing the deep link to fire.
           e.stopPropagation()
-          // Force navigation as a backup — some PWA / drawer combos
-          // swallow anchor default before the OS handler runs.
           if (typeof window !== 'undefined') {
             setTimeout(() => { window.location.href = href }, 0)
           }
@@ -677,20 +429,34 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
 function EmptyView({ hasFilter, onAdd }) {
   if (hasFilter) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs match that filter.</div>
+      <div className="v3-empty" style={{ gridColumn: '1 / -1' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+          No jobs match that filter.
+        </div>
         <div style={{ fontSize: 12 }}>Clear the search or switch stages to see more.</div>
       </div>
     )
   }
   return (
-    <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No jobs on the board.</div>
-      <div style={{ fontSize: 12, marginBottom: 10 }}>Drop in your first lead. Watch the Pipeline fill.</div>
+    <div className="v3-empty" style={{ gridColumn: '1 / -1' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+        No jobs on the board.
+      </div>
+      <div style={{ fontSize: 12, marginBottom: 10 }}>
+        Drop in your first lead. Watch the Pipeline fill.
+      </div>
       <button
         type="button"
         onClick={onAdd}
-        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          color: 'var(--v3-primary)',
+          fontWeight: 700,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
       >
         Add first lead →
       </button>

@@ -6,34 +6,40 @@
 
 import { supabase } from './supabase.js'
 
-export async function fetchInbox(limit = 30) {
+export async function fetchInbox(limit = 30, userId) {
+  if (!userId) return []
   const { data, error } = await supabase
     .from('fh_notifications')
     .select('id, kind, title, body, link, read_at, created_at, actor_user_id')
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
   return data || []
 }
 
-export async function unreadCount() {
+export async function unreadCount(userId) {
+  if (!userId) return 0
   const { count, error } = await supabase
     .from('fh_notifications')
     .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
     .is('read_at', null)
   if (error) return 0
   return count || 0
 }
 
-export async function markRead(id) {
-  if (!id) return
-  await supabase.from('fh_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)
+export async function markRead(id, userId) {
+  if (!id || !userId) return
+  await supabase.from('fh_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId)
 }
 
-export async function markAllRead() {
+export async function markAllRead(userId) {
+  if (!userId) return
   await supabase
     .from('fh_notifications')
     .update({ read_at: new Date().toISOString() })
+    .eq('user_id', userId)
     .is('read_at', null)
 }
 

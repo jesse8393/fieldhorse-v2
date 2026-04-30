@@ -1,0 +1,102 @@
+import { useMemo, useState } from 'react'
+import { SegmentedTabs } from '../../../components/v3'
+import MilestonesSection from '../sections/Milestones.jsx'
+import TodosSection from '../sections/Todos.jsx'
+import ScheduledSection from '../sections/Scheduled.jsx'
+import InspectionsSection from '../sections/Inspections.jsx'
+import InvitePartnerSection from '../sections/InvitePartner.jsx'
+
+/**
+ * DETAILS tab — sub-tab router for the work-plan side of a job.
+ *
+ * Sub-tabs: Milestones · To-dos · Scheduled · Inspections · Partner
+ *
+ * Inspections sub-tab is always present (the section UI renders the toggle
+ * + the dashed empty state when has_inspections is off — no functionality
+ * is hidden behind the flag, just the trade grid).
+ *
+ * Sub-tab state lives here, not in the parent shell. Switching to FINANCIALS
+ * and back resets to the default 'milestones' — matches PWA expectations.
+ */
+const SUB_TABS = [
+  { id: 'milestones',  label: 'Milestones' },
+  { id: 'todos',       label: 'To-dos' },
+  { id: 'scheduled',   label: 'Scheduled' },
+  { id: 'inspections', label: 'Inspections' },
+  { id: 'partner',     label: 'Partner' }
+]
+
+export default function DetailsTab({
+  contact,
+  inspections,
+  scheduleItems,
+  userId,
+  fetchAll,
+  patch,
+  onOpenAddEvent,
+  onOpenInvitePartner
+}) {
+  const [sub, setSub] = useState('milestones')
+
+  // Sub-tabs with counts where they make the screen more useful
+  const subTabsWithCounts = useMemo(() => {
+    const milestones = Array.isArray(contact?.milestones) ? contact.milestones : []
+    return SUB_TABS.map((t) => {
+      if (t.id === 'milestones') {
+        const undone = milestones.filter((m) => !m.done).length
+        return undone > 0 ? { ...t, count: undone } : t
+      }
+      if (t.id === 'scheduled') {
+        return scheduleItems.length > 0 ? { ...t, count: scheduleItems.length } : t
+      }
+      if (t.id === 'inspections' && contact?.has_inspections) {
+        return inspections.length > 0 ? { ...t, count: inspections.length } : t
+      }
+      return t
+    })
+  }, [contact, scheduleItems, inspections])
+
+  return (
+    <div>
+      <div style={{ paddingTop: 12 }}>
+        <SegmentedTabs
+          value={sub}
+          onChange={setSub}
+          tabs={subTabsWithCounts}
+          variant="pill"
+          ariaLabel="Details sub-tabs"
+        />
+      </div>
+
+      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+        {sub === 'milestones' && (
+          <MilestonesSection contact={contact} patch={patch} />
+        )}
+        {sub === 'todos' && (
+          <TodosSection jobId={contact?.id} userId={userId} />
+        )}
+        {sub === 'scheduled' && (
+          <ScheduledSection
+            scheduleItems={scheduleItems}
+            onOpenAddEvent={onOpenAddEvent}
+          />
+        )}
+        {sub === 'inspections' && (
+          <InspectionsSection
+            contact={contact}
+            inspections={inspections}
+            userId={userId}
+            fetchAll={fetchAll}
+            patch={patch}
+          />
+        )}
+        {sub === 'partner' && (
+          <InvitePartnerSection
+            contact={contact}
+            onOpenInvitePartner={onOpenInvitePartner}
+          />
+        )}
+      </div>
+    </div>
+  )
+}

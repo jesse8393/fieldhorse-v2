@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Moon, Sun, Hammer, Receipt, CloudSun } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
-import { Switch } from '@/components/ui/switch'
 
 const PRIMARY = [
   { to: '/', label: 'Home', icon: 'home', end: true },
@@ -15,50 +14,31 @@ const PRIMARY = [
   { to: '/schedule', label: 'Schedule', icon: 'schedule' }
 ]
 
-const MORE_GROUPS = [
-  {
-    label: 'Money tools',
-    items: [
-      { to: '/bid', label: 'AI Bid Engine', Icon: Calculator },
-      { to: '/invoices', label: 'Invoices', Icon: Receipt },
-      { to: '/compose', label: 'AI Compose', Icon: MessageSquare },
-      { to: '/analytics', label: 'Analytics', Icon: BarChart3 }
-    ]
-  },
-  {
-    label: 'People',
-    items: [
-      { to: '/subs', label: 'Sub directory', Icon: Hammer }
-    ]
-  },
-  {
-    label: 'Field',
-    items: [
-      // Forecast was unreachable from the nav — only entry was the
-      // weather card on Home. Surface it here so it's discoverable
-      // from any screen.
-      { to: '/pour-window', label: 'Forecast', Icon: CloudSun }
-    ]
-  },
-  {
-    label: 'Data',
-    items: [
-      { to: '/import', label: 'Import Data', Icon: Upload }
-    ]
-  },
-  {
-    label: 'App',
-    items: [
-      { to: '/settings', label: 'Settings', Icon: SettingsIcon }
-    ]
-  }
+/* Flat navigation list per v3 mockup — reads as a clean nav drawer,
+   not stacked group cards. Order matches mockup primary nav. Items
+   pointing to non-existent routes (Files & Documents, Team, Help)
+   are intentionally omitted; reintroduce them when those routes ship. */
+const NAV_ITEMS = [
+  { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
+  { to: '/jobs',        label: 'Jobs & Pipeline',     Icon: Briefcase },
+  { to: '/clients',     label: 'Clients',             Icon: Users },
+  { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
+  { to: '/bid',         label: 'Estimates',           Icon: Calculator },
+  { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
+  { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 },
+  { to: '/subs',        label: 'Sub Directory',       Icon: Hammer },
+  { to: '/compose',     label: 'AI Compose',          Icon: MessageSquare },
+  { to: '/import',      label: 'Import Data',         Icon: Upload },
+  { to: '/pour-window', label: 'Forecast',            Icon: CloudSun },
+  { to: '/settings',    label: 'Settings',            Icon: SettingsIcon }
 ]
 
 export default function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const navigate = useNavigate()
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const userEmail = user?.email || ''
 
   // Lock body scroll and listen for Escape while drawer is open
   useEffect(() => {
@@ -111,113 +91,170 @@ export default function BottomNav() {
             aria-label="More tools"
           >
             <div className="fh-drawer__grip" aria-hidden="true" />
-            <header className="fh-drawer__head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, padding: '4px 20px 16px' }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-                  Shortcuts
-                </span>
-                <h2
-                  className="fh-font-serif"
-                  style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
-                >
-                  More{' '}
-                  <em className="fh-font-serif-italic fh-text-gradient-gold">tools.</em>
-                </h2>
-              </div>
+            {/* HEADER — small FH wordmark + close. Was an h1 + eyebrow
+                that ate too much vertical space; the drawer is for
+                navigation, not branding. */}
+            <header
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                padding: '4px 18px 12px'
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'baseline',
+                  gap: 0,
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 18,
+                  letterSpacing: '0.16em',
+                  lineHeight: 1
+                }}
+              >
+                <span style={{ color: 'var(--v3-primary)' }}>FIELD</span>
+                <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
+              </span>
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}
                 aria-label="Close"
-                style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+                style={{
+                  flexShrink: 0,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'transparent',
+                  color: 'var(--v3-text-muted)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
               >
-                <X size={16} />
+                <X size={14} />
               </button>
             </header>
 
-            <div className="fh-drawer__body" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {MORE_GROUPS.map((group) => (
-                <section key={group.label}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: 8 }}>
-                    {group.label}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {group.items.map((it) => {
-                      const I = it.Icon
-                      return (
-                        <button
-                          key={it.to}
-                          type="button"
-                          onClick={() => go(it.to)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            padding: '12px 14px',
-                            borderRadius: 12,
-                            background: 'var(--surface-2)',
-                            border: '1px solid var(--rule)',
-                            color: 'var(--ink-strong)',
-                            fontFamily: 'var(--font-body)',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            minHeight: 44,
-                            width: '100%'
-                          }}
-                        >
-                          <span
-                            aria-hidden="true"
-                            style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)' }}
-                          >
-                            <I size={16} />
-                          </span>
-                          <span style={{ flex: 1 }}>{it.label}</span>
-                          <ChevronRight size={14} color="var(--ink-faint)" />
-                        </button>
-                      )
-                    })}
-                  </div>
-                </section>
+            {/* BODY — flat nav list. Tighter rows, no per-row dividers.
+                Spacing alone separates items. */}
+            <nav
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '4px 10px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0,
+                boxSizing: 'border-box'
+              }}
+              aria-label="Navigation"
+            >
+              {NAV_ITEMS.map((it) => (
+                <NavRow key={it.to} item={it} onTap={() => go(it.to)} />
               ))}
-            </div>
+            </nav>
 
-            <div className="fh-drawer__foot" style={{ padding: '18px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600 }}>
-                  {theme === 'dark' ? <Moon size={16} color="var(--field-gold-bright)" /> : <Sun size={16} color="var(--field-gold-bright)" />}
-                  {theme === 'dark' ? 'Dark theme' : 'Light theme'}
-                </span>
-                <Switch
-                  checked={theme === 'dark'}
-                  onCheckedChange={() => toggleTheme()}
-                  aria-label="Toggle dark theme"
-                />
-              </div>
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.97 }}
-                onClick={handleSignOut}
+            {/* ACCOUNT BLOCK — single inline row at the bottom.
+                email · theme toggle (icon button) · sign out (icon button)
+                Replaces the prior bulky two-card foot. */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 18px calc(14px + env(safe-area-inset-bottom, 0px))',
+                borderTop: '1px solid var(--v3-border)',
+                background: 'transparent'
+              }}
+            >
+              <div
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '12px 14px',
-                  borderRadius: 12,
-                  background: 'rgba(192,57,43,0.12)',
-                  border: '1px solid rgba(192,57,43,0.35)',
-                  color: 'var(--alert-red)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                minHeight: 44
+                  flex: 1,
+                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2
                 }}
               >
-                <LogOut size={16} />
-                Sign out
-              </motion.button>
+                <span
+                  className="v3-eyebrow"
+                  style={{ color: 'var(--v3-text-muted)' }}
+                >
+                  Account
+                </span>
+                {userEmail && (
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--v3-text)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {userEmail}
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => toggleTheme()}
+                aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                style={{
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface)',
+                  color: 'var(--v3-primary)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSignOut}
+                aria-label="Sign out"
+                title="Sign out"
+                style={{
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: '1px solid var(--v3-border-strong)',
+                  background: 'var(--v3-surface)',
+                  color: 'var(--v3-text-muted)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'color 140ms ease, border-color 140ms ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--v3-danger-bright)'
+                  e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger) 50%, transparent)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--v3-text-muted)'
+                  e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
+                }}
+              >
+                <LogOut size={15} />
+              </button>
             </div>
           </motion.div>
         </div>
@@ -267,5 +304,71 @@ export default function BottomNav() {
 
       {typeof document !== 'undefined' && createPortal(drawer, document.body)}
     </>
+  )
+}
+
+/* ============================================================
+   NavRow — premium navigation row.
+   Tight 44px row, 28px gold icon tile, label, chevron.
+   Hover paints a rounded surface-2 wash so the whole row reads
+   as a tappable target. No per-row dividers — spacing alone
+   separates items in the new compact drawer.
+   ============================================================ */
+function NavRow({ item, onTap }) {
+  const I = item.Icon
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        padding: '8px 10px',
+        background: 'transparent',
+        border: 'none',
+        borderRadius: 10,
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        minHeight: 44,
+        WebkitTapHighlightColor: 'transparent',
+        transition: 'background-color 140ms ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--v3-surface-2)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          display: 'grid',
+          placeItems: 'center',
+          background: 'var(--v3-primary-soft)',
+          color: 'var(--v3-primary)'
+        }}
+      >
+        <I size={14} />
+      </span>
+      <span style={{
+        flex: 1,
+        fontFamily: 'var(--font-body)',
+        fontSize: 14,
+        fontWeight: 500,
+        color: 'var(--v3-text)',
+        letterSpacing: '-0.005em'
+      }}>
+        {item.label}
+      </span>
+      <ChevronRight size={14} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+    </button>
   )
 }

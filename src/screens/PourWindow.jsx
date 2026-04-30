@@ -356,7 +356,7 @@ useEffect(() => {
 
       {/* 3-DAY CARDS */}
       {daily.length > 0 && (
-        <motion.section variants={item} style={{ padding: '0 20px 20px' }}>
+        <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
           <header style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
               Forecast
@@ -439,7 +439,7 @@ useEffect(() => {
       )}
 
       {/* PER-TRADE BREAKDOWN */}
-      <motion.section variants={item} style={{ padding: '0 20px 24px' }}>
+      <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
             Trades on your list · today

@@ -125,9 +125,9 @@ export default function Settings() {
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
           Profile
         </span>
-        <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-          Run your{' '}
-          operation.
+        <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
+          Your business,{' '}
+          organized.
         </h1>
       </motion.div>
 
@@ -363,14 +363,17 @@ export default function Settings() {
 
 function Section({ variants, title, sub, meta, metaTone, children }) {
   const metaBg = metaTone === 'red'
-    ? { background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)' }
-    : { background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }
+    ? { background: 'var(--v3-danger-soft)', border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)', color: 'var(--v3-danger-bright)' }
+    : { background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
   return (
-    <motion.section variants={variants} style={{ padding: '0 20px 16px' }}>
+    <motion.section
+      variants={variants}
+      className="v3-section"
+      style={{ margin: '0 var(--v3-gutter) 14px' }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sub ? 4 : 10, gap: 10 }}>
         <h2
-          className="fh-font-serif"
-          style={{ margin: 0, fontSize: 20, lineHeight: 1.15, letterSpacing: '-0.01em', fontWeight: 400, color: 'var(--ink-strong)' }}
+          style={{ margin: 0, fontSize: 18, lineHeight: 1.15, letterSpacing: '-0.01em', fontWeight: 600, color: 'var(--v3-text)' }}
         >
           {renderSectionTitle(title)}
         </h2>
@@ -394,7 +397,7 @@ function Section({ variants, title, sub, meta, metaTone, children }) {
         )}
       </div>
       {sub && (
-        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
+        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
           {sub}
         </p>
       )}

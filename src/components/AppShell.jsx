@@ -1,13 +1,11 @@
 import { Suspense, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster as SonnerToaster } from 'sonner'
 import AppHeader from './AppHeader.jsx'
 import BottomNav from './BottomNav.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import Toaster from './Toaster.jsx'
-import Aurora from './fx/Aurora.jsx'
-import GridPattern from './fx/GridPattern.jsx'
+import RouteErrorBoundary from './RouteErrorBoundary.jsx'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
@@ -45,34 +43,37 @@ export default function AppShell() {
           Bumps a11y so keyboard users don't have to tab through every
           header + nav control to reach the screen body. */}
       <a href="#fh-main" className="fh-skip-link">Skip to content</a>
-      <Aurora />
-      <GridPattern />
-
-      <div className="fh-page-corners" aria-hidden="true">
-        <span className="fh-corner fh-corner--tl" />
-        <span className="fh-corner fh-corner--tr" />
-        <span className="fh-corner fh-corner--bl" />
-        <span className="fh-corner fh-corner--br" />
-      </div>
+      {/* Removed for v3:
+          - <Aurora />          three large gold radial blobs (atmosphere)
+          - <GridPattern />     drifting 40px white grid (the "grid texture")
+          - <div .fh-page-corners> four gold corner brackets — the
+            bottom-left bracket was reading as a stray gold "+" once
+            legacy gold tokens were aliased to the v3 (brighter) gold.
+          v3 page atmosphere is provided by .v3-screen background only. */}
 
       <AppHeader />
 
-      <AnimatePresence mode="wait">
-        <motion.main
-          id="fh-main"
-          key={location.pathname}
-          className="fh-app__main"
-          style={{ position: 'relative', zIndex: 1 }}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-        >
-          <Suspense fallback={<RouteFallback />}>
+      {/* Routed screen content.
+          Previously wrapped in <AnimatePresence mode="wait"> + <motion.main>
+          which caused a black-screen race on browser-Back: with mode="wait"
+          the new motion.main couldn't mount until the old finished its
+          exit animation, but the new one's lazy <Outlet /> chunk could
+          suspend mid-cycle and leave the screen stuck at opacity:0
+          (header + nav still mounted, page content invisible).
+          Switched to a plain <main> + Suspense + RouteErrorBoundary so
+          navigation always completes and any per-screen crash falls back
+          to a v3 error card instead of a blank page. */}
+      <main
+        id="fh-main"
+        className="fh-app__main"
+        style={{ position: 'relative', zIndex: 1 }}
+      >
+        <Suspense fallback={<RouteFallback />}>
+          <RouteErrorBoundary resetKey={location.key}>
             <Outlet />
-          </Suspense>
-        </motion.main>
-      </AnimatePresence>
+          </RouteErrorBoundary>
+        </Suspense>
+      </main>
 
       <BottomNav />
       <CommandPalette />

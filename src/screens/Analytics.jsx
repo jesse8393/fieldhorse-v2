@@ -12,6 +12,7 @@ import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn,
 import { toastSuccess } from '../lib/toast.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
+import SectionHeader from '../components/v3/SectionHeader.jsx'
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 // Compact currency — matches Home hero pattern. Skips compaction under $1k
@@ -109,68 +110,95 @@ export default function Analytics() {
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+    <motion.div
+      className="v3-screen"
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+    >
       {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 20px 14px' }}>
+      <motion.div
+        variants={item}
+        style={{
+          padding: '12px var(--v3-gutter) 18px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16
+        }}
+      >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-            CEO dashboard
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <BarChart3 size={11} />
+            Reports & Insights
           </span>
-          <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-            CEO{' '}
-            read.
+          <h1 className="v3-h1" style={{ marginTop: 6 }}>
+            Know your <em>numbers.</em>
           </h1>
-        </div>
-        <div
-          aria-hidden="true"
-          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}
-        >
-          <BarChart3 size={20} />
+          <p className="v3-caption" style={{ marginTop: 6, lineHeight: 1.5 }}>
+            Pipeline, revenue, margins, and work volume — at a glance.
+          </p>
         </div>
       </motion.div>
 
       {loading && (
-        <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 20px 16px' }}>
-          {Array.from({ length: 8 }, (_, i) => <SkeletonStat key={i} />)}
+        <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 var(--v3-gutter) 16px' }}>
+          {Array.from({ length: 6 }, (_, i) => <SkeletonStat key={i} />)}
         </motion.div>
       )}
 
       {!loading && contacts.length === 0 && (
-        <motion.div variants={item} style={{ padding: '32px 20px', margin: '0 20px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>Not enough data yet.</div>
-          <div style={{ fontSize: 12 }}>Add a few leads and start closing. Analytics lights up once the Pipeline moves.</div>
+        <motion.div variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
+          <div className="v3-empty">
+            <BarChart3 size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+              Not enough data yet.
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+              Add a few leads and start closing. Analytics lights up once the pipeline moves.
+            </div>
+          </div>
         </motion.div>
       )}
 
       {!loading && contacts.length > 0 && (
         <>
-          {/* KPI GRID */}
-          <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 20px 16px' }}>
-            <KPI label="Pipeline" to={stats.pipeline} format={fmtMoneyCompact} Icon={TrendingUp} gold />
-            <KPI label="Won YTD" to={stats.wonYTD} format={fmtMoneyCompact} Icon={DollarSign} gold />
-            <KPI label="Profit YTD" to={stats.profitYTD} format={fmtMoneyCompact} Icon={DollarSign} gold />
-            <KPI label="Avg margin" to={stats.avgMargin} format={fmtPct} Icon={Target} />
-            <KPI label="Close rate" to={stats.closeRate} format={fmtPct} Icon={Target} />
-            <KPI label="Active leads" to={stats.leads} format={fmtInt} Icon={TrendingUp} />
-            <KPI label="Miles YTD" to={stats.milesYTD} format={fmtInt} Icon={Car} />
-            <KPI label="Mileage deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
+          {/* KPI GRID — wrapped in a v3-section so it reads as one
+              framed dashboard zone, not loose tiles on the page. */}
+          <motion.div
+            variants={item}
+            className="v3-section"
+            style={{ margin: '0 var(--v3-gutter) 14px' }}
+          >
+            <SectionHeader label="Owner KPIs" />
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 10,
+              marginTop: 4
+            }}>
+              <KPI label="Pipeline"          to={stats.pipeline}         format={fmtMoneyCompact} Icon={TrendingUp} gold />
+              <KPI label="Won YTD"           to={stats.wonYTD}           format={fmtMoneyCompact} Icon={DollarSign} gold />
+              <KPI label="Profit YTD"        to={stats.profitYTD}        format={fmtMoneyCompact} Icon={DollarSign} gold />
+              <KPI label="Avg Margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} />
+              <KPI label="Close Rate"        to={stats.closeRate}        format={fmtPct}          Icon={Target} />
+              <KPI label="Active Leads"      to={stats.leads}            format={fmtInt}          Icon={TrendingUp} />
+              <KPI label="Miles YTD"         to={stats.milesYTD}         format={fmtInt}          Icon={Car} />
+              <KPI label="Mileage Deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
+            </div>
           </motion.div>
 
-          {/* PIPELINE BY STAGE */}
           {/* PIPELINE TREND — 12-week area chart */}
-          <motion.section variants={item} style={{ padding: '0 20px 18px' }}>
-            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 10 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <TrendingUp size={13} color="var(--field-gold-bright)" />
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-                  Pipeline trend · 12 wks
-                </span>
-              </div>
-              <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
-                Active value
+          <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
+            <div className="v3-section-header">
+              <span className="v3-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <TrendingUp size={11} color="var(--v3-primary)" />
+                Pipeline Trend · 12 wks
               </span>
-            </header>
-            <div style={{ height: 120, padding: '6px 0', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', position: 'relative' }}>
+              <span className="v3-eyebrow" style={{ opacity: 0.65 }}>Active value</span>
+            </div>
+            <div style={{ height: 120, padding: '6px 0', borderRadius: 12, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', position: 'relative' }}>
               {/* Real empty state for low data — was a misleading
                   isolated bell curve at the right edge when only one or
                   two weeks had values. Now: until at least 4 weeks have
@@ -182,8 +210,8 @@ export default function Analytics() {
                       <span key={i} style={{ width: 5, height: `${h}px`, borderRadius: 2, background: 'var(--field-gold-bright)' }} />
                     ))}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--ink-strong)' }}>Not enough data yet</div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)' }}>The trend lights up once you have 4+ weeks of Pipeline.</div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text)' }}>Not enough data yet</div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)' }}>The trend lights up once you have 4+ weeks of pipeline.</div>
                 </div>
               ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -217,30 +245,25 @@ export default function Analytics() {
             </div>
           </motion.section>
 
-          <motion.section variants={item} style={{ padding: '0 20px 20px' }}>
-            <header style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <BarChart3 size={13} color="var(--field-gold-bright)" />
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-                Pipeline by stage
-              </span>
-            </header>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
+            <SectionHeader label="Pipeline by Stage" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
               {byStage.map((s, i) => {
                 const widthPct = (s.value / maxStageValue) * 100
                 return (
                   <div key={s.id}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--ink-strong)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}99` }} />
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text)' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
                         {s.label}
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
-                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{fmtMoneyCompact(s.value)}</span>
-                        <span style={{ color: 'var(--ink-faint)' }}>·</span>
-                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--ink-muted)' }}>{s.count}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>{fmtMoneyCompact(s.value)}</span>
+                        <span style={{ color: 'var(--v3-text-muted)', opacity: 0.55 }}>·</span>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{s.count}</span>
                       </span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                    <div style={{ height: 6, borderRadius: 999, background: 'var(--v3-track)', overflow: 'hidden' }}>
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${widthPct}%` }}
@@ -248,8 +271,7 @@ export default function Analytics() {
                         style={{
                           height: '100%',
                           borderRadius: 999,
-                          background: `linear-gradient(90deg, ${s.color}, var(--field-gold-bright))`,
-                          boxShadow: `0 0 10px ${s.color}55, 0 0 14px rgba(232,176,76,0.25)`
+                          background: `linear-gradient(90deg, ${s.color}, var(--v3-primary))`
                         }}
                       />
                     </div>
@@ -260,16 +282,25 @@ export default function Analytics() {
           </motion.section>
 
           {/* MILEAGE LOG */}
-          <motion.section variants={item} style={{ padding: '0 20px 24px' }}>
-            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Car size={13} color="var(--field-gold-bright)" />
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-                  Mileage log
-                </span>
-              </div>
+          <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 28px' }}>
+            <div className="v3-section-header">
+              <span className="v3-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Car size={11} color="var(--v3-primary)" />
+                Mileage Log
+              </span>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 400, letterSpacing: '0.1em' }}>
+                <span style={{
+                  padding: '3px 9px',
+                  borderRadius: 999,
+                  background: 'var(--v3-primary-soft)',
+                  border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+                  color: 'var(--v3-primary)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.10em',
+                  textTransform: 'uppercase'
+                }}>
                   IRS 2026 · $0.67/mi
                 </span>
                 <motion.button
@@ -282,35 +313,49 @@ export default function Analytics() {
                     gap: 6,
                     padding: '7px 12px',
                     borderRadius: 10,
-                    border: 'none',
-                    background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-                    color: 'var(--onyx)',
-                    fontFamily: 'var(--font-display)',
+                    border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
+                    background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                    color: 'var(--v3-on-primary)',
+                    fontFamily: 'var(--font-body)',
                     fontSize: 11,
-                    letterSpacing: '0.12em',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(201,150,58,0.3)'
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
                   }}
                 >
                   <Plus size={12} />
-                  LOG MILES
+                  Log miles
                 </motion.button>
               </div>
-            </header>
+            </div>
             {mileage.length === 0 ? (
-              <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No miles logged.</div>
+              <div className="v3-empty" style={{ marginTop: 4 }}>
+                <Car size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>No miles logged.</div>
                 <div style={{ fontSize: 12 }}>Log drives as you go. Every mile is $0.67 deducted at tax time.</div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
                 {mileage.slice(0, 10).map((m) => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
+                  <div
+                    key={m.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: 'var(--v3-surface)',
+                      border: '1px solid var(--v3-border-strong)'
+                    }}
+                  >
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>{m.purpose || 'Drive'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>{new Date(m.drove_on).toLocaleDateString()}</div>
+                      <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--v3-text)' }}>{m.purpose || 'Drive'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>{new Date(m.drove_on).toLocaleDateString()}</div>
                     </div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em' }}>{m.miles} mi</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>{m.miles} mi</div>
                   </div>
                 ))}
               </div>
@@ -335,24 +380,53 @@ function KPI({ label, to, format, Icon, gold }) {
       style={{
         position: 'relative',
         overflow: 'hidden',
-        padding: '14px 14px 16px',
-        borderRadius: 14,
-        background: gold ? 'linear-gradient(135deg, rgba(30,20,10,0.9), rgba(20,15,10,0.6))' : 'var(--surface-2)',
-        border: gold ? '1px solid rgba(201,150,58,0.35)' : '1px solid var(--rule)',
+        padding: '14px 14px 14px',
+        borderRadius: 12,
+        background: 'var(--v3-surface)',
+        border: gold
+          ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, var(--v3-border-strong))'
+          : '1px solid var(--v3-border-strong)',
+        boxShadow: gold
+          ? '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(229, 193, 88, 0.10)'
+          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.26)',
         minHeight: 92
       }}
     >
-      {Icon && <Icon size={14} style={{ position: 'absolute', top: 12, right: 12, color: gold ? 'var(--field-gold-bright)' : 'rgba(201,150,58,0.4)' }} />}
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</div>
+      {/* Top accent — 1px gold gradient stroke for emphasized tiles */}
+      {gold && (
+        <span aria-hidden="true" style={{
+          position: 'absolute',
+          top: 0,
+          left: '14%',
+          right: '14%',
+          height: 1,
+          background: 'linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%)',
+          pointerEvents: 'none'
+        }} />
+      )}
+      {Icon && (
+        <Icon
+          size={14}
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            color: gold ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+            opacity: gold ? 1 : 0.6
+          }}
+        />
+      )}
+      <div className="v3-eyebrow" style={{ paddingRight: 22 }}>{label}</div>
       <div
-        className={gold ? 'fh-text-gradient-gold' : undefined}
         style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 30,
-          letterSpacing: '0.01em',
+          fontSize: 28,
+          letterSpacing: '-0.005em',
           lineHeight: 1,
           marginTop: 10,
-          color: gold ? undefined : 'var(--ink-strong)'
+          color: gold ? 'var(--v3-primary)' : 'var(--v3-text)',
+          fontVariantNumeric: 'tabular-nums',
+          textShadow: gold ? '0 1px 12px rgba(229, 193, 88, 0.20)' : 'none'
         }}
       >
         <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />

@@ -1,47 +1,99 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, CloudSun, TrendingUp, Briefcase, FileText, ChevronRight, Receipt } from 'lucide-react'
+import {
+  CloudSun,
+  MapPin,
+  Plus,
+  CalendarRange,
+  Receipt,
+  FileText,
+  ArrowUpRight,
+  ArrowDownRight,
+  PhoneCall,
+  CalendarClock,
+  ChevronRight,
+  Zap,
+  Mic
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import { getWeather, workWindow, MURFREESBORO } from '../lib/weather.js'
+import { getWeather, MURFREESBORO } from '../lib/weather.js'
 import { ACTIVE_STAGES } from '../lib/stages.js'
-import Spotlight from '../components/fx/Spotlight.jsx'
-import ShimmerBar from '../components/fx/ShimmerBar.jsx'
-import GreetingTitle from '../components/fx/GreetingTitle.jsx'
-import CountUp from '../components/fx/CountUp.jsx'
-import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
+import CountUp from '../components/fx/CountUp.jsx'
+import { Card, KpiTile, QuickAction, Sparkline, SectionHeader, Pill } from '../components/v3'
+import { hapticTap } from '../lib/haptics.js'
 
-function formatDate(d) {
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()
-}
+/* ----------------- helpers ----------------- */
+
 function greetingPrefix() {
   const h = new Date().getHours()
-  if (h < 12) return 'Morning,'
-  if (h < 17) return 'Afternoon,'
-  return 'Evening,'
+  if (h < 12) return 'Good morning,'
+  if (h < 17) return 'Good afternoon,'
+  return 'Good evening,'
 }
-function initials(name) {
-  if (!name) return ''
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
-}
+
 function emailFirstToken(email) {
   if (!email) return ''
   const raw = email.split('@')[0].split(/[._-]/).filter(Boolean)[0] || ''
   return raw ? raw[0].toUpperCase() + raw.slice(1) : ''
 }
+
 function displayNameFrom(profile, user) {
-  // Multi-tenant guard: only use profile.full_name when it actually belongs
-  // to the currently-signed-in auth user. Without this, a stale profile
-  // row left in context during a sign-out→sign-in transition can leak
-  // the prior user's name onto the new user's greeting.
+  // Multi-tenant guard: profile must belong to the current auth user.
+  // Without this, a stale profile row left in context during a sign-out
+  // → sign-in transition can leak the prior user's name onto the greeting.
   const profileMatchesUser = profile && user && profile.user_id === user.id
   const full = profileMatchesUser ? profile.full_name?.trim() : ''
   if (full) return full
   return emailFirstToken(user?.email)
 }
+
+// Map Open-Meteo weather_code to a short label. Covers the common buckets;
+// rare codes fall through to "—" so we don't lie about the conditions.
+function weatherLabel(code) {
+  if (code == null) return ''
+  if (code === 0) return 'Clear'
+  if (code <= 2) return 'Partly cloudy'
+  if (code <= 3) return 'Overcast'
+  if (code <= 48) return 'Foggy'
+  if (code <= 67) return 'Rain'
+  if (code <= 77) return 'Snow'
+  if (code <= 82) return 'Showers'
+  if (code <= 99) return 'Storms'
+  return ''
+}
+
+// Stub trend until a daily snapshot table exists. Generates 7 points
+// climbing toward `target` so the spark visually agrees with the
+// number above it. Marked as TODO so this gets replaced when the
+// snapshot pipeline lands.
+function buildSparkline(target) {
+  const v = Number(target) || 0
+  if (v <= 0) return Array.from({ length: 7 }, (_, i) => ({ v: 0 }))
+  const start = v * 0.55
+  const pts = []
+  let cur = start
+  for (let i = 0; i < 6; i++) {
+    const wobble = 0.08 * Math.sin(i * 1.7 + v % 7)
+    const rise = (v - start) / 6
+    cur = cur + rise + cur * wobble * 0.15
+    pts.push({ v: Math.max(0, Math.round(cur)) })
+  }
+  pts.push({ v: Math.round(v) })
+  return pts
+}
+
+function startOfWeek(now) {
+  const d = new Date(now)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - d.getDay())
+  return d
+}
+
+/* ----------------- screen ----------------- */
 
 export default function Home() {
   const { user } = useAuth()
@@ -54,131 +106,254 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
+  // Weather
   const [weather, setWeather] = useState(null)
   const [weatherErr, setWeatherErr] = useState('')
-  const [weatherLoading, setWeatherLoading] = useState(false)
-  // KPIs default to null (not 0) so the dashboard distinguishes "loading"
-  // from "you actually have $0" — prevents the "Notes count went from 0
-  // to 7 when I tapped focus" perception bug where the user saw the
-  // unloaded zero, then watched it pop in once the query returned.
+
+  // KPIs default to null (loading) so we never flash "0" before the
+  // query lands — the perception bug fix carried over from v2.
   const [pipeline, setPipeline] = useState(null)
-  const [activeCount, setActiveCount] = useState(null)
-  const [notesCount, setNotesCount] = useState(null)
-  const [outstanding, setOutstanding] = useState(null)
-  const [todayJobs, setTodayJobs] = useState(null)
-  const [weeklyTarget] = useState(25000)
-  const [weeklyBooked, setWeeklyBooked] = useState(null)
+  const [pipelinePrev, setPipelinePrev] = useState(null)
+  const [dealsAtRisk, setDealsAtRisk] = useState(null) // { count, value }
+  const [jobsBehind, setJobsBehind] = useState(null)
+  const [invoicingWeek, setInvoicingWeek] = useState(null)
+  // Pipeline Preview = top 3 active deals by value (lead/quote/job/invoice).
+  // Renders as a glanceable list at the bottom of Home so the operator sees
+  // their highest-value open work without leaving the screen.
+  const [topPipeline, setTopPipeline] = useState(null)
+  // Stage breakdown for Pipeline card footer (mockup: Won / Active / Lead)
+  const [stageBreakdown, setStageBreakdown] = useState(null)
+  // Today on Site = schedule entries that start today (or are happening
+  // now). Read-only fetch, no schema change. Joined with fh_contacts so
+  // each row shows the job name + stage at a glance.
+  const [todayOnSite, setTodayOnSite] = useState(null)
+  // Next Actions = up to 5 actionable items (stale leads, overdue jobs,
+  // unsent invoices) computed from the same contacts/schedule/payments data.
+  // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
+  const [nextActions, setNextActions] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
   const displayName = displayNameFrom(profile, user)
   const firstName = displayName ? displayName.split(/\s+/)[0] : 'there'
 
+  /* ----- Weather ----- */
   useEffect(() => {
     let cancelled = false
-    // Always fetch SOMETHING so the weather card doesn't read "— / —".
-    // If the user pinned a location, use it. Otherwise fall back to the
-    // Murfreesboro default. The "Pin location for weather" button stays
-    // visible so they can switch to their own coords.
     const lat = profile?.location_lat ?? MURFREESBORO.lat
     const lon = profile?.location_lon ?? MURFREESBORO.lon
-    setWeatherLoading(true); setWeatherErr('')
+    setWeatherErr('')
     getWeather(lat, lon)
       .then((d) => { if (!cancelled) setWeather(d) })
       .catch((e) => { if (!cancelled) setWeatherErr(e.message || 'Forecast unavailable') })
-      .finally(() => { if (!cancelled) setWeatherLoading(false) })
     return () => { cancelled = true }
   }, [profile?.location_lat, profile?.location_lon])
 
-  const windowRead = useMemo(
-    () => workWindow(weather?.current, profile?.services || []),
-    [weather, profile?.services]
-  )
-
+  /* ----- KPIs + Live Feed ----- */
   useEffect(() => {
     if (!user) return
     let cancelled = false
     async function load() {
-      // "Crews on site" = job-stage contacts with at least one fh_schedule
-      // entry in the next 7 days. Open jobs without any scheduled work
-      // don't count — makes the KPI a real operational signal, not a
-      // pipeline-depth metric.
-      const now = new Date()
-      const windowStart = new Date(now); windowStart.setHours(0, 0, 0, 0)
-      const windowEnd = new Date(windowStart); windowEnd.setDate(windowEnd.getDate() + 7)
+      const nowD = new Date()
+      const sevenDaysAgo = new Date(nowD); sevenDaysAgo.setDate(nowD.getDate() - 7)
+      const fourteenDaysAgo = new Date(nowD); fourteenDaysAgo.setDate(nowD.getDate() - 14)
+      const wkStart = startOfWeek(nowD)
+      const todayStart = new Date(nowD); todayStart.setHours(0, 0, 0, 0)
+      const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
 
-      // Single Promise.all so every KPI lands on the same render frame.
-      // Notes count was previously sequenced AFTER this batch, which made
-      // it appear to "change" a moment after the rest of the dashboard
-      // settled.
-      const [{ data: contacts }, { data: upcomingSchedule }, { data: pays }, notesRes] = await Promise.all([
+      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes] = await Promise.all([
+        // Contacts: stages + amounts + last update for at-risk calc.
+        // updated_at falls back to created_at if missing.
         supabase
           .from('fh_contacts')
-          .select('id, name, amount, stage, job_title, job_type')
+          .select('id, name, amount, stage, updated_at, created_at')
           .eq('user_id', user.id),
+        // Schedule entries that should already have ended → if linked to a
+        // job-stage contact, that contact is "behind schedule".
         supabase
           .from('fh_schedule')
-          .select('contact_id, start_at')
+          .select('contact_id, end_at, start_at')
           .eq('user_id', user.id)
-          .gte('start_at', windowStart.toISOString())
-          .lte('start_at', windowEnd.toISOString()),
+          .lt('end_at', nowD.toISOString())
+          .gte('end_at', fourteenDaysAgo.toISOString()),
+        // Payments collected this week (Sun → today).
         supabase
           .from('fh_payments')
-          .select('contact_id, amount')
-          .eq('user_id', user.id),
-        supabase
-          .from('fh_notes')
-          .select('id', { count: 'exact', head: true })
+          .select('amount, created_at')
           .eq('user_id', user.id)
-          .eq('done', false)
+          .gte('created_at', wkStart.toISOString()),
+        // Today on Site — schedule entries that start today, joined with
+        // contacts for name+stage. Read-only query, no schema change.
+        supabase
+          .from('fh_schedule')
+          .select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)')
+          .eq('user_id', user.id)
+          .gte('start_at', todayStart.toISOString())
+          .lt('start_at', todayEnd.toISOString())
+          .order('start_at', { ascending: true })
+          .limit(6)
       ])
 
       if (cancelled) return
-      const rows = contacts || []
-      const scheduledContactIds = new Set(
-        (upcomingSchedule || []).map((s) => s.contact_id).filter(Boolean)
-      )
-      const crewsOnSite = rows.filter(
-        (c) => c.stage === 'job' && scheduledContactIds.has(c.id)
-      )
-      // Pipeline filter aligned with Analytics — was "any stage that
-      // isn't closed/lost", which counted custom/legacy stage values
-      // that Analytics filtered out. Audit caught the divergence
-      // ($166K Home vs $120K Analytics). Both now use ACTIVE_STAGES.
-      const totalPipeline = rows
+
+      const contacts = contactsRes.data || []
+
+      // Pipeline = sum of $ across active stages.
+      const totalPipeline = contacts
         .filter((c) => ACTIVE_STAGES.includes(c.stage))
         .reduce((s, c) => s + Number(c.amount || 0), 0)
-      const booked = rows
-        .filter((c) => c.stage === 'invoice' || c.stage === 'closed')
+
+      // Pipeline 7 days ago = active stages whose record predates the window
+      // (i.e. existed back then). Best-effort proxy until snapshot table.
+      const prevPipeline = contacts
+        .filter((c) => {
+          if (!ACTIVE_STAGES.includes(c.stage)) return false
+          const created = new Date(c.created_at || nowD)
+          return created < sevenDaysAgo
+        })
         .reduce((s, c) => s + Number(c.amount || 0), 0)
-      // Outstanding AR — sum of (amount - paid) for jobs in money pipeline.
-      // Closed/lost jobs and fully-paid ones drop out automatically.
-      const paidByJob = new Map()
-      for (const p of pays || []) {
-        if (!p.contact_id) continue
-        paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
+
+      // Deals At Risk = lead/quote with no update in 7+ days.
+      const risky = contacts.filter((c) => {
+        if (c.stage !== 'lead' && c.stage !== 'quote') return false
+        const last = new Date(c.updated_at || c.created_at || 0)
+        return last < sevenDaysAgo
+      })
+      const riskValue = risky.reduce((s, c) => s + Number(c.amount || 0), 0)
+
+      // Jobs Behind Schedule = stage=job + has at least one schedule entry
+      // whose end_at is in the past.
+      const overdueContactIds = new Set(
+        (overdueSchedRes.data || []).map((s) => s.contact_id).filter(Boolean)
+      )
+      const behind = contacts.filter((c) => c.stage === 'job' && overdueContactIds.has(c.id))
+
+      // Invoicing this week = sum of payments collected since Sunday.
+      const weekTotal = (paysRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+
+      // Next Actions — compose 3 source streams + sort by urgency (oldest
+      // last-touch wins). Capped at 5 so the section stays scannable.
+      const fiveDaysAgo = new Date(nowD); fiveDaysAgo.setDate(nowD.getDate() - 5)
+      const paidContactIds = new Set(
+        (paysRes.data || []).map((p) => p.contact_id).filter(Boolean)
+      )
+      const actions = []
+      // 1. Stale leads/quotes — needs a follow-up call/text. Urgency = warn
+      // (yellow) — opportunity slipping but salvageable.
+      for (const c of risky) {
+        const daysCold = Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
+        actions.push({
+          id: `followup-${c.id}`,
+          kind: 'followup',
+          contactId: c.id,
+          title: `Follow up with ${c.name || 'lead'}`,
+          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} cold for ${daysCold} days`,
+          urgencyLabel: `${daysCold}d cold`,
+          urgencyTone: daysCold >= 14 ? 'danger' : 'warn',
+          urgency: new Date(c.updated_at || c.created_at || 0).getTime()
+        })
       }
-      const outstandingTotal = rows
-        .filter((c) => c.stage === 'job' || c.stage === 'invoice')
-        .reduce((s, c) => {
-          const bal = Number(c.amount || 0) - (paidByJob.get(c.id) || 0)
-          return s + Math.max(0, bal)
-        }, 0)
-      setOutstanding(outstandingTotal)
+      // 2. Overdue jobs — needs a reschedule. Urgency = danger (red) —
+      // schedule slipped, crew/customer expectations broken.
+      for (const c of behind) {
+        actions.push({
+          id: `reschedule-${c.id}`,
+          kind: 'reschedule',
+          contactId: c.id,
+          title: `Reschedule ${c.name || 'job'}`,
+          detail: 'Job behind schedule',
+          urgencyLabel: 'Overdue',
+          urgencyTone: 'danger',
+          urgency: 0 // top priority — sort first
+        })
+      }
+      // 3. Invoiced jobs with no payment yet. Urgency = success (green) —
+      // money in motion, action results in cash flowing in.
+      for (const c of contacts) {
+        if (c.stage !== 'invoice') continue
+        if (paidContactIds.has(c.id)) continue
+        const updated = new Date(c.updated_at || c.created_at || 0)
+        if (updated > fiveDaysAgo) continue // give it 5 days to land naturally
+        actions.push({
+          id: `invoice-${c.id}`,
+          kind: 'invoice',
+          contactId: c.id,
+          title: `Chase invoice for ${c.name || 'job'}`,
+          detail: c.amount > 0 ? `$${Number(c.amount).toLocaleString()} owed` : 'Awaiting payment',
+          urgencyLabel: 'Invoice pending',
+          urgencyTone: 'success',
+          urgency: updated.getTime()
+        })
+      }
+      // Sort: lowest urgency value first (overdue=0 wins, then oldest last-touch)
+      actions.sort((a, b) => a.urgency - b.urgency)
+      const topActions = actions.slice(0, 5)
+
+      // Stage breakdown for the Pipeline card footer (mockup: Won/Active/Lead).
+      // Won = closed, Active = job + invoice, Lead = lead + quote.
+      const stageCounts = {
+        won:    contacts.filter((c) => c.stage === 'closed').length,
+        active: contacts.filter((c) => c.stage === 'job' || c.stage === 'invoice').length,
+        lead:   contacts.filter((c) => c.stage === 'lead' || c.stage === 'quote').length
+      }
+
+      // Quotes Needing Attention — quotes with no update in 7+ days
+      // (separate KPI from leads needing follow-up; the mockup splits
+      // them into 3 distinct priority signals).
+      const quotesAttention = contacts.filter((c) => {
+        if (c.stage !== 'quote') return false
+        const last = new Date(c.updated_at || c.created_at || 0)
+        return last < sevenDaysAgo
+      }).length
+
+      // Follow-ups — leads (only) with no update in 7+ days.
+      const followUps = contacts.filter((c) => {
+        if (c.stage !== 'lead') return false
+        const last = new Date(c.updated_at || c.created_at || 0)
+        return last < sevenDaysAgo
+      }).length
+
+      // Today on Site — derive the rows. fh_contacts() join may be null
+      // when the schedule entry has no linked contact.
+      const todayRows = (todaySchedRes.data || []).map((s) => ({
+        id: s.id,
+        contactId: s.contact_id,
+        title: s.title || s.fh_contacts?.name || 'Scheduled visit',
+        clientName: s.fh_contacts?.name || null,
+        stage: s.fh_contacts?.stage || null,
+        startAt: s.start_at,
+        endAt: s.end_at
+      }))
+
+      // Top pipeline = highest-value active deals. Used by the Pipeline
+      // Preview section. Capped at 3 to keep the home screen scannable —
+      // operators tap "View all" to drill into the full board.
+      const topActiveDeals = contacts
+        .filter((c) => ACTIVE_STAGES.includes(c.stage))
+        .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
+        .slice(0, 3)
+        .map((c) => ({
+          id: c.id,
+          name: c.name || 'Untitled',
+          amount: Number(c.amount || 0),
+          stage: c.stage
+        }))
 
       setPipeline(totalPipeline)
-      setActiveCount(crewsOnSite.length)
-      setWeeklyBooked(booked)
-      setTodayJobs(crewsOnSite.slice(0, 3))
-      setNotesCount(notesRes?.count || 0)
+      setPipelinePrev(prevPipeline)
+      setDealsAtRisk({ count: risky.length, value: riskValue, followUps, quotesAttention })
+      setJobsBehind(behind.length)
+      setInvoicingWeek(weekTotal)
+      setTopPipeline(topActiveDeals)
+      setStageBreakdown(stageCounts)
+      setTodayOnSite(todayRows)
+      setNextActions(topActions)
     }
     load()
     return () => { cancelled = true }
   }, [user, refreshTick])
 
-  // Supabase Realtime — re-fetch Home on any fh_contacts change for this user.
-  // Filter is server-side via the postgres_changes config; the channel only
-  // forwards rows matching the user_id. Cleanup unsubscribes on unmount.
+  /* ----- Realtime: re-fetch on any contact change for this user ----- */
   useEffect(() => {
     if (!user) return
     const channel = supabase
@@ -204,293 +379,964 @@ export default function Home() {
     )
   }
 
-  // Inline-edit greeting — preserved from previous Home, kill-list–clean copy.
-  const [editingFocus, setEditingFocus] = useState(false)
-  const [focusDraft, setFocusDraft] = useState(profile?.greeting || '')
-  const focusRef = useRef(null)
-  useEffect(() => {
-    if (!editingFocus) setFocusDraft(profile?.greeting || '')
-  }, [profile?.greeting, editingFocus])
-  useEffect(() => {
-    if (editingFocus && focusRef.current) {
-      focusRef.current.focus()
-      focusRef.current.select()
-    }
-  }, [editingFocus])
-  async function saveFocus() {
-    const next = focusDraft.trim().slice(0, 90)
-    setEditingFocus(false)
-    if (next !== (profile?.greeting || '')) {
-      await upsertProfile({ greeting: next || null })
-    }
-  }
+  /* ----- Derived ----- */
+  const sparkData = useMemo(() => buildSparkline(pipeline), [pipeline])
+  const trendUp = pipeline != null && pipelinePrev != null && pipeline >= pipelinePrev
+  const trendPct = useMemo(() => {
+    if (pipeline == null || pipelinePrev == null || pipelinePrev <= 0) return null
+    const pct = ((pipeline - pipelinePrev) / pipelinePrev) * 100
+    if (!Number.isFinite(pct)) return null
+    return Math.round(pct)
+  }, [pipeline, pipelinePrev])
 
-  const targetPct = weeklyTarget > 0 ? Math.min(100, Math.round(((weeklyBooked || 0) / weeklyTarget) * 100)) : 0
-  const pourStatus = windowRead?.status || (weather ? 'ok' : '—')
-  const pourGood = String(pourStatus).toLowerCase().includes('good') || String(pourStatus).toLowerCase().includes('ok')
-
+  const tempStr = weather?.current?.temperature_2m != null
+    ? `${Math.round(weather.current.temperature_2m)}°`
+    : '—'
+  const condStr = weatherLabel(weather?.current?.weather_code)
 
   const { stagger, item } = useFhMotion()
 
+  /* ----- Render -----
+     v3 hierarchy refactor (3-tier):
+       TIER 1 — HERO: dominant card on --v3-surface-2 (#1C1C22 elevated),
+                 oversized money + sparkline, hover lift, deep shadow
+       TIER 2 — PRIMARY KPIs: compact tiles on --v3-surface (#141418),
+                 muted body + colored accent only, smaller numerics
+       TIER 3 — SECONDARY: Quick Actions (primary tile gets gold halo,
+                 others sit flat) + Live Feed (rows with hover lift)
+
+     Asymmetric spacing breaks the rigid grid:
+       - Greeting: 12px top → 24px bottom (more air below)
+       - Hero: 28px below (most elevated → most room)
+       - KPI row: 24px below
+       - Section headers: 4px below
+       - Quick Actions: 28px below
+       - Live Feed: 40px below
+  */
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* Top bar moved to shared AppHeader in AppShell (Phase 16). */}
-
-      {/* HERO GREETING — phase 18.4: compact stack so the dashboard
-          actually appears above the fold on iPhone. Date now sits as
-          a small caption above the greeting (not a chunky pill on its
-          own row), subtitle tightens, focus prompt extracted to a
-          full-width card below for fat-finger compliance. */}
-      <motion.div variants={item} style={{ padding: '6px 20px 10px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', marginBottom: 4 }}>
-          <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--field-gold-bright)' }} />
-          {formatDate(now)}
+    <motion.div
+      className="v3-screen"
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      style={{ paddingBottom: 120, background: 'var(--v3-bg)' }}
+    >
+      {/* ─────────── GREETING + WEATHER CHIP ───────────
+          Tightened bottom padding 24 → 14 so the hero rides higher into
+          the viewport. The greeting reads as a single beat with the
+          hero, not a separate top zone. */}
+      <motion.div
+        variants={item}
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: '12px 16px 14px'
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
+            {now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
+          <h1 className="v3-h1" style={{ marginTop: 6 }}>
+            {greetingPrefix()} <em>{firstName}.</em>
+          </h1>
         </div>
-        <GreetingTitle prefix={greetingPrefix()} name={firstName} />
-        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-muted)' }}>
-          {activeCount > 0
-            ? <>{activeCount} {activeCount === 1 ? 'crew' : 'crews'} on site. <span style={{ color: 'var(--signal-green)', fontWeight: 600 }}>All green.</span></>
-            : 'Nothing active. Quiet day.'}
-        </div>
-      </motion.div>
 
-      {/* TODAY'S FOCUS — full-width tappable card. Replaces the inline
-          text-link pattern that was below 44×44 hit-target spec. */}
-      <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
-        {editingFocus ? (
-          <textarea
-            ref={focusRef}
-            value={focusDraft}
-            onChange={(e) => setFocusDraft(e.target.value)}
-            onBlur={saveFocus}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveFocus() }
-              if (e.key === 'Escape') { setFocusDraft(profile?.greeting || ''); setEditingFocus(false) }
+        {hasCoords ? (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ y: -1 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            onClick={() => { hapticTap(); navigate('/pour-window') }}
+            aria-label="Open weather forecast"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 12px',
+              borderRadius: 'var(--v3-radius-btn)',
+              background: 'var(--v3-surface)',
+              border: '1px solid var(--v3-border)',
+              color: 'var(--v3-text)',
+              cursor: 'pointer',
+              flexShrink: 0,
+              WebkitTapHighlightColor: 'transparent'
             }}
-            maxLength={90}
-            rows={2}
-            placeholder="What's the focus today?"
-            style={{ width: '100%', boxSizing: 'border-box', minHeight: 64, padding: '14px 16px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', resize: 'none', outline: 'none' }}
-          />
+          >
+            <CloudSun size={18} color="#8FB4E3" aria-hidden="true" />
+            <div style={{ textAlign: 'left', lineHeight: 1.05 }}>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700 }}>
+                {tempStr}
+              </div>
+              {condStr ? (
+                <div style={{ fontSize: 9, color: 'var(--v3-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 }}>
+                  {condStr}
+                </div>
+              ) : null}
+            </div>
+          </motion.button>
         ) : (
           <button
             type="button"
-            onClick={() => setEditingFocus(true)}
-            aria-label={profile?.greeting ? "Edit today's focus" : "Add today's focus"}
-            style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderRadius: 14, background: profile?.greeting ? 'var(--surface-2)' : 'rgba(201,150,58,0.06)', border: profile?.greeting ? '1px solid var(--rule)' : '1px dashed rgba(201,150,58,0.4)', color: profile?.greeting ? 'var(--ink-strong)' : 'var(--field-gold-bright)', fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: profile?.greeting ? 500 : 700, cursor: 'pointer', textAlign: 'left' }}
+            onClick={pinLocation}
+            aria-label="Pin location for weather"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '11px 14px',
+              minHeight: 40,
+              borderRadius: 'var(--v3-radius-btn)',
+              background: 'var(--v3-primary-soft)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+              color: 'var(--v3-primary)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
           >
-            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {profile?.greeting || "Add today's focus"}
-            </span>
-            <ChevronRight size={16} color={profile?.greeting ? 'var(--ink-faint)' : 'var(--field-gold-bright)'} />
+            <MapPin size={14} />
+            Pin
           </button>
         )}
       </motion.div>
+      {weatherErr && !hasCoords ? (
+        <div className="v3-caption" style={{ padding: '0 var(--v3-gutter) 12px', color: 'var(--v3-danger)' }}>
+          {weatherErr}
+        </div>
+      ) : null}
 
-      {/* WEEKLY TARGET CARD — Aceternity-style moving gradient border */}
-      <motion.div variants={item} className="fh-fx-moving-border fh-card-raised" style={{ position: 'relative', margin: '0 20px 14px', padding: '18px 20px', borderRadius: 22, background: 'linear-gradient(135deg, rgba(30,20,10,0.8), rgba(20,20,20,0.6))', border: '1px solid rgba(201,150,58,0.2)', backdropFilter: 'blur(20px)', overflow: 'hidden' }}>
-        {/* Outer pulse — 200x200 (default), phase 0 */}
-        <Spotlight style={{ top: -80, right: -80 }} />
-        {/* Inner pulse — smaller, more gold-saturated, behind the $ amount, 1.5s out of phase */}
-        <Spotlight
+      {/* ─────────── TODAY'S PRIORITIES — KPIs (mockup) ───────────
+          Per v3 mockup: 3 compact KPI cards stating what needs the
+          operator's attention today. Mockup leads with this BEFORE
+          the pipeline value so the operator sees the triage read
+          first; Pipeline follows. */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--quiet"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader label="Today's Priorities" />
+        <div
           style={{
-            bottom: -20,
-            left: -20,
-            width: 120,
-            height: 120,
-            background: 'radial-gradient(circle, rgba(232,176,76,0.55), transparent 55%)',
-            animationDelay: '-1.5s'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 10,
+            marginTop: 4
           }}
-        />
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10, position: 'relative' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Weekly target</div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: 'var(--signal-green)', background: 'rgba(45,122,79,0.12)', border: '1px solid rgba(45,122,79,0.25)', padding: '3px 10px', borderRadius: 999 }}>
-            <TrendingUp size={12} />{targetPct}%
-          </div>
-        </div>
-        <div className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 52, letterSpacing: '0.01em', lineHeight: 1 }}>
-          <span style={{ fontSize: 26, color: 'var(--ink-muted)', verticalAlign: 'top', marginRight: 2 }}>$</span>
-          <CountUp to={weeklyBooked} />
-        </div>
-        <div style={{ marginTop: 14, position: 'relative' }}>
-          <ShimmerBar value={targetPct} />
-          <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-muted)' }}>
-            <span><span style={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}>{targetPct}%</span> of ${(weeklyTarget / 1000).toFixed(0)}K</span>
-            <span>{pipeline > 0 ? `$${(pipeline / 1000).toFixed(0)}K in Pipeline` : '—'}</span>
-          </div>
+        >
+          <CompactKpi
+            tone="success"
+            icon={PhoneCall}
+            value={dealsAtRisk?.followUps}
+            label="Follow-ups"
+            subline={dealsAtRisk?.followUps > 0 ? 'Calls to leads' : null}
+            onTap={() => navigate('/jobs?filter=lead')}
+          />
+          <CompactKpi
+            tone="lead"
+            icon={FileText}
+            value={dealsAtRisk?.quotesAttention}
+            label="Quotes"
+            subline={dealsAtRisk?.quotesAttention > 0 ? 'Need follow up' : null}
+            onTap={() => navigate('/jobs?filter=quote')}
+          />
+          <CompactKpi
+            tone="warn"
+            icon={CalendarClock}
+            value={jobsBehind}
+            label="Jobs Behind"
+            subline={jobsBehind > 0 ? 'Reschedule' : null}
+            onTap={() => navigate('/schedule')}
+          />
         </div>
       </motion.div>
 
-      {/* WEATHER — tappable, routes to /pour-window. Trade-status pills
-          live in the dedicated 3-card row below so we don't duplicate them
-          here. */}
-      {hasCoords ? (
+      {/* PIPELINE CARD — compact per v3 mockup. Was the giant 100px-money
+          hero with stretched ambient blobs. Now: framed v3 section
+          card with modest pipeline value, trend, sparkline + bottom
+          breakdown row (Won / Active / Lead). */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--primary-quiet"
+        style={{ margin: '0 var(--v3-gutter) 14px', padding: '18px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
+          {trendPct != null ? (
+            <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
+              {trendUp ? '+' : ''}{trendPct}%
+            </Pill>
+          ) : null}
+        </div>
+
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <div
+            className="v3-money"
+            style={{
+              fontSize: 'clamp(40px, 9vw, 56px)',
+              lineHeight: 0.95,
+              letterSpacing: '-0.005em',
+              color: '#FFFFFF'
+            }}
+          >
+            {pipeline == null ? (
+              <span className="v3-skeleton" style={{ width: 180, height: 48, borderRadius: 6 }} />
+            ) : (
+              <>
+                <span style={{
+                  fontSize: 'clamp(20px, 4.5vw, 28px)',
+                  color: 'var(--v3-text-muted)',
+                  verticalAlign: 'top',
+                  marginRight: 3,
+                  lineHeight: 1
+                }}>
+                  $
+                </span>
+                <CountUp to={pipeline} formatter={(n) => n.toLocaleString()} />
+              </>
+            )}
+          </div>
+          <div className="v3-caption" style={{ fontSize: 11 }}>vs last 7 days</div>
+        </div>
+
+        <div style={{ marginTop: 14, marginLeft: -8, marginRight: -8 }}>
+          <Sparkline data={sparkData} color="var(--v3-primary)" height={48} />
+        </div>
+
+        {/* Stage breakdown — Won / Active / Lead as a stacked bar
+            visualization. Mockup-tier financial dashboard treatment:
+            single horizontal bar with 3 colored segments + a numbers
+            row underneath. Replaces the prior 3-column number grid. */}
+        <PipelineStackedBreakdown breakdown={stageBreakdown} />
+
+        <button
+          type="button"
+          onClick={() => { hapticTap(); navigate('/jobs') }}
+          className="v3-section-link"
+          style={{ fontSize: 11, marginTop: 12 }}
+        >
+          View all jobs →
+        </button>
+      </motion.div>
+
+      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
+          Strongest section on the screen after the hero. Gold-tinted
+          border + raised shadow + count badge in the eyebrow tells the
+          operator: this is what to DO. Per-job CTAs tagged with urgency
+          (danger/warn/success) so critical work surfaces by color. */}
+      {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
-          role="button"
-          tabIndex={0}
-          aria-label="Open work-window forecast"
-          whileTap={{ scale: 0.98 }}
-          onClick={() => { hapticTap(); navigate('/pour-window') }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hapticTap(); navigate('/pour-window') } }}
-          style={{ padding: '0 20px 14px', cursor: 'pointer' }}
+          className="v3-section v3-section--primary-quiet"
+          style={{ margin: '0 var(--v3-gutter) 14px' }}
         >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderRadius: 16, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-            <span aria-hidden="true" style={{ position: 'absolute', top: 8, right: 10, fontSize: 8, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--field-gold-bright)', opacity: 0.7 }}>
-              Open →
+          <div className="v3-section-header">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+                Next Actions
+              </span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 20,
+                height: 20,
+                padding: '0 7px',
+                borderRadius: 999,
+                background: 'var(--v3-primary)',
+                color: 'var(--v3-on-primary)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 11,
+                letterSpacing: '0.04em',
+                lineHeight: 1
+              }}>
+                {nextActions.length}
+              </span>
             </span>
-            <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg, #2d3f54, #1a2535)', display: 'grid', placeItems: 'center' }}>
-              <CloudSun size={18} color="#8fb4e3" />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--ink-strong)' }}>
-                {weatherLoading ? '—' : weather?.current?.temperature_2m != null ? `${Math.round(weather.current.temperature_2m)}°` : '—'}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 3 }}>
-                {weather?.current?.wind_speed_10m != null ? `Wind ${Math.round(weather.current.wind_speed_10m)}mph` : '—'}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => { hapticTap(); navigate('/jobs') }}
+              className="v3-section-link"
+            >
+              View all
+              <ChevronRight size={12} aria-hidden="true" />
+            </button>
           </div>
-        </motion.div>
-      ) : (
-        <motion.div variants={item} style={{ padding: '0 20px 14px' }}>
-          <button onClick={pinLocation} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            <MapPin size={16} />Pin location for weather
-          </button>
-          {weatherErr && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--alert-red)' }}>{weatherErr}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+            {nextActions.map((action) => (
+              <NextActionRow
+                key={action.id}
+                action={action}
+                onTap={() => action.contactId
+                  ? navigate(`/jobs/${action.contactId}`)
+                  : navigate('/jobs')
+                }
+              />
+            ))}
+          </div>
         </motion.div>
       )}
 
-
-      {/* KPI CAROUSEL — phase 18.4: horizontal scroll-snap row instead
-          of a 3-col grid. On 375px iPhone the prior grid gave each tile
-          ~98px which crammed the K-format numbers. Now each tile is
-          fixed at 160px (snaps), tiles can grow as we add more (Won
-          YTD, Today's bookings, etc.) without a layout rebuild. */}
-      <motion.div variants={item} style={{ padding: '0 0 20px' }}>
-        <div
-          className="fh-kpi-carousel"
-          style={{
-            display: 'flex',
-            gap: 10,
-            overflowX: 'auto',
-            scrollSnapType: 'x mandatory',
-            scrollPaddingLeft: 20,
-            padding: '2px 20px 6px',
-            WebkitOverflowScrolling: 'touch'
-          }}
-        >
-          {[
-            { label: 'Pipeline', value: pipeline, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: TrendingUp, gold: true, to: '/jobs' },
-            { label: 'Outstanding', value: outstanding, prefix: '$', format: (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toLocaleString(), icon: Receipt, alert: (outstanding || 0) > 0, to: '/invoices' },
-            { label: 'Crews on site', value: activeCount, format: (n) => String(n), icon: Briefcase, to: '/jobs' },
-            { label: 'Notes', value: notesCount, format: (n) => String(n), icon: FileText, to: '/notes' }
-          ].map((kpi) => {
-            const I = kpi.icon
-            const isButton = !!kpi.to
-            const Tag = isButton ? 'button' : 'div'
-            return (
-              <Tag
-                key={kpi.label}
-                onClick={isButton ? () => navigate(kpi.to) : undefined}
-                type={isButton ? 'button' : undefined}
-                className="fh-card-raised"
-                style={{
-                  flexShrink: 0,
-                  scrollSnapAlign: 'start',
-                  width: 160,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  padding: '14px 14px 16px',
-                  borderRadius: 14,
-                  background: kpi.gold
-                    ? 'linear-gradient(135deg, #2a1f10, #1a1208)'
-                    : kpi.alert
-                      ? 'linear-gradient(135deg, #2a1210, #1a0c08)'
-                      : 'var(--surface-2)',
-                  border: kpi.gold
-                    ? '1px solid rgba(201,150,58,0.5)'
-                    : kpi.alert
-                      ? '1px solid rgba(192,57,43,0.5)'
-                      : '1px solid var(--rule)',
-                  minHeight: 86,
-                  textAlign: 'left',
-                  cursor: isButton ? 'pointer' : 'default',
-                  color: 'inherit'
-                }}
-              >
-                <I size={14} style={{ position: 'absolute', top: 12, right: 12, color: kpi.gold ? 'var(--field-gold-bright)' : kpi.alert ? 'var(--alert-red)' : 'rgba(201,150,58,0.4)' }} />
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{kpi.label}</div>
-                <div
-                  className={kpi.gold ? 'fh-money fh-text-gradient-gold' : 'fh-money'}
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 28,
-                    letterSpacing: '0.01em',
-                    lineHeight: 1,
-                    marginTop: 8,
-                    color: kpi.gold ? undefined : kpi.alert && kpi.value > 0 ? 'var(--alert-red)' : 'var(--ink-strong)',
-                    minHeight: 28
-                  }}
-                >
-                  {/* While the KPI value is null (still loading) show a
-                      subtle skeleton bar instead of "0" — kills the
-                      perception bug where the user sees a wrong zero
-                      then watches it change a beat later. */}
-                  {kpi.value == null ? (
-                    <span aria-label="Loading" style={{ display: 'inline-block', width: 64, height: 18, borderRadius: 4, background: 'rgba(255,255,255,0.06)' }} />
-                  ) : (
-                    <CountUp to={kpi.value} prefix={kpi.prefix || ''} formatter={kpi.format} />
-                  )}
-                </div>
-              </Tag>
-            )
-          })}
+      {/* ─────────── TODAY ON SITE ───────────
+          Schedule entries that start today, sourced from a safe
+          read-only fh_schedule query (no schema change). Polished
+          empty state if no events scheduled — never shows a blank
+          panel. Tap a row to jump to the linked job. */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader
+          label="Today on Site"
+          action={{ label: 'View schedule', onTap: () => navigate('/schedule') }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+          {todayOnSite == null ? (
+            <>
+              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 12 }} />
+              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 12, opacity: 0.65 }} />
+            </>
+          ) : todayOnSite.length === 0 ? (
+            <div className="v3-empty">
+              <CalendarClock size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+                Nothing scheduled today.
+              </div>
+              <div style={{ fontSize: 12 }}>Open Schedule to plan crew visits.</div>
+            </div>
+          ) : (
+            todayOnSite.map((row) => (
+              <TodayOnSiteRow
+                key={row.id}
+                row={row}
+                onTap={() => row.contactId
+                  ? navigate(`/jobs/${row.contactId}`)
+                  : navigate('/schedule')
+                }
+              />
+            ))
+          )}
         </div>
       </motion.div>
 
-      {/* TODAY ON SITE */}
-      <motion.div variants={item}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px 12px' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 15, letterSpacing: '0.14em', color: 'var(--ink-strong)', margin: 0 }}>Today on site</h3>
-          <button onClick={() => navigate('/jobs')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'none', border: 'none', cursor: 'pointer' }}>
-            All <ChevronRight size={12} />
-          </button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 14px' }}>
-          {/* Loading skeleton — was a flash of "No active jobs yet" while
-              the contacts query was still in flight. Now shows two
-              shimmer rows during the first paint. */}
-          {todayJobs == null ? (
+      {/* ─────────── PIPELINE PREVIEW ───────────
+          Top 3 active deals by value. Replaces the old Live Feed:
+          forward-looking ("what's open and worth most") instead of
+          backward-looking ("what just happened"). Tap a row to drill
+          into the contact, or "View all" to open the board. */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 14px' }}
+      >
+        <SectionHeader
+          label="Pipeline Preview"
+          action={{ label: 'View all', onTap: () => navigate('/jobs') }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+          {topPipeline == null ? (
             <>
-              <div style={{ height: 60, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.6 }} />
-              <div style={{ height: 60, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.4 }} />
+              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 12 }} />
+              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 12, opacity: 0.65 }} />
             </>
-          ) : todayJobs.length === 0 ? (
-            <div style={{ padding: '24px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 12 }}>
-              No active jobs yet. <button onClick={() => navigate('/jobs?new=1')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--field-gold-bright)', fontWeight: 700, cursor: 'pointer' }}>Add your first lead →</button>
+          ) : topPipeline.length === 0 ? (
+            <div className="v3-empty">
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+                No active deals.
+              </div>
+              <div style={{ fontSize: 12 }}>Add your first lead to start the pipeline.</div>
             </div>
-          ) : todayJobs.map((job) => {
-            const accent = job.stage === 'job' ? 'green' : job.stage === 'quote' ? 'gold' : 'red'
-            const accentColors = { green: 'var(--signal-green)', gold: 'var(--field-gold-bright)', red: 'var(--alert-red)' }
-            return (
-              <motion.button key={job.id} whileTap={{ scale: 0.98 }} onClick={() => navigate(`/jobs/${job.id}`)} style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accentColors[accent], boxShadow: `0 0 12px ${accentColors[accent]}99` }} />
-                <div style={{ width: 36, height: 36, borderRadius: 11, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 15, letterSpacing: '0.04em', background: `linear-gradient(135deg, ${accentColors[accent]}33, ${accentColors[accent]}11)`, color: accentColors[accent], border: `1px solid ${accentColors[accent]}33` }}>
-                  {initials(job.name)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.name || 'Untitled'}</div>
-                  <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 3 }}>{job.job_type || job.job_title || '—'}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--field-gold-bright)' }}>${(Number(job.amount || 0) / 1000).toFixed(1)}K</div>
-                </div>
-              </motion.button>
-            )
-          })}
+          ) : (
+            topPipeline.map((deal) => (
+              <PipelineDealRow
+                key={deal.id}
+                deal={deal}
+                onTap={() => navigate(`/jobs/${deal.id}`)}
+              />
+            ))
+          )}
+        </div>
+      </motion.div>
+
+      {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
+          Demoted to the bottom of the screen as a tools toolbar.
+          Equal-width tight tiles (no asymmetric primary) — the eye
+          treats this as a launcher, not a CTA. Save Note / Schedule /
+          Invoice / Estimate read as parallel power tools. */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--tight"
+        style={{ margin: '0 var(--v3-gutter) 32px' }}
+      >
+        <SectionHeader label="Quick Actions" />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 8,
+            marginTop: 4
+          }}
+        >
+          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
+          <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
+          <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+/* ============================================================
+   PipelineStackedBreakdown — Won / Active / Lead as a stacked
+   horizontal bar with a numbers row underneath. Mockup-tier
+   financial dashboard treatment. Renders an empty bar with
+   "—" labels while data is loading so layout doesn't shift.
+   ============================================================ */
+function PipelineStackedBreakdown({ breakdown }) {
+  const won    = breakdown?.won    ?? 0
+  const active = breakdown?.active ?? 0
+  const lead   = breakdown?.lead   ?? 0
+  const total  = won + active + lead
+  const segments = [
+    { id: 'won',    label: 'Won',    count: won,    tone: 'var(--v3-success-bright)' },
+    { id: 'active', label: 'Active', count: active, tone: 'var(--v3-primary)' },
+    { id: 'lead',   label: 'Lead',   count: lead,   tone: 'var(--v3-text-muted)' }
+  ]
+  return (
+    <div style={{
+      marginTop: 14,
+      paddingTop: 14,
+      borderTop: '1px solid var(--v3-border)'
+    }}>
+      {/* Stacked bar */}
+      <div
+        aria-hidden="true"
+        style={{
+          height: 8,
+          borderRadius: 999,
+          background: 'var(--v3-track)',
+          overflow: 'hidden',
+          display: 'flex',
+          gap: 2
+        }}
+      >
+        {total > 0 ? segments.map((s) => (
+          <div
+            key={s.id}
+            style={{
+              width: `${(s.count / total) * 100}%`,
+              background: s.tone,
+              transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+            }}
+          />
+        )) : (
+          <div style={{ width: '100%', background: 'transparent' }} />
+        )}
+      </div>
+
+      {/* Numbers row underneath */}
+      <div style={{
+        marginTop: 10,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 12
+      }}>
+        {segments.map((s) => (
+          <div key={s.id}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontFamily: 'var(--font-display)',
+              fontSize: 22,
+              lineHeight: 1,
+              color: s.tone,
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              <span aria-hidden="true" style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: s.tone
+              }} />
+              {breakdown == null ? '—' : s.count}
+            </div>
+            <div className="v3-eyebrow" style={{ marginTop: 4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   TodayOnSiteRow — single schedule row in Today on Site.
+   Time + job/title + stage chip + chevron. Tap → linked job.
+   ============================================================ */
+function TodayOnSiteRow({ row, onTap }) {
+  const stage = row.stage ? STAGE_DISPLAY[row.stage] : null
+  const startTime = row.startAt
+    ? new Date(row.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : ''
+  const endTime = row.endAt
+    ? new Date(row.endAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : ''
+  const timeLabel = startTime && endTime ? `${startTime} – ${endTime}` : (startTime || '—')
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -1 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        padding: '12px 14px',
+        borderRadius: 12,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border-strong)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset'
+      }}
+    >
+      {/* Time slot — start–end range when both are known */}
+      <div style={{
+        flexShrink: 0,
+        minWidth: endTime ? 100 : 56,
+        textAlign: 'center',
+        padding: '4px 8px',
+        borderRadius: 8,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
+        fontFamily: 'var(--font-display)',
+        fontSize: 13,
+        color: 'var(--v3-text)',
+        fontVariantNumeric: 'tabular-nums',
+        letterSpacing: '0.02em',
+        lineHeight: 1.4,
+        whiteSpace: 'nowrap'
+      }}>
+        {timeLabel}
+      </div>
+      {/* Title + client */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'var(--v3-text)',
+          letterSpacing: '-0.005em',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          {row.title}
+        </div>
+        {stage && (
+          <div style={{
+            marginTop: 3,
+            fontFamily: 'var(--font-body)',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.10em',
+            textTransform: 'uppercase',
+            color: stage.color
+          }}>
+            {stage.label}
+          </div>
+        )}
+      </div>
+      <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+    </motion.button>
+  )
+}
+
+/* ============================================================
+   PipelineDealRow — single deal row inside Pipeline Preview.
+   Stage chip on the left + name + amount in Bebas. Hover lifts
+   border/background, tap navigates to the contact.
+   ============================================================ */
+const STAGE_DISPLAY = {
+  lead:    { label: 'Lead',    color: 'var(--v3-stage-lead)' },
+  quote:   { label: 'Quote',   color: 'var(--v3-stage-quote)' },
+  job:     { label: 'Job',     color: 'var(--v3-stage-active)' },
+  invoice: { label: 'Invoice', color: 'var(--v3-stage-won)' }
+}
+
+function PipelineDealRow({ deal, onTap }) {
+  const stage = STAGE_DISPLAY[deal.stage] || { label: deal.stage, color: 'var(--v3-text-muted)' }
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -2 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        width: '100%',
+        padding: '14px 14px',
+        borderRadius: 14,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border-strong)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+        transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
+      }}
+      onMouseEnter={(e) => {
+        // Hover stays neutral — black/charcoal/white. Stage color
+        // shows on the spine + label only (functional). No ambient
+        // blue/purple bleed onto the card's halo.
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
+        e.currentTarget.style.background = 'var(--v3-surface-3)'
+        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.40)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
+        e.currentTarget.style.background = 'var(--v3-surface)'
+        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
+      }}
+    >
+      {/* Stage spine — 5px gradient. Glow removed (QA pass): blue/
+          purple stages were bleeding ambient atmosphere. Functional
+          color only — chip + spine carry the meaning. */}
+      <span aria-hidden="true" style={{
+        flexShrink: 0,
+        width: 5,
+        height: 36,
+        borderRadius: 3,
+        background: `linear-gradient(180deg, ${stage.color}, color-mix(in srgb, ${stage.color} 50%, transparent))`
+      }} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 15,
+          fontWeight: 600,
+          color: 'var(--v3-text)',
+          letterSpacing: '-0.005em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}>
+          {deal.name}
+        </div>
+        <div style={{
+          marginTop: 4,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: stage.color
+        }}>
+          {stage.label}
+        </div>
+      </div>
+      <div style={{
+        flexShrink: 0,
+        fontFamily: 'var(--font-display)',
+        fontSize: 26,
+        color: 'var(--v3-text)',
+        fontVariantNumeric: 'tabular-nums',
+        lineHeight: 1,
+        textShadow: '0 1px 0 rgba(255, 255, 255, 0.06)'
+      }}>
+        ${deal.amount >= 1000
+          ? `${(deal.amount / 1000).toFixed(deal.amount >= 10000 ? 0 : 1)}K`
+          : deal.amount.toLocaleString()}
+      </div>
+      <ChevronRight size={18} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
+    </motion.button>
+  )
+}
+
+/* ============================================================
+   CompactKpi — Tier-2 KPI tile. Smaller than v3 KpiTile primitive,
+   color confined to the value + 1px top accent bar. Hover lift.
+   Internal CountUp from the v3 primitive is replaced here with the
+   home's own CountUp wiring (already imported above) so we control
+   the size + skeleton state.
+   ============================================================ */
+
+const COMPACT_TONE = {
+  primary: { color: 'var(--v3-primary)' },
+  success: { color: 'var(--v3-success-bright)' },
+  danger:  { color: 'var(--v3-danger-bright)' },
+  // warn — bronze/amber from the stage-quote token; reads as "needs attention
+  // soon" without claiming the urgency of danger.
+  warn:    { color: 'var(--v3-stage-quote)' },
+  // lead — steel-blue from the stage-lead token; the closest token-native
+  // option to the mockup's lavender for the Quotes tile.
+  lead:    { color: 'var(--v3-stage-lead)' }
+}
+
+function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }) {
+  const t = COMPACT_TONE[tone] || COMPACT_TONE.primary
+
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.97 }}
+      whileHover={{ y: -3 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      style={{
+        position: 'relative',
+        textAlign: 'left',
+        padding: '14px 12px 12px',
+        borderRadius: 14,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        color: 'var(--v3-text)',
+        cursor: 'pointer',
+        minHeight: 88,
+        WebkitTapHighlightColor: 'transparent',
+        overflow: 'hidden'
+      }}
+    >
+      {/* 2px accent bar at top — the only chromatic signal on the tile */}
+      <span aria-hidden="true" style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+        background: t.color, opacity: 0.85
+      }} />
+
+      {Icon ? (
+        <span aria-hidden="true" style={{
+          display: 'inline-grid', placeItems: 'center',
+          width: 28, height: 28, borderRadius: 8,
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border-strong)',
+          color: t.color,
+          marginBottom: 10
+        }}>
+          <Icon size={14} strokeWidth={2.2} />
+        </span>
+      ) : null}
+
+      <div style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 26,
+        color: t.color,
+        lineHeight: 1,
+        marginBottom: 8,
+        minHeight: 26,
+        fontVariantNumeric: 'tabular-nums'
+      }}>
+        {value == null ? (
+          <span className="v3-skeleton" style={{ width: 44, height: 22, borderRadius: 4 }} />
+        ) : isMoney ? (
+          <>
+            <span style={{
+              fontSize: 14, color: 'var(--v3-text-muted)',
+              verticalAlign: 'top', marginRight: 1
+            }}>
+              $
+            </span>
+            <CountUp
+              to={Number(value) || 0}
+              formatter={(n) => {
+                if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`
+                return n.toLocaleString()
+              }}
+            />
+          </>
+        ) : (
+          <CountUp to={Number(value) || 0} />
+        )}
+      </div>
+
+      <div style={{
+        fontFamily: 'var(--font-body)',
+        fontSize: 11,
+        fontWeight: 600,
+        color: 'var(--v3-text)',
+        lineHeight: 1.3,
+        letterSpacing: '-0.005em'
+      }}>
+        {label}
+      </div>
+
+      {subline ? (
+        <div style={{
+          marginTop: 4,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 700,
+          color: t.color,
+          fontVariantNumeric: 'tabular-nums'
+        }}>
+          {subline}
+        </div>
+      ) : null}
+    </motion.button>
+  )
+}
+
+/* ============================================================
+   NextActionRow — per-job CTA shown in the Next Actions section.
+   Icon + tone driven by `kind`. Gold left-edge accent; flat row
+   that hover-lifts to invite the tap.
+   ============================================================ */
+
+// Per-kind icon. The urgency tone (danger/warn/success) drives the row's
+// accent color via URGENCY_TONE below — kind alone no longer picks color
+// (an old lead can be warn OR danger depending on how cold it's gone).
+const NEXT_ACTION_KIND = {
+  followup:   { Icon: PhoneCall },
+  reschedule: { Icon: CalendarClock },
+  invoice:    { Icon: Receipt }
+}
+
+const URGENCY_TONE = {
+  danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
+  warn:    { color: 'var(--v3-primary)',        glow: 'rgba(212, 175, 55, 0.45)' },
+  success: { color: 'var(--v3-success-bright)', glow: 'rgba(46, 204, 113, 0.40)' }
+}
+
+function NextActionRow({ action, onTap }) {
+  const kindMeta = NEXT_ACTION_KIND[action.kind] || { Icon: Zap }
+  const { Icon } = kindMeta
+  const tone = URGENCY_TONE[action.urgencyTone] || URGENCY_TONE.warn
+
+  return (
+    <motion.button
+      type="button"
+      onClick={() => { hapticTap(); onTap?.() }}
+      whileTap={{ scale: 0.97 }}
+      // Hover: lift + shift right 2px + brighter surface. Reads as a
+      // control being depressed/highlighted. Hex literal so framer can
+      // interpolate the colour smoothly (matches --v3-surface-2 token).
+      whileHover={{
+        y: -2,
+        x: 2,
+        backgroundColor: 'var(--v3-surface-3)'
+      }}
+      // Snappier spring (stiffness 720 / damping 26) so tap + hover both
+      // read as immediate key-presses, not soft squishes.
+      transition={{ type: 'spring', stiffness: 720, damping: 26 }}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        // Tighter again: 9/12/9/14 saves ~6px height per row.
+        padding: '9px 12px 9px 14px',
+        borderRadius: 12,
+        // Subtle linear top-light overlay + slightly raised surface mix
+        // so each row reads as a metal plate, not a list item.
+        background: `
+          linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 40%),
+          var(--v3-surface)
+        `,
+        border: '1px solid var(--v3-border-strong)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        width: '100%',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Left edge accent — urgency-tone color + matching glow. THIS is the
+          critical-vs-optional signal. Operator scan: red bar = drop everything,
+          yellow = today, green = money in motion. */}
+      <span aria-hidden="true" style={{
+        position: 'absolute',
+        left: 0, top: 7, bottom: 7,
+        width: 3,
+        background: tone.color,
+        borderRadius: '0 3px 3px 0',
+        boxShadow: `0 0 12px ${tone.glow}`
+      }} />
+
+      <span aria-hidden="true" style={{
+        flexShrink: 0,
+        width: 32, height: 32,
+        borderRadius: 9,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border-strong)',
+        color: tone.color,
+        display: 'grid',
+        placeItems: 'center'
+      }}>
+        <Icon size={14} />
+      </span>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 13,
+          fontWeight: 700,
+          color: 'var(--v3-text)',
+          letterSpacing: '-0.01em',
+          lineHeight: 1.25,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          {action.title}
+        </div>
+        <div style={{
+          marginTop: 1,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          lineHeight: 1.3,
+          color: 'var(--v3-text-muted)',
+          fontVariantNumeric: 'tabular-nums'
+        }}>
+          {action.detail}
+        </div>
+      </div>
+
+      {/* Urgency chip — short label that names the urgency in plain words.
+          Color matches the spine. */}
+      {action.urgencyLabel && (
+        <span style={{
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '3px 7px',
+          borderRadius: 999,
+          background: `color-mix(in srgb, ${tone.color} 14%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${tone.color} 35%, transparent)`,
+          color: tone.color,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1.2
+        }}>
+          <span aria-hidden="true" style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: tone.color
+          }} />
+          {action.urgencyLabel}
+        </span>
+      )}
+
+      <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
+    </motion.button>
   )
 }

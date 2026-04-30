@@ -29,6 +29,7 @@ export async function transitionStage(contact, nextStage) {
     .from('fh_contacts')
     .update(patch)
     .eq('id', contact.id)
+    .eq('user_id', contact.user_id)
     .select()
     .single()
   return { data, error }
@@ -90,26 +91,30 @@ export async function logPayment(contact, { amount, method, reference, paid_on }
     .from('fh_payments')
     .select('amount')
     .eq('contact_id', contact.id)
+    .eq('user_id', contact.user_id)
   const total = (pays || []).reduce((s, p) => s + Number(p.amount || 0), 0)
   if (total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
-    await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id)
+    await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
   }
   return { total }
 }
 
-export async function recalcCost(contactId) {
+export async function recalcCost(contactId, userId) {
+  if (!contactId || !userId) return 0
   const { data: subs } = await supabase
     .from('fh_subs')
     .select('rate')
     .eq('contact_id', contactId)
+    .eq('user_id', userId)
   const { data: exps } = await supabase
     .from('fh_expenses')
     .select('amount')
     .eq('contact_id', contactId)
+    .eq('user_id', userId)
   const subsTotal = (subs || []).reduce((s, r) => s + Number(r.rate || 0), 0)
   const expsTotal = (exps || []).reduce((s, r) => s + Number(r.amount || 0), 0)
   const cost = subsTotal + expsTotal
-  await supabase.from('fh_contacts').update({ cost }).eq('id', contactId)
+  await supabase.from('fh_contacts').update({ cost }).eq('id', contactId).eq('user_id', userId)
   return cost
 }
 

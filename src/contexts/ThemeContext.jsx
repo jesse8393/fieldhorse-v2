@@ -5,9 +5,8 @@ const STORAGE_KEY = 'fh:theme'
 
 function initial() {
   if (typeof window === 'undefined') return 'dark'
-  // Safari Private Mode on older iOS throws SecurityError on localStorage
-  // access. A throw here would crash the whole app. Default to dark on
-  // any failure.
+  // Safari Private Mode on older iOS throws SecurityError on localStorage.
+  // Default to dark on any failure.
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === 'dark' || stored === 'light') return stored

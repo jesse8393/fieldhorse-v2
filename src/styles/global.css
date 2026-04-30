@@ -288,36 +288,6 @@ select:focus-visible,
 .fh-stage-pill--closed  { background: var(--stage-closed); }
 .fh-stage-pill--lost    { background: var(--stage-lost); color: #FAF7F1; }
 
-/* Floating action button — bottom-right, clears bottom nav + iOS home bar. */
-.fh-fab {
-  position: fixed;
-  right: 20px;
-  /* Was 96 px; bumped to 112 px so the gold glow has a 16 px gap above
-     the bottom nav and doesn't bleed over the active-tab dot. */
-  bottom: calc(112px + env(safe-area-inset-bottom));
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  background: var(--field-gold);
-  color: var(--onyx);
-  border: none;
-  cursor: pointer;
-  /* Tighter glow radius (was 28 px) so the halo stops well short of the
-     nav, even on shorter phones where vertical room is tight. */
-  box-shadow: 0 8px 18px rgba(201, 150, 58, 0.38),
-              0 2px 6px rgba(0, 0, 0, 0.4),
-              inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  z-index: calc(var(--z-nav) - 1);
-  transition: transform 80ms var(--ease-mechanical);
-  -webkit-tap-highlight-color: transparent;
-}
-.fh-fab:active { transform: translateY(1px) scale(0.96); }
-@media (prefers-reduced-motion: reduce) {
-  .fh-fab { transition: none; }
-}
-
 /* Aceternity-style animated moving border. Wrap any container and the gradient ring
    orbits its perimeter. Adds "premium shimmer" without affecting layout. */
 @keyframes fh-moving-border {
@@ -393,17 +363,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Film-grain noise overlay — industrial premium, 5% opacity, overlay blend. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  mix-blend-mode: overlay;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
+/* Film-grain overlay removed in v3 QA pass.
+   The mix-blend-mode: overlay against near-black surfaces was lifting
+   blacks toward a subtle blue cast (the "foggy haze" the user kept
+   seeing). v3 page texture lives in .v3-screen at a much lower
+   alpha and without overlay blending. */
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
@@ -1655,13 +1619,23 @@ a {
 }
 .fh-app__main {
   flex: 1;
-  /* AppHeader already reserves safe-area-inset-top on its own paddingTop.
-     Duplicating it here put ~40-50px of dead black space between the
-     header and the first page content on iPhone. */
-  /* Phase 18.2: 84 -> 96 to clear the BottomNav on Settings + Importer
-     where the terminal sections were getting clipped. Global because
-     every Gated screen sits in .fh-app__main and shares the problem. */
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  /* Stepped responsive frame — content reads as intentional at every
+     viewport size. Mobile = full width; tablet = 760px; desktop =
+     1080px; large desktop = 1180px (cap). Jobs/Clients grids fill the
+     frame and adapt their own column count via auto-fill / minmax. */
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (min-width: 720px) {
+  .fh-app__main { max-width: 760px; }
+}
+@media (min-width: 1024px) {
+  .fh-app__main { max-width: 1080px; }
+}
+@media (min-width: 1440px) {
+  .fh-app__main { max-width: 1180px; }
 }
 
 /* =========================================================================
@@ -1751,9 +1725,9 @@ a {
 .fh-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   z-index: var(--z-modal);
 }
 
@@ -1776,9 +1750,9 @@ a {
   .fh-cmdk-hint { display: none !important; }
 }
 
-/* Floating Action Button — bottom-right, sits above BottomNav with
-   safe-area cushion. Used by Jobs (+) so the New Lead action is in
-   thumb reach instead of the top-right corner. */
+/* Floating Action Button (override of the earlier .fh-fab declaration
+   above). Single source of truth for FAB visuals. Glow tightened so
+   the gold halo doesn't bleed across the page on wide viewports. */
 .fh-fab {
   position: fixed;
   right: 20px;
@@ -1788,15 +1762,27 @@ a {
   height: 56px;
   border-radius: 18px;
   border: none;
-  background: linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep));
-  color: var(--onyx);
+  background: linear-gradient(135deg, var(--v3-primary-hot), var(--v3-primary));
+  color: var(--v3-on-primary);
   display: grid;
   place-items: center;
   cursor: pointer;
-  box-shadow: 0 12px 28px rgba(201, 150, 58, 0.45), 0 0 0 1px rgba(201, 150, 58, 0.2);
+  /* Restrained halo — alpha 32→18 resting, 42→26 hover — so the FAB
+     reads as a primary CTA without dominating the screen. The button
+     itself remains gold; the surrounding glow is just a hint. */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 4px 12px rgba(229, 193, 88, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.40);
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
-.fh-fab:hover { transform: translateY(-2px); box-shadow: 0 16px 32px rgba(201, 150, 58, 0.55); }
+.fh-fab:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 8px 18px rgba(229, 193, 88, 0.26),
+    0 3px 8px rgba(0, 0, 0, 0.45);
+}
 .fh-fab:active { transform: scale(0.94); }
 
 /* AppHeader right-slot icon buttons — steel at rest, gold on hover/active.
@@ -1865,9 +1851,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-drawer__scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   /* Force GPU layer so background text doesn't smear on backdrop-filter. */
   transform: translateZ(0);
   will-change: backdrop-filter;
@@ -1879,22 +1865,46 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   right: 0;
   bottom: 0;
   z-index: 1;
-  background: var(--surface-1);
-  border-top: 1px solid var(--rule-bold);
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
-  box-shadow: 0 -20px 60px -12px rgba(0, 0, 0, 0.55);
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
   display: flex;
   flex-direction: column;
-  max-height: min(86dvh, calc(100vh - env(safe-area-inset-top) - 40px));
+  /* Less bulky than before (86 → 78dvh). The list now decides height
+     so the drawer doesn't dominate the screen. */
+  max-height: min(78dvh, calc(100vh - env(safe-area-inset-top) - 48px));
   overflow: hidden;
+  /* Drawer base — warm v3 surface, subtle top edge stroke. Reduced
+     box-shadow vs the prior settings-panel weight. */
+  background:
+    linear-gradient(180deg, var(--v3-glass-tint, rgba(255, 255, 255, 0.025)) 0%, transparent 160px),
+    var(--v3-bg);
+  border-top: 1px solid var(--v3-border-strong);
+  box-shadow: 0 -18px 48px -10px rgba(0, 0, 0, 0.45);
 }
-[data-theme='dark'] .fh-drawer { background: var(--onyx-2); }
-@media (min-width: 720px) {
+.fh-drawer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 24%;
+  right: 24%;
+  height: 1px;
+  background: var(--v3-gold-stroke, linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.40) 50%, transparent 100%));
+  pointer-events: none;
+}
+[data-theme='light'] .fh-drawer {
+  box-shadow: 0 -18px 48px -10px rgba(60, 50, 30, 0.18);
+}
+/* Tablet+ — render as a centered column, narrower than before so it
+   reads as a navigation panel, not a settings sheet. */
+@media (min-width: 560px) {
   .fh-drawer {
-    max-width: 640px;
+    max-width: 440px;
     left: 50%;
     transform: translateX(-50%);
+    border-radius: 18px;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    /* Bring the panel up off the very bottom so it floats — premium
+       command palette feel rather than a bottom sheet. */
   }
 }
 
@@ -2014,7 +2024,10 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   flex-shrink: 0;
   background: var(--surface-1);
 }
-[data-theme='dark'] .fh-drawer__foot { background: var(--onyx-2); }
+[data-theme='dark'] .fh-drawer__foot {
+  background: transparent;
+  border-top-color: var(--v3-border-strong);
+}
 .fh-drawer__theme,
 .fh-drawer__signout {
   display: inline-flex;
@@ -2072,9 +2085,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   position: fixed;
   inset: 0;
   z-index: var(--z-cmdk);
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   padding: 12vh 16px 16px;
   display: flex;
   justify-content: center;
@@ -4455,9 +4468,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-asheet__scrim {
   position: fixed;
   inset: 0;
-  background: rgba(6, 6, 6, 0.65);
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 [data-theme='light'] .fh-asheet__scrim,
 :root:not([data-theme='dark']) .fh-asheet__scrim {
@@ -5165,8 +5178,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
 }
 .fh-toast__dot {

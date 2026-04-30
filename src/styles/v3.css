@@ -1,0 +1,648 @@
+/* ================================================================
+   FIELDHORSE v3 — FOUNDATION UTILITY LAYER
+   Typography scale, button/card/pill primitives, motion helpers.
+   Scoped via .v3-* class names so legacy .fh-* rules are untouched.
+   v3 tokens (--v3-*) are defined in tokens.css.
+   ================================================================ */
+
+/* ---------- Typography scale (per spec) ---------- */
+.v3-h1 {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--v3-text);
+  margin: 0;
+}
+@media (min-width: 480px) {
+  .v3-h1 { font-size: 32px; }
+}
+.v3-h1 em,
+.v3-h1 .v3-h1__accent {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--v3-text);
+}
+
+.v3-h2 {
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--v3-text);
+  margin: 0;
+}
+@media (min-width: 480px) {
+  .v3-h2 { font-size: 24px; }
+}
+
+.v3-h3 {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--v3-text);
+  margin: 0;
+}
+
+.v3-body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--v3-text);
+}
+.v3-body-lg { font-size: 16px; line-height: 1.55; }
+
+.v3-caption {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--v3-text-muted);
+}
+
+.v3-eyebrow {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--v3-text-muted);
+  line-height: 1;
+}
+
+.v3-money {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  color: var(--v3-text);
+}
+
+.v3-text-muted { color: var(--v3-text-muted); }
+.v3-text-success { color: var(--v3-success); }
+.v3-text-danger { color: var(--v3-danger); }
+.v3-text-primary { color: var(--v3-primary); }
+
+/* ---------- Button primitive ---------- */
+.v3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: var(--v3-radius-btn);
+  border: 1px solid transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 100ms var(--ease-mechanical), background-color 140ms ease, border-color 140ms ease, box-shadow 200ms ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  white-space: nowrap;
+}
+.v3-btn:active { transform: scale(0.97); }
+.v3-btn[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
+.v3-btn--full { width: 100%; }
+
+.v3-btn--primary {
+  background: var(--v3-primary);
+  color: #0B0B0D;
+  box-shadow: 0 8px 22px rgba(212, 175, 55, 0.22), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+.v3-btn--primary:hover { background: #E0BC44; }
+
+.v3-btn--secondary {
+  background: var(--v3-surface-2);
+  color: var(--v3-text);
+  border-color: var(--v3-border-strong);
+}
+.v3-btn--secondary:hover { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.15); }
+
+.v3-btn--ghost {
+  background: transparent;
+  color: var(--v3-text);
+}
+.v3-btn--ghost:hover { background: rgba(255, 255, 255, 0.04); }
+
+.v3-btn--danger {
+  background: var(--v3-danger);
+  color: #ffffff;
+}
+
+.v3-btn--sm { padding: 8px 14px; font-size: 12px; min-height: 36px; }
+.v3-btn--lg { padding: 14px 22px; font-size: 15px; min-height: 52px; }
+.v3-btn--icon-only { padding: 0; width: 44px; min-height: 44px; }
+
+/* ---------- Card primitive — premium push ---------- */
+.v3-card {
+  background: var(--v3-surface-glass);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  border: 1px solid var(--v3-border-strong);
+  border-radius: var(--v3-radius-card);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    var(--v3-shadow);
+  position: relative;
+  overflow: hidden;
+}
+.v3-card--surface-2 { background: var(--v3-surface-2); }
+.v3-card--flat { box-shadow: none; }
+.v3-card--padded { padding: 18px; }
+.v3-card--padded-sm { padding: 14px; }
+.v3-card--padded-lg { padding: 22px; }
+.v3-card--interactive {
+  cursor: pointer;
+  transition: transform 140ms var(--ease-mechanical), border-color 200ms ease, box-shadow 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.v3-card--interactive:active {
+  transform: scale(0.99);
+  border-color: var(--v3-border-strong);
+}
+.v3-card--accent-primary {
+  border-color: rgba(212, 175, 55, 0.28);
+}
+.v3-card--accent-success {
+  border-color: rgba(46, 204, 113, 0.28);
+}
+.v3-card--accent-danger {
+  border-color: rgba(192, 57, 43, 0.32);
+}
+
+/* Hero card with subtle gold inner glow — used for Revenue Opportunity */
+.v3-card--hero {
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(212, 175, 55, 0.10), transparent 55%),
+    var(--v3-surface);
+  border-color: rgba(212, 175, 55, 0.15);
+}
+
+/* ---------- Pill primitive ---------- */
+.v3-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--v3-radius-pill);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.v3-pill--primary {
+  background: var(--v3-primary-soft);
+  color: #E8C25A;
+  border-color: rgba(212, 175, 55, 0.30);
+}
+.v3-pill--success {
+  background: var(--v3-success-soft);
+  color: var(--v3-success-bright);
+  border-color: rgba(46, 204, 113, 0.30);
+}
+.v3-pill--danger {
+  background: var(--v3-danger-soft);
+  color: #F47366;
+  border-color: rgba(192, 57, 43, 0.40);
+}
+.v3-pill--neutral {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--v3-text-muted);
+  border-color: var(--v3-border);
+}
+
+/* ---------- Section header ---------- */
+.v3-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0 12px;
+}
+.v3-section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--v3-primary);
+  cursor: pointer;
+}
+
+/* ---------- Layout helpers ---------- */
+/* .fh-screen (legacy) inherits the v3 screen treatment so older
+   screens like Settings, Bid, Compose, Invoices, Analytics, Importer,
+   Subs, PourWindow get the same page bg / min-height / padding as
+   v3 screens without a per-file rewrite. */
+.fh-screen,
+.v3-screen {
+  /* min-height: 100dvh ensures the dark page surface ALWAYS reaches
+     the bottom of the viewport even on screens with very little
+     content (or after a filter empties the grid). Otherwise the page
+     ends right after the last card and the body's white default
+     bleeds through, looking like an unfinished module zone. */
+  min-height: 100dvh;
+  background: var(--v3-bg);
+  color: var(--v3-text);
+  padding-bottom: 120px;
+}
+.v3-stack > * + * { margin-top: 16px; }
+.v3-stack-sm > * + * { margin-top: 8px; }
+
+/* ---------- System rhythm helpers ----------
+   Standardized vertical spacing — replaces ad-hoc padding-bottom
+   per group. Apply to a wrapping <div> around stacked sections. */
+.v3-stack-screen > * + * { margin-top: var(--v3-rhythm-screen); }
+.v3-stack-section > * + * { margin-top: var(--v3-rhythm-section); }
+.v3-stack-tight > * + * { margin-top: var(--v3-rhythm-tight); }
+.v3-stack-loose > * + * { margin-top: var(--v3-rhythm-loose); }
+
+/* Screen gutter — token-driven L/R padding for page content */
+.v3-gutter { padding-left: var(--v3-gutter); padding-right: var(--v3-gutter); }
+
+/* ---------- Section primitive (depth + framing) — premium push ----------
+   Wraps a logical group (header + cards/list/tiles) in a layered
+   container that lifts off the page background. Provides:
+     - tonal lift via --v3-section-bg (visible gradient)
+     - 12% white hairline + inset highlight
+     - ambient + key-light shadow stack
+     - radial top-left light leak via ::before
+     - 1px gradient top stroke via ::after (Stripe/Linear premium look)
+   The card primitive (.v3-card) sits INSIDE this. */
+.v3-section {
+  background: var(--v3-section-bg);
+  border: 1px solid var(--v3-section-border);
+  border-radius: var(--v3-section-radius);
+  box-shadow: var(--v3-section-shadow);
+  padding: var(--v3-pad-section);
+  position: relative;
+  overflow: hidden;
+}
+/* Top-left ambient light leak — angled radial for "stage light" feel */
+.v3-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(110% 70% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 50%);
+}
+/* Top edge stroke — 1px gradient with subtle glow. Pushed brighter
+   (16% → 28% white) + a 6px ambient glow so it reads as a real lit
+   leading edge, not a hairline. Linear/Stripe premium tier. */
+.v3-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.32) 50%, transparent 100%);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.18);
+}
+.v3-section > * { position: relative; z-index: 1; }
+
+/* Section variants */
+.v3-section--tight { padding: var(--v3-pad-section-tight); }
+.v3-section--flush { padding: 0; }
+.v3-section--quiet {
+  /* Lower-key variant for secondary zones — no inner highlight,
+     reduced shadow. Keeps depth without competing with primary
+     sections (hero, KPIs) that should dominate. */
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+.v3-section--quiet::before { display: none; }
+.v3-section--quiet::after { opacity: 0.5; }
+
+/* Primary section variant — smoked black glass with gold trim
+   (Phase 1A-3: pulled the warm-amber bg gradient (was 14% gold) down
+   to a barely-there 4% wash, dropped the radial blobs to nearly
+   invisible, halved the top-stroke glow). The gold IDENTITY of the
+   section now lives in the top stroke alone — border, ambient and
+   glow all read as restrained accent on a black-glass surface. */
+.v3-section--primary {
+  border-color: var(--v3-border-gold);            /* now 0.10 — hairline */
+  background:
+    linear-gradient(180deg, rgba(201, 150, 58, 0.04) 0%, transparent 60%),
+    var(--v3-section-bg);
+  box-shadow:
+    0 1px 0 rgba(255, 240, 210, 0.08) inset,
+    0 1px 2px rgba(0, 0, 0, 0.46),
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 10px 28px var(--v3-primary-glow);           /* now 0.06 */
+}
+.v3-section--primary::before {
+  /* Light-leak now nearly invisible — 8%/4% → 4%/0%. The remaining
+     top-left peak just keeps the section from feeling flat. */
+  background:
+    radial-gradient(110% 70% at 0% 0%, rgba(201, 150, 58, 0.04), transparent 55%);
+}
+.v3-section--primary::after {
+  left: 6%;
+  right: 6%;
+  height: 1px;
+  /* Gold "trim" — kept legible (the section's identity moment) but
+     glow halved again: 8px @ 0.30 → 6px @ 0.18. Stroke alpha from
+     the token (now 0.55) carries the line; glow is just a hint. */
+  background: var(--v3-gold-stroke);
+  box-shadow: 0 0 6px rgba(201, 150, 58, 0.18);
+}
+
+/* Quiet variant of the primary section — smoked black glass with gold
+   trim reduced to thin lines only. NO gold/amber background wash, NO
+   gold ambient glow — panel depth comes from black shadow + glass.
+   Identity still gold (hairline border + thin gold top-stroke) so the
+   section reads as primary hierarchy without claiming "revenue moment".
+   Use for Home Pipeline + Next Actions; Bid keeps the strong --primary. */
+.v3-section--primary-quiet {
+  border-color: var(--v3-border-gold);
+  background: var(--v3-section-bg);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 1px 2px rgba(0, 0, 0, 0.40),
+    0 18px 48px rgba(0, 0, 0, 0.50);
+}
+.v3-section--primary-quiet::before {
+  background:
+    radial-gradient(110% 70% at 0% 0%, rgba(255, 255, 255, 0.04), transparent 55%);
+}
+.v3-section--primary-quiet::after {
+  left: 6%;
+  right: 6%;
+  height: 1px;
+  background: var(--v3-gold-stroke);
+  box-shadow: 0 0 4px rgba(201, 150, 58, 0.10);
+}
+
+/* When a card sits directly inside a section, give it a real edge —
+   stronger border + a bit of inset so the card READS as a card, not
+   a tinted block. Hover bumps the surface to surface-3. */
+.v3-section .v3-card {
+  background: var(--v3-surface-glass);
+  border: 1px solid var(--v3-border-strong);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30);
+}
+.v3-section .v3-card--surface-2 { background: var(--v3-surface-2); }
+
+/* Section header inside a section reads tighter — bottom-pad only */
+.v3-section > .v3-section-header { padding: 0 0 12px; }
+
+/* Section group — container of multiple .v3-section blocks with
+   standardized rhythm between them. Apply as the screen's main
+   content wrapper. */
+.v3-section-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v3-rhythm-screen);
+  padding: 0 var(--v3-gutter);
+}
+
+/* Empty state — framed dashed surface so empty zones stop reading
+   as flat dead space. Use anywhere you currently render a bare
+   "Nothing yet" caption on the page background. */
+.v3-empty {
+  background: var(--v3-section-bg);
+  border: 1px dashed var(--v3-border-strong);
+  border-radius: var(--v3-section-radius);
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--v3-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  position: relative;
+  overflow: hidden;
+}
+.v3-empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(80% 60% at 50% 0%, rgba(212, 175, 55, 0.04), transparent 60%);
+}
+.v3-empty > * { position: relative; z-index: 1; }
+
+/* ---------- Skeleton ---------- */
+@keyframes v3-skeleton {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.85; }
+  100% { opacity: 0.5; }
+}
+.v3-skeleton {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  animation: v3-skeleton 1.4s ease-in-out infinite;
+}
+
+/* ---------- Focus ring ---------- */
+.v3-btn:focus-visible,
+.v3-card--interactive:focus-visible {
+  outline: 2px solid var(--v3-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- Hero ambient drift ----------
+   Very slow translate on the hero's gold corner blob — gives the card a
+   barely-perceptible "alive" quality without ever drawing the eye.
+   22s round-trip; opacity dips slightly mid-cycle so it breathes. */
+@keyframes fh-hero-drift {
+  0%, 100% { transform: translate(0, 0); opacity: 1; }
+  50%      { transform: translate(-22px, 10px); opacity: 0.82; }
+}
+.fh-hero-drift {
+  animation: fh-hero-drift 22s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fh-hero-drift { animation: none; }
+}
+
+/* ---------- Command Palette (cmdk + shadcn dialog) — v3 polish ----------
+   The shadcn dialog ships with --popover white and a thin gray border
+   that read as a default browser overlay against our dark theme.
+   Override the surface, border, shadow, list, separator, item, scrollbar
+   so the palette feels native to the app. */
+[data-slot='dialog-content']:has([data-slot='command']) {
+  background: var(--v3-surface) !important;
+  border: 1px solid var(--v3-border-strong) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 4px 16px rgba(0, 0, 0, 0.45),
+    0 32px 80px rgba(0, 0, 0, 0.55) !important;
+  padding: 0 !important;
+  overflow: hidden;
+  position: relative;
+}
+/* Top edge gradient stroke — matches v3-section identity */
+[data-slot='dialog-content']:has([data-slot='command'])::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.30) 50%, transparent 100%);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  z-index: 2;
+}
+
+[data-slot='command'] {
+  background: transparent !important;
+  color: var(--v3-text) !important;
+}
+
+/* Input row — bottom hairline matches our --v3-border-strong */
+[data-slot='command-input-wrapper'] {
+  border-bottom-color: var(--v3-border-strong) !important;
+  padding: 14px 18px !important;
+  height: auto !important;
+  gap: 12px !important;
+}
+[data-slot='command-input-wrapper'] svg {
+  color: var(--v3-text-muted);
+  opacity: 1 !important;
+}
+[data-slot='command-input'] {
+  color: var(--v3-text) !important;
+  font-family: var(--font-body);
+  font-size: 15px !important;
+}
+[data-slot='command-input']::placeholder {
+  color: var(--v3-text-muted) !important;
+}
+
+/* List + scrollbar (dark, subtle) */
+[data-slot='command-list'] {
+  max-height: 420px !important;
+  padding: 6px 6px 8px !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+[data-slot='command-list']::-webkit-scrollbar {
+  width: 8px;
+}
+[data-slot='command-list']::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-slot='command-list']::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+[data-slot='command-list']::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.20);
+  background-clip: padding-box;
+}
+
+/* Group + heading */
+[data-slot='command-group'] {
+  padding: 4px 6px !important;
+}
+[cmdk-group-heading] {
+  font-family: var(--font-body) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase !important;
+  color: var(--v3-text-muted) !important;
+  padding: 10px 10px 6px !important;
+}
+
+/* Items: clean hover, gold-tinted selected */
+[data-slot='command-item'] {
+  border-radius: 10px !important;
+  padding: 11px 12px !important;
+  color: var(--v3-text) !important;
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+[data-slot='command-item']:hover,
+[data-slot='command-item'][data-selected='true'] {
+  background: var(--v3-surface-2) !important;
+  color: var(--v3-text) !important;
+}
+[data-slot='command-item'] svg {
+  color: var(--v3-primary) !important;
+}
+
+/* Separator hairline */
+[data-slot='command-separator'] {
+  background: var(--v3-border) !important;
+  margin: 4px 8px !important;
+}
+
+/* Empty state */
+[data-slot='command-empty'] {
+  color: var(--v3-text-muted) !important;
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 24px 16px !important;
+}
+
+/* Dialog scrim — pure black at 72% so the page dims cleanly without
+   any cool tint. Minimal blur (2px). */
+[data-slot='dialog-overlay'] {
+  background: rgba(0, 0, 0, 0.72) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+}
+
+/* ---------- Schedule day-strip dispatch board ----------
+   Single-column timeline. The 7-day strip + Day/Week tabs + time-block
+   list match the mockup. Horizontal scroll on the day strip if the
+   viewport can't fit 7 cells side-by-side comfortably. */
+.fh-week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* ---------- Page background (QA-pass) ----------
+   .v3-screen is the page floor. Two layered effects:
+     1. Top-only gold "stage light" (subtle ambient, capped at 320px)
+     2. SVG noise grain at MUCH lower opacity (was 4.5% → 1.8%) so it
+        kills banding without becoming a visible grid texture
+   Background-attachment: fixed on the noise so scrolling doesn't
+   reveal a tiling seam at the bottom of long screens. */
+.fh-screen,
+.v3-screen {
+  position: relative;
+  overflow-x: hidden;
+  background:
+    /* Noise grain — only enough to kill banding on dark gradients.
+       0.6% alpha + finer frequency so it never reads as a grid/texture. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.006 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* Top stage light — gold, capped at top 280px */
+    radial-gradient(ellipse 100% 280px at 50% 0%, rgba(229, 193, 88, 0.04), transparent 70%),
+    var(--v3-bg);
+  background-attachment: fixed, scroll, scroll;
+}
+/* Page content rides above the bg */
+.fh-screen > *,
+.v3-screen > * {
+  position: relative;
+  z-index: 1;
+}

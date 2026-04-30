@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.js'
-import ActionSheet, { SheetField, SheetChipRow } from '../components/ActionSheet.jsx'
+import ActionSheet from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SpecTabs from '../components/SpecTabs.jsx'
@@ -16,8 +16,7 @@ import { useFhMotion } from '../lib/motion.js'
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' }
+  { value: 'week', label: 'Week' }
 ]
 
 function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x }
@@ -64,6 +63,11 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true)
   const [weather, setWeather] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
+  // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
+  // event row being deleted (for title display); deletingEvt is the
+  // commit-in-flight flag.
+  const [pendingDeleteEvt, setPendingDeleteEvt] = useState(null)
+  const [deletingEvt, setDeletingEvt] = useState(false)
 
   // If the URL had ?d=YYYY-MM-DD, consume it once so the back button
   // doesn't keep forcing the cursor back to that day.
@@ -76,12 +80,23 @@ export default function Schedule() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Resolve the event row from id and open the destructive-confirm sheet.
+  // Both DayView and WeekView delete affordances funnel through here so
+  // the confirm UX is consistent and lifted out of the row components.
+  function requestDeleteEvent(evtId) {
+    if (!evtId) return
+    const row = (events || []).find((e) => e.id === evtId)
+      || (upcoming || []).find((e) => e.id === evtId)
+      || { id: evtId, title: 'this event' }
+    setPendingDeleteEvt(row)
+  }
+
   async function deleteEvent(evtId) {
     if (!evtId) return
     // Snapshot before deletion so Undo can re-insert. Strip generated
     // fields and the joined relation; only re-insert the source row.
     const snapshot = events.find((e) => e.id === evtId) || upcoming.find((e) => e.id === evtId)
-    const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId)
+    const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId).eq('user_id', user.id)
     if (error) {
       toastError("Couldn't delete", error.message)
       return
@@ -165,8 +180,21 @@ export default function Schedule() {
 
   function shift(n) {
     if (view === 'day') setCursor((d) => addDays(d, n))
-    else if (view === 'week') setCursor((d) => addDays(d, 7 * n))
-    else setCursor((d) => new Date(d.getFullYear(), d.getMonth() + n, 1))
+    else setCursor((d) => addDays(d, 7 * n))
+  }
+
+  // Month nav (header chevrons) shifts the cursor by N months while
+  // keeping the day-of-month if it exists in the new month, else the last
+  // day. The week strip below the nav re-anchors automatically because
+  // cursor changed.
+  function shiftMonth(n) {
+    setCursor((d) => {
+      const next = new Date(d.getFullYear(), d.getMonth() + n, 1)
+      const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
+      next.setDate(Math.min(d.getDate(), lastDay))
+      next.setHours(0, 0, 0, 0)
+      return next
+    })
   }
 
   const windowRead = useMemo(
@@ -177,16 +205,35 @@ export default function Schedule() {
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* HEADER — top + button removed; the FAB at bottom-right is the
-          single, thumb-reachable add-event control. */}
-      <motion.div variants={item} style={{ padding: '10px 20px 6px' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-          Calendar
+    <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
+      {/* SUMMARY PANEL — black-glass cockpit. Eyebrow + title + today/
+          upcoming counts. The FAB at bottom-right is the single
+          thumb-reachable add-event control; an inline header CTA used
+          to live here but was removed in 1F-2 to avoid duplicating the
+          FAB action. The empty-state CTA inside DayView still renders
+          when zero events as a discoverability prompt. */}
+      <motion.div
+        variants={item}
+        className="v3-section v3-section--primary-quiet"
+        style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 18px' }}
+      >
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+          Schedule
         </span>
-        <h1 className="fh-font-serif" style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
-          Run the day.
+        <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}>
+          Today, planned.
         </h1>
+        {/* Today + Upcoming summary — surfaces the already-loaded upcoming
+            7-day window so the operator gets a forward read without
+            scrolling. Hidden until at least one stream has data so the
+            panel doesn't render an empty stat row. */}
+        {(events || upcoming.length > 0) && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, marginTop: 14, flexWrap: 'wrap' }}>
+            <SummaryStat label={view === 'day' ? 'Today' : view === 'week' ? 'This week' : 'Visible'} value={events ? events.length : '—'} tone="gold" />
+            <span aria-hidden="true" style={{ width: 1, height: 18, background: 'var(--v3-border)' }} />
+            <SummaryStat label="Upcoming · 7d" value={upcoming.length} tone="muted" />
+          </div>
+        )}
       </motion.div>
 
       {/* WEATHER STRIP */}
@@ -198,119 +245,183 @@ export default function Schedule() {
         </motion.div>
       )}
 
-      {/* UPCOMING LANE — only on Day view. On Week/Month the grid is
-          already showing the same window, so the upcoming row was
-          pushing the actual calendar past the fold (audit issues #2 +
-          #4: "land on Week and the column headers are below the
-          viewport"). */}
-      {view === 'day' && upcoming.length > 0 && (
-        <motion.section variants={item} style={{ padding: '14px 20px 0' }}>
-          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-              <CalendarIcon size={12} />
-              Upcoming · 7 days
+      {/* MONTH NAV — chevron-prev · "April 2025" · chevron-next · Today */}
+      <motion.div variants={item} style={{ padding: '4px 20px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              aria-label="Previous month"
+              style={chevBtnStyle}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              color: 'var(--v3-text)',
+              fontVariantNumeric: 'tabular-nums',
+              minWidth: 130,
+              textAlign: 'center'
+            }}>
+              {cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
             </span>
-            <span style={{ padding: '2px 9px', borderRadius: 999, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>
-              {upcoming.length}
-            </span>
-          </header>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' }}>
-            {upcoming.map((e, i) => {
-              const fromQuote = Boolean(e.contact_id && e.fh_contacts?.name)
-              const accent = fromQuote ? 'var(--field-gold-bright)' : 'var(--steel)'
-              return (
-                <motion.button
-                  key={e.id}
-                  type="button"
-                  initial={{ opacity: 0, x: 12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: Math.min(i * 0.04, 0.24), duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => e.contact_id && navigate(`/jobs/${e.contact_id}`)}
-                  style={{
-                    flexShrink: 0,
-                    position: 'relative',
-                    width: 180,
-                    padding: '12px 14px',
-                    borderRadius: 14,
-                    background: 'var(--surface-2)',
-                    border: `1px solid ${fromQuote ? 'rgba(201,150,58,0.35)' : 'var(--rule)'}`,
-                    color: 'var(--ink-strong)',
-                    cursor: e.contact_id ? 'pointer' : 'default',
-                    textAlign: 'left'
-                  }}
-                >
-                  <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 3px 3px 0', background: accent, boxShadow: `0 0 8px ${accent}66` }} />
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: 4 }}>
-                    <CalendarIcon size={11} />
-                    {new Date(e.start_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    <span aria-hidden="true">·</span>
-                    <Clock size={11} />
-                    {fmtTime(e.start_at)}
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {e.title || 'Untitled'}
-                  </div>
-                  {/* Subtitle: bumped from 10 -> 12 px and from --ink-faint
-                      to a proper readable color so "FROM QUOTE - DEENA NOLAN"
-                      is legible at a glance, not squinting-bait. */}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', color: fromQuote ? 'var(--field-gold-bright)' : 'var(--ink-strong)' }}>
-                    {fromQuote ? <MapPin size={12} /> : null}
-                    {fromQuote ? `From quote · ${e.fh_contacts.name}` : 'Manual event'}
-                  </div>
-                </motion.button>
-              )
-            })}
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              aria-label="Next month"
+              style={chevBtnStyle}
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
-        </motion.section>
-      )}
-
-      {/* VIEW TABS + NAV */}
-      <motion.div variants={item} style={{ padding: '14px 20px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <SpecTabs
-          options={VIEWS}
-          value={view}
-          onChange={setView}
-          ariaLabel="Calendar view"
-        />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type="button" onClick={() => shift(-1)} aria-label="Previous" style={iconBtnStyle}>
-            <ChevronLeft size={16} />
-          </button>
-          <span style={{ flex: 1, fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', textAlign: 'center' }}>
-            {view === 'month'
-              ? cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-              : view === 'week'
-                ? `Week of ${fmtDate(addDays(cursor, -cursor.getDay()))}`
-                : fmtDate(cursor)}
-          </span>
-          <button type="button" onClick={() => shift(1)} aria-label="Next" style={iconBtnStyle}>
-            <ChevronRight size={16} />
-          </button>
           <button
             type="button"
             onClick={() => setCursor(startOfDay(new Date()))}
-            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            style={{
+              padding: '8px 14px', borderRadius: 10,
+              border: '1px solid var(--v3-border-strong)',
+              background: 'var(--v3-surface)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent'
+            }}
           >
             Today
           </button>
         </div>
       </motion.div>
 
+      {/* WEEK STRIP — 7 cells anchored to Monday. Highlighted cell = cursor;
+          ring around today (when not selected). Tap any day to jump. */}
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+        <div className="fh-week-strip">
+          {Array.from({ length: 7 }, (_, i) => {
+            const today = startOfDay(new Date())
+            const cursorDow = (cursor.getDay() + 6) % 7
+            const day = addDays(cursor, i - cursorDow)
+            const isSelected = sameDay(day, cursor)
+            const isToday = sameDay(day, today)
+            const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase().slice(0, 3)
+            const dayNum = day.getDate()
+            return (
+              <motion.button
+                key={day.toISOString()}
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                onClick={() => { hapticTap(); setCursor(startOfDay(day)); setView('day') }}
+                aria-pressed={isSelected}
+                style={{
+                  position: 'relative',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: 4,
+                  padding: '10px 4px',
+                  borderRadius: 12,
+                  background: isSelected ? 'var(--v3-surface-2)' : 'var(--v3-surface)',
+                  border: isSelected
+                    ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
+                    : isToday
+                      ? '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)'
+                      : '1px solid var(--v3-border-strong)',
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text)',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                <span style={{
+                  fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
+                  letterSpacing: '0.14em',
+                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                }}>
+                  {dayName}
+                </span>
+                <span style={{
+                  fontFamily: 'var(--font-display)', fontSize: 18,
+                  letterSpacing: '0.02em',
+                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text)',
+                  fontVariantNumeric: 'tabular-nums', lineHeight: 1
+                }}>
+                  {dayNum}
+                </span>
+                {isToday && !isSelected && (
+                  <span aria-hidden="true" style={{
+                    width: 4, height: 4, borderRadius: '50%',
+                    background: 'var(--v3-primary)', marginTop: 1
+                  }} />
+                )}
+                {isSelected && (
+                  <span aria-hidden="true" style={{
+                    position: 'absolute',
+                    left: '20%', right: '20%', bottom: 4,
+                    height: 2, borderRadius: 2,
+                    background: 'var(--v3-primary)',
+                    boxShadow: '0 0 6px rgba(201, 150, 58, 0.35)'
+                  }} />
+                )}
+              </motion.button>
+            )
+          })}
+        </div>
+      </motion.div>
+
+      {/* DAY / WEEK TABS — narrower, sits above the timeline */}
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+        <SpecTabs
+          options={VIEWS}
+          value={view}
+          onChange={setView}
+          ariaLabel="Calendar view"
+        />
+      </motion.div>
+
       {/* Swipe-detector wraps the per-view body. Horizontal pointer drag
           past 60 px shifts the cursor by 1 (left = next, right = prev),
           giving phone users the same gesture they expect from native
           calendar apps. Vertical scroll inside the body still works. */}
+      {/* DAY HEADER — "TUE, APR 28" eyebrow that titles the timeline */}
+      {view === 'day' && (
+        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 8px' }}>
+          <span style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.10em',
+            textTransform: 'uppercase',
+            color: 'var(--v3-text-muted)'
+          }}>
+            {cursor.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
+        </motion.div>
+      )}
+
+      {/* TIMELINE — vertical time-block list. Matches mockup: each row
+          is a job block with time, name, sub, status pill, avatar group. */}
       <SwipeShell onShift={shift}>
-        <motion.div variants={item} style={{ padding: '0 20px 20px' }}>
-          {/* Show skeleton ONLY on the very first load (events still null).
-              On subsequent re-fetches (view switch, day shift) keep the
-              existing grid rendered so the user never sees a flash of
-              empty horizontal bars. */}
+        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 24px' }}>
           {loading && events == null && <SkeletonList rows={5} card={false} />}
-          {events != null && view === 'day' && <DayView events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-          {events != null && view === 'week' && <WeekView start={addDays(cursor, -cursor.getDay())} events={events} onClick={(id) => navigate(`/jobs/${id}`)} onDelete={deleteEvent} />}
-          {events != null && view === 'month' && <MonthView cursor={cursor} events={events} onDay={(d) => { setCursor(d); setView('day') }} />}
+          {events != null && view === 'day' && (
+            <DayView
+              events={events}
+              now={new Date()}
+              onClick={(id) => navigate(`/jobs/${id}`)}
+              onDelete={requestDeleteEvent}
+              onAdd={() => setAddOpen(true)}
+            />
+          )}
+          {events != null && view === 'week' && (
+            <WeekView
+              start={addDays(cursor, -((cursor.getDay() + 6) % 7))}
+              events={events}
+              onClick={(id) => navigate(`/jobs/${id}`)}
+              onDelete={requestDeleteEvent}
+            />
+          )}
         </motion.div>
       </SwipeShell>
 
@@ -332,7 +443,61 @@ export default function Schedule() {
         onClose={() => setAddOpen(false)}
         onSaved={() => { setAddOpen(false); load() }}
       />
+
+      {/* Destructive-confirm sheet for delete event. The actual delete
+          flow (snapshot + optimistic removal + Undo toast + Supabase
+          delete with user_id guard + refresh) lives in deleteEvent;
+          this sheet only gates execution behind a confirm step. */}
+      <ActionSheet
+        open={!!pendingDeleteEvt}
+        title="Delete this event?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deletingEvt ? 'Deleting…' : 'Delete event'}
+        commitBusy={deletingEvt}
+        commitDisabled={deletingEvt}
+        destructive
+        onClose={() => { if (!deletingEvt) setPendingDeleteEvt(null) }}
+        onCommit={async () => {
+          if (!pendingDeleteEvt) return
+          setDeletingEvt(true)
+          try {
+            await deleteEvent(pendingDeleteEvt.id)
+          } finally {
+            setDeletingEvt(false)
+            setPendingDeleteEvt(null)
+          }
+        }}
+      >
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{pendingDeleteEvt?.title || 'this event'}</strong> from your schedule. You'll get an Undo toast right after — tap it to restore.
+        </p>
+      </ActionSheet>
     </motion.div>
+  )
+}
+
+// Compact stat for the cockpit summary panel — tabular display number
+// over a small uppercase label. Tone "gold" for the primary today figure,
+// "muted" for secondary reads.
+function SummaryStat({ label, value, tone = 'muted' }) {
+  const valueColor = tone === 'gold' ? 'var(--v3-primary)' : 'var(--v3-text)'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+      <span style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+        color: valueColor,
+        fontVariantNumeric: 'tabular-nums'
+      }}>
+        {value}
+      </span>
+      <span className="v3-eyebrow">
+        {label}
+      </span>
+    </span>
   )
 }
 
@@ -370,71 +535,310 @@ const iconBtnStyle = {
   width: 44,
   height: 44,
   borderRadius: 11,
-  border: '1px solid var(--rule)',
-  background: 'var(--surface-2)',
-  color: 'var(--ink-strong)',
+  border: '1px solid var(--v3-border-strong)',
+  background: 'var(--v3-surface)',
+  color: 'var(--v3-text)',
   display: 'grid',
   placeItems: 'center',
-  cursor: 'pointer'
+  cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent'
 }
 
-function DayView({ events, onClick, onDelete }) {
+// Smaller chevron button used in the month nav header. Same surface
+// system as iconBtnStyle but 36x36 so the row reads tighter.
+const chevBtnStyle = {
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  border: '1px solid var(--v3-border-strong)',
+  background: 'var(--v3-surface)',
+  color: 'var(--v3-text)',
+  display: 'grid',
+  placeItems: 'center',
+  cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent'
+}
+
+function DayView({ events, now, onClick, onDelete, onAdd }) {
   if (events.length === 0) {
     return (
-      <div style={{ padding: '32px 20px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', fontFamily: 'var(--font-body)' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', marginBottom: 6 }}>Nothing scheduled.</div>
-        {/* Brighter body so it reads outside in direct sun. Was --ink-muted
-            (~ #6A665E) which fails on Onyx in bright light. */}
-        <div style={{ fontSize: 13, color: 'var(--ink-strong)', opacity: 0.78, lineHeight: 1.4 }}>
-          Queue something up. Crew runs smoother when the day's on the board.
+      <div style={{
+        padding: '40px 28px',
+        borderRadius: 18,
+        background: 'var(--v3-surface-glass)',
+        backdropFilter: 'blur(14px) saturate(1.1)',
+        WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+        border: '1px solid var(--v3-border-strong)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        textAlign: 'center',
+        fontFamily: 'var(--font-body)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 16
+      }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 14,
+          background: 'var(--v3-surface-2)',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
+          display: 'grid', placeItems: 'center',
+          color: 'var(--v3-primary)'
+        }}>
+          <CalendarIcon size={22} aria-hidden="true" />
         </div>
-        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Tap the + below
+        <div>
+          <h3 style={{
+            margin: 0,
+            fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em',
+            color: 'var(--v3-text)'
+          }}>
+            Nothing scheduled — fill your day.
+          </h3>
+          <p style={{
+            margin: '8px 0 0',
+            fontSize: 13,
+            color: 'var(--v3-text-muted)',
+            lineHeight: 1.5,
+            maxWidth: 320
+          }}>
+            Crew runs smoother when the day's on the board. Queue up the first job.
+          </p>
         </div>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          whileHover={{ y: -2 }}
+          transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+          onClick={() => { hapticTap(); onAdd?.() }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '11px 18px', borderRadius: 12, border: 'none',
+            background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
+            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+            letterSpacing: '0.04em', cursor: 'pointer',
+            boxShadow: 'var(--v3-gold-glow)',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+        >
+          <Plus size={14} />
+          Schedule a job
+        </motion.button>
       </div>
     )
   }
   return (
     <ul className="fh-timeline" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {events.map((e, i) => (
-        <motion.li
-          key={e.id}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: Math.min(i * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}
-        >
-          <span style={{ flexShrink: 0, width: 62, fontFamily: 'var(--font-display)', fontSize: 13, letterSpacing: '0.04em', color: 'var(--field-gold-bright)' }}>
-            {fmtTime(e.start_at)}
-          </span>
-          <button
-            type="button"
+      {events.map((e, i) => {
+        const status = deriveStatus(e, now)
+        const start = fmtTime(e.start_at)
+        const end = e.end_at ? fmtTime(e.end_at) : null
+        const primary = e.fh_contacts?.name || e.title || 'Untitled'
+        const secondary = e.fh_contacts?.name && e.title ? e.title : (e.description || (e.contact_id ? '' : 'Manual event'))
+        const initial = (primary || '·').trim().charAt(0).toUpperCase()
+        return (
+          <ScheduleRow
+            key={e.id}
+            index={i}
+            primary={primary}
+            secondary={secondary}
+            startStr={start}
+            endStr={end}
+            status={status}
+            initial={initial}
             onClick={() => e.contact_id && onClick(e.contact_id)}
-            style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: e.contact_id ? 'pointer' : 'default', color: 'var(--ink-strong)' }}
-          >
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {e.title || 'Untitled'}
-            </div>
-            {e.fh_contacts?.name && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 3, padding: '2px 8px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                <MapPin size={9} />
-                {e.fh_contacts.name}
-              </span>
-            )}
-          </button>
+            onDelete={onDelete ? () => onDelete(e.id) : undefined}
+            isClickable={Boolean(e.contact_id)}
+          />
+        )
+      })}
+    </ul>
+  )
+}
+
+/* Status taxonomy mirrors the mockup pill colors:
+     On Site     — currently happening, has a job (contact_id) → green
+     In Progress — currently happening, no contact (office/admin) → blue
+     Upcoming    — future today → gold
+     Scheduled   — future, not today → gray
+     Done        — past → muted gray (mockup doesn't show this; quiet) */
+const STATUS_TONE = {
+  'On Site':     { color: 'var(--v3-stage-active)', soft: 'rgba(79, 140, 94, 0.16)',   border: 'rgba(79, 140, 94, 0.40)' },
+  'In Progress': { color: 'var(--v3-stage-lead)',   soft: 'rgba(107, 124, 168, 0.14)', border: 'rgba(107, 124, 168, 0.40)' },
+  'Upcoming':    { color: 'var(--v3-primary)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
+  'Scheduled':   { color: 'var(--v3-text-muted)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border-mid)' },
+  'Done':        { color: 'var(--v3-text-faint)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border)' }
+}
+
+function deriveStatus(e, now) {
+  const start = e.start_at ? new Date(e.start_at).getTime() : null
+  const end = e.end_at ? new Date(e.end_at).getTime() : null
+  const t = now.getTime()
+  if (end && end < t) return 'Done'
+  if (start && start <= t && end && t <= end) {
+    return e.contact_id ? 'On Site' : 'In Progress'
+  }
+  if (start && start > t && sameDay(new Date(start), now)) return 'Upcoming'
+  return 'Scheduled'
+}
+
+function ScheduleRow({ index, primary, secondary, startStr, endStr, status, initial, onClick, onDelete, isClickable }) {
+  const tone = STATUS_TONE[status] || STATUS_TONE.Scheduled
+  return (
+    <motion.li
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={isClickable ? { y: -2, backgroundColor: 'var(--v3-surface-3)' } : undefined}
+      transition={{
+        opacity: { delay: Math.min(index * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
+        y: { type: 'spring', stiffness: 620, damping: 28 },
+        backgroundColor: { type: 'spring', stiffness: 620, damping: 28 }
+      }}
+      style={{
+        position: 'relative',
+        display: 'flex', alignItems: 'stretch', gap: 14,
+        padding: '14px 14px',
+        borderRadius: 14,
+        background: 'var(--v3-surface-glass)',
+        backdropFilter: 'blur(14px) saturate(1.1)',
+        WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+        border: '1px solid var(--v3-border-strong)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Status-color spine — drives the at-a-glance dispatch read.
+          Glow softened from 55 to 33 hex alpha so the spine stays a
+          thin accent line rather than a full halo across the row. */}
+      <span aria-hidden="true" style={{
+        position: 'absolute',
+        left: 0, top: 12, bottom: 12,
+        width: 3,
+        borderRadius: '0 3px 3px 0',
+        background: tone.color,
+        boxShadow: `0 0 8px ${tone.color}33`
+      }} />
+
+      {/* Time column — start over end, narrow handle on the left */}
+      <div style={{
+        flexShrink: 0,
+        width: 64,
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+        justifyContent: 'center',
+        paddingLeft: 6,
+        paddingRight: 12,
+        borderRight: '1px solid var(--v3-border)'
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 15,
+          letterSpacing: '0.02em',
+          color: 'var(--v3-text)',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1.05
+        }}>
+          {startStr}
+        </span>
+        {endStr && (
+          <span style={{
+            marginTop: 3,
+            fontFamily: 'var(--font-body)',
+            fontSize: 10,
+            color: 'var(--v3-text-muted)',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '0.04em'
+          }}>
+            {endStr}
+          </span>
+        )}
+      </div>
+
+      {/* Body — primary (job/client) + secondary (description) */}
+      <button
+        type="button"
+        onClick={isClickable ? onClick : undefined}
+        style={{
+          flex: 1, minWidth: 0,
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          gap: 3,
+          background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
+          cursor: isClickable ? 'pointer' : 'default',
+          color: 'var(--v3-text)',
+          WebkitTapHighlightColor: 'transparent'
+        }}
+      >
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 14, fontWeight: 700,
+          letterSpacing: '-0.01em',
+          color: 'var(--v3-text)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+        }}>
+          {primary}
+        </div>
+        {secondary && (
+          <div style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 11,
+            color: 'var(--v3-text-muted)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+          }}>
+            {secondary}
+          </div>
+        )}
+      </button>
+
+      {/* Right cluster — status pill + avatar (single, contact initial) */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '4px 10px',
+          borderRadius: 999,
+          background: tone.soft,
+          border: `1px solid ${tone.border}`,
+          color: tone.color,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap'
+        }}>
+          <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: tone.color }} />
+          {status}
+        </span>
+        <div aria-hidden="true" style={{
+          width: 30, height: 30,
+          borderRadius: '50%',
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border-strong)',
+          display: 'grid', placeItems: 'center',
+          fontFamily: 'var(--font-display)',
+          fontSize: 13,
+          letterSpacing: '0.04em',
+          color: 'var(--v3-text)'
+        }}>
+          {initial}
+        </div>
+        {onDelete && (
           <button
             type="button"
-            onClick={(ev) => { ev.stopPropagation(); if (onDelete && window.confirm('Delete this event?')) onDelete(e.id) }}
+            onClick={(ev) => { ev.stopPropagation(); onDelete() }}
             aria-label="Delete event"
-            style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.7 }}
-            onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--alert-red)' }}
-            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.7'; ev.currentTarget.style.color = 'var(--ink-faint)' }}
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              border: 'none', background: 'transparent',
+              color: 'var(--v3-text-muted)',
+              cursor: 'pointer', display: 'grid', placeItems: 'center',
+              opacity: 0.55,
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
+            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.55'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
-        </motion.li>
-      ))}
-    </ul>
+        )}
+      </div>
+    </motion.li>
   )
 }
 
@@ -465,11 +869,21 @@ function WeekView({ start, events, onClick, onDelete }) {
                   {onDelete && (
                     <button
                       type="button"
-                      onClick={(ev) => { ev.stopPropagation(); if (window.confirm('Delete this event?')) onDelete(e.id) }}
+                      onClick={(ev) => { ev.stopPropagation(); onDelete(e.id) }}
                       aria-label="Delete event"
-                      style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.6 }}
+                      style={{
+                        position: 'absolute', top: 0, right: 0,
+                        width: 40, height: 40, borderRadius: 10,
+                        border: 'none', background: 'transparent',
+                        color: 'var(--v3-text-muted)',
+                        cursor: 'pointer', display: 'grid', placeItems: 'center',
+                        opacity: 0.6,
+                        WebkitTapHighlightColor: 'transparent'
+                      }}
+                      onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
+                      onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.6'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
                     >
-                      <Trash2 size={11} />
+                      <Trash2 size={13} />
                     </button>
                   )}
                 </div>

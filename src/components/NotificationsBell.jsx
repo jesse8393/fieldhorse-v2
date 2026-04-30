@@ -37,7 +37,7 @@ export default function NotificationsBell() {
   const refresh = useCallback(async () => {
     if (!user) { setRows([]); return }
     try {
-      const list = await fetchInbox(40)
+      const list = await fetchInbox(40, user.id)
       setRows(list)
     } catch {
       // RLS denial / table missing → silently zero out so the bell never
@@ -73,11 +73,11 @@ export default function NotificationsBell() {
 
   async function handleTap(row) {
     hapticTap()
-    if (!row.read_at) {
+    if (!row.read_at && user) {
       // Optimistic update — badge falls automatically since it's
       // derived from rows.
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, read_at: new Date().toISOString() } : r))
-      await markRead(row.id)
+      await markRead(row.id, user.id)
     }
     if (row.link) {
       setOpen(false)
@@ -87,8 +87,9 @@ export default function NotificationsBell() {
 
   async function handleMarkAll() {
     hapticTap()
+    if (!user) return
     setRows((prev) => prev.map((r) => r.read_at ? r : { ...r, read_at: new Date().toISOString() }))
-    await markAllRead()
+    await markAllRead(user.id)
   }
 
   return (
