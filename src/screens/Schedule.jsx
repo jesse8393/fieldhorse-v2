@@ -511,7 +511,7 @@ const chevBtnStyle = {
   WebkitTapHighlightColor: 'transparent'
 }
 
-function DayView({ events, onClick, onDelete, onAdd }) {
+function DayView({ events, now, onClick, onDelete, onAdd }) {
   if (events.length === 0) {
     return (
       <div style={{
