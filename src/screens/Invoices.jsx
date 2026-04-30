@@ -180,15 +180,19 @@ export default function Invoices() {
       animate="show"
       style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
-      {/* COCKPIT — single black-glass A/R panel: title eyebrow + total
-          + aging bar + 3-cell aging breakdown */}
+      {/* COCKPIT — black-glass A/R panel: title eyebrow + state chip +
+          headline total + aging bar + 3-cell aging breakdown.
+          Backdrop-filter + neutral inner highlight match the v3 black-
+          glass treatment shipped on Schedule/Notes/Home cockpits. */}
       <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
         <div style={{
           padding: '14px 16px',
           borderRadius: 16,
-          background: 'var(--v3-surface)',
+          background: 'var(--v3-surface-glass)',
+          backdropFilter: 'blur(14px) saturate(1.1)',
+          WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
         }}>
           {/* Top row: section eyebrow + state chip (urgency lives here, not in the total) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -431,11 +435,13 @@ function PaymentCard({ row, onPDF, onPaid }) {
           gap: 12,
           padding: '14px 14px 14px 22px',
           borderRadius: 14,
-          background: 'var(--v3-surface)',
+          background: 'var(--v3-surface-glass)',
+          backdropFilter: 'blur(14px) saturate(1.1)',
+          WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
           border: isOverdue
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
           overflow: 'hidden'
         }}
       >
@@ -605,7 +611,7 @@ function PaymentCard({ row, onPDF, onPaid }) {
                 letterSpacing: '0.04em',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 4px 12px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
               }}
             >
               <DollarSign size={13} /> Mark Paid
