@@ -18,3 +18,7 @@ export { default as Eyebrow } from './Eyebrow.jsx'
 export { default as StampNumber } from './StampNumber.jsx'
 export { default as FilterPill } from './FilterPill.jsx'
 export { default as IconButton } from './IconButton.jsx'
+
+/* Phase 3D — canonical floating action button (portal-rendered to
+   escape framer-motion containing-block traps). */
+export { default as FloatingActionButton } from './FloatingActionButton.jsx'
