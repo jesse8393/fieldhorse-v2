@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Plus, Trash2 } from 'lucide-react'
+import { Check, Plus, Trash2, Calendar } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { toastSuccess, toastError, toastUndo } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
+import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.js'
 
 /**
  * To-dos section — backed by fh_job_todos. Owns its own fetch (independent of
@@ -21,6 +22,9 @@ export default function TodosSection({ jobId, userId }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState('')
+  // Optional due date for the new todo being composed. YYYY-MM-DD or ''.
+  // Converted to a local-end-of-day ISO at insert time via dateInputToTimestamp.
+  const [dueDraft, setDueDraft] = useState('')
 
   const fetchRows = useCallback(async () => {
     if (!jobId || !userId) return
@@ -42,15 +46,31 @@ export default function TodosSection({ jobId, userId }) {
     const txt = draft.trim()
     if (!txt) return
     hapticTap()
-    const { error } = await supabase.from('fh_job_todos').insert({
-      user_id: userId, job_id: jobId, text: txt
-    })
+    const payload = { user_id: userId, job_id: jobId, text: txt }
+    if (dueDraft) payload.due_at = dateInputToTimestamp(dueDraft)
+    const { error } = await supabase.from('fh_job_todos').insert(payload)
     if (error) {
       toastError("Couldn't add to-do", error.message)
       return
     }
     setDraft('')
+    setDueDraft('')
     fetchRows()
+  }
+
+  // Inline edit: tap a row's due chip → native date picker → onChange
+  // fires here. Optimistic update with rollback on Supabase error.
+  async function updateDueAt(rowId, nextDueAt) {
+    setRows((rs) => rs.map((r) => r.id === rowId ? { ...r, due_at: nextDueAt } : r))
+    const { error } = await supabase
+      .from('fh_job_todos')
+      .update({ due_at: nextDueAt })
+      .eq('id', rowId)
+      .eq('user_id', userId)
+    if (error) {
+      toastError("Couldn't update due date", error.message)
+      fetchRows()
+    }
   }
 
   async function toggle(row) {
@@ -119,19 +139,35 @@ export default function TodosSection({ jobId, userId }) {
         )}
       </div>
 
-      {/* Add row */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      {/* Add row — text + optional due date + Add. Wraps to two rows on
+          narrow viewports so the text input keeps its full width. */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') add() }}
           placeholder="Add a task…"
           style={{
-            flex: 1, minWidth: 0,
+            flex: '1 1 200px', minWidth: 0,
             padding: '11px 14px', borderRadius: 12,
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
             color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
             fontSize: 14, outline: 'none'
+          }}
+        />
+        <input
+          type="date"
+          value={dueDraft}
+          onChange={(e) => setDueDraft(e.target.value)}
+          aria-label="Due date (optional)"
+          style={{
+            flex: '0 0 auto',
+            padding: '11px 12px', borderRadius: 12,
+            background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
+            color: dueDraft ? 'var(--v3-text)' : 'var(--v3-text-muted)',
+            fontFamily: 'var(--font-body)',
+            fontSize: 13, outline: 'none',
+            WebkitTapHighlightColor: 'transparent'
           }}
         />
         <motion.button
@@ -213,14 +249,11 @@ export default function TodosSection({ jobId, userId }) {
                 }}>
                   {r.text}
                 </span>
-                <span style={{
-                  flexShrink: 0, fontSize: 10,
-                  color: 'var(--v3-text-muted)',
-                  fontFamily: 'var(--font-body)',
-                  fontVariantNumeric: 'tabular-nums'
-                }}>
-                  {new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                </span>
+                <DueChipButton
+                  iso={r.due_at}
+                  done={r.done}
+                  onChange={(nextIso) => updateDueAt(r.id, nextIso)}
+                />
                 <button
                   type="button"
                   onClick={() => remove(r.id)}
@@ -240,5 +273,79 @@ export default function TodosSection({ jobId, userId }) {
         </ul>
       )}
     </div>
+  )
+}
+
+/**
+ * DueChipButton — wraps a hidden <input type="date"> in a <label> so
+ * tapping the chip opens the native date picker. When iso is set:
+ * status chip (Overdue red / Today gold / muted future date). When
+ * iso is null: a quiet calendar icon serves as the "set due date"
+ * affordance — no labeled chip is shown, but the tap target stays.
+ */
+function DueChipButton({ iso, done, onChange }) {
+  const status = dueStatus(iso)
+  const dateStr = timestampToDateInput(iso)
+
+  // Tone → palette. surface-2 / muted by default; danger-soft for
+  // overdue; primary-soft for today. All use existing v3 tokens.
+  const palette = (() => {
+    if (!status) {
+      return { bg: 'transparent', border: 'var(--v3-border)', color: 'var(--v3-text-muted)' }
+    }
+    if (status.tone === 'danger') {
+      return {
+        bg: 'var(--v3-danger-soft)',
+        border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
+        color: 'var(--v3-danger-bright)'
+      }
+    }
+    if (status.tone === 'warn') {
+      return {
+        bg: 'var(--v3-primary-soft)',
+        border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+        color: 'var(--v3-primary)'
+      }
+    }
+    return { bg: 'var(--v3-surface-2)', border: 'var(--v3-border)', color: 'var(--v3-text-muted)' }
+  })()
+
+  return (
+    <label
+      style={{
+        position: 'relative',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        gap: 4,
+        flexShrink: 0,
+        minWidth: 40, minHeight: 28,
+        padding: status ? '0 9px' : 0,
+        borderRadius: 999,
+        background: palette.bg,
+        border: status ? `1px solid ${palette.border}` : `1px solid transparent`,
+        color: palette.color,
+        fontFamily: 'var(--font-body)',
+        fontSize: 10, fontWeight: 700,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        whiteSpace: 'nowrap',
+        opacity: done ? 0.5 : 1,
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent'
+      }}
+      aria-label={status ? `Due ${status.label}` : 'Set due date'}
+    >
+      <input
+        type="date"
+        value={dateStr}
+        onChange={(e) => onChange(dateInputToTimestamp(e.target.value))}
+        style={{
+          position: 'absolute', inset: 0,
+          opacity: 0, cursor: 'pointer',
+          width: '100%', height: '100%',
+          padding: 0, margin: 0, border: 'none', background: 'transparent'
+        }}
+      />
+      {status ? <span>{status.label}</span> : <Calendar size={12} aria-hidden="true" />}
+    </label>
   )
 }

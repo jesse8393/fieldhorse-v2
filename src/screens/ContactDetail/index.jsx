@@ -11,6 +11,7 @@ import { markLost } from '../../lib/pipeline.js'
 import { stageColor } from '../../lib/stages.js'
 import { toastSuccess, toastInfo, toastError } from '../../lib/toast.js'
 import { hapticTap, hapticError } from '../../lib/haptics.js'
+import { dueStatus } from '../../lib/dueDate.js'
 import { SkeletonBlock, SkeletonList } from '../../components/Skeleton.jsx'
 import ActionSheet from '../../components/ActionSheet.jsx'
 import AddEventSheet from '../../components/AddEventSheet.jsx'
@@ -516,6 +517,7 @@ function Header({
               }}>
                 {nextTodo.text || 'Open todo'}
               </div>
+              <NextTodoDueChip iso={nextTodo.due_at} />
             </div>
             <button
               type="button"
@@ -561,6 +563,57 @@ function CockpitMetric({ label, tone = 'default', size = 'lg', children }) {
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
       <StampNumber size={size} tone={tone}>{children}</StampNumber>
     </div>
+  )
+}
+
+/**
+ * NextTodoDueChip — read-only due-status chip rendered under the
+ * cockpit Next-Action text. Returns null when iso is null/undefined
+ * so rows without a due date stay clean. Tones mirror the v3 pattern:
+ *   danger  → overdue
+ *   warn    → today (gold)
+ *   muted   → future (date label)
+ */
+function NextTodoDueChip({ iso }) {
+  const status = dueStatus(iso)
+  if (!status) return null
+  const palette = status.tone === 'danger'
+    ? {
+        bg: 'var(--v3-danger-soft)',
+        border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
+        color: 'var(--v3-danger-bright)'
+      }
+    : status.tone === 'warn'
+      ? {
+          bg: 'var(--v3-primary-soft)',
+          border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+          color: 'var(--v3-primary)'
+        }
+      : {
+          bg: 'var(--v3-surface-2)',
+          border: 'var(--v3-border)',
+          color: 'var(--v3-text-muted)'
+        }
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      marginTop: 4,
+      padding: '2px 8px',
+      borderRadius: 999,
+      background: palette.bg,
+      border: `1px solid ${palette.border}`,
+      color: palette.color,
+      fontFamily: 'var(--font-body)',
+      fontSize: 9,
+      fontWeight: 700,
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
+      lineHeight: 1.4,
+      whiteSpace: 'nowrap'
+    }}>
+      Due · {status.label}
+    </span>
   )
 }
 
