@@ -63,7 +63,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       setSaving(false)
       return
     }
-    await recalcCost(contact.id)
+    await recalcCost(contact.id, userId)
     setSaving(false)
     setOpen(false)
     fetchAll?.()
@@ -74,7 +74,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
     const snapshot = expenses.find((e) => e.id === id)
     const { error } = await supabase.from('fh_expenses').delete().eq('id', id).eq('user_id', userId)
     if (error) { toastError("Couldn't delete", error.message); return }
-    await recalcCost(contact.id)
+    await recalcCost(contact.id, userId)
     fetchAll?.()
     toastUndo('Expense removed', {
       description: snapshot
@@ -84,7 +84,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_expenses').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
-        await recalcCost(contact.id)
+        await recalcCost(contact.id, userId)
         fetchAll?.()
         toastSuccess('Restored', snapshot.description || '')
       }

@@ -134,7 +134,7 @@ export default function TimeClockCard({ contact, userId, onLogged }) {
       hapticSuccess()
       toastSuccess('Time logged', `${hours.toFixed(2)} hrs · $${billable.toLocaleString()}`)
       // Refresh job cost / margin
-      try { await recalcCost(contact.id) } catch {}
+      try { await recalcCost(contact.id, userId) } catch {}
       onLogged?.()
     } catch (ex) {
       toastError("Couldn't log time", ex?.message || 'Try again')

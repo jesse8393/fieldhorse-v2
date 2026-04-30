@@ -64,7 +64,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
       setSaving(false)
       return
     }
-    await recalcCost(contact.id)
+    await recalcCost(contact.id, userId)
     setSaving(false)
     setOpen(false)
     fetchAll?.()
@@ -75,7 +75,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
     const snapshot = subs.find((s) => s.id === id)
     const { error } = await supabase.from('fh_subs').delete().eq('id', id).eq('user_id', userId)
     if (error) { toastError("Couldn't delete", error.message); return }
-    await recalcCost(contact.id)
+    await recalcCost(contact.id, userId)
     fetchAll?.()
     toastUndo('Sub removed', {
       description: snapshot?.name || 'Tap Undo to restore',
@@ -83,7 +83,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_subs').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
-        await recalcCost(contact.id)
+        await recalcCost(contact.id, userId)
         fetchAll?.()
         toastSuccess('Restored', snapshot.name || '')
       }
