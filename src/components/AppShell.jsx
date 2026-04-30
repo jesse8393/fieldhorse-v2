@@ -51,32 +51,6 @@ export default function AppShell() {
             legacy gold tokens were aliased to the v3 (brighter) gold.
           v3 page atmosphere is provided by .v3-screen background only. */}
 
-      {/* TEMP build marker — proves the browser is loading the latest
-          source. Remove once the freshness check is done. */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          top: 'calc(env(safe-area-inset-top, 0px) + 6px)',
-          right: 6,
-          zIndex: 100000,
-          padding: '4px 8px',
-          borderRadius: 6,
-          background: 'rgba(229, 193, 88, 0.92)',
-          color: '#0B0B0D',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          lineHeight: 1.2,
-          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.45)',
-          pointerEvents: 'none',
-          userSelect: 'none'
-        }}
-      >
-        QA CURRENT
-      </div>
-
       <AppHeader />
 
       {/* Routed screen content.

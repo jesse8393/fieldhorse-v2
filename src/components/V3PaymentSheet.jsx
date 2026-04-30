@@ -46,10 +46,23 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
     }
   }
 
+  // Defensive close — swallow the click so nothing behind the sheet
+  // (PaymentCard title <Link>, etc.) can interpret the gesture as a
+  // navigation. The sheet renders over a fixed backdrop, but rapid
+  // taps near the edge can land on underlying handlers when the
+  // backdrop animates in.
+  function handleClose(e) {
+    if (e) {
+      e.preventDefault?.()
+      e.stopPropagation?.()
+    }
+    onClose?.()
+  }
+
   return (
     <>
       <motion.div
-        onClick={onClose}
+        onClick={handleClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -62,16 +75,25 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 12, opacity: 0 }}
+        // Cap height so the sheet never overflows the viewport. Body
+        // scrolls; header + footer stay pinned. Bottom offset clears
+        // the BottomNav and the safe-area inset.
         style={{
           position: 'fixed',
           left: 16, right: 16, bottom: 'max(16px, env(safe-area-inset-bottom))',
           maxWidth: 480, margin: '0 auto',
           background: 'var(--v3-surface-2)', borderRadius: 18,
-          border: '1px solid var(--v3-border)', padding: 20, zIndex: 81,
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5)'
+          border: '1px solid var(--v3-border)', zIndex: 81,
+          boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+          maxHeight: 'min(85vh, 720px)',
+          display: 'flex', flexDirection: 'column'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 20px 14px',
+          flexShrink: 0
+        }}>
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
             letterSpacing: '0.18em', textTransform: 'uppercase',
@@ -81,7 +103,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
           </span>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close"
             style={{
               width: 32, height: 32, borderRadius: 10, border: '1px solid var(--v3-border)',
@@ -92,37 +114,61 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
             <X size={16} aria-hidden="true" />
           </button>
         </div>
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <SheetField label="Amount">
-            <input
-              autoFocus
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-          </SheetField>
-          <SheetField label="Method">
-            <select value={method} onChange={(e) => setMethod(e.target.value)}>
-              <option value="check">Check</option>
-              <option value="card">Card</option>
-              <option value="cash">Cash</option>
-              <option value="ach">ACH</option>
-            </select>
-          </SheetField>
-          {method === 'check' && (
-            <SheetField label="Check number">
-              <input value={reference} onChange={(e) => setReference(e.target.value)} />
+        <form
+          onSubmit={submit}
+          style={{
+            display: 'flex', flexDirection: 'column',
+            flex: 1, minHeight: 0
+          }}
+        >
+          {/* Scrollable body — fields live here. flex:1 + minHeight:0
+              + overflowY:auto is the standard recipe to make a flex
+              child scroll inside a capped flex parent. */}
+          <div style={{
+            flex: 1, minHeight: 0,
+            overflowY: 'auto',
+            padding: '0 20px',
+            display: 'flex', flexDirection: 'column', gap: 14
+          }}>
+            <SheetField label="Amount">
+              <input
+                autoFocus
+                type="number"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+              />
             </SheetField>
-          )}
-          <SheetField label="Paid on">
-            <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
-          </SheetField>
-          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <SheetField label="Method">
+              <select value={method} onChange={(e) => setMethod(e.target.value)}>
+                <option value="check">Check</option>
+                <option value="card">Card</option>
+                <option value="cash">Cash</option>
+                <option value="ach">ACH</option>
+              </select>
+            </SheetField>
+            {method === 'check' && (
+              <SheetField label="Check number">
+                <input value={reference} onChange={(e) => setReference(e.target.value)} />
+              </SheetField>
+            )}
+            <SheetField label="Paid on">
+              <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
+            </SheetField>
+          </div>
+          {/* Sticky footer — always visible. Top hairline separates
+              from the scrolling body. */}
+          <div style={{
+            display: 'flex', gap: 8,
+            padding: '14px 20px 20px',
+            borderTop: '1px solid var(--v3-border)',
+            flexShrink: 0,
+            background: 'var(--v3-surface-2)'
+          }}>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               style={{
                 flex: 1, padding: '12px', borderRadius: 12,
                 background: 'transparent', border: '1px solid var(--v3-border)',

@@ -805,19 +805,20 @@ function AddSubDrawer({ open, userId, onClose, onCreated }) {
               type="submit"
               whileTap={{ scale: 0.98 }}
               disabled={saving || !form.name.trim()}
+              // Always render the gold primary treatment so the CTA reads
+              // as "the action", not as "an empty chip". Disabled state
+              // is conveyed via opacity (canonical TodosSection Add
+              // pattern), which keeps text legible against the gold.
               style={{
                 padding: '12px 14px', borderRadius: 12,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-                background: !form.name.trim() || saving
-                  ? 'var(--v3-surface-2)'
-                  : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                color: !form.name.trim() || saving ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
+                background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
                 letterSpacing: '0.06em', textTransform: 'uppercase',
                 cursor: !form.name.trim() || saving ? 'default' : 'pointer',
-                boxShadow: !form.name.trim() || saving
-                  ? 'none'
-                  : '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+                opacity: !form.name.trim() || saving ? 0.5 : 1,
+                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
               }}
             >
               {saving ? 'Saving…' : 'Add sub'}
