@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.js'
+import { resolveNextAction } from './lib/jobNextAction.js'
 import OverviewTab from './tabs/Overview.jsx'
 import DetailsTab from './tabs/Details.jsx'
 import FinancialsTab from './tabs/Financials.jsx'
@@ -62,9 +63,24 @@ export default function ContactDetail() {
     paid, balance, loading, fetchAll, patch
   } = data
 
-  // Top open todo surfaces in the cockpit "Next action" row. Sorted by the
-  // hook (done asc, created desc), so [0] is the most recent open item.
-  const nextTodo = useMemo(() => (todos || []).find((t) => !t.done) || null, [todos])
+  // Cockpit "Next action" row consumes the same due-aware resolver as
+  // the Overview hero so the two never disagree (Phase 2H-5). The row's
+  // "Done" button is purpose-built for fh_job_todos completion, so we
+  // only surface todo-kind resolved actions here — when the resolver
+  // picks a schedule/milestone/stage default the row hides and the
+  // operator sees the canonical next action on the Overview tab.
+  const nextAction = useMemo(
+    () => resolveNextAction({ contact, scheduleItems, todos }),
+    [contact, scheduleItems, todos]
+  )
+  const nextTodo = useMemo(() => {
+    if (!nextAction || nextAction.kind !== 'todo') return null
+    return {
+      id: nextAction.sourceId,
+      text: nextAction.title,
+      due_at: nextAction.dueAt
+    }
+  }, [nextAction])
 
   async function markTodoDone(todoId) {
     if (!todoId || !user) return
