@@ -190,60 +190,23 @@ export default function Schedule() {
 
   return (
     <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
-      {/* HEADER — top + button removed; the FAB at bottom-right is the
-          single, thumb-reachable add-event control. */}
-      {/* HEADER — time-control bar with inline Schedule Job CTA.
-          Top-right CTA matches Hero command-center pattern; FAB at the
-          bottom-right stays for thumb-reach on mobile. Both wired to
-          the same setAddOpen handler. */}
       {/* SUMMARY PANEL — black-glass cockpit. Eyebrow + title + today/
-          upcoming counts surfaced inline + Schedule Job CTA. Replaces the
-          previous naked-title row. Uses --primary-quiet (smoked black
-          glass + thin gold trim, no gold wash). */}
+          upcoming counts. The FAB at bottom-right is the single
+          thumb-reachable add-event control; an inline header CTA used
+          to live here but was removed in 1F-2 to avoid duplicating the
+          FAB action. The empty-state CTA inside DayView still renders
+          when zero events as a discoverability prompt. */}
       <motion.div
         variants={item}
         className="v3-section v3-section--primary-quiet"
         style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 18px' }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
-              Schedule
-            </span>
-            <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}>
-              Today, planned.
-            </h1>
-          </div>
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ y: -2 }}
-            transition={{ type: 'spring', stiffness: 620, damping: 28 }}
-            onClick={() => { hapticTap(); setAddOpen(true) }}
-            aria-label="Schedule a job"
-            style={{
-              flexShrink: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '11px 16px',
-              borderRadius: 12,
-              border: 'none',
-              background: 'var(--v3-primary)',
-              color: 'var(--v3-on-primary)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              cursor: 'pointer',
-              boxShadow: 'var(--v3-gold-glow-sm)',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            <Plus size={14} aria-hidden="true" />
-            Schedule Job
-          </motion.button>
-        </div>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+          Schedule
+        </span>
+        <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}>
+          Today, planned.
+        </h1>
         {/* Today + Upcoming summary — surfaces the already-loaded upcoming
             7-day window so the operator gets a forward read without
             scrolling. Hidden until at least one stream has data so the
