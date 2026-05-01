@@ -1,4 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
+import { Eye, Download, Send } from 'lucide-react'
+import { supabase } from '../../../lib/supabase.js'
+import { useProfile } from '../../../contexts/ProfileContext.jsx'
+import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
+import { toastError, toastSuccess } from '../../../lib/toast.js'
+import { hapticTap } from '../../../lib/haptics.js'
 import QuoteItemsSection from '../sections/QuoteItems.jsx'
 import QuoteTermsSection from '../sections/QuoteTerms.jsx'
 
@@ -8,23 +15,184 @@ import QuoteTermsSection from '../sections/QuoteTerms.jsx'
  * once approved (Phase 4C) it becomes the locked baseline that
  * Production and Invoice surfaces inherit from.
  *
- * Phase 4A-2 / 4A-3 / 4A-4 — line-item editor (CRUD + parent
- * refresh) shipped in QuoteItemsSection.
+ * Phase 4A — line-item editor (CRUD + parent refresh).
+ * Phase 4B-2 — status pill + scope/terms/exclusions editor.
+ * Phase 4B-4 — Preview / Download / Send Quote action bar.
+ *   • Preview opens a blob URL of the generated PDF; no status change.
+ *   • Download saves the PDF locally; no status change.
+ *   • Send saves the PDF locally, uploads it to the job-files bucket
+ *     (visible in the Files tab), and flips proposal_status='sent' +
+ *     quote_sent_at=now() through the parent patch helper.
  *
- * Phase 4B-2 — adds:
- *   • Status pill header (proposal_status + sent age + expiration).
- *   • QuoteTerms section (scope / exclusions / payment terms /
- *     expiration date) wired to the parent `patch` helper.
- *
- * Send / Preview / Download actions (4B-3, 4B-4) and the approval
- * snapshot (4C) are still ahead. This tab stays an editor surface.
+ * Customer portal / e-sign / email send live in later phases.
  */
 export default function QuoteTab({ contact, userId, fetchAll, patch }) {
+  const { profile } = useProfile()
+
   const status = useMemo(() => deriveStatus(contact), [
     contact?.proposal_status,
     contact?.quote_sent_at,
     contact?.quote_expires_at
   ])
+
+  const company = useMemo(() => ({
+    name: profile?.company_name || profile?.full_name || 'My Company',
+    address: profile?.company_address || '',
+    phone: profile?.company_phone || '',
+    email: profile?.email || ''
+  }), [profile])
+
+  // Base-item count drives the disabled state on the action bar. Keyed
+  // on contact.updated_at — the recalc trigger from migration 011 bumps
+  // updated_at on every fh_quote_items write, so this auto-refreshes
+  // after add / edit / delete / Send without an extra subscription.
+  const [baseCount, setBaseCount] = useState(0)
+  useEffect(() => {
+    let alive = true
+    if (!contact?.id || !userId) { setBaseCount(0); return }
+    ;(async () => {
+      const { count } = await supabase
+        .from('fh_quote_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('contact_id', contact.id)
+        .eq('user_id', userId)
+        .eq('is_optional', false)
+        .eq('is_excluded', false)
+      if (alive) setBaseCount(count || 0)
+    })()
+    return () => { alive = false }
+  }, [contact?.id, contact?.updated_at, userId])
+
+  const [busy, setBusy] = useState(null) // 'preview' | 'download' | 'send' | null
+  const disabled = baseCount === 0 || busy !== null
+
+  // Shared PDF build path. Fetches fresh items so any pending blur
+  // saves on QuoteTerms or QuoteItems are reflected. Throws on zero
+  // base items so the catch in each handler can surface a friendly
+  // toast — defensive even though the disabled state prevents this.
+  async function buildPdf() {
+    if (!contact?.id || !userId) throw new Error('Contact not loaded')
+    const { data, error } = await supabase
+      .from('fh_quote_items')
+      .select('*')
+      .eq('contact_id', contact.id)
+      .eq('user_id', userId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(error.message)
+    const items = data || []
+    const base = items.filter((i) => !i.is_optional && !i.is_excluded)
+    if (base.length === 0) {
+      throw new Error('Add at least one base line item before generating a quote')
+    }
+    const result = generateQuote({
+      company,
+      contact: {
+        id: contact.id,
+        name: contact.name,
+        address: contact.address,
+        phone: contact.phone,
+        email: contact.email,
+        job_title: contact.job_title
+      },
+      items,
+      scope: contact.scope_text || '',
+      terms: contact.terms_text || '',
+      exclusions: contact.exclusions_text || '',
+      expiresAt: contact.quote_expires_at || null,
+      status: contact.proposal_status || 'draft',
+      quoteId: contact.id
+    })
+    if (!result?.doc) throw new Error('PDF generator returned no document')
+    return result
+  }
+
+  async function handlePreview() {
+    if (disabled) return
+    hapticTap()
+    setBusy('preview')
+    try {
+      const result = await buildPdf()
+      const url = result.doc.output('bloburl')
+      window.open(url, '_blank', 'noopener')
+    } catch (e) {
+      toastError("Couldn't preview", e?.message || 'Try again')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleDownload() {
+    if (disabled) return
+    hapticTap()
+    setBusy('download')
+    try {
+      const result = await buildPdf()
+      downloadPdf(result)
+      toastSuccess('Quote downloaded', result.filename)
+    } catch (e) {
+      toastError("Couldn't download", e?.message || 'Try again')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleSend() {
+    if (disabled) return
+    hapticTap()
+    setBusy('send')
+    try {
+      const result = await buildPdf()
+
+      // Save to job-files storage first so the row exists for audit
+      // even if the operator dismisses the download. Wrapped: storage
+      // failure logs + becomes a toast suffix but does not block the
+      // status flip — the operator already holds the PDF locally.
+      let storageNote = ''
+      try {
+        const blob = result.doc.output('blob')
+        const rowId = crypto.randomUUID()
+        const path = `${userId}/${contact.id}/${rowId}.pdf`
+        const { error: upErr } = await supabase.storage
+          .from('job-files')
+          .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+        if (upErr) throw upErr
+        const { error: insErr } = await supabase.from('fh_job_files').insert({
+          id: rowId,
+          user_id: userId,
+          job_id: contact.id,
+          filename: result.filename,
+          storage_path: path,
+          mime_type: 'application/pdf',
+          size_bytes: blob.size || 0,
+          kind: 'file'
+        })
+        if (insErr) throw insErr
+        storageNote = ' · Saved to Files'
+      } catch (storageErr) {
+        console.warn('[quote] storage save failed:', storageErr)
+        storageNote = ' · Storage save failed'
+      }
+
+      downloadPdf(result)
+
+      const sentIso = new Date().toISOString()
+      if (patch) {
+        await patch({ proposal_status: 'sent', quote_sent_at: sentIso })
+      }
+      // patch() optimistically updates the parent contact, which feeds
+      // the status pill and the baseCount effect. fetchAll is the
+      // belt to patch's suspenders — kept defensive in case patch is
+      // ever swapped for a non-optimistic helper.
+      if (fetchAll) await fetchAll()
+
+      toastSuccess(`Quote sent${storageNote}`, result.filename)
+    } catch (e) {
+      toastError("Couldn't send quote", e?.message || 'Try again')
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 32px' }}>
@@ -40,7 +208,132 @@ export default function QuoteTab({ contact, userId, fetchAll, patch }) {
         contact={contact}
         patch={patch}
       />
+
+      <ActionBar
+        baseCount={baseCount}
+        busy={busy}
+        disabled={disabled}
+        onPreview={handlePreview}
+        onDownload={handleDownload}
+        onSend={handleSend}
+      />
     </div>
+  )
+}
+
+/* ============================================================
+   Action bar — Preview / Download / Send Quote
+   ============================================================ */
+function ActionBar({ baseCount, busy, disabled, onPreview, onDownload, onSend }) {
+  const helperLine = baseCount === 0
+    ? 'Add at least one base line item to enable Send Quote.'
+    : 'Optional and excluded items appear on the PDF for reference but are not included in the quoted base total.'
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      padding: '14px 16px',
+      borderRadius: 14,
+      background: 'var(--v3-surface)',
+      border: '1px solid var(--v3-border)'
+    }}>
+      <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
+        Quote actions
+      </span>
+
+      <p style={{
+        margin: 0,
+        fontFamily: 'var(--font-body)',
+        fontSize: 11, lineHeight: 1.5,
+        color: 'var(--v3-text-muted)'
+      }}>
+        {helperLine}
+      </p>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <SecondaryButton
+          icon={<Eye size={14} aria-hidden="true" />}
+          label={busy === 'preview' ? 'Opening…' : 'Preview'}
+          onClick={onPreview}
+          disabled={disabled}
+        />
+        <SecondaryButton
+          icon={<Download size={14} aria-hidden="true" />}
+          label={busy === 'download' ? 'Building…' : 'Download'}
+          onClick={onDownload}
+          disabled={disabled}
+        />
+        <PrimaryButton
+          icon={<Send size={14} aria-hidden="true" />}
+          label={busy === 'send' ? 'Sending…' : 'Send Quote'}
+          onClick={onSend}
+          disabled={disabled}
+        />
+      </div>
+    </div>
+  )
+}
+
+function SecondaryButton({ icon, label, onClick, disabled }) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: disabled ? 1 : 0.98 }}
+      onClick={onClick}
+      disabled={disabled}
+      aria-disabled={disabled}
+      style={{
+        flex: '1 1 110px',
+        minHeight: 44,
+        padding: '11px 14px',
+        borderRadius: 12,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
+        color: disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+        fontFamily: 'var(--font-body)',
+        fontSize: 13, fontWeight: 600,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.55 : 1,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        WebkitTapHighlightColor: 'transparent'
+      }}
+    >
+      {icon}
+      {label}
+    </motion.button>
+  )
+}
+
+function PrimaryButton({ icon, label, onClick, disabled }) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: disabled ? 1 : 0.98 }}
+      onClick={onClick}
+      disabled={disabled}
+      aria-disabled={disabled}
+      style={{
+        flex: '2 1 180px',
+        minHeight: 44,
+        padding: '11px 14px',
+        borderRadius: 12,
+        border: 'none',
+        background: disabled
+          ? 'var(--v3-surface-2)'
+          : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+        color: disabled ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
+        fontFamily: 'var(--font-body)',
+        fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.55 : 1,
+        boxShadow: disabled ? 'none' : '0 0 0 2px rgba(228, 190, 111, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        WebkitTapHighlightColor: 'transparent'
+      }}
+    >
+      {icon}
+      {label}
+    </motion.button>
   )
 }
 
