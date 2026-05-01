@@ -238,6 +238,7 @@ export default function ContactDetail() {
             contact={contact}
             userId={user?.id}
             fetchAll={fetchAll}
+            patch={patch}
           />
         )}
         {tab === 'details' && (
