@@ -47,6 +47,10 @@ function emptyDraft() {
 }
 
 function draftFromRow(row) {
+  // amountOverridden seeds true on edit so changing qty/rate does not
+  // silently overwrite an intentionally-set amount on an existing row.
+  // Operators can still edit the amount field directly. Add-mode keeps
+  // auto-recompute because new rows have no source-of-truth amount yet.
   return {
     section: row.section || '',
     description: row.description || '',
@@ -59,6 +63,23 @@ function draftFromRow(row) {
     is_optional: !!row.is_optional,
     is_excluded: !!row.is_excluded
   }
+}
+
+// Validate a draft before write. Returns null on success, or an error
+// message string. Description requirement is enforced in handlers via
+// the disabled state, but mirrored here for defense in depth. Numeric
+// fields are guarded against negatives and NaN — HTML `min="0"` is not
+// reliably enforced on submit, so we re-check at the JS boundary.
+// Credit lines (negative amounts) are deferred to a later phase.
+function validateDraft(d) {
+  if (!d.description || !d.description.trim()) return 'Description is required'
+  const qty = Number(d.qty)
+  const rate = Number(d.rate)
+  const amount = Number(d.amount)
+  if (!Number.isFinite(qty) || qty < 0) return 'Qty must be a number ≥ 0'
+  if (!Number.isFinite(rate) || rate < 0) return 'Rate must be a number ≥ 0'
+  if (!Number.isFinite(amount) || amount < 0) return 'Amount must be a number ≥ 0'
+  return null
 }
 
 function normalizeForDB(d) {
@@ -75,7 +96,7 @@ function normalizeForDB(d) {
   }
 }
 
-export default function QuoteItemsSection({ jobId, userId }) {
+export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -129,6 +150,7 @@ export default function QuoteItemsSection({ jobId, userId }) {
       return null
     }
     await fetchRows()
+    onContactRefresh?.()
     return data
   }
 
@@ -144,6 +166,7 @@ export default function QuoteItemsSection({ jobId, userId }) {
       return false
     }
     await fetchRows()
+    onContactRefresh?.()
     return true
   }
 
@@ -162,6 +185,7 @@ export default function QuoteItemsSection({ jobId, userId }) {
       fetchRows()
       return false
     }
+    onContactRefresh?.()
     toastUndo('Line item deleted', {
       description: (snapshot?.description || '').slice(0, 60) || 'Tap Undo to restore',
       onUndo: async () => {
@@ -169,6 +193,7 @@ export default function QuoteItemsSection({ jobId, userId }) {
         const { error: insErr } = await supabase.from('fh_quote_items').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
         await fetchRows()
+        onContactRefresh?.()
         toastSuccess('Restored')
       }
     })
@@ -236,7 +261,9 @@ export default function QuoteItemsSection({ jobId, userId }) {
   }
 
   async function handleAdd() {
-    if (!draft.description.trim() || adding) return
+    if (adding) return
+    const err = validateDraft(draft)
+    if (err) { toastError("Couldn't add item", err); return }
     setAdding(true)
     const inserted = await addItem({
       ...normalizeForDB(draft),
@@ -257,7 +284,9 @@ export default function QuoteItemsSection({ jobId, userId }) {
   }
 
   async function saveEdit() {
-    if (!editingId || !editDraft.description.trim() || editing) return
+    if (!editingId || editing) return
+    const err = validateDraft(editDraft)
+    if (err) { toastError("Couldn't save changes", err); return }
     setEditing(true)
     const ok = await updateItem(editingId, normalizeForDB(editDraft))
     setEditing(false)
