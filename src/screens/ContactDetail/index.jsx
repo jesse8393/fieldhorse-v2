@@ -25,12 +25,14 @@ import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../compon
 import { useJobData } from './hooks/useJobData.js'
 import { resolveNextAction } from './lib/jobNextAction.js'
 import OverviewTab from './tabs/Overview.jsx'
+import QuoteTab from './tabs/Quote.jsx'
 import DetailsTab from './tabs/Details.jsx'
 import FinancialsTab from './tabs/Financials.jsx'
 import FilesTab from './tabs/Files.jsx'
 
 const TOP_TABS = [
   { id: 'overview',   label: 'Overview' },
+  { id: 'quote',      label: 'Quote' },
   { id: 'details',    label: 'Details' },
   { id: 'financials', label: 'Financials' },
   { id: 'files',      label: 'Files' }
@@ -229,6 +231,13 @@ export default function ContactDetail() {
             onOpenAddEvent={() => setEventOpen(true)}
             onOpenLogPayment={() => setPayModalOpen(true)}
             onOpenInvitePartner={() => setInviteOpen(true)}
+          />
+        )}
+        {tab === 'quote' && (
+          <QuoteTab
+            contact={contact}
+            userId={user?.id}
+            fetchAll={fetchAll}
           />
         )}
         {tab === 'details' && (
