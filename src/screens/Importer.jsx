@@ -329,8 +329,10 @@ export default function Importer() {
         </AnimatePresence>
       </motion.section>
 
-      {/* ADVANCED INTEGRATIONS — collapsed by default so contractors aren't
-          greeted with dev-speak. Webhook endpoint + POST JSON shape live here. */}
+      {/* LEAD INTAKE LINK — operator-facing reframe of the webhook flow.
+          Collapsed by default. Copy stays in business language; the
+          example payload is labelled "Example lead details" so it
+          reads as guidance, not a JSON spec. */}
       <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
         <details style={{ borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
           <summary
@@ -347,7 +349,7 @@ export default function Importer() {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <Zap size={14} color="var(--field-gold-bright)" />
               <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--ink-strong)' }}>
-                Advanced integrations
+                Lead intake link
               </span>
             </span>
             <ChevronDown size={16} color="var(--ink-muted)" className="fh-importer-chev" />
@@ -355,7 +357,7 @@ export default function Importer() {
 
           <div style={{ padding: '4px 14px 16px', borderTop: '1px solid var(--rule)' }}>
             <p style={{ margin: '12px 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-              Send leads from GoHighLevel, Zapier, Make, or any tool that can POST JSON. The endpoint routes new leads straight into your Pipeline.
+              Use this link to send new leads into FieldHorse from your automations — GoHighLevel, Zapier, Make, your website form, anything that can call a URL. Each lead lands straight in your Pipeline.
             </p>
             {webhookKey ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
@@ -367,7 +369,7 @@ export default function Importer() {
                 <button
                   type="button"
                   onClick={() => setWebhookRevealed((v) => !v)}
-                  aria-label={webhookRevealed ? 'Hide webhook key' : 'Reveal webhook key'}
+                  aria-label={webhookRevealed ? 'Hide intake key' : 'Reveal intake key'}
                   style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                 >
                   {webhookRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -375,7 +377,7 @@ export default function Importer() {
                 <button
                   type="button"
                   onClick={copyWebhook}
-                  aria-label="Copy webhook URL"
+                  aria-label="Copy intake link"
                   style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: copiedWebhook ? 'var(--signal-green)' : 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                 >
                   {copiedWebhook ? <Check size={14} /> : <Copy size={14} />}
@@ -403,12 +405,33 @@ export default function Importer() {
                 }}
               >
                 <Zap size={14} />
-                GENERATE WEBHOOK KEY
+                Generate intake link
               </motion.button>
             )}
+
+            <p style={{
+              margin: '14px 0 6px',
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
+              textTransform: 'uppercase', color: 'var(--ink-muted)',
+              fontFamily: 'var(--font-body)'
+            }}>
+              What to send
+            </p>
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
+              <strong style={{ color: 'var(--ink-strong)' }}>Required:</strong> name. <strong style={{ color: 'var(--ink-strong)' }}>Optional:</strong> phone, email, address, job title, amount, notes.
+            </p>
+
+            <p style={{
+              margin: '0 0 6px',
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
+              textTransform: 'uppercase', color: 'var(--ink-muted)',
+              fontFamily: 'var(--font-body)'
+            }}>
+              Example lead details
+            </p>
             <pre
               style={{
-                marginTop: 10,
+                margin: 0,
                 padding: '12px 14px',
                 borderRadius: 12,
                 background: 'var(--surface-2)',
@@ -419,8 +442,7 @@ export default function Importer() {
                 lineHeight: 1.5,
                 whiteSpace: 'pre-wrap'
               }}
-            >{`POST JSON shape:
-{
+            >{`{
   "name": "Jane Homeowner",
   "phone": "555-0199",
   "email": "jane@homeowner.com",

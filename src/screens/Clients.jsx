@@ -9,7 +9,7 @@ import { useFhMotion } from '../lib/motion.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { rollupByClient } from '../lib/rollups.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
-import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
+import { FilterPill, Eyebrow, StampNumber, FloatingActionButton } from '../components/v3'
 
 function money(n) {
   const v = Number(n || 0)
@@ -317,14 +317,11 @@ export default function Clients() {
           else load()
         }}
       />
-      <button
-        type="button"
-        onClick={() => { hapticMedium(); setAddOpen(true) }}
-        aria-label="New client"
-        className="fh-fab"
-      >
-        <Plus size={26} strokeWidth={2.75} />
-      </button>
+      <FloatingActionButton
+        onClick={() => setAddOpen(true)}
+        ariaLabel="New client"
+        iconStrokeWidth={2.75}
+      />
     </motion.div>
   )
 }

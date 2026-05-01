@@ -8,7 +8,7 @@ import {
 import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SwipeableRow from '../components/SwipeableRow.jsx'
-import { JobCard, FilterPill } from '../components/v3'
+import { JobCard, FilterPill, FloatingActionButton } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { ACTIVE_STAGES } from '../lib/stages.js'
@@ -349,16 +349,13 @@ export default function Jobs() {
       />
 
       {/* FAB — bottom-right above BottomNav. Thumb-reach primary action.
-          Per ruleset: "Max 1 primary action per screen" — this is it. */}
-      <motion.button
-        type="button"
-        whileTap={{ scale: 0.94 }}
-        onClick={() => { hapticMedium(); setAddOpen(true) }}
-        aria-label="New lead"
-        className="fh-fab"
-      >
-        <Plus size={26} strokeWidth={2.6} />
-      </motion.button>
+          Per ruleset: "Max 1 primary action per screen" — this is it.
+          Renders via the canonical portal-based primitive so it can't
+          be trapped by a transformed ancestor. */}
+      <FloatingActionButton
+        onClick={() => setAddOpen(true)}
+        ariaLabel="New lead"
+      />
     </motion.div>
   )
 }

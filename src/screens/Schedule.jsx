@@ -7,6 +7,7 @@ import ActionSheet from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SpecTabs from '../components/SpecTabs.jsx'
+import { FloatingActionButton } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -425,17 +426,13 @@ export default function Schedule() {
         </motion.div>
       </SwipeShell>
 
-      {/* FAB — bottom-right, thumb-reachable, clears the bottom nav. The
-          in-empty-state "Add event ->" link was removed; this is the
-          single source of truth for adding events on Schedule. */}
-      <button
-        type="button"
-        onClick={() => { hapticMedium(); setAddOpen(true) }}
-        aria-label="New event"
-        className="fh-fab"
-      >
-        <Plus size={26} strokeWidth={2.5} />
-      </button>
+      {/* FAB — canonical portal-rendered primitive, immune to
+          containing-block traps from transformed ancestors. */}
+      <FloatingActionButton
+        onClick={() => setAddOpen(true)}
+        ariaLabel="New event"
+        iconStrokeWidth={2.5}
+      />
 
       <AddEventSheet
         open={addOpen}

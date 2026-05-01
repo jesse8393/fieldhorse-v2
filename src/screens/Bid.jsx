@@ -105,11 +105,13 @@ export default function Bid() {
       animate="show"
       style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
-      {/* HEADER — premium estimating workspace identity */}
+      {/* HEADER — working-tool, no serif italic. Dropped per the design
+          direction: editorial type belongs on hero/marketing surfaces,
+          not on a tool the operator uses to build a bid. */}
       <motion.div
         variants={item}
         style={{
-          padding: '12px var(--v3-gutter) 18px',
+          padding: '12px var(--v3-gutter) 14px',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
@@ -117,15 +119,35 @@ export default function Bid() {
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Calculator size={11} />
-            Estimates
+          <span style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 10, fontWeight: 700,
+            letterSpacing: '0.16em', textTransform: 'uppercase',
+            color: 'var(--v3-primary)',
+            display: 'inline-flex', alignItems: 'center', gap: 6
+          }}>
+            <Calculator size={11} aria-hidden="true" />
+            AI Estimate
           </span>
-          <h1 className="v3-h1" style={{ marginTop: 6 }}>
-            Build a clean <em>estimate.</em>
+          <h1 style={{
+            margin: '6px 0 0',
+            fontFamily: 'var(--font-body)',
+            fontSize: 'clamp(20px, 5.5vw, 26px)',
+            lineHeight: 1.2,
+            letterSpacing: '-0.01em',
+            fontWeight: 700,
+            color: 'var(--v3-text)'
+          }}>
+            Build a clean estimate
           </h1>
-          <p className="v3-caption" style={{ marginTop: 6, lineHeight: 1.5 }}>
-            Describe the scope. AI turns it into a structured bid with line items, ranges, and a recommended price.
+          <p style={{
+            margin: '6px 0 0',
+            fontFamily: 'var(--font-body)',
+            fontSize: 12.5,
+            lineHeight: 1.5,
+            color: 'var(--v3-text-muted)'
+          }}>
+            Describe the scope below. The AI returns a structured bid with line items, ranges, and a recommended price.
           </p>
         </div>
       </motion.div>
