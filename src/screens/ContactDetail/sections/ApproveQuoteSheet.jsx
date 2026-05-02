@@ -255,16 +255,24 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       // and update fh_quote_versions.pdf_file_id. Wrapped: any failure
       // becomes a toast suffix but does NOT roll back the approval. The
       // snapshot row is the legal record; the PDF is an artifact.
+      //
+      // Three-state result distinguishes archive-OK from link-OK so the
+      // toast reflects truth: 'Saved to Files' is never claimed without
+      // a real fh_job_files row, and 'linked' is never claimed without
+      // a verified pdf_file_id readback.
       let archiveNote = ''
       try {
         const archiveResult = await archiveApprovedPdf({
           confirmed, snapshot, company, contact, userId
         })
-        archiveNote = archiveResult.ok
-          ? ' · Saved to Files'
-          : ' · PDF archive failed'
         if (!archiveResult.ok) {
+          archiveNote = ' · PDF archive failed'
           console.warn('[approve-quote] archive failed:', archiveResult.error)
+        } else if (!archiveResult.linked) {
+          archiveNote = ' · Saved to Files · Version link failed'
+          console.warn('[approve-quote] file archived but version link verify failed')
+        } else {
+          archiveNote = ' · Saved to Files'
         }
       } catch (archiveErr) {
         console.warn('[approve-quote] archive threw:', archiveErr)
@@ -552,30 +560,58 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
       .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
     if (upErr) return { ok: false, error: upErr }
 
-    const { error: insErr } = await supabase.from('fh_job_files').insert({
-      id: rowId,
-      user_id: userId,
-      job_id: contact.id,
-      filename,
-      storage_path: path,
-      mime_type: 'application/pdf',
-      size_bytes: blob.size || 0,
-      kind: 'file'
-    })
-    if (insErr) return { ok: false, error: insErr }
+    const { data: insertedFile, error: insErr } = await supabase
+      .from('fh_job_files')
+      .insert({
+        id: rowId,
+        user_id: userId,
+        job_id: contact.id,
+        filename,
+        storage_path: path,
+        mime_type: 'application/pdf',
+        size_bytes: blob.size || 0,
+        kind: 'file'
+      })
+      .select('id')
+      .single()
+    if (insErr || !insertedFile?.id) {
+      return { ok: false, error: insErr || new Error('fh_job_files insert returned no row') }
+    }
 
-    // Best-effort link the file to the version row. Failure here means
-    // the file lives in storage + Files tab but the version row's
-    // pointer is null — recoverable, low-impact.
-    const { error: linkErr } = await supabase.from('fh_quote_versions')
+    // Link the file to the version row, then VERIFY the link landed.
+    // Bare .update() returns no error for 0-row matches (PostgREST 204
+    // No Content), so we re-select the row and compare pdf_file_id
+    // against the file id. This catches any case where the UPDATE
+    // silently no-ops without raising — RLS edge cases, stale auth
+    // state, filter mismatches.
+    const { error: linkErr } = await supabase
+      .from('fh_quote_versions')
       .update({ pdf_file_id: rowId })
       .eq('id', confirmed.id)
       .eq('user_id', userId)
     if (linkErr) {
-      console.warn('[approve-quote] pdf_file_id link failed (file archived OK):', linkErr)
+      console.warn('[approve-quote] pdf_file_id link errored:', linkErr)
+      // File archived OK, link errored — still return ok+!linked.
+      return { ok: true, linked: false, fileId: rowId, linkError: linkErr }
     }
 
-    return { ok: true, fileId: rowId }
+    const { data: linkCheck, error: checkErr } = await supabase
+      .from('fh_quote_versions')
+      .select('pdf_file_id')
+      .eq('id', confirmed.id)
+      .maybeSingle()
+    if (checkErr) {
+      console.warn('[approve-quote] pdf_file_id verify errored:', checkErr)
+      return { ok: true, linked: false, fileId: rowId, linkError: checkErr }
+    }
+    const linked = linkCheck?.pdf_file_id === rowId
+    if (!linked) {
+      console.warn('[approve-quote] pdf_file_id verify mismatch:', {
+        expected: rowId,
+        actual: linkCheck?.pdf_file_id ?? null
+      })
+    }
+    return { ok: true, linked, fileId: rowId }
   } catch (e) {
     return { ok: false, error: e }
   }
