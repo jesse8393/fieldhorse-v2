@@ -39,34 +39,79 @@ function invoiceNumber(seed) {
 }
 
 /**
- * Render a Fieldhorse-branded header on the current page.
- * Wordmark left, meta block right.
+ * Render a header on the current invoice page (4D-2D extended).
+ * Logo or wordmark left, doc meta block right, brand-accent gold bar.
+ *
+ * @param {object} doc
+ * @param {object} opts
+ * @param {object} opts.company         { name, address, phone, email, website }
+ * @param {string} opts.documentType    e.g. 'Invoice'
+ * @param {string} opts.documentNumber
+ * @param {string} opts.date
+ * @param {object} [opts.logo]          { dataUrl, format, width, height } | null
+ * @param {[number,number,number]} [opts.brandGold]  RGB tuple, defaults FIELD_GOLD
+ * @param {string} [opts.trustLine]     pre-formatted micro-cap trust string
  */
-function drawHeader(doc, { company, logoUrl, documentType, documentNumber, date }) {
+function drawHeader(doc, {
+  company,
+  documentType,
+  documentNumber,
+  date,
+  logo = null,
+  brandGold = FIELD_GOLD,
+  trustLine = ''
+}) {
   const pageWidth = doc.internal.pageSize.getWidth()
 
-  // Gold bar across the top
-  doc.setFillColor(...FIELD_GOLD)
+  // Brand-accent bar across the top
+  doc.setFillColor(...brandGold)
   doc.rect(0, 0, pageWidth, 4, 'F')
 
-  // Company block (left)
-  doc.setTextColor(...ONYX)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(24)
-  doc.text((company?.name || 'Fieldhorse').toUpperCase(), 14, 20)
+  // Company mark (left) — logo image when available, else wordmark text
+  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
+    const maxW = 60
+    const maxH = 22
+    const aspect = logo.width / logo.height
+    let w = maxW
+    let h = w / aspect
+    if (h > maxH) {
+      h = maxH
+      w = h * aspect
+    }
+    try {
+      doc.addImage(logo.dataUrl, logo.format || 'PNG', 14, 8, w, h)
+    } catch {
+      drawInvoiceWordmark(doc, company)
+    }
+  } else {
+    drawInvoiceWordmark(doc, company)
+  }
 
+  // Contact lines under the mark
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...INK_MUTED)
-  let y = 27
+  let y = 33
   if (company?.address) { doc.text(company.address, 14, y); y += 4.5 }
   if (company?.phone)   { doc.text(company.phone, 14, y);   y += 4.5 }
   if (company?.email)   { doc.text(company.email, 14, y);   y += 4.5 }
+  if (company?.website) { doc.text(company.website, 14, y); y += 4.5 }
+
+  // Optional trust line — license + insured
+  if (trustLine) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.4)
+    doc.text(trustLine, 14, y + 0.5)
+    doc.setCharSpace(0)
+    y += 4.5
+  }
 
   // Doc meta (right) — aligned right
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
-  doc.setTextColor(...FIELD_GOLD)
+  doc.setTextColor(...brandGold)
   doc.text(documentType.toUpperCase(), pageWidth - 14, 20, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
@@ -76,12 +121,22 @@ function drawHeader(doc, { company, logoUrl, documentType, documentNumber, date 
   doc.setTextColor(...INK_MUTED)
   doc.text(date, pageWidth - 14, 30.5, { align: 'right' })
 
-  // Thin divider
+  // Header divider sits below the longest left column. Pin to a stable
+  // y so the table below always starts at a predictable position even
+  // when the contact block is thin.
+  const dividerY = Math.max(46, y + 2)
   doc.setDrawColor(220, 215, 205)
   doc.setLineWidth(0.3)
-  doc.line(14, 46, pageWidth - 14, 46)
+  doc.line(14, dividerY, pageWidth - 14, dividerY)
 
-  return 52  // y cursor after header
+  return dividerY + 6  // y cursor after header
+}
+
+function drawInvoiceWordmark(doc, company) {
+  doc.setTextColor(...ONYX)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(24)
+  doc.text((company?.name || 'My Company').toUpperCase(), 14, 22)
 }
 
 function drawBillTo(doc, y, contact) {
@@ -125,10 +180,12 @@ function drawFooter(doc, tagline = 'Built for the jobsite.') {
 }
 
 /**
- * Generate an invoice PDF.
+ * Generate a branded invoice PDF (4D-2D).
  *
  * @param {object} opts
- * @param {object} opts.company    { name, address, phone, email }
+ * @param {object} opts.company    { name, address, phone, email, website,
+ *                                    logo_url, brand_accent_hex,
+ *                                    license_number, insured_text }
  * @param {object} opts.contact    { name, address, phone, email }
  * @param {Array}  opts.lineItems  [{ description, qty, rate, amount }]
  * @param {number} opts.taxRate    decimal, e.g. 0.085
@@ -137,7 +194,7 @@ function drawFooter(doc, tagline = 'Built for the jobsite.') {
  * @param {string} opts.invoiceId  (source id for fingerprinting; auto if omitted)
  * @returns {{ doc: jsPDF, filename: string, number: string }}
  */
-export function generateInvoice({
+export async function generateInvoice({
   company = {},
   contact = {},
   lineItems = [],
@@ -149,11 +206,33 @@ export function generateInvoice({
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   const number = invoiceNumber(invoiceId)
 
+  // Pre-load the contractor's logo (4D-2B). Cached per session by the
+  // helper. Returns null on missing URL / network failure / decode
+  // failure / canvas taint — drawHeader falls through to the wordmark.
+  const logo = company?.logo_url
+    ? await loadLogoForPdf(company.logo_url, { maxDimension: 720 })
+    : null
+
+  // Brand accent — falls back to FIELD_GOLD when invalid or too light.
+  // Same parser the proposal uses (4D-2C).
+  const brandGold = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
+
+  // Trust line — license + insured. Each piece optional; whole line
+  // suppressed when both blank.
+  const trustParts = [
+    company?.license_number ? `License #${String(company.license_number).trim()}` : '',
+    company?.insured_text ? String(company.insured_text).trim() : ''
+  ].filter(Boolean)
+  const trustLine = trustParts.length > 0 ? trustParts.join(' · ').toUpperCase() : ''
+
   let y = drawHeader(doc, {
     company,
     documentType: 'Invoice',
     documentNumber: number,
-    date: today()
+    date: today(),
+    logo,
+    brandGold,
+    trustLine
   })
 
   y = drawBillTo(doc, y, contact)
@@ -192,7 +271,7 @@ export function generateInvoice({
     theme: 'plain',
     headStyles: {
       fillColor: ONYX,
-      textColor: FIELD_GOLD,
+      textColor: brandGold,
       fontStyle: 'bold',
       fontSize: 9,
       cellPadding: { top: 3, right: 4, bottom: 3, left: 4 }
@@ -238,7 +317,7 @@ export function generateInvoice({
   }
 
   afterTable += 4
-  doc.setDrawColor(...FIELD_GOLD)
+  doc.setDrawColor(...brandGold)
   doc.setLineWidth(0.6)
   doc.line(labelX, afterTable, valueX, afterTable)
   afterTable += 7
@@ -247,7 +326,7 @@ export function generateInvoice({
   doc.setFontSize(13)
   doc.setTextColor(...ONYX)
   doc.text('TOTAL DUE', labelX, afterTable)
-  doc.setTextColor(...FIELD_GOLD)
+  doc.setTextColor(...brandGold)
   doc.text(money(total), valueX, afterTable, { align: 'right' })
 
   // Notes
@@ -265,7 +344,17 @@ export function generateInvoice({
     doc.text(wrapped, 14, afterTable)
   }
 
-  drawFooter(doc, `${company?.name || 'Fieldhorse'} · Thanks for the work.`)
+  // Footer — contractor contact line, no FieldHorse branding.
+  const footerLine = [
+    company?.name,
+    company?.phone,
+    company?.email,
+    company?.website
+  ]
+    .map((s) => (s && String(s).trim()) || '')
+    .filter(Boolean)
+    .join(' · ')
+  drawFooter(doc, footerLine || (company?.name || 'My Company'))
 
   return {
     doc,
