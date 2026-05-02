@@ -215,7 +215,7 @@ export default function Settings() {
       <Section
         variants={item}
         title={<>Customer-facing <em>details.</em></>}
-        sub="What clients see on your proposals, invoices, and approvals."
+        sub="These details strengthen your proposals, invoices, and approvals when filled in. Only company name is needed to get started — everything else is optional and can be added anytime."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <BrandField label="Company phone">
@@ -242,7 +242,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Company website">
+          <BrandField label="Company website" optional>
             <input
               type="url"
               inputMode="url"
@@ -254,7 +254,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Company address" hint="One line or several — used on cover pages.">
+          <BrandField label="Company address" optional hint="One line or several — used on cover pages.">
             <textarea
               rows={2}
               value={companyAddress}
@@ -264,7 +264,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="License number">
+          <BrandField label="License number" optional>
             <input
               type="text"
               value={licenseNumber}
@@ -274,7 +274,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Insurance / insured text" hint="Short line shown in proposal trust block.">
+          <BrandField label="Insurance / insured text" optional hint="Short line shown in proposal trust block.">
             <input
               type="text"
               value={insuredText}
@@ -284,7 +284,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Default warranty text" hint="Default workmanship warranty paragraph for new proposals.">
+          <BrandField label="Default warranty text" optional hint="Default workmanship warranty paragraph for new proposals.">
             <textarea
               rows={3}
               value={warrantyDefault}
@@ -551,14 +551,28 @@ function Meta({ label, value }) {
   )
 }
 
-function BrandField({ label, hint, children }) {
+function BrandField({ label, hint, optional, children }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
-        textTransform: 'uppercase', color: 'var(--ink-muted)'
-      }}>
-        {label}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+          textTransform: 'uppercase', color: 'var(--ink-muted)'
+        }}>
+          {label}
+        </span>
+        {optional && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '1px 7px', borderRadius: 999,
+            background: 'var(--surface-2)', border: '1px solid var(--rule)',
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: 'var(--ink-faint, var(--ink-muted))',
+            fontFamily: 'var(--font-body)'
+          }}>
+            Optional
+          </span>
+        )}
       </span>
       {children}
       {hint && (
