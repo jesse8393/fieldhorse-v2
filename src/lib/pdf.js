@@ -468,9 +468,17 @@ function parseBrandAccentRgb(hex) {
  * @param {string} opts.terms       terms_text (payment terms prose)
  * @param {string} opts.exclusions  exclusions_text (out-of-scope prose)
  * @param {string} opts.expiresAt   quote_expires_at ISO timestamp (or null)
- * @param {string} opts.status      proposal_status (accepted; not yet
- *                                  rendered — reserved for 4C-3 stamp)
+ * @param {string} opts.status      proposal_status (accepted; not currently
+ *                                  rendered — see opts.approval for the
+ *                                  approval-stamped variant)
  * @param {string} opts.quoteId     contact id for number fingerprinting
+ * @param {object} [opts.approval]  Phase 4C-3. When present, renders the
+ *                                  approved-snapshot variant: a green
+ *                                  APPROVED seal on the cover and a
+ *                                  certificate block on the final page.
+ *                                  Shape: { versionNumber, quoteNumber,
+ *                                  method, approvedByName, approvedByEmail,
+ *                                  approvalNote, baseTotal, approvedAt }
  * @returns {{ doc: jsPDF, filename: string, number: string }}
  */
 export async function generateQuote({
@@ -482,7 +490,8 @@ export async function generateQuote({
   exclusions = '',
   expiresAt = null,
   status = 'draft', // eslint-disable-line no-unused-vars
-  quoteId
+  quoteId,
+  approval = null
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
 
@@ -495,7 +504,7 @@ export async function generateQuote({
     : null
 
   const ctx = buildProposalCtx({
-    doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId, logo
+    doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId, logo, approval
   })
 
   // === PAGE 1 — COVER (no header strip, no footer band) ===
@@ -536,7 +545,7 @@ export async function generateQuote({
    resolved fallback strings, and the formatted number/date.
    ============================================================ */
 function buildProposalCtx({
-  doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId, logo
+  doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId, logo, approval
 }) {
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -595,7 +604,8 @@ function buildProposalCtx({
     companyName: company?.name || 'My Company',
     logo: logo || null,
     brandGold,
-    trustLine: trustParts.length > 0 ? trustParts.join(' · ').toUpperCase() : ''
+    trustLine: trustParts.length > 0 ? trustParts.join(' · ').toUpperCase() : '',
+    approval: approval && typeof approval === 'object' ? approval : null
   }
 }
 
@@ -625,6 +635,12 @@ function drawCoverPage(doc, ctx) {
   doc.setCharSpace(0.5)
   doc.text(eyebrow, pageWidth / 2, 24, { align: 'center' })
   doc.setCharSpace(0)
+
+  // Approval seal (4C-3) — small, restrained, upper-right corner.
+  // Only rendered for approved snapshots; absent on draft/sent quotes.
+  if (ctx.approval) {
+    drawApprovalSeal(doc, ctx)
+  }
 
   // Brand mark — logo image when available, else typographic wordmark.
   // Either path leaves `markEndY` set so the contact line below sits
@@ -784,6 +800,114 @@ function drawWordmarkFallback(doc, ctx) {
 function company0(ctx, key) {
   const v = ctx?.company?.[key]
   return v && String(v).trim() ? String(v).trim() : ''
+}
+
+/* ============================================================
+   Approval seal (Phase 4C-3) — drawn on the cover when ctx.approval
+   is present. Restrained: thin SIGNAL_GREEN border + "APPROVED"
+   wordmark + "v{n} · {date}" sub-line. Axis-aligned, no kitsch.
+   ============================================================ */
+function drawApprovalSeal(doc, ctx) {
+  const { pageWidth, approval } = ctx
+  const w = 56
+  const h = 18
+  const x = pageWidth - 18 - w
+  const y = 36
+
+  doc.setDrawColor(...SIGNAL_GREEN)
+  doc.setLineWidth(0.5)
+  doc.rect(x, y, w, h, 'D')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(...SIGNAL_GREEN)
+  doc.setCharSpace(0.8)
+  doc.text('APPROVED', x + w / 2, y + 7.8, { align: 'center' })
+  doc.setCharSpace(0)
+
+  const sub = `v${approval.versionNumber || 1} · ${formatLongDate(approval.approvedAt) || ''}`
+    .toUpperCase()
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(...SIGNAL_GREEN)
+  doc.setCharSpace(0.4)
+  doc.text(sub, x + w / 2, y + 13.5, { align: 'center' })
+  doc.setCharSpace(0)
+}
+
+/* ============================================================
+   Approval certificate (Phase 4C-3) — replaces the READY TO START?
+   acceptance/signature block on Page 4 when ctx.approval is set.
+   The signatures already did their job; the doc now records what
+   was agreed to and how the agreement was captured.
+   ============================================================ */
+function drawApprovalCertificate(doc, ctx, y) {
+  const { margin, contentWidth, approval } = ctx
+
+  y = drawSectionTitle(doc, margin, y, 'APPROVED QUOTE SNAPSHOT', PROPOSAL_BRAND.sectionH3)
+  y += 2
+
+  const rows = [
+    ['Version',       `v${approval.versionNumber || 1}`],
+    ['Quote number',  approval.quoteNumber || ctx.number],
+    ['Approved on',   approval.approvedAt ? formatLongDate(approval.approvedAt) : ''],
+    ['Approved by',   approval.approvedByName +
+                       (approval.approvedByEmail ? `  ·  ${approval.approvedByEmail}` : '')],
+    ['Method',        formatApprovalMethod(approval.method)],
+    ['Quoted price',  money(approval.baseTotal != null ? approval.baseTotal : ctx.baseTotal)]
+  ].filter(([, val]) => val && String(val).trim().length > 0)
+
+  const labelX = margin
+  const valueX = margin + 50
+  const rowGap = 8
+
+  for (const [label, val] of rows) {
+    drawEyebrow(doc, labelX, y + 0.5, label.toUpperCase())
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(PROPOSAL_BRAND.bodySize)
+    doc.setTextColor(...ONYX)
+    const wrapped = doc.splitTextToSize(String(val), contentWidth - 50)
+    doc.text(wrapped, valueX, y + 0.5)
+    y += rowGap + (wrapped.length - 1) * 5
+  }
+
+  if (approval.approvalNote && String(approval.approvalNote).trim()) {
+    y += 4
+    drawEyebrow(doc, labelX, y + 0.5, 'NOTE')
+    y += 5.5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(PROPOSAL_BRAND.bodySize)
+    doc.setTextColor(...ONYX)
+    const wrapped = doc.splitTextToSize(String(approval.approvalNote).trim(), contentWidth)
+    doc.text(wrapped, labelX, y)
+    y += wrapped.length * PROPOSAL_BRAND.proseLineHeight
+  }
+
+  // Audit footer note — small, muted, sits below the certificate so the
+  // contractor's branding stays the dominant moment of the page.
+  y += 8
+  doc.setFont('helvetica', 'italic')
+  doc.setFontSize(8.5)
+  doc.setTextColor(...INK_MUTED)
+  const auditFootnote =
+    'This page certifies the snapshot above as the approved quote of record. Subsequent changes to items, scope, or terms do not alter this snapshot.'
+  const auditWrapped = doc.splitTextToSize(auditFootnote, contentWidth)
+  doc.text(auditWrapped, margin, y)
+  return y + auditWrapped.length * 4
+}
+
+function formatApprovalMethod(method) {
+  if (!method) return ''
+  switch (String(method).toLowerCase()) {
+    case 'verbal':            return 'Verbal'
+    case 'text':              return 'Text message'
+    case 'email':             return 'Email'
+    case 'in_person':         return 'In person'
+    case 'signature_typed':   return 'Typed signature'
+    case 'signature_drawn':   return 'Drawn signature'
+    case 'esign_link':        return 'Customer e-signature link'
+    default:                  return String(method)
+  }
 }
 
 /* ============================================================
@@ -1206,25 +1330,38 @@ function drawTermsAndAcceptancePage(doc, ctx) {
     y += warrantyWrapped.length * PROPOSAL_BRAND.proseLineHeight + 10
   }
 
-  // READY TO START? + acceptance + signatures — keep block together
-  const acceptanceBlockHeight = 60
-  if (y + acceptanceBlockHeight > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
-    doc.addPage()
-    drawPageHeaderStrip(doc, ctx)
-    y = PROPOSAL_BRAND.pageTopBody
+  // Closing block — EITHER the acceptance + signatures (draft/sent
+  // proposal) OR the approval certificate (4C-3, when ctx.approval
+  // is set). Both blocks reserve their own height + auto-page-break
+  // so neither orphans on the bottom of a previous page.
+  if (ctx.approval) {
+    const certBlockHeight = 110
+    if (y + certBlockHeight > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
+      doc.addPage()
+      drawPageHeaderStrip(doc, ctx)
+      y = PROPOSAL_BRAND.pageTopBody
+    }
+    drawApprovalCertificate(doc, ctx, y)
+  } else {
+    const acceptanceBlockHeight = 60
+    if (y + acceptanceBlockHeight > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
+      doc.addPage()
+      drawPageHeaderStrip(doc, ctx)
+      y = PROPOSAL_BRAND.pageTopBody
+    }
+
+    y = drawSectionTitle(doc, margin, y, 'READY TO START?', PROPOSAL_BRAND.sectionH3)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(PROPOSAL_BRAND.acceptSize)
+    doc.setTextColor(...ONYX)
+    const acceptText = `Sign below to authorize ${ctx.companyName} to begin work under the scope and terms above. Change orders priced and signed before any out-of-scope work proceeds.`
+    const acceptWrapped = doc.splitTextToSize(acceptText, contentWidth)
+    doc.text(acceptWrapped, margin, y)
+    y += acceptWrapped.length * 5.6 + 16
+
+    drawSignatureBlock(doc, ctx, y)
   }
-
-  y = drawSectionTitle(doc, margin, y, 'READY TO START?', PROPOSAL_BRAND.sectionH3)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(PROPOSAL_BRAND.acceptSize)
-  doc.setTextColor(...ONYX)
-  const acceptText = `Sign below to authorize ${ctx.companyName} to begin work under the scope and terms above. Change orders priced and signed before any out-of-scope work proceeds.`
-  const acceptWrapped = doc.splitTextToSize(acceptText, contentWidth)
-  doc.text(acceptWrapped, margin, y)
-  y += acceptWrapped.length * 5.6 + 16
-
-  drawSignatureBlock(doc, ctx, y)
 }
 
 function drawSignatureBlock(doc, ctx, y) {

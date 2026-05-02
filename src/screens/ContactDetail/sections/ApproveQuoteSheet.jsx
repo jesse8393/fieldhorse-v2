@@ -6,6 +6,7 @@ import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { toastError, toastSuccess } from '../../../lib/toast.js'
 import { hapticStageChange } from '../../../lib/haptics.js'
 import { approveQuote as pipelineApproveQuote } from '../../../lib/pipeline.js'
+import { generateQuote } from '../../../lib/pdf.js'
 
 /**
  * Approve Quote sheet — Phase 4C-2.
@@ -142,11 +143,21 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
     setSubmitting(true)
     try {
+      // Full branding shape — matches what generateQuote() (4D-2C) reads.
+      // The snapshot stores only the 4 customer-visible fields below; the
+      // wider object is also passed to generateQuote at certificate time
+      // so the approved PDF carries the contractor's logo/accent/trust.
       const company = {
         name: profile?.company_name || profile?.full_name || 'My Company',
         address: profile?.company_address || '',
         phone: profile?.company_phone || '',
-        email: profile?.email || ''
+        email: profile?.company_email || profile?.email || '',
+        website: profile?.company_website || '',
+        logo_url: profile?.logo_url || null,
+        brand_accent_hex: profile?.brand_accent_hex || null,
+        license_number: profile?.license_number || '',
+        insured_text: profile?.insured_text || '',
+        warranty_default: profile?.warranty_default || ''
       }
 
       const snapshot = {
@@ -221,7 +232,11 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       // row, we refuse to advance stage or show success.
       const { data: confirmed, error: verifyErr } = await supabase
         .from('fh_quote_versions')
-        .select('id, contact_id, version_number, status, approved_by_name, base_total, approved_at')
+        .select(
+          'id, contact_id, version_number, status, approved_by_name, ' +
+          'approved_by_email, approval_method, approval_note, ' +
+          'base_total, approved_at, snapshot'
+        )
         .eq('id', versionRow.id)
         .eq('user_id', userId)
         .maybeSingle()
@@ -235,9 +250,31 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         throw new Error('Approval did not verify. Snapshot row was not found after save.')
       }
 
+      // Approval-stamped PDF archive (Phase 4C-3) — generate the
+      // approved variant, upload to job-files, insert fh_job_files row,
+      // and update fh_quote_versions.pdf_file_id. Wrapped: any failure
+      // becomes a toast suffix but does NOT roll back the approval. The
+      // snapshot row is the legal record; the PDF is an artifact.
+      let archiveNote = ''
+      try {
+        const archiveResult = await archiveApprovedPdf({
+          confirmed, snapshot, company, contact, userId
+        })
+        archiveNote = archiveResult.ok
+          ? ' · Saved to Files'
+          : ' · PDF archive failed'
+        if (!archiveResult.ok) {
+          console.warn('[approve-quote] archive failed:', archiveResult.error)
+        }
+      } catch (archiveErr) {
+        console.warn('[approve-quote] archive threw:', archiveErr)
+        archiveNote = ' · PDF archive failed'
+      }
+
       // Stage advance only runs after the snapshot is confirmed persisted
       // by a real SELECT. Failure here logs but does not unlock the
       // snapshot — proposal_status is already 'approved' on the server.
+      // Stage advance proceeds independently of PDF archive outcome.
       let stageNote = ''
       if (moveToJob) {
         try {
@@ -251,7 +288,10 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         }
       }
 
-      toastSuccess(`Quote approved${stageNote}`, `Locked snapshot v${confirmed.version_number} · ${money(totals.base)}`)
+      toastSuccess(
+        `Quote approved${archiveNote}${stageNote}`,
+        `Locked snapshot v${confirmed.version_number} · ${money(totals.base)}`
+      )
       onApproved?.()
       onClose?.()
     } catch (e) {
@@ -446,6 +486,99 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       )}
     </ActionSheet>
   )
+}
+
+/**
+ * Archive the approval-stamped proposal PDF (Phase 4C-3).
+ *
+ * Source of truth split:
+ *   - PDF body content (items, scope, terms, exclusions, expires_at,
+ *     quote_number) reads from the persisted `snapshot` JSONB. This is
+ *     the legal record of what was approved.
+ *   - Visual chrome (logo, brand accent, website, license, insured,
+ *     warranty) reads from current `company` profile because branding
+ *     is the contractor's identity, not a per-quote agreement.
+ *   - Approval metadata (version_number, approved_at, etc.) reads from
+ *     the `confirmed` row, never optimistic local state.
+ *
+ * Returns { ok: true, fileId } on full success, { ok: false, error }
+ * on any failure. Caller treats failure as a non-blocking warning;
+ * the snapshot stays approved either way.
+ */
+async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userId }) {
+  try {
+    const approval = {
+      versionNumber: confirmed.version_number,
+      quoteNumber: snapshot?.quote_number || null,
+      method: confirmed.approval_method,
+      approvedByName: confirmed.approved_by_name,
+      approvedByEmail: confirmed.approved_by_email || '',
+      approvalNote: confirmed.approval_note || '',
+      baseTotal: Number(confirmed.base_total || 0),
+      approvedAt: confirmed.approved_at
+    }
+
+    // Use snapshot for content; fall back to fresh inputs if any field
+    // is unexpectedly missing from the JSONB.
+    const result = await generateQuote({
+      company,
+      contact: snapshot?.contact || {
+        id: contact.id,
+        name: contact.name,
+        address: contact.address,
+        phone: contact.phone,
+        email: contact.email,
+        job_title: contact.job_title
+      },
+      items: Array.isArray(snapshot?.items) ? snapshot.items : [],
+      scope: snapshot?.scope_text || '',
+      terms: snapshot?.terms_text || '',
+      exclusions: snapshot?.exclusions_text || '',
+      expiresAt: snapshot?.quote_expires_at || null,
+      status: 'approved',
+      quoteId: contact.id,
+      approval
+    })
+    if (!result?.doc) return { ok: false, error: new Error('Generator returned no doc') }
+
+    const blob = result.doc.output('blob')
+    const rowId = crypto.randomUUID()
+    const safeName = (contact.name || 'client').replace(/\s+/g, '_')
+    const filename = `Approved_Quote_${approval.quoteNumber || result.number}_${safeName}_v${approval.versionNumber}.pdf`
+    const path = `${userId}/${contact.id}/${rowId}.pdf`
+
+    const { error: upErr } = await supabase.storage
+      .from('job-files')
+      .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+    if (upErr) return { ok: false, error: upErr }
+
+    const { error: insErr } = await supabase.from('fh_job_files').insert({
+      id: rowId,
+      user_id: userId,
+      job_id: contact.id,
+      filename,
+      storage_path: path,
+      mime_type: 'application/pdf',
+      size_bytes: blob.size || 0,
+      kind: 'file'
+    })
+    if (insErr) return { ok: false, error: insErr }
+
+    // Best-effort link the file to the version row. Failure here means
+    // the file lives in storage + Files tab but the version row's
+    // pointer is null — recoverable, low-impact.
+    const { error: linkErr } = await supabase.from('fh_quote_versions')
+      .update({ pdf_file_id: rowId })
+      .eq('id', confirmed.id)
+      .eq('user_id', userId)
+    if (linkErr) {
+      console.warn('[approve-quote] pdf_file_id link failed (file archived OK):', linkErr)
+    }
+
+    return { ok: true, fileId: rowId }
+  } catch (e) {
+    return { ok: false, error: e }
+  }
 }
 
 function shortDate(iso) {
