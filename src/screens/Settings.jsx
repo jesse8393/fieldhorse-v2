@@ -34,6 +34,16 @@ export default function Settings() {
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
+  // Customer-facing branding fields (migration 015). Empty strings save
+  // as null at submit time so downstream PDF code can use `is null`
+  // checks without trim/null-trim ambiguity.
+  const [companyPhone, setCompanyPhone] = useState(profile?.company_phone || '')
+  const [companyEmail, setCompanyEmail] = useState(profile?.company_email || '')
+  const [companyWebsite, setCompanyWebsite] = useState(profile?.company_website || '')
+  const [companyAddress, setCompanyAddress] = useState(profile?.company_address || '')
+  const [licenseNumber, setLicenseNumber] = useState(profile?.license_number || '')
+  const [insuredText, setInsuredText] = useState(profile?.insured_text || '')
+  const [warrantyDefault, setWarrantyDefault] = useState(profile?.warranty_default || '')
   // Dedupe on read — older onboarding flows wrote duplicates into
   // profile.services so the count shown ("24 picked") didn't match the
   // 12 visible chips. We persist the deduped version on next save.
@@ -78,6 +88,13 @@ export default function Settings() {
   useEffect(() => {
     setDisplayName(profile?.full_name || '')
     setCompanyName(profile?.company_name || '')
+    setCompanyPhone(profile?.company_phone || '')
+    setCompanyEmail(profile?.company_email || '')
+    setCompanyWebsite(profile?.company_website || '')
+    setCompanyAddress(profile?.company_address || '')
+    setLicenseNumber(profile?.license_number || '')
+    setInsuredText(profile?.insured_text || '')
+    setWarrantyDefault(profile?.warranty_default || '')
     setServices(Array.from(new Set((profile?.services || []).map((s) => String(s || '').trim()).filter(Boolean))))
   }, [profile])
 
@@ -94,7 +111,25 @@ export default function Settings() {
 
   async function save() {
     setSaving(true)
-    await upsertProfile({ company_name: companyName, services })
+    // Empty strings -> null so downstream PDF code can rely on `is null`
+    // checks. company_name keeps its existing trim-and-pass behavior so
+    // legacy callers (Invoices, Quote PDF) continue reading a non-null
+    // string even if the operator clears the input briefly.
+    const nullIfBlank = (s) => {
+      const t = (s || '').trim()
+      return t.length === 0 ? null : t
+    }
+    await upsertProfile({
+      company_name: companyName,
+      company_phone: nullIfBlank(companyPhone),
+      company_email: nullIfBlank(companyEmail),
+      company_website: nullIfBlank(companyWebsite),
+      company_address: nullIfBlank(companyAddress),
+      license_number: nullIfBlank(licenseNumber),
+      insured_text: nullIfBlank(insuredText),
+      warranty_default: nullIfBlank(warrantyDefault),
+      services
+    })
     refresh()
     setSaving(false)
     setSaved(true)
@@ -171,6 +206,93 @@ export default function Settings() {
               refresh()
             }}
           />
+        </div>
+      </Section>
+
+      {/* CUSTOMER-FACING DETAILS — Phase 4D-2A. Branding data the
+          contractor's clients see on quotes, invoices, and approval
+          certificates. Saved together via the bottom Save Changes bar. */}
+      <Section
+        variants={item}
+        title={<>Customer-facing <em>details.</em></>}
+        sub="What clients see on your proposals, invoices, and approvals."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <BrandField label="Company phone">
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={companyPhone}
+              onChange={(e) => setCompanyPhone(e.target.value)}
+              placeholder="(555) 555-0100"
+              style={brandInputStyle}
+            />
+          </BrandField>
+
+          <BrandField label="Company email">
+            <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={companyEmail}
+              onChange={(e) => setCompanyEmail(e.target.value)}
+              placeholder="hello@yourcompany.com"
+              style={brandInputStyle}
+            />
+          </BrandField>
+
+          <BrandField label="Company website">
+            <input
+              type="url"
+              inputMode="url"
+              autoComplete="url"
+              value={companyWebsite}
+              onChange={(e) => setCompanyWebsite(e.target.value)}
+              placeholder="yourcompany.com"
+              style={brandInputStyle}
+            />
+          </BrandField>
+
+          <BrandField label="Company address" hint="One line or several — used on cover pages.">
+            <textarea
+              rows={2}
+              value={companyAddress}
+              onChange={(e) => setCompanyAddress(e.target.value)}
+              placeholder="1234 Main St · Murfreesboro, TN 37130"
+              style={{ ...brandInputStyle, resize: 'vertical', lineHeight: 1.45 }}
+            />
+          </BrandField>
+
+          <BrandField label="License number">
+            <input
+              type="text"
+              value={licenseNumber}
+              onChange={(e) => setLicenseNumber(e.target.value)}
+              placeholder="GC-12345"
+              style={brandInputStyle}
+            />
+          </BrandField>
+
+          <BrandField label="Insurance / insured text" hint="Short line shown in proposal trust block.">
+            <input
+              type="text"
+              value={insuredText}
+              onChange={(e) => setInsuredText(e.target.value)}
+              placeholder="Insured · $2M general liability"
+              style={brandInputStyle}
+            />
+          </BrandField>
+
+          <BrandField label="Default warranty text" hint="Default workmanship warranty paragraph for new proposals.">
+            <textarea
+              rows={3}
+              value={warrantyDefault}
+              onChange={(e) => setWarrantyDefault(e.target.value)}
+              placeholder="One-year workmanship warranty on all installed labor. Manufacturer warranties pass through to the customer."
+              style={{ ...brandInputStyle, resize: 'vertical', lineHeight: 1.45 }}
+            />
+          </BrandField>
         </div>
       </Section>
 
@@ -427,4 +549,39 @@ function Meta({ label, value }) {
       <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{value}</span>
     </div>
   )
+}
+
+function BrandField({ label, hint, children }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+        textTransform: 'uppercase', color: 'var(--ink-muted)'
+      }}>
+        {label}
+      </span>
+      {children}
+      {hint && (
+        <span style={{
+          fontSize: 11, color: 'var(--ink-faint, var(--ink-muted))',
+          fontFamily: 'var(--font-body)', lineHeight: 1.4
+        }}>
+          {hint}
+        </span>
+      )}
+    </label>
+  )
+}
+
+const brandInputStyle = {
+  padding: '11px 14px',
+  borderRadius: 12,
+  background: 'var(--surface-2)',
+  border: '1px solid var(--rule)',
+  color: 'var(--ink-strong)',
+  fontFamily: 'var(--font-body)',
+  fontSize: 14,
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box'
 }
