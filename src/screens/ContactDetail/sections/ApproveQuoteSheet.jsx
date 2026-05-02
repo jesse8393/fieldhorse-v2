@@ -199,24 +199,45 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         p_signature_data: null
       })
       if (rpcErr) {
-        console.error('[approve-quote] RPC error:', rpcErr)
+        console.error('[approve-quote] RPC error:', { rpc: rpcErr })
         throw rpcErr
       }
 
       // Require a row with an id. supabase-js may return the composite
       // result either as a single object or wrapped in a one-element
       // array depending on PostgREST representation; tolerate both.
-      // If no id surfaces, the snapshot did NOT persist — refuse to
-      // advance stage or claim success.
       const versionRow = Array.isArray(rpcData) ? rpcData[0] : rpcData
       if (!versionRow || !versionRow.id) {
-        console.error('[approve-quote] RPC returned no row:', rpcData)
+        console.error('[approve-quote] RPC returned no row:', { rpc: rpcData })
         throw new Error('Approval did not save. Your snapshot was not created — check your connection and try again.')
       }
 
-      // Stage advance only runs after the snapshot is confirmed persisted.
-      // Failure here logs but does not unlock the snapshot — proposal_status
-      // is already 'approved' on the server via fn_approve_quote_version.
+      // Hard readback guard — the RPC's "success" claim is not enough.
+      // A second authenticated SELECT must find the row in
+      // fh_quote_versions filtered by id + user_id. This catches any
+      // case where supabase-js / PostgREST returned a phantom row that
+      // didn't actually persist (schema cache stub, transaction roll
+      // back, mismatched project, etc.). Until this read returns the
+      // row, we refuse to advance stage or show success.
+      const { data: confirmed, error: verifyErr } = await supabase
+        .from('fh_quote_versions')
+        .select('id, contact_id, version_number, status, approved_by_name, base_total, approved_at')
+        .eq('id', versionRow.id)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (verifyErr) {
+        console.error('[approve-quote] readback error:', { rpc: rpcData, verify: verifyErr })
+        throw verifyErr
+      }
+      if (!confirmed) {
+        console.error('[approve-quote] readback returned no row:', { rpc: rpcData, confirmed })
+        throw new Error('Approval did not verify. Snapshot row was not found after save.')
+      }
+
+      // Stage advance only runs after the snapshot is confirmed persisted
+      // by a real SELECT. Failure here logs but does not unlock the
+      // snapshot — proposal_status is already 'approved' on the server.
       let stageNote = ''
       if (moveToJob) {
         try {
@@ -230,7 +251,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         }
       }
 
-      toastSuccess(`Quote approved${stageNote}`, `Locked snapshot v${versionRow.version_number} · ${money(totals.base)}`)
+      toastSuccess(`Quote approved${stageNote}`, `Locked snapshot v${confirmed.version_number} · ${money(totals.base)}`)
       onApproved?.()
       onClose?.()
     } catch (e) {
