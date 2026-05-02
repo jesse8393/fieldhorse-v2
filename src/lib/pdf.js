@@ -4,6 +4,7 @@
 
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { loadLogoForPdf } from './pdfLogo.js'
 
 const FIELD_GOLD = [200, 161, 84]      // #C8A154
 const ONYX = [18, 18, 18]              // #121212
@@ -333,6 +334,36 @@ const PROPOSAL_BRAND = {
 }
 
 /**
+ * Parse `profile.brand_accent_hex` and return an [r, g, b] tuple
+ * suitable for jsPDF setFillColor / setDrawColor / setTextColor calls.
+ *
+ * Returns null when:
+ *   - input isn't `#RRGGBB` shape
+ *   - relative luminance > 0.6 (too light for chapter rules + 8mm cover
+ *     bars drawn on white paper). The doc has many gold-on-white moments
+ *     so we apply one threshold across the whole proposal — no split
+ *     dark-vs-light surface palette in v1.
+ *
+ * Caller falls back to FIELD_GOLD on null.
+ */
+function parseBrandAccentRgb(hex) {
+  if (!hex || typeof hex !== 'string') return null
+  const m = hex.match(/^#([0-9a-fA-F]{6})$/)
+  if (!m) return null
+  const r = parseInt(m[1].slice(0, 2), 16)
+  const g = parseInt(m[1].slice(2, 4), 16)
+  const b = parseInt(m[1].slice(4, 6), 16)
+  // WCAG relative luminance.
+  const lin = (c) => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  }
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+  if (L > 0.6) return null
+  return [r, g, b]
+}
+
+/**
  * Generate a premium proposal PDF from fh_quote_items + the customer-
  * facing prose blocks on fh_contacts.
  *
@@ -353,7 +384,7 @@ const PROPOSAL_BRAND = {
  * @param {string} opts.quoteId     contact id for number fingerprinting
  * @returns {{ doc: jsPDF, filename: string, number: string }}
  */
-export function generateQuote({
+export async function generateQuote({
   company = {},
   contact = {},
   items = [],
@@ -365,8 +396,17 @@ export function generateQuote({
   quoteId
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+
+  // Pre-load the contractor's logo (4D-2B). Returns null on missing URL,
+  // network failure, decode failure, or canvas taint — caller falls
+  // through to the typographic wordmark cascade. Cached per session by
+  // the helper so Preview / Download / Send share one fetch.
+  const logo = company?.logo_url
+    ? await loadLogoForPdf(company.logo_url, { maxDimension: 720 })
+    : null
+
   const ctx = buildProposalCtx({
-    doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId
+    doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId, logo
   })
 
   // === PAGE 1 — COVER (no header strip, no footer band) ===
@@ -407,7 +447,7 @@ export function generateQuote({
    resolved fallback strings, and the formatted number/date.
    ============================================================ */
 function buildProposalCtx({
-  doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId
+  doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId, logo
 }) {
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -427,6 +467,18 @@ function buildProposalCtx({
   const baseTotal = baseItems.reduce((s, i) => s + Number(i.amount || 0), 0)
   const optionalTotal = optionalItems.reduce((s, i) => s + Number(i.amount || 0), 0)
 
+  // Brand accent — use company.brand_accent_hex when valid + readable,
+  // otherwise FIELD_GOLD. Single decision applies everywhere gold draws
+  // (cover bars, chapter rules, hero label/money, table headers, etc).
+  const brandGold = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
+
+  // Trust line for cover bottom band — license + insured. Each piece
+  // optional; whole line suppressed when both are blank.
+  const trustParts = [
+    company?.license_number ? `License #${String(company.license_number).trim()}` : '',
+    company?.insured_text ? String(company.insured_text).trim() : ''
+  ].filter(Boolean)
+
   return {
     company,
     contact,
@@ -443,12 +495,18 @@ function buildProposalCtx({
     scope: scope && scope.trim() ? scope.trim() : '',
     terms: terms && terms.trim() ? terms.trim() : '',
     exclusions: exclusions && exclusions.trim() ? exclusions.trim() : '',
+    warranty: company?.warranty_default && String(company.warranty_default).trim()
+      ? String(company.warranty_default).trim()
+      : '',
     baseItems,
     optionalItems,
     excludedItems,
     baseTotal,
     optionalTotal,
-    companyName: company?.name || 'My Company'
+    companyName: company?.name || 'My Company',
+    logo: logo || null,
+    brandGold,
+    trustLine: trustParts.length > 0 ? trustParts.join(' · ').toUpperCase() : ''
   }
 }
 
@@ -462,10 +520,11 @@ function formatLongDate(d) {
    PAGE 1 — COVER
    ============================================================ */
 function drawCoverPage(doc, ctx) {
-  const { pageWidth, pageHeight, margin, companyName, contact } = ctx
+  const { pageWidth, pageHeight, margin, companyName, contact, brandGold, logo } = ctx
 
-  // Top + bottom full-bleed gold bars
-  doc.setFillColor(...FIELD_GOLD)
+  // Top + bottom full-bleed brand-accent bars (FIELD_GOLD when no
+  // accent set or accent is too light — see parseBrandAccentRgb)
+  doc.setFillColor(...brandGold)
   doc.rect(0, 0, pageWidth, PROPOSAL_BRAND.bandTopGold, 'F')
   doc.rect(0, pageHeight - PROPOSAL_BRAND.bandBottomGold, pageWidth, PROPOSAL_BRAND.bandBottomGold, 'F')
 
@@ -478,46 +537,47 @@ function drawCoverPage(doc, ctx) {
   doc.text(eyebrow, pageWidth / 2, 24, { align: 'center' })
   doc.setCharSpace(0)
 
-  // Company wordmark — fit-to-width cascade so long company names
-  // don't overflow the page edge. 28pt single line is the default;
-  // falls back to 22pt single, then 22pt wrapped to 2 lines max.
-  // Block midpoint stays anchored near y=70 so the contact line and
-  // the customer hero below never need to budge in tandem.
-  const wmText = (companyName || 'My Company').toUpperCase()
-  const wmAvail = pageWidth - margin * 2
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...ONYX)
-
-  doc.setFontSize(28)
-  let wmFontSize = 28
-  let wmLines = [wmText]
-  if (doc.getTextWidth(wmText) > wmAvail) {
-    doc.setFontSize(22)
-    wmFontSize = 22
-    if (doc.getTextWidth(wmText) > wmAvail) {
-      // Wrap at 22pt; cap at 2 lines so the cover never grows tall
-      wmLines = doc.splitTextToSize(wmText, wmAvail).slice(0, 2)
+  // Brand mark — logo image when available, else typographic wordmark.
+  // Either path leaves `markEndY` set so the contact line below sits
+  // a consistent 10mm under whatever rendered.
+  let markEndY
+  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
+    const maxW = 80
+    const maxH = 28
+    const aspect = logo.width / logo.height
+    let w = maxW
+    let h = w / aspect
+    if (h > maxH) {
+      h = maxH
+      w = h * aspect
     }
+    const x = (pageWidth - w) / 2
+    // Bottom edge at y=82 so contact line baseline at y=92 reads
+    // balanced regardless of logo aspect ratio.
+    const yLogo = 82 - h
+    try {
+      doc.addImage(logo.dataUrl, logo.format || 'PNG', x, yLogo, w, h)
+      markEndY = 82
+    } catch {
+      // Fall through to wordmark if jsPDF rejects the image bytes.
+      markEndY = drawWordmarkFallback(doc, ctx)
+    }
+  } else {
+    markEndY = drawWordmarkFallback(doc, ctx)
   }
-  doc.setFontSize(wmFontSize)
 
-  // Line height ≈ 0.36× point size in mm. 1-line block: baseline at
-  // y=70. 2-line block: baselines spaced lineGap apart, midpoint at 70.
-  const wmLineGap = wmFontSize * 0.36
-  const wmStartY = 70 - ((wmLines.length - 1) * wmLineGap) / 2
-  for (let i = 0; i < wmLines.length; i++) {
-    doc.text(wmLines[i], pageWidth / 2, wmStartY + i * wmLineGap, { align: 'center' })
-  }
-  const wmEndY = wmStartY + (wmLines.length - 1) * wmLineGap
-
-  // Company contact line under the wordmark — sits 10mm below the
-  // last wordmark baseline regardless of how many lines rendered.
-  const contactLine = [company0(ctx, 'phone'), company0(ctx, 'email')].filter(Boolean).join(' · ')
+  // Company contact line under the mark — phone, email, website joined
+  // by middle dot. Each piece optional; suppressed entirely when blank.
+  const contactLine = [
+    company0(ctx, 'phone'),
+    company0(ctx, 'email'),
+    company0(ctx, 'website')
+  ].filter(Boolean).join(' · ')
   if (contactLine) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(...INK_MUTED)
-    doc.text(contactLine, pageWidth / 2, wmEndY + 10, { align: 'center' })
+    doc.text(contactLine, pageWidth / 2, markEndY + 10, { align: 'center' })
   }
 
   // Vertical-center hero — PREPARED FOR + customer + PROJECT + title
@@ -551,12 +611,12 @@ function drawCoverPage(doc, ctx) {
     doc.text(titleLines, pageWidth / 2, y, { align: 'center' })
   }
 
-  // Bottom band — RAW_LINEN tint with valid-through + address
+  // Bottom band — RAW_LINEN tint with valid-through + address + trust
   const bandTop = pageHeight - PROPOSAL_BRAND.bandBottomGold - 60
   doc.setFillColor(...RAW_LINEN)
   doc.rect(0, bandTop, pageWidth, 60, 'F')
-  // Inner gold rule at top of band
-  doc.setDrawColor(...FIELD_GOLD)
+  // Inner brand-accent rule at top of band
+  doc.setDrawColor(...brandGold)
   doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
   doc.line(margin + 12, bandTop + 12, pageWidth - margin - 12, bandTop + 12)
 
@@ -590,6 +650,46 @@ function drawCoverPage(doc, ctx) {
     doc.setTextColor(...INK_MUTED)
     doc.text(ctx.company.address, pageWidth / 2, bandTop + 44, { align: 'center' })
   }
+
+  // Trust line — license number + insured text (when present). Sits
+  // below address as small caps to read as a credentials footnote.
+  if (ctx.trustLine) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.5)
+    doc.text(ctx.trustLine, pageWidth / 2, bandTop + 52, { align: 'center' })
+    doc.setCharSpace(0)
+  }
+}
+
+function drawWordmarkFallback(doc, ctx) {
+  // Used when company.logo_url is null OR loadLogoForPdf returns null
+  // (network failure, decode failure, canvas taint). Same fit-to-width
+  // cascade that 4D-1 polish landed: 28pt → 22pt single → 22pt 2-line.
+  const { pageWidth, margin, companyName } = ctx
+  const wmText = (companyName || 'My Company').toUpperCase()
+  const wmAvail = pageWidth - margin * 2
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...ONYX)
+
+  doc.setFontSize(28)
+  let wmFontSize = 28
+  let wmLines = [wmText]
+  if (doc.getTextWidth(wmText) > wmAvail) {
+    doc.setFontSize(22)
+    wmFontSize = 22
+    if (doc.getTextWidth(wmText) > wmAvail) {
+      wmLines = doc.splitTextToSize(wmText, wmAvail).slice(0, 2)
+    }
+  }
+  doc.setFontSize(wmFontSize)
+  const wmLineGap = wmFontSize * 0.36
+  const wmStartY = 70 - ((wmLines.length - 1) * wmLineGap) / 2
+  for (let i = 0; i < wmLines.length; i++) {
+    doc.text(wmLines[i], pageWidth / 2, wmStartY + i * wmLineGap, { align: 'center' })
+  }
+  return wmStartY + (wmLines.length - 1) * wmLineGap
 }
 
 function company0(ctx, key) {
@@ -601,9 +701,9 @@ function company0(ctx, key) {
    Pages 2+ — header strip
    ============================================================ */
 function drawPageHeaderStrip(doc, ctx) {
-  const { pageWidth, margin } = ctx
-  // Thin gold rule across the top
-  doc.setDrawColor(...FIELD_GOLD)
+  const { pageWidth, margin, brandGold } = ctx
+  // Thin brand-accent rule across the top
+  doc.setDrawColor(...brandGold)
   doc.setLineWidth(PROPOSAL_BRAND.headerStripGold)
   doc.line(0, 6, pageWidth, 6)
 
@@ -628,9 +728,12 @@ function drawProposalPageFooter(doc, ctx, pageNumber, totalPages) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(PROPOSAL_BRAND.footerSize)
   doc.setTextColor(...INK_MUTED)
-  const left = [ctx.companyName, company0(ctx, 'phone'), company0(ctx, 'email')]
-    .filter(Boolean)
-    .join(' · ')
+  const left = [
+    ctx.companyName,
+    company0(ctx, 'phone'),
+    company0(ctx, 'email'),
+    company0(ctx, 'website')
+  ].filter(Boolean).join(' · ')
   if (left) doc.text(left, margin, pageHeight - 8)
   doc.text(`Page ${pageNumber - 1} of ${totalPages - 1}`, pageWidth - margin, pageHeight - 8, { align: 'right' })
 }
@@ -654,7 +757,7 @@ function drawEyebrow(doc, x, y, label, color = INK_MUTED, opts = {}) {
 }
 
 function drawChapterRule(doc, ctx, y) {
-  doc.setDrawColor(...FIELD_GOLD)
+  doc.setDrawColor(...ctx.brandGold)
   doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
   doc.line(ctx.margin, y, ctx.pageWidth - ctx.margin, y)
   return y + 8
@@ -697,9 +800,9 @@ function drawProjectAndScopePage(doc, ctx) {
 
   const blockBottom = Math.max(yL, yR)
 
-  // Vertical gold divider between cols (drawn from top of names down to
-  // the longer column's bottom)
-  doc.setDrawColor(...FIELD_GOLD)
+  // Vertical brand-accent divider between cols (drawn from top of names
+  // down to the longer column's bottom)
+  doc.setDrawColor(...ctx.brandGold)
   doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
   doc.line(dividerX, y + 7, dividerX, blockBottom - 4)
 
@@ -780,7 +883,7 @@ function drawInvestmentPage(doc, ctx) {
     } else {
       y = drawChapterRule(doc, ctx, y)
     }
-    drawEyebrow(doc, margin, y, 'OPTIONAL ADD-ONS', FIELD_GOLD)
+    drawEyebrow(doc, margin, y, 'OPTIONAL ADD-ONS', ctx.brandGold)
     y += 6
     doc.setFont('helvetica', 'italic')
     doc.setFontSize(9)
@@ -793,20 +896,20 @@ function drawInvestmentPage(doc, ctx) {
 }
 
 function drawHeroPriceBand(doc, y, ctx) {
-  const { margin, contentWidth, pageWidth } = ctx
+  const { margin, contentWidth, pageWidth, brandGold } = ctx
   doc.setFillColor(...ONYX)
   doc.rect(margin, y, contentWidth, PROPOSAL_BRAND.heroBandHeight, 'F')
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
-  doc.setTextColor(...FIELD_GOLD)
+  doc.setTextColor(...brandGold)
   doc.setCharSpace(0.5)
   doc.text('QUOTED PRICE', margin + 8, y + 11)
   doc.setCharSpace(0)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(PROPOSAL_BRAND.heroMoneySize)
-  doc.setTextColor(...FIELD_GOLD)
+  doc.setTextColor(...brandGold)
   doc.text(money(ctx.baseTotal), margin + 8, y + 30)
 
   if (ctx.optionalTotal > 0) {
@@ -836,7 +939,7 @@ function drawProposalItemsTable(doc, startY, ctx, items, { isOptional }) {
         colSpan: 3,
         styles: {
           fillColor: ONYX,
-          textColor: FIELD_GOLD,
+          textColor: ctx.brandGold,
           fontStyle: 'bold',
           fontSize: 8.5,
           halign: 'left',
@@ -868,7 +971,7 @@ function drawProposalItemsTable(doc, startY, ctx, items, { isOptional }) {
     },
     headStyles: {
       fillColor: ONYX,
-      textColor: FIELD_GOLD,
+      textColor: ctx.brandGold,
       fontStyle: 'bold',
       fontSize: 9,
       cellPadding: { top: 3.5, right: 6, bottom: 3.5, left: 6 }
@@ -963,8 +1066,8 @@ function drawTermsAndAcceptancePage(doc, ctx) {
 
     const blockBottom = Math.max(yL, yR)
 
-    // Vertical gold divider
-    doc.setDrawColor(...FIELD_GOLD)
+    // Vertical brand-accent divider
+    doc.setDrawColor(...ctx.brandGold)
     doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
     doc.line(dividerX, y + 7, dividerX, blockBottom - 2)
 
@@ -995,6 +1098,24 @@ function drawTermsAndAcceptancePage(doc, ctx) {
   const termsWrapped = doc.splitTextToSize(termsBody, contentWidth)
   doc.text(termsWrapped, margin, y)
   y += termsWrapped.length * PROPOSAL_BRAND.proseLineHeight + 10
+
+  // WARRANTY — only when company.warranty_default is set. Optional and
+  // non-blocking; no fallback copy because every contractor's warranty
+  // is different and a generic line could create real liability.
+  if (ctx.warranty) {
+    if (y + 28 > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
+      doc.addPage()
+      drawPageHeaderStrip(doc, ctx)
+      y = PROPOSAL_BRAND.pageTopBody
+    }
+    y = drawSectionTitle(doc, margin, y, 'WARRANTY', PROPOSAL_BRAND.sectionH3)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(PROPOSAL_BRAND.bodySize)
+    doc.setTextColor(...ONYX)
+    const warrantyWrapped = doc.splitTextToSize(ctx.warranty, contentWidth)
+    doc.text(warrantyWrapped, margin, y)
+    y += warrantyWrapped.length * PROPOSAL_BRAND.proseLineHeight + 10
+  }
 
   // READY TO START? + acceptance + signatures — keep block together
   const acceptanceBlockHeight = 60

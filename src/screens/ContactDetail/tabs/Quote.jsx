@@ -39,7 +39,15 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
     phone: profile?.company_phone || '',
-    email: profile?.email || ''
+    // Prefer the customer-facing company_email (migration 015) over the
+    // operator's auth email so proposals show the public address.
+    email: profile?.company_email || profile?.email || '',
+    website: profile?.company_website || '',
+    logo_url: profile?.logo_url || null,
+    brand_accent_hex: profile?.brand_accent_hex || null,
+    license_number: profile?.license_number || '',
+    insured_text: profile?.insured_text || '',
+    warranty_default: profile?.warranty_default || ''
   }), [profile])
 
   // Base-item count drives the disabled state on the action bar. Keyed
@@ -85,7 +93,9 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     if (base.length === 0) {
       throw new Error('Add at least one base line item before generating a quote')
     }
-    const result = generateQuote({
+    // generateQuote() became async in 4D-2C — it pre-fetches the
+    // contractor's logo via loadLogoForPdf before rendering the cover.
+    const result = await generateQuote({
       company,
       contact: {
         id: contact.id,
