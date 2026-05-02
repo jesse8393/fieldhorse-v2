@@ -273,29 +273,83 @@ export function generateInvoice({
   }
 }
 
+/* ============================================================
+   PROPOSAL PDF — Phase 4D-1 redesign (premium 4-page proposal).
+
+   Pages:
+     1. Cover                — number + date eyebrow, company wordmark,
+                               PREPARED FOR / PROJECT hero, tinted band
+                               with valid-through line.
+     2. Project + Scope      — PREPARED FOR / PREPARED BY two-column,
+                               THE WORK section, scope_text body.
+     3. Investment           — THE INVESTMENT title, 40mm ONYX hero
+                               band with 40pt FIELD_GOLD money, base
+                               line items table (Item / Qty / Amount —
+                               Rate dropped from customer view), optional
+                               add-ons table when present.
+     4. Terms · Acceptance   — INCLUDED / EXCLUDED two-column (no red,
+                               gold/muted only), PAYMENT TERMS body,
+                               READY TO START? + acceptance paragraph,
+                               two large signature blocks.
+
+   Reuses the existing brand tokens. Helvetica only — custom font
+   embedding, logo image, project photos, and the approval stamp are
+   intentionally deferred to 4D-2/3/4 and resumed-4C-3.
+
+   downloadPdf() and generateInvoice() are untouched.
+============================================================ */
+
+const PROPOSAL_BRAND = {
+  marginX: 18,
+  pageTopBody: 30,
+  pageBottomGuard: 22,
+  bandTopGold: 8,
+  bandBottomGold: 8,
+  // Pages 2+ header strip
+  headerStripGold: 1.2,
+  headerStripBaseline: 18,
+  // Body line-height multiplier for prose at 11pt
+  proseLineHeight: 5.5,
+  // Hero price band
+  heroBandHeight: 40,
+  heroMoneySize: 40,
+  // Section title sizes
+  sectionH2: 18,
+  sectionH3: 16,
+  // Body sizes
+  bodySize: 11,
+  acceptSize: 12,
+  tableBodySize: 10,
+  // Eyebrow
+  eyebrowSize: 8.5,
+  // Footer
+  footerSize: 8,
+  // Signature underline
+  sigUnderlineWeight: 0.6,
+  sigUnderlineWidth: 60,
+  sigUnderlineGap: 18,
+  // Chapter rule
+  chapterRuleWeight: 0.4
+}
+
 /**
- * Generate a sendable quote / proposal PDF from fh_quote_items + the
- * customer-facing prose blocks on fh_contacts (Phase 4B-1 columns:
- * scope_text / terms_text / exclusions_text / quote_expires_at).
+ * Generate a premium proposal PDF from fh_quote_items + the customer-
+ * facing prose blocks on fh_contacts.
  *
- * Single-price model — one rate per line, totals come straight from
- * the live items. is_optional rows render in their own table tagged
- * "not included in base total"; is_excluded rows render in the
- * Exclusions section as a structured tail under any prose.
+ * Single-price line items. is_optional rows render in their own table
+ * on page 3 tagged "not included in the quoted price." is_excluded
+ * rows render as a bullet list in the EXCLUDED column on page 4.
  *
  * @param {object} opts
  * @param {object} opts.company     { name, address, phone, email }
  * @param {object} opts.contact     { id, name, address, phone, email, job_title }
  * @param {Array}  opts.items       fh_quote_items rows
- *                                  [{ section, description, qty, unit, rate,
- *                                     amount, notes, is_optional, is_excluded,
- *                                     sort_order }]
  * @param {string} opts.scope       scope_text (prose)
  * @param {string} opts.terms       terms_text (payment terms prose)
  * @param {string} opts.exclusions  exclusions_text (out-of-scope prose)
  * @param {string} opts.expiresAt   quote_expires_at ISO timestamp (or null)
- * @param {string} opts.status      proposal_status (display only — number /
- *                                  filename do not change with status)
+ * @param {string} opts.status      proposal_status (accepted; not yet
+ *                                  rendered — reserved for 4C-3 stamp)
  * @param {string} opts.quoteId     contact id for number fingerprinting
  * @returns {{ doc: jsPDF, filename: string, number: string }}
  */
@@ -311,312 +365,652 @@ export function generateQuote({
   quoteId
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const ctx = buildProposalCtx({
+    doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId
+  })
+
+  // === PAGE 1 — COVER (no header strip, no footer band) ===
+  drawCoverPage(doc, ctx)
+
+  // === PAGE 2 — PROJECT + SCOPE ===
+  doc.addPage()
+  drawPageHeaderStrip(doc, ctx)
+  drawProjectAndScopePage(doc, ctx)
+
+  // === PAGE 3 — INVESTMENT ===
+  doc.addPage()
+  drawPageHeaderStrip(doc, ctx)
+  drawInvestmentPage(doc, ctx)
+
+  // === PAGE 4 — TERMS · ACCEPTANCE ===
+  doc.addPage()
+  drawPageHeaderStrip(doc, ctx)
+  drawTermsAndAcceptancePage(doc, ctx)
+
+  // Final pass — total page count + footer on every page except the cover.
+  const total = doc.internal.getNumberOfPages()
+  for (let p = 2; p <= total; p++) {
+    doc.setPage(p)
+    drawProposalPageFooter(doc, ctx, p, total)
+  }
+
+  return {
+    doc,
+    filename: `Quote_${ctx.number}_${(contact?.name || 'client').replace(/\s+/g, '_')}.pdf`,
+    number: ctx.number
+  }
+}
+
+/* ============================================================
+   buildProposalCtx — computes the immutable render context once.
+   Carries pageWidth/Height, brand spacing, derived items / totals,
+   resolved fallback strings, and the formatted number/date.
+   ============================================================ */
+function buildProposalCtx({
+  doc, company, contact, items, scope, terms, exclusions, expiresAt, quoteId
+}) {
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   const number = invoiceNumber(quoteId || contact?.id).replace('FH-', 'FH-Q')
 
-  // Bucket items once. is_excluded wins over is_optional if both flags
-  // are accidentally set (defense-in-depth — UI mutual-exclusion already
-  // prevents this in QuoteItems.jsx).
-  const sortedItems = [...items].sort((a, b) => {
+  const sorted = [...(items || [])].sort((a, b) => {
     const ao = Number(a?.sort_order ?? 0)
     const bo = Number(b?.sort_order ?? 0)
-    return ao - bo
+    if (ao !== bo) return ao - bo
+    const ac = a?.created_at ? new Date(a.created_at).getTime() : 0
+    const bc = b?.created_at ? new Date(b.created_at).getTime() : 0
+    return ac - bc
   })
-  const baseItems = sortedItems.filter((i) => !i.is_excluded && !i.is_optional)
-  const optionalItems = sortedItems.filter((i) => !i.is_excluded && i.is_optional)
-  const excludedItems = sortedItems.filter((i) => i.is_excluded)
-
+  const baseItems = sorted.filter((i) => !i.is_excluded && !i.is_optional)
+  const optionalItems = sorted.filter((i) => !i.is_excluded && i.is_optional)
+  const excludedItems = sorted.filter((i) => i.is_excluded)
   const baseTotal = baseItems.reduce((s, i) => s + Number(i.amount || 0), 0)
   const optionalTotal = optionalItems.reduce((s, i) => s + Number(i.amount || 0), 0)
 
-  // Page-break helper — checks remaining vertical room and starts a
-  // new page if not enough. Returns the next y to use.
-  function ensureRoom(y, needed) {
-    if (y + needed > pageHeight - 22) {
-      doc.addPage()
-      return 20
-    }
-    return y
-  }
-
-  let y = drawHeader(doc, {
-    company,
-    documentType: 'Quote',
-    documentNumber: number,
-    date: today()
-  })
-
-  y = drawBillTo(doc, y, contact)
-
-  // Project + expiration line
-  if (contact?.job_title || expiresAt) {
-    if (contact?.job_title) {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.setTextColor(...INK_MUTED)
-      doc.text('PROJECT', 14, y)
-      y += 5
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(16)
-      doc.setTextColor(...ONYX)
-      const jobWrapped = doc.splitTextToSize(contact.job_title, pageWidth - 28)
-      doc.text(jobWrapped, 14, y)
-      y += jobWrapped.length * 6 + 2
-    }
-    if (expiresAt) {
-      const expDate = new Date(expiresAt)
-      const expValid = !Number.isNaN(expDate.getTime())
-      if (expValid) {
-        const isExpired = expDate.getTime() < Date.now()
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(8)
-        doc.setTextColor(...(isExpired ? ALERT_RED : INK_MUTED))
-        doc.text(isExpired ? 'EXPIRED' : 'VALID THROUGH', 14, y + 2)
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(10)
-        doc.setTextColor(...(isExpired ? ALERT_RED : ONYX))
-        doc.text(
-          expDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }),
-          50,
-          y + 2
-        )
-        y += 8
-      }
-    }
-    y += 4
-  }
-
-  // Scope of work
-  if (scope) {
-    y = ensureRoom(y, 24)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...INK_MUTED)
-    doc.text('SCOPE OF WORK', 14, y)
-    y += 5
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9.5)
-    doc.setTextColor(...ONYX)
-    const scopeWrapped = doc.splitTextToSize(scope, pageWidth - 28)
-    doc.text(scopeWrapped, 14, y)
-    y += scopeWrapped.length * 4.8 + 8
-  }
-
-  // Base line items table — Section / Description / Qty / Rate / Amount.
-  // autoTable handles row-level pagination automatically.
-  if (baseItems.length > 0) {
-    const rows = baseItems.map((i) => [
-      i.section || '',
-      [i.description || '', i.notes ? `(${i.notes})` : ''].filter(Boolean).join('\n'),
-      `${formatQty(i.qty)}${i.unit ? ' ' + i.unit : ''}`,
-      money(i.rate),
-      money(i.amount)
-    ])
-
-    autoTable(doc, {
-      startY: y,
-      head: [['Section', 'Description', 'Qty', 'Rate', 'Amount']],
-      body: rows,
-      theme: 'plain',
-      headStyles: {
-        fillColor: ONYX,
-        textColor: FIELD_GOLD,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: { top: 3, right: 4, bottom: 3, left: 4 }
-      },
-      bodyStyles: {
-        fontSize: 9,
-        textColor: ONYX,
-        cellPadding: { top: 3, right: 4, bottom: 3, left: 4 }
-      },
-      alternateRowStyles: { fillColor: RAW_LINEN },
-      columnStyles: {
-        0: { cellWidth: 26, fontStyle: 'bold', textColor: INK_MUTED },
-        1: { cellWidth: 'auto' },
-        2: { halign: 'right', cellWidth: 22 },
-        3: { halign: 'right', cellWidth: 26 },
-        4: { halign: 'right', cellWidth: 28, fontStyle: 'bold' }
-      },
-      margin: { left: 14, right: 14 }
-    })
-    y = doc.lastAutoTable.finalY + 8
-  }
-
-  // Total band — gold number on ONYX.
-  y = ensureRoom(y, 32)
-  doc.setFillColor(...ONYX)
-  doc.rect(14, y, pageWidth - 28, 28, 'F')
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...FIELD_GOLD)
-  doc.text('QUOTED PRICE', 20, y + 8)
-
-  doc.setFontSize(26)
-  doc.text(money(baseTotal), 20, y + 22)
-
-  if (optionalTotal > 0) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(...RAW_LINEN)
-    doc.text(
-      `Optional add-ons available: ${money(optionalTotal)}`,
-      pageWidth - 20,
-      y + 22,
-      { align: 'right' }
-    )
-  }
-  y += 36
-
-  // Optional add-ons table.
-  if (optionalItems.length > 0) {
-    y = ensureRoom(y, 28)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...FIELD_GOLD)
-    doc.text('OPTIONAL ADD-ONS', 14, y)
-    y += 5
-    doc.setFont('helvetica', 'italic')
-    doc.setFontSize(8)
-    doc.setTextColor(...INK_MUTED)
-    doc.text('Listed for reference. Not included in the quoted price above.', 14, y)
-    y += 4
-
-    const rows = optionalItems.map((i) => [
-      i.section || '',
-      [i.description || '', i.notes ? `(${i.notes})` : ''].filter(Boolean).join('\n'),
-      `${formatQty(i.qty)}${i.unit ? ' ' + i.unit : ''}`,
-      money(i.rate),
-      money(i.amount)
-    ])
-
-    autoTable(doc, {
-      startY: y,
-      head: [['Section', 'Add-on', 'Qty', 'Rate', 'Amount']],
-      body: rows,
-      theme: 'plain',
-      headStyles: {
-        fillColor: [60, 60, 60],
-        textColor: FIELD_GOLD,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: { top: 3, right: 4, bottom: 3, left: 4 }
-      },
-      bodyStyles: {
-        fontSize: 9,
-        textColor: ONYX,
-        cellPadding: { top: 3, right: 4, bottom: 3, left: 4 }
-      },
-      alternateRowStyles: { fillColor: RAW_LINEN },
-      columnStyles: {
-        0: { cellWidth: 26, fontStyle: 'bold', textColor: INK_MUTED },
-        1: { cellWidth: 'auto' },
-        2: { halign: 'right', cellWidth: 22 },
-        3: { halign: 'right', cellWidth: 26 },
-        4: { halign: 'right', cellWidth: 28, fontStyle: 'bold' }
-      },
-      margin: { left: 14, right: 14 }
-    })
-    y = doc.lastAutoTable.finalY + 8
-  }
-
-  // Exclusions — prose first, structured excluded items as a tail.
-  if (exclusions || excludedItems.length > 0) {
-    y = ensureRoom(y, 24)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...ALERT_RED)
-    doc.text('EXCLUSIONS', 14, y)
-    y += 5
-
-    if (exclusions) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9.5)
-      doc.setTextColor(...ONYX)
-      const wrapped = doc.splitTextToSize(exclusions, pageWidth - 28)
-      doc.text(wrapped, 14, y)
-      y += wrapped.length * 4.8 + 4
-    }
-
-    if (excludedItems.length > 0) {
-      doc.setFont('helvetica', 'italic')
-      doc.setFontSize(8.5)
-      doc.setTextColor(...INK_MUTED)
-      doc.text('Specifically excluded:', 14, y)
-      y += 4
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(...ONYX)
-      excludedItems.forEach((i) => {
-        const line = `• ${i.description || '—'}`
-        const wrapped = doc.splitTextToSize(line, pageWidth - 28)
-        y = ensureRoom(y, wrapped.length * 4.4 + 2)
-        doc.text(wrapped, 14, y)
-        y += wrapped.length * 4.4 + 1
-      })
-    }
-    y += 6
-  }
-
-  // Payment terms.
-  if (terms) {
-    y = ensureRoom(y, 24)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...INK_MUTED)
-    doc.text('PAYMENT TERMS', 14, y)
-    y += 5
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9.5)
-    doc.setTextColor(...ONYX)
-    const wrapped = doc.splitTextToSize(terms, pageWidth - 28)
-    doc.text(wrapped, 14, y)
-    y += wrapped.length * 4.8 + 8
-  }
-
-  // Acceptance + signature lines — keep the block together on one page.
-  y = ensureRoom(y, 50)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...INK_MUTED)
-  doc.text('ACCEPTANCE', 14, y)
-  y += 6
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...ONYX)
-  const acceptText = `Signed acceptance of this quote authorizes ${company?.name || 'the contractor'} to begin work under the scope and terms above. Change orders will be priced and signed before any out-of-scope work proceeds.`
-  const acceptWrapped = doc.splitTextToSize(acceptText, pageWidth - 28)
-  doc.text(acceptWrapped, 14, y)
-  y += acceptWrapped.length * 4.4 + 14
-
-  const sigWidth = (pageWidth - 28 - 20) / 2
-  doc.setDrawColor(...ONYX)
-  doc.setLineWidth(0.4)
-  doc.line(14, y, 14 + sigWidth, y)
-  doc.line(14 + sigWidth + 20, y, pageWidth - 14, y)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(...INK_MUTED)
-  doc.text('Client signature / date', 14, y + 4)
-  doc.text(`${company?.name || 'Contractor'} signature / date`, 14 + sigWidth + 20, y + 4)
-
-  drawFooter(doc, `${company?.name || 'Fieldhorse'} · Quote ${number}`)
-
   return {
-    doc,
-    filename: `Quote_${number}_${(contact?.name || 'client').replace(/\s+/g, '_')}.pdf`,
-    number
+    company,
+    contact,
+    pageWidth,
+    pageHeight,
+    margin: PROPOSAL_BRAND.marginX,
+    contentWidth: pageWidth - PROPOSAL_BRAND.marginX * 2,
+    number,
+    date: today(),
+    longDate: formatLongDate(new Date()),
+    expiresAt,
+    expiresAtLong: expiresAt ? formatLongDate(new Date(expiresAt)) : '',
+    expiresAtIsExpired: expiresAt ? new Date(expiresAt).getTime() < Date.now() : false,
+    scope: scope && scope.trim() ? scope.trim() : '',
+    terms: terms && terms.trim() ? terms.trim() : '',
+    exclusions: exclusions && exclusions.trim() ? exclusions.trim() : '',
+    baseItems,
+    optionalItems,
+    excludedItems,
+    baseTotal,
+    optionalTotal,
+    companyName: company?.name || 'My Company'
   }
 }
 
-// Quantities render as integers when whole, two decimals otherwise.
-// Operators carry mixed units (1 lot, 480 sf, 12.5 hr) and trailing
-// .00 on whole counts looks cluttered.
-function formatQty(n) {
+function formatLongDate(d) {
+  const dt = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(dt.getTime())) return ''
+  return dt.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+/* ============================================================
+   PAGE 1 — COVER
+   ============================================================ */
+function drawCoverPage(doc, ctx) {
+  const { pageWidth, pageHeight, margin, companyName, contact } = ctx
+
+  // Top + bottom full-bleed gold bars
+  doc.setFillColor(...FIELD_GOLD)
+  doc.rect(0, 0, pageWidth, PROPOSAL_BRAND.bandTopGold, 'F')
+  doc.rect(0, pageHeight - PROPOSAL_BRAND.bandBottomGold, pageWidth, PROPOSAL_BRAND.bandBottomGold, 'F')
+
+  // Eyebrow line — number + date in micro-caps, centered
+  const eyebrow = `PROPOSAL · NO. ${ctx.number} · ${ctx.longDate.toUpperCase()}`
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.5)
+  doc.text(eyebrow, pageWidth / 2, 24, { align: 'center' })
+  doc.setCharSpace(0)
+
+  // Company wordmark — large, centered
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(28)
+  doc.setTextColor(...ONYX)
+  doc.text((companyName || 'My Company').toUpperCase(), pageWidth / 2, 70, { align: 'center' })
+
+  // Company contact line under wordmark — small, muted
+  const contactLine = [company0(ctx, 'phone'), company0(ctx, 'email')].filter(Boolean).join(' · ')
+  if (contactLine) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...INK_MUTED)
+    doc.text(contactLine, pageWidth / 2, 80, { align: 'center' })
+  }
+
+  // Vertical-center hero — PREPARED FOR + customer + PROJECT + title
+  let y = 130
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.5)
+  doc.text('PREPARED FOR', pageWidth / 2, y, { align: 'center' })
+  doc.setCharSpace(0)
+  y += 7
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  doc.setTextColor(...ONYX)
+  doc.text(contact?.name || 'Valued Client', pageWidth / 2, y, { align: 'center' })
+
+  if (contact?.job_title) {
+    y += 14
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.5)
+    doc.text('PROJECT', pageWidth / 2, y, { align: 'center' })
+    doc.setCharSpace(0)
+    y += 10
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(32)
+    doc.setTextColor(...ONYX)
+    const titleWrapped = doc.splitTextToSize(contact.job_title, pageWidth - margin * 2 - 10)
+    const titleLines = titleWrapped.slice(0, 2)
+    doc.text(titleLines, pageWidth / 2, y, { align: 'center' })
+  }
+
+  // Bottom band — RAW_LINEN tint with valid-through + address
+  const bandTop = pageHeight - PROPOSAL_BRAND.bandBottomGold - 60
+  doc.setFillColor(...RAW_LINEN)
+  doc.rect(0, bandTop, pageWidth, 60, 'F')
+  // Inner gold rule at top of band
+  doc.setDrawColor(...FIELD_GOLD)
+  doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
+  doc.line(margin + 12, bandTop + 12, pageWidth - margin - 12, bandTop + 12)
+
+  // Valid-through line
+  if (ctx.expiresAtLong) {
+    if (ctx.expiresAtIsExpired) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+      doc.setTextColor(...ALERT_RED)
+      doc.setCharSpace(0.5)
+      doc.text('EXPIRED', pageWidth / 2, bandTop + 24, { align: 'center' })
+      doc.setCharSpace(0)
+    } else {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+      doc.setTextColor(...INK_MUTED)
+      doc.setCharSpace(0.5)
+      doc.text('VALID THROUGH', pageWidth / 2, bandTop + 22, { align: 'center' })
+      doc.setCharSpace(0)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      doc.setTextColor(...ONYX)
+      doc.text(ctx.expiresAtLong, pageWidth / 2, bandTop + 30, { align: 'center' })
+    }
+  }
+
+  // Company address line
+  if (ctx.company?.address) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...INK_MUTED)
+    doc.text(ctx.company.address, pageWidth / 2, bandTop + 44, { align: 'center' })
+  }
+}
+
+function company0(ctx, key) {
+  const v = ctx?.company?.[key]
+  return v && String(v).trim() ? String(v).trim() : ''
+}
+
+/* ============================================================
+   Pages 2+ — header strip
+   ============================================================ */
+function drawPageHeaderStrip(doc, ctx) {
+  const { pageWidth, margin } = ctx
+  // Thin gold rule across the top
+  doc.setDrawColor(...FIELD_GOLD)
+  doc.setLineWidth(PROPOSAL_BRAND.headerStripGold)
+  doc.line(0, 6, pageWidth, 6)
+
+  // Left meta — proposal number
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.5)
+  doc.text(`PROPOSAL · NO. ${ctx.number}`, margin, PROPOSAL_BRAND.headerStripBaseline)
+  // Right meta — company name (filled in real footer; here keep silent so
+  // page-of-N count lands at the bottom only)
+  doc.text((ctx.companyName || '').toUpperCase(), pageWidth - margin, PROPOSAL_BRAND.headerStripBaseline, { align: 'right' })
+  doc.setCharSpace(0)
+}
+
+function drawProposalPageFooter(doc, ctx, pageNumber, totalPages) {
+  const { pageWidth, pageHeight, margin } = ctx
+  doc.setDrawColor(220, 215, 205)
+  doc.setLineWidth(0.2)
+  doc.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(PROPOSAL_BRAND.footerSize)
+  doc.setTextColor(...INK_MUTED)
+  const left = [ctx.companyName, company0(ctx, 'phone'), company0(ctx, 'email')]
+    .filter(Boolean)
+    .join(' · ')
+  if (left) doc.text(left, margin, pageHeight - 8)
+  doc.text(`Page ${pageNumber - 1} of ${totalPages - 1}`, pageWidth - margin, pageHeight - 8, { align: 'right' })
+}
+
+function drawSectionTitle(doc, x, y, label, size = PROPOSAL_BRAND.sectionH2) {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(size)
+  doc.setTextColor(...ONYX)
+  doc.text(label, x, y)
+  return y + size * 0.45 + 8
+}
+
+function drawEyebrow(doc, x, y, label, color = INK_MUTED, opts = {}) {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+  doc.setTextColor(...color)
+  doc.setCharSpace(0.5)
+  doc.text(label, x, y, opts)
+  doc.setCharSpace(0)
+  return y + 5
+}
+
+function drawChapterRule(doc, ctx, y) {
+  doc.setDrawColor(...FIELD_GOLD)
+  doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
+  doc.line(ctx.margin, y, ctx.pageWidth - ctx.margin, y)
+  return y + 8
+}
+
+/* ============================================================
+   PAGE 2 — Project + Scope
+   ============================================================ */
+function drawProjectAndScopePage(doc, ctx) {
+  const { contact, company, margin, contentWidth } = ctx
+  let y = PROPOSAL_BRAND.pageTopBody
+
+  // PREPARED FOR / PREPARED BY two-column block
+  const colWidth = (contentWidth - 12) / 2
+  const leftX = margin
+  const rightX = margin + colWidth + 12
+  const dividerX = margin + colWidth + 6
+
+  drawEyebrow(doc, leftX, y, 'PREPARED FOR')
+  drawEyebrow(doc, rightX, y, 'PREPARED BY')
+
+  let yL = y + 7
+  let yR = y + 7
+
+  // Left column
+  yL = drawPartyBlock(doc, leftX, yL, {
+    name: contact?.name || 'Valued Client',
+    address: contact?.address,
+    phone: contact?.phone,
+    email: contact?.email
+  }, colWidth)
+
+  // Right column
+  yR = drawPartyBlock(doc, rightX, yR, {
+    name: company?.name || 'My Company',
+    address: company?.address,
+    phone: company?.phone,
+    email: company?.email
+  }, colWidth)
+
+  const blockBottom = Math.max(yL, yR)
+
+  // Vertical gold divider between cols (drawn from top of names down to
+  // the longer column's bottom)
+  doc.setDrawColor(...FIELD_GOLD)
+  doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
+  doc.line(dividerX, y + 7, dividerX, blockBottom - 4)
+
+  y = blockBottom + 6
+  y = drawChapterRule(doc, ctx, y)
+
+  // THE WORK
+  y = drawSectionTitle(doc, margin, y + 6, 'THE WORK')
+
+  // Scope body (or fallback)
+  const scopeBody = ctx.scope ||
+    "We'll cover the full scope of this project as described in the line items on the next page."
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(PROPOSAL_BRAND.bodySize)
+  doc.setTextColor(...ONYX)
+  const wrapped = doc.splitTextToSize(scopeBody, contentWidth)
+  // Page-aware multi-line (auto-flow if scope is huge)
+  for (const line of wrapped) {
+    if (y > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
+      doc.addPage()
+      drawPageHeaderStrip(doc, ctx)
+      y = PROPOSAL_BRAND.pageTopBody
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(PROPOSAL_BRAND.bodySize)
+      doc.setTextColor(...ONYX)
+    }
+    doc.text(line, margin, y)
+    y += PROPOSAL_BRAND.proseLineHeight
+  }
+}
+
+function drawPartyBlock(doc, x, y, party, width) {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(...ONYX)
+  const nameLines = doc.splitTextToSize(party.name || '—', width - 4)
+  doc.text(nameLines, x, y)
+  y += nameLines.length * 5
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(...INK_MUTED)
+  for (const line of [party.address, party.phone, party.email].filter(Boolean)) {
+    const wrapped = doc.splitTextToSize(line, width - 4)
+    doc.text(wrapped, x, y)
+    y += wrapped.length * 4.6
+  }
+  return y
+}
+
+/* ============================================================
+   PAGE 3 — Investment
+   ============================================================ */
+function drawInvestmentPage(doc, ctx) {
+  const { margin, pageWidth, contentWidth } = ctx
+  let y = PROPOSAL_BRAND.pageTopBody
+
+  y = drawSectionTitle(doc, margin, y, 'THE INVESTMENT')
+  y += 4
+
+  // Hero price band
+  drawHeroPriceBand(doc, y, ctx)
+  y += PROPOSAL_BRAND.heroBandHeight + 8
+
+  // Base line items table
+  if (ctx.baseItems.length > 0) {
+    drawProposalItemsTable(doc, y, ctx, ctx.baseItems, { isOptional: false })
+    y = doc.lastAutoTable.finalY + 10
+  }
+
+  // Optional add-ons
+  if (ctx.optionalItems.length > 0) {
+    // Chapter break
+    if (y + 60 > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
+      doc.addPage()
+      drawPageHeaderStrip(doc, ctx)
+      y = PROPOSAL_BRAND.pageTopBody
+    } else {
+      y = drawChapterRule(doc, ctx, y)
+    }
+    drawEyebrow(doc, margin, y, 'OPTIONAL ADD-ONS', FIELD_GOLD)
+    y += 6
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(9)
+    doc.setTextColor(...INK_MUTED)
+    doc.text('Listed for reference. Not included in the quoted price.', margin, y)
+    y += 5
+    drawProposalItemsTable(doc, y, ctx, ctx.optionalItems, { isOptional: true })
+    y = doc.lastAutoTable.finalY + 8
+  }
+}
+
+function drawHeroPriceBand(doc, y, ctx) {
+  const { margin, contentWidth, pageWidth } = ctx
+  doc.setFillColor(...ONYX)
+  doc.rect(margin, y, contentWidth, PROPOSAL_BRAND.heroBandHeight, 'F')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(PROPOSAL_BRAND.eyebrowSize)
+  doc.setTextColor(...FIELD_GOLD)
+  doc.setCharSpace(0.5)
+  doc.text('QUOTED PRICE', margin + 8, y + 11)
+  doc.setCharSpace(0)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(PROPOSAL_BRAND.heroMoneySize)
+  doc.setTextColor(...FIELD_GOLD)
+  doc.text(money(ctx.baseTotal), margin + 8, y + 30)
+
+  if (ctx.optionalTotal > 0) {
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(8.5)
+    doc.setTextColor(...RAW_LINEN)
+    doc.text(
+      `Optional add-ons available · ${money(ctx.optionalTotal)}`,
+      pageWidth - margin - 8,
+      y + PROPOSAL_BRAND.heroBandHeight - 6,
+      { align: 'right' }
+    )
+  }
+}
+
+function drawProposalItemsTable(doc, startY, ctx, items, { isOptional }) {
+  // Build the body rows. When the section name changes between rows,
+  // emit a section divider row before the item row. Description and
+  // notes are stacked inside the Item cell using \n-separated lines.
+  const body = []
+  let lastSection = null
+  for (const i of items) {
+    const sec = (i.section || '').trim()
+    if (sec && sec.toUpperCase() !== (lastSection || '').toUpperCase()) {
+      body.push([{
+        content: sec.toUpperCase(),
+        colSpan: 3,
+        styles: {
+          fillColor: ONYX,
+          textColor: FIELD_GOLD,
+          fontStyle: 'bold',
+          fontSize: 8.5,
+          halign: 'left',
+          cellPadding: { top: 2.5, right: 6, bottom: 2.5, left: 6 }
+        }
+      }])
+      lastSection = sec
+    } else if (!sec && lastSection !== null) {
+      // Item without a section after a sectioned run — stop printing
+      // section context (next section'd item will re-emit a divider).
+      lastSection = null
+    }
+
+    const desc = (i.description || '').trim()
+    const noteLine = i.notes && String(i.notes).trim() ? `(${String(i.notes).trim()})` : ''
+    const itemCell = [desc, noteLine].filter(Boolean).join('\n')
+    const qtyCell = `${formatProposalQty(i.qty)}${i.unit ? ' ' + i.unit : ''}`.trim()
+    body.push([itemCell, qtyCell, money(i.amount)])
+  }
+
+  autoTable(doc, {
+    startY,
+    head: [['Item', 'Qty', 'Amount']],
+    body,
+    theme: 'plain',
+    styles: {
+      fontSize: PROPOSAL_BRAND.tableBodySize,
+      cellPadding: { top: 4, right: 6, bottom: 4, left: 6 }
+    },
+    headStyles: {
+      fillColor: ONYX,
+      textColor: FIELD_GOLD,
+      fontStyle: 'bold',
+      fontSize: 9,
+      cellPadding: { top: 3.5, right: 6, bottom: 3.5, left: 6 }
+    },
+    bodyStyles: {
+      textColor: ONYX,
+      lineWidth: 0
+    },
+    alternateRowStyles: {
+      fillColor: RAW_LINEN
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { halign: 'right', cellWidth: 26 },
+      2: { halign: 'right', cellWidth: 32, fontStyle: 'bold' }
+    },
+    margin: { left: ctx.margin, right: ctx.margin },
+    didDrawPage: () => {
+      // autoTable redraws head on each new page; ensure the page header
+      // strip lands on every spilled page too.
+      const pageNumber = doc.internal.getCurrentPageInfo().pageNumber
+      if (pageNumber !== 1) drawPageHeaderStrip(doc, ctx)
+    }
+  })
+}
+
+function formatProposalQty(n) {
   const num = Number(n || 0)
   if (!Number.isFinite(num)) return '—'
   return Number.isInteger(num) ? String(num) : num.toFixed(2)
+}
+
+/* ============================================================
+   PAGE 4 — Terms · Exclusions · Acceptance
+   ============================================================ */
+function drawTermsAndAcceptancePage(doc, ctx) {
+  const { margin, pageWidth, contentWidth } = ctx
+  let y = PROPOSAL_BRAND.pageTopBody
+
+  // Dual-column INCLUDED · EXCLUDED
+  const hasExcluded = ctx.exclusions || ctx.excludedItems.length > 0
+
+  y = drawSectionTitle(doc, margin, y, hasExcluded ? "WHAT'S INCLUDED · WHAT'S EXCLUDED" : "WHAT'S INCLUDED", PROPOSAL_BRAND.sectionH3)
+  y += 4
+
+  if (hasExcluded) {
+    // 60/40 split
+    const leftWidth = (contentWidth - 12) * 0.6
+    const rightWidth = (contentWidth - 12) * 0.4
+    const leftX = margin
+    const rightX = margin + leftWidth + 12
+    const dividerX = margin + leftWidth + 6
+
+    drawEyebrow(doc, leftX, y, 'INCLUDED')
+    drawEyebrow(doc, rightX, y, 'EXCLUDED')
+    let yL = y + 7
+    let yR = y + 7
+
+    // Left — short summary of what's included
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(PROPOSAL_BRAND.bodySize)
+    doc.setTextColor(...ONYX)
+    const includedText = "All work and materials described in The Work on Page 2 and itemized in the line items on Page 3."
+    const incWrapped = doc.splitTextToSize(includedText, leftWidth - 4)
+    doc.text(incWrapped, leftX, yL)
+    yL += incWrapped.length * PROPOSAL_BRAND.proseLineHeight
+
+    // Right — exclusions prose + structured items
+    if (ctx.exclusions) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(...ONYX)
+      const exWrapped = doc.splitTextToSize(ctx.exclusions, rightWidth - 4)
+      doc.text(exWrapped, rightX, yR)
+      yR += exWrapped.length * 4.8 + 4
+    }
+    if (ctx.excludedItems.length > 0) {
+      if (ctx.exclusions) {
+        // Small visual gap between prose and bullet list
+        yR += 1
+      }
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(...ONYX)
+      for (const i of ctx.excludedItems) {
+        const line = `• ${i.description || '—'}`
+        const wrapped = doc.splitTextToSize(line, rightWidth - 4)
+        doc.text(wrapped, rightX, yR)
+        yR += wrapped.length * 4.6
+      }
+    }
+
+    const blockBottom = Math.max(yL, yR)
+
+    // Vertical gold divider
+    doc.setDrawColor(...FIELD_GOLD)
+    doc.setLineWidth(PROPOSAL_BRAND.chapterRuleWeight)
+    doc.line(dividerX, y + 7, dividerX, blockBottom - 2)
+
+    y = blockBottom + 6
+  } else {
+    // Single column — INCLUDED only
+    drawEyebrow(doc, margin, y, 'INCLUDED')
+    let yC = y + 7
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(PROPOSAL_BRAND.bodySize)
+    doc.setTextColor(...ONYX)
+    const includedText = "All work and materials described in The Work on Page 2 and itemized in the line items on Page 3."
+    const incWrapped = doc.splitTextToSize(includedText, contentWidth)
+    doc.text(incWrapped, margin, yC)
+    yC += incWrapped.length * PROPOSAL_BRAND.proseLineHeight
+    y = yC + 6
+  }
+
+  y = drawChapterRule(doc, ctx, y)
+
+  // PAYMENT TERMS
+  y = drawSectionTitle(doc, margin, y + 4, 'PAYMENT TERMS', PROPOSAL_BRAND.sectionH3)
+  const termsBody = ctx.terms ||
+    "Standard payment terms apply. Deposit due on signing, balance on completion. Workmanship warranty per local code. Change orders priced and signed before any out-of-scope work proceeds."
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(PROPOSAL_BRAND.bodySize)
+  doc.setTextColor(...ONYX)
+  const termsWrapped = doc.splitTextToSize(termsBody, contentWidth)
+  doc.text(termsWrapped, margin, y)
+  y += termsWrapped.length * PROPOSAL_BRAND.proseLineHeight + 10
+
+  // READY TO START? + acceptance + signatures — keep block together
+  const acceptanceBlockHeight = 60
+  if (y + acceptanceBlockHeight > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
+    doc.addPage()
+    drawPageHeaderStrip(doc, ctx)
+    y = PROPOSAL_BRAND.pageTopBody
+  }
+
+  y = drawSectionTitle(doc, margin, y, 'READY TO START?', PROPOSAL_BRAND.sectionH3)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(PROPOSAL_BRAND.acceptSize)
+  doc.setTextColor(...ONYX)
+  const acceptText = `Sign below to authorize ${ctx.companyName} to begin work under the scope and terms above. Change orders priced and signed before any out-of-scope work proceeds.`
+  const acceptWrapped = doc.splitTextToSize(acceptText, contentWidth)
+  doc.text(acceptWrapped, margin, y)
+  y += acceptWrapped.length * 5.6 + 16
+
+  drawSignatureBlock(doc, ctx, y)
+}
+
+function drawSignatureBlock(doc, ctx, y) {
+  const { margin, pageWidth } = ctx
+  const each = PROPOSAL_BRAND.sigUnderlineWidth
+  const gap = PROPOSAL_BRAND.sigUnderlineGap
+  const totalWidth = each * 2 + gap
+  const startX = margin + (ctx.contentWidth - totalWidth) / 2
+
+  doc.setDrawColor(...ONYX)
+  doc.setLineWidth(PROPOSAL_BRAND.sigUnderlineWeight)
+  doc.line(startX, y, startX + each, y)
+  doc.line(startX + each + gap, y, startX + each * 2 + gap, y)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...INK_MUTED)
+  doc.text('Customer signature & date', startX, y + 5)
+  doc.text(
+    `${ctx.companyName} signature & date`,
+    startX + each + gap,
+    y + 5
+  )
 }
 
 /**
