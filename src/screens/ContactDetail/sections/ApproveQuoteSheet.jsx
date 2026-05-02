@@ -345,7 +345,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
           color: 'var(--v3-text)'
         }}>
-          Approval saves a permanent record of these items, scope, terms, and total. Edits made later won't change what was approved.
+          This creates the approved quote snapshot — a permanent record of what the customer agreed to. Different from sending the PDF (Send Quote). Edits made later won't change what was approved.
         </span>
       </div>
 

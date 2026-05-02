@@ -25,6 +25,18 @@ import { SkeletonList } from '../../../components/Skeleton.jsx'
 
 const SECTION_SUGGESTIONS = ['Labor', 'Materials', 'Subs', 'Equipment', 'Other']
 
+// Mobile keyboard fix — when an input gains focus, the soft keyboard
+// commonly covers the active field on phones. Defer the scroll until
+// the keyboard has had a moment to appear, then center the input in
+// the visible viewport. No-op on desktop (already-visible inputs ignore
+// scrollIntoView). Used on every DraftCard input + textarea.
+function scrollIntoCenterOnFocus(e) {
+  const el = e.currentTarget
+  setTimeout(() => {
+    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
+  }, 250)
+}
+
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 2
@@ -641,6 +653,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
           type="text"
           value={draft.description}
           onChange={(e) => onChange('description', e.target.value)}
+          onFocus={scrollIntoCenterOnFocus}
           placeholder="What's this line for?"
           style={inputStyle}
         />
@@ -657,6 +670,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
             type="text"
             value={draft.section}
             onChange={(e) => onChange('section', e.target.value)}
+            onFocus={scrollIntoCenterOnFocus}
             list="quote-section-suggestions"
             placeholder="Materials, Labor…"
             style={inputStyle}
@@ -673,6 +687,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
             step="any"
             value={draft.qty}
             onChange={(e) => onChange('qty', e.target.value)}
+            onFocus={scrollIntoCenterOnFocus}
             style={inputStyle}
           />
         </FormField>
@@ -681,6 +696,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
             type="text"
             value={draft.unit}
             onChange={(e) => onChange('unit', e.target.value)}
+            onFocus={scrollIntoCenterOnFocus}
             placeholder="ea, hr, sf…"
             style={inputStyle}
           />
@@ -693,6 +709,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
             step="any"
             value={draft.rate}
             onChange={(e) => onChange('rate', e.target.value)}
+            onFocus={scrollIntoCenterOnFocus}
             style={inputStyle}
           />
         </FormField>
@@ -703,6 +720,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
             step="any"
             value={draft.amount}
             onChange={(e) => onChange('amount', e.target.value)}
+            onFocus={scrollIntoCenterOnFocus}
             style={inputStyle}
           />
         </FormField>
@@ -714,6 +732,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
           type="text"
           value={draft.notes}
           onChange={(e) => onChange('notes', e.target.value)}
+          onFocus={scrollIntoCenterOnFocus}
           placeholder="Optional"
           style={inputStyle}
         />
@@ -846,7 +865,11 @@ const inputStyle = {
   fontFamily: 'var(--font-body)',
   fontSize: 14,
   outline: 'none',
-  fontVariantNumeric: 'tabular-nums'
+  fontVariantNumeric: 'tabular-nums',
+  // Mobile keyboard defense — when the browser auto-scroll-into-view
+  // fires on focus, scroll-margin tells it to leave keyboard room
+  // below the field. Companion to scrollIntoCenterOnFocus().
+  scrollMarginBottom: 320
 }
 
 function Stat({ label, value, tone = 'default' }) {

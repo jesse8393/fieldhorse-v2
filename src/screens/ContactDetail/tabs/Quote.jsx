@@ -195,7 +195,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 32px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 120px' }}>
       <StatusPill status={status} />
 
       <QuoteItemsSection
@@ -288,7 +288,7 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
 
   const helper = baseCount === 0
     ? 'Add at least one base line item to enable approval.'
-    : 'Approval saves a permanent record of the items, scope, terms, and total. Edits made later won\'t change what was approved.'
+    : 'Locks the customer-approved quote as a permanent snapshot. Different from sending the PDF — use this when the customer says yes.'
 
   return (
     <div style={{
@@ -349,7 +349,7 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
 function ActionBar({ baseCount, busy, disabled, onPreview, onDownload, onSend }) {
   const helperLine = baseCount === 0
     ? 'Add at least one base line item to enable Send Quote.'
-    : 'Optional and excluded items appear on the PDF for reference but are not included in the quoted base total.'
+    : 'Generates the proposal PDF and marks the quote as sent. This does not approve the job — use Approve Quote when the customer says yes.'
 
   return (
     <div style={{
