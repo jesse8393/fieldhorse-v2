@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Eye, Download, Send } from 'lucide-react'
+import { Eye, Download, Send, ShieldCheck, Lock } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
@@ -26,7 +26,7 @@ import QuoteTermsSection from '../sections/QuoteTerms.jsx'
  *
  * Customer portal / e-sign / email send live in later phases.
  */
-export default function QuoteTab({ contact, userId, fetchAll, patch }) {
+export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenApprove }) {
   const { profile } = useProfile()
 
   const status = useMemo(() => deriveStatus(contact), [
@@ -217,6 +217,128 @@ export default function QuoteTab({ contact, userId, fetchAll, patch }) {
         onDownload={handleDownload}
         onSend={handleSend}
       />
+
+      <ApproveBand
+        contact={contact}
+        baseCount={baseCount}
+        busy={busy}
+        onOpenApprove={onOpenApprove}
+      />
+    </div>
+  )
+}
+
+/* ============================================================
+   Approve band — primary "Approve Quote" CTA when status allows.
+   When status='approved', shows a muted approved badge plus a
+   small "Approve a new version" link so re-approval requires an
+   intentional tap (no accidental double-approval). Phase 4C-2.
+   ============================================================ */
+function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
+  const status = (contact?.proposal_status || 'draft').toLowerCase()
+  const isApproved = status === 'approved'
+  const canApprove = !isApproved && baseCount > 0 && !busy
+  const approvedAt = contact?.updated_at && isApproved ? contact.updated_at : null
+
+  if (isApproved) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 10,
+        padding: '14px 16px',
+        borderRadius: 14,
+        background: 'rgba(72, 130, 95, 0.10)',
+        border: '1px solid rgba(72, 130, 95, 0.40)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-good, #6FB387)' }} />
+          <span style={{
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+            letterSpacing: '0.10em', textTransform: 'uppercase',
+            color: 'var(--v3-good, #6FB387)'
+          }}>
+            Quote approved
+          </span>
+        </div>
+        <p style={{
+          margin: 0,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11, lineHeight: 1.5,
+          color: 'var(--v3-text-muted)'
+        }}>
+          Snapshot is locked{approvedAt ? ` · ${shortDate(approvedAt)}` : ''}. Future edits to items, scope, terms, or exclusions don't change what the customer agreed to.
+        </p>
+        <button
+          type="button"
+          onClick={onOpenApprove}
+          style={{
+            alignSelf: 'flex-start',
+            background: 'transparent', border: 'none',
+            padding: '4px 0',
+            color: 'var(--v3-text-muted)',
+            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+            textDecoration: 'underline', textUnderlineOffset: 3,
+            cursor: 'pointer'
+          }}
+        >
+          Approve a new version
+        </button>
+      </div>
+    )
+  }
+
+  const helper = baseCount === 0
+    ? 'Add at least one base line item to enable approval.'
+    : 'Approval saves a permanent record of the items, scope, terms, and total. Edits made later won\'t change what was approved.'
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      padding: '14px 16px',
+      borderRadius: 14,
+      background: 'var(--v3-surface)',
+      border: '1px solid var(--v3-border)'
+    }}>
+      <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+        <Lock size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
+        Approval
+      </span>
+
+      <p style={{
+        margin: 0,
+        fontFamily: 'var(--font-body)',
+        fontSize: 11, lineHeight: 1.5,
+        color: 'var(--v3-text-muted)'
+      }}>
+        {helper}
+      </p>
+
+      <motion.button
+        type="button"
+        whileTap={{ scale: canApprove ? 0.98 : 1 }}
+        onClick={() => { if (canApprove) { hapticTap(); onOpenApprove?.() } }}
+        disabled={!canApprove}
+        aria-disabled={!canApprove}
+        style={{
+          minHeight: 44,
+          padding: '12px 14px',
+          borderRadius: 12,
+          border: 'none',
+          background: canApprove
+            ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+            : 'var(--v3-surface-2)',
+          color: canApprove ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
+          fontFamily: 'var(--font-body)',
+          fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+          cursor: canApprove ? 'pointer' : 'not-allowed',
+          opacity: canApprove ? 1 : 0.55,
+          boxShadow: canApprove ? '0 0 0 2px rgba(228, 190, 111, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18)' : 'none',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          WebkitTapHighlightColor: 'transparent'
+        }}
+      >
+        <ShieldCheck size={14} aria-hidden="true" />
+        Approve Quote
+      </motion.button>
     </div>
   )
 }
