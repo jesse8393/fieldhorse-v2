@@ -478,19 +478,46 @@ function drawCoverPage(doc, ctx) {
   doc.text(eyebrow, pageWidth / 2, 24, { align: 'center' })
   doc.setCharSpace(0)
 
-  // Company wordmark — large, centered
+  // Company wordmark — fit-to-width cascade so long company names
+  // don't overflow the page edge. 28pt single line is the default;
+  // falls back to 22pt single, then 22pt wrapped to 2 lines max.
+  // Block midpoint stays anchored near y=70 so the contact line and
+  // the customer hero below never need to budge in tandem.
+  const wmText = (companyName || 'My Company').toUpperCase()
+  const wmAvail = pageWidth - margin * 2
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(28)
   doc.setTextColor(...ONYX)
-  doc.text((companyName || 'My Company').toUpperCase(), pageWidth / 2, 70, { align: 'center' })
 
-  // Company contact line under wordmark — small, muted
+  doc.setFontSize(28)
+  let wmFontSize = 28
+  let wmLines = [wmText]
+  if (doc.getTextWidth(wmText) > wmAvail) {
+    doc.setFontSize(22)
+    wmFontSize = 22
+    if (doc.getTextWidth(wmText) > wmAvail) {
+      // Wrap at 22pt; cap at 2 lines so the cover never grows tall
+      wmLines = doc.splitTextToSize(wmText, wmAvail).slice(0, 2)
+    }
+  }
+  doc.setFontSize(wmFontSize)
+
+  // Line height ≈ 0.36× point size in mm. 1-line block: baseline at
+  // y=70. 2-line block: baselines spaced lineGap apart, midpoint at 70.
+  const wmLineGap = wmFontSize * 0.36
+  const wmStartY = 70 - ((wmLines.length - 1) * wmLineGap) / 2
+  for (let i = 0; i < wmLines.length; i++) {
+    doc.text(wmLines[i], pageWidth / 2, wmStartY + i * wmLineGap, { align: 'center' })
+  }
+  const wmEndY = wmStartY + (wmLines.length - 1) * wmLineGap
+
+  // Company contact line under the wordmark — sits 10mm below the
+  // last wordmark baseline regardless of how many lines rendered.
   const contactLine = [company0(ctx, 'phone'), company0(ctx, 'email')].filter(Boolean).join(' · ')
   if (contactLine) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(...INK_MUTED)
-    doc.text(contactLine, pageWidth / 2, 80, { align: 'center' })
+    doc.text(contactLine, pageWidth / 2, wmEndY + 10, { align: 'center' })
   }
 
   // Vertical-center hero — PREPARED FOR + customer + PROJECT + title
