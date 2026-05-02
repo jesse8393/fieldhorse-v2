@@ -184,7 +184,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         }
       }
 
-      const { error: rpcErr } = await supabase.rpc('fn_approve_quote_version', {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('fn_approve_quote_version', {
         p_user_id: userId,
         p_contact_id: contact.id,
         p_snapshot: snapshot,
@@ -198,11 +198,25 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         p_signature_kind: null,
         p_signature_data: null
       })
-      if (rpcErr) throw rpcErr
+      if (rpcErr) {
+        console.error('[approve-quote] RPC error:', rpcErr)
+        throw rpcErr
+      }
 
-      // Stage advance is a separate pipeline call so a failure here
-      // does not unlock the snapshot. fn_approve_quote_version already
-      // committed proposal_status='approved'.
+      // Require a row with an id. supabase-js may return the composite
+      // result either as a single object or wrapped in a one-element
+      // array depending on PostgREST representation; tolerate both.
+      // If no id surfaces, the snapshot did NOT persist — refuse to
+      // advance stage or claim success.
+      const versionRow = Array.isArray(rpcData) ? rpcData[0] : rpcData
+      if (!versionRow || !versionRow.id) {
+        console.error('[approve-quote] RPC returned no row:', rpcData)
+        throw new Error('Approval did not save. Your snapshot was not created — check your connection and try again.')
+      }
+
+      // Stage advance only runs after the snapshot is confirmed persisted.
+      // Failure here logs but does not unlock the snapshot — proposal_status
+      // is already 'approved' on the server via fn_approve_quote_version.
       let stageNote = ''
       if (moveToJob) {
         try {
@@ -216,7 +230,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         }
       }
 
-      toastSuccess(`Quote approved${stageNote}`, `Locked snapshot · ${money(totals.base)}`)
+      toastSuccess(`Quote approved${stageNote}`, `Locked snapshot v${versionRow.version_number} · ${money(totals.base)}`)
       onApproved?.()
       onClose?.()
     } catch (e) {
