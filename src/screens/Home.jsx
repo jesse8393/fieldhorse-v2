@@ -25,6 +25,10 @@ import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
 import { QuickAction, SectionHeader } from '../components/v3'
 import { hapticTap } from '../lib/haptics.js'
+// V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
+// same batch helper Jobs already uses (one query + one signed-URL
+// batch call, no N+1). Returns { [contactId]: signedUrl }.
+import { fetchCoverPhotosByJob } from '../lib/photos.js'
 
 /* ----------------- helpers ----------------- */
 
@@ -111,6 +115,12 @@ export default function Home() {
   // unsent invoices) computed from the same contacts/schedule/payments data.
   // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
   const [nextActions, setNextActions] = useState(null)
+  // V3-SYSTEM-1B-3: signed cover-photo URLs keyed by contact id. Populated
+  // alongside the rest of the Home data via fetchCoverPhotosByJob (same
+  // pattern Jobs uses). Empty map = every row falls back to a neutral
+  // initial tile. Doesn't gate render — lists paint immediately, photos
+  // pop in when the URL map arrives.
+  const [photoUrlByJob, setPhotoUrlByJob] = useState({})
   const [refreshTick, setRefreshTick] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -141,7 +151,11 @@ export default function Home() {
       const todayStart = new Date(nowD); todayStart.setHours(0, 0, 0, 0)
       const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
 
-      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes] = await Promise.all([
+      // V3-SYSTEM-1B-3: photo fetch runs in the same Promise.all as the
+      // existing four queries. Failure is non-fatal — empty map → rows
+      // fall back to neutral initial tiles. No N+1: helper does one
+      // fh_job_files query + one batch signed-URL call total.
+      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes, photoMap] = await Promise.all([
         // Contacts: stages + amounts + last update for at-risk calc.
         // updated_at falls back to created_at if missing.
         supabase
@@ -171,7 +185,9 @@ export default function Home() {
           .gte('start_at', todayStart.toISOString())
           .lt('start_at', todayEnd.toISOString())
           .order('start_at', { ascending: true })
-          .limit(6)
+          .limit(6),
+        // Cover photos keyed by contact id — same helper Jobs uses.
+        fetchCoverPhotosByJob(user.id).catch(() => ({}))
       ])
 
       if (cancelled) return
@@ -328,6 +344,7 @@ export default function Home() {
       setStageBreakdown(stageCounts)
       setTodayOnSite(todayRows)
       setNextActions(topActions)
+      setPhotoUrlByJob(photoMap || {})
     }
     load()
     return () => { cancelled = true }
@@ -728,6 +745,7 @@ export default function Home() {
               <NextActionRow
                 key={action.id}
                 action={action}
+                photoUrl={action.contactId ? photoUrlByJob[action.contactId] : undefined}
                 onTap={() => action.contactId
                   ? navigate(`/jobs/${action.contactId}`)
                   : navigate('/jobs')
@@ -825,6 +843,7 @@ export default function Home() {
               <TodayOnSiteRow
                 key={row.id}
                 row={row}
+                photoUrl={row.contactId ? photoUrlByJob[row.contactId] : undefined}
                 onTap={() => row.contactId
                   ? navigate(`/jobs/${row.contactId}`)
                   : navigate('/schedule')
@@ -871,6 +890,7 @@ export default function Home() {
               <PipelineDealRow
                 key={deal.id}
                 deal={deal}
+                photoUrl={photoUrlByJob[deal.id]}
                 onTap={() => navigate(`/jobs/${deal.id}`)}
               />
             ))
@@ -916,7 +936,7 @@ export default function Home() {
    TodayOnSiteRow — single schedule row in Today on Site.
    Time + job/title + stage chip + chevron. Tap → linked job.
    ============================================================ */
-function TodayOnSiteRow({ row, onTap }) {
+function TodayOnSiteRow({ row, photoUrl, onTap }) {
   const stage = row.stage ? STAGE_DISPLAY[row.stage] : null
   const startTime = row.startAt
     ? new Date(row.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
@@ -935,7 +955,9 @@ function TodayOnSiteRow({ row, onTap }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
+        // V3-SYSTEM-1B-3: gap 12 → 10 to claw back ~4px when adding the
+        // 32px thumbnail + its gap. Row stays comfortable on a 360px phone.
+        gap: 10,
         width: '100%',
         // V3-SYSTEM-1B-1: row pad 12/14 → 10/12, radius 12 → 10.
         padding: '10px 12px',
@@ -968,6 +990,11 @@ function TodayOnSiteRow({ row, onTap }) {
       }}>
         {timeLabel}
       </div>
+      {/* V3-SYSTEM-1B-3: real cover photo for the linked job, falling
+          back to a neutral initial tile when no photo exists. Reserves
+          its 32×32 space immediately so async photo loads don't shift
+          the row. */}
+      <RowThumb photoUrl={photoUrl} name={row.clientName || row.title} />
       {/* Title + client */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -1013,7 +1040,7 @@ const STAGE_DISPLAY = {
   invoice: { label: 'Invoice', color: 'var(--v3-stage-won)' }
 }
 
-function PipelineDealRow({ deal, onTap }) {
+function PipelineDealRow({ deal, photoUrl, onTap }) {
   const stage = STAGE_DISPLAY[deal.stage] || { label: deal.stage, color: 'var(--v3-text-muted)' }
   return (
     <motion.button
@@ -1025,7 +1052,8 @@ function PipelineDealRow({ deal, onTap }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
+        // V3-SYSTEM-1B-3: gap 14 → 12 to make room for the 32px thumb.
+        gap: 12,
         width: '100%',
         // V3-SYSTEM-1B-1: row pad 14/14 → 12/12, radius 14 → 12.
         padding: '12px 12px',
@@ -1064,6 +1092,10 @@ function PipelineDealRow({ deal, onTap }) {
         borderRadius: 2,
         background: `color-mix(in srgb, ${stage.color} 70%, transparent)`
       }} />
+      {/* V3-SYSTEM-1B-3: real cover photo (or neutral initial fallback)
+          between the stage spine and the deal name block. Reads as a
+          job object, not a database row. */}
+      <RowThumb photoUrl={photoUrl} name={deal.name} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{
           fontFamily: 'var(--font-body)',
@@ -1261,7 +1293,7 @@ const URGENCY_TONE = {
   success: { color: 'var(--v3-success-bright)', glow: 'rgba(46, 204, 113, 0.40)' }
 }
 
-function NextActionRow({ action, onTap }) {
+function NextActionRow({ action, photoUrl, onTap }) {
   const kindMeta = NEXT_ACTION_KIND[action.kind] || { Icon: Zap }
   const { Icon } = kindMeta
   const tone = URGENCY_TONE[action.urgencyTone] || URGENCY_TONE.warn
@@ -1319,18 +1351,48 @@ function NextActionRow({ action, onTap }) {
         boxShadow: `0 0 8px ${tone.glow}`
       }} />
 
-      <span aria-hidden="true" style={{
-        flexShrink: 0,
-        width: 32, height: 32,
-        borderRadius: 9,
-        background: 'var(--v3-surface-2)',
-        border: '1px solid var(--v3-border-strong)',
-        color: tone.color,
-        display: 'grid',
-        placeItems: 'center'
-      }}>
-        <Icon size={14} />
-      </span>
+      {/* V3-SYSTEM-1B-3: when a real cover photo exists for the linked
+          contact, show it instead of the kind-of-action icon chip. The
+          row title already names the action ("Follow up with Jane"), so
+          a photo telegraphs "this is about Jane's job" — a stronger
+          object cue than a generic phone glyph. Without a photo, the
+          existing tone-keyed icon chip stays as the kind cue. */}
+      {photoUrl ? (
+        <img
+          src={photoUrl}
+          alt=""
+          loading="lazy"
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 32,
+            height: 32,
+            borderRadius: 9,
+            objectFit: 'cover',
+            background: 'var(--v3-surface-2)',
+            border: '1px solid var(--v3-border-strong)',
+            display: 'block'
+          }}
+          onError={(e) => {
+            // Signed URL expired or blocked — hide so the broken-image
+            // glyph doesn't show. Space stays reserved.
+            e.currentTarget.style.visibility = 'hidden'
+          }}
+        />
+      ) : (
+        <span aria-hidden="true" style={{
+          flexShrink: 0,
+          width: 32, height: 32,
+          borderRadius: 9,
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border-strong)',
+          color: tone.color,
+          display: 'grid',
+          placeItems: 'center'
+        }}>
+          <Icon size={14} />
+        </span>
+      )}
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -1390,4 +1452,73 @@ function NextActionRow({ action, onTap }) {
       <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
     </motion.button>
   )
+}
+
+/* ============================================================
+   RowThumb — V3-SYSTEM-1B-3.
+   32×32 cover-photo tile used by Today on Site rows + Pipeline
+   Preview rows. Renders a real signed-URL image when one exists,
+   otherwise a neutral surface-2 + hairline tile with 1-2 letter
+   initials in muted ink. No gold tint, no stage tint, no fake
+   placeholder image — restraint is intentional so the row's
+   spine + stage label + amount stay the carriers of meaning.
+   ============================================================ */
+function RowThumb({ photoUrl, name, size = 32 }) {
+  const radius = 8
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt=""
+        loading="lazy"
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: size,
+          height: size,
+          borderRadius: radius,
+          objectFit: 'cover',
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border)',
+          display: 'block'
+        }}
+        onError={(e) => {
+          // Signed URL 403 / network failure — hide rather than show
+          // a broken-image glyph. The tile space stays reserved so the
+          // row layout doesn't shift; next data refresh restores it.
+          e.currentTarget.style.visibility = 'hidden'
+        }}
+      />
+    )
+  }
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        flexShrink: 0,
+        width: size,
+        height: size,
+        borderRadius: radius,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
+        color: 'var(--v3-text-muted)',
+        display: 'grid',
+        placeItems: 'center',
+        fontFamily: 'var(--font-display)',
+        fontSize: size >= 36 ? 14 : 12,
+        letterSpacing: '0.04em',
+        lineHeight: 1
+      }}
+    >
+      {nameInitials(name)}
+    </span>
+  )
+}
+
+function nameInitials(name) {
+  if (!name) return '—'
+  const parts = String(name).trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '—'
+  if (parts.length === 1) return parts[0][0].toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
 }
