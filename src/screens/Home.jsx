@@ -412,7 +412,9 @@ export default function Home() {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 16,
-          padding: '10px 16px 10px'
+          // V3-SYSTEM-1B-1: greeting strip pad 10/16/10 → 8/16/6 so the
+          // first card sits ~6px closer to the header.
+          padding: '8px 16px 6px'
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -436,18 +438,22 @@ export default function Home() {
         </div>
 
         {hasCoords ? (
+          /* V3-SYSTEM-1B-1: weather pill compacted — pad 10/12 → 6/10,
+             icon 18 → 16, temp 14 → 13, condition subline dropped (the
+             small uppercase line ate ~11px and the temp+icon already
+             telegraphs weather). Pill height 44 → 32. */
           <motion.button
             type="button"
             whileTap={{ scale: 0.96 }}
             whileHover={{ y: -1 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             onClick={() => { hapticTap(); navigate('/pour-window') }}
-            aria-label="Open weather forecast"
+            aria-label={condStr ? `Open weather forecast — ${condStr}` : 'Open weather forecast'}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 10,
-              padding: '10px 12px',
+              gap: 8,
+              padding: '6px 10px',
               borderRadius: 'var(--v3-radius-btn)',
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border)',
@@ -457,17 +463,15 @@ export default function Home() {
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <CloudSun size={18} color="#8FB4E3" aria-hidden="true" />
-            <div style={{ textAlign: 'left', lineHeight: 1.05 }}>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700 }}>
-                {tempStr}
-              </div>
-              {condStr ? (
-                <div style={{ fontSize: 9, color: 'var(--v3-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 }}>
-                  {condStr}
-                </div>
-              ) : null}
-            </div>
+            <CloudSun size={16} color="#8FB4E3" aria-hidden="true" />
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 13,
+              fontWeight: 700,
+              lineHeight: 1
+            }}>
+              {tempStr}
+            </span>
           </motion.button>
         ) : (
           <button
@@ -520,8 +524,12 @@ export default function Home() {
         style={{
           position: 'relative',
           overflow: 'hidden',
-          margin: '0 var(--v3-gutter) 14px',
-          padding: '14px 18px',
+          // V3-SYSTEM-1B-1: section-to-section margin 14 → 12, card pad
+          // 14/18 → 12/16, radius (token default 20) → 16. Home-only
+          // density override; tokens stay alone for other screens.
+          margin: '0 var(--v3-gutter) 12px',
+          padding: '12px 16px',
+          borderRadius: 16,
           // Glass-metal depth from V3-HOME-1C — kept verbatim. Inset top
           // highlight + inset bottom shadow + crisp outline + soft halo.
           border: '1px solid var(--v3-border-strong)',
@@ -660,34 +668,44 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK (promoted) ───────────
-          V3-HOME-1: moved above Today's Priorities so the operator sees
-          their command surface in the first viewport. Gold-tinted card
-          retains primary status; per-action pills now uniform shape. */}
+      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
+          V3-SYSTEM-1B-1 demote pass:
+            - wrapper class --primary-quiet → base --section (drop the
+              gold border + gold ::after stroke).
+            - eyebrow gold → muted ink.
+            - count chip solid gold bg → neutral surface-2 + hairline.
+            - View-all default gold → muted, fades to gold on hover.
+            - Section radius 20 → 16, padding 18 → 14, margin 14 → 12. */}
       {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
-          className="v3-section v3-section--primary-quiet"
-          style={{ margin: '0 var(--v3-gutter) 14px' }}
+          className="v3-section"
+          style={{
+            margin: '0 var(--v3-gutter) 12px',
+            padding: 14,
+            borderRadius: 16
+          }}
         >
           <div className="v3-section-header">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
                 Next Actions
               </span>
               <span style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minWidth: 20,
-                height: 20,
-                padding: '0 7px',
+                minWidth: 18,
+                height: 18,
+                padding: '0 6px',
                 borderRadius: 999,
-                background: 'var(--v3-primary)',
-                color: 'var(--v3-on-primary)',
+                background: 'var(--v3-surface-2)',
+                border: '1px solid var(--v3-border)',
+                color: 'var(--v3-text)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 700,
+                fontVariantNumeric: 'tabular-nums',
                 lineHeight: 1
               }}>
                 {nextActions.length}
@@ -697,6 +715,9 @@ export default function Home() {
               type="button"
               onClick={() => { hapticTap(); navigate('/jobs') }}
               className="v3-section-link"
+              style={{ color: 'var(--v3-text-muted)', transition: 'color 160ms ease' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--v3-primary)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--v3-text-muted)' }}
             >
               View all
               <ChevronRight size={12} aria-hidden="true" />
@@ -718,13 +739,16 @@ export default function Home() {
       )}
 
       {/* ─────────── TODAY'S PRIORITIES — KPIs (demoted) ───────────
-          V3-HOME-1: moved below Next Actions. Tile chrome demoted —
-          colored top-edge bar removed; tone now signaled only by the
-          tiny icon chip color, keeping cards quiet but readable. */}
+          V3-SYSTEM-1B-1: section padding 18 → 14, radius 20 → 16,
+          margin 14 → 12. Tile shrink lives in CompactKpi below. */}
       <motion.div
         variants={item}
         className="v3-section v3-section--quiet"
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 12px',
+          padding: 14,
+          borderRadius: 16
+        }}
       >
         <SectionHeader label="Today's Priorities" />
         <div
@@ -772,7 +796,11 @@ export default function Home() {
       <motion.div
         variants={item}
         className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 12px',
+          padding: 14,
+          borderRadius: 16
+        }}
       >
         <SectionHeader
           label="Today on Site"
@@ -815,7 +843,11 @@ export default function Home() {
       <motion.div
         variants={item}
         className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 12px',
+          padding: 14,
+          borderRadius: 16
+        }}
       >
         <SectionHeader
           label="Pipeline Preview"
@@ -854,7 +886,11 @@ export default function Home() {
       <motion.div
         variants={item}
         className="v3-section v3-section--tight"
-        style={{ margin: '0 var(--v3-gutter) 32px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 28px',
+          padding: 14,
+          borderRadius: 16
+        }}
       >
         <SectionHeader label="Quick Actions" />
         <div
@@ -901,8 +937,9 @@ function TodayOnSiteRow({ row, onTap }) {
         alignItems: 'center',
         gap: 12,
         width: '100%',
-        padding: '12px 14px',
-        borderRadius: 12,
+        // V3-SYSTEM-1B-1: row pad 12/14 → 10/12, radius 12 → 10.
+        padding: '10px 12px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
         color: 'var(--v3-text)',
@@ -990,8 +1027,9 @@ function PipelineDealRow({ deal, onTap }) {
         alignItems: 'center',
         gap: 14,
         width: '100%',
-        padding: '14px 14px',
-        borderRadius: 14,
+        // V3-SYSTEM-1B-1: row pad 14/14 → 12/12, radius 14 → 12.
+        padding: '12px 12px',
+        borderRadius: 12,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
         color: 'var(--v3-text)',
@@ -1091,6 +1129,11 @@ const COMPACT_TONE = {
 
 function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }) {
   const t = COMPACT_TONE[tone] || COMPACT_TONE.primary
+  // V3-SYSTEM-1B-1: subline mutes when the metric is zero. Three tiles
+  // at zero used to read as three colored shouts; now they read as
+  // three quiet captions and only nonzero counts wear their tone.
+  const isZero = value != null && Number(value) === 0
+  const sublineColor = isZero ? 'var(--v3-text-muted)' : t.color
 
   return (
     <motion.button
@@ -1102,49 +1145,50 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
       style={{
         position: 'relative',
         textAlign: 'left',
-        padding: '14px 12px 12px',
-        borderRadius: 14,
+        // V3-SYSTEM-1B-1: tile pad 14/12/12 → 12/12/10, radius 14 → 12,
+        // minHeight 88 → 72 so the three KPIs read as a quiet strip.
+        padding: '12px 12px 10px',
+        borderRadius: 12,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
         color: 'var(--v3-text)',
         cursor: 'pointer',
-        minHeight: 88,
+        minHeight: 72,
         WebkitTapHighlightColor: 'transparent',
         overflow: 'hidden'
       }}
     >
-      {/* V3-HOME-1: removed the 2px colored top-edge bar. Tone now
-          signaled only via the icon chip + value color, keeping the
-          tile chrome quiet so Next Actions stays the gold moment. */}
+      {/* V3-HOME-1: no colored top-edge bar. Tone signaled only via the
+          icon chip + value color. Chip + value sizes shrunk in 1B-1. */}
 
       {Icon ? (
         <span aria-hidden="true" style={{
           display: 'inline-grid', placeItems: 'center',
-          width: 28, height: 28, borderRadius: 8,
+          width: 24, height: 24, borderRadius: 7,
           background: 'var(--v3-surface-2)',
           border: '1px solid var(--v3-border-strong)',
           color: t.color,
-          marginBottom: 10
+          marginBottom: 8
         }}>
-          <Icon size={14} strokeWidth={2.2} />
+          <Icon size={13} strokeWidth={2.2} />
         </span>
       ) : null}
 
       <div style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 26,
+        fontSize: 22,
         color: t.color,
         lineHeight: 1,
-        marginBottom: 8,
-        minHeight: 26,
+        marginBottom: 6,
+        minHeight: 22,
         fontVariantNumeric: 'tabular-nums'
       }}>
         {value == null ? (
-          <span className="v3-skeleton" style={{ width: 44, height: 22, borderRadius: 4 }} />
+          <span className="v3-skeleton" style={{ width: 40, height: 18, borderRadius: 4 }} />
         ) : isMoney ? (
           <>
             <span style={{
-              fontSize: 14, color: 'var(--v3-text-muted)',
+              fontSize: 12, color: 'var(--v3-text-muted)',
               verticalAlign: 'top', marginRight: 1
             }}>
               $
@@ -1175,11 +1219,14 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 
       {subline ? (
         <div style={{
-          marginTop: 4,
+          marginTop: 3,
           fontFamily: 'var(--font-body)',
           fontSize: 11,
-          fontWeight: 700,
-          color: t.color,
+          // V3-SYSTEM-1B-1: subline weight 700 → 500 so the row carries
+          // less shout. Three tiles in a row read as quiet captions; only
+          // the icon chip + value digit carry the tone-color load.
+          fontWeight: 500,
+          color: sublineColor,
           fontVariantNumeric: 'tabular-nums'
         }}>
           {subline}
@@ -1204,9 +1251,13 @@ const NEXT_ACTION_KIND = {
   invoice:    { Icon: Receipt }
 }
 
+// V3-SYSTEM-1B-1: warn no longer uses brand gold (--v3-primary). Stale
+// leads <14d cold now wear the dedicated --v3-warn amber (#D4A042) so
+// gold can stay scarce on Home — reserved for the Pipeline money digits
+// and the small hairline sweep. Red urgency stays red, green stays green.
 const URGENCY_TONE = {
   danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
-  warn:    { color: 'var(--v3-primary)',        glow: 'rgba(212, 175, 55, 0.45)' },
+  warn:    { color: 'var(--v3-warn)',           glow: 'rgba(212, 160, 66, 0.40)' },
   success: { color: 'var(--v3-success-bright)', glow: 'rgba(46, 204, 113, 0.40)' }
 }
 
@@ -1257,14 +1308,15 @@ function NextActionRow({ action, onTap }) {
     >
       {/* Left edge accent — urgency-tone color + matching glow. THIS is the
           critical-vs-optional signal. Operator scan: red bar = drop everything,
-          yellow = today, green = money in motion. */}
+          amber = today, green = money in motion. V3-SYSTEM-1B-1: glow blur
+          softened 12 → 8 so the spine reads as a hairline cue, not a halo. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
         left: 0, top: 7, bottom: 7,
         width: 3,
         background: tone.color,
         borderRadius: '0 3px 3px 0',
-        boxShadow: `0 0 12px ${tone.glow}`
+        boxShadow: `0 0 8px ${tone.glow}`
       }} />
 
       <span aria-hidden="true" style={{

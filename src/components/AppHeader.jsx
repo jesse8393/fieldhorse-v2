@@ -48,11 +48,11 @@ export default function AppHeader() {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
-        // V3-SYSTEM-1A: tightened from 14/14/12 → 10/14/9 so the header
-        // total is ~52px+safe-area instead of ~70px. Header is supporting
-        // chrome, not a hero panel.
-        padding: '10px 14px 9px',
-        paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))',
+        // V3-SYSTEM-1B-1: further trim 10/14/9 → 8/14/6 so the header
+        // total is ~48px+safe-area. Was 70px → 52px (1A) → 48px (1B).
+        // Header is supporting chrome, not a hero panel.
+        padding: '8px 14px 6px',
+        paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))',
         minHeight: 0,
         background: 'linear-gradient(180deg, rgba(20,20,20,0.88) 0%, rgba(20,20,20,0.72) 82%, rgba(20,20,20,0) 100%)',
         backdropFilter: 'blur(14px)',
@@ -138,18 +138,17 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }) {
-  // V3-SYSTEM-1A: header is supporting chrome, not a hero. Logo scales
-  // up to 32px tall on desktop (was 56) — small enough that the actual
-  // app content leads, large enough to recognize the brand at a glance.
-  // Text fallbacks land at 18px max (was 28) for the same reason.
+  // V3-SYSTEM-1B-1: further trim from 1A. Logo clamps at 28 (was 32)
+  // and the wordmark fallback at 16 (was 18) so the brand chrome stays
+  // calm next to the content data on Home.
   if (logoSrc) {
     return (
       <img
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(22px, 4vw, 32px)',
-          maxWidth: 'min(40vw, 220px)',
+          maxHeight: 'clamp(20px, 3.4vw, 28px)',
+          maxWidth: 'min(36vw, 200px)',
           width: 'auto',
           height: 'auto',
           objectFit: 'contain',
@@ -167,14 +166,14 @@ function BrandSlot({ logoSrc, company, fullName }) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(14px, 3.2vw, 18px)',
+    fontSize: 'clamp(13px, 3vw, 16px)',
     letterSpacing: '0.08em',
     lineHeight: 1,
     textTransform: 'uppercase',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    maxWidth: 'min(44vw, 220px)'
+    maxWidth: 'min(40vw, 200px)'
   }
   if (company) {
     // V3-SYSTEM-1A: company-name fallback drops the gold tint — the
@@ -200,7 +199,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(14px, 3.2vw, 18px)',
+        fontSize: 'clamp(13px, 3vw, 16px)',
         letterSpacing: '0.10em',
         lineHeight: 1,
         display: 'inline-flex',

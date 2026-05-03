@@ -279,7 +279,7 @@ export default function BottomNav() {
             {({ isActive }) => (
               <>
                 <span className="fh-nav__icon">
-                  <Icon name={item.icon} size={22} />
+                  <Icon name={item.icon} size={20} />
                 </span>
                 <span className="fh-nav__label">{item.label}</span>
                 {isActive && (
@@ -300,7 +300,7 @@ export default function BottomNav() {
           aria-expanded={moreOpen}
         >
           <span className="fh-nav__icon">
-            <Icon name="more" size={22} />
+            <Icon name="more" size={20} />
           </span>
           <span className="fh-nav__label">More</span>
         </button>

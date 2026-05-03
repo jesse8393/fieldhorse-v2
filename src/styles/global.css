@@ -1664,7 +1664,9 @@ a {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 0;
-  padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+  /* V3-SYSTEM-1B-2: top/horizontal pad 8 → 6, bottom 10 → 8 so the
+     dock loses ~4px of chunk while keeping the safe-area inset intact. */
+  padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
   /* Fully solid — no glass / blur / translucency. Per user feedback the
      frosted backdrop-filter still read as "see-through" even with an
      opaque background color, because the saturated blur layer sits on
@@ -1704,10 +1706,11 @@ a {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  /* Enforce 48x48 minimum tap area (iOS HIG + Android a11y). */
-  min-height: 48px;
-  min-width: 48px;
-  padding: 8px 6px 6px;
+  /* V3-SYSTEM-1B-2: WCAG-compliant 44px minimum tap area (was 48). The
+     header padding extends touch beyond the visible cell. */
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 6px 4px;
   background: none;
   border: none;
   color: var(--ink-muted);
@@ -1719,15 +1722,16 @@ a {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-/* Active tab: stronger soft-pill read (V3-HOME-1) — bumped alpha and
-   added a subtle inner gold stroke so the active state feels tactile,
-   not just tinted. Dark theme gets the gold wash; light theme gets an
-   onyx-tinted wash with the same inner stroke for parity. */
+/* V3-SYSTEM-1B-2: active state keeps the gold wash + inner stroke
+   pattern but quieter — alpha 0.18 → 0.12 and inner stroke gold@30%
+   → gold@22% so the dock reads as a calm mobile dock instead of
+   chunky control. Dot below also shrinks. Light theme tracks the
+   same demotion. */
 .fh-nav__item.is-active {
   color: var(--ink-strong);
-  background: rgba(229, 193, 88, 0.18);
+  background: rgba(229, 193, 88, 0.12);
   border-radius: 12px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 22%, transparent);
 }
 .fh-nav__item.is-active .fh-nav__icon { color: var(--field-gold-bright); }
 .fh-nav__item.is-active .fh-nav__label { color: var(--ink-strong); font-weight: 700; }
@@ -1755,14 +1759,13 @@ a {
 .fh-nav__dot {
   position: absolute;
   bottom: 2px;
-  width: 4px;
-  height: 4px;
+  /* V3-SYSTEM-1B-2: 4 → 3px with softer halo so the dot reads as a
+     transition cue under a calmer pill, not a separate gold pip. */
+  width: 3px;
+  height: 3px;
   border-radius: 999px;
   background: var(--field-gold);
-  box-shadow: 0 0 0 3px rgba(199, 164, 90, 0.18);
-  /* V3-HOME-1: 6→4px so the soft active pill carries the visual
-     weight; the dot stays as a transition cue, not the dominant mark.
-     The layoutId dot can otherwise steal the first tap while animating. */
+  box-shadow: 0 0 0 2px rgba(199, 164, 90, 0.14);
   pointer-events: none;
 }
 
