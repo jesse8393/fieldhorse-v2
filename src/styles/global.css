@@ -1620,22 +1620,19 @@ a {
 .fh-app__main {
   flex: 1;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  /* Stepped responsive frame — content reads as intentional at every
-     viewport size. Mobile = full width; tablet = 760px; desktop =
-     1080px; large desktop = 1180px (cap). Jobs/Clients grids fill the
-     frame and adapt their own column count via auto-fill / minmax. */
+  /* V3-SYSTEM-1A: mobile-frame-on-desktop. The app is mobile-first
+     until dedicated desktop layouts exist; stretching mobile screens
+     across 1080px makes cards look wide and empty. Core app column
+     caps at 440px on tablet+ so desktop renders the production app
+     inside a centered premium mobile frame. Phones (<720px) keep
+     full-width behavior. Future grid screens (Jobs/Schedule desktop)
+     can opt out via .fh-app__main--wide when those layouts ship. */
   width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
 @media (min-width: 720px) {
-  .fh-app__main { max-width: 760px; }
-}
-@media (min-width: 1024px) {
-  .fh-app__main { max-width: 1080px; }
-}
-@media (min-width: 1440px) {
-  .fh-app__main { max-width: 1180px; }
+  .fh-app__main { max-width: 440px; }
 }
 
 /* =========================================================================
@@ -1657,6 +1654,23 @@ a {
      top of the solid bg. Onyx tile only. */
   background: var(--surface-1);
   border-top: 1px solid var(--rule);
+}
+/* V3-SYSTEM-1A: cap nav to the mobile app frame on tablet+ so it reads
+   as a floating mobile dock instead of stretching cell-by-cell across
+   1440px. Phones (<720px) keep edge-to-edge behavior. Rounded top
+   corners + side hairlines give the dock its lift on dark desktop bg. */
+@media (min-width: 720px) {
+  .fh-nav {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 440px;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+  }
 }
 .fh-nav__item {
   position: relative;

@@ -103,19 +103,23 @@ export default function BottomNav() {
                 padding: '4px 18px 12px'
               }}
             >
+              {/* V3-SYSTEM-1A: drawer is for navigation, not branding —
+                  demote the gold "FIELD" so it reads as a quiet header,
+                  not a screaming wordmark. Both halves now muted text. */}
               <span
                 style={{
                   display: 'inline-flex',
                   alignItems: 'baseline',
                   gap: 0,
                   fontFamily: 'var(--font-display)',
-                  fontSize: 18,
-                  letterSpacing: '0.16em',
-                  lineHeight: 1
+                  fontSize: 16,
+                  letterSpacing: '0.14em',
+                  lineHeight: 1,
+                  color: 'var(--v3-text-muted)'
                 }}
               >
-                <span style={{ color: 'var(--v3-primary)' }}>FIELD</span>
-                <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
+                <span>FIELD</span>
+                <span>HORSE</span>
               </span>
               <button
                 type="button"
@@ -343,6 +347,11 @@ function NavRow({ item, onTap }) {
         e.currentTarget.style.background = 'transparent'
       }}
     >
+      {/* V3-SYSTEM-1A: row icon chips demoted from gold default to a
+          neutral surface-2 chip with muted icon. Gold belongs to the
+          active route (handled in the primary nav, .fh-nav__item.is-active),
+          not to every drawer row. Active-state highlight in this drawer
+          is a future polish item; for now all rows read as quiet nav. */}
       <span
         aria-hidden="true"
         style={{
@@ -352,8 +361,9 @@ function NavRow({ item, onTap }) {
           borderRadius: 8,
           display: 'grid',
           placeItems: 'center',
-          background: 'var(--v3-primary-soft)',
-          color: 'var(--v3-primary)'
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border)',
+          color: 'var(--v3-text-muted)'
         }}
       >
         <I size={14} />
