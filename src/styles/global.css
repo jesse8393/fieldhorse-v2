@@ -1620,19 +1620,36 @@ a {
 .fh-app__main {
   flex: 1;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  /* V3-SYSTEM-1A: mobile-frame-on-desktop. The app is mobile-first
-     until dedicated desktop layouts exist; stretching mobile screens
-     across 1080px makes cards look wide and empty. Core app column
-     caps at 440px on tablet+ so desktop renders the production app
-     inside a centered premium mobile frame. Phones (<720px) keep
-     full-width behavior. Future grid screens (Jobs/Schedule desktop)
-     can opt out via .fh-app__main--wide when those layouts ship. */
+  /* V3-SYSTEM-1A2: base shell — no width cap here. The cap is applied
+     by a route-aware layout modifier on the .fh-app root, set in
+     AppShell.layoutForPath(). Three modes are defined below. Today
+     every route resolves to --layout-mobile-frame, so visual output
+     is identical to V3-SYSTEM-1A; when dedicated desktop designs ship
+     for Home/Jobs/Schedule, those routes flip to --layout-responsive
+     and pick up the wider canvas without touching this base rule. */
   width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
+/* Mobile-frame — today's default for every route. Centered ~440px
+   premium mobile frame on tablet+ so desktop renders the production
+   app at its design width instead of stretching. Phones unchanged. */
 @media (min-width: 720px) {
-  .fh-app__main { max-width: 440px; }
+  .fh-app--layout-mobile-frame .fh-app__main { max-width: 440px; }
+}
+/* Prose — capped at 640px per MASTER §4 prose-column rule, for any
+   future read-heavy detail screen (Notes detail, long-form views).
+   Not activated on any route yet. */
+@media (min-width: 720px) {
+  .fh-app--layout-prose .fh-app__main { max-width: 640px; }
+}
+/* Responsive — adaptive multi-column desktop canvas. Caps at 1280px
+   per MASTER §4 container rule. Not activated on any route yet; lands
+   per-route as desktop mockups for Home/Jobs/Schedule ship. Per-screen
+   desktop CSS (multi-column grids, sidebars, dashboard panels) sits
+   beside the existing mobile CSS in each screen's stylesheet/component. */
+@media (min-width: 768px) {
+  .fh-app--layout-responsive .fh-app__main { max-width: 1280px; }
 }
 
 /* =========================================================================
@@ -1655,12 +1672,17 @@ a {
   background: var(--surface-1);
   border-top: 1px solid var(--rule);
 }
-/* V3-SYSTEM-1A: cap nav to the mobile app frame on tablet+ so it reads
-   as a floating mobile dock instead of stretching cell-by-cell across
-   1440px. Phones (<720px) keep edge-to-edge behavior. Rounded top
-   corners + side hairlines give the dock its lift on dark desktop bg. */
+/* V3-SYSTEM-1A2: bottom nav cap follows the active layout mode on
+   .fh-app root, so the dock and the content column always agree. In
+   mobile-frame routes the dock floats centered at ~440px with rounded
+   top corners; phones (<720px) keep edge-to-edge behavior regardless.
+   Other layout modes (prose, responsive) leave the nav at its default
+   edge-to-edge state — desktop dashboard layouts will likely replace
+   the bottom nav with sidebar nav, and that decision happens when
+   those layouts ship, not here. */
 @media (min-width: 720px) {
-  .fh-nav {
+  .fh-app--layout-mobile-frame .fh-nav,
+  .fh-app--layout-prose .fh-nav {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
@@ -1671,6 +1693,9 @@ a {
     border-left: 1px solid var(--rule);
     border-right: 1px solid var(--rule);
   }
+}
+@media (min-width: 720px) {
+  .fh-app--layout-prose .fh-nav { max-width: 640px; }
 }
 .fh-nav__item {
   position: relative;

@@ -30,6 +30,36 @@ function RouteFallback() {
   )
 }
 
+/**
+ * Route → layout mode resolver. V3-SYSTEM-1A2.
+ *
+ * Three modes are defined in global.css and applied via the
+ * .fh-app--layout-{mode} class on the shell root. Both the content
+ * column cap and the bottom-nav cap key off this single class so the
+ * dock and the page always agree.
+ *
+ *   'mobile-frame'  centered ~440px premium mobile frame (today's default)
+ *   'prose'         centered 640px prose width (read-heavy detail screens)
+ *   'responsive'    adaptive multi-column desktop canvas, caps at 1280
+ *
+ * Today every route resolves to 'mobile-frame', so visual output
+ * matches V3-SYSTEM-1A. When dedicated desktop mockups land for a
+ * route (Home, Jobs, Schedule are the priority candidates), add the
+ * override here and author per-screen desktop CSS alongside the
+ * existing mobile CSS. Screens stay layout-agnostic — they don't read
+ * the layout mode, they don't import a hook, they just render their
+ * mobile-first markup and the shell decides how much canvas they get.
+ */
+function layoutForPath(pathname) {
+  // Per-route overrides plug in here as desktop designs ship. Examples
+  // (commented placeholders, not active):
+  //   if (pathname === '/' || pathname.startsWith('/jobs')) return 'responsive'
+  //   if (pathname.startsWith('/schedule')) return 'responsive'
+  //   if (pathname.startsWith('/notes/')) return 'prose'
+  void pathname
+  return 'mobile-frame'
+}
+
 export default function AppShell() {
   const location = useLocation()
 
@@ -37,8 +67,14 @@ export default function AppShell() {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [location.pathname])
 
+  const layoutMode = layoutForPath(location.pathname)
+
   return (
-    <div className="fh-app" style={{ position: 'relative' }}>
+    <div
+      className={`fh-app fh-app--layout-${layoutMode}`}
+      data-layout={layoutMode}
+      style={{ position: 'relative' }}
+    >
       {/* Skip-to-content link — only visible when keyboard-focused.
           Bumps a11y so keyboard users don't have to tab through every
           header + nav control to reach the screen body. */}
