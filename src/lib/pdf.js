@@ -844,7 +844,7 @@ function drawApprovalSeal(doc, ctx) {
 function drawApprovalCertificate(doc, ctx, y) {
   const { margin, contentWidth, approval } = ctx
 
-  y = drawSectionTitle(doc, margin, y, 'APPROVED QUOTE SNAPSHOT', PROPOSAL_BRAND.sectionH3)
+  y = drawSectionTitle(doc, margin, y, 'APPROVED QUOTE RECORD', PROPOSAL_BRAND.sectionH3)
   y += 2
 
   const rows = [
@@ -890,7 +890,7 @@ function drawApprovalCertificate(doc, ctx, y) {
   doc.setFontSize(8.5)
   doc.setTextColor(...INK_MUTED)
   const auditFootnote =
-    'This page certifies the snapshot above as the approved quote of record. Subsequent changes to items, scope, or terms do not alter this snapshot.'
+    'This page certifies the record above as the approved quote. Future changes to items, scope, or terms do not alter this approval record.'
   const auditWrapped = doc.splitTextToSize(auditFootnote, contentWidth)
   doc.text(auditWrapped, margin, y)
   return y + auditWrapped.length * 4

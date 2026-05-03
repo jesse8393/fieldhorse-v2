@@ -252,7 +252,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       })
       if (rpcErr) {
         console.error('[approve-quote] RPC error:', { rpc: rpcErr })
-        throw rpcErr
+        throw new Error('Approval could not be saved. Please try again.')
       }
 
       // Require a row with an id. supabase-js may return the composite
@@ -261,7 +261,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       const versionRow = Array.isArray(rpcData) ? rpcData[0] : rpcData
       if (!versionRow || !versionRow.id) {
         console.error('[approve-quote] RPC returned no row:', { rpc: rpcData })
-        throw new Error('Approval did not save. Your snapshot was not created — check your connection and try again.')
+        throw new Error('Approval could not be saved. Please try again.')
       }
 
       // Hard readback guard — the RPC's "success" claim is not enough.
@@ -285,11 +285,11 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
       if (verifyErr) {
         console.error('[approve-quote] readback error:', { rpc: rpcData, verify: verifyErr })
-        throw verifyErr
+        throw new Error('Approval could not be saved. Please try again.')
       }
       if (!confirmed) {
         console.error('[approve-quote] readback returned no row:', { rpc: rpcData, confirmed })
-        throw new Error('Approval did not verify. Snapshot row was not found after save.')
+        throw new Error('The approval was sent, but we couldn\'t confirm it saved. Please try again.')
       }
 
       // Approval-stamped PDF archive (Phase 4C-3) — generate the
@@ -308,22 +308,25 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           confirmed, snapshot, company, contact, userId
         })
         if (!archiveResult.ok) {
-          archiveNote = ' · PDF archive failed'
+          archiveNote = ' · PDF save failed'
           console.warn('[approve-quote] archive failed:', archiveResult.error)
         } else if (!archiveResult.linked) {
-          archiveNote = ' · Saved to Files · Version link failed'
+          // File row exists in Files tab — operator-visible success.
+          // Internal version-link gap is a developer concern; suppress
+          // from user-facing toast per copy spec.
+          archiveNote = ' · Saved to Files'
           console.warn('[approve-quote] file archived but version link verify failed')
         } else {
           archiveNote = ' · Saved to Files'
         }
       } catch (archiveErr) {
         console.warn('[approve-quote] archive threw:', archiveErr)
-        archiveNote = ' · PDF archive failed'
+        archiveNote = ' · PDF save failed'
       }
 
-      // Stage advance only runs after the snapshot is confirmed persisted
-      // by a real SELECT. Failure here logs but does not unlock the
-      // snapshot — proposal_status is already 'approved' on the server.
+      // Stage advance only runs after the approval record is persisted
+      // by a real SELECT. Failure here logs but does not unwind the
+      // approval — proposal_status is already 'approved' on the server.
       // Stage advance proceeds independently of PDF archive outcome.
       let stageNote = ''
       if (moveToJob) {
@@ -334,19 +337,23 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           stageNote = ' · Moved to Job'
         } catch (stageErr) {
           console.warn('[approve-quote] stage advance failed:', stageErr)
-          stageNote = ' · Stage advance failed — set Job manually'
+          stageNote = ' · Job stage update failed'
         }
       }
 
       toastSuccess(
         `Quote approved${archiveNote}${stageNote}`,
-        `Locked snapshot v${confirmed.version_number} · ${money(totals.base)}`
+        `Approved version ${confirmed.version_number} · ${money(totals.base)}`
       )
       onApproved?.()
       onClose?.()
     } catch (e) {
       console.error('[approve-quote] failed:', e)
-      setErr(e?.message || 'Approval failed. Try again.')
+      // Use the message we threw when it's one of ours; otherwise
+      // fall back to a generic human message. Technical/Postgres
+      // strings stay in the console for diagnostics, never surfaced.
+      const ours = e?.message && /^(Approval|The approval|Add at least)/.test(e.message)
+      setErr(ours ? e.message : 'Approval could not be saved. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -435,7 +442,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
           color: 'var(--v3-text)'
         }}>
-          This creates the approved quote snapshot — a permanent record of what the customer agreed to. Different from sending the PDF (Send Quote). Edits made later won't change what was approved.
+          This creates a saved approval record — a permanent record of what the customer agreed to. Different from sending the PDF (Send Quote). Edits made later won't change what was approved.
         </span>
       </div>
 
@@ -496,11 +503,11 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           value={signatureData}
           onChange={setSignatureData}
           label="Customer signature"
-          hint="Optional — capture a signature when the customer signs in person."
+          hint="Optional — use this when the customer signs in person."
         />
       )}
       {method === 'signature_typed' && (
-        <SheetField label="Typed signature">
+        <SheetField label="Customer signature">
           <input
             type="text"
             value={signatureData || ''}
@@ -515,7 +522,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
             marginTop: 4,
             display: 'block'
           }}>
-            Optional — capture a signature when the customer signs in person.
+            Optional — use this when the customer signs in person.
           </span>
         </SheetField>
       )}

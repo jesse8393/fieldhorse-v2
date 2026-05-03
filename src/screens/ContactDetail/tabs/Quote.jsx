@@ -275,7 +275,7 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
           fontSize: 11, lineHeight: 1.5,
           color: 'var(--v3-text-muted)'
         }}>
-          Snapshot is locked{approvedAt ? ` · ${shortDate(approvedAt)}` : ''}. Future edits to items, scope, terms, or exclusions don't change what the customer agreed to.
+          Approval saved{approvedAt ? ` · ${shortDate(approvedAt)}` : ''}. Future edits to items, scope, terms, or exclusions don't change what the customer agreed to.
         </p>
         <button
           type="button"
@@ -298,7 +298,7 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
 
   const helper = baseCount === 0
     ? 'Add at least one base line item to enable approval.'
-    : 'Locks the customer-approved quote as a permanent snapshot. Different from sending the PDF — use this when the customer says yes.'
+    : 'Saves a permanent record of the customer-approved quote. Different from sending the PDF — use this when the customer says yes.'
 
   return (
     <div style={{
