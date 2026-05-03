@@ -533,14 +533,38 @@ export default function Home() {
         variants={item}
         className="v3-section"
         style={{
+          position: 'relative',
+          overflow: 'hidden',
           margin: '0 var(--v3-gutter) 14px',
-          padding: '14px 16px',
-          // V3-HOME-1B: a touch more frame weight so the card reads as
-          // an anchor, not a stat strip. Border + soft inner highlight.
+          padding: '14px 18px',
+          // V3-HOME-1C: glass-metal depth recipe. Stronger inset top
+          // highlight reads as glass, subtle bottom inner shadow gives
+          // the surface vertical body, deep+soft outer shadow lifts the
+          // card off the obsidian base. Border kept restrained — depth
+          // does the work, not a heavy outline.
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 6px 18px rgba(0, 0, 0, 0.22)'
+          boxShadow: [
+            'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+            'inset 0 -1px 0 rgba(0, 0, 0, 0.18)',
+            '0 1px 2px rgba(0, 0, 0, 0.40)',
+            '0 12px 28px rgba(0, 0, 0, 0.30)'
+          ].join(', ')
         }}
       >
+        {/* Gold accent stripe — V3-HOME-1C. The financial anchor earns
+            this metallic accent; list cards never get it. Restrained
+            gradient, partial-width inset so it reads as luminance, not
+            decoration. */}
+        <span aria-hidden="true" style={{
+          position: 'absolute',
+          top: 0,
+          left: '20%',
+          right: '20%',
+          height: 1,
+          background: 'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--v3-primary) 50%, transparent) 50%, transparent 100%)',
+          pointerEvents: 'none'
+        }} />
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
           {/* View-all demoted: smaller, muted-by-default so the metric
@@ -571,23 +595,28 @@ export default function Home() {
         <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
           <div style={{
             fontFamily: 'var(--font-body)',
-            fontSize: 28,
+            // V3-HOME-1C: 28→30pt with conservative metallic gold glow.
+            // Soft text-shadow at 22% alpha — luminance, not bling.
+            // Tabular nums + tight tracking keep the read sharp.
+            fontSize: 30,
             fontWeight: 700,
-            letterSpacing: '-0.01em',
+            letterSpacing: '-0.012em',
             color: 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums',
-            lineHeight: 1.05
+            lineHeight: 1.05,
+            textShadow: '0 0 14px color-mix(in srgb, var(--v3-primary) 22%, transparent)'
           }}>
             {pipeline == null ? (
-              <span className="v3-skeleton" style={{ width: 140, height: 26, borderRadius: 6 }} />
+              <span className="v3-skeleton" style={{ width: 140, height: 28, borderRadius: 6 }} />
             ) : (
               <>
                 <span style={{
-                  fontSize: 16,
+                  fontSize: 17,
                   color: 'var(--v3-text-muted)',
                   verticalAlign: 'top',
                   marginRight: 2,
-                  fontWeight: 600
+                  fontWeight: 600,
+                  textShadow: 'none'
                 }}>
                   $
                 </span>
@@ -839,15 +868,17 @@ function PipelineStackedBreakdown({ breakdown }) {
   ]
   return (
     <div style={{ marginTop: 12 }}>
-      {/* V3-HOME-1B: 4→6px track so the breakdown reads as a real
-          status anchor, not a hairline. Still slim enough to feel
-          like a status rule, not a chart. */}
+      {/* V3-HOME-1C: glass-track refinement. Inset depression on the
+          track wrapper + 1px top-edge highlight on each filled segment
+          so the breakdown reads as carved-into-glass rather than
+          painted-on-glass. Stays at 6px — chrome upgrade, not size. */}
       <div
         aria-hidden="true"
         style={{
           height: 6,
           borderRadius: 999,
           background: 'var(--v3-track)',
+          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.40)',
           overflow: 'hidden',
           display: 'flex',
           gap: 1
@@ -859,6 +890,7 @@ function PipelineStackedBreakdown({ breakdown }) {
             style={{
               width: `${(s.count / total) * 100}%`,
               background: s.tone,
+              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.18)',
               transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
             }}
           />
