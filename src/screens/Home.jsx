@@ -452,7 +452,7 @@ export default function Home() {
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           }}>
-            {greetingPrefix()}, {firstName}.
+            {greetingPrefix()} {firstName}.
           </div>
         </div>
 
@@ -532,17 +532,39 @@ export default function Home() {
       <motion.div
         variants={item}
         className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) 14px', padding: '14px 16px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 14px',
+          padding: '14px 16px',
+          // V3-HOME-1B: a touch more frame weight so the card reads as
+          // an anchor, not a stat strip. Border + soft inner highlight.
+          border: '1px solid var(--v3-border-strong)',
+          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 6px 18px rgba(0, 0, 0, 0.22)'
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
+          {/* View-all demoted: smaller, muted-by-default so the metric
+              framing stays the dominant moment. Fades to gold on hover/tap. */}
           <button
             type="button"
             onClick={() => { hapticTap(); navigate('/jobs') }}
-            className="v3-section-link"
-            style={{ fontSize: 11 }}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '4px 0',
+              fontFamily: 'var(--font-body)',
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              color: 'var(--v3-text-muted)',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              transition: 'color 160ms ease'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--v3-primary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--v3-text-muted)' }}
           >
-            View all jobs →
+            View all →
           </button>
         </div>
 
@@ -681,7 +703,7 @@ export default function Home() {
             icon={CalendarClock}
             value={jobsBehind}
             label="Jobs Behind"
-            subline={jobsBehind > 0 ? 'Reschedule' : null}
+            subline={jobsBehind > 0 ? 'Reschedule' : 'Overdue work'}
             onTap={() => navigate('/schedule')}
           />
         </div>
@@ -817,13 +839,13 @@ function PipelineStackedBreakdown({ breakdown }) {
   ]
   return (
     <div style={{ marginTop: 12 }}>
-      {/* Thin 4px progress track — V3-HOME-1: was 8px stacked bar with
-          a 3-column number grid below. Now a single slim track that
-          reads as a status rule, not a financial chart. */}
+      {/* V3-HOME-1B: 4→6px track so the breakdown reads as a real
+          status anchor, not a hairline. Still slim enough to feel
+          like a status rule, not a chart. */}
       <div
         aria-hidden="true"
         style={{
-          height: 4,
+          height: 6,
           borderRadius: 999,
           background: 'var(--v3-track)',
           overflow: 'hidden',
@@ -845,32 +867,38 @@ function PipelineStackedBreakdown({ breakdown }) {
         )}
       </div>
 
-      {/* Inline legend — replaces the 3-column 22pt numbers grid.
-          Single horizontal row with dot · count · label per segment. */}
+      {/* Inline legend — V3-HOME-1B: 11→12pt with stronger count
+          weight + slightly larger 7px dots so the row carries enough
+          visual weight to anchor the card without bringing back the
+          old 3-column 22pt numbers grid. */}
       <div style={{
-        marginTop: 8,
+        marginTop: 10,
         display: 'flex',
         flexWrap: 'wrap',
-        gap: 14,
+        gap: 16,
         fontFamily: 'var(--font-body)',
-        fontSize: 11,
+        fontSize: 12,
         color: 'var(--v3-text-muted)'
       }}>
         {segments.map((s) => (
           <span key={s.id} style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 7,
             lineHeight: 1
           }}>
             <span aria-hidden="true" style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: s.tone
+              width: 7, height: 7, borderRadius: '50%',
+              background: s.tone,
+              boxShadow: `0 0 0 2px color-mix(in srgb, ${
+                s.tone.startsWith('var(') ? `${s.tone}` : s.tone
+              } 18%, transparent)`
             }} />
             <span style={{
-              fontWeight: 700,
+              fontWeight: 800,
               color: 'var(--v3-text)',
-              fontVariantNumeric: 'tabular-nums'
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.005em'
             }}>
               {breakdown == null ? '—' : s.count}
             </span>
@@ -1021,15 +1049,16 @@ function PipelineDealRow({ deal, onTap }) {
         e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
       }}
     >
-      {/* Stage spine — 5px gradient. Glow removed (QA pass): blue/
-          purple stages were bleeding ambient atmosphere. Functional
-          color only — chip + spine carry the meaning. */}
+      {/* Stage spine — V3-HOME-1B: thinned 5→3px and shortened 36→20px
+          so it reads as a stage cue, not an old colored card outline.
+          Stage label below the deal name still carries the explicit
+          stage signal in its own color. */}
       <span aria-hidden="true" style={{
         flexShrink: 0,
-        width: 5,
-        height: 36,
-        borderRadius: 3,
-        background: `linear-gradient(180deg, ${stage.color}, color-mix(in srgb, ${stage.color} 50%, transparent))`
+        width: 3,
+        height: 20,
+        borderRadius: 2,
+        background: `color-mix(in srgb, ${stage.color} 70%, transparent)`
       }} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{
