@@ -421,27 +421,39 @@ export default function Home() {
       animate="show"
       style={{ paddingBottom: 120, background: 'var(--v3-bg)' }}
     >
-      {/* ─────────── GREETING + WEATHER CHIP ───────────
-          Tightened bottom padding 24 → 14 so the hero rides higher into
-          the viewport. The greeting reads as a single beat with the
-          hero, not a separate top zone. */}
+      {/* ─────────── COMPACT GREETING STRIP — V3-HOME-1 ───────────
+          Demoted from 36pt serif italic h1 to a single sans 14pt muted
+          line so the AppHeader wordmark and the operator command data
+          (pipeline + next actions) stay dominant. Date eyebrow stays.
+          Weather chip stays on the right. */}
       <motion.div
         variants={item}
         style={{
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
           gap: 16,
-          padding: '12px 16px 14px'
+          padding: '10px 16px 10px'
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
             {now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
           </span>
-          <h1 className="v3-h1" style={{ marginTop: 6 }}>
-            {greetingPrefix()} <em>{firstName}.</em>
-          </h1>
+          <div style={{
+            marginTop: 4,
+            fontFamily: 'var(--font-body)',
+            fontSize: 14,
+            fontWeight: 500,
+            letterSpacing: '-0.005em',
+            color: 'var(--v3-text-muted)',
+            lineHeight: 1.3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {greetingPrefix()}, {firstName}.
+          </div>
         </div>
 
         {hasCoords ? (
@@ -511,11 +523,129 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* ─────────── TODAY'S PRIORITIES — KPIs (mockup) ───────────
-          Per v3 mockup: 3 compact KPI cards stating what needs the
-          operator's attention today. Mockup leads with this BEFORE
-          the pipeline value so the operator sees the triage read
-          first; Pipeline follows. */}
+      {/* ─────────── PIPELINE MINI-CARD — V3-HOME-1 ───────────
+          Collapsed from a 300px stack (eyebrow + 56pt money + caption +
+          48px sparkline + stacked-bar + 3-col numbers row + link) into
+          a ~120px row: eyebrow + inline View-all + 28pt sans tabular
+          gold money + trend pill + thin progress + inline legend.
+          Sparkline removed — was stub-data driven, no real signal. */}
+      <motion.div
+        variants={item}
+        className="v3-section"
+        style={{ margin: '0 var(--v3-gutter) 14px', padding: '14px 16px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
+          <button
+            type="button"
+            onClick={() => { hapticTap(); navigate('/jobs') }}
+            className="v3-section-link"
+            style={{ fontSize: 11 }}
+          >
+            View all jobs →
+          </button>
+        </div>
+
+        <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 28,
+            fontWeight: 700,
+            letterSpacing: '-0.01em',
+            color: 'var(--v3-primary)',
+            fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1.05
+          }}>
+            {pipeline == null ? (
+              <span className="v3-skeleton" style={{ width: 140, height: 26, borderRadius: 6 }} />
+            ) : (
+              <>
+                <span style={{
+                  fontSize: 16,
+                  color: 'var(--v3-text-muted)',
+                  verticalAlign: 'top',
+                  marginRight: 2,
+                  fontWeight: 600
+                }}>
+                  $
+                </span>
+                <CountUp to={pipeline} formatter={(n) => n.toLocaleString()} />
+              </>
+            )}
+          </div>
+          {trendPct != null ? (
+            <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
+              {trendUp ? '+' : ''}{trendPct}% · 7d
+            </Pill>
+          ) : null}
+        </div>
+
+        {/* Thin breakdown — single 4px track + inline legend. Replaces
+            the chunky 8px stacked bar + 3-column numbers grid. */}
+        <PipelineStackedBreakdown breakdown={stageBreakdown} />
+      </motion.div>
+
+      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK (promoted) ───────────
+          V3-HOME-1: moved above Today's Priorities so the operator sees
+          their command surface in the first viewport. Gold-tinted card
+          retains primary status; per-action pills now uniform shape. */}
+      {nextActions != null && nextActions.length > 0 && (
+        <motion.div
+          variants={item}
+          className="v3-section v3-section--primary-quiet"
+          style={{ margin: '0 var(--v3-gutter) 14px' }}
+        >
+          <div className="v3-section-header">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+                Next Actions
+              </span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 20,
+                height: 20,
+                padding: '0 7px',
+                borderRadius: 999,
+                background: 'var(--v3-primary)',
+                color: 'var(--v3-on-primary)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1
+              }}>
+                {nextActions.length}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => { hapticTap(); navigate('/jobs') }}
+              className="v3-section-link"
+            >
+              View all
+              <ChevronRight size={12} aria-hidden="true" />
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+            {nextActions.map((action) => (
+              <NextActionRow
+                key={action.id}
+                action={action}
+                onTap={() => action.contactId
+                  ? navigate(`/jobs/${action.contactId}`)
+                  : navigate('/jobs')
+                }
+              />
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ─────────── TODAY'S PRIORITIES — KPIs (demoted) ───────────
+          V3-HOME-1: moved below Next Actions. Tile chrome demoted —
+          colored top-edge bar removed; tone now signaled only by the
+          tiny icon chip color, keeping cards quiet but readable. */}
       <motion.div
         variants={item}
         className="v3-section v3-section--quiet"
@@ -556,132 +686,6 @@ export default function Home() {
           />
         </div>
       </motion.div>
-
-      {/* PIPELINE CARD — compact per v3 mockup. Was the giant 100px-money
-          hero with stretched ambient blobs. Now: framed v3 section
-          card with modest pipeline value, trend, sparkline + bottom
-          breakdown row (Won / Active / Lead). */}
-      <motion.div
-        variants={item}
-        className="v3-section v3-section--primary-quiet"
-        style={{ margin: '0 var(--v3-gutter) 14px', padding: '18px' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
-          {trendPct != null ? (
-            <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
-              {trendUp ? '+' : ''}{trendPct}%
-            </Pill>
-          ) : null}
-        </div>
-
-        <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <div
-            className="v3-money"
-            style={{
-              fontSize: 'clamp(40px, 9vw, 56px)',
-              lineHeight: 0.95,
-              letterSpacing: '-0.005em',
-              color: '#FFFFFF'
-            }}
-          >
-            {pipeline == null ? (
-              <span className="v3-skeleton" style={{ width: 180, height: 48, borderRadius: 6 }} />
-            ) : (
-              <>
-                <span style={{
-                  fontSize: 'clamp(20px, 4.5vw, 28px)',
-                  color: 'var(--v3-text-muted)',
-                  verticalAlign: 'top',
-                  marginRight: 3,
-                  lineHeight: 1
-                }}>
-                  $
-                </span>
-                <CountUp to={pipeline} formatter={(n) => n.toLocaleString()} />
-              </>
-            )}
-          </div>
-          <div className="v3-caption" style={{ fontSize: 11 }}>vs last 7 days</div>
-        </div>
-
-        <div style={{ marginTop: 14, marginLeft: -8, marginRight: -8 }}>
-          <Sparkline data={sparkData} color="var(--v3-primary)" height={48} />
-        </div>
-
-        {/* Stage breakdown — Won / Active / Lead as a stacked bar
-            visualization. Mockup-tier financial dashboard treatment:
-            single horizontal bar with 3 colored segments + a numbers
-            row underneath. Replaces the prior 3-column number grid. */}
-        <PipelineStackedBreakdown breakdown={stageBreakdown} />
-
-        <button
-          type="button"
-          onClick={() => { hapticTap(); navigate('/jobs') }}
-          className="v3-section-link"
-          style={{ fontSize: 11, marginTop: 12 }}
-        >
-          View all jobs →
-        </button>
-      </motion.div>
-
-      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
-          Strongest section on the screen after the hero. Gold-tinted
-          border + raised shadow + count badge in the eyebrow tells the
-          operator: this is what to DO. Per-job CTAs tagged with urgency
-          (danger/warn/success) so critical work surfaces by color. */}
-      {nextActions != null && nextActions.length > 0 && (
-        <motion.div
-          variants={item}
-          className="v3-section v3-section--primary-quiet"
-          style={{ margin: '0 var(--v3-gutter) 14px' }}
-        >
-          <div className="v3-section-header">
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
-                Next Actions
-              </span>
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 20,
-                height: 20,
-                padding: '0 7px',
-                borderRadius: 999,
-                background: 'var(--v3-primary)',
-                color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 11,
-                letterSpacing: '0.04em',
-                lineHeight: 1
-              }}>
-                {nextActions.length}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => { hapticTap(); navigate('/jobs') }}
-              className="v3-section-link"
-            >
-              View all
-              <ChevronRight size={12} aria-hidden="true" />
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
-            {nextActions.map((action) => (
-              <NextActionRow
-                key={action.id}
-                action={action}
-                onTap={() => action.contactId
-                  ? navigate(`/jobs/${action.contactId}`)
-                  : navigate('/jobs')
-                }
-              />
-            ))}
-          </div>
-        </motion.div>
-      )}
 
       {/* ─────────── TODAY ON SITE ───────────
           Schedule entries that start today, sourced from a safe
@@ -812,21 +816,19 @@ function PipelineStackedBreakdown({ breakdown }) {
     { id: 'lead',   label: 'Lead',   count: lead,   tone: 'var(--v3-text-muted)' }
   ]
   return (
-    <div style={{
-      marginTop: 14,
-      paddingTop: 14,
-      borderTop: '1px solid var(--v3-border)'
-    }}>
-      {/* Stacked bar */}
+    <div style={{ marginTop: 12 }}>
+      {/* Thin 4px progress track — V3-HOME-1: was 8px stacked bar with
+          a 3-column number grid below. Now a single slim track that
+          reads as a status rule, not a financial chart. */}
       <div
         aria-hidden="true"
         style={{
-          height: 8,
+          height: 4,
           borderRadius: 999,
           background: 'var(--v3-track)',
           overflow: 'hidden',
           display: 'flex',
-          gap: 2
+          gap: 1
         }}
       >
         {total > 0 ? segments.map((s) => (
@@ -843,33 +845,37 @@ function PipelineStackedBreakdown({ breakdown }) {
         )}
       </div>
 
-      {/* Numbers row underneath */}
+      {/* Inline legend — replaces the 3-column 22pt numbers grid.
+          Single horizontal row with dot · count · label per segment. */}
       <div style={{
-        marginTop: 10,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 12
+        marginTop: 8,
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 14,
+        fontFamily: 'var(--font-body)',
+        fontSize: 11,
+        color: 'var(--v3-text-muted)'
       }}>
         {segments.map((s) => (
-          <div key={s.id}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontFamily: 'var(--font-display)',
-              fontSize: 22,
-              lineHeight: 1,
-              color: s.tone,
+          <span key={s.id} style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            lineHeight: 1
+          }}>
+            <span aria-hidden="true" style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: s.tone
+            }} />
+            <span style={{
+              fontWeight: 700,
+              color: 'var(--v3-text)',
               fontVariantNumeric: 'tabular-nums'
             }}>
-              <span aria-hidden="true" style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: s.tone
-              }} />
               {breakdown == null ? '—' : s.count}
-            </div>
-            <div className="v3-eyebrow" style={{ marginTop: 4 }}>{s.label}</div>
-          </div>
+            </span>
+            <span style={{ letterSpacing: '0.02em' }}>{s.label}</span>
+          </span>
         ))}
       </div>
     </div>
@@ -1112,11 +1118,9 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
         overflow: 'hidden'
       }}
     >
-      {/* 2px accent bar at top — the only chromatic signal on the tile */}
-      <span aria-hidden="true" style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-        background: t.color, opacity: 0.85
-      }} />
+      {/* V3-HOME-1: removed the 2px colored top-edge bar. Tone now
+          signaled only via the icon chip + value color, keeping the
+          tile chrome quiet so Next Actions stays the gold moment. */}
 
       {Icon ? (
         <span aria-hidden="true" style={{

@@ -1680,16 +1680,22 @@ a {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-/* Active tab: strong read via color + subtle bg tile + gold glyph.
-   Dark theme gets a faint gold wash; light theme gets an onyx-tinted wash. */
+/* Active tab: stronger soft-pill read (V3-HOME-1) — bumped alpha and
+   added a subtle inner gold stroke so the active state feels tactile,
+   not just tinted. Dark theme gets the gold wash; light theme gets an
+   onyx-tinted wash with the same inner stroke for parity. */
 .fh-nav__item.is-active {
   color: var(--ink-strong);
-  background: rgba(199, 164, 90, 0.10);
+  background: rgba(229, 193, 88, 0.18);
   border-radius: 12px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 30%, transparent);
 }
 .fh-nav__item.is-active .fh-nav__icon { color: var(--field-gold-bright); }
 .fh-nav__item.is-active .fh-nav__label { color: var(--ink-strong); font-weight: 700; }
-[data-theme='light'] .fh-nav__item.is-active { background: rgba(11, 11, 11, 0.05); }
+[data-theme='light'] .fh-nav__item.is-active {
+  background: rgba(11, 11, 11, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(11, 11, 11, 0.08);
+}
 .fh-nav__item:hover { color: var(--ink-strong); }
 .fh-nav__icon {
   display: inline-flex;
@@ -1710,12 +1716,14 @@ a {
 .fh-nav__dot {
   position: absolute;
   bottom: 2px;
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   border-radius: 999px;
   background: var(--field-gold);
-  box-shadow: 0 0 0 4px rgba(199, 164, 90, 0.18);
-  /* The layoutId dot can otherwise steal the first tap while animating. */
+  box-shadow: 0 0 0 3px rgba(199, 164, 90, 0.18);
+  /* V3-HOME-1: 6→4px so the soft active pill carries the visual
+     weight; the dot stays as a transition cue, not the dominant mark.
+     The layoutId dot can otherwise steal the first tap while animating. */
   pointer-events: none;
 }
 
