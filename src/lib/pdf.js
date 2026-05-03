@@ -883,6 +883,20 @@ function drawApprovalCertificate(doc, ctx, y) {
     y += wrapped.length * PROPOSAL_BRAND.proseLineHeight
   }
 
+  // Signature block (Phase 4C-4c) — drawn or typed. Page-break-protected
+  // so the signature + audit footnote stay together. Rendered only when
+  // signatureKind + signatureData were captured at approval time.
+  const hasSig = approval.signatureKind && approval.signatureData &&
+    String(approval.signatureData).trim().length > 0
+  if (hasSig) {
+    if (y + 54 > ctx.pageHeight - PROPOSAL_BRAND.pageBottomGuard) {
+      doc.addPage()
+      drawPageHeaderStrip(doc, ctx)
+      y = PROPOSAL_BRAND.pageTopBody
+    }
+    y = drawSignatureOnCertificate(doc, ctx, y, approval)
+  }
+
   // Audit footer note — small, muted, sits below the certificate so the
   // contractor's branding stays the dominant moment of the page.
   y += 8
@@ -908,6 +922,88 @@ function formatApprovalMethod(method) {
     case 'esign_link':        return 'Customer e-signature link'
     default:                  return String(method)
   }
+}
+
+/* ============================================================
+   Signature block on the approved certificate (Phase 4C-4c).
+   Renders the captured customer signature — drawn PNG or typed
+   italic text — above a baseline rule, with a small label below.
+   Falls back to the printed name when the data URL can't be
+   embedded; never throws so PDF generation always completes.
+   ============================================================ */
+function drawSignatureOnCertificate(doc, ctx, y, approval) {
+  const { margin } = ctx
+  const baselineWidth = 80
+
+  drawEyebrow(doc, margin, y + 0.5, 'CUSTOMER SIGNATURE')
+  y += 8
+
+  // Render the signature mark. blockBottom is the y-coordinate just
+  // below the rendered ink — used to position the baseline rule.
+  let blockBottom
+
+  const isDrawn =
+    approval.signatureKind === 'drawn' &&
+    typeof approval.signatureData === 'string' &&
+    approval.signatureData.startsWith('data:image/')
+
+  if (isDrawn) {
+    try {
+      const props = doc.getImageProperties(approval.signatureData)
+      const aspect = (props?.width || 1) / (props?.height || 1)
+      const maxW = baselineWidth
+      const maxH = 24
+      let w = maxW
+      let h = w / aspect
+      if (h > maxH) {
+        h = maxH
+        w = h * aspect
+      }
+      doc.addImage(approval.signatureData, 'PNG', margin, y, w, h)
+      blockBottom = y + h
+    } catch (e) {
+      console.warn('[pdf] drawn signature embed failed, falling back to typed:', e)
+      blockBottom = drawTypedSignatureLine(doc, margin, y, approval.approvedByName || '')
+    }
+  } else if (approval.signatureKind === 'typed' && approval.signatureData) {
+    blockBottom = drawTypedSignatureLine(doc, margin, y, String(approval.signatureData))
+  } else {
+    // Unknown shape (shouldn't happen given the hasSig gate at the
+    // caller). Defensive: print the approved-by name in italic.
+    blockBottom = drawTypedSignatureLine(doc, margin, y, approval.approvedByName || '')
+  }
+
+  // Baseline rule under the signature.
+  doc.setDrawColor(...ONYX)
+  doc.setLineWidth(0.6)
+  doc.line(margin, blockBottom + 1, margin + baselineWidth, blockBottom + 1)
+
+  // Label below baseline — name, signed date, method.
+  const labelY = blockBottom + 6
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...INK_MUTED)
+  const labelParts = [
+    approval.approvedByName || '',
+    approval.approvedAt ? `Signed ${formatLongDate(approval.approvedAt)}` : '',
+    formatApprovalMethod(approval.method)
+  ].filter((s) => s && String(s).trim().length > 0)
+  if (labelParts.length > 0) {
+    doc.text(labelParts.join('  ·  '), margin, labelY)
+  }
+
+  return labelY + 4
+}
+
+function drawTypedSignatureLine(doc, x, yTop, text) {
+  // Italic 22pt — visual signature feel without a custom script font.
+  // yTop is the top of the cell; baseline lands ~8mm below for 22pt.
+  doc.setFont('helvetica', 'italic')
+  doc.setFontSize(22)
+  doc.setTextColor(...ONYX)
+  const baseline = yTop + 8
+  doc.text(String(text || ''), x, baseline)
+  return baseline + 2
 }
 
 /* ============================================================
