@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Eye, Download, Send, ShieldCheck, Lock } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
@@ -6,6 +6,7 @@ import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
 import { toastError, toastSuccess } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
+import { dateInputToTimestamp } from '../../../lib/dueDate.js'
 import QuoteItemsSection from '../sections/QuoteItems.jsx'
 import QuoteTermsSection from '../sections/QuoteTerms.jsx'
 
@@ -74,19 +75,58 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   const [busy, setBusy] = useState(null) // 'preview' | 'download' | 'send' | null
   const disabled = baseCount === 0 || busy !== null
 
+  // Mirror of QuoteTermsSection's local state. The terms editor pushes
+  // its current values here on every change; buildPdf reads from this
+  // ref so unblurred textarea content reaches the PDF — independent of
+  // mobile blur-timing races (P1 fix from V3-QA-1B retest).
+  const termsValuesRef = useRef({ scope: '', exclusions: '', terms: '', expires: '' })
+
   // Shared PDF build path. Fetches fresh items so any pending blur
   // saves on QuoteTerms or QuoteItems are reflected. Throws on zero
   // base items so the catch in each handler can surface a friendly
   // toast — defensive even though the disabled state prevents this.
   async function buildPdf() {
     if (!contact?.id || !userId) throw new Error('Contact not loaded')
-    // Flush any pending onBlur autosaves on the QuoteTerms inputs so
-    // contact.scope_text / terms_text / exclusions_text reflect the
-    // operator's latest typed value before we build the PDF payload.
-    // P1 fix: without this, hitting Preview while still focused inside
-    // a textarea read stale fields and the PDF substituted boilerplate.
-    try { document?.activeElement?.blur?.() } catch { /* noop */ }
-    await new Promise((r) => setTimeout(r, 50))
+
+    // Pull latest local state from QuoteTermsSection — published into
+    // termsValuesRef on every change (V3-QA-1B fix). Falls back to the
+    // contact row's persisted values when no edits are pending.
+    const local = termsValuesRef.current || {}
+    const pendingScope = local.scope ?? (contact.scope_text || '')
+    const pendingExclusions = local.exclusions ?? (contact.exclusions_text || '')
+    const pendingTerms = local.terms ?? (contact.terms_text || '')
+    const pendingExpiresIso = local.expires
+      ? dateInputToTimestamp(local.expires)
+      : (contact.quote_expires_at || null)
+
+    // Persist any unblurred edits before rendering, so the approval
+    // snapshot also reflects them. Diff vs persisted values; null
+    // out blanks. patch is optimistic — local state matches contact
+    // immediately; the awaited server-write also queues.
+    const norm = (s) => {
+      const t = String(s || '').trim()
+      return t.length === 0 ? null : t
+    }
+    const updates = {}
+    const persistedScope = contact.scope_text || ''
+    const persistedExclusions = contact.exclusions_text || ''
+    const persistedTerms = contact.terms_text || ''
+    if (norm(pendingScope) !== norm(persistedScope)) {
+      updates.scope_text = norm(pendingScope)
+    }
+    if (norm(pendingExclusions) !== norm(persistedExclusions)) {
+      updates.exclusions_text = norm(pendingExclusions)
+    }
+    if (norm(pendingTerms) !== norm(persistedTerms)) {
+      updates.terms_text = norm(pendingTerms)
+    }
+    if (pendingExpiresIso !== (contact.quote_expires_at || null)) {
+      updates.quote_expires_at = pendingExpiresIso
+    }
+    if (Object.keys(updates).length > 0 && patch) {
+      try { await patch(updates) } catch (e) { console.warn('[buildPdf] terms patch failed:', e) }
+    }
+
     const { data, error } = await supabase
       .from('fh_quote_items')
       .select('*')
@@ -113,10 +153,10 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         job_title: contact.job_title
       },
       items,
-      scope: contact.scope_text || '',
-      terms: contact.terms_text || '',
-      exclusions: contact.exclusions_text || '',
-      expiresAt: contact.quote_expires_at || null,
+      scope: pendingScope || '',
+      terms: pendingTerms || '',
+      exclusions: pendingExclusions || '',
+      expiresAt: pendingExpiresIso,
       status: contact.proposal_status || 'draft',
       quoteId: contact.id
     })
@@ -224,6 +264,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       <QuoteTermsSection
         contact={contact}
         patch={patch}
+        valuesRef={termsValuesRef}
       />
 
       <ActionBar

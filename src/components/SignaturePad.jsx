@@ -131,6 +131,11 @@ export default function SignaturePad({
 
     function down(e) {
       e.preventDefault()
+      // Stop bubbling so the parent ActionSheet's framer-motion drag
+      // handler doesn't pick this gesture up and dismiss the sheet
+      // when the operator slightly oversteps the canvas. P2 fix from
+      // V3-QA-1B retest.
+      e.stopPropagation()
       try { canvas.setPointerCapture(e.pointerId) } catch { /* ignore */ }
       isDrawing.current = true
       const p = pointerPos(e)
@@ -144,6 +149,7 @@ export default function SignaturePad({
     function move(e) {
       if (!isDrawing.current) return
       e.preventDefault()
+      e.stopPropagation()
       const p = pointerPos(e)
       const last = lastPoint.current
       // Quadratic-curve smoothing through midpoint of last+current.
@@ -159,6 +165,7 @@ export default function SignaturePad({
     function up(e) {
       if (!isDrawing.current) return
       isDrawing.current = false
+      e.stopPropagation()
       try { canvas.releasePointerCapture(e.pointerId) } catch { /* ignore */ }
       // Tail off any in-progress curve to the final point.
       const p = pointerPos(e)

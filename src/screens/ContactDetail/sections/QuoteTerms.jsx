@@ -17,7 +17,7 @@ import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate
  * the operator typing and blurring because the effect keys on
  * `id` + `updated_at`, not on every render.
  */
-export default function QuoteTermsSection({ contact, patch }) {
+export default function QuoteTermsSection({ contact, patch, valuesRef }) {
   const [scope, setScope] = useState(contact?.scope_text || '')
   const [exclusions, setExclusions] = useState(contact?.exclusions_text || '')
   const [terms, setTerms] = useState(contact?.terms_text || '')
@@ -29,6 +29,15 @@ export default function QuoteTermsSection({ contact, patch }) {
     setTerms(contact?.terms_text || '')
     setExpires(timestampToDateInput(contact?.quote_expires_at))
   }, [contact?.id, contact?.updated_at])
+
+  // Publish the latest local state into a parent-owned ref on every
+  // change. Quote.jsx's buildPdf reads from this ref so unblurred
+  // textarea content reaches the PDF reliably — independent of any
+  // blur-timing race. No re-render side effect (refs don't subscribe).
+  useEffect(() => {
+    if (!valuesRef) return
+    valuesRef.current = { scope, exclusions, terms, expires }
+  }, [scope, exclusions, terms, expires, valuesRef])
 
   // Normalize blank → null so the column stores absence consistently
   // (downstream PDF + status-pill logic checks `is null` not `=== ''`).

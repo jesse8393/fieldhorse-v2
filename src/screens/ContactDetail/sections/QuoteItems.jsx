@@ -95,6 +95,14 @@ function validateDraft(d) {
 }
 
 function normalizeForDB(d) {
+  // Derive flags from a single canonical kind so an inconsistent draft
+  // (e.g. both flags somehow true) can never reach the DB. Mutually
+  // exclusive by construction.
+  const kind = d?.is_excluded
+    ? 'excluded'
+    : d?.is_optional
+      ? 'optional'
+      : 'base'
   return {
     section: d.section?.trim() || null,
     description: d.description.trim(),
@@ -103,8 +111,8 @@ function normalizeForDB(d) {
     rate: Number(d.rate),
     amount: Number(d.amount),
     notes: d.notes?.trim() || null,
-    is_optional: !!d.is_optional,
-    is_excluded: !!d.is_excluded
+    is_optional: kind === 'optional',
+    is_excluded: kind === 'excluded'
   }
 }
 
@@ -756,16 +764,31 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
         />
       </FormField>
 
-      {/* Mode — mutually exclusive 3-way segment. Replaces the prior
-          parallel checkboxes so every row is exactly one of base /
-          optional / excluded. Drives is_optional + is_excluded
-          atomically via the synthetic 'kind' key in patchDraft. */}
-      <FormField label="Mode" hint="Base items count toward the quoted price. Optional add-ons and exclusions appear on the proposal but never roll up.">
+      {/* Mode — mutually exclusive 3-way segment. NOT wrapped in
+          FormField (a <label>) because <label> forwards clicks to the
+          first form-control descendant — the Base button — which
+          silently reset every non-Base selection back to Base on the
+          Add form. Inline div avoids the label-forward path entirely. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.10em',
+          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
+        }}>
+          Mode
+        </span>
         <KindPicker
           value={draft.is_excluded ? 'excluded' : draft.is_optional ? 'optional' : 'base'}
           onChange={(kind) => onChange('kind', kind)}
         />
-      </FormField>
+        <span style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 11, lineHeight: 1.4,
+          color: 'var(--v3-text-muted)'
+        }}>
+          Base items count toward the quoted price. Optional add-ons and exclusions appear on the proposal but never roll up.
+        </span>
+      </div>
 
       {/* Action row */}
       <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>

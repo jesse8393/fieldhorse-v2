@@ -373,6 +373,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       currentStep={submitting ? 2 : 1}
       commitLabel={submitting ? 'Approving…' : 'Approve quote'}
       commitBusy={submitting}
+      commitBusyLabel="Approving…"
       commitDisabled={commitDisabled}
       onClose={onClose}
       onCommit={handleCommit}
@@ -508,6 +509,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           onChange={setSignatureData}
           label="Customer signature"
           hint="Optional — use this when the customer signs in person."
+          height={150}
         />
       )}
       {method === 'signature_typed' && (
