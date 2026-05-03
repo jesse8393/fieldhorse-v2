@@ -4,9 +4,10 @@ import ActionSheet, { SheetField, SheetChipRow } from '../../../components/Actio
 import { supabase } from '../../../lib/supabase.js'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { toastError, toastSuccess } from '../../../lib/toast.js'
-import { hapticStageChange } from '../../../lib/haptics.js'
+import { hapticStageChange, hapticTap } from '../../../lib/haptics.js'
 import { approveQuote as pipelineApproveQuote } from '../../../lib/pipeline.js'
 import { generateQuote } from '../../../lib/pdf.js'
+import SignaturePad from '../../../components/SignaturePad.jsx'
 
 /**
  * Approve Quote sheet — Phase 4C-2.
@@ -33,10 +34,14 @@ import { generateQuote } from '../../../lib/pdf.js'
  */
 
 const METHODS = [
-  { value: 'verbal',    label: 'Verbal' },
-  { value: 'text',      label: 'Text' },
-  { value: 'email',     label: 'Email' },
-  { value: 'in_person', label: 'In person' }
+  { value: 'verbal',           label: 'Verbal' },
+  { value: 'text',             label: 'Text' },
+  { value: 'email',            label: 'Email' },
+  { value: 'in_person',        label: 'In person' },
+  { value: 'signature_drawn',  label: 'Signature (drawn)' },
+  { value: 'signature_typed',  label: 'Signature (typed)' },
+  // 4C-5 reserved — public customer-facing approval link.
+  { value: 'esign_link',       label: 'Customer link', disabled: true, hint: 'Customer link coming soon.' }
 ]
 
 function money(n) {
@@ -66,6 +71,11 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   const [email, setEmail] = useState('')
   const [note, setNote] = useState('')
   const [moveToJob, setMoveToJob] = useState(true)
+  // Signature state (4C-4b). signatureKind mirrors the schema enum
+  // ('drawn' | 'typed' | null). signatureData is either a PNG data URL
+  // (drawn) or plain text (typed). Both null when method is non-signature.
+  const [signatureKind, setSignatureKind] = useState(null)
+  const [signatureData, setSignatureData] = useState(null)
 
   const [items, setItems] = useState([])
   const [loadingItems, setLoadingItems] = useState(false)
@@ -82,6 +92,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     setEmail(contact?.email || '')
     setNote('')
     setMoveToJob(true)
+    setSignatureKind(null)
+    setSignatureData(null)
     setErr('')
     setSubmitting(false)
     if (!contact?.id || !userId) { setItems([]); return }
@@ -127,6 +139,26 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   const baseDisabled = totals.baseCount === 0 || loadingItems
   const formInvalid = !name.trim() || !method
   const commitDisabled = baseDisabled || formInvalid || submitting
+
+  // Method change controller — clean transition between modes so stale
+  // signature data never leaks across kinds. Typed mode seeds signatureData
+  // with the current name field ONCE on transition (per spec); subsequent
+  // edits in either field don't override each other.
+  function handleMethodChange(next) {
+    if (next === method) return
+    hapticTap()
+    setMethod(next)
+    if (next === 'signature_drawn') {
+      setSignatureKind('drawn')
+      setSignatureData(null) // canvas starts blank
+    } else if (next === 'signature_typed') {
+      setSignatureKind('typed')
+      setSignatureData(name.trim() || '')
+    } else {
+      setSignatureKind(null)
+      setSignatureData(null)
+    }
+  }
 
   async function handleCommit() {
     if (commitDisabled) return
@@ -195,6 +227,15 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         }
       }
 
+      // Normalize signature payload — non-signature methods send null
+      // for both fields regardless of any stale local state. Empty
+      // typed strings collapse to null so SQL `is null` checks work.
+      const isSigMethod = method === 'signature_drawn' || method === 'signature_typed'
+      const sigKindOut = isSigMethod ? signatureKind : null
+      const sigDataOut = isSigMethod && signatureData && String(signatureData).trim().length > 0
+        ? signatureData
+        : null
+
       const { data: rpcData, error: rpcErr } = await supabase.rpc('fn_approve_quote_version', {
         p_user_id: userId,
         p_contact_id: contact.id,
@@ -206,8 +247,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         p_approved_by_name: name.trim(),
         p_approved_by_email: email.trim() || null,
         p_approval_note: note.trim() || null,
-        p_signature_kind: null,
-        p_signature_data: null
+        p_signature_kind: sigKindOut,
+        p_signature_data: sigDataOut
       })
       if (rpcErr) {
         console.error('[approve-quote] RPC error:', { rpc: rpcErr })
@@ -235,7 +276,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         .select(
           'id, contact_id, version_number, status, approved_by_name, ' +
           'approved_by_email, approval_method, approval_note, ' +
-          'base_total, approved_at, snapshot'
+          'base_total, approved_at, snapshot, ' +
+          'signature_kind, signature_data'
         )
         .eq('id', versionRow.id)
         .eq('user_id', userId)
@@ -414,13 +456,69 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         </div>
       )}
 
-      {/* METHOD */}
-      <SheetChipRow
-        label="How was it approved?"
-        value={method}
-        options={METHODS}
-        onChange={setMethod}
-      />
+      {/* METHOD — inline so the disabled `Customer link` chip can carry
+          its own muted style + 'Coming soon' hint without touching the
+          shared SheetChipRow primitive. */}
+      <div className="fh-asheet-field">
+        <span className="fh-asheet-field__k">How was it approved?</span>
+        <div className="fh-asheet-chips" role="radiogroup" aria-label="How was it approved?">
+          {METHODS.map((opt) => {
+            const on = method === opt.value
+            const dis = !!opt.disabled
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-disabled={dis}
+                disabled={dis}
+                title={opt.hint || undefined}
+                className={`fh-asheet-chip${on ? ' is-on' : ''}`}
+                style={dis
+                  ? { opacity: 0.45, cursor: 'not-allowed' }
+                  : undefined}
+                onClick={() => { if (!dis) handleMethodChange(opt.value) }}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* SIGNATURE — drawn canvas or typed input depending on method.
+          Optional even when a signature method is selected (per spec:
+          'do not block verbal/text/email/in-person approvals' AND
+          'signature is optional even when signature method is selected'). */}
+      {method === 'signature_drawn' && (
+        <SignaturePad
+          value={signatureData}
+          onChange={setSignatureData}
+          label="Customer signature"
+          hint="Optional — capture a signature when the customer signs in person."
+        />
+      )}
+      {method === 'signature_typed' && (
+        <SheetField label="Typed signature">
+          <input
+            type="text"
+            value={signatureData || ''}
+            onChange={(e) => setSignatureData(e.target.value)}
+            placeholder={name || 'Customer types their name'}
+            style={{ fontStyle: 'italic' }}
+          />
+          <span style={{
+            fontSize: 11, lineHeight: 1.45,
+            color: 'var(--ink-faint, var(--ink-muted))',
+            fontFamily: 'var(--font-body)',
+            marginTop: 4,
+            display: 'block'
+          }}>
+            Optional — capture a signature when the customer signs in person.
+          </span>
+        </SheetField>
+      )}
 
       {/* NAME */}
       <SheetField label="Approved by">
@@ -523,7 +621,13 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
       approvedByEmail: confirmed.approved_by_email || '',
       approvalNote: confirmed.approval_note || '',
       baseTotal: Number(confirmed.base_total || 0),
-      approvedAt: confirmed.approved_at
+      approvedAt: confirmed.approved_at,
+      // 4C-4b: signature payload — read from confirmed row, not local
+      // state, so the artifact reflects what actually persisted.
+      // Rendered into the certificate by 4C-4c; ignored by current
+      // generateQuote.
+      signatureKind: confirmed.signature_kind || null,
+      signatureData: confirmed.signature_data || null
     }
 
     // Use snapshot for content; fall back to fresh inputs if any field
