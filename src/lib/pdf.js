@@ -948,17 +948,26 @@ function drawSignatureOnCertificate(doc, ctx, y, approval) {
     approval.signatureData.startsWith('data:image/')
 
   if (isDrawn) {
+    // Default to a signature-line aspect (~3.3:1) — matches the
+    // SignaturePad's typical canvas dims (280×~85 px). Two separate
+    // try/catches: getImageProperties is the flaky one (jsPDF can
+    // throw on certain data URLs); addImage almost always succeeds
+    // once we have a sane box. Keeps the signature visible even when
+    // image-property introspection fails.
+    let w = baselineWidth
+    let h = 24
     try {
       const props = doc.getImageProperties(approval.signatureData)
-      const aspect = (props?.width || 1) / (props?.height || 1)
-      const maxW = baselineWidth
-      const maxH = 24
-      let w = maxW
-      let h = w / aspect
-      if (h > maxH) {
-        h = maxH
-        w = h * aspect
+      if (props?.width && props?.height) {
+        const aspect = props.width / props.height
+        w = baselineWidth
+        h = w / aspect
+        if (h > 28) { h = 28; w = h * aspect }
       }
+    } catch (e) {
+      console.warn('[pdf] getImageProperties failed; using default sig aspect', e)
+    }
+    try {
       doc.addImage(approval.signatureData, 'PNG', margin, y, w, h)
       blockBottom = y + h
     } catch (e) {
@@ -1044,7 +1053,11 @@ function drawProposalPageFooter(doc, ctx, pageNumber, totalPages) {
     company0(ctx, 'website')
   ].filter(Boolean).join(' · ')
   if (left) doc.text(left, margin, pageHeight - 8)
-  doc.text(`Page ${pageNumber - 1} of ${totalPages - 1}`, pageWidth - margin, pageHeight - 8, { align: 'right' })
+  // Include cover in the count — body pages read "Page 2 of 4" through
+  // "Page 4 of 4" on a 4-page proposal. Cover has no footer of its own
+  // so the customer never sees "Page 1 of 4"; sequence still reads
+  // correctly because each body page knows where it sits in the doc.
+  doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: 'right' })
 }
 
 function drawSectionTitle(doc, x, y, label, size = PROPOSAL_BRAND.sectionH2) {

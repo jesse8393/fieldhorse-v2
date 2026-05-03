@@ -249,6 +249,16 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
 
   function patchDraft(setter, key, value) {
     setter((d) => {
+      // Synthetic 'kind' key — drives the 3-way mode picker and writes
+      // both is_optional + is_excluded atomically. Mutually exclusive
+      // by design; eliminates the ambiguity of two parallel checkboxes.
+      if (key === 'kind') {
+        return {
+          ...d,
+          is_optional: value === 'optional',
+          is_excluded: value === 'excluded'
+        }
+      }
       const next = { ...d, [key]: value }
       if (key === 'qty' || key === 'rate') {
         if (!d.amountOverridden) {
@@ -270,6 +280,14 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
       }
       return next
     })
+  }
+
+  // Derive the 3-way mode label from the current flags. Used by the
+  // segment control to show the active selection.
+  function kindFromDraft(d) {
+    if (d?.is_excluded) return 'excluded'
+    if (d?.is_optional) return 'optional'
+    return 'base'
   }
 
   async function handleAdd() {
@@ -380,7 +398,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
           lineHeight: 1.5,
           color: 'var(--v3-text-muted)'
         }}>
-          Base subtotal is what syncs to <code style={{ fontFamily: 'inherit' }}>fh_contacts.amount</code> through the DB trigger. Optional and excluded rows are listed for the customer but never roll up.
+          Base items make up the quoted price. Optional add-ons and exclusions can be shown on the proposal without changing the approved total.
         </p>
       </section>
 
@@ -738,19 +756,16 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
         />
       </FormField>
 
-      {/* Toggles */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <ToggleField
-          label="Optional add-on"
-          checked={draft.is_optional}
-          onChange={(v) => onChange('is_optional', v)}
+      {/* Mode — mutually exclusive 3-way segment. Replaces the prior
+          parallel checkboxes so every row is exactly one of base /
+          optional / excluded. Drives is_optional + is_excluded
+          atomically via the synthetic 'kind' key in patchDraft. */}
+      <FormField label="Mode" hint="Base items count toward the quoted price. Optional add-ons and exclusions appear on the proposal but never roll up.">
+        <KindPicker
+          value={draft.is_excluded ? 'excluded' : draft.is_optional ? 'optional' : 'base'}
+          onChange={(kind) => onChange('kind', kind)}
         />
-        <ToggleField
-          label="Excluded (out of scope)"
-          checked={draft.is_excluded}
-          onChange={(v) => onChange('is_excluded', v)}
-        />
-      </div>
+      </FormField>
 
       {/* Action row */}
       <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
@@ -810,7 +825,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
   )
 }
 
-function FormField({ label, required, children }) {
+function FormField({ label, required, hint, children }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <span style={{
@@ -821,37 +836,79 @@ function FormField({ label, required, children }) {
         {label}{required ? ' *' : ''}
       </span>
       {children}
+      {hint && (
+        <span style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 11, lineHeight: 1.4,
+          color: 'var(--v3-text-muted)'
+        }}>
+          {hint}
+        </span>
+      )}
     </label>
   )
 }
 
-function ToggleField({ label, checked, onChange }) {
+/**
+ * KindPicker — 3-way segment control for quote item classification.
+ * Mutually exclusive by design: every row is exactly Base, Optional,
+ * or Excluded. Replaces the prior parallel checkboxes that allowed
+ * an ambiguous "neither flag set" state to slip through silently.
+ */
+function KindPicker({ value, onChange }) {
+  const options = [
+    { value: 'base',     label: 'Base',     hint: 'Counts toward quoted price' },
+    { value: 'optional', label: 'Optional', hint: 'Add-on, shown for reference' },
+    { value: 'excluded', label: 'Excluded', hint: 'Out of scope, not included' }
+  ]
   return (
-    <label style={{
-      display: 'inline-flex', alignItems: 'center', gap: 8,
-      padding: '8px 12px', borderRadius: 12,
-      background: checked ? 'var(--v3-surface-2)' : 'transparent',
-      border: `1px solid ${checked ? 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' : 'var(--v3-border)'}`,
-      cursor: 'pointer',
-      flex: '0 1 auto',
-      WebkitTapHighlightColor: 'transparent',
-      transition: 'background 160ms ease, border-color 160ms ease'
-    }}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 16, height: 16, accentColor: 'var(--v3-primary)', margin: 0, cursor: 'pointer' }}
-      />
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 12, fontWeight: 600,
-        color: checked ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
-        whiteSpace: 'nowrap'
-      }}>
-        {label}
-      </span>
-    </label>
+    <div
+      role="radiogroup"
+      aria-label="Item mode"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 6,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
+        borderRadius: 10,
+        padding: 4
+      }}
+    >
+      {options.map((opt) => {
+        const on = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(opt.value)}
+            title={opt.hint}
+            style={{
+              minHeight: 40,
+              padding: '8px 6px',
+              borderRadius: 8,
+              border: 'none',
+              background: on
+                ? 'color-mix(in srgb, var(--v3-primary) 18%, transparent)'
+                : 'transparent',
+              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              transition: 'background 160ms ease, color 160ms ease'
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

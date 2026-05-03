@@ -33,20 +33,9 @@ function initials(name) {
 }
 
 function MarginBadge({ pct, hasCost }) {
-  if (!hasCost) {
-    return (
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.02em',
-        color: 'var(--v3-text-muted)',
-        fontVariantNumeric: 'tabular-nums'
-      }}>
-        Margin —
-      </span>
-    )
-  }
+  // No cost data → hide the row entirely. The previous "Margin —"
+  // placeholder added visual noise without conveying anything.
+  if (!hasCost) return null
   const tier = marginTier(pct)
   const color = tier === 'good'
     ? 'var(--v3-success-bright)'
@@ -282,28 +271,10 @@ const JobCard = memo(function JobCard({
         }} />
       )}
 
-      {/* TOP DEAL chip for non-banner cards — sits in the corner */}
-      {featured && !hasPhotoBanner && (
-        <span style={{
-          position: 'absolute',
-          right: 12,
-          top: 12,
-          padding: '3px 9px',
-          borderRadius: 999,
-          background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-          color: 'var(--v3-on-primary)',
-          fontFamily: 'var(--font-body)',
-          fontSize: 9,
-          fontWeight: 800,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          lineHeight: 1.2,
-          boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.18), 0 4px 10px rgba(229, 193, 88, 0.35), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
-          pointerEvents: 'none'
-        }}>
-          Top Deal
-        </span>
-      )}
+      {/* TOP DEAL chip for non-banner cards — placed at the top of the
+          name column inline so it never collides with the amount on
+          the right. Renders below as part of the name block, not as
+          an absolutely-positioned corner overlay. */}
 
       {/* Top row: photo/initial tile + name block + amount block.
           When the banner is rendered, the inline photo tile is
@@ -317,6 +288,25 @@ const JobCard = memo(function JobCard({
           />
         )}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {featured && !hasPhotoBanner && (
+            <span style={{
+              alignSelf: 'flex-start',
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+              color: 'var(--v3-on-primary)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 9,
+              fontWeight: 800,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              lineHeight: 1.2,
+              marginBottom: 4,
+              boxShadow: '0 4px 10px rgba(229, 193, 88, 0.35), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+            }}>
+              Top Deal
+            </span>
+          )}
           <div style={{
             fontFamily: 'var(--font-body)',
             fontSize: 14,

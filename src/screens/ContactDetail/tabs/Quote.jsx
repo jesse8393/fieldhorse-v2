@@ -80,6 +80,13 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // toast — defensive even though the disabled state prevents this.
   async function buildPdf() {
     if (!contact?.id || !userId) throw new Error('Contact not loaded')
+    // Flush any pending onBlur autosaves on the QuoteTerms inputs so
+    // contact.scope_text / terms_text / exclusions_text reflect the
+    // operator's latest typed value before we build the PDF payload.
+    // P1 fix: without this, hitting Preview while still focused inside
+    // a textarea read stale fields and the PDF substituted boilerplate.
+    try { document?.activeElement?.blur?.() } catch { /* noop */ }
+    await new Promise((r) => setTimeout(r, 50))
     const { data, error } = await supabase
       .from('fh_quote_items')
       .select('*')

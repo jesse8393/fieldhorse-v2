@@ -4482,10 +4482,12 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   bottom: 0;
   left: 0;
   right: 0;
-  /* Fits inside visual viewport, leaves 40px below the notch, and shrinks by keyboard height. */
+  /* Fits inside visual viewport, leaves 40px below the notch, and shrinks by keyboard height.
+     Uses dvh (dynamic viewport height) so the sheet collapses with the iOS URL bar — fixes
+     P1 where the commit footer rendered below the visible area on 812px phone heights. */
   height: min(
-    92vh,
-    calc(var(--fh-vvh, 100vh) - env(safe-area-inset-top) - 40px - var(--fh-kbd, 0px))
+    92dvh,
+    calc(var(--fh-vvh, 100dvh) - env(safe-area-inset-top) - 40px - var(--fh-kbd, 0px))
   );
   max-height: calc(100dvh - env(safe-area-inset-top) - 40px);
   background: var(--surface-1);

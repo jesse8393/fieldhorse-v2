@@ -88,7 +88,11 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   useEffect(() => {
     if (!open) return
     setMethod('verbal')
-    setName('')
+    // Pre-fill approved-by with the contact's name so the commit
+    // button is enabled out of the gate; operator can edit before
+    // submit. Avoids the "placeholder looks filled but submit is
+    // disabled" trap from the prior empty-string default.
+    setName(contact?.name || '')
     setEmail(contact?.email || '')
     setNote('')
     setMoveToJob(true)
