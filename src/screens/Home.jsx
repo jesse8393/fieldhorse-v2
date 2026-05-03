@@ -23,7 +23,7 @@ import { getWeather, MURFREESBORO } from '../lib/weather.js'
 import { ACTIVE_STAGES } from '../lib/stages.js'
 import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
-import { Card, KpiTile, QuickAction, Sparkline, SectionHeader, Pill } from '../components/v3'
+import { QuickAction, SectionHeader } from '../components/v3'
 import { hapticTap } from '../lib/haptics.js'
 
 /* ----------------- helpers ----------------- */
@@ -64,26 +64,6 @@ function weatherLabel(code) {
   if (code <= 82) return 'Showers'
   if (code <= 99) return 'Storms'
   return ''
-}
-
-// Stub trend until a daily snapshot table exists. Generates 7 points
-// climbing toward `target` so the spark visually agrees with the
-// number above it. Marked as TODO so this gets replaced when the
-// snapshot pipeline lands.
-function buildSparkline(target) {
-  const v = Number(target) || 0
-  if (v <= 0) return Array.from({ length: 7 }, (_, i) => ({ v: 0 }))
-  const start = v * 0.55
-  const pts = []
-  let cur = start
-  for (let i = 0; i < 6; i++) {
-    const wobble = 0.08 * Math.sin(i * 1.7 + v % 7)
-    const rise = (v - start) / 6
-    cur = cur + rise + cur * wobble * 0.15
-    pts.push({ v: Math.max(0, Math.round(cur)) })
-  }
-  pts.push({ v: Math.round(v) })
-  return pts
 }
 
 function startOfWeek(now) {
@@ -380,7 +360,6 @@ export default function Home() {
   }
 
   /* ----- Derived ----- */
-  const sparkData = useMemo(() => buildSparkline(pipeline), [pipeline])
   const trendUp = pipeline != null && pipelinePrev != null && pipeline >= pipelinePrev
   const trendPct = useMemo(() => {
     if (pipeline == null || pipelinePrev == null || pipelinePrev <= 0) return null
@@ -523,12 +502,18 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* ─────────── PIPELINE MINI-CARD — V3-HOME-1 ───────────
-          Collapsed from a 300px stack (eyebrow + 56pt money + caption +
-          48px sparkline + stacked-bar + 3-col numbers row + link) into
-          a ~120px row: eyebrow + inline View-all + 28pt sans tabular
-          gold money + trend pill + thin progress + inline legend.
-          Sparkline removed — was stub-data driven, no real signal. */}
+      {/* ─────────── PIPELINE REVENUE CARD — V3-HOME-1D ───────────
+          Mockup-faithful revenue moment. Eyebrow reframed from
+          "Total Pipeline" descriptor to "Today's Revenue Opportunity"
+          aspirational header (muted, not gold). Money stays the gold
+          anchor with a calm halo. Trend renders as inline colored text
+          — no Pill chip chrome. "Total Pipeline" demoted to a sublabel
+          beneath the figure. The Won/Active/Lead segmented bar + dotted
+          legend is retired in favor of a single muted text caption. A
+          1px gold hairline sweep sits under the sublabel as decorative
+          brand luminance — presentation only, not a fake chart.
+          Card-top gold accent stripe + View-all link removed: gold is
+          scarce here, only the money + the small sweep wear it. */}
       <motion.div
         variants={item}
         className="v3-section"
@@ -537,11 +522,8 @@ export default function Home() {
           overflow: 'hidden',
           margin: '0 var(--v3-gutter) 14px',
           padding: '14px 18px',
-          // V3-HOME-1C: glass-metal depth recipe. Stronger inset top
-          // highlight reads as glass, subtle bottom inner shadow gives
-          // the surface vertical body, deep+soft outer shadow lifts the
-          // card off the obsidian base. Border kept restrained — depth
-          // does the work, not a heavy outline.
+          // Glass-metal depth from V3-HOME-1C — kept verbatim. Inset top
+          // highlight + inset bottom shadow + crisp outline + soft halo.
           border: '1px solid var(--v3-border-strong)',
           boxShadow: [
             'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
@@ -551,71 +533,49 @@ export default function Home() {
           ].join(', ')
         }}
       >
-        {/* Gold accent stripe — V3-HOME-1C. The financial anchor earns
-            this metallic accent; list cards never get it. Restrained
-            gradient, partial-width inset so it reads as luminance, not
-            decoration. */}
-        <span aria-hidden="true" style={{
-          position: 'absolute',
-          top: 0,
-          left: '20%',
-          right: '20%',
-          height: 1,
-          background: 'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--v3-primary) 50%, transparent) 50%, transparent 100%)',
-          pointerEvents: 'none'
-        }} />
+        {/* Eyebrow — muted ink, slightly looser tracking than the v3
+            default to give the longer phrase room. */}
+        <span className="v3-eyebrow" style={{
+          color: 'var(--v3-text-muted)',
+          letterSpacing: '0.16em'
+        }}>
+          Today's Revenue Opportunity
+        </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
-          {/* View-all demoted: smaller, muted-by-default so the metric
-              framing stays the dominant moment. Fades to gold on hover/tap. */}
-          <button
-            type="button"
-            onClick={() => { hapticTap(); navigate('/jobs') }}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '4px 0',
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              color: 'var(--v3-text-muted)',
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'color 160ms ease'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--v3-primary)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--v3-text-muted)' }}
-          >
-            View all →
-          </button>
-        </div>
-
-        <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        {/* Money + trend row — money baseline-aligned with a tiny
+            gold-bronze $ glyph and an inline arrow+pct trend. No Pill
+            chip; trend is just colored text. */}
+        <div style={{
+          marginTop: 6,
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 12,
+          flexWrap: 'nowrap'
+        }}>
           <div style={{
+            flex: 1,
+            minWidth: 0,
             fontFamily: 'var(--font-body)',
-            // V3-HOME-1C: 28→30pt with conservative metallic gold glow.
-            // Soft text-shadow at 22% alpha — luminance, not bling.
-            // Tabular nums + tight tracking keep the read sharp.
-            fontSize: 30,
+            fontSize: 32,
             fontWeight: 700,
             letterSpacing: '-0.012em',
             color: 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums',
             lineHeight: 1.05,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
             textShadow: '0 0 14px color-mix(in srgb, var(--v3-primary) 22%, transparent)'
           }}>
             {pipeline == null ? (
-              <span className="v3-skeleton" style={{ width: 140, height: 28, borderRadius: 6 }} />
+              <span className="v3-skeleton" style={{ width: 160, height: 30, borderRadius: 6 }} />
             ) : (
               <>
                 <span style={{
-                  fontSize: 17,
-                  color: 'var(--v3-text-muted)',
-                  verticalAlign: 'top',
-                  marginRight: 2,
+                  fontSize: 22,
                   fontWeight: 600,
+                  marginRight: 1,
+                  color: 'color-mix(in srgb, var(--v3-primary) 70%, var(--v3-text-muted))',
                   textShadow: 'none'
                 }}>
                   $
@@ -624,16 +584,80 @@ export default function Home() {
               </>
             )}
           </div>
-          {trendPct != null ? (
-            <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
+          {trendPct != null && (
+            <span style={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1
+            }}>
+              {trendUp
+                ? <ArrowUpRight size={11} aria-hidden="true" />
+                : <ArrowDownRight size={11} aria-hidden="true" />}
               {trendUp ? '+' : ''}{trendPct}% · 7d
-            </Pill>
-          ) : null}
+            </span>
+          )}
         </div>
 
-        {/* Thin breakdown — single 4px track + inline legend. Replaces
-            the chunky 8px stacked bar + 3-column numbers grid. */}
-        <PipelineStackedBreakdown breakdown={stageBreakdown} />
+        {/* Sublabel under the figure — quiet caption naming the metric. */}
+        <div style={{
+          marginTop: 4,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--v3-text-muted)',
+          lineHeight: 1.3
+        }}>
+          Total Pipeline
+        </div>
+
+        {/* Decorative gold hairline sweep — 60px wide, 1px tall, fades
+            from gold to transparent. Not a chart, not a sparkline; just
+            a brand luminance accent under the financial label. */}
+        <span aria-hidden="true" style={{
+          display: 'block',
+          marginTop: 6,
+          width: 60,
+          height: 1,
+          background: 'linear-gradient(90deg, color-mix(in srgb, var(--v3-primary) 35%, transparent), transparent)'
+        }} />
+
+        {/* Stage caption — single muted text line. Numbers in ink-strong
+            so the digits register without per-stage tint. Renders an em
+            dash while data hydrates so the row never reads as "0/0/0". */}
+        <div style={{
+          marginTop: 10,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--v3-text-muted)',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1.3
+        }}>
+          {stageBreakdown == null ? '—' : (
+            <>
+              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
+                {stageBreakdown.active}
+              </span>
+              {' active · '}
+              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
+                {stageBreakdown.won}
+              </span>
+              {' won · '}
+              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
+                {stageBreakdown.lead}
+              </span>
+              {' lead'}
+            </>
+          )}
+        </div>
       </motion.div>
 
       {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK (promoted) ───────────
@@ -727,8 +751,10 @@ export default function Home() {
             subline={dealsAtRisk?.quotesAttention > 0 ? 'Need follow up' : null}
             onTap={() => navigate('/jobs?filter=quote')}
           />
+          {/* V3-HOME-1D: tone changed warn(amber) → danger(red). Behind/
+              overdue is a recovery state, not a gold opportunity state. */}
           <CompactKpi
-            tone="warn"
+            tone="danger"
             icon={CalendarClock}
             value={jobsBehind}
             label="Jobs Behind"
@@ -847,98 +873,6 @@ export default function Home() {
         </div>
       </motion.div>
     </motion.div>
-  )
-}
-
-/* ============================================================
-   PipelineStackedBreakdown — Won / Active / Lead as a stacked
-   horizontal bar with a numbers row underneath. Mockup-tier
-   financial dashboard treatment. Renders an empty bar with
-   "—" labels while data is loading so layout doesn't shift.
-   ============================================================ */
-function PipelineStackedBreakdown({ breakdown }) {
-  const won    = breakdown?.won    ?? 0
-  const active = breakdown?.active ?? 0
-  const lead   = breakdown?.lead   ?? 0
-  const total  = won + active + lead
-  const segments = [
-    { id: 'won',    label: 'Won',    count: won,    tone: 'var(--v3-success-bright)' },
-    { id: 'active', label: 'Active', count: active, tone: 'var(--v3-primary)' },
-    { id: 'lead',   label: 'Lead',   count: lead,   tone: 'var(--v3-text-muted)' }
-  ]
-  return (
-    <div style={{ marginTop: 12 }}>
-      {/* V3-HOME-1C: glass-track refinement. Inset depression on the
-          track wrapper + 1px top-edge highlight on each filled segment
-          so the breakdown reads as carved-into-glass rather than
-          painted-on-glass. Stays at 6px — chrome upgrade, not size. */}
-      <div
-        aria-hidden="true"
-        style={{
-          height: 6,
-          borderRadius: 999,
-          background: 'var(--v3-track)',
-          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.40)',
-          overflow: 'hidden',
-          display: 'flex',
-          gap: 1
-        }}
-      >
-        {total > 0 ? segments.map((s) => (
-          <div
-            key={s.id}
-            style={{
-              width: `${(s.count / total) * 100}%`,
-              background: s.tone,
-              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.18)',
-              transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
-            }}
-          />
-        )) : (
-          <div style={{ width: '100%', background: 'transparent' }} />
-        )}
-      </div>
-
-      {/* Inline legend — V3-HOME-1B: 11→12pt with stronger count
-          weight + slightly larger 7px dots so the row carries enough
-          visual weight to anchor the card without bringing back the
-          old 3-column 22pt numbers grid. */}
-      <div style={{
-        marginTop: 10,
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 16,
-        fontFamily: 'var(--font-body)',
-        fontSize: 12,
-        color: 'var(--v3-text-muted)'
-      }}>
-        {segments.map((s) => (
-          <span key={s.id} style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            lineHeight: 1
-          }}>
-            <span aria-hidden="true" style={{
-              width: 7, height: 7, borderRadius: '50%',
-              background: s.tone,
-              boxShadow: `0 0 0 2px color-mix(in srgb, ${
-                s.tone.startsWith('var(') ? `${s.tone}` : s.tone
-              } 18%, transparent)`
-            }} />
-            <span style={{
-              fontWeight: 800,
-              color: 'var(--v3-text)',
-              fontVariantNumeric: 'tabular-nums',
-              letterSpacing: '-0.005em'
-            }}>
-              {breakdown == null ? '—' : s.count}
-            </span>
-            <span style={{ letterSpacing: '0.02em' }}>{s.label}</span>
-          </span>
-        ))}
-      </div>
-    </div>
   )
 }
 
