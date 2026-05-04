@@ -690,21 +690,14 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
-          V3-SYSTEM-1B-1 demote pass:
-            - wrapper class --primary-quiet → base --section (drop the
-              gold border + gold ::after stroke).
-            - eyebrow gold → muted ink.
-            - count chip solid gold bg → neutral surface-2 + hairline.
-            - View-all default gold → muted, fades to gold on hover.
-            - Section radius 20 → 16, padding 18 → 14, margin 14 → 12. */}
+          V3-HOME-2 de-box: dropped the bordered section wrapper. Section
+          header organizes; the row cards self-frame on the page surface.
+          Pipeline mini-card stays the only bordered anchor on Home. */}
       {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
-          className="v3-section"
           style={{
-            margin: '0 var(--v3-gutter) 12px',
-            padding: 14,
-            borderRadius: 16
+            margin: '0 var(--v3-gutter) 16px'
           }}
         >
           <div className="v3-section-header">
@@ -760,16 +753,18 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* ─────────── TODAY'S PRIORITIES — KPIs (demoted) ───────────
-          V3-SYSTEM-1B-1: section padding 18 → 14, radius 20 → 16,
-          margin 14 → 12. Tile shrink lives in CompactKpi below. */}
+      {/* ─────────── TODAY'S PRIORITIES — KPI strip ───────────
+          V3-HOME-2 un-nest: dropped the bordered wrapper that nested
+          three already-bordered tiles inside another box. Tiles render
+          directly on the page surface as a clean 3-column KPI strip.
+          Tile internals (V3-SYSTEM-1B-1: 72px minHeight, 22pt value,
+          danger tone preserved on Jobs Behind, mute-when-zero subline)
+          unchanged. Inter-tile gap tightened 10 → 8 so the three tiles
+          read as a continuous strip, not loose chips. */}
       <motion.div
         variants={item}
-        className="v3-section v3-section--quiet"
         style={{
-          margin: '0 var(--v3-gutter) 12px',
-          padding: 14,
-          borderRadius: 16
+          margin: '0 var(--v3-gutter) 16px'
         }}
       >
         <SectionHeader label="Today's Priorities" />
@@ -777,7 +772,7 @@ export default function Home() {
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 10,
+            gap: 8,
             marginTop: 4
           }}
         >
@@ -811,17 +806,13 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── TODAY ON SITE ───────────
-          Schedule entries that start today, sourced from a safe
-          read-only fh_schedule query (no schema change). Polished
-          empty state if no events scheduled — never shows a blank
-          panel. Tap a row to jump to the linked job. */}
+          V3-HOME-2 de-box: header + row stack on page surface. Each
+          row is its own self-framing card; no parent panel needed.
+          Empty state still uses the dashed v3-empty primitive. */}
       <motion.div
         variants={item}
-        className="v3-section"
         style={{
-          margin: '0 var(--v3-gutter) 12px',
-          padding: 14,
-          borderRadius: 16
+          margin: '0 var(--v3-gutter) 16px'
         }}
       >
         <SectionHeader
@@ -859,17 +850,13 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── PIPELINE PREVIEW ───────────
-          Top 3 active deals by value. Replaces the old Live Feed:
-          forward-looking ("what's open and worth most") instead of
-          backward-looking ("what just happened"). Tap a row to drill
-          into the contact, or "View all" to open the board. */}
+          Top 3 active deals by value. V3-HOME-2 de-box: header + row
+          stack on page surface. Each PipelineDealRow is a self-framed
+          glass card already; the bordered wrapper was redundant. */}
       <motion.div
         variants={item}
-        className="v3-section"
         style={{
-          margin: '0 var(--v3-gutter) 12px',
-          padding: 14,
-          borderRadius: 16
+          margin: '0 var(--v3-gutter) 16px'
         }}
       >
         <SectionHeader
@@ -903,17 +890,12 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
-          Demoted to the bottom of the screen as a tools toolbar.
-          Equal-width tight tiles (no asymmetric primary) — the eye
-          treats this as a launcher, not a CTA. Save Note / Schedule /
-          Invoice / Estimate read as parallel power tools. */}
+          V3-HOME-2 de-box: header + 5 tile launcher row on page surface.
+          Each QuickAction tile self-frames; wrapper was redundant chrome. */}
       <motion.div
         variants={item}
-        className="v3-section v3-section--tight"
         style={{
-          margin: '0 var(--v3-gutter) 28px',
-          padding: 14,
-          borderRadius: 16
+          margin: '0 var(--v3-gutter) 28px'
         }}
       >
         <SectionHeader label="Quick Actions" />
@@ -1323,8 +1305,10 @@ function NextActionRow({ action, photoUrl, onTap }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        // Tighter again: 9/12/9/14 saves ~6px height per row.
-        padding: '9px 12px 9px 14px',
+        // V3-HOME-2: row pad 9/12/9/14 → 8/12/8/14, saves ~10px stacked
+        // across 5 rows. Tap target stays comfortable (icon + title
+        // text already span ~36px tall before the row padding).
+        padding: '8px 12px 8px 14px',
         borderRadius: 12,
         // Subtle linear top-light overlay + slightly raised surface mix
         // so each row reads as a metal plate, not a list item.

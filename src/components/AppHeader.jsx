@@ -48,11 +48,11 @@ export default function AppHeader() {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
-        // V3-SYSTEM-1B-1: further trim 10/14/9 → 8/14/6 so the header
-        // total is ~48px+safe-area. Was 70px → 52px (1A) → 48px (1B).
-        // Header is supporting chrome, not a hero panel.
-        padding: '8px 14px 6px',
-        paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))',
+        // V3-HOME-2: thin-ribbon trim 8/14/6 → 6/14/4. Header total
+        // ~42px+safe-area. Was 70 → 52 (1A) → 48 (1B-1) → 42 (HOME-2).
+        // Header is supporting chrome — the page surface is the canvas.
+        padding: '6px 14px 4px',
+        paddingTop: 'calc(6px + env(safe-area-inset-top, 0px))',
         minHeight: 0,
         background: 'linear-gradient(180deg, rgba(20,20,20,0.88) 0%, rgba(20,20,20,0.72) 82%, rgba(20,20,20,0) 100%)',
         backdropFilter: 'blur(14px)',
@@ -93,10 +93,10 @@ export default function AppHeader() {
           onClick={openPalette}
           className="fh-header-search-btn"
           style={{
-            width: 36,
-            height: 36,
-            minWidth: 36,
-            borderRadius: 9,
+            width: 34,
+            height: 34,
+            minWidth: 34,
+            borderRadius: 8,
             background: 'var(--surface-2)',
             border: '1px solid var(--rule)',
             display: 'grid',
@@ -107,7 +107,7 @@ export default function AppHeader() {
             transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
           }}
         >
-          <Search size={14} />
+          <Search size={13} />
         </button>
         <NotificationsBell />
         <button
@@ -116,10 +116,10 @@ export default function AppHeader() {
           onClick={() => navigate('/notes')}
           className="fh-header-notes-btn"
           style={{
-            width: 36,
-            height: 36,
-            minWidth: 36,
-            borderRadius: 9,
+            width: 34,
+            height: 34,
+            minWidth: 34,
+            borderRadius: 8,
             background: 'var(--surface-2)',
             border: '1px solid var(--rule)',
             display: 'grid',
@@ -130,7 +130,7 @@ export default function AppHeader() {
             transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
           }}
         >
-          <NotebookPen size={14} />
+          <NotebookPen size={13} />
         </button>
       </div>
     </header>
@@ -138,17 +138,17 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }) {
-  // V3-SYSTEM-1B-1: further trim from 1A. Logo clamps at 28 (was 32)
-  // and the wordmark fallback at 16 (was 18) so the brand chrome stays
-  // calm next to the content data on Home.
+  // V3-HOME-2: thin-ribbon trim. Logo clamps at 24 (was 28), wordmark
+  // at 14 (was 16) so the brand row reads as identification, not as a
+  // billboard sitting above the page content.
   if (logoSrc) {
     return (
       <img
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(20px, 3.4vw, 28px)',
-          maxWidth: 'min(36vw, 200px)',
+          maxHeight: 'clamp(18px, 3vw, 24px)',
+          maxWidth: 'min(32vw, 180px)',
           width: 'auto',
           height: 'auto',
           objectFit: 'contain',
@@ -166,14 +166,14 @@ function BrandSlot({ logoSrc, company, fullName }) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(13px, 3vw, 16px)',
+    fontSize: 'clamp(12px, 2.6vw, 14px)',
     letterSpacing: '0.08em',
     lineHeight: 1,
     textTransform: 'uppercase',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    maxWidth: 'min(40vw, 200px)'
+    maxWidth: 'min(36vw, 180px)'
   }
   if (company) {
     // V3-SYSTEM-1A: company-name fallback drops the gold tint — the
@@ -199,7 +199,7 @@ function BrandSlot({ logoSrc, company, fullName }) {
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(13px, 3vw, 16px)',
+        fontSize: 'clamp(12px, 2.6vw, 14px)',
         letterSpacing: '0.10em',
         lineHeight: 1,
         display: 'inline-flex',
