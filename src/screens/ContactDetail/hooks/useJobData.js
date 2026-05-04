@@ -40,15 +40,23 @@ export function useJobData(id, userId) {
 
   const fetchAll = useCallback(async () => {
     if (!userId || !id) return
+    // V3-PARTNERS: dropped the .eq('user_id', userId) JS-layer filter from
+    // every SELECT below. RLS already enforces owner OR accepted-partner
+    // access via fh_contacts_partner_read + matching child-table partner
+    // policies (migrations 004, 006, 011). The JS filter was excluding
+    // partner-shared rows entirely — partner opening /jobs/:id saw a blank
+    // contact + every child tab empty. Owner queries return the same data
+    // they always did; partner queries now return the shared job + its
+    // subs/expenses/payments/inspections/notes/schedule/todos.
     const [c, s, e, p, i, n, sch, td] = await Promise.all([
-      supabase.from('fh_contacts').select('*').eq('id', id).eq('user_id', userId).maybeSingle(),
-      supabase.from('fh_subs').select('*').eq('contact_id', id).eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('fh_expenses').select('*').eq('contact_id', id).eq('user_id', userId).order('expense_date', { ascending: false }),
-      supabase.from('fh_payments').select('*').eq('contact_id', id).eq('user_id', userId).order('paid_on', { ascending: false }),
-      supabase.from('fh_inspections').select('*').eq('contact_id', id).eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('fh_notes').select('*').eq('contact_id', id).eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('fh_schedule').select('*').eq('contact_id', id).eq('user_id', userId).order('start_at', { ascending: true }),
-      supabase.from('fh_job_todos').select('*').eq('job_id', id).eq('user_id', userId).order('done', { ascending: true }).order('created_at', { ascending: false })
+      supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
+      supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+      supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
+      supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
+      supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+      supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+      supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
+      supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: false })
     ])
 
     const contactRow = c.data || null
@@ -99,19 +107,19 @@ export function useJobData(id, userId) {
   // optimistic state in place silently (matches legacy behavior; we can add
   // rollback here in a follow-up without touching callers).
   //
-  // Defense-in-depth: filter on user_id alongside id. Supabase RLS already
-  // enforces the same constraint, but a JS-layer guard prevents accidental
-  // writes if RLS ever has a gap (service-role bypass during tests, migration
-  // ordering bug, etc.). Project memory documents a $160K pipeline leak from
-  // a multi-tenant gap — this guard is the cheap belt-and-suspenders.
+  // V3-PARTNERS: removed the .eq('user_id', userId) JS guard. The defense-
+  // in-depth pattern was breaking partner edits — partner.user_id never
+  // matches the row's user_id (which is the owner's id), so the WHERE clause
+  // matched 0 rows and the update silently no-op'd. RLS owner-write +
+  // fh_contacts_partner_write together enforce that only owners and
+  // accepted partners can mutate the row, scoped to the matching id.
   const patch = useCallback(async (update) => {
     setContact((c) => ({ ...c, ...update }))
     const { error } = await supabase.from('fh_contacts')
       .update(update)
       .eq('id', id)
-      .eq('user_id', userId)
     if (!error) toastSuccess('Saved', 'Changes synced')
-  }, [id, userId])
+  }, [id])
 
   // Derived — payments aggregate + balance + legacy scheduleCount kept as a
   // memoized read so nothing in the delete-cascade UI breaks.

@@ -158,10 +158,12 @@ export default function Home() {
       const [contactsRes, overdueSchedRes, paysRes, todaySchedRes, photoMap] = await Promise.all([
         // Contacts: stages + amounts + last update for at-risk calc.
         // updated_at falls back to created_at if missing.
+        // V3-PARTNERS: dropped the .eq('user_id', user.id) JS-layer filter
+        // so partner-shared jobs flow into Pipeline / Next Actions / Today
+        // on Site / Pipeline Preview. RLS enforces owner+partner access.
         supabase
           .from('fh_contacts')
-          .select('id, name, amount, stage, updated_at, created_at')
-          .eq('user_id', user.id),
+          .select('id, name, amount, stage, updated_at, created_at'),
         // Schedule entries that should already have ended → if linked to a
         // job-stage contact, that contact is "behind schedule".
         supabase

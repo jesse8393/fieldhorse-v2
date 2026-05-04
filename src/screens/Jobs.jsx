@@ -65,11 +65,16 @@ export default function Jobs() {
     setLoading(true)
     // Run contacts + cover-photos in parallel. Photos failure is non-fatal
     // (we just keep the existing photo map / fall back to initials).
+    // V3-PARTNERS: dropped the .eq('user_id', user.id) JS-layer filter so
+    // partner-shared jobs surface in this list. RLS (fh_contacts owner +
+    // fh_contacts_partner_read) is the enforcement layer; the JS filter
+    // was excluding shared rows entirely. Owner sees the same set they
+    // always did; partner now sees jobs owned by other contractors that
+    // were shared with them via accepted fh_job_partners invites.
     const [contactsRes, photoMap] = await Promise.all([
       supabase
         .from('fh_contacts')
         .select('*, fh_clients(name)')
-        .eq('user_id', user.id)
         .order('updated_at', { ascending: false }),
       fetchCoverPhotosByJob(user.id).catch(() => ({}))
     ])
