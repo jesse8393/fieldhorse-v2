@@ -234,18 +234,22 @@ export default function Home() {
         (paysRes.data || []).map((p) => p.contact_id).filter(Boolean)
       )
       const actions = []
-      // 1. Stale leads/quotes — needs a follow-up call/text. Urgency = warn
-      // (yellow) — opportunity slipping but salvageable.
+      // 1. Stale leads/quotes — needs a follow-up call/text. Urgency
+      // escalates to danger at 14+ days; visual tone carries the
+      // severity, so the label stays plain "Follow up" regardless.
+      // Operator-facing copy (no CRM shorthand): subline names the
+      // stage + days waiting in plain English.
       for (const c of risky) {
-        const daysCold = Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
+        const daysWaiting = Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
+        const dayWord = daysWaiting === 1 ? 'day' : 'days'
         actions.push({
           id: `followup-${c.id}`,
           kind: 'followup',
           contactId: c.id,
           title: `Follow up with ${c.name || 'lead'}`,
-          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} cold for ${daysCold} days`,
-          urgencyLabel: `${daysCold}d cold`,
-          urgencyTone: daysCold >= 14 ? 'danger' : 'warn',
+          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} waiting ${daysWaiting} ${dayWord}`,
+          urgencyLabel: 'Follow up',
+          urgencyTone: daysWaiting >= 14 ? 'danger' : 'warn',
           urgency: new Date(c.updated_at || c.created_at || 0).getTime()
         })
       }
