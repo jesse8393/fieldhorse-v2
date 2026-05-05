@@ -65,11 +65,16 @@ export default function Jobs() {
     setLoading(true)
     // Run contacts + cover-photos in parallel. Photos failure is non-fatal
     // (we just keep the existing photo map / fall back to initials).
+    // V3-PARTNERS: dropped the .eq('user_id', user.id) JS-layer filter so
+    // partner-shared jobs surface in this list. RLS (fh_contacts owner +
+    // fh_contacts_partner_read) is the enforcement layer; the JS filter
+    // was excluding shared rows entirely. Owner sees the same set they
+    // always did; partner now sees jobs owned by other contractors that
+    // were shared with them via accepted fh_job_partners invites.
     const [contactsRes, photoMap] = await Promise.all([
       supabase
         .from('fh_contacts')
         .select('*, fh_clients(name)')
-        .eq('user_id', user.id)
         .order('updated_at', { ascending: false }),
       fetchCoverPhotosByJob(user.id).catch(() => ({}))
     ])
@@ -126,10 +131,15 @@ export default function Jobs() {
   }, [contacts])
 
   const tabCounts = useMemo(() => {
+    // V3-JOBS-1 loading-state fix: while data is hydrating, return an
+    // empty map so each FilterPill receives `count={undefined}` and
+    // skips its count chip entirely — avoids the misleading
+    // "0 lead 0 quote 0 active 0 won" first-paint state.
+    if (loading) return {}
     const out = {}
     for (const t of TABS) out[t.id] = contacts.filter(t.match).length
     return out
-  }, [contacts])
+  }, [contacts, loading])
 
   // Featured deal id — highest-value job in the currently filtered list.
   // Only applied when the filtered set has 2+ jobs (no point featuring
@@ -182,13 +192,21 @@ export default function Jobs() {
             Jobs & Pipeline
           </h1>
           <div className="v3-caption" style={{ marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-            <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{summary.activeCount}</span>
-            <span> active</span>
-            {summary.pipeline > 0 && (
+            {loading ? (
+              // V3-JOBS-1: avoid the misleading "0 active" first-paint
+              // state — show a quiet loading hint until data hydrates.
+              <span>Loading…</span>
+            ) : (
               <>
-                <span style={{ margin: '0 6px', color: 'var(--v3-text-faint)' }}>·</span>
-                <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{kFormat(summary.pipeline)}</span>
-                <span> total</span>
+                <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{summary.activeCount}</span>
+                <span> active</span>
+                {summary.pipeline > 0 && (
+                  <>
+                    <span style={{ margin: '0 6px', color: 'var(--v3-text-faint)' }}>·</span>
+                    <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{kFormat(summary.pipeline)}</span>
+                    <span> total</span>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -227,7 +245,10 @@ export default function Jobs() {
             <FilterPill
               key={t.id}
               active={filter === t.id}
-              count={tabCounts[t.id] ?? 0}
+              // V3-JOBS-1: pass undefined while loading so the count
+              // chip is suppressed entirely (FilterPill renders the
+              // chip only when `count != null`).
+              count={tabCounts[t.id]}
               onClick={() => { hapticTap(); setFilter(t.id) }}
             >
               {t.label}

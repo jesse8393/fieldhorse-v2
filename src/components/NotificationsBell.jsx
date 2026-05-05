@@ -100,10 +100,13 @@ export default function NotificationsBell() {
         onClick={() => { hapticTap(); setOpen(true) }}
         className="fh-header-search-btn"
         style={{
-          width: 44,
-          height: 44,
-          minWidth: 44,
-          borderRadius: 11,
+          // V3-HOME-2: matches the search + notes trio in AppHeader at
+          // 34/r8/13. Unread dot stays 14×14 and still fits the smaller
+          // frame; positioned at 3/3 from corners.
+          width: 34,
+          height: 34,
+          minWidth: 34,
+          borderRadius: 8,
           background: 'var(--surface-2)',
           border: '1px solid var(--rule)',
           display: 'grid',
@@ -115,14 +118,14 @@ export default function NotificationsBell() {
           transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
         }}
       >
-        <Bell size={16} />
+        <Bell size={13} />
         {unread > 0 && (
           <span
             aria-hidden="true"
             style={{
               position: 'absolute',
-              top: 8,
-              right: 8,
+              top: 3,
+              right: 3,
               minWidth: 14,
               height: 14,
               padding: '0 4px',

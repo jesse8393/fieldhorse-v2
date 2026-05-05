@@ -23,8 +23,12 @@ import { getWeather, MURFREESBORO } from '../lib/weather.js'
 import { ACTIVE_STAGES } from '../lib/stages.js'
 import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
-import { Card, KpiTile, QuickAction, Sparkline, SectionHeader, Pill } from '../components/v3'
+import { QuickAction, SectionHeader } from '../components/v3'
 import { hapticTap } from '../lib/haptics.js'
+// V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
+// same batch helper Jobs already uses (one query + one signed-URL
+// batch call, no N+1). Returns { [contactId]: signedUrl }.
+import { fetchCoverPhotosByJob } from '../lib/photos.js'
 
 /* ----------------- helpers ----------------- */
 
@@ -64,26 +68,6 @@ function weatherLabel(code) {
   if (code <= 82) return 'Showers'
   if (code <= 99) return 'Storms'
   return ''
-}
-
-// Stub trend until a daily snapshot table exists. Generates 7 points
-// climbing toward `target` so the spark visually agrees with the
-// number above it. Marked as TODO so this gets replaced when the
-// snapshot pipeline lands.
-function buildSparkline(target) {
-  const v = Number(target) || 0
-  if (v <= 0) return Array.from({ length: 7 }, (_, i) => ({ v: 0 }))
-  const start = v * 0.55
-  const pts = []
-  let cur = start
-  for (let i = 0; i < 6; i++) {
-    const wobble = 0.08 * Math.sin(i * 1.7 + v % 7)
-    const rise = (v - start) / 6
-    cur = cur + rise + cur * wobble * 0.15
-    pts.push({ v: Math.max(0, Math.round(cur)) })
-  }
-  pts.push({ v: Math.round(v) })
-  return pts
 }
 
 function startOfWeek(now) {
@@ -131,6 +115,12 @@ export default function Home() {
   // unsent invoices) computed from the same contacts/schedule/payments data.
   // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
   const [nextActions, setNextActions] = useState(null)
+  // V3-SYSTEM-1B-3: signed cover-photo URLs keyed by contact id. Populated
+  // alongside the rest of the Home data via fetchCoverPhotosByJob (same
+  // pattern Jobs uses). Empty map = every row falls back to a neutral
+  // initial tile. Doesn't gate render — lists paint immediately, photos
+  // pop in when the URL map arrives.
+  const [photoUrlByJob, setPhotoUrlByJob] = useState({})
   const [refreshTick, setRefreshTick] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -161,13 +151,19 @@ export default function Home() {
       const todayStart = new Date(nowD); todayStart.setHours(0, 0, 0, 0)
       const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
 
-      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes] = await Promise.all([
+      // V3-SYSTEM-1B-3: photo fetch runs in the same Promise.all as the
+      // existing four queries. Failure is non-fatal — empty map → rows
+      // fall back to neutral initial tiles. No N+1: helper does one
+      // fh_job_files query + one batch signed-URL call total.
+      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes, photoMap] = await Promise.all([
         // Contacts: stages + amounts + last update for at-risk calc.
         // updated_at falls back to created_at if missing.
+        // V3-PARTNERS: dropped the .eq('user_id', user.id) JS-layer filter
+        // so partner-shared jobs flow into Pipeline / Next Actions / Today
+        // on Site / Pipeline Preview. RLS enforces owner+partner access.
         supabase
           .from('fh_contacts')
-          .select('id, name, amount, stage, updated_at, created_at')
-          .eq('user_id', user.id),
+          .select('id, name, amount, stage, updated_at, created_at'),
         // Schedule entries that should already have ended → if linked to a
         // job-stage contact, that contact is "behind schedule".
         supabase
@@ -191,7 +187,9 @@ export default function Home() {
           .gte('start_at', todayStart.toISOString())
           .lt('start_at', todayEnd.toISOString())
           .order('start_at', { ascending: true })
-          .limit(6)
+          .limit(6),
+        // Cover photos keyed by contact id — same helper Jobs uses.
+        fetchCoverPhotosByJob(user.id).catch(() => ({}))
       ])
 
       if (cancelled) return
@@ -238,18 +236,22 @@ export default function Home() {
         (paysRes.data || []).map((p) => p.contact_id).filter(Boolean)
       )
       const actions = []
-      // 1. Stale leads/quotes — needs a follow-up call/text. Urgency = warn
-      // (yellow) — opportunity slipping but salvageable.
+      // 1. Stale leads/quotes — needs a follow-up call/text. Urgency
+      // escalates to danger at 14+ days; visual tone carries the
+      // severity, so the label stays plain "Follow up" regardless.
+      // Operator-facing copy (no CRM shorthand): subline names the
+      // stage + days waiting in plain English.
       for (const c of risky) {
-        const daysCold = Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
+        const daysWaiting = Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
+        const dayWord = daysWaiting === 1 ? 'day' : 'days'
         actions.push({
           id: `followup-${c.id}`,
           kind: 'followup',
           contactId: c.id,
           title: `Follow up with ${c.name || 'lead'}`,
-          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} cold for ${daysCold} days`,
-          urgencyLabel: `${daysCold}d cold`,
-          urgencyTone: daysCold >= 14 ? 'danger' : 'warn',
+          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} waiting ${daysWaiting} ${dayWord}`,
+          urgencyLabel: 'Follow up',
+          urgencyTone: daysWaiting >= 14 ? 'danger' : 'warn',
           urgency: new Date(c.updated_at || c.created_at || 0).getTime()
         })
       }
@@ -348,6 +350,7 @@ export default function Home() {
       setStageBreakdown(stageCounts)
       setTodayOnSite(todayRows)
       setNextActions(topActions)
+      setPhotoUrlByJob(photoMap || {})
     }
     load()
     return () => { cancelled = true }
@@ -380,7 +383,6 @@ export default function Home() {
   }
 
   /* ----- Derived ----- */
-  const sparkData = useMemo(() => buildSparkline(pipeline), [pipeline])
   const trendUp = pipeline != null && pipelinePrev != null && pipeline >= pipelinePrev
   const trendPct = useMemo(() => {
     if (pipeline == null || pipelinePrev == null || pipelinePrev <= 0) return null
@@ -421,42 +423,60 @@ export default function Home() {
       animate="show"
       style={{ paddingBottom: 120, background: 'var(--v3-bg)' }}
     >
-      {/* ─────────── GREETING + WEATHER CHIP ───────────
-          Tightened bottom padding 24 → 14 so the hero rides higher into
-          the viewport. The greeting reads as a single beat with the
-          hero, not a separate top zone. */}
+      {/* ─────────── COMPACT GREETING STRIP — V3-HOME-1 ───────────
+          Demoted from 36pt serif italic h1 to a single sans 14pt muted
+          line so the AppHeader wordmark and the operator command data
+          (pipeline + next actions) stay dominant. Date eyebrow stays.
+          Weather chip stays on the right. */}
       <motion.div
         variants={item}
         style={{
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
           gap: 16,
-          padding: '12px 16px 14px'
+          // V3-SYSTEM-1B-1: greeting strip pad 10/16/10 → 8/16/6 so the
+          // first card sits ~6px closer to the header.
+          padding: '8px 16px 6px'
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
             {now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
           </span>
-          <h1 className="v3-h1" style={{ marginTop: 6 }}>
-            {greetingPrefix()} <em>{firstName}.</em>
-          </h1>
+          <div style={{
+            marginTop: 4,
+            fontFamily: 'var(--font-body)',
+            fontSize: 14,
+            fontWeight: 500,
+            letterSpacing: '-0.005em',
+            color: 'var(--v3-text-muted)',
+            lineHeight: 1.3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {greetingPrefix()} {firstName}.
+          </div>
         </div>
 
         {hasCoords ? (
+          /* V3-SYSTEM-1B-1: weather pill compacted — pad 10/12 → 6/10,
+             icon 18 → 16, temp 14 → 13, condition subline dropped (the
+             small uppercase line ate ~11px and the temp+icon already
+             telegraphs weather). Pill height 44 → 32. */
           <motion.button
             type="button"
             whileTap={{ scale: 0.96 }}
             whileHover={{ y: -1 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             onClick={() => { hapticTap(); navigate('/pour-window') }}
-            aria-label="Open weather forecast"
+            aria-label={condStr ? `Open weather forecast — ${condStr}` : 'Open weather forecast'}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 10,
-              padding: '10px 12px',
+              gap: 8,
+              padding: '6px 10px',
               borderRadius: 'var(--v3-radius-btn)',
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border)',
@@ -466,17 +486,15 @@ export default function Home() {
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <CloudSun size={18} color="#8FB4E3" aria-hidden="true" />
-            <div style={{ textAlign: 'left', lineHeight: 1.05 }}>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700 }}>
-                {tempStr}
-              </div>
-              {condStr ? (
-                <div style={{ fontSize: 9, color: 'var(--v3-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 }}>
-                  {condStr}
-                </div>
-              ) : null}
-            </div>
+            <CloudSun size={16} color="#8FB4E3" aria-hidden="true" />
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 13,
+              fontWeight: 700,
+              lineHeight: 1
+            }}>
+              {tempStr}
+            </span>
           </motion.button>
         ) : (
           <button
@@ -511,22 +529,252 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* ─────────── TODAY'S PRIORITIES — KPIs (mockup) ───────────
-          Per v3 mockup: 3 compact KPI cards stating what needs the
-          operator's attention today. Mockup leads with this BEFORE
-          the pipeline value so the operator sees the triage read
-          first; Pipeline follows. */}
+      {/* ─────────── PIPELINE REVENUE CARD — V3-HOME-1D ───────────
+          Mockup-faithful revenue moment. Eyebrow reframed from
+          "Total Pipeline" descriptor to "Today's Revenue Opportunity"
+          aspirational header (muted, not gold). Money stays the gold
+          anchor with a calm halo. Trend renders as inline colored text
+          — no Pill chip chrome. "Total Pipeline" demoted to a sublabel
+          beneath the figure. The Won/Active/Lead segmented bar + dotted
+          legend is retired in favor of a single muted text caption. A
+          1px gold hairline sweep sits under the sublabel as decorative
+          brand luminance — presentation only, not a fake chart.
+          Card-top gold accent stripe + View-all link removed: gold is
+          scarce here, only the money + the small sweep wear it. */}
       <motion.div
         variants={item}
-        className="v3-section v3-section--quiet"
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
+        className="v3-section"
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          // V3-SYSTEM-1B-1: section-to-section margin 14 → 12, card pad
+          // 14/18 → 12/16, radius (token default 20) → 16. Home-only
+          // density override; tokens stay alone for other screens.
+          margin: '0 var(--v3-gutter) 12px',
+          padding: '12px 16px',
+          borderRadius: 16,
+          // Glass-metal depth from V3-HOME-1C — kept verbatim. Inset top
+          // highlight + inset bottom shadow + crisp outline + soft halo.
+          border: '1px solid var(--v3-border-strong)',
+          boxShadow: [
+            'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+            'inset 0 -1px 0 rgba(0, 0, 0, 0.18)',
+            '0 1px 2px rgba(0, 0, 0, 0.40)',
+            '0 12px 28px rgba(0, 0, 0, 0.30)'
+          ].join(', ')
+        }}
+      >
+        {/* Eyebrow — muted ink, slightly looser tracking than the v3
+            default to give the longer phrase room. */}
+        <span className="v3-eyebrow" style={{
+          color: 'var(--v3-text-muted)',
+          letterSpacing: '0.16em'
+        }}>
+          Today's Revenue Opportunity
+        </span>
+
+        {/* Money + trend row — money baseline-aligned with a tiny
+            gold-bronze $ glyph and an inline arrow+pct trend. No Pill
+            chip; trend is just colored text. */}
+        <div style={{
+          marginTop: 6,
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 12,
+          flexWrap: 'nowrap'
+        }}>
+          <div style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: 'var(--font-body)',
+            fontSize: 32,
+            fontWeight: 700,
+            letterSpacing: '-0.012em',
+            color: 'var(--v3-primary)',
+            fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1.05,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            textShadow: '0 0 14px color-mix(in srgb, var(--v3-primary) 22%, transparent)'
+          }}>
+            {pipeline == null ? (
+              <span className="v3-skeleton" style={{ width: 160, height: 30, borderRadius: 6 }} />
+            ) : (
+              <>
+                <span style={{
+                  fontSize: 22,
+                  fontWeight: 600,
+                  marginRight: 1,
+                  color: 'color-mix(in srgb, var(--v3-primary) 70%, var(--v3-text-muted))',
+                  textShadow: 'none'
+                }}>
+                  $
+                </span>
+                <CountUp to={pipeline} formatter={(n) => n.toLocaleString()} />
+              </>
+            )}
+          </div>
+          {trendPct != null && (
+            <span style={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1
+            }}>
+              {trendUp
+                ? <ArrowUpRight size={11} aria-hidden="true" />
+                : <ArrowDownRight size={11} aria-hidden="true" />}
+              {trendUp ? '+' : ''}{trendPct}% · 7d
+            </span>
+          )}
+        </div>
+
+        {/* Sublabel under the figure — quiet caption naming the metric. */}
+        <div style={{
+          marginTop: 4,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--v3-text-muted)',
+          lineHeight: 1.3
+        }}>
+          Total Pipeline
+        </div>
+
+        {/* Decorative gold hairline sweep — 60px wide, 1px tall, fades
+            from gold to transparent. Not a chart, not a sparkline; just
+            a brand luminance accent under the financial label. */}
+        <span aria-hidden="true" style={{
+          display: 'block',
+          marginTop: 6,
+          width: 60,
+          height: 1,
+          background: 'linear-gradient(90deg, color-mix(in srgb, var(--v3-primary) 35%, transparent), transparent)'
+        }} />
+
+        {/* Stage caption — single muted text line. Numbers in ink-strong
+            so the digits register without per-stage tint. Renders an em
+            dash while data hydrates so the row never reads as "0/0/0". */}
+        <div style={{
+          marginTop: 10,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--v3-text-muted)',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1.3
+        }}>
+          {stageBreakdown == null ? '—' : (
+            <>
+              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
+                {stageBreakdown.active}
+              </span>
+              {' active · '}
+              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
+                {stageBreakdown.won}
+              </span>
+              {' won · '}
+              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
+                {stageBreakdown.lead}
+              </span>
+              {' lead'}
+            </>
+          )}
+        </div>
+      </motion.div>
+
+      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
+          V3-HOME-2 de-box: dropped the bordered section wrapper. Section
+          header organizes; the row cards self-frame on the page surface.
+          Pipeline mini-card stays the only bordered anchor on Home. */}
+      {nextActions != null && nextActions.length > 0 && (
+        <motion.div
+          variants={item}
+          style={{
+            margin: '0 var(--v3-gutter) 16px'
+          }}
+        >
+          <div className="v3-section-header">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
+                Next Actions
+              </span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 18,
+                height: 18,
+                padding: '0 6px',
+                borderRadius: 999,
+                background: 'var(--v3-surface-2)',
+                border: '1px solid var(--v3-border)',
+                color: 'var(--v3-text)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 10,
+                fontWeight: 700,
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1
+              }}>
+                {nextActions.length}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => { hapticTap(); navigate('/jobs') }}
+              className="v3-section-link"
+              style={{ color: 'var(--v3-text-muted)', transition: 'color 160ms ease' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--v3-primary)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--v3-text-muted)' }}
+            >
+              View all
+              <ChevronRight size={12} aria-hidden="true" />
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+            {nextActions.map((action) => (
+              <NextActionRow
+                key={action.id}
+                action={action}
+                photoUrl={action.contactId ? photoUrlByJob[action.contactId] : undefined}
+                onTap={() => action.contactId
+                  ? navigate(`/jobs/${action.contactId}`)
+                  : navigate('/jobs')
+                }
+              />
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ─────────── TODAY'S PRIORITIES — KPI strip ───────────
+          V3-HOME-2 un-nest: dropped the bordered wrapper that nested
+          three already-bordered tiles inside another box. Tiles render
+          directly on the page surface as a clean 3-column KPI strip.
+          Tile internals (V3-SYSTEM-1B-1: 72px minHeight, 22pt value,
+          danger tone preserved on Jobs Behind, mute-when-zero subline)
+          unchanged. Inter-tile gap tightened 10 → 8 so the three tiles
+          read as a continuous strip, not loose chips. */}
+      <motion.div
+        variants={item}
+        style={{
+          margin: '0 var(--v3-gutter) 16px'
+        }}
       >
         <SectionHeader label="Today's Priorities" />
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 10,
+            gap: 8,
             marginTop: 4
           }}
         >
@@ -546,152 +794,28 @@ export default function Home() {
             subline={dealsAtRisk?.quotesAttention > 0 ? 'Need follow up' : null}
             onTap={() => navigate('/jobs?filter=quote')}
           />
+          {/* V3-HOME-1D: tone changed warn(amber) → danger(red). Behind/
+              overdue is a recovery state, not a gold opportunity state. */}
           <CompactKpi
-            tone="warn"
+            tone="danger"
             icon={CalendarClock}
             value={jobsBehind}
             label="Jobs Behind"
-            subline={jobsBehind > 0 ? 'Reschedule' : null}
+            subline={jobsBehind > 0 ? 'Reschedule' : 'Overdue work'}
             onTap={() => navigate('/schedule')}
           />
         </div>
       </motion.div>
 
-      {/* PIPELINE CARD — compact per v3 mockup. Was the giant 100px-money
-          hero with stretched ambient blobs. Now: framed v3 section
-          card with modest pipeline value, trend, sparkline + bottom
-          breakdown row (Won / Active / Lead). */}
-      <motion.div
-        variants={item}
-        className="v3-section v3-section--primary-quiet"
-        style={{ margin: '0 var(--v3-gutter) 14px', padding: '18px' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Total Pipeline</span>
-          {trendPct != null ? (
-            <Pill tone={trendUp ? 'success' : 'danger'} icon={trendUp ? ArrowUpRight : ArrowDownRight}>
-              {trendUp ? '+' : ''}{trendPct}%
-            </Pill>
-          ) : null}
-        </div>
-
-        <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <div
-            className="v3-money"
-            style={{
-              fontSize: 'clamp(40px, 9vw, 56px)',
-              lineHeight: 0.95,
-              letterSpacing: '-0.005em',
-              color: '#FFFFFF'
-            }}
-          >
-            {pipeline == null ? (
-              <span className="v3-skeleton" style={{ width: 180, height: 48, borderRadius: 6 }} />
-            ) : (
-              <>
-                <span style={{
-                  fontSize: 'clamp(20px, 4.5vw, 28px)',
-                  color: 'var(--v3-text-muted)',
-                  verticalAlign: 'top',
-                  marginRight: 3,
-                  lineHeight: 1
-                }}>
-                  $
-                </span>
-                <CountUp to={pipeline} formatter={(n) => n.toLocaleString()} />
-              </>
-            )}
-          </div>
-          <div className="v3-caption" style={{ fontSize: 11 }}>vs last 7 days</div>
-        </div>
-
-        <div style={{ marginTop: 14, marginLeft: -8, marginRight: -8 }}>
-          <Sparkline data={sparkData} color="var(--v3-primary)" height={48} />
-        </div>
-
-        {/* Stage breakdown — Won / Active / Lead as a stacked bar
-            visualization. Mockup-tier financial dashboard treatment:
-            single horizontal bar with 3 colored segments + a numbers
-            row underneath. Replaces the prior 3-column number grid. */}
-        <PipelineStackedBreakdown breakdown={stageBreakdown} />
-
-        <button
-          type="button"
-          onClick={() => { hapticTap(); navigate('/jobs') }}
-          className="v3-section-link"
-          style={{ fontSize: 11, marginTop: 12 }}
-        >
-          View all jobs →
-        </button>
-      </motion.div>
-
-      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
-          Strongest section on the screen after the hero. Gold-tinted
-          border + raised shadow + count badge in the eyebrow tells the
-          operator: this is what to DO. Per-job CTAs tagged with urgency
-          (danger/warn/success) so critical work surfaces by color. */}
-      {nextActions != null && nextActions.length > 0 && (
-        <motion.div
-          variants={item}
-          className="v3-section v3-section--primary-quiet"
-          style={{ margin: '0 var(--v3-gutter) 14px' }}
-        >
-          <div className="v3-section-header">
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
-                Next Actions
-              </span>
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 20,
-                height: 20,
-                padding: '0 7px',
-                borderRadius: 999,
-                background: 'var(--v3-primary)',
-                color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 11,
-                letterSpacing: '0.04em',
-                lineHeight: 1
-              }}>
-                {nextActions.length}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => { hapticTap(); navigate('/jobs') }}
-              className="v3-section-link"
-            >
-              View all
-              <ChevronRight size={12} aria-hidden="true" />
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
-            {nextActions.map((action) => (
-              <NextActionRow
-                key={action.id}
-                action={action}
-                onTap={() => action.contactId
-                  ? navigate(`/jobs/${action.contactId}`)
-                  : navigate('/jobs')
-                }
-              />
-            ))}
-          </div>
-        </motion.div>
-      )}
-
       {/* ─────────── TODAY ON SITE ───────────
-          Schedule entries that start today, sourced from a safe
-          read-only fh_schedule query (no schema change). Polished
-          empty state if no events scheduled — never shows a blank
-          panel. Tap a row to jump to the linked job. */}
+          V3-HOME-2 de-box: header + row stack on page surface. Each
+          row is its own self-framing card; no parent panel needed.
+          Empty state still uses the dashed v3-empty primitive. */}
       <motion.div
         variants={item}
-        className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 16px'
+        }}
       >
         <SectionHeader
           label="Today on Site"
@@ -716,6 +840,7 @@ export default function Home() {
               <TodayOnSiteRow
                 key={row.id}
                 row={row}
+                photoUrl={row.contactId ? photoUrlByJob[row.contactId] : undefined}
                 onTap={() => row.contactId
                   ? navigate(`/jobs/${row.contactId}`)
                   : navigate('/schedule')
@@ -727,14 +852,14 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── PIPELINE PREVIEW ───────────
-          Top 3 active deals by value. Replaces the old Live Feed:
-          forward-looking ("what's open and worth most") instead of
-          backward-looking ("what just happened"). Tap a row to drill
-          into the contact, or "View all" to open the board. */}
+          Top 3 active deals by value. V3-HOME-2 de-box: header + row
+          stack on page surface. Each PipelineDealRow is a self-framed
+          glass card already; the bordered wrapper was redundant. */}
       <motion.div
         variants={item}
-        className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) 14px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 16px'
+        }}
       >
         <SectionHeader
           label="Pipeline Preview"
@@ -758,6 +883,7 @@ export default function Home() {
               <PipelineDealRow
                 key={deal.id}
                 deal={deal}
+                photoUrl={photoUrlByJob[deal.id]}
                 onTap={() => navigate(`/jobs/${deal.id}`)}
               />
             ))
@@ -766,14 +892,13 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
-          Demoted to the bottom of the screen as a tools toolbar.
-          Equal-width tight tiles (no asymmetric primary) — the eye
-          treats this as a launcher, not a CTA. Save Note / Schedule /
-          Invoice / Estimate read as parallel power tools. */}
+          V3-HOME-2 de-box: header + 5 tile launcher row on page surface.
+          Each QuickAction tile self-frames; wrapper was redundant chrome. */}
       <motion.div
         variants={item}
-        className="v3-section v3-section--tight"
-        style={{ margin: '0 var(--v3-gutter) 32px' }}
+        style={{
+          margin: '0 var(--v3-gutter) 28px'
+        }}
       >
         <SectionHeader label="Quick Actions" />
         <div
@@ -796,91 +921,10 @@ export default function Home() {
 }
 
 /* ============================================================
-   PipelineStackedBreakdown — Won / Active / Lead as a stacked
-   horizontal bar with a numbers row underneath. Mockup-tier
-   financial dashboard treatment. Renders an empty bar with
-   "—" labels while data is loading so layout doesn't shift.
-   ============================================================ */
-function PipelineStackedBreakdown({ breakdown }) {
-  const won    = breakdown?.won    ?? 0
-  const active = breakdown?.active ?? 0
-  const lead   = breakdown?.lead   ?? 0
-  const total  = won + active + lead
-  const segments = [
-    { id: 'won',    label: 'Won',    count: won,    tone: 'var(--v3-success-bright)' },
-    { id: 'active', label: 'Active', count: active, tone: 'var(--v3-primary)' },
-    { id: 'lead',   label: 'Lead',   count: lead,   tone: 'var(--v3-text-muted)' }
-  ]
-  return (
-    <div style={{
-      marginTop: 14,
-      paddingTop: 14,
-      borderTop: '1px solid var(--v3-border)'
-    }}>
-      {/* Stacked bar */}
-      <div
-        aria-hidden="true"
-        style={{
-          height: 8,
-          borderRadius: 999,
-          background: 'var(--v3-track)',
-          overflow: 'hidden',
-          display: 'flex',
-          gap: 2
-        }}
-      >
-        {total > 0 ? segments.map((s) => (
-          <div
-            key={s.id}
-            style={{
-              width: `${(s.count / total) * 100}%`,
-              background: s.tone,
-              transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
-            }}
-          />
-        )) : (
-          <div style={{ width: '100%', background: 'transparent' }} />
-        )}
-      </div>
-
-      {/* Numbers row underneath */}
-      <div style={{
-        marginTop: 10,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 12
-      }}>
-        {segments.map((s) => (
-          <div key={s.id}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontFamily: 'var(--font-display)',
-              fontSize: 22,
-              lineHeight: 1,
-              color: s.tone,
-              fontVariantNumeric: 'tabular-nums'
-            }}>
-              <span aria-hidden="true" style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: s.tone
-              }} />
-              {breakdown == null ? '—' : s.count}
-            </div>
-            <div className="v3-eyebrow" style={{ marginTop: 4 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/* ============================================================
    TodayOnSiteRow — single schedule row in Today on Site.
    Time + job/title + stage chip + chevron. Tap → linked job.
    ============================================================ */
-function TodayOnSiteRow({ row, onTap }) {
+function TodayOnSiteRow({ row, photoUrl, onTap }) {
   const stage = row.stage ? STAGE_DISPLAY[row.stage] : null
   const startTime = row.startAt
     ? new Date(row.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
@@ -899,10 +943,13 @@ function TodayOnSiteRow({ row, onTap }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
+        // V3-SYSTEM-1B-3: gap 12 → 10 to claw back ~4px when adding the
+        // 32px thumbnail + its gap. Row stays comfortable on a 360px phone.
+        gap: 10,
         width: '100%',
-        padding: '12px 14px',
-        borderRadius: 12,
+        // V3-SYSTEM-1B-1: row pad 12/14 → 10/12, radius 12 → 10.
+        padding: '10px 12px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
         color: 'var(--v3-text)',
@@ -931,6 +978,11 @@ function TodayOnSiteRow({ row, onTap }) {
       }}>
         {timeLabel}
       </div>
+      {/* V3-SYSTEM-1B-3: real cover photo for the linked job, falling
+          back to a neutral initial tile when no photo exists. Reserves
+          its 32×32 space immediately so async photo loads don't shift
+          the row. */}
+      <RowThumb photoUrl={photoUrl} name={row.clientName || row.title} />
       {/* Title + client */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -976,7 +1028,7 @@ const STAGE_DISPLAY = {
   invoice: { label: 'Invoice', color: 'var(--v3-stage-won)' }
 }
 
-function PipelineDealRow({ deal, onTap }) {
+function PipelineDealRow({ deal, photoUrl, onTap }) {
   const stage = STAGE_DISPLAY[deal.stage] || { label: deal.stage, color: 'var(--v3-text-muted)' }
   return (
     <motion.button
@@ -988,10 +1040,12 @@ function PipelineDealRow({ deal, onTap }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
+        // V3-SYSTEM-1B-3: gap 14 → 12 to make room for the 32px thumb.
+        gap: 12,
         width: '100%',
-        padding: '14px 14px',
-        borderRadius: 14,
+        // V3-SYSTEM-1B-1: row pad 14/14 → 12/12, radius 14 → 12.
+        padding: '12px 12px',
+        borderRadius: 12,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
         color: 'var(--v3-text)',
@@ -1015,16 +1069,21 @@ function PipelineDealRow({ deal, onTap }) {
         e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
       }}
     >
-      {/* Stage spine — 5px gradient. Glow removed (QA pass): blue/
-          purple stages were bleeding ambient atmosphere. Functional
-          color only — chip + spine carry the meaning. */}
+      {/* Stage spine — V3-HOME-1B: thinned 5→3px and shortened 36→20px
+          so it reads as a stage cue, not an old colored card outline.
+          Stage label below the deal name still carries the explicit
+          stage signal in its own color. */}
       <span aria-hidden="true" style={{
         flexShrink: 0,
-        width: 5,
-        height: 36,
-        borderRadius: 3,
-        background: `linear-gradient(180deg, ${stage.color}, color-mix(in srgb, ${stage.color} 50%, transparent))`
+        width: 3,
+        height: 20,
+        borderRadius: 2,
+        background: `color-mix(in srgb, ${stage.color} 70%, transparent)`
       }} />
+      {/* V3-SYSTEM-1B-3: real cover photo (or neutral initial fallback)
+          between the stage spine and the deal name block. Reads as a
+          job object, not a database row. */}
+      <RowThumb photoUrl={photoUrl} name={deal.name} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{
           fontFamily: 'var(--font-body)',
@@ -1090,6 +1149,11 @@ const COMPACT_TONE = {
 
 function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }) {
   const t = COMPACT_TONE[tone] || COMPACT_TONE.primary
+  // V3-SYSTEM-1B-1: subline mutes when the metric is zero. Three tiles
+  // at zero used to read as three colored shouts; now they read as
+  // three quiet captions and only nonzero counts wear their tone.
+  const isZero = value != null && Number(value) === 0
+  const sublineColor = isZero ? 'var(--v3-text-muted)' : t.color
 
   return (
     <motion.button
@@ -1101,51 +1165,50 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
       style={{
         position: 'relative',
         textAlign: 'left',
-        padding: '14px 12px 12px',
-        borderRadius: 14,
+        // V3-SYSTEM-1B-1: tile pad 14/12/12 → 12/12/10, radius 14 → 12,
+        // minHeight 88 → 72 so the three KPIs read as a quiet strip.
+        padding: '12px 12px 10px',
+        borderRadius: 12,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
         color: 'var(--v3-text)',
         cursor: 'pointer',
-        minHeight: 88,
+        minHeight: 72,
         WebkitTapHighlightColor: 'transparent',
         overflow: 'hidden'
       }}
     >
-      {/* 2px accent bar at top — the only chromatic signal on the tile */}
-      <span aria-hidden="true" style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-        background: t.color, opacity: 0.85
-      }} />
+      {/* V3-HOME-1: no colored top-edge bar. Tone signaled only via the
+          icon chip + value color. Chip + value sizes shrunk in 1B-1. */}
 
       {Icon ? (
         <span aria-hidden="true" style={{
           display: 'inline-grid', placeItems: 'center',
-          width: 28, height: 28, borderRadius: 8,
+          width: 24, height: 24, borderRadius: 7,
           background: 'var(--v3-surface-2)',
           border: '1px solid var(--v3-border-strong)',
           color: t.color,
-          marginBottom: 10
+          marginBottom: 8
         }}>
-          <Icon size={14} strokeWidth={2.2} />
+          <Icon size={13} strokeWidth={2.2} />
         </span>
       ) : null}
 
       <div style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 26,
+        fontSize: 22,
         color: t.color,
         lineHeight: 1,
-        marginBottom: 8,
-        minHeight: 26,
+        marginBottom: 6,
+        minHeight: 22,
         fontVariantNumeric: 'tabular-nums'
       }}>
         {value == null ? (
-          <span className="v3-skeleton" style={{ width: 44, height: 22, borderRadius: 4 }} />
+          <span className="v3-skeleton" style={{ width: 40, height: 18, borderRadius: 4 }} />
         ) : isMoney ? (
           <>
             <span style={{
-              fontSize: 14, color: 'var(--v3-text-muted)',
+              fontSize: 12, color: 'var(--v3-text-muted)',
               verticalAlign: 'top', marginRight: 1
             }}>
               $
@@ -1176,11 +1239,14 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 
       {subline ? (
         <div style={{
-          marginTop: 4,
+          marginTop: 3,
           fontFamily: 'var(--font-body)',
           fontSize: 11,
-          fontWeight: 700,
-          color: t.color,
+          // V3-SYSTEM-1B-1: subline weight 700 → 500 so the row carries
+          // less shout. Three tiles in a row read as quiet captions; only
+          // the icon chip + value digit carry the tone-color load.
+          fontWeight: 500,
+          color: sublineColor,
           fontVariantNumeric: 'tabular-nums'
         }}>
           {subline}
@@ -1205,13 +1271,17 @@ const NEXT_ACTION_KIND = {
   invoice:    { Icon: Receipt }
 }
 
+// V3-SYSTEM-1B-1: warn no longer uses brand gold (--v3-primary). Stale
+// leads <14d cold now wear the dedicated --v3-warn amber (#D4A042) so
+// gold can stay scarce on Home — reserved for the Pipeline money digits
+// and the small hairline sweep. Red urgency stays red, green stays green.
 const URGENCY_TONE = {
   danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
-  warn:    { color: 'var(--v3-primary)',        glow: 'rgba(212, 175, 55, 0.45)' },
+  warn:    { color: 'var(--v3-warn)',           glow: 'rgba(212, 160, 66, 0.40)' },
   success: { color: 'var(--v3-success-bright)', glow: 'rgba(46, 204, 113, 0.40)' }
 }
 
-function NextActionRow({ action, onTap }) {
+function NextActionRow({ action, photoUrl, onTap }) {
   const kindMeta = NEXT_ACTION_KIND[action.kind] || { Icon: Zap }
   const { Icon } = kindMeta
   const tone = URGENCY_TONE[action.urgencyTone] || URGENCY_TONE.warn
@@ -1237,8 +1307,10 @@ function NextActionRow({ action, onTap }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        // Tighter again: 9/12/9/14 saves ~6px height per row.
-        padding: '9px 12px 9px 14px',
+        // V3-HOME-2: row pad 9/12/9/14 → 8/12/8/14, saves ~10px stacked
+        // across 5 rows. Tap target stays comfortable (icon + title
+        // text already span ~36px tall before the row padding).
+        padding: '8px 12px 8px 14px',
         borderRadius: 12,
         // Subtle linear top-light overlay + slightly raised surface mix
         // so each row reads as a metal plate, not a list item.
@@ -1258,28 +1330,59 @@ function NextActionRow({ action, onTap }) {
     >
       {/* Left edge accent — urgency-tone color + matching glow. THIS is the
           critical-vs-optional signal. Operator scan: red bar = drop everything,
-          yellow = today, green = money in motion. */}
+          amber = today, green = money in motion. V3-SYSTEM-1B-1: glow blur
+          softened 12 → 8 so the spine reads as a hairline cue, not a halo. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
         left: 0, top: 7, bottom: 7,
         width: 3,
         background: tone.color,
         borderRadius: '0 3px 3px 0',
-        boxShadow: `0 0 12px ${tone.glow}`
+        boxShadow: `0 0 8px ${tone.glow}`
       }} />
 
-      <span aria-hidden="true" style={{
-        flexShrink: 0,
-        width: 32, height: 32,
-        borderRadius: 9,
-        background: 'var(--v3-surface-2)',
-        border: '1px solid var(--v3-border-strong)',
-        color: tone.color,
-        display: 'grid',
-        placeItems: 'center'
-      }}>
-        <Icon size={14} />
-      </span>
+      {/* V3-SYSTEM-1B-3: when a real cover photo exists for the linked
+          contact, show it instead of the kind-of-action icon chip. The
+          row title already names the action ("Follow up with Jane"), so
+          a photo telegraphs "this is about Jane's job" — a stronger
+          object cue than a generic phone glyph. Without a photo, the
+          existing tone-keyed icon chip stays as the kind cue. */}
+      {photoUrl ? (
+        <img
+          src={photoUrl}
+          alt=""
+          loading="lazy"
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 32,
+            height: 32,
+            borderRadius: 9,
+            objectFit: 'cover',
+            background: 'var(--v3-surface-2)',
+            border: '1px solid var(--v3-border-strong)',
+            display: 'block'
+          }}
+          onError={(e) => {
+            // Signed URL expired or blocked — hide so the broken-image
+            // glyph doesn't show. Space stays reserved.
+            e.currentTarget.style.visibility = 'hidden'
+          }}
+        />
+      ) : (
+        <span aria-hidden="true" style={{
+          flexShrink: 0,
+          width: 32, height: 32,
+          borderRadius: 9,
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border-strong)',
+          color: tone.color,
+          display: 'grid',
+          placeItems: 'center'
+        }}>
+          <Icon size={14} />
+        </span>
+      )}
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -1339,4 +1442,73 @@ function NextActionRow({ action, onTap }) {
       <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
     </motion.button>
   )
+}
+
+/* ============================================================
+   RowThumb — V3-SYSTEM-1B-3.
+   32×32 cover-photo tile used by Today on Site rows + Pipeline
+   Preview rows. Renders a real signed-URL image when one exists,
+   otherwise a neutral surface-2 + hairline tile with 1-2 letter
+   initials in muted ink. No gold tint, no stage tint, no fake
+   placeholder image — restraint is intentional so the row's
+   spine + stage label + amount stay the carriers of meaning.
+   ============================================================ */
+function RowThumb({ photoUrl, name, size = 32 }) {
+  const radius = 8
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt=""
+        loading="lazy"
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: size,
+          height: size,
+          borderRadius: radius,
+          objectFit: 'cover',
+          background: 'var(--v3-surface-2)',
+          border: '1px solid var(--v3-border)',
+          display: 'block'
+        }}
+        onError={(e) => {
+          // Signed URL 403 / network failure — hide rather than show
+          // a broken-image glyph. The tile space stays reserved so the
+          // row layout doesn't shift; next data refresh restores it.
+          e.currentTarget.style.visibility = 'hidden'
+        }}
+      />
+    )
+  }
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        flexShrink: 0,
+        width: size,
+        height: size,
+        borderRadius: radius,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
+        color: 'var(--v3-text-muted)',
+        display: 'grid',
+        placeItems: 'center',
+        fontFamily: 'var(--font-display)',
+        fontSize: size >= 36 ? 14 : 12,
+        letterSpacing: '0.04em',
+        lineHeight: 1
+      }}
+    >
+      {nameInitials(name)}
+    </span>
+  )
+}
+
+function nameInitials(name) {
+  if (!name) return '—'
+  const parts = String(name).trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '—'
+  if (parts.length === 1) return parts[0][0].toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
 }

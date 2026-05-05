@@ -3,6 +3,23 @@ import { motion } from 'framer-motion'
 import { Users as UsersIcon, ArrowUpRight } from 'lucide-react'
 import { STAGE_MAP, margin, marginTier } from '../../lib/stages.js'
 import { hapticTap } from '../../lib/haptics.js'
+import StatusPill from './StatusPill.jsx'
+
+// Cold threshold (V3-JOBS-1) — a contact in lead or quote stage with no
+// updated_at activity for at least 7 days reads as cold. Mirrors the
+// Home Next-Actions cold-lead threshold so the two surfaces stay aligned.
+const COLD_DAYS = 7
+const COLD_MS = COLD_DAYS * 24 * 60 * 60 * 1000
+
+function isColdContact(contact) {
+  if (!contact) return false
+  if (contact.stage !== 'lead' && contact.stage !== 'quote') return false
+  const ts = contact.updated_at || contact.created_at
+  if (!ts) return false
+  const t = new Date(ts).getTime()
+  if (!Number.isFinite(t)) return false
+  return Date.now() - t >= COLD_MS
+}
 
 // Stage progression visual (lost collapses to 0). Same constants Jobs.jsx
 // has used; centralized here so JobCard owns the per-card visual maths.
@@ -33,20 +50,9 @@ function initials(name) {
 }
 
 function MarginBadge({ pct, hasCost }) {
-  if (!hasCost) {
-    return (
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.02em',
-        color: 'var(--v3-text-muted)',
-        fontVariantNumeric: 'tabular-nums'
-      }}>
-        Margin —
-      </span>
-    )
-  }
+  // No cost data → hide the row entirely. The previous "Margin —"
+  // placeholder added visual noise without conveying anything.
+  if (!hasCost) return null
   const tier = marginTier(pct)
   const color = tier === 'good'
     ? 'var(--v3-success-bright)'
@@ -67,30 +73,10 @@ function MarginBadge({ pct, hasCost }) {
   )
 }
 
-function StagePill({ stageId }) {
-  const meta = STAGE_MAP[stageId]
-  if (!meta) return null
-  const color = meta.color
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '3px 9px',
-      borderRadius: 999,
-      background: `color-mix(in srgb, ${color} 14%, transparent)`,
-      border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
-      color: `color-mix(in srgb, ${color} 80%, white 20%)`,
-      fontFamily: 'var(--font-body)',
-      fontSize: 10,
-      fontWeight: 700,
-      letterSpacing: '0.1em',
-      textTransform: 'uppercase',
-      lineHeight: 1.4
-    }}>
-      {meta.label}
-    </span>
-  )
-}
+// V3-JOBS-1: local StagePill removed — replaced app-wide by the
+// shared StatusPill primitive (src/components/v3/StatusPill.jsx)
+// so all status badges (stage / Top Deal / Approved / Cold) share
+// one chip family.
 
 /**
  * v3 JobCard — premium pipeline card.
@@ -150,9 +136,9 @@ const JobCard = memo(function JobCard({
       whileHover={{
         y: -4,
         backgroundColor: 'var(--v3-surface-3)',
-        boxShadow: featured
-          ? '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(229, 193, 88, 0.22)'
-          : '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
+        // V3-JOBS-1: featured cards drop the gold halo on hover.
+        // Gold border alone marks the Top Deal — halo was decoration.
+        boxShadow: '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
       }}
       style={{
         position: 'relative',
@@ -166,17 +152,18 @@ const JobCard = memo(function JobCard({
         padding: hasPhotoBanner ? '0 18px 18px' : '18px 18px 18px 22px',
         borderRadius: 'var(--v3-radius-card)',
         background: 'var(--v3-surface)',
+        // V3-JOBS-1: card border demoted to matte hairline (matches
+        // V3-HOME-1 pass). Featured cards keep a functional gold border
+        // to telegraph Top Deal status without halo decoration.
         border: featured
           ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
-          : '1px solid rgba(255, 255, 255, 0.22)',
+          : '1px solid var(--v3-border)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
         overflow: 'hidden',
-        boxShadow: featured
-          ? '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30), 0 4px 16px rgba(229, 193, 88, 0.14)'
-          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30)'
+        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30)'
       }}
     >
       {/* Photo cover banner (only when photo present). Renders flush
@@ -253,57 +240,30 @@ const JobCard = memo(function JobCard({
         </div>
       )}
 
-      {/* Stage-color spine — left-edge accent. Adjusted for banner
-          mode (sits below the banner) vs no-banner mode (full height). */}
+      {/* Stage-color spine — V3-JOBS-1: softened from 4px×full-height
+          gradient to 3px×~28mm flat at 70% tone. Mirrors the Home
+          Pipeline Preview row treatment so list surfaces stay
+          consistent. Stage signal still present, no longer reads
+          as a colored card outline. */}
       <span aria-hidden="true" style={{
         position: 'absolute',
         left: 0,
-        top: hasPhotoBanner ? 152 : 14,
-        bottom: 12,
-        width: 4,
-        background: `linear-gradient(180deg, ${stageColor}, color-mix(in srgb, ${stageColor} 55%, transparent))`,
-        borderRadius: '0 4px 4px 0',
+        top: hasPhotoBanner ? 158 : 22,
+        height: 28,
+        width: 3,
+        background: `color-mix(in srgb, ${stageColor} 70%, transparent)`,
+        borderRadius: '0 2px 2px 0',
         pointerEvents: 'none'
       }} />
 
-      {/* Top edge gradient stroke — only in non-banner mode (the
-          banner has its own visual leading edge). */}
-      {!hasPhotoBanner && (
-        <span aria-hidden="true" style={{
-          position: 'absolute',
-          top: 0,
-          left: '14%',
-          right: '14%',
-          height: 1,
-          background: featured
-            ? 'linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%)'
-            : 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.20) 50%, transparent 100%)',
-          pointerEvents: 'none'
-        }} />
-      )}
+      {/* V3-JOBS-1: removed the decorative top-edge gradient stroke.
+          The matte hairline border + spine + bottom progress bar
+          carry the visual rhythm without the extra ornament. */}
 
-      {/* TOP DEAL chip for non-banner cards — sits in the corner */}
-      {featured && !hasPhotoBanner && (
-        <span style={{
-          position: 'absolute',
-          right: 12,
-          top: 12,
-          padding: '3px 9px',
-          borderRadius: 999,
-          background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-          color: 'var(--v3-on-primary)',
-          fontFamily: 'var(--font-body)',
-          fontSize: 9,
-          fontWeight: 800,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          lineHeight: 1.2,
-          boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.18), 0 4px 10px rgba(229, 193, 88, 0.35), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
-          pointerEvents: 'none'
-        }}>
-          Top Deal
-        </span>
-      )}
+      {/* TOP DEAL chip for non-banner cards — placed at the top of the
+          name column inline so it never collides with the amount on
+          the right. Renders below as part of the name block, not as
+          an absolutely-positioned corner overlay. */}
 
       {/* Top row: photo/initial tile + name block + amount block.
           When the banner is rendered, the inline photo tile is
@@ -317,6 +277,10 @@ const JobCard = memo(function JobCard({
           />
         )}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* V3-JOBS-1: Top Deal chip moved into the unified status
+              row at the bottom (rendered via StatusPill). The inline
+              gold-gradient chip above the name is retired in favor
+              of the consistent pill family. */}
           <div style={{
             fontFamily: 'var(--font-body)',
             fontSize: 14,
@@ -438,9 +402,24 @@ const JobCard = memo(function JobCard({
         </div>
       )}
 
-      {/* Bottom row: stage pill + stage X/5 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <StagePill stageId={contact.stage} />
+      {/* Bottom row: unified status pills (mockup-canonical stage
+          chip + V3-JOBS-1 added Top Deal / Approved / Cold) on the
+          left, Stage X/5 numeric on the right.  All chips now share
+          the StatusPill family — same shape, padding, font; only
+          tone color differs. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <StatusPill tone={stageToneFor(contact.stage)} label={STAGE_MAP[contact.stage]?.label || contact.stage} />
+          {featured && (
+            <StatusPill tone="topDeal" />
+          )}
+          {contact.proposal_status === 'approved' && (
+            <StatusPill tone="approved" />
+          )}
+          {isColdContact(contact) && (
+            <StatusPill tone="cold" />
+          )}
+        </div>
         <span style={{
           fontFamily: 'var(--font-body)',
           fontSize: 10,
@@ -453,8 +432,9 @@ const JobCard = memo(function JobCard({
         </span>
       </div>
 
-      {/* Progress bar — thicker (4px) + subtle stage-colored glow so the
-          progression is readable at a glance from across a 3-col grid. */}
+      {/* Progress bar — V3-JOBS-1: removed the stage-color glow ring;
+          flat 4px filled track only. Mockup-canonical thin progress
+          signal stays. */}
       <div style={{
         position: 'relative',
         height: 4,
@@ -468,13 +448,26 @@ const JobCard = memo(function JobCard({
           width: `${progressPct}%`,
           background: stageColor,
           borderRadius: 999,
-          boxShadow: `0 0 10px ${stageColor}66`,
           transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
         }} />
       </div>
     </motion.button>
   )
 })
+
+// Map a stage id to a StatusPill tone. Lost folds into the muted
+// 'lost' tone; everything else has its own canonical tone variant.
+function stageToneFor(stageId) {
+  switch (stageId) {
+    case 'lead':    return 'lead'
+    case 'quote':   return 'quote'
+    case 'job':     return 'job'
+    case 'invoice': return 'invoice'
+    case 'closed':  return 'closed'
+    case 'lost':    return 'lost'
+    default:        return 'lead'
+  }
+}
 
 /**
  * Cover photo with stage-tinted initial fallback.

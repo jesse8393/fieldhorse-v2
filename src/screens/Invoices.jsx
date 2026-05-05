@@ -109,16 +109,25 @@ export default function Invoices() {
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
     phone: profile?.company_phone || '',
-    email: profile?.email || ''
+    // Prefer customer-facing company_email (migration 015) over the
+    // operator's auth email so invoices show the public address.
+    email: profile?.company_email || profile?.email || '',
+    website: profile?.company_website || '',
+    logo_url: profile?.logo_url || null,
+    brand_accent_hex: profile?.brand_accent_hex || null,
+    license_number: profile?.license_number || '',
+    insured_text: profile?.insured_text || ''
   }), [profile])
 
-  function handleGeneratePDF(row) {
+  async function handleGeneratePDF(row) {
     // Audit caught this as a no-op. Wrap in try/catch so a jsPDF
     // failure surfaces a real error instead of silently swallowing,
     // and so the user sees a toast immediately on click instead of
     // wondering if anything happened.
     try {
-      const result = generateInvoice({
+      // generateInvoice() became async in 4D-2D — pre-fetches the
+      // contractor's logo via loadLogoForPdf before rendering.
+      const result = await generateInvoice({
         company,
         contact: {
           name: row.job.name || row.job.client_name || 'Client',

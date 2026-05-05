@@ -22,3 +22,8 @@ export { default as IconButton } from './IconButton.jsx'
 /* Phase 3D — canonical floating action button (portal-rendered to
    escape framer-motion containing-block traps). */
 export { default as FloatingActionButton } from './FloatingActionButton.jsx'
+
+/* Phase V3-JOBS-1 — unified status badge primitive. One pill family
+   for stage (lead/quote/job/invoice/closed/lost), Top Deal, Approved,
+   Cold. Replaces the prior mix of inline StagePill + ad-hoc chips. */
+export { default as StatusPill } from './StatusPill.jsx'

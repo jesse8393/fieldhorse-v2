@@ -31,6 +31,10 @@ export default function ActionSheet({
   currentStep = 1,
   commitLabel = 'Commit',
   commitBusy = false,
+  // Human in-flight label — overrides the legacy 'Committing…' default
+  // so customer-facing wording isn't database/version-control-ish.
+  // ApproveQuoteSheet passes 'Approving…' for accuracy.
+  commitBusyLabel = 'Saving…',
   commitDisabled = false,
   destructive = false,
   onClose,
@@ -189,7 +193,7 @@ export default function ActionSheet({
                 disabled={commitBusy || commitDisabled}
               >
                 <span className="fh-asheet__commit-label">
-                  {commitBusy ? (destructive ? 'Deleting…' : 'Committing…') : commitLabel}
+                  {commitBusy ? (destructive ? 'Deleting…' : commitBusyLabel) : commitLabel}
                 </span>
               </button>
             </footer>

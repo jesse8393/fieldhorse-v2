@@ -25,12 +25,15 @@ import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../compon
 import { useJobData } from './hooks/useJobData.js'
 import { resolveNextAction } from './lib/jobNextAction.js'
 import OverviewTab from './tabs/Overview.jsx'
+import QuoteTab from './tabs/Quote.jsx'
 import DetailsTab from './tabs/Details.jsx'
 import FinancialsTab from './tabs/Financials.jsx'
 import FilesTab from './tabs/Files.jsx'
+import ApproveQuoteSheet from './sections/ApproveQuoteSheet.jsx'
 
 const TOP_TABS = [
   { id: 'overview',   label: 'Overview' },
+  { id: 'quote',      label: 'Quote' },
   { id: 'details',    label: 'Details' },
   { id: 'financials', label: 'Financials' },
   { id: 'files',      label: 'Files' }
@@ -116,6 +119,10 @@ export default function ContactDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteErr, setDeleteErr] = useState('')
+  // Approve Quote sheet — lifted to root so the Overview NextAction CTA
+  // and the Quote tab ApproveBand both open the same sheet without
+  // duplicating state. Phase 4C-2.
+  const [approveOpen, setApproveOpen] = useState(false)
   // Edit mode is a flag the Overview tab + section editors read.
   // Header EDIT button toggles + jumps to overview if currently on another tab.
   const [isEditing, setIsEditing] = useState(false)
@@ -229,6 +236,16 @@ export default function ContactDetail() {
             onOpenAddEvent={() => setEventOpen(true)}
             onOpenLogPayment={() => setPayModalOpen(true)}
             onOpenInvitePartner={() => setInviteOpen(true)}
+            onOpenApproveQuote={() => setApproveOpen(true)}
+          />
+        )}
+        {tab === 'quote' && (
+          <QuoteTab
+            contact={contact}
+            userId={user?.id}
+            fetchAll={fetchAll}
+            patch={patch}
+            onOpenApprove={() => setApproveOpen(true)}
           />
         )}
         {tab === 'details' && (
@@ -293,6 +310,14 @@ export default function ContactDetail() {
         contactId={contact.id}
         contactName={contact.name}
         invitedByUserId={user?.id}
+      />
+
+      <ApproveQuoteSheet
+        open={approveOpen}
+        contact={contact}
+        userId={user?.id}
+        onClose={() => setApproveOpen(false)}
+        onApproved={fetchAll}
       />
 
       <ActionSheet

@@ -1620,22 +1620,36 @@ a {
 .fh-app__main {
   flex: 1;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  /* Stepped responsive frame — content reads as intentional at every
-     viewport size. Mobile = full width; tablet = 760px; desktop =
-     1080px; large desktop = 1180px (cap). Jobs/Clients grids fill the
-     frame and adapt their own column count via auto-fill / minmax. */
+  /* V3-SYSTEM-1A2: base shell — no width cap here. The cap is applied
+     by a route-aware layout modifier on the .fh-app root, set in
+     AppShell.layoutForPath(). Three modes are defined below. Today
+     every route resolves to --layout-mobile-frame, so visual output
+     is identical to V3-SYSTEM-1A; when dedicated desktop designs ship
+     for Home/Jobs/Schedule, those routes flip to --layout-responsive
+     and pick up the wider canvas without touching this base rule. */
   width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
+/* Mobile-frame — today's default for every route. Centered ~440px
+   premium mobile frame on tablet+ so desktop renders the production
+   app at its design width instead of stretching. Phones unchanged. */
 @media (min-width: 720px) {
-  .fh-app__main { max-width: 760px; }
+  .fh-app--layout-mobile-frame .fh-app__main { max-width: 440px; }
 }
-@media (min-width: 1024px) {
-  .fh-app__main { max-width: 1080px; }
+/* Prose — capped at 640px per MASTER §4 prose-column rule, for any
+   future read-heavy detail screen (Notes detail, long-form views).
+   Not activated on any route yet. */
+@media (min-width: 720px) {
+  .fh-app--layout-prose .fh-app__main { max-width: 640px; }
 }
-@media (min-width: 1440px) {
-  .fh-app__main { max-width: 1180px; }
+/* Responsive — adaptive multi-column desktop canvas. Caps at 1280px
+   per MASTER §4 container rule. Not activated on any route yet; lands
+   per-route as desktop mockups for Home/Jobs/Schedule ship. Per-screen
+   desktop CSS (multi-column grids, sidebars, dashboard panels) sits
+   beside the existing mobile CSS in each screen's stylesheet/component. */
+@media (min-width: 768px) {
+  .fh-app--layout-responsive .fh-app__main { max-width: 1280px; }
 }
 
 /* =========================================================================
@@ -1650,13 +1664,40 @@ a {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 0;
-  padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+  /* V3-SYSTEM-1B-2: top/horizontal pad 8 → 6, bottom 10 → 8 so the
+     dock loses ~4px of chunk while keeping the safe-area inset intact. */
+  padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
   /* Fully solid — no glass / blur / translucency. Per user feedback the
      frosted backdrop-filter still read as "see-through" even with an
      opaque background color, because the saturated blur layer sits on
      top of the solid bg. Onyx tile only. */
   background: var(--surface-1);
   border-top: 1px solid var(--rule);
+}
+/* V3-SYSTEM-1A2: bottom nav cap follows the active layout mode on
+   .fh-app root, so the dock and the content column always agree. In
+   mobile-frame routes the dock floats centered at ~440px with rounded
+   top corners; phones (<720px) keep edge-to-edge behavior regardless.
+   Other layout modes (prose, responsive) leave the nav at its default
+   edge-to-edge state — desktop dashboard layouts will likely replace
+   the bottom nav with sidebar nav, and that decision happens when
+   those layouts ship, not here. */
+@media (min-width: 720px) {
+  .fh-app--layout-mobile-frame .fh-nav,
+  .fh-app--layout-prose .fh-nav {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 440px;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+  }
+}
+@media (min-width: 720px) {
+  .fh-app--layout-prose .fh-nav { max-width: 640px; }
 }
 .fh-nav__item {
   position: relative;
@@ -1665,10 +1706,11 @@ a {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  /* Enforce 48x48 minimum tap area (iOS HIG + Android a11y). */
-  min-height: 48px;
-  min-width: 48px;
-  padding: 8px 6px 6px;
+  /* V3-SYSTEM-1B-2: WCAG-compliant 44px minimum tap area (was 48). The
+     header padding extends touch beyond the visible cell. */
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 6px 4px;
   background: none;
   border: none;
   color: var(--ink-muted);
@@ -1680,16 +1722,23 @@ a {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-/* Active tab: strong read via color + subtle bg tile + gold glyph.
-   Dark theme gets a faint gold wash; light theme gets an onyx-tinted wash. */
+/* V3-SYSTEM-1B-2: active state keeps the gold wash + inner stroke
+   pattern but quieter — alpha 0.18 → 0.12 and inner stroke gold@30%
+   → gold@22% so the dock reads as a calm mobile dock instead of
+   chunky control. Dot below also shrinks. Light theme tracks the
+   same demotion. */
 .fh-nav__item.is-active {
   color: var(--ink-strong);
-  background: rgba(199, 164, 90, 0.10);
+  background: rgba(229, 193, 88, 0.12);
   border-radius: 12px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 22%, transparent);
 }
 .fh-nav__item.is-active .fh-nav__icon { color: var(--field-gold-bright); }
 .fh-nav__item.is-active .fh-nav__label { color: var(--ink-strong); font-weight: 700; }
-[data-theme='light'] .fh-nav__item.is-active { background: rgba(11, 11, 11, 0.05); }
+[data-theme='light'] .fh-nav__item.is-active {
+  background: rgba(11, 11, 11, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(11, 11, 11, 0.08);
+}
 .fh-nav__item:hover { color: var(--ink-strong); }
 .fh-nav__icon {
   display: inline-flex;
@@ -1710,12 +1759,13 @@ a {
 .fh-nav__dot {
   position: absolute;
   bottom: 2px;
-  width: 6px;
-  height: 6px;
+  /* V3-SYSTEM-1B-2: 4 → 3px with softer halo so the dot reads as a
+     transition cue under a calmer pill, not a separate gold pip. */
+  width: 3px;
+  height: 3px;
   border-radius: 999px;
   background: var(--field-gold);
-  box-shadow: 0 0 0 4px rgba(199, 164, 90, 0.18);
-  /* The layoutId dot can otherwise steal the first tap while animating. */
+  box-shadow: 0 0 0 2px rgba(199, 164, 90, 0.14);
   pointer-events: none;
 }
 
@@ -4482,10 +4532,12 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   bottom: 0;
   left: 0;
   right: 0;
-  /* Fits inside visual viewport, leaves 40px below the notch, and shrinks by keyboard height. */
+  /* Fits inside visual viewport, leaves 40px below the notch, and shrinks by keyboard height.
+     Uses dvh (dynamic viewport height) so the sheet collapses with the iOS URL bar — fixes
+     P1 where the commit footer rendered below the visible area on 812px phone heights. */
   height: min(
-    92vh,
-    calc(var(--fh-vvh, 100vh) - env(safe-area-inset-top) - 40px - var(--fh-kbd, 0px))
+    92dvh,
+    calc(var(--fh-vvh, 100dvh) - env(safe-area-inset-top) - 40px - var(--fh-kbd, 0px))
   );
   max-height: calc(100dvh - env(safe-area-inset-top) - 40px);
   background: var(--surface-1);

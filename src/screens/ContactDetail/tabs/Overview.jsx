@@ -52,7 +52,8 @@ export default function OverviewTab({
   onExitEdit,
   onOpenAddEvent,
   onOpenLogPayment,
-  onOpenInvitePartner
+  onOpenInvitePartner,
+  onOpenApproveQuote
 }) {
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -119,6 +120,19 @@ export default function OverviewTab({
           break
         }
         case 'stage': {
+          // Approval intercept (Phase 4C-2): the bare approveQuote()
+          // pipeline call would advance stage + add a kickoff schedule
+          // but write NO immutable snapshot, leaving no record of what
+          // was approved. Route through the ApproveQuoteSheet instead
+          // so every approval lands as an fh_quote_versions row via
+          // fn_approve_quote_version. The sheet itself calls
+          // approveQuote() afterward when the operator leaves the
+          // "Move to Job" checkbox checked.
+          if (nextAction.pipelineFn === 'approveQuote' && onOpenApproveQuote) {
+            hapticStageChange()
+            onOpenApproveQuote()
+            break
+          }
           const fn = STAGE_FN_MAP[nextAction.pipelineFn]
           if (fn) {
             // Heavier haptic on stage boundary — matches haptics.js convention
