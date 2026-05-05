@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Users, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -38,6 +38,14 @@ export default function PartnerInvite() {
   const [info, setInfo] = useState(null)
   const [infoErr, setInfoErr] = useState('')
   const [accepting, setAccepting] = useState(false)
+  // Ref-tracked "have we already started the accept call" guard.
+  // Using state for this caused a cleanup-cancel cascade: putting
+  // `accepting` in the effect's deps meant setAccepting(true) re-ran
+  // the effect, which fired its cleanup (cancelled = true), which made
+  // the in-flight fetch's .then/.finally no-op out. End result: spinner
+  // stuck on "Linking you to the job…" forever even after the network
+  // returned a successful job_id. A ref does not re-trigger the effect.
+  const acceptStartedRef = useRef(false)
 
   useEffect(() => {
     if (!token) {
@@ -56,7 +64,7 @@ export default function PartnerInvite() {
         if (cancelled) return
         // eslint-disable-next-line no-console
         console.error('[partner-invite] info fetch failed', err)
-        setInfoErr('Invite lookup failed')
+        setInfoErr("We couldn't load this invite. Check your connection and try again.")
       })
     return () => { cancelled = true }
   }, [token])
@@ -65,10 +73,23 @@ export default function PartnerInvite() {
     if (loading) return
     if (!session?.access_token) return
     if (!token) return
-    if (accepting) return
+    if (acceptStartedRef.current) return
     if (isFatalError(infoErr)) return
+
+    acceptStartedRef.current = true
     let cancelled = false
     setAccepting(true)
+
+    // Hard timeout safety net. If the accept call never resolves (DNS,
+    // proxy, function cold-start beyond Netlify's limit, etc.) we surface
+    // a real error instead of leaving the user staring at the spinner
+    // indefinitely. 15s is comfortably above a normal Netlify cold start.
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return
+      setInfoErr("This is taking longer than expected. Refresh the page to try again.")
+      setAccepting(false)
+    }, 15000)
+
     fetch(`/api/partner-invite-accept`, {
       method: 'POST',
       headers: {
@@ -80,18 +101,35 @@ export default function PartnerInvite() {
       .then((r) => r.json().catch(() => ({})))
       .then((data) => {
         if (cancelled) return
-        if (data?.job_id) navigate(`/jobs/${data.job_id}`, { replace: true })
-        else setInfoErr(friendlyError(data?.error) || 'Could not accept invite')
+        clearTimeout(timeoutId)
+        if (data?.job_id) {
+          navigate(`/jobs/${data.job_id}`, { replace: true })
+        } else {
+          setInfoErr(friendlyError(data?.error) || "We couldn't accept this invite. Try again.")
+          setAccepting(false)
+          // Allow the user to retry on next render (e.g., after they
+          // refresh or the underlying state changes).
+          acceptStartedRef.current = false
+        }
       })
       .catch((err) => {
         if (cancelled) return
+        clearTimeout(timeoutId)
         // eslint-disable-next-line no-console
         console.error('[partner-invite] accept failed', err)
-        setInfoErr('Accept failed')
+        setInfoErr("We couldn't reach the server. Check your connection and try again.")
+        setAccepting(false)
+        acceptStartedRef.current = false
       })
-      .finally(() => { if (!cancelled) setAccepting(false) })
-    return () => { cancelled = true }
-  }, [loading, session, token, accepting, infoErr, navigate])
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
+    // Intentionally exclude `accepting` and `infoErr` from deps — they're
+    // updated INSIDE this effect and including them would re-trigger the
+    // cleanup cancel cascade. Auth + token + navigate are the real inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, session, token, navigate])
 
   const inviterName = info?.inviter_company || info?.inviter_name || 'A contractor on Fieldhorse'
   const jobTitle = info?.job_title || 'a job'
