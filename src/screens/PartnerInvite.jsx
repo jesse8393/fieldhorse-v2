@@ -11,7 +11,10 @@ function friendlyError(code) {
   if (code === 'invite_revoked') return 'This invite was revoked by the sender.'
   if (code === 'email_mismatch') return 'Sign in with the email this invite was sent to.'
   if (code === 'not_authenticated' || code === 'invalid_token') return 'Please sign in to accept this invite.'
-  return code
+  // Unknown non-empty backend code — surface a safe generic message
+  // instead of leaking the raw identifier (lookup_failed, accept_failed,
+  // server_misconfigured, etc.) into the UI.
+  return "We couldn't accept this invite. Try again."
 }
 
 function isFatalError(msg) {
