@@ -147,9 +147,17 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
       return
     }
     try {
+      // CRITICAL: inline the URL into `text` because many email apps
+      // (iOS Mail, Gmail web, several Android mail clients) render
+      // navigator.share's `text` as the entire body and silently drop
+      // the separate `url` field. Recipients were getting an email
+      // saying "Co-manage X with me on Fieldhorse." with NO link.
+      // We still pass `url` for share targets (Messages, AirDrop) that
+      // do consume it as a structured field.
+      const body = `Co-manage ${contactName || 'this job'} with me on Fieldhorse:\n\n${readyUrl}`
       await navigator.share({
         title: 'Fieldhorse partner invite',
-        text: `Co-manage ${contactName || 'this job'} with me on Fieldhorse.`,
+        text: body,
         url: readyUrl
       })
     } catch (ex) {
