@@ -127,6 +127,14 @@ export default function PartnerInvite() {
     return () => {
       cancelled = true
       clearTimeout(timeoutId)
+      // Reset the ref so a re-run of this effect (e.g. Supabase fires
+      // TOKEN_REFRESHED and AuthContext emits a new session reference
+      // mid-fetch) can start a fresh accept call instead of early-
+      // returning past the guard. Without this, a session refresh
+      // during the fetch would: cancel the in-flight handlers, leave
+      // acceptStartedRef = true, and leave accepting = true forever
+      // — same "stuck spinner" dead end the original bug had.
+      acceptStartedRef.current = false
     }
     // Intentionally exclude `accepting` and `infoErr` from deps — they're
     // updated INSIDE this effect and including them would re-trigger the
