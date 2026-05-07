@@ -52,13 +52,19 @@ function RouteFallback() {
  * canvas they get.
  */
 function layoutForPath(pathname) {
-  // Phase 1 of the Responsive Desktop Command Center: Home is the first
-  // route that opts into the multi-column desktop canvas. Below the
-  // 900px breakpoint the layout collapses back to the mobile frame
-  // automatically (the responsive max-width media query only activates
-  // on wider viewports), so phones are unaffected.
+  // Responsive Desktop Command Center.
+  //   Phase 1: Home (`/`) opts into the multi-column desktop canvas.
+  //   Phase 2: Jobs (`/jobs`) and Clients (`/clients`) get desktop-grade
+  //            grid + header layouts — phone view is preserved verbatim.
+  //   Phase 3 (pending): Schedule + Job Detail multi-column.
+  //
+  // Below the 900px breakpoint the layout collapses back to the mobile
+  // frame automatically (the responsive max-width media queries only
+  // activate on wider viewports), so phones are unaffected.
   if (pathname === '/') return 'responsive'
-  // Jobs, Clients, Schedule, Job Detail land in Phase 2/3.
+  if (pathname === '/jobs') return 'responsive'
+  if (pathname === '/clients') return 'responsive'
+  // Schedule and Job Detail (`/jobs/:id`) stay mobile-frame for now.
   return 'mobile-frame'
 }
 

@@ -174,7 +174,7 @@ export default function Jobs() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen v3-screen--jobs"
       variants={stagger}
       initial="hidden"
       animate="show"
@@ -184,7 +184,7 @@ export default function Jobs() {
           "{count} active · ${total} total" caption rather than a
           display-font command bar; the count + total still surface,
           just in a calmer hierarchy that lets the cards lead. */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
+      <motion.div className="fh-jobs__head" variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1
             style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}
@@ -211,10 +211,23 @@ export default function Jobs() {
             )}
           </div>
         </div>
+        {/* Desktop-only inline primary action. The FAB is hidden on
+            desktop (it's a phone thumb-reach pattern), so the new-lead
+            entry point lives here at >=900px. CSS keeps this hidden on
+            mobile via display:none. */}
+        <button
+          type="button"
+          className="fh-jobs__action fh-desktop-only-action"
+          onClick={() => { hapticMedium(); setAddOpen(true) }}
+          aria-label="New lead"
+        >
+          <Plus size={15} strokeWidth={2.4} />
+          <span>New lead</span>
+        </button>
       </motion.div>
 
       {/* SEARCH */}
-      <motion.div variants={item} style={{ padding: '12px 20px 10px' }}>
+      <motion.div className="fh-jobs__search" variants={item} style={{ padding: '12px 20px 10px' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={16} style={{ position: 'absolute', left: 14, color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
@@ -239,7 +252,7 @@ export default function Jobs() {
       </motion.div>
 
       {/* STAGE TABS — horizontal scroll on overflow */}
-      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+      <motion.div className="fh-jobs__tabs" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist">
           {TABS.map((t) => (
             <FilterPill
@@ -261,7 +274,7 @@ export default function Jobs() {
           Net effect: 1 col on phone (≤520), 2 cols on tablet (520-820),
           3 cols on small desktop (820-1080), 4 cols on wide (≥1080).
           Was capping at 3 cols even on wide screens — left empty space. */}
-      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+      <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
         {loading && <SkeletonList rows={5} />}
         {!loading && filtered.length === 0 && (
           <EmptyView
@@ -369,13 +382,16 @@ export default function Jobs() {
         }}
       />
 
-      {/* FAB — bottom-right above BottomNav. Thumb-reach primary action.
-          Per ruleset: "Max 1 primary action per screen" — this is it.
-          Renders via the canonical portal-based primitive so it can't
-          be trapped by a transformed ancestor. */}
+      {/* FAB — bottom-right above BottomNav. Thumb-reach primary action
+          on phone. Per ruleset: "Max 1 primary action per screen" — on
+          desktop the inline .fh-jobs__action button takes that role and
+          the FAB collapses via hideOnDesktop. Renders via the canonical
+          portal-based primitive so it can't be trapped by a transformed
+          ancestor. */}
       <FloatingActionButton
         onClick={() => setAddOpen(true)}
         ariaLabel="New lead"
+        hideOnDesktop
       />
     </motion.div>
   )

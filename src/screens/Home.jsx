@@ -417,7 +417,7 @@ export default function Home() {
   */
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen v3-screen--home"
       variants={stagger}
       initial="hidden"
       animate="show"

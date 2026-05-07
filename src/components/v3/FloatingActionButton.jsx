@@ -21,10 +21,14 @@ import { hapticMedium } from '../../lib/haptics.js'
  *   resolves correctly to the viewport. Same fix used by V3PaymentSheet.
  *
  * Props:
- *   onClick    — required tap handler
- *   ariaLabel  — required accessible label (e.g., "New lead")
- *   icon       — optional ReactNode; defaults to a Plus glyph
- *   iconSize   — optional size for the default icon (default 26)
+ *   onClick         — required tap handler
+ *   ariaLabel       — required accessible label (e.g., "New lead")
+ *   icon            — optional ReactNode; defaults to a Plus glyph
+ *   iconSize        — optional size for the default icon (default 26)
+ *   hideOnDesktop   — Phase 2 desktop shell flag. When true, applies
+ *                     .fh-fab--hide-desktop so the FAB collapses at
+ *                     >=900px (where the screen now provides an inline
+ *                     primary action button in its desktop header).
  *
  * Position is owned by the .fh-fab class in global.css:
  *   right: 20px;
@@ -38,7 +42,8 @@ export default function FloatingActionButton({
   ariaLabel,
   icon,
   iconSize = 26,
-  iconStrokeWidth = 2.6
+  iconStrokeWidth = 2.6,
+  hideOnDesktop = false
 }) {
   if (typeof document === 'undefined') return null
 
@@ -53,7 +58,7 @@ export default function FloatingActionButton({
       whileTap={{ scale: 0.94 }}
       onClick={handleClick}
       aria-label={ariaLabel}
-      className="fh-fab"
+      className={`fh-fab${hideOnDesktop ? ' fh-fab--hide-desktop' : ''}`}
     >
       {icon || <Plus size={iconSize} strokeWidth={iconStrokeWidth} />}
     </motion.button>

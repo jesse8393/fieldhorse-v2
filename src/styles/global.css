@@ -2070,20 +2070,21 @@ a {
 /* =========================================================================
    HOME — desktop dashboard grid (Phase 1)
 
-   Home renders inside <motion.div className="v3-screen">. On desktop
-   we promote that single-column flow to a 2-column dashboard grid.
-   The first two children (greeting strip + pipeline revenue card) span
-   the full width to anchor the page; everything below distributes
+   Home renders inside <motion.div className="v3-screen v3-screen--home">.
+   On desktop we promote that single-column flow to a 2-column dashboard
+   grid. The first two children (greeting strip + pipeline revenue card)
+   span the full width to anchor the page; everything below distributes
    into two columns by source order. Phones (<900px) keep the existing
    single-column flow exactly as before.
 
    The :nth-child rule is intentionally simple — Home's section order
    is stable and the rule lives next to the layout-mode CSS so a future
-   reorder is easy to spot. When a section is added or moved, adjust
-   the :nth-child(-n+N) selector here, not in JSX.
+   reorder is easy to spot. Scoped to .v3-screen--home so Jobs / Clients
+   (also on the responsive layout from Phase 2 onward) don't inherit
+   Home's "first 2 full-width, rest split into 2 cols" pattern.
    ========================================================================= */
 @media (min-width: 900px) {
-  .fh-app--layout-responsive .v3-screen {
+  .fh-app--layout-responsive .v3-screen--home {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 24px;
@@ -2094,18 +2095,190 @@ a {
   /* First two top-of-page rows (greeting strip + Today's Revenue
      Opportunity card) span both columns so they read as the page
      header. Items 3+ stack in two columns by source order. */
-  .fh-app--layout-responsive .v3-screen > :nth-child(-n+2) {
+  .fh-app--layout-responsive .v3-screen--home > :nth-child(-n+2) {
     grid-column: 1 / -1;
   }
   /* Reset per-section horizontal margins inside the grid — the inner
      wrapper provides the gutter on desktop, so child cards should
      hug the column they live in instead of carrying their own
      mobile-tuned 0 var(--v3-gutter) shoulders. */
-  .fh-app--layout-responsive .v3-screen > .v3-section,
-  .fh-app--layout-responsive .v3-screen > .v3-section-header {
+  .fh-app--layout-responsive .v3-screen--home > .v3-section,
+  .fh-app--layout-responsive .v3-screen--home > .v3-section-header {
     margin-left: 0;
     margin-right: 0;
     margin-bottom: 16px;
+  }
+}
+
+/* =========================================================================
+   DESKTOP-ONLY INLINE ACTION BUTTON — Phase 2
+
+   Replaces the FAB on desktop for screens that opt in. Premium black-
+   glass with a restrained gold accent, matches sidebar hover language.
+   On mobile this stays display:none and the FAB carries the primary
+   action (thumb-reach pattern).
+   ========================================================================= */
+.fh-desktop-only-action { display: none; }
+@media (min-width: 900px) {
+  .fh-desktop-only-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    height: 36px;
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(228, 190, 111, 0.18) 0%, rgba(201, 150, 58, 0.10) 100%),
+      var(--v3-surface);
+    border: 1px solid color-mix(in srgb, var(--v3-primary) 38%, var(--v3-border));
+    color: var(--v3-primary);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 1px 0 rgba(255, 240, 210, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.32);
+    transition: transform 140ms var(--ease), box-shadow 140ms var(--ease), border-color 140ms var(--ease);
+    flex-shrink: 0;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fh-desktop-only-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 1px 0 rgba(255, 240, 210, 0.08) inset, 0 8px 22px rgba(201, 150, 58, 0.18);
+    border-color: color-mix(in srgb, var(--v3-primary) 55%, var(--v3-border));
+  }
+  .fh-desktop-only-action:active { transform: translateY(0); }
+
+  /* FAB collapses on desktop when the screen has supplied an inline
+     primary action (Jobs, Clients in Phase 2). Other screens that
+     keep the FAB are unaffected because they don't pass the prop. */
+  .fh-fab--hide-desktop { display: none !important; }
+}
+
+/* =========================================================================
+   JOBS — desktop command layout (Phase 2)
+
+   At >=900px the four mobile-stacked sections (head, search, tabs, grid)
+   reflow into a single sticky-feeling header row + a wide card grid.
+   Mobile layout is unchanged because all desktop rules live inside the
+   @media (min-width: 900px) block.
+
+       ┌─────────────── header row ──────────────────────────────────┐
+       │ [Title + caption] [── search ──] [tabs] [+ New Lead]        │
+       ├─────────────── card grid (3-4 cols) ────────────────────────┤
+       │ [card] [card] [card] [card]                                 │
+       │ [card] [card] [card] [card]                                 │
+       └─────────────────────────────────────────────────────────────┘
+
+   Section identity comes from explicit BEM-style classes added in
+   Jobs.jsx (.fh-jobs__head / __search / __tabs / __action / __grid)
+   so the grid placement isn't a fragile :nth-child contract.
+   ========================================================================= */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .v3-screen--jobs {
+    display: grid;
+    /* Three top-row cells — head (which contains the inline new-lead
+       button), search, tabs — then a full-width grid row. */
+    grid-template-columns:
+      minmax(280px, 1fr)
+      minmax(220px, 360px)
+      minmax(0, auto);
+    grid-template-rows: auto auto;
+    column-gap: 16px;
+    row-gap: 14px;
+    align-items: center;
+    padding: 4px 0 32px;
+  }
+  .v3-screen--jobs > .fh-jobs__head {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 0 !important;
+    /* Head contains the title block on the left and the inline
+       new-lead button on the right. align-items center so the button
+       sits middle-aligned with the title (mobile-only inline style
+       has it flex-start which leaves the button drifting up on
+       desktop where the caption shouldn't push the action). */
+    align-items: center !important;
+  }
+  .v3-screen--jobs > .fh-jobs__search {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0 !important;
+  }
+  .v3-screen--jobs > .fh-jobs__tabs {
+    grid-column: 3;
+    grid-row: 1;
+    padding: 0 !important;
+    overflow: visible;
+  }
+  /* Tabs container: drop horizontal scroll affordance on desktop —
+     all 5 stage tabs always fit at this width. */
+  .v3-screen--jobs > .fh-jobs__tabs > div {
+    overflow-x: visible !important;
+    padding-bottom: 0 !important;
+    flex-wrap: nowrap;
+  }
+  /* Card grid spans full width on row 2. Bumped minmax for desktop
+     so cards have more breathing room (mobile 260 → desktop 290). */
+  .v3-screen--jobs > .fh-jobs__grid {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding: 0 !important;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)) !important;
+    gap: 14px !important;
+  }
+}
+
+/* =========================================================================
+   CLIENTS — desktop directory layout (Phase 2)
+
+   At >=900px the cockpit panel becomes a horizontal command strip
+   spanning the full canvas, the filter row stretches inline, and the
+   client tile grid takes the full width with 3-4 columns. Mobile
+   unchanged.
+   ========================================================================= */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .v3-screen--clients {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 14px;
+    padding: 4px 0 32px;
+  }
+  /* Cockpit + filters + grid stack vertically but each section drops
+     its mobile gutter so they can stretch to the canvas edges. The
+     .fh-app__main-inner wrapper already provides the desktop gutter. */
+  .v3-screen--clients > .fh-clients__cockpit,
+  .v3-screen--clients > .fh-clients__filters,
+  .v3-screen--clients > .fh-clients__grid {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .v3-screen--clients > .fh-clients__cockpit { padding-top: 0 !important; padding-bottom: 0 !important; }
+  /* Inside the filters block: search input + filter pills sit on a
+     single row instead of stacking — search takes available space, pills
+     hug right. */
+  .v3-screen--clients > .fh-clients__filters {
+    display: grid;
+    grid-template-columns: minmax(280px, 460px) minmax(0, auto);
+    align-items: center;
+    column-gap: 16px;
+  }
+  .v3-screen--clients > .fh-clients__filters > div:first-child { /* search */
+    margin: 0;
+  }
+  .v3-screen--clients > .fh-clients__filters > div:nth-child(2) { /* pills */
+    margin-top: 0 !important;
+    overflow-x: visible !important;
+    padding-bottom: 0 !important;
+    flex-wrap: nowrap;
+  }
+  /* Card grid — bump minmax so tiles have breathing room on the wider
+     canvas (mobile 320 → desktop 320 unchanged but the column count
+     scales naturally with auto-fill). Slightly looser gap. */
+  .v3-screen--clients > .fh-clients__grid {
+    gap: 16px !important;
   }
 }
 
