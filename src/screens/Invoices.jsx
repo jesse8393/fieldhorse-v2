@@ -292,7 +292,17 @@ export default function Invoices() {
                 key={r.job.id}
                 row={r}
                 onPDF={() => handleGeneratePDF(r)}
-                onPaid={() => openPaymentSheet(r)}
+                onPaid={() => {
+                  // Phase 11 stabilization — confirm before opening the
+                  // payment sheet so accidental Mark Paid taps in a
+                  // dense list don't begin the log-payment flow.
+                  const name = r.job?.name || 'this job'
+                  const amt = Number(r.balance || 0).toLocaleString(undefined, {
+                    style: 'currency', currency: 'USD', maximumFractionDigits: 0
+                  })
+                  if (!window.confirm(`Log payment for ${name}?\nThis opens the payment sheet pre-filled with ${amt}.`)) return
+                  openPaymentSheet(r)
+                }}
               />
             ))}
           </ul>

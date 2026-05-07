@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Plus, Search, Filter as FilterIcon, ArrowUpDown, Star } from 'lucide-react'
+import { Plus, Search, Star } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../../lib/haptics.js'
 import { ACTIVE_STAGES } from '../../lib/stages.js'
 
@@ -169,12 +169,10 @@ export default function DesktopJobsBoard({
           )
         })}
         <div className="dt-jobs__filt-spacer" />
-        <button type="button" className="dt-filt" disabled aria-disabled="true" title="Coming soon">
-          <FilterIcon size={12} aria-hidden="true" /> Filter
-        </button>
-        <button type="button" className="dt-filt" disabled aria-disabled="true" title="Coming soon">
-          <ArrowUpDown size={12} aria-hidden="true" /> Recency
-        </button>
+        {/* Phase 11 stabilization: removed disabled "Filter" + "Recency"
+            placeholder buttons — they read as broken Coming Soon
+            controls. Real advanced filter / sort UX lands when the
+            features ship. */}
       </div>
 
       {/* JOBS GRID */}

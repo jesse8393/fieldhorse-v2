@@ -425,7 +425,7 @@ export default function Home() {
         todayOnSite={todayOnSite}
         topPipeline={topPipeline}
         nextActions={nextActions}
-        onGoToJobs={() => navigate('/jobs')}
+        onGoToJobs={(filter) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
         onGoToSchedule={() => navigate('/schedule')}
         onGoToInvoices={() => navigate('/invoices')}
         onGoToBid={() => navigate('/bid')}

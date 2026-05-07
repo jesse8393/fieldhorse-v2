@@ -2120,18 +2120,107 @@ a {
   }
 }
 
-/* Light theme tone-down for the sidebar on desktop. Sidebar inherits
-   var(--surface-1) which already flips with theme; the gradient above
-   is dark-only so override it for light to avoid a black slab in light
-   mode. */
+/* Sidebar stays dark in both themes (Phase 11 stabilization fix).
+   Tenant logos are typically designed for dark backgrounds (white /
+   cream marks), so a near-white light-theme sidebar made wide white
+   logos invisible. Now the rail is consistently a dark glass-metal
+   surface in both themes; inner text/icons are pinned to dark-theme
+   tones so contrast holds. The PAGE bg still flips with theme — only
+   the sidebar is theme-locked. */
 @media (min-width: 900px) {
   [data-theme='light'] .fh-desktop-sidebar {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 245, 238, 0.98) 100%),
-      var(--surface-1);
+      linear-gradient(180deg, rgba(16, 12, 8, 0.98) 0%, rgba(10, 8, 6, 0.99) 100%);
     box-shadow:
-      inset -1px 0 0 rgba(11, 11, 11, 0.04),
-      4px 0 24px rgba(0, 0, 0, 0.10);
+      inset -1px 0 0 rgba(255, 255, 255, 0.04),
+      4px 0 24px rgba(0, 0, 0, 0.45);
+  }
+  /* Lock sidebar inner text/icons to dark-theme equivalents so the
+     light-theme ink colors (which would render dark-on-dark) don't
+     blow out contrast. Hardcoded RGB so they're independent of theme. */
+  [data-theme='light'] .fh-desktop-sidebar__co {
+    color: #F2EDE4;
+  }
+  [data-theme='light'] .fh-desktop-sidebar__tag,
+  [data-theme='light'] .fh-desktop-sidebar__system-label,
+  [data-theme='light'] .fh-desktop-sidebar__eyebrow,
+  [data-theme='light'] .fh-desktop-sidebar__account-eyebrow {
+    color: rgba(242, 237, 228, 0.55);
+  }
+  [data-theme='light'] .fh-desktop-sidebar__account-email {
+    color: #F2EDE4;
+  }
+  [data-theme='light'] .fh-desktop-sidebar__link {
+    color: rgba(242, 237, 228, 0.78);
+  }
+  [data-theme='light'] .fh-desktop-sidebar__link:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #F2EDE4;
+  }
+  [data-theme='light'] .fh-desktop-sidebar__link.is-active {
+    background: rgba(229, 193, 88, 0.10);
+    color: #F2EDE4;
+  }
+  [data-theme='light'] .fh-desktop-sidebar__link-label {
+    color: inherit;
+  }
+  [data-theme='light'] .fh-desktop-sidebar__icon-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: rgba(242, 237, 228, 0.78);
+  }
+  [data-theme='light'] .fh-desktop-sidebar__divider {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  [data-theme='light'] .fh-desktop-sidebar__brand {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* =========================================================================
+   PHASE 11 STABILIZATION — desktop fixes (browser audit follow-ups)
+
+   Three CSS-only fixes addressing browser-audit feedback before PR:
+     #4 Duplicate Next Action — hide the OverviewTab's NextActionCard
+        when rendered inside DesktopJobDetail.main; the rail card
+        already surfaces it.
+     #8 Brown / olive / hazy desktop background — scrub the gold-radial
+        "stage light" that .v3-screen paints across the top 280px of
+        every page on desktop, and replace the warm-onyx page floor
+        with a cool neutral near-black (#070708). Cards / surfaces
+        keep their existing warm-onyx tokens; the contrast against
+        neutral page bg is intentional and reads as crisp.
+   ========================================================================= */
+@media (min-width: 900px) {
+  /* #4 — Hide Overview tab's NextActionCard when rendered inside the
+     desktop shell. The right rail's NextActionCard owns the surface on
+     desktop (per Phase 8 design); Overview's instance becomes a duplicate.
+     We keep HealthDonut visible by collapsing the 2-col v3-overview-grid
+     to 1 column so the donut takes the cell. */
+  .dt-jobdetail__main .v3-overview-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dt-jobdetail__main .v3-overview-grid > :first-child {
+    display: none !important;
+  }
+
+  /* #8 — Brown/hazy background scrub.
+     Root cause: .v3-screen at v3.css:631 paints a 280px gold radial
+     `radial-gradient(ellipse 100% 280px at 50% 0%, rgba(229, 193, 88,
+     0.04), transparent 70%)` across the top of every page, plus uses
+     --v3-bg (#0B0907 warm onyx) as the floor. On a calibrated dark
+     monitor that combination reads as brown/olive haze.
+     Fix: override on desktop only — kill the radial + noise grain
+     background-images on .v3-screen / .fh-screen and pin the page
+     floor to a neutral near-black. Mobile path keeps its existing
+     warm-onyx + gold-stage-light treatment. */
+  .fh-app {
+    background: #070708;
+  }
+  .fh-screen,
+  .v3-screen {
+    background-image: none !important;
+    background-color: #070708 !important;
   }
 }
 

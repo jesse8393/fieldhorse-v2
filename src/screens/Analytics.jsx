@@ -84,9 +84,25 @@ export default function Analytics() {
     const wonYTD = wonYTDFn(contacts)
     const profitYTD = profitYTDFn(contacts)
     // Close rate as 0..1 from the shared helper, * 100 for the %.
-    const closeRate = closeRateFn(contacts) * 100
+    // Phase 11 stabilization: sample-size guard. With only 1-2
+    // terminal jobs the rate reads as 100% / 0% which is misleading.
+    // Need at least 3 terminal jobs (won + lost) to surface a value;
+    // below that we display "—" via the KPI null branch.
+    const wonCount = contacts.filter((c) => c.stage === 'invoice' || c.stage === 'closed').length
+    const lostTerminalCount = contacts.filter((c) => c.stage === 'lost').length
+    const terminalSample = wonCount + lostTerminalCount
+    const closeRate = terminalSample >= 3 ? closeRateFn(contacts) * 100 : null
     // Avg margin as 0..1 from the shared helper, * 100 for the %.
-    const avgMargin = avgMarginFn(contacts) * 100
+    // Phase 11 stabilization: cost-data guard. avgMarginFn returns 1.0
+    // (100%) when won jobs have null/zero cost — `(amount - 0) / amount`
+    // = 1. That's a fake 100% that confuses operators. Only surface
+    // the value when at least one won job has positive cost data.
+    const wonHasCost = contacts.some((c) =>
+      (c.stage === 'invoice' || c.stage === 'closed') &&
+      Number(c.amount) > 0 &&
+      Number(c.cost) > 0
+    )
+    const avgMargin = wonHasCost ? avgMarginFn(contacts) * 100 : null
     const leads = contacts.filter((c) => c.stage === 'lead').length
     const quotes = contacts.filter((c) => c.stage === 'quote').length
     const jobs = contacts.filter((c) => c.stage === 'job').length
@@ -429,7 +445,11 @@ function KPI({ label, to, format, Icon, gold }) {
           textShadow: gold ? '0 1px 12px rgba(229, 193, 88, 0.20)' : 'none'
         }}
       >
-        <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />
+        {to == null ? (
+          <span style={{ color: 'var(--v3-text-muted)' }}>—</span>
+        ) : (
+          <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />
+        )}
       </div>
     </div>
   )

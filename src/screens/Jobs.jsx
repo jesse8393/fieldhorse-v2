@@ -109,6 +109,20 @@ export default function Jobs() {
     }
   }, [searchParams, setSearchParams])
 
+  // Phase 11 stabilization — Home priority cards deep-link via
+  // ?stage=lead|quote|active|won. Apply the matching tab on mount and
+  // strip the param so the URL stays clean. Unrecognized stages are
+  // ignored. Empty stage param falls through to the default tab.
+  useEffect(() => {
+    const stage = searchParams.get('stage')
+    if (!stage) return
+    const validIds = TABS.map((t) => t.id)
+    if (validIds.includes(stage)) setFilter(stage)
+    searchParams.delete('stage')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const activeTab = TABS.find((t) => t.id === filter) || TABS[0]
 
   const filtered = useMemo(() => {

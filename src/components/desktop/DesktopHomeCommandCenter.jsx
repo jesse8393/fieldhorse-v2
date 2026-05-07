@@ -221,7 +221,7 @@ export default function DesktopHomeCommandCenter({
             label="Follow-ups"
             sub="Leads gone cold"
             tone={followUps > 0 ? 'alert' : 'muted'}
-            onClick={onGoToJobs}
+            onClick={() => onGoToJobs?.('lead')}
           />
           <PrioRow
             icon={Zap}
@@ -229,7 +229,7 @@ export default function DesktopHomeCommandCenter({
             label="Quotes"
             sub="Need attention"
             tone={quotesAttention > 0 ? 'warn' : 'muted'}
-            onClick={onGoToJobs}
+            onClick={() => onGoToJobs?.('quote')}
           />
           <PrioRow
             icon={Receipt}
@@ -247,7 +247,7 @@ export default function DesktopHomeCommandCenter({
               label="Behind"
               sub="Jobs need a reschedule"
               tone="alert"
-              onClick={onGoToSchedule}
+              onClick={() => onGoToJobs?.('active')}
             />
           )}
         </section>
