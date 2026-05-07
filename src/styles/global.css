@@ -1620,36 +1620,48 @@ a {
 .fh-app__main {
   flex: 1;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  /* V3-SYSTEM-1A2: base shell — no width cap here. The cap is applied
-     by a route-aware layout modifier on the .fh-app root, set in
-     AppShell.layoutForPath(). Three modes are defined below. Today
-     every route resolves to --layout-mobile-frame, so visual output
-     is identical to V3-SYSTEM-1A; when dedicated desktop designs ship
-     for Home/Jobs/Schedule, those routes flip to --layout-responsive
-     and pick up the wider canvas without touching this base rule. */
+  /* V3-SYSTEM-1A2: base shell — no width cap here. Phase 1 of the
+     Responsive Desktop Command Center: the cap moved from this element
+     to .fh-app__main-inner so the desktop sidebar offset (padding-left
+     applied to .fh-app__main on >=900px) can coexist with margin:auto
+     centering on the inner content column.
+
+     The route-aware layout modifier on the .fh-app root (set in
+     AppShell.layoutForPath) drives the inner cap below. */
+  width: 100%;
+}
+/* Inner content column — owns the width cap. Centers in whatever
+   space .fh-app__main exposes, which on desktop excludes the sidebar
+   inset, and on mobile is the full viewport width. */
+.fh-app__main-inner {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
-/* Mobile-frame — today's default for every route. Centered ~440px
-   premium mobile frame on tablet+ so desktop renders the production
-   app at its design width instead of stretching. Phones unchanged. */
+/* Mobile-frame — today's default for every non-desktop-flipped route.
+   Centered ~440px premium mobile frame on tablet+ so non-phone
+   viewports render the production app at its design width instead of
+   stretching. Phones unchanged. */
 @media (min-width: 720px) {
-  .fh-app--layout-mobile-frame .fh-app__main { max-width: 440px; }
+  .fh-app--layout-mobile-frame .fh-app__main-inner { max-width: 440px; }
 }
 /* Prose — capped at 640px per MASTER §4 prose-column rule, for any
    future read-heavy detail screen (Notes detail, long-form views).
    Not activated on any route yet. */
 @media (min-width: 720px) {
-  .fh-app--layout-prose .fh-app__main { max-width: 640px; }
+  .fh-app--layout-prose .fh-app__main-inner { max-width: 640px; }
 }
-/* Responsive — adaptive multi-column desktop canvas. Caps at 1280px
-   per MASTER §4 container rule. Not activated on any route yet; lands
-   per-route as desktop mockups for Home/Jobs/Schedule ship. Per-screen
-   desktop CSS (multi-column grids, sidebars, dashboard panels) sits
-   beside the existing mobile CSS in each screen's stylesheet/component. */
-@media (min-width: 768px) {
-  .fh-app--layout-responsive .fh-app__main { max-width: 1280px; }
+/* Responsive — adaptive multi-column desktop canvas. Phase 1 activates
+   this on Home (`/`). At tablet widths (720-899px) we still want the
+   centered ~440px premium frame so iPads don't stretch to a thin
+   uncapped column with a phone-width BottomNav underneath; the wide
+   1280px canvas only unlocks at >=900px when the sidebar joins it
+   and the layout becomes a real dashboard. */
+@media (min-width: 720px) and (max-width: 899px) {
+  .fh-app--layout-responsive .fh-app__main-inner { max-width: 440px; }
+}
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .fh-app__main-inner { max-width: 1280px; }
 }
 
 /* =========================================================================
@@ -1698,6 +1710,23 @@ a {
 }
 @media (min-width: 720px) {
   .fh-app--layout-prose .fh-nav { max-width: 640px; }
+}
+/* Phase 1: Responsive route at tablet widths keeps the same centered
+   440px BottomNav as mobile-frame, since Home looks the same at 720-
+   899px (sidebar hasn't activated yet). At >=900px the BottomNav is
+   hidden entirely by the desktop shell rules below. */
+@media (min-width: 720px) and (max-width: 899px) {
+  .fh-app--layout-responsive .fh-nav {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 440px;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+  }
 }
 .fh-nav__item {
   position: relative;
@@ -1767,6 +1796,317 @@ a {
   background: var(--field-gold);
   box-shadow: 0 0 0 2px rgba(199, 164, 90, 0.14);
   pointer-events: none;
+}
+
+/* =========================================================================
+   DESKTOP SHELL — Phase 1 of the Responsive Desktop Command Center
+
+   Activates at >=900px. The persistent left rail (.fh-desktop-sidebar)
+   replaces the BottomNav on desktop. Phones stay on BottomNav verbatim.
+
+   Layering plan:
+     - Sidebar is position:fixed at z-index 31 (above the sticky header
+       at z:30) so the rail visually owns the left edge.
+     - .fh-app__main absorbs a 240px padding-left so content + the
+       inner cap shift right of the rail. The inner cap (440 / 1280)
+       lives on .fh-app__main-inner so margin:auto can still center.
+     - .fh-app-header gets the same padding-left so its right-side
+       icons cluster within the visible content area.
+     - .fh-nav (BottomNav) hides via display:none.
+
+   Below 900px every desktop rule is suppressed and the existing mobile
+   layout (BottomNav-driven) renders unchanged.
+   ========================================================================= */
+.fh-desktop-sidebar {
+  /* Hidden by default — shown only on desktop via @media below. Keeping
+     the element mounted at all viewports avoids unmount/remount cycles
+     across breakpoint flips and matches the BottomNav pattern. */
+  display: none;
+}
+@media (min-width: 900px) {
+  .fh-desktop-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 240px;
+    z-index: 31;
+    display: flex;
+    flex-direction: column;
+    background:
+      linear-gradient(180deg, rgba(20, 20, 20, 0.96) 0%, rgba(11, 9, 7, 0.98) 100%),
+      var(--surface-1);
+    border-right: 1px solid var(--rule);
+    box-shadow:
+      inset -1px 0 0 rgba(255, 255, 255, 0.04),
+      4px 0 24px rgba(0, 0, 0, 0.45);
+    color: var(--ink-strong);
+    padding: 18px 14px 14px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+  /* Top brand block */
+  .fh-desktop-sidebar__brand {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 6px 16px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 14px;
+  }
+  .fh-desktop-sidebar__wordmark {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0;
+    font-family: var(--font-display);
+    font-size: 18px;
+    letter-spacing: 0.14em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .fh-desktop-sidebar__tenant {
+    display: flex;
+    align-items: center;
+    min-height: 18px;
+    color: var(--ink-muted);
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    overflow: hidden;
+  }
+  .fh-desktop-sidebar__tenant img {
+    max-height: 22px;
+    max-width: 180px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    opacity: 0.92;
+  }
+  .fh-desktop-sidebar__tenant span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Nav stack */
+  .fh-desktop-sidebar__nav {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    /* Subtle scroll fade for long lists */
+    scrollbar-width: thin;
+  }
+  .fh-desktop-sidebar__group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .fh-desktop-sidebar__eyebrow {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    padding: 4px 10px 6px;
+    opacity: 0.7;
+  }
+  .fh-desktop-sidebar__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .fh-desktop-sidebar__divider {
+    height: 1px;
+    background: var(--rule);
+    margin: 4px 6px;
+    opacity: 0.6;
+  }
+  .fh-desktop-sidebar__link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    line-height: 1;
+    transition: background-color 140ms var(--ease), color 140ms var(--ease);
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+  }
+  .fh-desktop-sidebar__link:hover {
+    background: var(--surface-2);
+    color: var(--ink-strong);
+  }
+  .fh-desktop-sidebar__link.is-active {
+    background: rgba(229, 193, 88, 0.10);
+    color: var(--ink-strong);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 22%, transparent);
+  }
+  .fh-desktop-sidebar__link.is-active .fh-desktop-sidebar__link-icon {
+    color: var(--field-gold-bright);
+  }
+  .fh-desktop-sidebar__link-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    color: currentColor;
+  }
+  .fh-desktop-sidebar__link-label {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Foot — account chip + theme/sign-out icon buttons */
+  .fh-desktop-sidebar__foot {
+    margin-top: 12px;
+    padding: 10px 6px 4px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .fh-desktop-sidebar__account {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .fh-desktop-sidebar__account-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+  .fh-desktop-sidebar__account-email {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fh-desktop-sidebar__icon-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    color: var(--ink-muted);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: color 140ms var(--ease), border-color 140ms var(--ease), background-color 140ms var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fh-desktop-sidebar__icon-btn:hover {
+    color: var(--ink-strong);
+    border-color: color-mix(in srgb, var(--field-gold) 32%, var(--rule));
+  }
+
+  /* Shift the main content + header inset to clear the sidebar. */
+  .fh-app__main {
+    padding-left: 240px;
+    padding-bottom: 32px;
+  }
+  .fh-app-header {
+    padding-left: calc(14px + 240px);
+  }
+  /* Hide the BottomNav on desktop — sidebar carries primary nav. */
+  .fh-nav { display: none !important; }
+  /* Hide AppHeader's mobile-only brand slots — sidebar owns identity. */
+  .fh-app-header__badge { display: none; }
+  .fh-app-header__brand { display: none; }
+  /* Header content shifts to the right — give the action cluster more
+     room to breathe and align with content gutter on desktop. */
+  .fh-app-header { justify-content: flex-end; padding-right: 24px; }
+
+  /* On responsive routes, give the inner column a true gutter — the
+     1280px cap centers within the (viewport - 240px) space. */
+  .fh-app--layout-responsive .fh-app__main-inner {
+    padding-left: 32px;
+    padding-right: 32px;
+    box-sizing: border-box;
+  }
+}
+
+/* Light theme tone-down for the sidebar on desktop. Sidebar inherits
+   var(--surface-1) which already flips with theme; the gradient above
+   is dark-only so override it for light to avoid a black slab in light
+   mode. */
+@media (min-width: 900px) {
+  [data-theme='light'] .fh-desktop-sidebar {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 245, 238, 0.98) 100%),
+      var(--surface-1);
+    box-shadow:
+      inset -1px 0 0 rgba(11, 11, 11, 0.04),
+      4px 0 24px rgba(0, 0, 0, 0.10);
+  }
+}
+
+/* =========================================================================
+   HOME — desktop dashboard grid (Phase 1)
+
+   Home renders inside <motion.div className="v3-screen">. On desktop
+   we promote that single-column flow to a 2-column dashboard grid.
+   The first two children (greeting strip + pipeline revenue card) span
+   the full width to anchor the page; everything below distributes
+   into two columns by source order. Phones (<900px) keep the existing
+   single-column flow exactly as before.
+
+   The :nth-child rule is intentionally simple — Home's section order
+   is stable and the rule lives next to the layout-mode CSS so a future
+   reorder is easy to spot. When a section is added or moved, adjust
+   the :nth-child(-n+N) selector here, not in JSX.
+   ========================================================================= */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .v3-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 24px;
+    row-gap: 0;
+    align-items: start;
+    padding-top: 4px;
+  }
+  /* First two top-of-page rows (greeting strip + Today's Revenue
+     Opportunity card) span both columns so they read as the page
+     header. Items 3+ stack in two columns by source order. */
+  .fh-app--layout-responsive .v3-screen > :nth-child(-n+2) {
+    grid-column: 1 / -1;
+  }
+  /* Reset per-section horizontal margins inside the grid — the inner
+     wrapper provides the gutter on desktop, so child cards should
+     hug the column they live in instead of carrying their own
+     mobile-tuned 0 var(--v3-gutter) shoulders. */
+  .fh-app--layout-responsive .v3-screen > .v3-section,
+  .fh-app--layout-responsive .v3-screen > .v3-section-header {
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 16px;
+  }
 }
 
 /* More drawer */
