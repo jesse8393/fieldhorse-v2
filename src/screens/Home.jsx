@@ -29,6 +29,8 @@ import { hapticTap } from '../lib/haptics.js'
 // same batch helper Jobs already uses (one query + one signed-URL
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
 import { fetchCoverPhotosByJob } from '../lib/photos.js'
+import { useIsDesktop } from '../lib/useMediaQuery.js'
+import DesktopHomeCommandCenter from '../components/desktop/DesktopHomeCommandCenter.jsx'
 
 /* ----------------- helpers ----------------- */
 
@@ -397,6 +399,44 @@ export default function Home() {
   const condStr = weatherLabel(weather?.current?.weather_code)
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  // Phase 10 — desktop dispatch. At >=900px the new
+  // DesktopHomeCommandCenter renders the full command-center layout
+  // using the same data this screen already fetches. Below 900px the
+  // existing motion.div.v3-screen--home flow renders verbatim.
+  if (isDesktop) {
+    return (
+      <DesktopHomeCommandCenter
+        firstName={firstName}
+        now={now}
+        hasCoords={hasCoords}
+        tempStr={tempStr}
+        condStr={condStr}
+        weatherErr={weatherErr}
+        pinLocation={pinLocation}
+        pipeline={pipeline}
+        trendUp={trendUp}
+        trendPct={trendPct}
+        stageBreakdown={stageBreakdown}
+        dealsAtRisk={dealsAtRisk}
+        jobsBehind={jobsBehind}
+        invoicingWeek={invoicingWeek}
+        todayOnSite={todayOnSite}
+        topPipeline={topPipeline}
+        nextActions={nextActions}
+        onGoToJobs={() => navigate('/jobs')}
+        onGoToSchedule={() => navigate('/schedule')}
+        onGoToInvoices={() => navigate('/invoices')}
+        onGoToBid={() => navigate('/bid')}
+        onGoToCompose={() => navigate('/compose')}
+        onGoToPourWindow={() => navigate('/pour-window')}
+        onOpenJob={(id) => navigate(`/jobs/${id}`)}
+        onOpenJobAtTab={(id, tab) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
+        onNewLead={() => navigate('/jobs?new=1')}
+      />
+    )
+  }
 
   /* ----- Render -----
      v3 hierarchy refactor (3-tier):
