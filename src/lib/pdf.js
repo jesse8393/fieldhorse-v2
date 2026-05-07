@@ -1,6 +1,10 @@
 // PDF generator — invoices and proposals.
-// Uses jsPDF + jspdf-autotable. Styled with Fieldhorse brand tokens baked in
-// so the output reads like a premium contractor doc, not a generic template.
+//
+// White-label: every customer-facing string, number, logo, color, and
+// footer pulls from the contractor's profile (company_name, logo_url,
+// brand_accent_hex, license_number, etc.). The PDF must read like the
+// contractor's own document. The internal app's name does not appear
+// anywhere on the rendered output.
 
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -30,12 +34,44 @@ function today() {
   })
 }
 
-function invoiceNumber(seed) {
+/**
+ * Derive a 2-3 letter document-number prefix from the contractor's
+ * company name. "Parker Construction Company" → "PCC". "Acme Roofing"
+ * → "AR". Single-word or unparseable → fallback.
+ *
+ * Skip-words ("the", "of", "and", "&", "a", "an") are ignored so the
+ * prefix lands on the actual brand initials.
+ */
+function deriveCompanyPrefix(companyName, fallback) {
+  if (!companyName || !String(companyName).trim()) return fallback
+  const skip = new Set(['the', 'of', 'and', '&', 'a', 'an'])
+  const initials = String(companyName)
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w && !skip.has(w.toLowerCase()))
+    .map((w) => w[0])
+    .filter(Boolean)
+    .join('')
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 3)
+  return initials.length >= 2 ? initials : fallback
+}
+
+/**
+ * Build a document number "{PREFIX}-{YYMM}-{4CHAR}". Prefix derives from
+ * the company name (or a neutral fallback like "INV" / "PROPOSAL" when
+ * the name is missing or unparseable). Seed is the source row id so
+ * repeat-renders produce stable numbers.
+ *
+ * NEVER prefixes with the app's name — that's why this function exists.
+ */
+function documentNumber(prefix, seed) {
   const d = new Date()
   const y = d.getFullYear().toString().slice(-2)
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const tail = seed ? String(seed).slice(-4).toUpperCase() : Math.random().toString(36).slice(2, 6).toUpperCase()
-  return `FH-${y}${m}-${tail}`
+  return `${prefix}-${y}${m}-${tail}`
 }
 
 /**
@@ -161,7 +197,7 @@ function drawBillTo(doc, y, contact) {
   return yy + 4
 }
 
-function drawFooter(doc, tagline = 'Built for the jobsite.') {
+function drawFooter(doc, tagline = '') {
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
 
@@ -204,7 +240,9 @@ export async function generateInvoice({
   invoiceId
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  const number = invoiceNumber(invoiceId)
+  // Derive the doc-number prefix from the contractor's company name.
+  // Falls back to a neutral "INV" — never the app's name.
+  const number = documentNumber(deriveCompanyPrefix(company?.name, 'INV'), invoiceId)
 
   // Pre-load the contractor's logo (4D-2B). Cached per session by the
   // helper. Returns null on missing URL / network failure / decode
@@ -344,7 +382,8 @@ export async function generateInvoice({
     doc.text(wrapped, 14, afterTable)
   }
 
-  // Footer — contractor contact line, no FieldHorse branding.
+  // Footer — contractor contact line ONLY. The app's name never
+  // appears on the customer document.
   const footerLine = [
     company?.name,
     company?.phone,
@@ -354,7 +393,7 @@ export async function generateInvoice({
     .map((s) => (s && String(s).trim()) || '')
     .filter(Boolean)
     .join(' · ')
-  drawFooter(doc, footerLine || (company?.name || 'My Company'))
+  drawFooter(doc, footerLine || (company?.name || ''))
 
   return {
     doc,
@@ -549,7 +588,13 @@ function buildProposalCtx({
 }) {
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  const number = invoiceNumber(quoteId || contact?.id).replace('FH-', 'FH-Q')
+  // Proposal number prefix derives from the contractor's company name,
+  // not the app's name. "Parker Construction Company" → "PCC-2605-XXXX".
+  // Neutral fallback "PROPOSAL" when the company name is missing.
+  const number = documentNumber(
+    deriveCompanyPrefix(company?.name, 'PROPOSAL'),
+    quoteId || contact?.id
+  )
 
   const sorted = [...(items || [])].sort((a, b) => {
     const ao = Number(a?.sort_order ?? 0)
