@@ -140,8 +140,15 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     if (base.length === 0) {
       throw new Error('Add at least one base line item before generating a quote')
     }
+
+    // Pull project photos for this job (best effort) so the magazine
+    // proposal can use a hero image + per-scope photos. Quietly tolerates
+    // failure: the renderer falls back to graceful placeholders when no
+    // photos are loaded.
+    const photos = await loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
+
     // generateQuote() became async in 4D-2C — it pre-fetches the
-    // contractor's logo via loadLogoForPdf before rendering the cover.
+    // contractor's logo + project photos before rendering the cover.
     const result = await generateQuote({
       company,
       contact: {
@@ -158,7 +165,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       exclusions: pendingExclusions || '',
       expiresAt: pendingExpiresIso,
       status: contact.proposal_status || 'draft',
-      quoteId: contact.id
+      quoteId: contact.id,
+      photos
     })
     if (!result?.doc) throw new Error('PDF generator returned no document')
     return result
@@ -640,4 +648,52 @@ function shortDate(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/**
+ * Pull project photos for this job and resolve each storage_path to a
+ * signed URL the PDF generator can fetch. Best-effort:
+ *   - skips photos with no storage_path
+ *   - tolerates per-photo signed-URL failures (filtered out)
+ *   - returns [] when the table query fails so the renderer falls
+ *     through to its placeholder zones cleanly
+ *
+ * Each entry returns { url, section_tag, caption } so the renderer can
+ * route a tagged photo to its matching scope block. section_tag is
+ * sourced from the photo's caption when present (e.g., a caption of
+ * "Roofing" tags the photo for the Roofing scope) — a lightweight
+ * convention that doesn't require a schema change.
+ */
+async function loadProjectPhotosForPdf(jobId, userId) {
+  if (!jobId || !userId) return []
+  const { data, error } = await supabase
+    .from('fh_job_files')
+    .select('id, storage_path, caption, kind, uploaded_at')
+    .eq('job_id', jobId)
+    .eq('user_id', userId)
+    .eq('kind', 'photo')
+    .order('uploaded_at', { ascending: true })
+    .limit(8)
+  if (error || !Array.isArray(data) || data.length === 0) return []
+
+  // Sign each path. Failures filter out — the renderer handles missing
+  // photos via placeholders without throwing.
+  const signed = await Promise.all(
+    data.map(async (row) => {
+      try {
+        const { data: signedRes, error: signErr } = await supabase.storage
+          .from('job-photos')
+          .createSignedUrl(row.storage_path, 60 * 60)
+        if (signErr || !signedRes?.signedUrl) return null
+        return {
+          url: signedRes.signedUrl,
+          section_tag: (row.caption || '').trim() || null,
+          caption: row.caption || null
+        }
+      } catch {
+        return null
+      }
+    })
+  )
+  return signed.filter(Boolean)
 }
