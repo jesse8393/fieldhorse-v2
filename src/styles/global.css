@@ -1654,14 +1654,23 @@ a {
 /* Responsive — adaptive multi-column desktop canvas. Phase 1 activates
    this on Home (`/`). At tablet widths (720-899px) we still want the
    centered ~440px premium frame so iPads don't stretch to a thin
-   uncapped column with a phone-width BottomNav underneath; the wide
-   1280px canvas only unlocks at >=900px when the sidebar joins it
-   and the layout becomes a real dashboard. */
+   uncapped column with a phone-width BottomNav underneath.
+   At >=900px the wide canvas unlocks once the sidebar joins it.
+
+   Phase 9 fit fix: cap raised 1280 → 1600. At 1440 viewport the
+   main-area (1440 - 256 sidebar = 1184) fits inside 1600 with no
+   cap, so content uses the full available width. At 1920 viewport
+   the main-area (1664) still gets capped at 1600, leaving only
+   ~32px of breathing space on each side instead of the prior ~190px
+   of dead canvas — the "1000px island floating in black" goes away.
+   Beyond ~2300px the cap returns to centering, but content is wide
+   enough by then that the side margins read as deliberate gutters
+   instead of voids. */
 @media (min-width: 720px) and (max-width: 899px) {
   .fh-app--layout-responsive .fh-app__main-inner { max-width: 440px; }
 }
 @media (min-width: 900px) {
-  .fh-app--layout-responsive .fh-app__main-inner { max-width: 1280px; }
+  .fh-app--layout-responsive .fh-app__main-inner { max-width: 1600px; }
 }
 
 /* =========================================================================
@@ -1829,10 +1838,13 @@ a {
     top: 0;
     left: 0;
     bottom: 0;
-    /* Phase 2.5: sidebar bumped 240 → 248 so the brand row + nav rows
-       stop feeling crammed in at the right edge. Matches the reference
-       handoff's breathing room (28px 18px sidepad). */
-    width: 248px;
+    /* Phase 9 fit fix: sidebar bumped 248 → 256 + horizontal padding
+       16 → 18 so wide tenant logos render with breathing room
+       (logo-wrap usable width grows from ~216 → ~232px). The +8px
+       width is matched by the .fh-app__main padding-left + AppHeader
+       padding-left adjustments below so content never sits under
+       the rail. */
+    width: 256px;
     z-index: 31;
     display: flex;
     flex-direction: column;
@@ -1844,7 +1856,7 @@ a {
       inset -1px 0 0 rgba(255, 255, 255, 0.04),
       4px 0 24px rgba(0, 0, 0, 0.45);
     color: var(--ink-strong);
-    padding: 22px 16px 14px;
+    padding: 22px 18px 14px;
     box-sizing: border-box;
     overflow-y: auto;
   }
@@ -2059,13 +2071,14 @@ a {
     border-color: color-mix(in srgb, var(--field-gold) 32%, var(--rule));
   }
 
-  /* Shift the main content + header inset to clear the 248px sidebar. */
+  /* Shift the main content + header inset to clear the 256px sidebar
+     (Phase 9 fit fix). */
   .fh-app__main {
-    padding-left: 248px;
+    padding-left: 256px;
     padding-bottom: 32px;
   }
   .fh-app-header {
-    padding-left: calc(14px + 248px);
+    padding-left: calc(14px + 256px);
   }
   /* Hide the BottomNav on desktop — sidebar carries primary nav. */
   .fh-nav { display: none !important; }
@@ -2081,7 +2094,10 @@ a {
   .fh-app-header { justify-content: flex-end; padding-right: 24px; }
 
   /* On responsive routes, give the inner column a true gutter — the
-     1280px cap centers within the (viewport - 240px) space. */
+     1600px cap centers within the (viewport - 256px) space. The
+     gutter is intentionally modest (32px) so wide-canvas screens
+     like Jobs / Clients / Schedule / Job Detail use the full
+     available width and don't read as a centered island. */
   .fh-app--layout-responsive .fh-app__main-inner {
     padding-left: 32px;
     padding-right: 32px;
