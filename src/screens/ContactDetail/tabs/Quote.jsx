@@ -252,37 +252,192 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 120px' }}>
-      <StatusPill status={status} />
-
-      <QuoteItemsSection
-        jobId={contact?.id}
-        userId={userId}
-        onContactRefresh={fetchAll}
-      />
-
-      <QuoteTermsSection
+    /* Phase 4 — Estimate workspace.
+       Mobile (<900px): stacks vertically as before. Each section
+       carries its existing padding/margin so the mobile layout is
+       byte-for-byte identical to pre-Phase-4.
+       Desktop (>=900px): the .fh-quote-workspace CSS in global.css
+       reflows the workspace into two panes — left = items + terms
+       (the builder), right = context + actions + approve (the
+       sticky decision rail). The data + handlers below are
+       unchanged. */
+    <div className="fh-quote-workspace">
+      {/* Desktop-only header strip: eyebrow ID + serif headline + the
+          two key actions on the far right. CSS hides the strip below
+          900px because the StatusPill + ActionBar already serve this
+          job in the mobile flow. */}
+      <WorkspaceHead
         contact={contact}
-        patch={patch}
-        valuesRef={termsValuesRef}
-      />
-
-      <ActionBar
+        status={status}
         baseCount={baseCount}
         busy={busy}
         disabled={disabled}
         onPreview={handlePreview}
-        onDownload={handleDownload}
         onSend={handleSend}
       />
 
-      <ApproveBand
-        contact={contact}
-        baseCount={baseCount}
-        busy={busy}
-        onOpenApprove={onOpenApprove}
-      />
+      <div className="fh-quote-workspace__main">
+        {/* StatusPill is mobile-primary identity; on desktop it's
+            duplicated by the WorkspaceHead eyebrow. CSS hides this
+            instance on desktop so the head reads as the single
+            identity moment. */}
+        <div className="fh-quote-workspace__status-mobile">
+          <StatusPill status={status} />
+        </div>
+
+        <QuoteItemsSection
+          jobId={contact?.id}
+          userId={userId}
+          onContactRefresh={fetchAll}
+        />
+
+        <QuoteTermsSection
+          contact={contact}
+          patch={patch}
+          valuesRef={termsValuesRef}
+        />
+      </div>
+
+      <aside className="fh-quote-workspace__side">
+        {/* Job + client context — name, address, stage, total, status.
+            Renders only on desktop (CSS-hidden on mobile because the
+            global ContactDetail Header already shows this above
+            the tabs). */}
+        <ContextCard contact={contact} status={status} />
+
+        <ActionBar
+          baseCount={baseCount}
+          busy={busy}
+          disabled={disabled}
+          onPreview={handlePreview}
+          onDownload={handleDownload}
+          onSend={handleSend}
+        />
+
+        <ApproveBand
+          contact={contact}
+          baseCount={baseCount}
+          busy={busy}
+          onOpenApprove={onOpenApprove}
+        />
+      </aside>
     </div>
+  )
+}
+
+/* ============================================================
+   WorkspaceHead — desktop-only header strip.
+
+   Reference: desktop-flows-2.jsx DesktopEstimate header row —
+   eyebrow ("EST-... · DRAFT v3 · saved 6 min ago"), serif H1 with
+   gold-italic accent on the second word, subtitle (client + address +
+   target start), Preview + Send buttons on the right.
+
+   We don't have a discrete "EST-" identifier — the contact id +
+   proposal_status is the closest equivalent. saved-ago hint omitted
+   (we'd need to track a separate dirty timestamp).
+   ============================================================ */
+function WorkspaceHead({ contact, status, baseCount, busy, disabled, onPreview, onSend }) {
+  const idShort = contact?.id ? `EST · ${String(contact.id).slice(0, 8).toUpperCase()}` : 'ESTIMATE'
+  const statusLabel = (status?.label || 'Draft').toUpperCase()
+  const titleText = contact?.job_title || contact?.name || 'Estimate'
+  const subBits = [
+    contact?.name && contact.job_title ? contact.name : null,
+    contact?.address || null
+  ].filter(Boolean)
+
+  return (
+    <header className="fh-quote-workspace__head" aria-hidden={false}>
+      <div className="fh-quote-workspace__head-text">
+        <span className="fh-quote-workspace__head-eyebrow">
+          {idShort} · {statusLabel}
+        </span>
+        <h1 className="fh-quote-workspace__head-title">
+          {titleText}
+        </h1>
+        {subBits.length > 0 && (
+          <p className="fh-quote-workspace__head-sub">
+            {subBits.join(' · ')}
+          </p>
+        )}
+      </div>
+      <div className="fh-quote-workspace__head-actions">
+        <button
+          type="button"
+          className="fh-quote-workspace__head-btn"
+          onClick={() => { if (!disabled) onPreview?.() }}
+          disabled={disabled}
+        >
+          <Eye size={14} aria-hidden="true" />
+          {busy === 'preview' ? 'Opening…' : 'Preview'}
+        </button>
+        <button
+          type="button"
+          className="fh-quote-workspace__head-btn fh-quote-workspace__head-btn--primary"
+          onClick={() => { if (!disabled) onSend?.() }}
+          disabled={disabled}
+          title={baseCount === 0 ? 'Add at least one base line item to enable Send' : undefined}
+        >
+          <Send size={14} aria-hidden="true" />
+          {busy === 'send' ? 'Sending…' : 'Send to client'}
+        </button>
+      </div>
+    </header>
+  )
+}
+
+/* ============================================================
+   ContextCard — desktop-only client + job context card on the
+   workspace side rail. Reads contact + derived status only —
+   no fetches, no writes. CSS-hidden on mobile because
+   ContactDetail Header already surfaces this info above the tabs.
+   ============================================================ */
+function ContextCard({ contact, status }) {
+  const total = Number(contact?.amount || 0)
+  const moneyFmt = (n) => Number(n || 0).toLocaleString(undefined, {
+    style: 'currency', currency: 'USD', maximumFractionDigits: 0
+  })
+
+  return (
+    <section className="fh-quote-workspace__context" aria-label="Client context">
+      <div className="fh-quote-workspace__context-row">
+        <span className="fh-quote-workspace__context-key">Client</span>
+        <span className="fh-quote-workspace__context-val">{contact?.name || '—'}</span>
+      </div>
+      {contact?.address && (
+        <div className="fh-quote-workspace__context-row">
+          <span className="fh-quote-workspace__context-key">Address</span>
+          <span className="fh-quote-workspace__context-val">{contact.address}</span>
+        </div>
+      )}
+      {contact?.stage && (
+        <div className="fh-quote-workspace__context-row">
+          <span className="fh-quote-workspace__context-key">Stage</span>
+          <span className="fh-quote-workspace__context-val">
+            {String(contact.stage).charAt(0).toUpperCase() + String(contact.stage).slice(1)}
+          </span>
+        </div>
+      )}
+      <div className="fh-quote-workspace__context-row fh-quote-workspace__context-row--total">
+        <span className="fh-quote-workspace__context-key">Quote total</span>
+        <span className="fh-quote-workspace__context-val fh-quote-workspace__context-total">
+          {moneyFmt(total)}
+        </span>
+      </div>
+      <div className="fh-quote-workspace__context-row">
+        <span className="fh-quote-workspace__context-key">Status</span>
+        <span
+          className="fh-quote-workspace__context-val"
+          style={{ color: status?.tone === 'gold' ? 'var(--v3-primary)'
+            : status?.tone === 'good' ? 'var(--v3-good, #6FB387)'
+            : status?.tone === 'danger' ? 'var(--v3-danger-bright)'
+            : 'var(--v3-text-muted)' }}
+        >
+          {status?.label || 'Draft'}
+          {status?.sub && <span style={{ display: 'block', fontSize: 10, color: 'var(--v3-text-muted)', marginTop: 2 }}>{status.sub}</span>}
+        </span>
+      </div>
+    </section>
   )
 }
 

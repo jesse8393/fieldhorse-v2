@@ -2120,7 +2120,7 @@ a {
    ========================================================================= */
 @media (min-width: 900px) {
   .fh-app--layout-responsive
-    .v3-screen:not(.v3-screen--home):not(.v3-screen--jobs):not(.v3-screen--clients):not(.v3-screen--schedule):not(.v3-screen--compose) {
+    .v3-screen:not(.v3-screen--home):not(.v3-screen--jobs):not(.v3-screen--clients):not(.v3-screen--schedule):not(.v3-screen--compose):not(.v3-screen--job-detail) {
     max-width: 960px;
     margin-left: auto;
     margin-right: auto;
@@ -2206,6 +2206,230 @@ a {
      stretch to fill — natural 1fr keeps it sane. When the draft IS
      visible (output cockpit is the second motion child), grid lays
      them side-by-side automatically. */
+}
+
+/* =========================================================================
+   ESTIMATE WORKSPACE — Phase 4
+
+   Lives inside ContactDetail's Quote tab. Mobile (<900px) keeps the
+   pre-Phase-4 vertical stack: status pill → items → terms → action
+   bar → approve band. Desktop (>=900px) reflows into a 2-pane
+   workspace per the desktop-flows-2.jsx DesktopEstimate handoff:
+   header strip on top, items + terms in the left pane (the builder),
+   client context + actions + approve in the sticky right rail.
+
+   The mobile ContactDetail Header already surfaces job context above
+   the tabs, so the workspace ContextCard, the WorkspaceHead title
+   strip, and the duplicate inline StatusPill are all hidden on
+   mobile — they only render value at >=900px where the user sees
+   the full estimate workspace as a single command surface.
+   ========================================================================= */
+.fh-quote-workspace {
+  /* Mobile defaults — pre-Phase-4 layout. The inner sections each
+     have their own padding (12-16px), so the workspace just stacks. */
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 0 120px;
+}
+.fh-quote-workspace__head { display: none; }
+.fh-quote-workspace__context { display: none; }
+.fh-quote-workspace__main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fh-quote-workspace__side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 20px;
+}
+
+@media (min-width: 900px) {
+  /* Two-pane grid keyed off the parent .v3-screen--quote-active
+     (set in ContactDetail when tab=quote). The workspace itself
+     adopts a desktop frame: 1.05fr / 1fr split, 18px column gap,
+     auto-rows so the header strip can span both columns. */
+  .v3-screen--quote-active .fh-quote-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(280px, 1fr);
+    grid-template-areas:
+      "head head"
+      "main side";
+    column-gap: 18px;
+    row-gap: 18px;
+    padding: 18px 24px 60px;
+    align-items: start;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head {
+    grid-area: head;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 8px 0 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-eyebrow {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--v3-text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--v3-text);
+    line-height: 1.05;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-sub {
+    margin: 8px 0 0;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--v3-text-muted);
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 18px;
+    height: 40px;
+    border-radius: 999px;
+    background: var(--v3-surface-2);
+    border: 1px solid var(--v3-border);
+    color: var(--v3-text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 140ms var(--ease), box-shadow 140ms var(--ease), border-color 140ms var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--v3-primary) 30%, var(--v3-border));
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-btn--primary {
+    background: linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%);
+    border-color: color-mix(in srgb, var(--v3-primary) 55%, transparent);
+    color: var(--v3-on-primary);
+    box-shadow: 0 4px 14px rgba(201, 150, 58, 0.32);
+  }
+  .v3-screen--quote-active .fh-quote-workspace__head-btn--primary:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(201, 150, 58, 0.42);
+  }
+
+  /* Main pane (the builder) */
+  .v3-screen--quote-active .fh-quote-workspace__main {
+    grid-area: main;
+    min-width: 0;
+  }
+  /* Drop the per-section gutters that were tuned for mobile so the
+     items + terms cards align flush with the workspace edges. The
+     QuoteItems section keeps its own 16-18px internal padding. */
+  .v3-screen--quote-active .fh-quote-workspace__main > div {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Side pane (sticky decision rail) */
+  .v3-screen--quote-active .fh-quote-workspace__side {
+    grid-area: side;
+    padding: 0;
+    position: sticky;
+    /* Stick below the AppHeader (~42px) plus the SegmentedTabs strip
+       (~46px) and the page heading rows above. Tuned to keep the
+       Send / Approve buttons in the eye line as the operator scrolls
+       through long line-item lists. */
+    top: 96px;
+    align-self: start;
+  }
+
+  /* Hide the duplicate inline StatusPill — workspace head shows status. */
+  .v3-screen--quote-active .fh-quote-workspace__status-mobile { display: none; }
+
+  /* Show the desktop-only blocks. */
+  .v3-screen--quote-active .fh-quote-workspace__context { display: flex; }
+
+  /* Context card — 5-row label/value pattern on the side rail. */
+  .v3-screen--quote-active .fh-quote-workspace__context {
+    flex-direction: column;
+    gap: 0;
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: var(--v3-surface);
+    border: 1px solid var(--v3-border);
+    box-shadow: var(--lift-1, 0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.32));
+  }
+  .v3-screen--quote-active .fh-quote-workspace__context-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--v3-border);
+  }
+  .v3-screen--quote-active .fh-quote-workspace__context-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__context-row--total {
+    margin-top: 4px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    border-top: 1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent);
+  }
+  .v3-screen--quote-active .fh-quote-workspace__context-key {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--v3-text-muted);
+    flex-shrink: 0;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__context-val {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--v3-text);
+    text-align: right;
+    word-break: break-word;
+  }
+  .v3-screen--quote-active .fh-quote-workspace__context-total {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 0.01em;
+    color: var(--v3-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The workspace head's Preview + Send appear at the top, but the
+     existing ActionBar (with Preview/Download/Send) inside the side
+     rail still gives operators Download access. No need to hide. */
 }
 
 /* =========================================================================

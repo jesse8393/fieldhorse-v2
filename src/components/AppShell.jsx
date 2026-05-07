@@ -85,8 +85,16 @@ function layoutForPath(pathname) {
   if (pathname === '/import') return 'responsive'
   if (pathname === '/pour-window') return 'responsive'
   if (pathname === '/notes') return 'responsive'
-  // Job Detail + Client Detail still mobile-frame — their internal
-  // layouts need bespoke desktop work in a follow-up phase.
+  // Phase 4: Job Detail (`/jobs/:id`) is the host of the Estimate
+  // workspace (Quote tab) and gets the responsive canvas. Non-quote
+  // tabs (Overview / Details / Financials / Files) inherit the wider
+  // canvas but keep their existing per-section padding so they render
+  // as wide rows rather than a 440px column floating in space. Quote
+  // tab itself flips to a true 2-pane workspace via scoped CSS keyed
+  // off the .v3-screen--quote-active modifier set in ContactDetail.
+  if (pathname.startsWith('/jobs/')) return 'responsive'
+  // Client Detail still mobile-frame — its internal layout needs
+  // bespoke desktop work in a follow-up phase.
   return 'mobile-frame'
 }
 

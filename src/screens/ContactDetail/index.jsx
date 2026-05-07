@@ -184,7 +184,10 @@ export default function ContactDetail() {
   }
 
   return (
-    <div className="v3-screen" style={{ position: 'relative' }}>
+    <div
+      className={`v3-screen v3-screen--job-detail${tab === 'quote' ? ' v3-screen--quote-active' : ''}`}
+      style={{ position: 'relative' }}
+    >
       {/* HEADER — back / title / more, then action row, then stage timeline */}
       <Header
         contact={contact}
