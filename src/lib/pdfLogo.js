@@ -146,3 +146,14 @@ function loadImage(src) {
 export function clearLogoCache() {
   cache.clear()
 }
+
+/**
+ * Same loader, semantic alias for project photos. The implementation is
+ * already content-agnostic — it just needs a URL that returns image
+ * bytes. Exporting a separate name so call sites read clearly:
+ *   loadLogoForPdf(...)  for the contractor's brand mark
+ *   loadImageForPdf(...) for project photos / hero images
+ *
+ * Same cache, same null-on-failure contract.
+ */
+export const loadImageForPdf = loadLogoForPdf
