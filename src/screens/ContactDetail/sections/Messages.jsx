@@ -4,6 +4,7 @@ import { Plus, FileText } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { toastError } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
+import { PostedByChip } from '../../../components/v3'
 
 /**
  * Messages section — communication log (fh_notes) tied to this job.
@@ -141,6 +142,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     hour: 'numeric', minute: '2-digit'
                   })}
                 </div>
+                {n.user_id && <PostedByChip userId={n.user_id} verb="posted" style={{ marginTop: 2 }} />}
               </motion.li>
             ))}
           </AnimatePresence>

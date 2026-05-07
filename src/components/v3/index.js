@@ -23,6 +23,11 @@ export { default as IconButton } from './IconButton.jsx'
    escape framer-motion containing-block traps). */
 export { default as FloatingActionButton } from './FloatingActionButton.jsx'
 
+/* Account attribution — inline byline chip for shared-job content
+   ("Posted by Parker Construction Co." etc.). Resolves via the
+   fh_resolve_account_labels RPC (migration 016). */
+export { default as PostedByChip } from './PostedByChip.jsx'
+
 /* Phase V3-JOBS-1 — unified status badge primitive. One pill family
    for stage (lead/quote/job/invoice/closed/lost), Top Deal, Approved,
    Cold. Replaces the prior mix of inline StagePill + ad-hoc chips. */
