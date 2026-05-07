@@ -6,7 +6,12 @@
 // contractor's own document. The internal app's name does not appear
 // anywhere on the rendered output.
 
-import jsPDF from 'jspdf'
+// Named import works in both Vite (browser) and Node ESM. jsPDF's
+// CJS module exposes the constructor as a named export; the default-
+// export form only resolves through bundler interop. Using the named
+// form lets headless QA scripts (scripts/qa-render-proposal.mjs)
+// render the same code path the browser uses.
+import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.js'
 
