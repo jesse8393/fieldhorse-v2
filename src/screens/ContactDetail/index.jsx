@@ -30,6 +30,8 @@ import DetailsTab from './tabs/Details.jsx'
 import FinancialsTab from './tabs/Financials.jsx'
 import FilesTab from './tabs/Files.jsx'
 import ApproveQuoteSheet from './sections/ApproveQuoteSheet.jsx'
+import DesktopJobDetail from '../../components/desktop/DesktopJobDetail.jsx'
+import { useIsDesktop } from '../../lib/useMediaQuery.js'
 
 const TOP_TABS = [
   { id: 'overview',   label: 'Overview' },
@@ -65,6 +67,7 @@ export default function ContactDetail() {
     scheduleItems, scheduleCount, todos, clientSummary,
     paid, balance, loading, fetchAll, patch
   } = data
+  const isDesktop = useIsDesktop()
 
   // Cockpit "Next action" row consumes the same due-aware resolver as
   // the Overview hero so the two never disagree (Phase 2H-5). The row's
@@ -183,8 +186,61 @@ export default function ContactDetail() {
     )
   }
 
+  // Phase 8 — desktop dispatch. At >=900px AND tab is not quote, render
+  // DesktopJobDetail (header + tabs + 2-col workspace + sticky context
+  // rail). Quote tab on desktop falls through to the existing flow,
+  // which Phase 4 already gave a proper 2-pane workspace via the
+  // .v3-screen--quote-active wrapper. Mobile <900px uses the existing
+  // Header + StageTimeline + SegmentedTabs + tab content layout
+  // verbatim. Modals stay mounted at the wrapper level so both
+  // branches can dispatch them.
+  const useDesktopShell = isDesktop && tab !== 'quote'
+
   return (
-    <div className="v3-screen" style={{ position: 'relative' }}>
+    <div
+      className={`v3-screen v3-screen--job-detail${tab === 'quote' ? ' v3-screen--quote-active' : ''}`}
+      style={{ position: 'relative' }}
+    >
+      {useDesktopShell ? (
+        <DesktopJobDetail
+          contact={contact}
+          clientSummary={clientSummary}
+          scheduleItems={scheduleItems}
+          todos={todos}
+          notes={notes}
+          subs={subs}
+          expenses={expenses}
+          payments={payments}
+          inspections={inspections}
+          paid={paid}
+          balance={balance}
+          scheduleCount={scheduleCount}
+          nextAction={nextAction}
+          nextTodo={nextTodo}
+          tab={tab}
+          setTab={setTab}
+          userId={user?.id}
+          isEditing={isEditing}
+          fetchAll={fetchAll}
+          patch={patch}
+          onBack={() => navigate('/jobs')}
+          onEdit={handleEditClick}
+          onMarkLost={async () => {
+            hapticError()
+            await markLost(contact)
+            toastInfo('Marked lost', 'Moved to lost column')
+            fetchAll()
+          }}
+          onDelete={() => setDeleteOpen(true)}
+          onClientNav={(cid) => navigate(`/clients/${cid}`)}
+          onTodoDone={markTodoDone}
+          onOpenLogPayment={() => setPayModalOpen(true)}
+          onOpenAddEvent={() => setEventOpen(true)}
+          onOpenInvitePartner={() => setInviteOpen(true)}
+          onOpenApproveQuote={() => setApproveOpen(true)}
+        />
+      ) : (
+      <>
       {/* HEADER — back / title / more, then action row, then stage timeline */}
       <Header
         contact={contact}
@@ -283,6 +339,8 @@ export default function ContactDetail() {
           />
         )}
       </div>
+      </>
+      )}
 
       {/* MODALS */}
       <AnimatePresence>

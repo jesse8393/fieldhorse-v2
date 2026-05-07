@@ -9,12 +9,14 @@ import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SwipeableRow from '../components/SwipeableRow.jsx'
 import { JobCard, FilterPill, FloatingActionButton } from '../components/v3'
+import DesktopJobsBoard from '../components/desktop/DesktopJobsBoard.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { ACTIVE_STAGES } from '../lib/stages.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { toastSuccess } from '../lib/toast.js'
 import { useFhMotion } from '../lib/motion.js'
+import { useIsDesktop } from '../lib/useMediaQuery.js'
 import { fetchCoverPhotosByJob } from '../lib/photos.js'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
@@ -107,6 +109,20 @@ export default function Jobs() {
     }
   }, [searchParams, setSearchParams])
 
+  // Phase 11 stabilization — Home priority cards deep-link via
+  // ?stage=lead|quote|active|won. Apply the matching tab on mount and
+  // strip the param so the URL stays clean. Unrecognized stages are
+  // ignored. Empty stage param falls through to the default tab.
+  useEffect(() => {
+    const stage = searchParams.get('stage')
+    if (!stage) return
+    const validIds = TABS.map((t) => t.id)
+    if (validIds.includes(stage)) setFilter(stage)
+    searchParams.delete('stage')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const activeTab = TABS.find((t) => t.id === filter) || TABS[0]
 
   const filtered = useMemo(() => {
@@ -171,10 +187,96 @@ export default function Jobs() {
   }
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  // Phase 7 — desktop-first composition. At >=900px we render
+  // DesktopJobsBoard (a real command-center board), passing the same
+  // contacts / filters / handlers the mobile branch uses. Below 900px
+  // the existing motion.div.v3-screen--jobs flow renders verbatim.
+  if (isDesktop) {
+    return (
+      <>
+        <DesktopJobsBoard
+          contacts={contacts}
+          filtered={filtered}
+          loading={loading}
+          filter={filter}
+          setFilter={setFilter}
+          search={search}
+          setSearch={setSearch}
+          photoUrlByJob={photoUrlByJob}
+          featuredId={featuredId}
+          tabCounts={tabCounts}
+          onOpenJob={openDrawer}
+          onNewLead={() => setAddOpen(true)}
+        />
+        <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
+              <DrawerDescription>
+                {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
+                {' · '}
+                {money(drawerContact?.amount || 0)}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '8px 20px 8px' }}>
+              <ActionTile
+                icon={MessageSquare}
+                label="Text"
+                disabled={!drawerContact?.phone}
+                href={drawerContact?.phone ? `sms:${drawerContact.phone}` : undefined}
+              />
+              <ActionTile
+                icon={Mail}
+                label="Email"
+                disabled={!drawerContact?.email}
+                href={drawerContact?.email ? `mailto:${drawerContact.email}` : undefined}
+              />
+              <ActionTile
+                icon={Phone}
+                label="Call"
+                disabled={!drawerContact?.phone}
+                href={drawerContact?.phone ? `tel:${drawerContact.phone}` : undefined}
+              />
+              <ActionTile
+                icon={ExternalLink}
+                label="Open"
+                primary
+                onClick={() => {
+                  const id = drawerContact?.id
+                  if (id) navigate(`/jobs/${id}`)
+                  closeDrawer()
+                }}
+              />
+            </div>
+            <div style={{ padding: '14px 20px 28px', color: 'var(--v3-text-muted)', fontSize: 11, fontFamily: 'var(--font-body)', textAlign: 'center' }}>
+              Click outside to dismiss
+            </div>
+          </DrawerContent>
+        </Drawer>
+        <NewLeadSheet
+          open={addOpen}
+          userId={user?.id}
+          onClose={() => setAddOpen(false)}
+          onCreated={async (created) => {
+            setAddOpen(false)
+            if (created?.id) setJustAddedId(created.id)
+            await load()
+            setTimeout(() => setJustAddedId(null), 1200)
+            toastSuccess(
+              'New lead added',
+              created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+            )
+          }}
+        />
+      </>
+    )
+  }
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen v3-screen--jobs"
       variants={stagger}
       initial="hidden"
       animate="show"
@@ -184,7 +286,7 @@ export default function Jobs() {
           "{count} active · ${total} total" caption rather than a
           display-font command bar; the count + total still surface,
           just in a calmer hierarchy that lets the cards lead. */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
+      <motion.div className="fh-jobs__head" variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1
             style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}
@@ -211,10 +313,23 @@ export default function Jobs() {
             )}
           </div>
         </div>
+        {/* Desktop-only inline primary action. The FAB is hidden on
+            desktop (it's a phone thumb-reach pattern), so the new-lead
+            entry point lives here at >=900px. CSS keeps this hidden on
+            mobile via display:none. */}
+        <button
+          type="button"
+          className="fh-jobs__action fh-desktop-only-action"
+          onClick={() => { hapticMedium(); setAddOpen(true) }}
+          aria-label="New lead"
+        >
+          <Plus size={15} strokeWidth={2.4} />
+          <span>New lead</span>
+        </button>
       </motion.div>
 
       {/* SEARCH */}
-      <motion.div variants={item} style={{ padding: '12px 20px 10px' }}>
+      <motion.div className="fh-jobs__search" variants={item} style={{ padding: '12px 20px 10px' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={16} style={{ position: 'absolute', left: 14, color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
@@ -239,7 +354,7 @@ export default function Jobs() {
       </motion.div>
 
       {/* STAGE TABS — horizontal scroll on overflow */}
-      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+      <motion.div className="fh-jobs__tabs" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist">
           {TABS.map((t) => (
             <FilterPill
@@ -261,7 +376,7 @@ export default function Jobs() {
           Net effect: 1 col on phone (≤520), 2 cols on tablet (520-820),
           3 cols on small desktop (820-1080), 4 cols on wide (≥1080).
           Was capping at 3 cols even on wide screens — left empty space. */}
-      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+      <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
         {loading && <SkeletonList rows={5} />}
         {!loading && filtered.length === 0 && (
           <EmptyView
@@ -369,13 +484,16 @@ export default function Jobs() {
         }}
       />
 
-      {/* FAB — bottom-right above BottomNav. Thumb-reach primary action.
-          Per ruleset: "Max 1 primary action per screen" — this is it.
-          Renders via the canonical portal-based primitive so it can't
-          be trapped by a transformed ancestor. */}
+      {/* FAB — bottom-right above BottomNav. Thumb-reach primary action
+          on phone. Per ruleset: "Max 1 primary action per screen" — on
+          desktop the inline .fh-jobs__action button takes that role and
+          the FAB collapses via hideOnDesktop. Renders via the canonical
+          portal-based primitive so it can't be trapped by a transformed
+          ancestor. */}
       <FloatingActionButton
         onClick={() => setAddOpen(true)}
         ariaLabel="New lead"
+        hideOnDesktop
       />
     </motion.div>
   )

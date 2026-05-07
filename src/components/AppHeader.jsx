@@ -60,9 +60,14 @@ export default function AppHeader() {
         pointerEvents: 'auto'
       }}
     >
-      <FieldhorseBadge />
+      {/* Brand badge — phone-only. Desktop mounts the wordmark in the
+          left rail (DesktopSidebar) so the header strip can stay quiet. */}
+      <span className="fh-app-header__badge">
+        <FieldhorseBadge />
+      </span>
 
       <div
+        className="fh-app-header__brand"
         style={{
           flex: 1,
           minWidth: 0,

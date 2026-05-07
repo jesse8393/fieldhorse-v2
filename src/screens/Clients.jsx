@@ -10,6 +10,8 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { rollupByClient } from '../lib/rollups.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton } from '../components/v3'
+import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.jsx'
+import { useIsDesktop } from '../lib/useMediaQuery.js'
 
 function money(n) {
   const v = Number(n || 0)
@@ -139,11 +141,50 @@ export default function Clients() {
   }, [filtered, rollupMap])
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  // Phase 7 — desktop-first composition. At >=900px DesktopClientsDirectory
+  // renders the real KPI strip + list+detail directory using the same
+  // rows / jobs / rollups / handlers the mobile branch consumes. Below
+  // 900px the existing motion.div.v3-screen--clients flow renders verbatim.
+  if (isDesktop) {
+    return (
+      <>
+        <DesktopClientsDirectory
+          rows={rows}
+          filtered={filtered}
+          loading={loading}
+          q={q}
+          setQ={setQ}
+          filter={filter}
+          setFilter={setFilter}
+          filterCounts={filterCounts}
+          rollupFor={rollupFor}
+          jobs={jobs}
+          screenStats={screenStats}
+          topClientId={topClientId}
+          totalLifetime={totalLifetime}
+          onOpenClient={(id) => navigate(`/clients/${id}`)}
+          onNewClient={() => setAddOpen(true)}
+        />
+        <NewClientSheet
+          open={addOpen}
+          userId={user?.id}
+          onClose={() => setAddOpen(false)}
+          onSaved={(client) => {
+            setAddOpen(false)
+            if (client?.id) navigate(`/clients/${client.id}`)
+            else load()
+          }}
+        />
+      </>
+    )
+  }
 
   return (
-    <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
+    <motion.div className="v3-screen v3-screen--clients" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
       {/* COCKPIT — black-glass panel: title eyebrow + state chip + KPI strip */}
-      <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
+      <motion.div className="fh-clients__cockpit" variants={item} style={{ padding: '8px 20px 12px' }}>
         <div style={{
           padding: '14px 16px',
           borderRadius: 16,
@@ -153,8 +194,20 @@ export default function Clients() {
         }}>
           {/* Header row: section eyebrow + state chip */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-            <Eyebrow tone="gold">Clients</Eyebrow>
-            {!loading && <ClientsStateChip stats={screenStats} totalAccounts={rows.length} />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+              <Eyebrow tone="gold">Clients</Eyebrow>
+              {!loading && <ClientsStateChip stats={screenStats} totalAccounts={rows.length} />}
+            </div>
+            {/* Desktop-only inline primary action. FAB hides on desktop. */}
+            <button
+              type="button"
+              className="fh-clients__action fh-desktop-only-action"
+              onClick={() => { hapticMedium(); setAddOpen(true) }}
+              aria-label="New client"
+            >
+              <Plus size={15} strokeWidth={2.4} />
+              <span>New client</span>
+            </button>
           </div>
 
           {/* KPI strip — Lifetime billed | Outstanding (when populated) */}
@@ -192,7 +245,7 @@ export default function Clients() {
       </motion.div>
 
       {/* Search + filter row — unified gutter, FilterPill primitive */}
-      <motion.div variants={item} style={{ padding: '0 20px 12px' }}>
+      <motion.div className="fh-clients__filters" variants={item} style={{ padding: '0 20px 12px' }}>
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
@@ -224,6 +277,7 @@ export default function Clients() {
       {/* GRID LAYOUT — 1/2/3 col responsive (320px min). Each client is a
           tall vertical tile, not a wide row. */}
       <motion.div
+        className="fh-clients__grid"
         variants={item}
         style={{
           display: 'grid',
@@ -321,6 +375,7 @@ export default function Clients() {
         onClick={() => setAddOpen(true)}
         ariaLabel="New client"
         iconStrokeWidth={2.75}
+        hideOnDesktop
       />
     </motion.div>
   )
@@ -366,6 +421,7 @@ function ClientTile({ client: c, rollup: r, lastActivityRel, index, isTop, onOpe
     <motion.button
       type="button"
       layout
+      className={`fh-client-tile${isTop ? ' fh-client-tile--top' : ''}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}

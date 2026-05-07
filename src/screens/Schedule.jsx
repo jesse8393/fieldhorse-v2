@@ -14,6 +14,8 @@ import { useProfile } from '../contexts/ProfileContext.jsx'
 import { getWeather, workWindow } from '../lib/weather.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
+import { useIsDesktop } from '../lib/useMediaQuery.js'
+import DesktopScheduleWorkspace from '../components/desktop/DesktopScheduleWorkspace.jsx'
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
@@ -204,9 +206,38 @@ export default function Schedule() {
   )
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  // Phase 7 — desktop-first composition. At >=900px the planner +
+  // upcoming rail workspace replaces the narrow mobile dispatch
+  // board. Mobile <900px keeps every feature of the existing
+  // motion.div.v3-screen--schedule flow (month grid, week / day
+  // toggles, weather strip, FAB add-event) verbatim.
+  if (isDesktop) {
+    return (
+      <>
+        <DesktopScheduleWorkspace
+          events={events}
+          upcoming={upcoming}
+          loading={loading}
+          cursor={cursor}
+          setCursor={setCursor}
+          view={view}
+          setView={setView}
+          onAddEvent={() => setAddOpen(true)}
+        />
+        <AddEventSheet
+          open={addOpen}
+          userId={user?.id}
+          onClose={() => setAddOpen(false)}
+          onSaved={() => { setAddOpen(false); load() }}
+        />
+      </>
+    )
+  }
 
   return (
-    <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
+    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
       {/* SUMMARY PANEL — black-glass cockpit. Eyebrow + title + today/
           upcoming counts. The FAB at bottom-right is the single
           thumb-reachable add-event control; an inline header CTA used
