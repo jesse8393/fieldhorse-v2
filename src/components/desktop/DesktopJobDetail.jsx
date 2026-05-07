@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import {
   ChevronLeft, Phone, MessageSquare, Mail, Pencil, Plus,
   CalendarPlus, Users, ShieldCheck, MapPin, Clock,
-  ArrowRight, Receipt, FolderClosed
+  ArrowRight, Receipt
 } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../../lib/haptics.js'
 import { stageColor } from '../../lib/stages.js'

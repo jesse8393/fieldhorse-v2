@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import {
   CloudSun, MapPin, ArrowUpRight, ArrowDownRight,
   ArrowRight, ChevronRight, AlertTriangle, Zap, Receipt,
-  CalendarClock, PhoneCall, Plus, Sparkles
+  CalendarClock, Plus, Sparkles
 } from 'lucide-react'
 import { hapticTap } from '../../lib/haptics.js'
 
