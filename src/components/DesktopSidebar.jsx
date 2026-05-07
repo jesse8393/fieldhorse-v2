@@ -71,39 +71,64 @@ export default function DesktopSidebar() {
     navigate('/login', { replace: true })
   }
 
-  // Sidebar brand follows the reference handoff pattern (dt-side__brand):
-  // a 36px FH mark on the left, then tenant company name + "Construction Co."
-  // tag on the right. Compact, never clips, and reads as
-  // "FieldHorse hosts Parker" rather than "Parker is the app". When the
-  // tenant has uploaded a logo we show it INSIDE the FH mark slot — the
-  // tenant company name still wins the right-side text.
-  const tenantInitials = (company || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
-  const fhMarkContent = logoSrc ? (
-    <img
-      src={logoSrc}
-      alt={company || 'Company logo'}
-      onError={(e) => { e.currentTarget.style.display = 'none' }}
-    />
-  ) : tenantInitials ? (
-    <span>{tenantInitials}</span>
-  ) : (
-    <span>FH</span>
-  )
+  // Sidebar brand block — logo-first.
+  //
+  // Per Phase 5 user feedback: the small FH-mark + tenant-text combo
+  // read as awkward. Restored the full company logo as the visual
+  // anchor at the top of the rail, matching the older Parker-on-top
+  // treatment. Layout stack:
+  //
+  //   small "FIELDHORSE" system label       (only when a tenant logo
+  //                                           or company name exists,
+  //                                           so the user always knows
+  //                                           which product they're in)
+  //   full company logo                     (max-height ~84px,
+  //                                           object-fit: contain — never
+  //                                           cropped, squeezed, or clipped)
+  //   thin divider
+  //   nav starts below
+  //
+  // Fallback chain when no logo_url:
+  //   1. company_name → wide serif Bebas Neue wordmark
+  //   2. nothing      → "FIELDHORSE" gold/ink wordmark
+  const hasLogo = !!logoSrc
+  const showSystemLabel = hasLogo || !!company  // when a tenant brand
+                                                // is shown, label what
+                                                // app it lives in.
 
   return (
     <aside className="fh-desktop-sidebar" aria-label="Primary navigation">
       <div className="fh-desktop-sidebar__brand">
-        <span className="fh-desktop-sidebar__mark" aria-hidden="true">
-          {fhMarkContent}
-        </span>
-        <div className="fh-desktop-sidebar__brand-text">
-          <span className="fh-desktop-sidebar__co">
-            {company || 'FIELDHORSE'}
+        {showSystemLabel && (
+          <span className="fh-desktop-sidebar__system-label" aria-hidden="true">
+            FIELDHORSE
           </span>
-          <span className="fh-desktop-sidebar__tag">
-            {company ? 'on Fieldhorse' : 'Command Center'}
+        )}
+        {hasLogo ? (
+          <div className="fh-desktop-sidebar__logo-wrap">
+            <img
+              src={logoSrc}
+              alt={company || 'Company logo'}
+              className="fh-desktop-sidebar__logo"
+              onError={(e) => {
+                // Signed URL expired or 403'd — hide the img and let
+                // the wordmark fallback paint on next render. We don't
+                // hold a re-fetch state machine here on purpose; the
+                // tenant can hard-refresh to retry.
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          </div>
+        ) : company ? (
+          <span className="fh-desktop-sidebar__co-wordmark" title={company}>
+            {company}
           </span>
-        </div>
+        ) : (
+          <span className="fh-desktop-sidebar__co-wordmark fh-desktop-sidebar__co-wordmark--system">
+            <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
+            <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
+          </span>
+        )}
       </div>
 
       <nav className="fh-desktop-sidebar__nav" aria-label="Primary">
