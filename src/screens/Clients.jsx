@@ -380,6 +380,7 @@ function ClientTile({ client: c, rollup: r, lastActivityRel, index, isTop, onOpe
     <motion.button
       type="button"
       layout
+      className={`fh-client-tile${isTop ? ' fh-client-tile--top' : ''}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}

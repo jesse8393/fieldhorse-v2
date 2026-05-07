@@ -124,6 +124,7 @@ const JobCard = memo(function JobCard({
     <motion.button
       type="button"
       layout
+      className={`fh-job-card${hasPhotoBanner ? ' fh-job-card--with-photo' : ''}${featured ? ' fh-job-card--featured' : ''}`}
       onClick={() => { hapticTap(); onOpen?.(contact) }}
       initial={isNew ? { opacity: 0, scale: 0.94 } : { opacity: 0, y: 8 }}
       animate={isNew ? { opacity: 1, scale: [0.94, 1.02, 1] } : { opacity: 1, y: 0 }}
