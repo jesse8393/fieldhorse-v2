@@ -9,12 +9,14 @@ import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SwipeableRow from '../components/SwipeableRow.jsx'
 import { JobCard, FilterPill, FloatingActionButton } from '../components/v3'
+import DesktopJobsBoard from '../components/desktop/DesktopJobsBoard.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { ACTIVE_STAGES } from '../lib/stages.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { toastSuccess } from '../lib/toast.js'
 import { useFhMotion } from '../lib/motion.js'
+import { useIsDesktop } from '../lib/useMediaQuery.js'
 import { fetchCoverPhotosByJob } from '../lib/photos.js'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
@@ -171,6 +173,92 @@ export default function Jobs() {
   }
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  // Phase 7 — desktop-first composition. At >=900px we render
+  // DesktopJobsBoard (a real command-center board), passing the same
+  // contacts / filters / handlers the mobile branch uses. Below 900px
+  // the existing motion.div.v3-screen--jobs flow renders verbatim.
+  if (isDesktop) {
+    return (
+      <>
+        <DesktopJobsBoard
+          contacts={contacts}
+          filtered={filtered}
+          loading={loading}
+          filter={filter}
+          setFilter={setFilter}
+          search={search}
+          setSearch={setSearch}
+          photoUrlByJob={photoUrlByJob}
+          featuredId={featuredId}
+          tabCounts={tabCounts}
+          onOpenJob={openDrawer}
+          onNewLead={() => setAddOpen(true)}
+        />
+        <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
+              <DrawerDescription>
+                {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
+                {' · '}
+                {money(drawerContact?.amount || 0)}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '8px 20px 8px' }}>
+              <ActionTile
+                icon={MessageSquare}
+                label="Text"
+                disabled={!drawerContact?.phone}
+                href={drawerContact?.phone ? `sms:${drawerContact.phone}` : undefined}
+              />
+              <ActionTile
+                icon={Mail}
+                label="Email"
+                disabled={!drawerContact?.email}
+                href={drawerContact?.email ? `mailto:${drawerContact.email}` : undefined}
+              />
+              <ActionTile
+                icon={Phone}
+                label="Call"
+                disabled={!drawerContact?.phone}
+                href={drawerContact?.phone ? `tel:${drawerContact.phone}` : undefined}
+              />
+              <ActionTile
+                icon={ExternalLink}
+                label="Open"
+                primary
+                onClick={() => {
+                  const id = drawerContact?.id
+                  if (id) navigate(`/jobs/${id}`)
+                  closeDrawer()
+                }}
+              />
+            </div>
+            <div style={{ padding: '14px 20px 28px', color: 'var(--v3-text-muted)', fontSize: 11, fontFamily: 'var(--font-body)', textAlign: 'center' }}>
+              Click outside to dismiss
+            </div>
+          </DrawerContent>
+        </Drawer>
+        <NewLeadSheet
+          open={addOpen}
+          userId={user?.id}
+          onClose={() => setAddOpen(false)}
+          onCreated={async (created) => {
+            setAddOpen(false)
+            if (created?.id) setJustAddedId(created.id)
+            await load()
+            setTimeout(() => setJustAddedId(null), 1200)
+            toastSuccess(
+              'New lead added',
+              created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+            )
+          }}
+        />
+      </>
+    )
+  }
 
   return (
     <motion.div

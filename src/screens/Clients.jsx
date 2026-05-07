@@ -10,6 +10,8 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { rollupByClient } from '../lib/rollups.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton } from '../components/v3'
+import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.jsx'
+import { useIsDesktop } from '../lib/useMediaQuery.js'
 
 function money(n) {
   const v = Number(n || 0)
@@ -139,6 +141,45 @@ export default function Clients() {
   }, [filtered, rollupMap])
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  // Phase 7 — desktop-first composition. At >=900px DesktopClientsDirectory
+  // renders the real KPI strip + list+detail directory using the same
+  // rows / jobs / rollups / handlers the mobile branch consumes. Below
+  // 900px the existing motion.div.v3-screen--clients flow renders verbatim.
+  if (isDesktop) {
+    return (
+      <>
+        <DesktopClientsDirectory
+          rows={rows}
+          filtered={filtered}
+          loading={loading}
+          q={q}
+          setQ={setQ}
+          filter={filter}
+          setFilter={setFilter}
+          filterCounts={filterCounts}
+          rollupFor={rollupFor}
+          jobs={jobs}
+          screenStats={screenStats}
+          topClientId={topClientId}
+          totalLifetime={totalLifetime}
+          onOpenClient={(id) => navigate(`/clients/${id}`)}
+          onNewClient={() => setAddOpen(true)}
+        />
+        <NewClientSheet
+          open={addOpen}
+          userId={user?.id}
+          onClose={() => setAddOpen(false)}
+          onSaved={(client) => {
+            setAddOpen(false)
+            if (client?.id) navigate(`/clients/${client.id}`)
+            else load()
+          }}
+        />
+      </>
+    )
+  }
 
   return (
     <motion.div className="v3-screen v3-screen--clients" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
