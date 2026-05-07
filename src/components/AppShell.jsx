@@ -53,18 +53,40 @@ function RouteFallback() {
  */
 function layoutForPath(pathname) {
   // Responsive Desktop Command Center.
-  //   Phase 1: Home (`/`) opts into the multi-column desktop canvas.
-  //   Phase 2: Jobs (`/jobs`) and Clients (`/clients`) get desktop-grade
-  //            grid + header layouts — phone view is preserved verbatim.
-  //   Phase 3 (pending): Schedule + Job Detail multi-column.
+  //   Phase 1: Home (`/`) — multi-column dashboard canvas.
+  //   Phase 2: Jobs (`/jobs`) + Clients (`/clients`) — desktop command
+  //            header + wide card grid.
+  //   Phase 2.5 / 3: All remaining tool routes get the responsive
+  //            workspace canvas at >=900px so they stop rendering as a
+  //            440px phone column inside a giant desktop shell. Each
+  //            screen author can layer dedicated desktop CSS on top of
+  //            their `v3-screen` markup as time permits — until then the
+  //            wider canvas + sensible gutters is the floor we ship.
+  //   Phase 3 (still pending): Job Detail multi-column dashboard.
   //
-  // Below the 900px breakpoint the layout collapses back to the mobile
-  // frame automatically (the responsive max-width media queries only
-  // activate on wider viewports), so phones are unaffected.
+  // Detail routes (`/jobs/:id`, `/clients/:id`) intentionally stay on
+  // mobile-frame because their internal layouts (tab strips, full-bleed
+  // photo grids) are still mobile-tuned; promoting them would stretch
+  // those internals weirdly. Will be lifted once Phase 3 designs land.
+  //
+  // Below 900px the layout collapses to the mobile frame automatically
+  // (the responsive max-width media queries only activate at >=900px),
+  // so phones are unaffected by every promotion below.
   if (pathname === '/') return 'responsive'
   if (pathname === '/jobs') return 'responsive'
   if (pathname === '/clients') return 'responsive'
-  // Schedule and Job Detail (`/jobs/:id`) stay mobile-frame for now.
+  if (pathname === '/schedule') return 'responsive'
+  if (pathname === '/compose') return 'responsive'
+  if (pathname === '/bid') return 'responsive'
+  if (pathname === '/invoices') return 'responsive'
+  if (pathname === '/analytics') return 'responsive'
+  if (pathname === '/subs') return 'responsive'
+  if (pathname === '/settings') return 'responsive'
+  if (pathname === '/import') return 'responsive'
+  if (pathname === '/pour-window') return 'responsive'
+  if (pathname === '/notes') return 'responsive'
+  // Job Detail + Client Detail still mobile-frame — their internal
+  // layouts need bespoke desktop work in a follow-up phase.
   return 'mobile-frame'
 }
 

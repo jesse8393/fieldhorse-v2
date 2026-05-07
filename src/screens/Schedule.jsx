@@ -206,7 +206,7 @@ export default function Schedule() {
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="v3-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
+    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
       {/* SUMMARY PANEL — black-glass cockpit. Eyebrow + title + today/
           upcoming counts. The FAB at bottom-right is the single
           thumb-reachable add-event control; an inline header CTA used

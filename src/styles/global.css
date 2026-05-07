@@ -1829,63 +1829,89 @@ a {
     top: 0;
     left: 0;
     bottom: 0;
-    width: 240px;
+    /* Phase 2.5: sidebar bumped 240 → 248 so the brand row + nav rows
+       stop feeling crammed in at the right edge. Matches the reference
+       handoff's breathing room (28px 18px sidepad). */
+    width: 248px;
     z-index: 31;
     display: flex;
     flex-direction: column;
     background:
-      linear-gradient(180deg, rgba(20, 20, 20, 0.96) 0%, rgba(11, 9, 7, 0.98) 100%),
+      linear-gradient(180deg, rgba(16, 12, 8, 0.98) 0%, rgba(10, 8, 6, 0.99) 100%),
       var(--surface-1);
     border-right: 1px solid var(--rule);
     box-shadow:
       inset -1px 0 0 rgba(255, 255, 255, 0.04),
       4px 0 24px rgba(0, 0, 0, 0.45);
     color: var(--ink-strong);
-    padding: 18px 14px 14px;
+    padding: 22px 16px 14px;
     box-sizing: border-box;
     overflow-y: auto;
   }
-  /* Top brand block */
+  /* Brand block — horizontal [FH-mark] [Co + tag] pattern from the
+     reference handoff (dt-side__brand). Replaces the prior stacked
+     wordmark/tenant layout that was clipping at narrower sidebar
+     widths. */
   .fh-desktop-sidebar__brand {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 4px 6px 16px;
-    border-bottom: 1px solid var(--rule);
-    margin-bottom: 14px;
-  }
-  .fh-desktop-sidebar__wordmark {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0;
-    font-family: var(--font-display);
-    font-size: 18px;
-    letter-spacing: 0.14em;
-    line-height: 1;
-    text-transform: uppercase;
-  }
-  .fh-desktop-sidebar__tenant {
-    display: flex;
     align-items: center;
-    min-height: 18px;
-    color: var(--ink-muted);
-    font-family: var(--font-body);
-    font-size: 11px;
+    gap: 12px;
+    padding: 4px 6px 20px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 16px;
+    min-width: 0;
+  }
+  .fh-desktop-sidebar__mark {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #1f1812, #0d0907);
+    border: 1px solid color-mix(in srgb, var(--field-gold) 28%, transparent);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: 14px;
     font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--field-gold-bright);
     overflow: hidden;
   }
-  .fh-desktop-sidebar__tenant img {
-    max-height: 22px;
-    max-width: 180px;
+  .fh-desktop-sidebar__mark img {
+    max-width: 26px;
+    max-height: 26px;
     width: auto;
     height: auto;
     object-fit: contain;
     display: block;
-    opacity: 0.92;
   }
-  .fh-desktop-sidebar__tenant span {
+  .fh-desktop-sidebar__brand-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .fh-desktop-sidebar__co {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    letter-spacing: 0.16em;
+    color: var(--ink-strong);
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fh-desktop-sidebar__tag {
+    font-family: var(--font-body);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2026,19 +2052,23 @@ a {
     border-color: color-mix(in srgb, var(--field-gold) 32%, var(--rule));
   }
 
-  /* Shift the main content + header inset to clear the sidebar. */
+  /* Shift the main content + header inset to clear the 248px sidebar. */
   .fh-app__main {
-    padding-left: 240px;
+    padding-left: 248px;
     padding-bottom: 32px;
   }
   .fh-app-header {
-    padding-left: calc(14px + 240px);
+    padding-left: calc(14px + 248px);
   }
   /* Hide the BottomNav on desktop — sidebar carries primary nav. */
   .fh-nav { display: none !important; }
-  /* Hide AppHeader's mobile-only brand slots — sidebar owns identity. */
-  .fh-app-header__badge { display: none; }
-  .fh-app-header__brand { display: none; }
+  /* Hide AppHeader's mobile-only brand slots — sidebar owns identity.
+     `!important` overrides the inline `display: flex` on the brand
+     wrapper div (Phase 2.5 fix — without it the centered tenant
+     wordmark was still rendering at the top of every desktop view,
+     reading as "Parker dominates the page"). */
+  .fh-app-header__badge { display: none !important; }
+  .fh-app-header__brand { display: none !important; }
   /* Header content shifts to the right — give the action cluster more
      room to breathe and align with content gutter on desktop. */
   .fh-app-header { justify-content: flex-end; padding-right: 24px; }
@@ -2064,6 +2094,147 @@ a {
     box-shadow:
       inset -1px 0 0 rgba(11, 11, 11, 0.04),
       4px 0 24px rgba(0, 0, 0, 0.10);
+  }
+}
+
+/* =========================================================================
+   DESKTOP WORKSPACE FALLBACK — Phase 2.5
+
+   At >=900px every tool route (Schedule, Compose, Bid, Invoices,
+   Analytics, Subs, Settings, Notes, Importer, PourWindow) is now on
+   layout 'responsive', which gives them the full 1280px main canvas.
+   But not every screen has a bespoke dashboard layout yet — without
+   one, their mobile-tuned vertical stack would stretch to 1280 and
+   look thin.
+
+   This block caps the content column at 960px for every responsive
+   screen that DOESN'T own a dedicated desktop layout (--home, --jobs,
+   --clients, --schedule, --compose). Centered, with breathing space.
+   It's not pretty per-screen UI yet, but it stops the phone-in-a-
+   giant-shell feel — the floor we ship before each screen gets a
+   bespoke desktop layout.
+
+   When a screen lands its own desktop layout, add its modifier class
+   to the :not() chain (or just give it dedicated rules above this
+   block — they'll win on specificity).
+   ========================================================================= */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive
+    .v3-screen:not(.v3-screen--home):not(.v3-screen--jobs):not(.v3-screen--clients):not(.v3-screen--schedule):not(.v3-screen--compose) {
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* Same fallback for legacy .fh-screen wrappers used by a few tool
+     screens (Settings, Bid, Importer, Compose) — keeps them in the
+     workspace cap rather than stretched. */
+  .fh-app--layout-responsive
+    .fh-screen:not(.fh-screen--home):not(.fh-screen--jobs):not(.fh-screen--clients):not(.fh-screen--schedule):not(.fh-screen--compose) {
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* =========================================================================
+   SCHEDULE — desktop dispatch board (Phase 3)
+
+   At >=900px, Schedule uses the full responsive canvas with its
+   summary panel, weather strip, month nav, day grid, and event list
+   reflowing into a 2-column layout: planner on the left (~62%),
+   running list / details on the right (~38%). The existing JSX is
+   preserved verbatim — desktop layout is purely CSS.
+
+   Mobile remains the single-column flow it always was.
+   ========================================================================= */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .v3-screen--schedule {
+    /* Reset mobile gutter — main inner provides the desktop gutter. */
+    padding: 4px 0 32px;
+  }
+  /* Gutters on each Schedule section come from the wrapping inner —
+     drop the per-section horizontal margins so cards span the full
+     desktop canvas instead of carrying the 20px mobile gutter that
+     leaves stripes. */
+  .fh-app--layout-responsive .v3-screen--schedule > .v3-section,
+  .fh-app--layout-responsive .v3-screen--schedule > .fh-weatherbar {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  /* The summary panel reads as a clean header strip — pad it for the
+     wider canvas and let the today/upcoming counts breathe. */
+  .fh-app--layout-responsive .v3-screen--schedule > .v3-section {
+    padding: 22px 26px !important;
+  }
+}
+
+/* =========================================================================
+   COMPOSE — desktop draft workspace (Phase 3)
+
+   At >=900px, AI Compose splits into a 2-column workspace: input
+   cockpit (channel/intent/contact/context/CTA) on the left, generated
+   draft on the right. When no draft exists yet, the input panel
+   centers and the right column shows a placeholder hint — keeping
+   the canvas full so the screen never reads as a narrow phone form.
+
+   Implementation: the two top-level motion.divs (input + draft) each
+   carry mobile padding `0 20px` — desktop CSS removes that and
+   wraps them in a CSS Grid via the parent .v3-screen--compose.
+   ========================================================================= */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .v3-screen--compose {
+    display: grid;
+    /* Input cockpit takes 1fr, draft takes 1.2fr so generated text
+       has more reading room — the draft is the centerpiece per the
+       handoff "draft-as-hero" pattern. */
+    grid-template-columns: minmax(360px, 1fr) minmax(0, 1.2fr);
+    column-gap: 24px;
+    align-items: start;
+    padding: 4px 0 32px;
+  }
+  /* First child = input cockpit motion.div (entire block). Second
+     visible child = output cockpit (draft). The AnimatePresence
+     wrapper renders nothing when there's no draft, so the grid will
+     show the input alone in the left column — the right column stays
+     empty space, which works as a "draft will appear here" canvas
+     while the input form is being filled. */
+  .fh-app--layout-responsive .v3-screen--compose > * {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  /* When the draft isn't visible the input cockpit alone shouldn't
+     stretch to fill — natural 1fr keeps it sane. When the draft IS
+     visible (output cockpit is the second motion child), grid lays
+     them side-by-side automatically. */
+}
+
+/* =========================================================================
+   DESKTOP MODAL SIZING — Phase 2.5
+
+   ActionSheet (NewLeadSheet) + Drawer (NewClientSheet) are mobile-
+   first slide-up sheets pinned to bottom: 0; left: 0; right: 0. On
+   desktop the full-viewport-width sheet reads as oddly stretched.
+   We cap the width and center horizontally — still a bottom sheet
+   visually, but constrained to a proper modal width. Mobile is
+   untouched (rules are inside the @media min-width: 900px block).
+
+   Vaul Drawer marks its content panel with [data-vaul-drawer-direction];
+   ActionSheet uses the `.fh-asheet` class (defined ~line 5220 below).
+   ========================================================================= */
+@media (min-width: 900px) {
+  /* Both vaul Drawer and our ActionSheet animate via inline
+     `transform: translate3d(...)` from framer-motion (or vaul's own
+     spring). Overriding transform here would kill the slide-up. So
+     centering uses `left: 0; right: 0; margin-inline: auto` plus a
+     `max-width` cap — same effect, no transform conflict. */
+  [data-vaul-drawer][data-vaul-drawer-direction='bottom'] {
+    max-width: 520px !important;
+    margin-inline: auto !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+  .fh-asheet {
+    max-width: 560px !important;
+    margin-inline: auto !important;
   }
 }
 

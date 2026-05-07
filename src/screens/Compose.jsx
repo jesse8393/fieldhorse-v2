@@ -104,7 +104,7 @@ export default function Compose() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen v3-screen--compose"
       variants={stagger}
       initial="hidden"
       animate="show"

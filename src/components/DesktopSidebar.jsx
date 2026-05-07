@@ -71,26 +71,39 @@ export default function DesktopSidebar() {
     navigate('/login', { replace: true })
   }
 
+  // Sidebar brand follows the reference handoff pattern (dt-side__brand):
+  // a 36px FH mark on the left, then tenant company name + "Construction Co."
+  // tag on the right. Compact, never clips, and reads as
+  // "FieldHorse hosts Parker" rather than "Parker is the app". When the
+  // tenant has uploaded a logo we show it INSIDE the FH mark slot — the
+  // tenant company name still wins the right-side text.
+  const tenantInitials = (company || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
+  const fhMarkContent = logoSrc ? (
+    <img
+      src={logoSrc}
+      alt={company || 'Company logo'}
+      onError={(e) => { e.currentTarget.style.display = 'none' }}
+    />
+  ) : tenantInitials ? (
+    <span>{tenantInitials}</span>
+  ) : (
+    <span>FH</span>
+  )
+
   return (
     <aside className="fh-desktop-sidebar" aria-label="Primary navigation">
       <div className="fh-desktop-sidebar__brand">
-        <span className="fh-desktop-sidebar__wordmark">
-          <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
-          <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
+        <span className="fh-desktop-sidebar__mark" aria-hidden="true">
+          {fhMarkContent}
         </span>
-        {(logoSrc || company) && (
-          <div className="fh-desktop-sidebar__tenant">
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                alt={company || 'Company logo'}
-                onError={(e) => { e.currentTarget.style.display = 'none' }}
-              />
-            ) : (
-              <span>{company}</span>
-            )}
-          </div>
-        )}
+        <div className="fh-desktop-sidebar__brand-text">
+          <span className="fh-desktop-sidebar__co">
+            {company || 'FIELDHORSE'}
+          </span>
+          <span className="fh-desktop-sidebar__tag">
+            {company ? 'on Fieldhorse' : 'Command Center'}
+          </span>
+        </div>
       </div>
 
       <nav className="fh-desktop-sidebar__nav" aria-label="Primary">
