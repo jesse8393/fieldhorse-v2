@@ -12,7 +12,8 @@ import {
   HealthDonut,
   ProgressMeter,
   FeedRow,
-  SectionHeader
+  SectionHeader,
+  PostedByChip
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.jsx'
 import { computeJobHealth } from '../lib/jobHealth.js'
@@ -212,15 +213,23 @@ export default function OverviewTab({
             </div>
           ) : (
             activityRows.map((row) => (
-              <FeedRow
-                key={row.key}
-                type={row.type}
-                title={row.title}
-                detail={row.detail}
-                timestamp={row.timestamp}
-                pillTone={row.pillTone}
-                pillLabel={row.pillLabel}
-              />
+              <div key={row.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <FeedRow
+                  type={row.type}
+                  title={row.title}
+                  detail={row.detail}
+                  timestamp={row.timestamp}
+                  pillTone={row.pillTone}
+                  pillLabel={row.pillLabel}
+                />
+                {row.userId && (
+                  <PostedByChip
+                    userId={row.userId}
+                    verb={row.verb || 'posted'}
+                    style={{ paddingLeft: 14 }}
+                  />
+                )}
+              </div>
             ))
           )}
         </div>
@@ -313,7 +322,9 @@ function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
       detail: p.method ? `via ${p.method}` : null,
       timestamp: p.paid_on || p.created_at,
       pillTone: 'success',
-      pillLabel: 'PAID'
+      pillLabel: 'PAID',
+      userId: p.user_id || null,
+      verb: 'posted'
     })
   }
 
@@ -323,7 +334,9 @@ function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
       type: 'note',
       title: n.text || 'Note',
       detail: n.category && n.category !== 'note' ? n.category : null,
-      timestamp: n.created_at
+      timestamp: n.created_at,
+      userId: n.user_id || null,
+      verb: 'posted'
     })
   }
 
@@ -333,7 +346,9 @@ function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
       type: 'crew-on-site',
       title: s.title || 'Scheduled work',
       detail: s.description || null,
-      timestamp: s.start_at
+      timestamp: s.start_at,
+      userId: s.user_id || null,
+      verb: 'added'
     })
   }
 
