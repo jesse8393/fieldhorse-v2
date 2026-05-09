@@ -88,10 +88,31 @@ export default function ActionSheet({
     }
   }, [open])
 
-  // iOS Safari handles auto-scroll-into-view on focus natively. The old
-  // delayed scrollIntoView competed with that and produced the audit
-  // "janky jump on keyboard open". The visualViewport-driven height
-  // shrink (above) keeps the focused field above the keyboard.
+  // Focus scroll INSIDE the body scroll container. iOS native auto-
+  // scroll-into-view only works on the window scroll, but the body has
+  // its own overflow:auto and the document scroll is locked above. The
+  // 280ms delay covers the iOS keyboard slide-up so we scroll AFTER the
+  // visualViewport resize lands — otherwise the scroll target moves out
+  // from under the animation. Pairs with scroll-margin on inputs (CSS)
+  // so 'nearest' clears the footer + a comfortable gap.
+  useEffect(() => {
+    if (!open) return
+    const body = bodyRef.current
+    if (!body) return
+    function onFocusIn(e) {
+      const t = e.target
+      if (!t || !t.matches?.('input, textarea, select')) return
+      // Skip non-text inputs (chips, radio buttons) — they're already
+      // in view and don't summon the keyboard.
+      const inputType = (t.getAttribute?.('type') || '').toLowerCase()
+      if (inputType === 'checkbox' || inputType === 'radio' || inputType === 'button' || inputType === 'submit') return
+      setTimeout(() => {
+        try { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } catch {}
+      }, 280)
+    }
+    body.addEventListener('focusin', onFocusIn)
+    return () => body.removeEventListener('focusin', onFocusIn)
+  }, [open])
 
   function handleCommit() {
     if (commitBusy || commitDisabled) return
