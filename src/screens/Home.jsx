@@ -731,6 +731,37 @@ export default function Home() {
         </div>
       </motion.div>
 
+      {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
+          V3-HOME-2 de-box: header + 5 tile launcher row on page surface.
+          Each QuickAction tile self-frames; wrapper was redundant chrome.
+          Position: relocated here from the bottom so the primary launcher
+          tiles (Add Lead / New Job / Schedule / Invoice / Voice Note) sit
+          inside the first thumb-reach zone on mobile, right after the
+          revenue moment. Desktop uses DesktopHomeCommandCenter and is
+          unaffected. */}
+      <motion.div
+        variants={item}
+        style={{
+          margin: '0 var(--v3-gutter) 16px'
+        }}
+      >
+        <SectionHeader label="Quick Actions" />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 8,
+            marginTop: 4
+          }}
+        >
+          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
+          <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
+          <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
+        </div>
+      </motion.div>
+
       {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
           V3-HOME-2 de-box: dropped the bordered section wrapper. Section
           header organizes; the row cards self-frame on the page surface.
@@ -931,31 +962,6 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
-          V3-HOME-2 de-box: header + 5 tile launcher row on page surface.
-          Each QuickAction tile self-frames; wrapper was redundant chrome. */}
-      <motion.div
-        variants={item}
-        style={{
-          margin: '0 var(--v3-gutter) 28px'
-        }}
-      >
-        <SectionHeader label="Quick Actions" />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
-            gap: 8,
-            marginTop: 4
-          }}
-        >
-          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
-          <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1')} />
-          <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
-          <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
-          <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
-        </div>
-      </motion.div>
     </motion.div>
   )
 }
