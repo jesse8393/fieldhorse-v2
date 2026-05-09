@@ -1,0 +1,43 @@
+/* ================================================================
+   Mobile keyboard safety overrides — paired with the visualViewport
+   listeners in src/components/ActionSheet.jsx and NewClientSheet.jsx.
+
+   Loaded AFTER global.css so these rules win the cascade. Kept in a
+   separate file because the global.css blob is too large to push
+   through the proxy's API path; iterating this file is fast.
+
+   What changed vs the global.css defaults:
+
+   1. .fh-asheet was anchored to bottom: 0 of the LAYOUT viewport. On
+      iPhone Safari the layout viewport doesn't shrink with the
+      keyboard, so the lower half of the sheet hid behind the keyboard
+      and the user couldn't see what they were typing. We now lift the
+      sheet via bottom: var(--fh-kbd, 0px) so it always sits above the
+      keyboard.
+
+   2. .fh-asheet had min-height: 56vh which (per CSS spec) wins over
+      max-height when they conflict. With the keyboard open, the sheet
+      stayed tall enough to extend below the visible viewport. We set
+      min-height: 0 so max-height is honored.
+
+   3. Inputs get scroll-margin-top/bottom so scrollIntoView({block:
+      'nearest'}) (called from ActionSheet.jsx focusin) leaves
+      headroom above for the sheet header and below for the footer.
+   ================================================================ */
+
+.fh-asheet {
+  bottom: var(--fh-kbd, 0px);
+  min-height: 0;
+  max-height: calc(
+    var(--fh-vvh, 100dvh) - env(safe-area-inset-top) - 24px
+  );
+  transition: bottom 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              max-height 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fh-asheet-field input:not([type='checkbox']):not([type='radio']),
+.fh-asheet-field textarea,
+.fh-asheet-field select {
+  scroll-margin-top: 96px;
+  scroll-margin-bottom: 120px;
+}

@@ -9,6 +9,8 @@ import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import './styles/tokens.css'
 import './styles/global.css'
 import './styles/v3.css'
+// Loaded LAST so cascade-equal rules win. See file header for context.
+import './styles/mobile-keyboard-fix.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
