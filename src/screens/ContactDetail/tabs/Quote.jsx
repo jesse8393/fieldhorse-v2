@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Eye, Download, Send, ShieldCheck, Lock } from 'lucide-react'
+import { Eye, Download, Send, ShieldCheck, Lock, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
@@ -194,6 +194,52 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     }
   }
 
+  // Clear-draft action — wipes all fh_quote_items + scope/exclusions/
+  // terms/expiration/sent timestamp + resets proposal_status to 'draft'.
+  // Safety: BLOCKED when proposal_status='approved' because approval
+  // history (fh_quote_versions) is the immutable record of what the
+  // customer agreed to; we don't want a "clear draft" gesture to
+  // appear to wipe an approved quote.
+  const [clearing, setClearing] = useState(false)
+  async function handleClearDraft() {
+    if (!contact?.id || !userId) return
+    if ((contact?.proposal_status || 'draft').toLowerCase() === 'approved') return
+    if (!window.confirm('Delete this draft quote?\n\nThis removes the quote line items and draft terms. This cannot be undone.')) return
+    hapticTap()
+    setClearing(true)
+    try {
+      // Delete all line items for this contact (RLS scoped). The recalc
+      // trigger from migration 011 fires per-row delete, so totals on
+      // fh_contacts are recomputed automatically.
+      const { error: delErr } = await supabase
+        .from('fh_quote_items')
+        .delete()
+        .eq('contact_id', contact.id)
+        .eq('user_id', userId)
+      if (delErr) throw delErr
+
+      // Reset draft fields on the contact. Keep stage + name + client
+      // intact — only clear the quote-specific fields. Status reverts
+      // to 'draft' if it was 'sent'/'viewed'/'rejected'/'expired'.
+      if (patch) {
+        await patch({
+          scope_text: null,
+          exclusions_text: null,
+          terms_text: null,
+          quote_sent_at: null,
+          quote_expires_at: null,
+          proposal_status: 'draft'
+        })
+      }
+      if (fetchAll) await fetchAll()
+      toastSuccess('Draft quote cleared', 'Line items and draft terms removed.')
+    } catch (e) {
+      toastError("Couldn't clear draft", e?.message || 'Try again in a moment.')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   async function handleSend() {
     if (disabled) return
     hapticTap()
@@ -320,7 +366,104 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           busy={busy}
           onOpenApprove={onOpenApprove}
         />
+
+        <ClearDraftBand
+          contact={contact}
+          baseCount={baseCount}
+          clearing={clearing}
+          onClearDraft={handleClearDraft}
+        />
       </aside>
+    </div>
+  )
+}
+
+/* ============================================================
+   ClearDraftBand — destructive action to wipe the working draft
+   (line items + scope/terms/exclusions/expiration + reset status).
+   Safety: BLOCKED when the quote is approved — approval history in
+   fh_quote_versions is the immutable record and shouldn't appear
+   to be wiped by a "clear draft" gesture. Renders nothing when
+   the line-item count is 0 AND status is draft (nothing to clear).
+   ============================================================ */
+function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }) {
+  const status = (contact?.proposal_status || 'draft').toLowerCase()
+  const isApproved = status === 'approved'
+  const isEmptyDraft = status === 'draft' && baseCount === 0
+
+  // Hide entirely when there's nothing to clear (clean slate). Render
+  // the safe-wording variant when approved.
+  if (isEmptyDraft) return null
+
+  if (isApproved) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 6,
+        padding: '12px 14px',
+        borderRadius: 12,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)'
+      }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
+          Approved quote
+        </span>
+        <p style={{
+          margin: 0,
+          fontFamily: 'var(--font-body)',
+          fontSize: 11, lineHeight: 1.5,
+          color: 'var(--v3-text-muted)'
+        }}>
+          Approved quotes cannot be deleted. Create a revision instead.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      padding: '12px 14px',
+      borderRadius: 12,
+      background: 'var(--v3-surface)',
+      border: '1px solid var(--v3-border)'
+    }}>
+      <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
+        Reset draft
+      </span>
+      <p style={{
+        margin: 0,
+        fontFamily: 'var(--font-body)',
+        fontSize: 11, lineHeight: 1.5,
+        color: 'var(--v3-text-muted)'
+      }}>
+        Removes all line items and draft scope, exclusions, terms, and expiration. The job, client, files, and any payments are unaffected.
+      </p>
+      <motion.button
+        type="button"
+        whileTap={{ scale: clearing ? 1 : 0.98 }}
+        onClick={onClearDraft}
+        disabled={clearing}
+        aria-disabled={clearing}
+        style={{
+          alignSelf: 'flex-start',
+          minHeight: 36,
+          padding: '8px 14px',
+          borderRadius: 10,
+          background: 'transparent',
+          border: '1px solid color-mix(in srgb, var(--v3-danger-bright) 35%, transparent)',
+          color: 'var(--v3-danger-bright)',
+          fontFamily: 'var(--font-body)',
+          fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
+          cursor: clearing ? 'not-allowed' : 'pointer',
+          opacity: clearing ? 0.55 : 1,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          WebkitTapHighlightColor: 'transparent',
+          touchAction: 'manipulation'
+        }}
+      >
+        <Trash2 size={13} aria-hidden="true" />
+        {clearing ? 'Clearing…' : 'Delete draft quote'}
+      </motion.button>
     </div>
   )
 }
