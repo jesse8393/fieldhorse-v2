@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useDragControls } from 'framer-motion'
 
 const EASE = [0.16, 1, 0.3, 1]
 const DUR = 0.5
@@ -37,12 +37,16 @@ export default function ActionSheet({
   commitBusyLabel = 'Saving…',
   commitDisabled = false,
   destructive = false,
+  // Optional class hook so individual sheets (NewLead) can opt in to
+  // a v2 visual scope without affecting other ActionSheet consumers.
+  variantClass = '',
   onClose,
   onCommit,
   children
 }) {
   const sheetRef = useRef(null)
   const bodyRef = useRef(null)
+  const dragControls = useDragControls()
 
   useEffect(() => {
     if (!open) return
@@ -84,21 +88,10 @@ export default function ActionSheet({
     }
   }, [open])
 
-  // Scroll the focused field into view inside the sheet body when keyboard opens.
-  useEffect(() => {
-    if (!open) return
-    const body = bodyRef.current
-    if (!body) return
-    function onFocusIn(e) {
-      const t = e.target
-      if (!t || !(t.matches?.('input, textarea, select'))) return
-      setTimeout(() => {
-        try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
-      }, 260)
-    }
-    body.addEventListener('focusin', onFocusIn)
-    return () => body.removeEventListener('focusin', onFocusIn)
-  }, [open])
+  // iOS Safari handles auto-scroll-into-view on focus natively. The old
+  // delayed scrollIntoView competed with that and produced the audit
+  // "janky jump on keyboard open". The visualViewport-driven height
+  // shrink (above) keeps the focused field above the keyboard.
 
   function handleCommit() {
     if (commitBusy || commitDisabled) return
@@ -116,7 +109,7 @@ export default function ActionSheet({
     // "DELETE THIS JOB? text fragment remained at bottom" leak.
     <AnimatePresence mode="wait">
       {open && (
-        <div className="fh-asheet-root" key="action-sheet">
+        <div className={`fh-asheet-root${variantClass ? ` ${variantClass}` : ''}`} key="action-sheet">
           <motion.div
             className="fh-asheet__scrim"
             initial={{ opacity: 0 }}
@@ -136,6 +129,8 @@ export default function ActionSheet({
             exit={{ y: '100%' }}
             transition={{ duration: DUR, ease: EASE }}
             drag="y"
+            dragListener={false}
+            dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.4 }}
             dragMomentum={false}
@@ -143,7 +138,12 @@ export default function ActionSheet({
               if (info.offset.y > 140 || info.velocity.y > 500) onClose?.()
             }}
           >
-            <div className="fh-asheet__handle" aria-hidden="true" />
+            <div
+              className="fh-asheet__handle"
+              aria-hidden="true"
+              onPointerDown={(e) => dragControls.start(e)}
+              style={{ touchAction: 'none' }}
+            />
             <header className="fh-asheet__head">
               <div className="fh-asheet__headMeta">
                 <h2 className="fh-asheet__title">
@@ -206,13 +206,16 @@ export default function ActionSheet({
 }
 
 export function SheetField({ label, code, children }) {
+  // Wrapper is a <div>, not a <label>. iOS Safari redirects taps inside a
+  // <label> to the first form control, which silently swallows clicks on
+  // nested buttons (e.g. ClientPicker rows in NewLeadSheet).
   return (
-    <label className="fh-asheet-field">
+    <div className="fh-asheet-field">
       <span className="fh-asheet-field__k">
         {label}
       </span>
       {children}
-    </label>
+    </div>
   )
 }
 

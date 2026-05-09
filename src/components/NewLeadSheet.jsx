@@ -322,9 +322,20 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
     // parsing state: no-op
   }
 
+  // When the user picks an existing client, mirror their name onto the
+  // lead form so what saves matches what the user picked. The picker
+  // remains the source of truth for client_id.
+  function handleClientChange(next) {
+    setClient(next)
+    if (next?.name) {
+      setForm((f) => ({ ...f, name: next.name }))
+    }
+  }
+
   return (
     <ActionSheet
       open={open}
+      variantClass="fh-asheet--v2"
       title={committed ? 'Lead captured.' : 'New lead.'}
       accentWord={committed ? 'captured' : 'lead'}
       sectionLabel="New lead"
@@ -421,12 +432,13 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       </div>
 
       {/* Client link — optional, picks an existing fh_clients row or
-          inline-creates one so this new job inherits client_id. */}
+          inline-creates one so this new job inherits client_id. Picking
+          a client mirrors the name onto the form (handleClientChange). */}
       <SheetField label="Client">
         <ClientPicker
           userId={userId}
           value={client}
-          onChange={setClient}
+          onChange={handleClientChange}
         />
       </SheetField>
 

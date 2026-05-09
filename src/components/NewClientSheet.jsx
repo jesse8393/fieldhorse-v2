@@ -89,7 +89,22 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
           </DrawerDescription>
         </DrawerHeader>
 
-        <form onSubmit={submit} style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12, boxSizing: 'border-box', maxWidth: '100%', minWidth: 0 }}>
+        <form
+          onSubmit={submit}
+          style={{
+            // Safe-area bottom keeps the SAVE CLIENT button above the
+            // home indicator on notched phones with the keyboard closed.
+            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            boxSizing: 'border-box',
+            maxWidth: '100%',
+            minWidth: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={labelStyle}>Name *</span>
             <input
@@ -169,7 +184,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
             </button>
             <motion.button
               type="submit"
-              whileTap={{ scale: 0.97 }}
+              whileTap={(saving || !name.trim()) ? undefined : { scale: 0.97 }}
               disabled={saving || !name.trim()}
               style={{
                 display: 'inline-flex',
@@ -178,17 +193,19 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
                 gap: 8,
                 padding: '12px 14px',
                 borderRadius: 12,
-                border: 'none',
-                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-                color: 'var(--onyx)',
+                border: (saving || !name.trim()) ? '1px solid var(--rule)' : 'none',
+                background: (saving || !name.trim())
+                  ? 'var(--surface-2)'
+                  : 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                color: (saving || !name.trim()) ? 'var(--ink-muted)' : 'var(--onyx)',
                 fontFamily: 'var(--font-display)',
                 fontSize: 14,
                 letterSpacing: '0.14em',
-                cursor: (saving || !name.trim()) ? 'default' : 'pointer',
-                boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
-                opacity: (saving || !name.trim()) ? 0.6 : 1,
+                cursor: (saving || !name.trim()) ? 'not-allowed' : 'pointer',
+                boxShadow: (saving || !name.trim()) ? 'none' : '0 6px 16px rgba(201,150,58,0.3)',
                 minWidth: 0,
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                touchAction: 'manipulation'
               }}
             >
               <SaveIcon size={14} />
