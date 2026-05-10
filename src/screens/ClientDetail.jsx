@@ -690,7 +690,7 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }) {
           fontSize: 15,
           fontWeight: hasValue ? 600 : 400,
           color: hasValue ? 'var(--v3-text)' : 'var(--v3-text-muted)',
-          fontStyle: hasValue ? 'normal' : 'italic',
+          fontStyle: 'normal',
           lineHeight: 1.4,
           wordBreak: 'break-word',
           whiteSpace: multiline ? 'pre-wrap' : 'normal'

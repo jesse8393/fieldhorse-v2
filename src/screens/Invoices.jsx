@@ -13,6 +13,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import V3PaymentSheet from '../components/V3PaymentSheet.jsx'
+import { useConfirm } from '../components/ConfirmSheet.jsx'
 
 // Invoices / AR — v3 money command screen.
 //
@@ -49,6 +50,7 @@ export default function Invoices() {
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
   const [payingRow, setPayingRow] = useState(null)
+  const confirm = useConfirm()
 
   const refresh = async () => {
     if (!user) return
@@ -292,7 +294,7 @@ export default function Invoices() {
                 key={r.job.id}
                 row={r}
                 onPDF={() => handleGeneratePDF(r)}
-                onPaid={() => {
+                onPaid={async () => {
                   // Phase 11 stabilization — confirm before opening the
                   // payment sheet so accidental Mark Paid taps in a
                   // dense list don't begin the log-payment flow.
@@ -300,7 +302,12 @@ export default function Invoices() {
                   const amt = Number(r.balance || 0).toLocaleString(undefined, {
                     style: 'currency', currency: 'USD', maximumFractionDigits: 0
                   })
-                  if (!window.confirm(`Log payment for ${name}?\nThis opens the payment sheet pre-filled with ${amt}.`)) return
+                  const ok = await confirm({
+                    title: `Log payment for ${name}?`,
+                    body: `Opens the payment sheet pre-filled with ${amt}.`,
+                    confirmLabel: 'Open sheet'
+                  })
+                  if (!ok) return
                   openPaymentSheet(r)
                 }}
               />

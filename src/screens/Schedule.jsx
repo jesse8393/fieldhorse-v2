@@ -458,12 +458,17 @@ export default function Schedule() {
       </SwipeShell>
 
       {/* FAB — canonical portal-rendered primitive, immune to
-          containing-block traps from transformed ancestors. */}
-      <FloatingActionButton
-        onClick={() => setAddOpen(true)}
-        ariaLabel="New event"
-        iconStrokeWidth={2.5}
-      />
+          containing-block traps from transformed ancestors. Hidden
+          when the day view is showing its own "Schedule a job" empty
+          state CTA so the screen never has two stacked gold +
+          buttons fighting for the operator's tap. */}
+      {events && events.length > 0 && (
+        <FloatingActionButton
+          onClick={() => setAddOpen(true)}
+          ariaLabel="New event"
+          iconStrokeWidth={2.5}
+        />
+      )}
 
       <AddEventSheet
         open={addOpen}
