@@ -26,7 +26,7 @@ export default function ClientPicker({ userId, value, onChange }) {
     setLoading(true)
     supabase
       .from('fh_clients')
-      .select('id, name, company_name, phone, email, active_jobs_count')
+      .select('id, name, company_name, phone, email, address, active_jobs_count')
       .eq('user_id', userId)
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .limit(60)
@@ -66,10 +66,14 @@ export default function ClientPicker({ userId, value, onChange }) {
       const { data, error } = await supabase
         .from('fh_clients')
         .insert({ user_id: userId, name: trimmed })
-        .select('id, name, company_name, phone, email, active_jobs_count')
+        .select('id, name, company_name, phone, email, address, active_jobs_count')
         .single()
       if (error) throw error
-      onChange?.({ id: data.id, name: data.name })
+      // Pass the full row so the lead form can hydrate from it. A bare
+      // {id, name} payload — what we used to send — meant the parent
+      // had no phone/email/address to fill, so picking an existing
+      // client never auto-completed the rest of the form.
+      onChange?.(data)
       setOpen(false)
       setQ('')
       setRows((r) => [data, ...r])
@@ -145,7 +149,9 @@ export default function ClientPicker({ userId, value, onChange }) {
               onPointerDown={(ev) => {
                 ev.preventDefault()
                 ev.stopPropagation()
-                onChange?.({ id: r.id, name: r.name })
+                // Pass the full row so the parent (lead/job sheet) can
+                // hydrate phone/email/address/company on selection.
+                onChange?.(r)
                 setOpen(false)
                 setQ('')
               }}
