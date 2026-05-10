@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, FileText } from 'lucide-react'
+import { Plus, FileText, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
-import { toastError } from '../../../lib/toast.js'
+import { toastError, toastUndo } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
 import { PostedByChip } from '../../../components/v3'
 
@@ -36,6 +36,35 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
     }
     setDraft('')
     fetchAll?.()
+  }
+
+  // Confirm-then-delete with toastUndo restore. Snapshot the row before
+  // deletion so the Undo can re-insert it. RLS scopes the delete to the
+  // owner; partner-shared jobs let the original poster delete their own
+  // posts via fh_notes_partner policy.
+  async function remove(note) {
+    if (!note?.id) return
+    if (!window.confirm('Delete this note? This cannot be undone.')) return
+    hapticTap()
+    const snapshot = { ...note }
+    const { error } = await supabase.from('fh_notes').delete().eq('id', note.id)
+    if (error) {
+      toastError("Couldn't delete note", 'Try again in a moment.')
+      return
+    }
+    fetchAll?.()
+    toastUndo('Note deleted', {
+      onUndo: async () => {
+        // Drop server-managed columns from the snapshot before re-insert.
+        const { id, created_at, updated_at, ...payload } = snapshot
+        const { error: undoErr } = await supabase.from('fh_notes').insert(payload)
+        if (undoErr) {
+          toastError("Couldn't restore note", 'Note deletion was permanent.')
+          return
+        }
+        fetchAll?.()
+      }
+    })
   }
 
   return (
@@ -120,29 +149,61 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ delay: Math.min(i * 0.03, 0.2), duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
                 style={{
-                  display: 'flex', flexDirection: 'column', gap: 4,
+                  display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 10,
                   padding: '12px 14px', borderRadius: 12,
                   background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
                 }}
               >
-                <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
-                  color: 'var(--v3-text)', lineHeight: 1.45,
-                  overflowWrap: 'anywhere'
-                }}>
-                  {n.text || n.action || 'Note'}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{
+                    fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
+                    color: 'var(--v3-text)', lineHeight: 1.45,
+                    overflowWrap: 'anywhere'
+                  }}>
+                    {n.text || n.action || 'Note'}
+                  </div>
+                  <div style={{
+                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    color: 'var(--v3-text-muted)',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    {n.category || 'note'} · {new Date(n.created_at).toLocaleString(undefined, {
+                      month: 'short', day: 'numeric',
+                      hour: 'numeric', minute: '2-digit'
+                    })}
+                  </div>
+                  {n.user_id && <PostedByChip userId={n.user_id} verb="posted" style={{ marginTop: 2 }} />}
                 </div>
-                <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: 11,
-                  color: 'var(--v3-text-muted)',
-                  fontVariantNumeric: 'tabular-nums'
-                }}>
-                  {n.category || 'note'} · {new Date(n.created_at).toLocaleString(undefined, {
-                    month: 'short', day: 'numeric',
-                    hour: 'numeric', minute: '2-digit'
-                  })}
-                </div>
-                {n.user_id && <PostedByChip userId={n.user_id} verb="posted" style={{ marginTop: 2 }} />}
+                <button
+                  type="button"
+                  onClick={() => remove(n)}
+                  aria-label="Delete note"
+                  style={{
+                    flexShrink: 0,
+                    width: 36, height: 36,
+                    display: 'grid', placeItems: 'center',
+                    borderRadius: 8,
+                    background: 'transparent',
+                    border: '1px solid transparent',
+                    color: 'var(--v3-text-muted)',
+                    cursor: 'pointer',
+                    transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease',
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation'
+                  }}
+                  onMouseEnter={(ev) => {
+                    ev.currentTarget.style.color = 'var(--v3-danger-bright)'
+                    ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
+                    ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'
+                  }}
+                  onMouseLeave={(ev) => {
+                    ev.currentTarget.style.color = 'var(--v3-text-muted)'
+                    ev.currentTarget.style.background = 'transparent'
+                    ev.currentTarget.style.borderColor = 'transparent'
+                  }}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
               </motion.li>
             ))}
           </AnimatePresence>

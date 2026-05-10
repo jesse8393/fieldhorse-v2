@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { UserPlus, Save as SaveIcon, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
@@ -13,11 +13,57 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  // iOS keyboard offset — used to lift the Vaul drawer ABOVE the
+  // keyboard (Vaul anchors to layout viewport, not visualViewport, so
+  // without this the lower fields hide behind the keyboard).
+  const [kbd, setKbd] = useState(0)
+  const formRef = useRef(null)
 
   useEffect(() => {
     if (!open) {
       setName(''); setCompany(''); setPhone(''); setEmail(''); setAddress(''); setNotes(''); setSaving(false)
     }
+  }, [open])
+
+  // Track iOS keyboard via visualViewport. 40px floor avoids treating
+  // the soft-button bar (notched phones) as a keyboard.
+  useEffect(() => {
+    if (!open) return
+    const vv = window.visualViewport
+    if (!vv) return
+    function update() {
+      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+      setKbd(next > 40 ? next : 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      setKbd(0)
+    }
+  }, [open])
+
+  // Focus-scroll inside the form's overflow container. Vaul drawer
+  // locks document scroll, so iOS native focus-scroll has nothing to
+  // scroll — we have to scroll the form ourselves. 280ms covers the
+  // iOS keyboard slide-up + visualViewport resize.
+  useEffect(() => {
+    if (!open) return
+    const form = formRef.current
+    if (!form) return
+    function onFocusIn(e) {
+      const t = e.target
+      if (!t || !t.matches?.('input, textarea, select')) return
+      const inputType = (t.getAttribute?.('type') || '').toLowerCase()
+      if (inputType === 'checkbox' || inputType === 'radio' || inputType === 'button' || inputType === 'submit') return
+      setTimeout(() => {
+        try { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } catch {}
+      }, 280)
+    }
+    form.addEventListener('focusin', onFocusIn)
+    return () => form.removeEventListener('focusin', onFocusIn)
   }, [open])
 
   async function submit(e) {
@@ -58,7 +104,12 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
     fontSize: 14,
-    outline: 'none'
+    outline: 'none',
+    // iOS scroll-into-view clearance — leaves room above for the drawer
+    // header and below for SAVE CLIENT so the focused input never lands
+    // crammed under another control after focus-scroll runs.
+    scrollMarginTop: 96,
+    scrollMarginBottom: 120
   }
   const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
@@ -66,7 +117,19 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
     <Drawer open={open} onOpenChange={(v) => { if (!v) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{ maxWidth: '100%', overflowX: 'hidden' }}
+        style={{
+          maxWidth: '100%',
+          overflowX: 'hidden',
+          // Lift the drawer above the iOS keyboard. transform stays
+          // GPU-friendly and doesn't fight Vaul's own bottom: 0 anchor.
+          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
+          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+          // Cap height to visualViewport so internal scroll always works
+          // even after the keyboard rises. 24px matches ActionSheet.
+          maxHeight: kbd
+            ? `calc(100dvh - ${kbd}px - env(safe-area-inset-top) - 24px)`
+            : `calc(100dvh - env(safe-area-inset-top) - 24px)`
+        }}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -89,7 +152,27 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
           </DrawerDescription>
         </DrawerHeader>
 
-        <form onSubmit={submit} style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12, boxSizing: 'border-box', maxWidth: '100%', minWidth: 0 }}>
+        <form
+          ref={formRef}
+          onSubmit={submit}
+          style={{
+            // Safe-area bottom keeps the SAVE CLIENT button above the
+            // home indicator on notched phones with the keyboard closed.
+            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            boxSizing: 'border-box',
+            maxWidth: '100%',
+            minWidth: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            // Bound the form scroll area so internal scrolling always
+            // works even when the drawer is constrained.
+            flex: 1,
+            minHeight: 0
+          }}
+        >
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={labelStyle}>Name *</span>
             <input
@@ -169,7 +252,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
             </button>
             <motion.button
               type="submit"
-              whileTap={{ scale: 0.97 }}
+              whileTap={(saving || !name.trim()) ? undefined : { scale: 0.97 }}
               disabled={saving || !name.trim()}
               style={{
                 display: 'inline-flex',
@@ -178,17 +261,19 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
                 gap: 8,
                 padding: '12px 14px',
                 borderRadius: 12,
-                border: 'none',
-                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-                color: 'var(--onyx)',
+                border: (saving || !name.trim()) ? '1px solid var(--rule)' : 'none',
+                background: (saving || !name.trim())
+                  ? 'var(--surface-2)'
+                  : 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                color: (saving || !name.trim()) ? 'var(--ink-muted)' : 'var(--onyx)',
                 fontFamily: 'var(--font-display)',
                 fontSize: 14,
                 letterSpacing: '0.14em',
-                cursor: (saving || !name.trim()) ? 'default' : 'pointer',
-                boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
-                opacity: (saving || !name.trim()) ? 0.6 : 1,
+                cursor: (saving || !name.trim()) ? 'not-allowed' : 'pointer',
+                boxShadow: (saving || !name.trim()) ? 'none' : '0 6px 16px rgba(201,150,58,0.3)',
                 minWidth: 0,
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                touchAction: 'manipulation'
               }}
             >
               <SaveIcon size={14} />

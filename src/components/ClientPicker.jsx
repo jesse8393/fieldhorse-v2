@@ -35,12 +35,14 @@ export default function ClientPicker({ userId, value, onChange }) {
   }, [open, userId])
 
   useEffect(() => {
-    function onDocClick(e) {
+    function onDocPointer(e) {
       if (!ref.current) return
       if (!ref.current.contains(e.target)) setOpen(false)
     }
-    if (open) document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
+    // pointerdown handles touch + mouse uniformly. mousedown alone misses
+    // some iOS Safari touch sequences inside portaled drawers.
+    if (open) document.addEventListener('pointerdown', onDocPointer)
+    return () => document.removeEventListener('pointerdown', onDocPointer)
   }, [open])
 
   const filtered = useMemo(() => {
@@ -78,16 +80,17 @@ export default function ClientPicker({ userId, value, onChange }) {
 
   if (value?.id) {
     return (
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)' }}>
-        <Check size={12} />
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value.name || 'Client'}</span>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 8px 10px 14px', borderRadius: 12, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)', maxWidth: '100%', minWidth: 0 }}>
+        <Check size={14} />
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value.name || 'Client'}</span>
         <button
           type="button"
-          onClick={() => onChange?.(null)}
+          onPointerDown={(ev) => { ev.preventDefault(); ev.stopPropagation(); onChange?.(null) }}
+          onClick={(ev) => { ev.preventDefault(); ev.stopPropagation() }}
           aria-label="Unlink client"
-          style={{ width: 18, height: 18, padding: 0, borderRadius: 5, background: 'transparent', border: 'none', color: 'var(--field-gold-bright)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+          style={{ width: 28, height: 28, padding: 0, borderRadius: 8, background: 'transparent', border: 'none', color: 'var(--field-gold-bright)', cursor: 'pointer', display: 'grid', placeItems: 'center', touchAction: 'manipulation', flexShrink: 0 }}
         >
-          <X size={12} />
+          <X size={14} />
         </button>
       </div>
     )
@@ -133,8 +136,21 @@ export default function ClientPicker({ userId, value, onChange }) {
             <button
               key={r.id}
               type="button"
-              onClick={() => { onChange?.({ id: r.id, name: r.name }); setOpen(false); setQ('') }}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', background: 'transparent', border: 'none', borderRadius: 8, color: 'var(--ink-strong)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)' }}
+              role="option"
+              aria-selected={value?.id === r.id}
+              // pointerdown fires before the document outside-click handler
+              // re-evaluates and before a wrapping label can hijack the tap
+              // on iOS Safari. preventDefault stops the synthesized click
+              // that would re-focus the search input.
+              onPointerDown={(ev) => {
+                ev.preventDefault()
+                ev.stopPropagation()
+                onChange?.({ id: r.id, name: r.name })
+                setOpen(false)
+                setQ('')
+              }}
+              onClick={(ev) => { ev.preventDefault(); ev.stopPropagation() }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 10px', background: 'transparent', border: 'none', borderRadius: 8, color: 'var(--ink-strong)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)', touchAction: 'manipulation' }}
               onMouseEnter={(ev) => { ev.currentTarget.style.background = 'rgba(201,150,58,0.1)' }}
               onMouseLeave={(ev) => { ev.currentTarget.style.background = 'transparent' }}
             >
@@ -154,9 +170,10 @@ export default function ClientPicker({ userId, value, onChange }) {
           {!loading && trimmed && !exactMatch && (
             <button
               type="button"
-              onClick={createInline}
+              onPointerDown={(ev) => { ev.preventDefault(); ev.stopPropagation(); createInline() }}
+              onClick={(ev) => { ev.preventDefault(); ev.stopPropagation() }}
               disabled={creating}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px', marginTop: filtered.length ? 4 : 0, background: 'linear-gradient(135deg, rgba(201,150,58,0.18), rgba(140,111,48,0.12))', border: '1px solid rgba(201,150,58,0.4)', borderRadius: 8, color: 'var(--field-gold-bright)', cursor: creating ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700 }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 10px', marginTop: filtered.length ? 4 : 0, background: 'linear-gradient(135deg, rgba(201,150,58,0.18), rgba(140,111,48,0.12))', border: '1px solid rgba(201,150,58,0.4)', borderRadius: 8, color: 'var(--field-gold-bright)', cursor: creating ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, touchAction: 'manipulation' }}
             >
               <UserPlus size={14} />
               {creating ? 'Creating…' : <>Create "<span style={{ color: 'var(--ink-strong)' }}>{trimmed}</span>"</>}

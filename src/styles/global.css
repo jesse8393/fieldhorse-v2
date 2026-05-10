@@ -7992,9 +7992,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-asheet__scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  /* Solid scrim, no backdrop blur. The previous blur(2px) combined with
+     iOS keyboard inflate produced the "fog" effect reported in mobile QA. */
+  background: rgba(0, 0, 0, 0.62);
 }
 [data-theme='light'] .fh-asheet__scrim,
 :root:not([data-theme='dark']) .fh-asheet__scrim {
@@ -8006,25 +8006,26 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   bottom: 0;
   left: 0;
   right: 0;
-  /* Fits inside visual viewport, leaves 40px below the notch, and shrinks by keyboard height.
-     Uses dvh (dynamic viewport height) so the sheet collapses with the iOS URL bar — fixes
-     P1 where the commit footer rendered below the visible area on 812px phone heights. */
-  height: min(
-    92dvh,
-    calc(var(--fh-vvh, 100dvh) - env(safe-area-inset-top) - 40px - var(--fh-kbd, 0px))
+  /* Adaptive height: prefer fitting content, but cap to visual viewport
+     minus keyboard. The cap is what keeps the commit footer visible when
+     the iOS keyboard is open. min-height stops the sheet from collapsing
+     too small when fields are few. */
+  height: auto;
+  min-height: 56vh;
+  max-height: calc(
+    var(--fh-vvh, 100dvh) - env(safe-area-inset-top) - 24px - var(--fh-kbd, 0px)
   );
-  max-height: calc(100dvh - env(safe-area-inset-top) - 40px);
   background: var(--surface-1);
   border-top: 1px solid var(--rule-bold);
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
   box-shadow: 0 -20px 60px -12px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   overscroll-behavior: contain;
   will-change: transform;
-  transition: height 220ms var(--ease);
+  transition: max-height 220ms var(--ease);
 }
 [data-theme='dark'] .fh-asheet {
   background: var(--onyx-2);
@@ -8324,6 +8325,101 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 .fh-asheet-money__input::-webkit-outer-spin-button,
 .fh-asheet-money__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ================================================================
+   ActionSheet v2 scope — opt-in via variantClass="fh-asheet--v2".
+   Aligns NewLeadSheet's input rhythm to NewClientSheet (Vaul) without
+   touching other ActionSheet consumers (ApproveQuote, Subs, Expenses,
+   AddEvent). Pill inputs replace the underlined "spec sheet" look;
+   field-key labels switch to readable sentence case; step dots fade.
+   ================================================================ */
+.fh-asheet--v2 .fh-asheet-field {
+  gap: 6px;
+}
+.fh-asheet--v2 .fh-asheet-field__k {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+/* Hide the legacy "01·NAME" code chip in v2 — kept in markup so we can
+   bring it back without a full pass, but visually quiet. */
+.fh-asheet--v2 .fh-asheet-field__code { display: none; }
+
+.fh-asheet--v2 .fh-asheet-field input:not([type='checkbox']):not([type='radio']),
+.fh-asheet--v2 .fh-asheet-field textarea,
+.fh-asheet--v2 .fh-asheet-field select {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--ink-strong);
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.fh-asheet--v2 .fh-asheet-field textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+.fh-asheet--v2 .fh-asheet-field input:focus,
+.fh-asheet--v2 .fh-asheet-field textarea:focus,
+.fh-asheet--v2 .fh-asheet-field select:focus {
+  border-color: var(--field-gold);
+  background: var(--surface-1);
+}
+
+/* Money field stays high-contrast but loses the underline for parity. */
+.fh-asheet--v2 .fh-asheet-money {
+  border-bottom: none;
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 6px 14px;
+  align-items: center;
+}
+.fh-asheet--v2 .fh-asheet-money:focus-within {
+  border-color: var(--field-gold);
+  background: var(--surface-1);
+}
+.fh-asheet--v2 .fh-asheet-money__prefix { font-size: 1.5rem; }
+.fh-asheet--v2 .fh-asheet-money__input { font-size: 1.25rem; }
+
+/* Step dots become a quiet progress hint, not a hero element. */
+.fh-asheet--v2 .fh-asheet__progress { gap: 4px; padding-bottom: 4px; opacity: 0.6; }
+.fh-asheet--v2 .fh-asheet__dot { width: 18px; height: 2px; }
+
+/* Title — drop the display caps face down to match NewClient's serif heading scale. */
+.fh-asheet--v2 .fh-asheet__title {
+  font-family: var(--font-serif, var(--font-display));
+  font-size: clamp(1.6rem, 5.2vw, 2rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-weight: 400;
+  text-transform: none;
+}
+
+/* Disabled commit — clearer "not ready" state. */
+.fh-asheet--v2 .fh-asheet__commit:disabled,
+.fh-asheet__commit:disabled {
+  background: var(--surface-2);
+  color: var(--ink-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+.fh-asheet--v2 .fh-asheet__commit:disabled::before,
+.fh-asheet__commit:disabled::before { content: none; }
+
+/* Body padding — keep the bottom clearance with safe-area for notched phones. */
+.fh-asheet__body {
+  padding-bottom: max(var(--space-6), calc(var(--space-4) + env(safe-area-inset-bottom)));
+}
 
 /* ---- Voice hero for NewLeadSheet: card layout, mic + label side-by-side ---- */
 .fh-voice-hero {

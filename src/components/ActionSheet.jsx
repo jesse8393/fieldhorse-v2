@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useDragControls } from 'framer-motion'
 
 const EASE = [0.16, 1, 0.3, 1]
 const DUR = 0.5
@@ -37,12 +37,16 @@ export default function ActionSheet({
   commitBusyLabel = 'Saving…',
   commitDisabled = false,
   destructive = false,
+  // Optional class hook so individual sheets (NewLead) can opt in to
+  // a v2 visual scope without affecting other ActionSheet consumers.
+  variantClass = '',
   onClose,
   onCommit,
   children
 }) {
   const sheetRef = useRef(null)
   const bodyRef = useRef(null)
+  const dragControls = useDragControls()
 
   useEffect(() => {
     if (!open) return
@@ -84,17 +88,27 @@ export default function ActionSheet({
     }
   }, [open])
 
-  // Scroll the focused field into view inside the sheet body when keyboard opens.
+  // Focus scroll INSIDE the body scroll container. iOS native auto-
+  // scroll-into-view only works on the window scroll, but the body has
+  // its own overflow:auto and the document scroll is locked above. The
+  // 280ms delay covers the iOS keyboard slide-up so we scroll AFTER the
+  // visualViewport resize lands — otherwise the scroll target moves out
+  // from under the animation. Pairs with scroll-margin on inputs (CSS)
+  // so 'nearest' clears the footer + a comfortable gap.
   useEffect(() => {
     if (!open) return
     const body = bodyRef.current
     if (!body) return
     function onFocusIn(e) {
       const t = e.target
-      if (!t || !(t.matches?.('input, textarea, select'))) return
+      if (!t || !t.matches?.('input, textarea, select')) return
+      // Skip non-text inputs (chips, radio buttons) — they're already
+      // in view and don't summon the keyboard.
+      const inputType = (t.getAttribute?.('type') || '').toLowerCase()
+      if (inputType === 'checkbox' || inputType === 'radio' || inputType === 'button' || inputType === 'submit') return
       setTimeout(() => {
-        try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
-      }, 260)
+        try { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } catch {}
+      }, 280)
     }
     body.addEventListener('focusin', onFocusIn)
     return () => body.removeEventListener('focusin', onFocusIn)
@@ -116,7 +130,7 @@ export default function ActionSheet({
     // "DELETE THIS JOB? text fragment remained at bottom" leak.
     <AnimatePresence mode="wait">
       {open && (
-        <div className="fh-asheet-root" key="action-sheet">
+        <div className={`fh-asheet-root${variantClass ? ` ${variantClass}` : ''}`} key="action-sheet">
           <motion.div
             className="fh-asheet__scrim"
             initial={{ opacity: 0 }}
@@ -136,6 +150,8 @@ export default function ActionSheet({
             exit={{ y: '100%' }}
             transition={{ duration: DUR, ease: EASE }}
             drag="y"
+            dragListener={false}
+            dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.4 }}
             dragMomentum={false}
@@ -143,7 +159,12 @@ export default function ActionSheet({
               if (info.offset.y > 140 || info.velocity.y > 500) onClose?.()
             }}
           >
-            <div className="fh-asheet__handle" aria-hidden="true" />
+            <div
+              className="fh-asheet__handle"
+              aria-hidden="true"
+              onPointerDown={(e) => dragControls.start(e)}
+              style={{ touchAction: 'none' }}
+            />
             <header className="fh-asheet__head">
               <div className="fh-asheet__headMeta">
                 <h2 className="fh-asheet__title">
@@ -206,13 +227,16 @@ export default function ActionSheet({
 }
 
 export function SheetField({ label, code, children }) {
+  // Wrapper is a <div>, not a <label>. iOS Safari redirects taps inside a
+  // <label> to the first form control, which silently swallows clicks on
+  // nested buttons (e.g. ClientPicker rows in NewLeadSheet).
   return (
-    <label className="fh-asheet-field">
+    <div className="fh-asheet-field">
       <span className="fh-asheet-field__k">
         {label}
       </span>
       {children}
-    </label>
+    </div>
   )
 }
 
