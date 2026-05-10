@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Briefcase, Phone, Mail, MessageSquare, Map } from 'lucide-react'
+import { Plus, Search, Briefcase, ChevronRight } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -277,26 +277,21 @@ export default function Clients() {
       {/* GRID LAYOUT — 1/2/3 col responsive (320px min). Each client is a
           tall vertical tile, not a wide row. */}
       <motion.div
-        className="fh-clients__grid"
+        className="fh-clients__list"
         variants={item}
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: 14,
-          padding: '0 var(--v3-gutter) 24px',
-          alignItems: 'stretch'
+          padding: '0 var(--v3-gutter) 24px'
         }}
       >
         {loading && (
-          <>
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="v3-skeleton" style={{ height: 220, borderRadius: 18 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="v3-skeleton" style={{ height: 64, borderRadius: 12 }} />
             ))}
-          </>
+          </div>
         )}
         {!loading && rows.length === 0 && (
           <div style={{
-            gridColumn: '1 / -1',
             padding: '32px 24px', borderRadius: 16,
             background: 'var(--v3-surface)',
             border: '1px dashed var(--v3-border-strong)',
@@ -335,28 +330,46 @@ export default function Clients() {
           </div>
         )}
         {!loading && rows.length > 0 && filtered.length === 0 && (
-          <div className="v3-empty" style={{ gridColumn: '1 / -1' }}>
+          <div className="v3-empty">
             No clients match that search.
           </div>
         )}
-        <AnimatePresence>
-          {filtered.map((c, i) => {
-            const r = rollupFor(c.id)
-            const lastActivity = c.last_activity_at ? new Date(c.last_activity_at) : null
-            const lastActivityRel = lastActivity ? formatRelative(lastActivity) : null
-            return (
-              <ClientTile
-                key={c.id}
-                client={c}
-                rollup={r}
-                lastActivityRel={lastActivityRel}
-                index={i}
-                isTop={c.id === topClientId}
-                onOpen={() => navigate(`/clients/${c.id}`)}
-              />
-            )
-          })}
-        </AnimatePresence>
+        {/* Single black-glass list container with hairline dividers — premium
+            iOS list pattern. Each row is a tap target into /clients/:id;
+            the heavier per-card chrome (lifetime stamp, contact row,
+            stat chips) lives on the detail screen now. */}
+        {!loading && filtered.length > 0 && (
+          <div
+            role="list"
+            style={{
+              borderRadius: 16,
+              background: 'var(--v3-surface-glass)',
+              backdropFilter: 'blur(14px) saturate(1.1)',
+              WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+              border: '1px solid var(--v3-border)',
+              boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+              overflow: 'hidden'
+            }}
+          >
+            {filtered.map((c, i) => {
+              const r = rollupFor(c.id)
+              const lastActivity = c.last_activity_at ? new Date(c.last_activity_at) : null
+              const lastActivityRel = lastActivity ? formatRelative(lastActivity) : null
+              return (
+                <ClientRow
+                  key={c.id}
+                  client={c}
+                  rollup={r}
+                  lastActivityRel={lastActivityRel}
+                  index={i}
+                  isTop={c.id === topClientId}
+                  isLast={i === filtered.length - 1}
+                  onOpen={() => navigate(`/clients/${c.id}`)}
+                />
+              )
+            })}
+          </div>
+        )}
       </motion.div>
 
       {/* end of grid */}
@@ -382,27 +395,26 @@ export default function Clients() {
 }
 
 /* ============================================================
-   ClientTile — premium account tile (vertical card layout).
+   ClientRow — compact list row inside the rounded black-glass
+   container. ~64px tall. Premium iOS list pattern.
 
-   Replaces the old full-width row stack with a tall card built for grid
-   layout (1/2/3 col responsive). Reads as a "valuable account" the
-   operator can scan, not a database row.
+     ┌────────────────────────────────────────────────────┐
+     │ (40 av) Client Name              $LIFETIME       › │
+     │         status subline           N active           │
+     ├────────────────────────────────────────────────────┤  ← hairline
+     │ ...next row...                                        │
+     └─────────────────────────────────────────────────────┘
 
-     ┌─────────────────────────────────────┐  ← gold spine on left
-     │ [AV 56]                $LIFETIME    │
-     │                          LIFETIME   │
-     │                                     │
-     │ Client Name (16/700)                │
-     │ Company (12/muted)                  │
-     │                                     │
-     │ ─────── divider ─────────────────── │
-     │                                     │
-     │ ●3 ACTIVE   ●$12K OUTSTANDING       │
-     │                                     │
-     │ ─────── divider ─────────────────── │
-     │                                     │
-     │ [📞] [💬] [✉] [🗺]   Last: 2d ago  │
-     └─────────────────────────────────────┘
+   Subline is a single synthesized status string — order of preference:
+     1. "Owes $X · N+ days"            (overdue, danger tone)
+     2. "N active jobs · $X outstanding" (active money in motion, gold)
+     3. "N active jobs"                  (work in flight, neutral)
+     4. company_name                     (relationship-only fallback)
+     5. "—"                              (truly empty record)
+
+   Contact actions (call / text / email / map) live on the client
+   detail screen; surfacing them on every list row was clutter the
+   user wouldn't read before tapping anyway.
    ============================================================ */
 
 function formatRelative(date) {
@@ -416,246 +428,147 @@ function formatRelative(date) {
   return `${Math.floor(days / 365)}y ago`
 }
 
-function ClientTile({ client: c, rollup: r, lastActivityRel, index, isTop, onOpen }) {
+function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast, onOpen }) {
+  const subline = useMemo(() => {
+    if (r.outstanding > 0) {
+      return { text: `Owes ${money(r.outstanding)}`, tone: 'danger' }
+    }
+    if (r.activeCount > 0 && r.outstanding > 0) {
+      return { text: `${r.activeCount} active · ${money(r.outstanding)} outstanding`, tone: 'gold' }
+    }
+    if (r.activeCount > 0) {
+      return { text: `${r.activeCount} active ${r.activeCount === 1 ? 'job' : 'jobs'}`, tone: 'muted' }
+    }
+    if (c.company_name) return { text: c.company_name, tone: 'muted' }
+    return { text: '—', tone: 'muted' }
+  }, [c.company_name, r.activeCount, r.outstanding])
+
+  const sublineColor =
+    subline.tone === 'danger' ? 'var(--v3-danger-bright)' :
+    subline.tone === 'gold'   ? 'var(--v3-primary)' :
+                                'var(--v3-text-muted)'
+
+  // Performance: drop per-row entrance animations and whileHover. The
+  // staggered entrance compounds across N rows, the hover doesn't fire
+  // on touch, and AnimatePresence layout cost was a measurable hit on
+  // mid-range iPhones. Plain button + cheap whileTap is enough.
   return (
-    <motion.button
+    <button
       type="button"
-      layout
-      className={`fh-client-tile${isTop ? ' fh-client-tile--top' : ''}`}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.2), ease: [0.2, 0.8, 0.2, 1] }}
-      whileHover={{
-        y: -3,
-        boxShadow: '0 16px 40px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35)'
-      }}
-      whileTap={{ scale: 0.985 }}
+      role="listitem"
       onClick={() => { hapticTap(); onOpen() }}
       style={{
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        padding: '18px 18px 14px 22px',
-        borderRadius: 16,
-        background: 'var(--v3-surface)',
-        border: isTop
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)'
-          : '1px solid var(--v3-border)',
-        boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.32)',
-        textAlign: 'left',
-        color: 'var(--v3-text)',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        minHeight: 210,
-        width: '100%',
-        boxSizing: 'border-box'
-      }}
-    >
-      {/* Gold spine — relationship value cue. Halo dropped (was a gold
-          wash); gradient spine kept as a quieter brand cue. */}
-      <span aria-hidden="true" style={{
-        position: 'absolute',
-        left: 0, top: 16, bottom: 14,
-        width: 3,
-        borderRadius: '0 3px 3px 0',
-        background: 'linear-gradient(180deg, var(--v3-primary), color-mix(in srgb, var(--v3-primary) 40%, transparent))'
-      }} />
-
-      {/* Optional TOP rib — appears only on the highest-lifetime tile in
-          the filtered set (real derived value, threshold-gated). */}
-      {isTop && (
-        <span aria-hidden="true" style={{
-          position: 'absolute',
-          top: 12, right: 12,
-          padding: '2px 8px',
-          borderRadius: 999,
-          background: 'var(--v3-primary-soft)',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)',
-          color: 'var(--v3-primary)',
-          fontFamily: 'var(--font-body)',
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          lineHeight: 1
-        }}>
-          Top
-        </span>
-      )}
-
-      {/* Top section: Avatar (left) + Lifetime $ (right) */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, paddingRight: isTop ? 40 : 0 }}>
-        {/* 56x56 restrained avatar — surface-2 + subtle gold border + gold initial.
-            Gold gradient/halo dropped per the no-gold-wash direction. */}
-        <div aria-hidden="true" style={{
-          flexShrink: 0,
-          width: 56, height: 56,
-          borderRadius: 16,
-          background: 'var(--v3-surface-2)',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
-          display: 'grid', placeItems: 'center',
-          fontFamily: 'var(--font-display)',
-          fontSize: 22,
-          letterSpacing: '0.04em',
-          color: 'var(--v3-primary)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 240, 210, 0.05)'
-        }}>
-          {(c.name || '·').trim().charAt(0).toUpperCase()}
-        </div>
-
-        <div style={{ flexShrink: 0, textAlign: 'right', opacity: r.lifetime > 0 ? 1 : 0.4 }}>
-          <div style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 28, lineHeight: 1,
-            letterSpacing: '0.01em',
-            color: 'var(--v3-primary)',
-            fontVariantNumeric: 'tabular-nums'
-          }}>
-            {money(r.lifetime)}
-          </div>
-          <div style={{
-            marginTop: 5,
-            fontFamily: 'var(--font-body)',
-            fontSize: 9,
-            fontWeight: 700,
-            color: 'var(--v3-text-muted)',
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase'
-          }}>
-            Lifetime
-          </div>
-        </div>
-      </div>
-
-      {/* Name + Company */}
-      <div style={{ minWidth: 0 }}>
-        <h3 style={{
-          margin: 0,
-          fontFamily: 'var(--font-body)',
-          fontSize: 17, fontWeight: 700,
-          letterSpacing: '-0.01em',
-          color: 'var(--v3-text)',
-          lineHeight: 1.25,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-        }}>
-          {c.name || 'Unnamed client'}
-        </h3>
-        {c.company_name && (
-          <div style={{
-            marginTop: 4,
-            fontFamily: 'var(--font-body)',
-            fontSize: 12,
-            color: 'var(--v3-text-muted)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-          }}>
-            {c.company_name}
-          </div>
-        )}
-      </div>
-
-      {/* Stat strip — colored chips with leading dot */}
-      <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
-        flexWrap: 'wrap',
-        fontSize: 11,
-        fontFamily: 'var(--font-body)',
-        fontWeight: 700
+        gap: 12,
+        width: '100%',
+        padding: '12px 14px',
+        background: isTop
+          ? 'color-mix(in srgb, var(--v3-primary) 6%, transparent)'
+          : 'transparent',
+        border: 'none',
+        borderBottom: isLast ? 'none' : '1px solid var(--v3-border)',
+        color: 'var(--v3-text)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        minHeight: 64,
+        boxSizing: 'border-box',
+        transition: 'background 160ms ease'
+      }}
+    >
+      {/* Avatar — 40px tile. Highlight tile when client is the top
+          earner so the visual hierarchy reads at a glance. */}
+      <div aria-hidden="true" style={{
+        flexShrink: 0,
+        width: 40, height: 40,
+        borderRadius: 10,
+        background: isTop
+          ? 'linear-gradient(135deg, color-mix(in srgb, var(--v3-primary) 18%, var(--v3-surface-2)), var(--v3-surface-2))'
+          : 'var(--v3-surface-2)',
+        border: isTop
+          ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
+          : '1px solid var(--v3-border)',
+        display: 'grid', placeItems: 'center',
+        fontFamily: 'var(--font-display)',
+        fontSize: 14,
+        letterSpacing: '0.04em',
+        color: isTop ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
       }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '4px 10px',
-          borderRadius: 999,
-          background: r.activeCount > 0 ? 'var(--v3-primary-soft)' : 'rgba(255, 255, 255, 0.03)',
-          border: r.activeCount > 0
-            ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
-            : '1px solid var(--v3-border)',
-          color: r.activeCount > 0 ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
-          fontVariantNumeric: 'tabular-nums',
-          letterSpacing: '0.04em'
-        }}>
-          <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: r.activeCount > 0 ? 'var(--v3-primary)' : 'var(--v3-text-muted)' }} />
-          {r.activeCount} active {r.activeCount === 1 ? 'job' : 'jobs'}
-        </span>
-        {r.outstanding > 0 && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '4px 10px',
-            borderRadius: 999,
-            background: 'rgba(192, 57, 43, 0.10)',
-            border: '1px solid color-mix(in srgb, var(--v3-danger) 35%, transparent)',
-            color: 'var(--v3-danger-bright)',
-            fontVariantNumeric: 'tabular-nums',
-            letterSpacing: '0.04em'
-          }}>
-            <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-danger-bright)' }} />
-            {money(r.outstanding)} outstanding
-          </span>
-        )}
+        {(c.name || '·').trim().charAt(0).toUpperCase()}
       </div>
 
-      {/* Push footer to bottom of card so all tiles match height */}
-      <div style={{ flex: 1 }} />
-
-      {/* Footer: contact actions + last-activity caption */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          gap: 10, paddingTop: 12, borderTop: '1px solid var(--v3-border)',
-          marginTop: 'auto'
-        }}
-      >
-        <div style={{ display: 'flex', gap: 6 }}>
-          {c.phone && (
-            <>
-              <a href={`tel:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Call ${c.name}`} style={contactBtnStyle}>
-                <Phone size={14} />
-              </a>
-              <a href={`sms:${c.phone}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Text ${c.name}`} style={contactBtnStyle}>
-                <MessageSquare size={14} />
-              </a>
-            </>
-          )}
-          {c.email && (
-            <a href={`mailto:${c.email}`} onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Email ${c.name}`} style={contactBtnStyle}>
-              <Mail size={14} />
-            </a>
-          )}
-          {c.address && (
-            <a href={`https://maps.apple.com/?address=${encodeURIComponent(c.address)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); hapticTap() }} aria-label={`Map to ${c.name}`} style={contactBtnStyle}>
-              <Map size={14} />
-            </a>
-          )}
-        </div>
-        {lastActivityRel && (
+      {/* Name + synthesized subline */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span style={{
             fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--v3-text-muted)',
-            fontVariantNumeric: 'tabular-nums'
+            fontSize: 14, fontWeight: 600,
+            color: 'var(--v3-text)',
+            letterSpacing: '-0.005em',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            minWidth: 0
           }}>
-            Last · {lastActivityRel}
+            {c.name || 'Unnamed client'}
           </span>
-        )}
+          {isTop && (
+            <span style={{
+              flexShrink: 0,
+              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
+              letterSpacing: '0.16em', textTransform: 'uppercase',
+              color: 'var(--v3-primary)'
+            }}>
+              · TOP
+            </span>
+          )}
+        </div>
+        <span style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: subline.tone === 'muted' ? 500 : 700,
+          color: sublineColor,
+          fontVariantNumeric: 'tabular-nums',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+        }}>
+          {subline.text}
+        </span>
       </div>
-    </motion.button>
-  )
-}
 
-const contactBtnStyle = {
-  display: 'grid', placeItems: 'center',
-  width: 42, height: 42, borderRadius: 11,
-  background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
-  color: 'var(--v3-text)', textDecoration: 'none',
-  WebkitTapHighlightColor: 'transparent'
+      {/* Right column: lifetime $ + small "N active" or last-activity
+          caption (whichever is more useful). Lifetime stays the
+          primary number; the second line falls back through:
+            1. "N active" if there are active jobs
+            2. last-activity relative time if known (recently-added
+               value from migration 007's last_activity_at column)
+            3. "lifetime" as a quiet label */}
+      <div style={{ flexShrink: 0, textAlign: 'right', opacity: r.lifetime > 0 ? 1 : 0.45 }}>
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 16, lineHeight: 1,
+          color: 'var(--v3-text)',
+          fontVariantNumeric: 'tabular-nums',
+          letterSpacing: '0.01em'
+        }}>
+          {money(r.lifetime)}
+        </div>
+        <div style={{
+          marginTop: 4,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10,
+          color: 'var(--v3-text-muted)',
+          fontVariantNumeric: 'tabular-nums'
+        }}>
+          {r.activeCount > 0
+            ? `${r.activeCount} active`
+            : lastActivityRel
+              ? `Last · ${lastActivityRel}`
+              : 'lifetime'}
+        </div>
+      </div>
+
+      <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
+    </button>
+  )
 }
 
 /* ============================================================

@@ -863,14 +863,60 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
             flexShrink: 0,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
-            fontFamily: 'var(--font-body)',
-            fontSize: 11,
-            color: 'var(--v3-text-muted)',
+            gap: 8,
             whiteSpace: 'nowrap'
           }}>
-            <Clock size={11} />
-            {when}
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              color: 'var(--v3-text-muted)'
+            }}>
+              <Clock size={11} />
+              {when}
+            </span>
+            {/* Visible delete affordance — the SwipeableRow swipe-left
+                gesture is preserved as the iOS-native power-user path,
+                but a tappable trash icon makes deletion discoverable
+                for users who don't think to swipe. Stops propagation so
+                the row's onTap doesn't fire underneath. */}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={(ev) => {
+                  ev.stopPropagation()
+                  if (!window.confirm('Delete this note? This cannot be undone.')) return
+                  onDelete()
+                }}
+                aria-label="Delete note"
+                style={{
+                  width: 32, height: 32,
+                  display: 'grid', placeItems: 'center',
+                  borderRadius: 8,
+                  background: 'transparent',
+                  border: '1px solid transparent',
+                  color: 'var(--v3-text-muted)',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation',
+                  transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
+                }}
+                onMouseEnter={(ev) => {
+                  ev.currentTarget.style.color = 'var(--v3-danger-bright)'
+                  ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
+                  ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'
+                }}
+                onMouseLeave={(ev) => {
+                  ev.currentTarget.style.color = 'var(--v3-text-muted)'
+                  ev.currentTarget.style.background = 'transparent'
+                  ev.currentTarget.style.borderColor = 'transparent'
+                }}
+              >
+                <Trash2 size={13} aria-hidden="true" />
+              </button>
+            )}
           </span>
         </div>
 
