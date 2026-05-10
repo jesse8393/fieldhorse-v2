@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import AppErrorBoundary from './components/AppErrorBoundary.jsx'
+import { ConfirmProvider } from './components/ConfirmSheet.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { ProfileProvider } from './contexts/ProfileContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
@@ -26,7 +27,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <ThemeProvider>
           <AuthProvider>
             <ProfileProvider>
-              <App />
+              <ConfirmProvider>
+                <App />
+              </ConfirmProvider>
             </ProfileProvider>
           </AuthProvider>
         </ThemeProvider>

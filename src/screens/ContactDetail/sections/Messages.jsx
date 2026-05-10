@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase.js'
 import { toastError, toastUndo } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
 import { PostedByChip } from '../../../components/v3'
+import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 
 /**
  * Messages section — communication log (fh_notes) tied to this job.
@@ -17,6 +18,7 @@ import { PostedByChip } from '../../../components/v3'
 export default function MessagesSection({ contactId, userId, notes = [], fetchAll }) {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const confirm = useConfirm()
 
   async function add() {
     const txt = draft.trim()
@@ -44,7 +46,13 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
   // posts via fh_notes_partner policy.
   async function remove(note) {
     if (!note?.id) return
-    if (!window.confirm('Delete this note? This cannot be undone.')) return
+    const ok = await confirm({
+      title: 'Delete this note?',
+      body: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true
+    })
+    if (!ok) return
     hapticTap()
     const snapshot = { ...note }
     const { error } = await supabase.from('fh_notes').delete().eq('id', note.id)

@@ -181,7 +181,15 @@ export default function CommandPalette() {
   }
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      // Custom class is the source of truth for positioning — see
+      // mobile-keyboard-fix.css. Tailwind utility overrides (top-[10vh]
+      // etc.) don't reliably dedupe with the ui: prefix, so we go
+      // straight to a stable class with !important rules.
+      className="fh-command-dialog"
+    >
       <CommandInput
         placeholder="Search jobs, clients, notes, events, files…"
         value={query}
