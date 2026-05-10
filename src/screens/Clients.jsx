@@ -351,25 +351,23 @@ export default function Clients() {
               overflow: 'hidden'
             }}
           >
-            <AnimatePresence>
-              {filtered.map((c, i) => {
-                const r = rollupFor(c.id)
-                const lastActivity = c.last_activity_at ? new Date(c.last_activity_at) : null
-                const lastActivityRel = lastActivity ? formatRelative(lastActivity) : null
-                return (
-                  <ClientRow
-                    key={c.id}
-                    client={c}
-                    rollup={r}
-                    lastActivityRel={lastActivityRel}
-                    index={i}
-                    isTop={c.id === topClientId}
-                    isLast={i === filtered.length - 1}
-                    onOpen={() => navigate(`/clients/${c.id}`)}
-                  />
-                )
-              })}
-            </AnimatePresence>
+            {filtered.map((c, i) => {
+              const r = rollupFor(c.id)
+              const lastActivity = c.last_activity_at ? new Date(c.last_activity_at) : null
+              const lastActivityRel = lastActivity ? formatRelative(lastActivity) : null
+              return (
+                <ClientRow
+                  key={c.id}
+                  client={c}
+                  rollup={r}
+                  lastActivityRel={lastActivityRel}
+                  index={i}
+                  isTop={c.id === topClientId}
+                  isLast={i === filtered.length - 1}
+                  onOpen={() => navigate(`/clients/${c.id}`)}
+                />
+              )
+            })}
           </div>
         )}
       </motion.div>
@@ -400,12 +398,12 @@ export default function Clients() {
    ClientRow — compact list row inside the rounded black-glass
    container. ~64px tall. Premium iOS list pattern.
 
-     ┌──────────────────────────────────────────────────────┐
+     ┌────────────────────────────────────────────────────┐
      │ (40 av) Client Name              $LIFETIME       › │
      │         status subline           N active           │
-     ├──────────────────────────────────────────────────────┤  ← hairline
+     ├────────────────────────────────────────────────────┤  ← hairline
      │ ...next row...                                        │
-     └──────────────────────────────────────────────────────┘
+     └─────────────────────────────────────────────────────┘
 
    Subline is a single synthesized status string — order of preference:
      1. "Owes $X · N+ days"            (overdue, danger tone)
@@ -450,17 +448,14 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
     subline.tone === 'gold'   ? 'var(--v3-primary)' :
                                 'var(--v3-text-muted)'
 
+  // Performance: drop per-row entrance animations and whileHover. The
+  // staggered entrance compounds across N rows, the hover doesn't fire
+  // on touch, and AnimatePresence layout cost was a measurable hit on
+  // mid-range iPhones. Plain button + cheap whileTap is enough.
   return (
-    <motion.button
+    <button
       type="button"
       role="listitem"
-      layout
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -2 }}
-      transition={{ duration: 0.18, delay: Math.min(index * 0.02, 0.16), ease: [0.2, 0.8, 0.2, 1] }}
-      whileHover={{ backgroundColor: 'var(--v3-surface)' }}
-      whileTap={{ scale: 0.995 }}
       onClick={() => { hapticTap(); onOpen() }}
       style={{
         display: 'flex',
@@ -572,7 +567,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
       </div>
 
       <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
-    </motion.button>
+    </button>
   )
 }
 
