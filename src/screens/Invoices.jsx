@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Receipt, FileDown, DollarSign, ExternalLink, Check } from 'lucide-react'
+import { Receipt, FileDown, DollarSign, ChevronRight, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -487,7 +487,7 @@ function PaymentCard({ row, onPDF, onPaid }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <Link
-              to={`/jobs/${job.id}`}
+              to={`/invoices/${job.id}`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -504,7 +504,7 @@ function PaymentCard({ row, onPDF, onPaid }) {
               }}>
                 {job.name || 'Unnamed job'}
               </span>
-              <ExternalLink size={11} color="var(--v3-text-muted)" />
+              <ChevronRight size={12} color="var(--v3-text-muted)" />
             </Link>
             {job.job_title && (
               <div style={{
