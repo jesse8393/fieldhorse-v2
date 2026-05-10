@@ -31,6 +31,7 @@ const Settings       = lazy(() => import('./screens/Settings.jsx'))
 const PourWindow     = lazy(() => import('./screens/PourWindow.jsx'))
 const Subs           = lazy(() => import('./screens/Subs.jsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.jsx'))
+const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.jsx'))
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth()
@@ -94,6 +95,7 @@ export default function App() {
           <Route path="/pour-window" element={<PourWindow />} />
           <Route path="/subs" element={<Subs />} />
           <Route path="/invoices" element={<Invoices />} />
+          <Route path="/invoices/:id" element={<InvoiceDetail />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
