@@ -584,6 +584,18 @@ export default function Home() {
       <motion.div
         variants={item}
         className="v3-section"
+        role="button"
+        tabIndex={0}
+        aria-label="Open pipeline"
+        whileTap={{ scale: 0.995 }}
+        onClick={() => { hapticTap(); navigate('/jobs') }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            hapticTap()
+            navigate('/jobs')
+          }
+        }}
         style={{
           position: 'relative',
           overflow: 'hidden',
@@ -601,7 +613,9 @@ export default function Home() {
             'inset 0 -1px 0 rgba(0, 0, 0, 0.18)',
             '0 1px 2px rgba(0, 0, 0, 0.40)',
             '0 12px 28px rgba(0, 0, 0, 0.30)'
-          ].join(', ')
+          ].join(', '),
+          cursor: 'pointer',
+          WebkitTapHighlightColor: 'transparent'
         }}
       >
         {/* Eyebrow — muted ink, slightly looser tracking than the v3
@@ -700,9 +714,10 @@ export default function Home() {
           background: 'linear-gradient(90deg, color-mix(in srgb, var(--v3-primary) 35%, transparent), transparent)'
         }} />
 
-        {/* Stage caption — single muted text line. Numbers in ink-strong
-            so the digits register without per-stage tint. Renders an em
-            dash while data hydrates so the row never reads as "0/0/0". */}
+        {/* Stage caption — three inline tap chips that filter the Jobs
+            tab. stopPropagation so the outer card tap (→ /jobs) doesn't
+            fire alongside. Renders an em dash while data hydrates so the
+            row never reads as "0/0/0". */}
         <div style={{
           marginTop: 10,
           fontFamily: 'var(--font-body)',
@@ -710,22 +725,19 @@ export default function Home() {
           fontWeight: 500,
           color: 'var(--v3-text-muted)',
           fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1.3
+          lineHeight: 1.3,
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 6,
+          flexWrap: 'wrap'
         }}>
           {stageBreakdown == null ? '—' : (
             <>
-              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
-                {stageBreakdown.active}
-              </span>
-              {' active · '}
-              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
-                {stageBreakdown.won}
-              </span>
-              {' won · '}
-              <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>
-                {stageBreakdown.lead}
-              </span>
-              {' lead'}
+              <StageChip count={stageBreakdown.active} label="active" stage="active" navigate={navigate} />
+              <span aria-hidden="true">·</span>
+              <StageChip count={stageBreakdown.won} label="won" stage="won" navigate={navigate} />
+              <span aria-hidden="true">·</span>
+              <StageChip count={stageBreakdown.lead} label="lead" stage="lead" navigate={navigate} />
             </>
           )}
         </div>
@@ -855,7 +867,7 @@ export default function Home() {
             value={dealsAtRisk?.followUps}
             label="Follow-ups"
             subline={dealsAtRisk?.followUps > 0 ? 'Calls to leads' : null}
-            onTap={() => navigate('/jobs?filter=lead')}
+            onTap={() => navigate('/jobs?stage=lead')}
           />
           <CompactKpi
             tone="lead"
@@ -863,7 +875,7 @@ export default function Home() {
             value={dealsAtRisk?.quotesAttention}
             label="Quotes"
             subline={dealsAtRisk?.quotesAttention > 0 ? 'Need follow up' : null}
-            onTap={() => navigate('/jobs?filter=quote')}
+            onTap={() => navigate('/jobs?stage=quote')}
           />
           {/* V3-HOME-1D: tone changed warn(amber) → danger(red). Behind/
               overdue is a recovery state, not a gold opportunity state. */}
@@ -1557,4 +1569,36 @@ function nameInitials(name) {
   if (parts.length === 0) return '—'
   if (parts.length === 1) return parts[0][0].toUpperCase()
   return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+/* StageChip — inline "<count> <label>" tap target inside the pipeline
+   card breakdown. stopPropagation so the outer card tap (→ /jobs)
+   doesn't double-fire when one of the chips is pressed. */
+function StageChip({ count, label, stage, navigate }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        hapticTap()
+        navigate(`/jobs?stage=${stage}`)
+      }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'baseline',
+        gap: 4,
+        padding: '2px 4px',
+        margin: '-2px -4px',
+        background: 'transparent',
+        border: 'none',
+        color: 'inherit',
+        font: 'inherit',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent'
+      }}
+    >
+      <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>{count}</span>
+      <span>{label}</span>
+    </button>
+  )
 }

@@ -51,7 +51,7 @@ export default function ActionSheet({
   useEffect(() => {
     if (!open) return
     function handleKey(e) {
-      if (e.key === 'Escape') { e.preventDefault(); onClose?.() }
+      if (e.key === 'Escape') { e.preventDefault(); requestClose() }
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleCommit() }
     }
     window.addEventListener('keydown', handleKey)
@@ -63,6 +63,16 @@ export default function ActionSheet({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose])
+
+  // Blur whatever input is focused before unmounting the sheet. Without
+  // this, iOS Safari keeps the soft keyboard up after the sheet animates
+  // away because no element formally lost focus — the focused input is
+  // simply destroyed. Blurring first gives iOS the focusout event it
+  // needs to dismiss the keyboard cleanly.
+  function requestClose(e) {
+    try { document.activeElement?.blur?.() } catch {}
+    onClose?.(e)
+  }
 
   // visualViewport — track real viewport height and keyboard height.
   // Sets --fh-vvh + --fh-kbd CSS vars on the sheet element.
@@ -137,7 +147,7 @@ export default function ActionSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: DUR, ease: EASE }}
-            onClick={onClose}
+            onClick={requestClose}
           />
           <motion.div
             ref={sheetRef}
@@ -156,7 +166,7 @@ export default function ActionSheet({
             dragElastic={{ top: 0, bottom: 0.4 }}
             dragMomentum={false}
             onDragEnd={(_, info) => {
-              if (info.offset.y > 140 || info.velocity.y > 500) onClose?.()
+              if (info.offset.y > 140 || info.velocity.y > 500) requestClose()
             }}
           >
             <div
@@ -182,7 +192,7 @@ export default function ActionSheet({
                   // underneath (calendar cell, kanban card, etc.) right
                   // before the sheet unmounts.
                   e.stopPropagation()
-                  onClose?.(e)
+                  requestClose(e)
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Close"
