@@ -30,6 +30,7 @@ const Importer       = lazy(() => import('./screens/Importer.jsx'))
 const Settings       = lazy(() => import('./screens/Settings.jsx'))
 const PourWindow     = lazy(() => import('./screens/PourWindow.jsx'))
 const Subs           = lazy(() => import('./screens/Subs.jsx'))
+const SubDetail      = lazy(() => import('./screens/SubDetail.jsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.jsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.jsx'))
 
@@ -94,6 +95,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/pour-window" element={<PourWindow />} />
           <Route path="/subs" element={<Subs />} />
+          <Route path="/subs/:key" element={<SubDetail />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
         </Route>
