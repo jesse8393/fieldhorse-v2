@@ -29,7 +29,7 @@ function writeLastJobType(value) {
 
 function buildEmptyForm() {
   return {
-    name: '', phone: '', email: '', address: '',
+    name: '', phone: '', email: '', address: '', company: '',
     job_title: '', job_type: readLastJobType(), amount: '', notes: '', referred_by: '',
     stage: 'lead'
   }
@@ -322,14 +322,26 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
     // parsing state: no-op
   }
 
-  // When the user picks an existing client, mirror their name onto the
-  // lead form so what saves matches what the user picked. The picker
-  // remains the source of truth for client_id.
+  // When the user picks an existing client, hydrate every empty form
+  // field from the client's record so the lead matches the chosen
+  // identity. Fields the user has already typed are preserved (spec:
+  // "If the user edits a hydrated field, preserve the edited value
+  // for the new lead, but keep the existing client link"). Clearing
+  // the picker (next == null) leaves form values in place — the user
+  // can keep typing in manual mode without losing what they had.
+  // Defensive aliases (client_name, job_address) cover schemas that
+  // surface different column names downstream.
   function handleClientChange(next) {
     setClient(next)
-    if (next?.name) {
-      setForm((f) => ({ ...f, name: next.name }))
-    }
+    if (!next) return
+    setForm((prev) => ({
+      ...prev,
+      name:    prev.name?.trim()    ? prev.name    : next.name    || next.client_name || '',
+      phone:   prev.phone?.trim()   ? prev.phone   : next.phone   || '',
+      email:   prev.email?.trim()   ? prev.email   : next.email   || '',
+      address: prev.address?.trim() ? prev.address : next.address || next.job_address || '',
+      company: prev.company?.trim() ? prev.company : next.company || next.company_name || ''
+    }))
   }
 
   return (
@@ -478,6 +490,18 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
           value={form.address}
           onChange={(e) => set('address', e.target.value)}
           placeholder="1234 Main St · Murfreesboro, TN"
+        />
+      </SheetField>
+
+      {/* Company — hydrates from the linked client's company_name on
+          existing-client selection. The lead row itself doesn't store
+          company; the link to fh_clients carries it via client_id, so
+          this field is reassurance + edit-before-save only. */}
+      <SheetField label="Company" code="04B·CO">
+        <input
+          value={form.company}
+          onChange={(e) => set('company', e.target.value)}
+          placeholder="(optional) Acme Construction LLC"
         />
       </SheetField>
 
