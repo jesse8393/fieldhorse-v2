@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Phone, Plus, Search, Hammer, ChevronRight, MessageSquare } from 'lucide-react'
+import { Phone, Plus, Search, Hammer, ChevronRight, MessageSquare, IdCard } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { formatPhone } from '../lib/utils.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -570,6 +570,34 @@ function SubCard({ g, contacts, isTop }) {
             <ChevronRight size={16} />
           </span>
         </button>
+
+        {/* Profile entry — surfaces vendor profile (insurance, banking,
+            docs). Visible whenever expanded, regardless of job history,
+            so subs added from the Add-sub drawer with no jobs yet still
+            have a way in. */}
+        {expanded && (
+          <Link
+            to={`/subs/${encodeURIComponent(g.key)}`}
+            onClick={(e) => { e.stopPropagation(); hapticTap() }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '12px 18px',
+              borderTop: '1px solid var(--v3-border)',
+              color: 'var(--v3-primary)',
+              textDecoration: 'none',
+              fontFamily: 'var(--font-body)',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.06em'
+            }}
+          >
+            <IdCard size={14} aria-hidden="true" />
+            <span style={{ flex: 1 }}>View vendor profile</span>
+            <ChevronRight size={14} aria-hidden="true" />
+          </Link>
+        )}
 
         {/* Expanded job history — preserved logic + restyled rows */}
         {expanded && g.rows.length > 0 && (
