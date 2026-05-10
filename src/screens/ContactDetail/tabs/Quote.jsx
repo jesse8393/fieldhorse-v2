@@ -9,6 +9,7 @@ import { hapticTap } from '../../../lib/haptics.js'
 import { dateInputToTimestamp } from '../../../lib/dueDate.js'
 import QuoteItemsSection from '../sections/QuoteItems.jsx'
 import QuoteTermsSection from '../sections/QuoteTerms.jsx'
+import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 
 /**
  * QUOTE tab — the formal sellable scope. Lead → Quote → Approved Job
@@ -201,10 +202,17 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // customer agreed to; we don't want a "clear draft" gesture to
   // appear to wipe an approved quote.
   const [clearing, setClearing] = useState(false)
+  const confirm = useConfirm()
   async function handleClearDraft() {
     if (!contact?.id || !userId) return
     if ((contact?.proposal_status || 'draft').toLowerCase() === 'approved') return
-    if (!window.confirm('Delete this draft quote?\n\nThis removes the quote line items and draft terms. This cannot be undone.')) return
+    const ok = await confirm({
+      title: 'Delete this draft quote?',
+      body: 'This removes the quote line items and draft terms. This cannot be undone.',
+      confirmLabel: 'Delete draft',
+      destructive: true
+    })
+    if (!ok) return
     hapticTap()
     setClearing(true)
     try {

@@ -564,7 +564,6 @@ function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown 
           fontFamily: 'var(--font-body)',
           fontSize: 12,
           color: 'var(--v3-text-muted)',
-          fontStyle: 'italic',
           lineHeight: 1.4,
           overflowWrap: 'anywhere'
         }}>
@@ -647,8 +646,7 @@ function StatusChip({ label, tone }) {
       background: palette.bg, border: `1px solid ${palette.border}`,
       color: palette.color,
       fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-      letterSpacing: '0.10em', textTransform: 'uppercase',
-      fontStyle: tone === 'muted' ? 'italic' : 'normal'
+      letterSpacing: '0.10em', textTransform: 'uppercase'
     }}>
       {label}
     </span>

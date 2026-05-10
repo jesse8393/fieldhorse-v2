@@ -50,10 +50,11 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   return (
     <ActionSheet
       open={open}
+      variantClass="fh-asheet--v2"
       title="New event."
       accentWord="event"
       sectionLabel="New event"
-      commitLabel={saving ? 'Committing…' : 'Commit event'}
+      commitLabel={saving ? 'Saving…' : 'Save event'}
       commitBusy={saving}
       commitDisabled={!title.trim()}
       onClose={onClose}

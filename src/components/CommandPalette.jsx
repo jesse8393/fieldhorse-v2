@@ -181,7 +181,15 @@ export default function CommandPalette() {
   }
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      // Top-anchor on mobile so the palette is reachable from the tap
+      // origin (header search button) instead of centering at 50% where
+      // the iOS keyboard can hide it behind the fold. translate-y-0 +
+      // top: 10vh keeps the dialog visually attached to the header.
+      className="ui:top-[10vh] ui:translate-y-0 ui:max-h-[80vh]"
+    >
       <CommandInput
         placeholder="Search jobs, clients, notes, events, files…"
         value={query}

@@ -41,3 +41,18 @@
   scroll-margin-top: 96px;
   scroll-margin-bottom: 120px;
 }
+
+/* ================================================================
+   ZERO-ITALICS POLICY
+   User direction: "across the whole mobile and desktop there should
+   be 0 italics." Strips italic rendering from every <em> tag, every
+   .fh-font-serif-italic accent (the gold-italic word treatment used
+   on Notifications / Settings / Analytics / DesktopHome), and any
+   ad-hoc italic classes. The serif font face is preserved where it
+   was paired with the italic, so the visual hierarchy still reads
+   premium — just upright now.
+   ================================================================ */
+em, i, .fh-font-serif-italic, [class*="--italic"] {
+  font-style: normal !important;
+}
+
