@@ -56,3 +56,27 @@ em, i, .fh-font-serif-italic, [class*="--italic"] {
   font-style: normal !important;
 }
 
+/* ================================================================
+   COMMAND PALETTE — top-anchored, viewport-safe.
+
+   Radix Dialog defaults center via top:50% + translate-y(-50%).
+   On iPhone the centered dialog gets pushed to weird positions when
+   the keyboard rises (visual viewport vs. layout viewport math), so
+   it ends up looking like a bottom sheet behind the keyboard.
+
+   This overrides position + transform so the palette anchors at the
+   top of the visible viewport — right under the iOS safe-area inset
+   — and caps height to dvh so internal scroll always works. !important
+   is required because Radix Dialog's utility classes carry equal
+   specificity; without it our rules tie and lose to declaration order.
+   ================================================================ */
+.fh-command-dialog {
+  top: max(env(safe-area-inset-top), 16px) !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
+  width: min(calc(100% - 24px), 560px) !important;
+  max-width: min(calc(100% - 24px), 560px) !important;
+}
+
+

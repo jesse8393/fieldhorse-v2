@@ -184,11 +184,11 @@ export default function CommandPalette() {
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      // Top-anchor on mobile so the palette is reachable from the tap
-      // origin (header search button) instead of centering at 50% where
-      // the iOS keyboard can hide it behind the fold. translate-y-0 +
-      // top: 10vh keeps the dialog visually attached to the header.
-      className="ui:top-[10vh] ui:translate-y-0 ui:max-h-[80vh]"
+      // Custom class is the source of truth for positioning — see
+      // mobile-keyboard-fix.css. Tailwind utility overrides (top-[10vh]
+      // etc.) don't reliably dedupe with the ui: prefix, so we go
+      // straight to a stable class with !important rules.
+      className="fh-command-dialog"
     >
       <CommandInput
         placeholder="Search jobs, clients, notes, events, files…"
