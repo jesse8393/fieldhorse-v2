@@ -143,17 +143,19 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }) {
-  // V3-HOME-2: thin-ribbon trim. Logo clamps at 24 (was 28), wordmark
-  // at 14 (was 16) so the brand row reads as identification, not as a
-  // billboard sitting above the page content.
+  // Mobile-header-fix: the thin-ribbon trim left the wordmark visibly
+  // weak on iPhone — at clamp(12px, 2.6vw, 14px) on a 390px viewport the
+  // brand max'd at 14px and read as a faint placeholder. Bumped to
+  // clamp(15px, 4vw, 18px) so the contractor's name registers as
+  // immediate identification without taking over the header strip.
   if (logoSrc) {
     return (
       <img
         src={logoSrc}
         alt={company || 'Company logo'}
         style={{
-          maxHeight: 'clamp(18px, 3vw, 24px)',
-          maxWidth: 'min(32vw, 180px)',
+          maxHeight: 'clamp(22px, 4.6vw, 30px)',
+          maxWidth: 'min(38vw, 200px)',
           width: 'auto',
           height: 'auto',
           objectFit: 'contain',
@@ -171,19 +173,17 @@ function BrandSlot({ logoSrc, company, fullName }) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(12px, 2.6vw, 14px)',
-    letterSpacing: '0.08em',
+    fontSize: 'clamp(15px, 4vw, 18px)',
+    fontWeight: 600,
+    letterSpacing: '0.06em',
     lineHeight: 1,
     textTransform: 'uppercase',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    maxWidth: 'min(36vw, 180px)'
+    maxWidth: 'min(56vw, 240px)'
   }
   if (company) {
-    // V3-SYSTEM-1A: company-name fallback drops the gold tint — the
-    // header is brand-supporting, not a brand moment. Gold is reserved
-    // for actions / revenue / active route; chrome stays muted ink.
     return (
       <span style={{ ...fallbackTextStyle, color: 'var(--ink-strong)' }}>
         {company}
@@ -197,15 +197,14 @@ function BrandSlot({ logoSrc, company, fullName }) {
       </span>
     )
   }
-  // Final fallback — FIELDHORSE wordmark. Keeps the gold-split FIELD/HORSE
-  // when there's no user brand to compete with, so anonymous users still
-  // see the brand identity in the header.
+  // Final fallback — FIELDHORSE wordmark with the gold-split FIELD/HORSE.
   return (
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(12px, 2.6vw, 14px)',
-        letterSpacing: '0.10em',
+        fontSize: 'clamp(15px, 4.2vw, 19px)',
+        fontWeight: 600,
+        letterSpacing: '0.08em',
         lineHeight: 1,
         display: 'inline-flex',
         alignItems: 'center',

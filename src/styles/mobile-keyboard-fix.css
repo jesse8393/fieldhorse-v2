@@ -57,26 +57,97 @@ em, i, .fh-font-serif-italic, [class*="--italic"] {
 }
 
 /* ================================================================
-   COMMAND PALETTE — top-anchored, viewport-safe.
+   COMMAND PALETTE — top-anchored, viewport-safe, FieldHorse-dark.
 
-   Radix Dialog defaults center via top:50% + translate-y(-50%).
-   On iPhone the centered dialog gets pushed to weird positions when
-   the keyboard rises (visual viewport vs. layout viewport math), so
-   it ends up looking like a bottom sheet behind the keyboard.
+   Radix Dialog defaults to center via top:50% + translate-y(-50%) and
+   shadcn DialogContent uses ui:bg-background / ui:text-foreground —
+   tokens that aren't reliably defined for the dark theme in this app.
+   That combo produced the audit symptom: on iPhone the palette either
+   rendered near-invisible (transparent/white-on-white) OR landed below
+   the header/notch when the keyboard rose.
 
-   This overrides position + transform so the palette anchors at the
-   top of the visible viewport — right under the iOS safe-area inset
-   — and caps height to dvh so internal scroll always works. !important
-   is required because Radix Dialog's utility classes carry equal
-   specificity; without it our rules tie and lose to declaration order.
+   These overrides:
+   1. Pin position: fixed + left:50% explicitly so cascade can't drop it.
+   2. Top-anchor under the iOS safe-area inset (notch / Dynamic Island).
+   3. Lift z-index above every other overlay in the app (action sheets
+      are 80-91, bottom nav is 40, header is 30; we sit at 110).
+   4. Paint a FieldHorse dark surface with a visible gold-tinted border
+      and a real shadow so the panel is unmistakably present.
+   5. Cap height to dvh-minus-insets so internal scroll always works.
+
+   !important is required throughout because Radix Dialog's utility
+   classes (ui:fixed ui:top-[50%] ui:left-[50%] ui:z-50 ui:bg-background
+   ui:rounded-lg ui:border) carry equal specificity; without it our
+   rules tie and lose to declaration order.
    ================================================================ */
 .fh-command-dialog {
+  position: fixed !important;
   top: max(env(safe-area-inset-top), 16px) !important;
+  left: 50% !important;
+  right: auto !important;
   bottom: auto !important;
   transform: translateX(-50%) !important;
-  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
+  z-index: 110 !important;
   width: min(calc(100% - 24px), 560px) !important;
   max-width: min(calc(100% - 24px), 560px) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
+  background: var(--surface-1, #141414) !important;
+  color: var(--ink-strong, #f4f1e8) !important;
+  border: 1px solid color-mix(in srgb, var(--field-gold-bright, #d4a042) 22%, rgba(255, 255, 255, 0.08)) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 12px 24px rgba(0, 0, 0, 0.42) !important;
+}
+
+/* Lift the scrim alongside the panel so it sits above the sticky
+   header/notch (z:30) and the bottom nav (z:40) but stays below the
+   panel itself. */
+.fh-command-dialog ~ [data-slot="dialog-overlay"],
+[data-slot="dialog-portal"] [data-slot="dialog-overlay"] {
+  z-index: 109 !important;
+}
+
+/* Force the inner scroll list and input strip onto the dark surface
+   so they don't inherit shadcn's --popover / --background tokens
+   (which may resolve to a light value in this build). Targets the
+   data-slot hooks emitted by src/components/ui/command.jsx. */
+.fh-command-dialog [data-slot="command"],
+.fh-command-dialog [data-slot="command-list"] {
+  background: transparent !important;
+  color: var(--ink-strong, #f4f1e8) !important;
+}
+.fh-command-dialog [data-slot="command-input-wrapper"] {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+.fh-command-dialog [data-slot="command-input"] {
+  background: transparent !important;
+  color: var(--ink-strong, #f4f1e8) !important;
+  caret-color: var(--field-gold-bright, #d4a042) !important;
+  font-size: 16px !important; /* >=16px keeps iOS from zooming on focus */
+}
+.fh-command-dialog [data-slot="command-input"]::placeholder {
+  color: var(--ink-muted, rgba(244, 241, 232, 0.55)) !important;
+}
+.fh-command-dialog [data-slot="command-group"] [cmdk-group-heading] {
+  color: var(--ink-muted, rgba(244, 241, 232, 0.55)) !important;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.fh-command-dialog [data-slot="command-item"] {
+  color: var(--ink-strong, #f4f1e8) !important;
+}
+.fh-command-dialog [data-slot="command-item"][data-selected="true"] {
+  background: color-mix(in srgb, var(--field-gold-bright, #d4a042) 14%, transparent) !important;
+  color: var(--ink-strong, #f4f1e8) !important;
+}
+.fh-command-dialog [data-slot="command-separator"] {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+.fh-command-dialog [data-slot="command-empty"] {
+  color: var(--ink-muted, rgba(244, 241, 232, 0.55)) !important;
 }
 
 
