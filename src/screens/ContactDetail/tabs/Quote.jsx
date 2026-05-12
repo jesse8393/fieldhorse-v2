@@ -75,6 +75,15 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
   const [busy, setBusy] = useState(null) // 'preview' | 'download' | 'send' | null
   const disabled = baseCount === 0 || busy !== null
+  // Phase 1 send requires a recipient — the proposal email is attached to
+  // the client's email address. Preview and Download don't require this.
+  const hasClientEmail = Boolean((contact?.email || '').trim())
+  const sendDisabled = disabled || !hasClientEmail
+  const sendDisabledReason = baseCount === 0
+    ? 'Add at least one base line item to enable Send.'
+    : !hasClientEmail
+      ? "Add a client email first so we know where to send."
+      : null
 
   // Mirror of QuoteTermsSection's local state. The terms editor pushes
   // its current values here on every change; buildPdf reads from this
@@ -258,56 +267,88 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
   async function handleSend() {
     if (disabled) return
+    // Phase 1 send-by-email — require a client email. The Send button is
+    // already disabled in this state, so this is a belt-and-suspenders
+    // guard for the desktop WorkspaceHead path which doesn't see the
+    // hasClientEmail wrapper.
+    if (!hasClientEmail) {
+      toastError('Add a client email first', 'Open the client card to add an email, then send.')
+      return
+    }
     hapticTap()
     setBusy('send')
     try {
       const result = await buildPdf()
 
-      // Save to job-files storage first so the row exists for audit
-      // even if the operator dismisses the download. Wrapped: storage
-      // failure logs + becomes a toast suffix but does not block the
-      // status flip — the operator already holds the PDF locally.
-      let storageNote = ''
-      try {
-        const blob = result.doc.output('blob')
-        const rowId = crypto.randomUUID()
-        const path = `${userId}/${contact.id}/${rowId}.pdf`
-        const { error: upErr } = await supabase.storage
-          .from('job-files')
-          .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-        if (upErr) throw upErr
-        const { error: insErr } = await supabase.from('fh_job_files').insert({
-          id: rowId,
-          user_id: userId,
-          job_id: contact.id,
-          filename: result.filename,
+      // 1. Save to job-files first so the server can pull the PDF by
+      // path with service-role privileges. Upload failure aborts the
+      // send — without the PDF on storage the email can't carry it.
+      const blob = result.doc.output('blob')
+      const rowId = crypto.randomUUID()
+      const path = `${userId}/${contact.id}/${rowId}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from('job-files')
+        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+      if (upErr) {
+        throw new Error(`Couldn't save the proposal PDF: ${upErr.message}`)
+      }
+      const { error: insErr } = await supabase.from('fh_job_files').insert({
+        id: rowId,
+        user_id: userId,
+        job_id: contact.id,
+        filename: result.filename,
+        storage_path: path,
+        mime_type: 'application/pdf',
+        size_bytes: blob.size || 0,
+        kind: 'file'
+      })
+      if (insErr) {
+        // Soft-fail — the file is in storage even if the audit row missed.
+        console.warn('[quote] fh_job_files row insert failed', insErr)
+      }
+
+      // 2. Ask the server to send. The server downloads the PDF using
+      // the service role, attaches it to a Resend send, and on success
+      // flips proposal_status='sent' + quote_sent_at + logs activity.
+      // Status is NOT optimistically updated client-side — we want the
+      // pill to stay 'draft' until the email actually went out.
+      const sendRes = await fetch('/api/send-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          sender_user_id: userId,
+          recipient_email: contact.email,
+          recipient_name: contact.name || null,
           storage_path: path,
-          mime_type: 'application/pdf',
-          size_bytes: blob.size || 0,
-          kind: 'file'
+          filename: result.filename
         })
-        if (insErr) throw insErr
-        storageNote = ' · Saved to Files'
-      } catch (storageErr) {
-        console.warn('[quote] storage save failed:', storageErr)
-        storageNote = ' · Storage save failed'
+      })
+      const sendBody = await sendRes.json().catch(() => ({}))
+
+      if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
+        toastError(
+          'Email sender is not configured yet',
+          "The PDF is saved to Files. Ask whoever set up the deploy to add the Resend keys."
+        )
+        // Still offer the local download so the operator can email manually.
+        downloadPdf(result)
+        return
+      }
+      if (!sendRes.ok || !sendBody?.ok) {
+        throw new Error(sendBody?.detail || sendBody?.error || 'Email send failed.')
       }
 
-      downloadPdf(result)
-
-      const sentIso = new Date().toISOString()
-      if (patch) {
-        await patch({ proposal_status: 'sent', quote_sent_at: sentIso })
-      }
-      // patch() optimistically updates the parent contact, which feeds
-      // the status pill and the baseCount effect. fetchAll is the
-      // belt to patch's suspenders — kept defensive in case patch is
-      // ever swapped for a non-optimistic helper.
+      // 3. Server already updated quote_sent_at + proposal_status. Pull
+      // the fresh contact so the status pill reflects 'sent' immediately.
       if (fetchAll) await fetchAll()
 
-      toastSuccess(`Quote sent${storageNote}`, result.filename)
+      toastSuccess(
+        `Proposal sent to ${contact.email}`,
+        result.filename
+      )
     } catch (e) {
-      toastError("Couldn't send quote", e?.message || 'Try again')
+      toastError("Couldn't send proposal", e?.message || 'Try again')
     } finally {
       setBusy(null)
     }
@@ -334,6 +375,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         baseCount={baseCount}
         busy={busy}
         disabled={disabled}
+        sendDisabled={sendDisabled}
+        sendDisabledReason={sendDisabledReason}
         onPreview={handlePreview}
         onSend={handleSend}
       />
@@ -371,6 +414,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           baseCount={baseCount}
           busy={busy}
           disabled={disabled}
+          sendDisabled={sendDisabled}
+          sendDisabledReason={sendDisabledReason}
           onPreview={handlePreview}
           onDownload={handleDownload}
           onSend={handleSend}
@@ -496,7 +541,7 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }) {
    proposal_status is the closest equivalent. saved-ago hint omitted
    (we'd need to track a separate dirty timestamp).
    ============================================================ */
-function WorkspaceHead({ contact, status, baseCount, busy, disabled, onPreview, onSend }) {
+function WorkspaceHead({ contact, status, baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onSend }) {
   const idShort = contact?.id ? `EST · ${String(contact.id).slice(0, 8).toUpperCase()}` : 'ESTIMATE'
   const statusLabel = (status?.label || 'Draft').toUpperCase()
   const titleText = contact?.job_title || contact?.name || 'Estimate'
@@ -533,9 +578,9 @@ function WorkspaceHead({ contact, status, baseCount, busy, disabled, onPreview, 
         <button
           type="button"
           className="fh-quote-workspace__head-btn fh-quote-workspace__head-btn--primary"
-          onClick={() => { if (!disabled) onSend?.() }}
-          disabled={disabled}
-          title={baseCount === 0 ? 'Add at least one base line item to enable Send' : undefined}
+          onClick={() => { if (!sendDisabled) onSend?.() }}
+          disabled={sendDisabled}
+          title={sendDisabledReason || undefined}
         >
           <Send size={14} aria-hidden="true" />
           {busy === 'send' ? 'Sending…' : 'Send to client'}
@@ -718,10 +763,10 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
 /* ============================================================
    Action bar — Preview / Download / Send Quote
    ============================================================ */
-function ActionBar({ baseCount, busy, disabled, onPreview, onDownload, onSend }) {
-  const helperLine = baseCount === 0
-    ? 'Add at least one base line item to enable Send Quote.'
-    : 'Generates the proposal PDF and marks the quote as sent. This does not approve the job — use Approve Quote when the customer says yes.'
+function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend }) {
+  const helperLine = sendDisabledReason
+    ? sendDisabledReason
+    : 'Generates the proposal PDF and emails it directly to the client. Marks the quote as sent on success. This is not the same as Approve — use Approve when the customer says yes.'
 
   return (
     <div style={{
@@ -759,9 +804,9 @@ function ActionBar({ baseCount, busy, disabled, onPreview, onDownload, onSend })
         />
         <PrimaryButton
           icon={<Send size={14} aria-hidden="true" />}
-          label={busy === 'send' ? 'Sending…' : 'Send Quote'}
+          label={busy === 'send' ? 'Sending…' : 'Send Proposal'}
           onClick={onSend}
-          disabled={disabled}
+          disabled={sendDisabled}
         />
       </div>
     </div>

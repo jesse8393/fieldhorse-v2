@@ -39,6 +39,11 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
   const [email, setEmail] = useState('')
   const [sending, setSending] = useState(false)
   const [readyUrl, setReadyUrl] = useState('')
+  // Reason the email send didn't happen, when applicable. Surfaces a
+  // small caption above the Copy/Share buttons so the operator knows
+  // they need to share manually.
+  const [sendFallbackReason, setSendFallbackReason] = useState('')
+  const [recipientEmail, setRecipientEmail] = useState('')
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef(null)
 
@@ -47,6 +52,8 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
       setEmail('')
       setSending(false)
       setReadyUrl('')
+      setSendFallbackReason('')
+      setRecipientEmail('')
       setCopied(false)
       if (copyTimer.current) { clearTimeout(copyTimer.current); copyTimer.current = null }
     }
@@ -61,13 +68,19 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     }
     setSending(true)
     try {
+      // Always ask the server to send the email directly. The function
+      // creates the invite token first, then attempts the send. When
+      // RESEND env isn't configured (Phase 1 rollout, staging, etc.) the
+      // server returns sender_not_configured=true alongside the
+      // invite_url so we can fall back to the copy/share pane.
       const res = await fetch('/api/partner-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           job_id: contactId,
           invited_by_user_id: invitedByUserId,
-          partner_email: trimmed
+          partner_email: trimmed,
+          send_email: true
         })
       })
       const data = await res.json().catch(() => ({}))
@@ -77,14 +90,28 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         const detail = data?.detail || data?.hint
         throw new Error(detail ? `${friendly} — ${detail}` : friendly)
       }
-      if (data?.invite_url) {
-        // Flip the sheet to the success pane. DO NOT touch the clipboard
-        // here — on iOS standalone PWA, writing the clipboard after a
-        // fetch-await chain loses the user-gesture context and silently
-        // rejects. The Copy / Share buttons in the success pane run
-        // inside a direct tap handler which is clipboard-safe.
+
+      setRecipientEmail(trimmed)
+
+      if (data?.sent) {
+        // Email actually delivered to the provider — happy path. Close
+        // the sheet with a clear success toast; copy/share pane not
+        // needed because the recipient already has the link in inbox.
+        toastSuccess('Invite sent', `${trimmed} will get the link shortly.`)
+        onOpenChange(false)
+      } else if (data?.invite_url) {
+        // Token issued but email didn't go (env not configured or
+        // provider failure). Show the success pane with a reason so
+        // the operator can share manually via Copy/Share.
+        if (data?.sender_not_configured) {
+          setSendFallbackReason('Email sender is not configured yet — share the link manually below.')
+        } else if (data?.send_failed) {
+          setSendFallbackReason("We couldn't send the email automatically — share the link manually below.")
+        }
         setReadyUrl(data.invite_url)
       } else {
+        // Defensive — server returned ok without a URL and without a
+        // sent flag. Treat as success but without confirmation.
         toastSuccess('Invite sent', `${trimmed} will get the link shortly.`)
         onOpenChange(false)
       }
@@ -206,6 +233,28 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
 
         {readyUrl ? (
           <div style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12, boxSizing, maxWidth: '100%', minWidth: 0 }}>
+            {sendFallbackReason && (
+              <div
+                role="status"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'color-mix(in srgb, var(--field-gold-bright) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--field-gold-bright) 40%, transparent)',
+                  color: 'var(--ink-strong)',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 12,
+                  lineHeight: 1.45
+                }}
+              >
+                {sendFallbackReason}
+                {recipientEmail && (
+                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-muted)' }}>
+                    Recipient: {recipientEmail}
+                  </div>
+                )}
+              </div>
+            )}
             <div
               style={{
                 padding: '12px 14px',
