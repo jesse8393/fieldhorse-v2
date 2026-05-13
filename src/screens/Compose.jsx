@@ -120,15 +120,57 @@ export default function Compose() {
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
         }}>
-          {/* Header — title eyebrow + recipient state chip */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          {/* Header — title eyebrow on its own row, recipient pill on the
+              row below. The old layout placed both on one flex row with
+              flexWrap:wrap, but two uppercase eyebrows with letter-
+              spacing:0.16em collided on iPhone — the "TO · GENERIC"
+              clipped against the cockpit edge. Splitting into two rows
+              gives each label room to breathe and keeps the recipient
+              cue visible regardless of contact-name length. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
             <Eyebrow tone="gold">
               <PenLine size={11} aria-hidden="true" />
               AI Compose
             </Eyebrow>
-            <Eyebrow tone={contact ? 'default' : 'default'} style={{ opacity: contact ? 1 : 0.65 }}>
-              To · {contact?.name || 'Generic'}
-            </Eyebrow>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignSelf: 'flex-start',
+                maxWidth: '100%',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: 'var(--v3-surface-2)',
+                border: '1px solid var(--v3-border)',
+                color: 'var(--v3-text-muted)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                lineHeight: 1.2,
+                opacity: contact ? 1 : 0.75
+              }}
+            >
+              <span style={{ color: 'var(--v3-text-muted)' }}>To</span>
+              <span aria-hidden="true" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))' }}>·</span>
+              <span
+                style={{
+                  color: 'var(--v3-text)',
+                  letterSpacing: '0.04em',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: 11,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '60vw'
+                }}
+              >
+                {contact?.name || 'Generic'}
+              </span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
