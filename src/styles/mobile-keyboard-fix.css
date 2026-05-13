@@ -150,4 +150,97 @@ em, i, .fh-font-serif-italic, [class*="--italic"] {
   color: var(--ink-muted, rgba(244, 241, 232, 0.55)) !important;
 }
 
+/* ================================================================
+   NEW LEAD SHEET — surface regression tightening.
+
+   The audit screenshots flagged the sheet as "too tall and old" —
+   the voice-hero block (Fast Capture) consumed roughly a third of
+   the visible viewport on iPhone, fields had loose vertical rhythm,
+   and the commit button at the foot felt visually buried below all
+   that space. None of this is a structural problem; the v2 variant
+   already exists. We tighten the v2 vertical rhythm here so the
+   JSX doesn't have to be rearranged.
+
+   Targets ONLY .fh-asheet--v2 — the sheets that opted into v2 are
+   NewLeadSheet + AddEventSheet today. Other sheets (delete confirm,
+   approval, etc.) are not affected.
+   ================================================================ */
+.fh-asheet--v2 .fh-asheet__body {
+  padding-top: 12px !important;
+  gap: 12px !important;
+}
+
+.fh-asheet--v2 .fh-voice-hero {
+  padding: 10px 12px !important;
+  gap: 6px !important;
+}
+.fh-asheet--v2 .fh-voice-hero__head {
+  margin-bottom: 0 !important;
+}
+.fh-asheet--v2 .fh-voice-hero__desc {
+  font-size: 11px !important;
+  margin: 2px 0 4px !important;
+  line-height: 1.35 !important;
+  color: var(--ink-muted) !important;
+}
+.fh-asheet--v2 .fh-voice-hero__btn {
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+}
+.fh-asheet--v2 .fh-voice-hero__mic {
+  width: 16px !important;
+  height: 16px !important;
+}
+.fh-asheet--v2 .fh-voice-hero__transcript {
+  min-height: 32px !important;
+  padding: 8px 10px !important;
+  font-size: 12px !important;
+}
+
+/* Tighten field rhythm — labels stay readable, inputs lose excess
+   padding. Two-up rows (Phone | Email) get a smaller gap to match. */
+.fh-asheet--v2 .fh-asheet-field input,
+.fh-asheet--v2 .fh-asheet-field select,
+.fh-asheet--v2 .fh-asheet-field textarea,
+.fh-asheet--v2 .fh-asheet-select {
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+  border-radius: 10px !important;
+}
+.fh-asheet--v2 .fh-asheet-money__input {
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+}
+
+/* Active commit button gets a brighter halo so it no longer reads
+   as inactive. Disabled state untouched — still muted. */
+.fh-asheet--v2 .fh-asheet__commit:not(:disabled) {
+  box-shadow:
+    0 0 0 2px rgba(228, 190, 111, 0.16),
+    0 8px 22px rgba(201, 150, 58, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+
+/* ================================================================
+   VAUL DRAWER SHEETS — keyboard-aware bottom padding for the two
+   sheets that use Vaul directly (LogMilesSheet, AddSubDrawer in
+   Subs.jsx). The ActionSheet primitive already lifts on
+   visualViewport, but Vaul sheets don't read the same vars. We
+   give the drawer content a sensible max-height bound to dvh so
+   it scrolls naturally when the soft keyboard rises and we ensure
+   the inner form has safe-area-inset-bottom padding so the Save /
+   Cancel buttons aren't pinned right against the keyboard.
+
+   Targets vaul's standard data attribute so we don't tightly bind
+   to drawer ID or class names. .fh-vaul-form is added in the JSX
+   on the two sheets touched in this pass.
+   ================================================================ */
+[data-vaul-drawer] .fh-vaul-form {
+  padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px)) !important;
+}
+[data-vaul-drawer][data-vaul-drawer-direction="bottom"] {
+  max-height: 92dvh;
+}
+
 

@@ -183,7 +183,17 @@ export default function Invoices() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+      // paddingBottom was 120 — defensive clearance for the bottom nav
+      // but it left a huge dead void below the last invoice card on
+      // short lists. Bottom nav is ~56-64px tall; safe-area-inset-bottom
+      // covers the iOS home indicator. Sum gives enough breathing room
+      // for the last card's tap target without printing a half-screen
+      // of empty surface.
+      style={{
+        paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
+        position: 'relative',
+        background: 'var(--v3-bg)'
+      }}
     >
       {/* COCKPIT — black-glass A/R panel: title eyebrow + state chip +
           headline total + aging bar + 3-cell aging breakdown.

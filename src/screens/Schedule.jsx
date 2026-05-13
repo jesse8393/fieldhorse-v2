@@ -237,7 +237,7 @@ export default function Schedule() {
   }
 
   return (
-    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
+    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))', position: 'relative', background: 'var(--v3-bg)' }}>
       {/* SUMMARY PANEL — black-glass cockpit. Eyebrow + title + today/
           upcoming counts. The FAB at bottom-right is the single
           thumb-reachable add-event control; an inline header CTA used
@@ -596,11 +596,12 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
   if (events.length === 0) {
     return (
       <div style={{
-        padding: '40px 28px',
-        borderRadius: 18,
-        background: 'var(--v3-surface-glass)',
-        backdropFilter: 'blur(14px) saturate(1.1)',
-        WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+        // Tightened from 40/28 → 22/20 and the icon avatar from 52 → 40
+        // so the empty state reads as a quick prompt, not a full
+        // billboard card occupying most of the timeline area.
+        padding: '22px 20px',
+        borderRadius: 16,
+        background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
         boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
         textAlign: 'center',
@@ -608,30 +609,30 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 16
+        gap: 12
       }}>
         <div style={{
-          width: 52, height: 52, borderRadius: 14,
+          width: 40, height: 40, borderRadius: 12,
           background: 'var(--v3-surface-2)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
           display: 'grid', placeItems: 'center',
           color: 'var(--v3-primary)'
         }}>
-          <CalendarIcon size={22} aria-hidden="true" />
+          <CalendarIcon size={18} aria-hidden="true" />
         </div>
         <div>
           <h3 style={{
             margin: 0,
-            fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em',
+            fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em',
             color: 'var(--v3-text)'
           }}>
             Nothing scheduled — fill your day.
           </h3>
           <p style={{
-            margin: '8px 0 0',
-            fontSize: 13,
+            margin: '6px 0 0',
+            fontSize: 12,
             color: 'var(--v3-text-muted)',
-            lineHeight: 1.5,
+            lineHeight: 1.45,
             maxWidth: 320
           }}>
             Crew runs smoother when the day's on the board. Queue up the first job.

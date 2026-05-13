@@ -96,7 +96,24 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }) {
           </DrawerDescription>
         </DrawerHeader>
 
-        <form onSubmit={submit} style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <form
+          onSubmit={submit}
+          className="fh-vaul-form"
+          style={{
+            padding: '6px 20px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            // Body scrolls naturally when the soft keyboard rises so the
+            // active input + Save/Cancel buttons stay reachable. The
+            // .fh-vaul-form class adds safe-area-inset-bottom padding via
+            // mobile-keyboard-fix.css so the buttons aren't pinned right
+            // against the iOS keyboard accessory bar.
+            maxHeight: 'calc(92dvh - 96px)',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain'
+          }}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={labelStyle}>Date</span>

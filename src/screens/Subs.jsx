@@ -782,7 +782,23 @@ function AddSubDrawer({ open, userId, onClose, onCreated }) {
           </DrawerDescription>
         </DrawerHeader>
 
-        <form onSubmit={save} style={{ padding: '4px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <form
+          onSubmit={save}
+          className="fh-vaul-form"
+          style={{
+            padding: '4px 20px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            // Keyboard-safe scrollable body (mirrors LogMilesSheet). The
+            // fh-vaul-form class adds safe-area-inset-bottom padding via
+            // mobile-keyboard-fix.css so Cancel / Add Sub stay reachable
+            // above the iOS keyboard accessory bar.
+            maxHeight: 'calc(92dvh - 96px)',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain'
+          }}
+        >
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={labelStyle}>Name</span>
             <input
