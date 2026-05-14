@@ -48,11 +48,18 @@ export default function AppHeader() {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
-        // V3-HOME-2: thin-ribbon trim 8/14/6 → 6/14/4. Header total
-        // ~42px+safe-area. Was 70 → 52 (1A) → 48 (1B-1) → 42 (HOME-2).
-        // Header is supporting chrome — the page surface is the canvas.
-        padding: '6px 14px 4px',
+        // Padding longhand ONLY — never use the `padding:` shorthand
+        // here. The desktop sidebar offset is applied via the CSS rule
+        // `@media(min-width:900px) .fh-app-header { padding-left: calc(14px + 256px) }`,
+        // which loses to inline shorthand. The audit on 5/13 found
+        // the search/notifications/notes cluster pinned behind the
+        // 256px sidebar because the inline `padding: '6px 14px 4px'`
+        // was forcing padding-left:14 over the responsive rule. Keep
+        // top/right/bottom inline; let CSS own padding-left.
         paddingTop: 'calc(6px + env(safe-area-inset-top, 0px))',
+        paddingRight: 14,
+        paddingBottom: 4,
+        paddingLeft: 14, // mobile default — overridden by desktop CSS rule
         minHeight: 0,
         background: 'linear-gradient(180deg, rgba(20,20,20,0.88) 0%, rgba(20,20,20,0.72) 82%, rgba(20,20,20,0) 100%)',
         backdropFilter: 'blur(14px)',

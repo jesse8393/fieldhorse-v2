@@ -101,7 +101,11 @@ export function useAccountLabels(userIds) {
  */
 export function formatAttribution(entry, verb = 'posted', showRole = false) {
   const v = verb === 'added' ? 'Added by' : verb === 'created' ? 'Created by' : 'Posted by'
-  if (!entry) return `${v} someone on this job`
+  // Friendlier fallback when the label RPC can't resolve a name. The
+  // prior "someone on this job" read as alarming/stub-y in the 5/13
+  // audit; "a teammate" implies an account member without claiming
+  // their identity.
+  if (!entry) return `${v} a teammate`
   if (entry.role === 'self') return `${v} you`
   const roleSuffix = showRole && entry.role && entry.role !== 'unknown'
     ? ` · ${entry.role.charAt(0).toUpperCase()}${entry.role.slice(1)}`

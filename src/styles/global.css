@@ -2078,7 +2078,13 @@ a {
     padding-bottom: 32px;
   }
   .fh-app-header {
-    padding-left: calc(14px + 256px);
+    /* !important required — AppHeader.jsx sets paddingLeft inline as a
+       mobile default, and inline styles win over stylesheet declarations.
+       Without !important the desktop sidebar offset never applies and
+       the right-side action cluster (Search/Notifications/Notes) sits
+       pinned behind the 256px sidebar at viewport (14,6) (~audit
+       5/13 production-blocker). */
+    padding-left: calc(14px + 256px) !important;
   }
   /* Hide the BottomNav on desktop — sidebar carries primary nav. */
   .fh-nav { display: none !important; }
@@ -2091,7 +2097,7 @@ a {
   .fh-app-header__brand { display: none !important; }
   /* Header content shifts to the right — give the action cluster more
      room to breathe and align with content gutter on desktop. */
-  .fh-app-header { justify-content: flex-end; padding-right: 24px; }
+  .fh-app-header { justify-content: flex-end !important; padding-right: 24px !important; }
   /* Phase 10b crisp-glass mandate: replace the mobile fade-to-
      transparent gradient + 14px backdrop-blur with a solid black-
      glass bar and a hard 1px bottom rule on desktop. The phone path
