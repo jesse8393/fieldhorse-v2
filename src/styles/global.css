@@ -375,6 +375,146 @@ select:focus-visible,
 }
 
 /* ============================================================
+   CLIENTS SCREEN — featured top-client card from design handoff.
+   Ported from styles-workflows.css .cl-card / .cl-card--top /
+   .cl-card__rib / .cl-card__strip. Re-tokenized to --v3-* and
+   used by FeaturedClientCard in Clients.jsx.
+   ============================================================ */
+.cl-card {
+  position: relative;
+  background: linear-gradient(180deg, #1a1410 0%, var(--v3-surface) 60%);
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong));
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 14px 38px rgba(0, 0, 0, 0.45);
+  margin: 4px 0 14px;
+}
+.cl-card--top::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 80% 0%, rgba(228, 190, 111, 0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+.cl-card__rib {
+  position: absolute;
+  top: 0;
+  right: 18px;
+  padding: 4px 11px;
+  background: linear-gradient(180deg, var(--v3-primary-bright, var(--v3-primary)), var(--v3-primary));
+  color: #1a1208;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  border-radius: 0 0 6px 6px;
+  z-index: 2;
+}
+.cl-card__hdr {
+  padding: 18px 16px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+.cl-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #2a1f10, #1a1208);
+  color: var(--v3-primary);
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent);
+  box-shadow: inset 0 1px 0 rgba(228, 190, 111, 0.15);
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.cl-card__main { flex: 1; min-width: 0; }
+.cl-card__name {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--v3-text);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cl-card__kind {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  margin-top: 3px;
+}
+.cl-card__amt { text-align: right; flex-shrink: 0; }
+.cl-card__amt-val {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--v3-primary);
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cl-card__amt-lbl {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--v3-text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.cl-card__strip {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--v3-border);
+  background: rgba(0, 0, 0, 0.22);
+}
+.cl-strip-cell {
+  flex: 1;
+  padding: 10px 14px;
+}
+.cl-strip-cell + .cl-strip-cell {
+  border-left: 1px solid var(--v3-border);
+}
+.cl-strip-cell__lbl {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--v3-text-muted);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+.cl-strip-cell__val {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--v3-text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.cl-strip-cell__val--gold { color: var(--v3-primary); }
+.cl-strip-cell__val--alert { color: var(--v3-danger-bright); }
+
+.cl-card__tap {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.cl-card__tap:focus-visible {
+  outline: 2px solid var(--v3-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================
    JOBS SCREEN — design handoff alignment (5/17).
    Mobile Jobs header pattern from screens-jobs.jsx:
      <h1.jobs-title>Jobs <span gold>& Pipeline</span></h1>

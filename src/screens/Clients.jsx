@@ -334,6 +334,54 @@ export default function Clients() {
             No clients match that search.
           </div>
         )}
+        {/* FEATURED TOP CLIENT — gold-rib hero card from design handoff
+            (styles-workflows.css .cl-card--top). Only rendered when the
+            top earner is meaningfully ahead of the pack and we're on the
+            "all" filter so it never competes with an active search/filter. */}
+        {!loading && filter === 'all' && !q.trim() && topClientId && (() => {
+          const top = filtered.find((c) => c.id === topClientId)
+          if (!top) return null
+          const r = rollupFor(top.id)
+          const lastActivity = top.last_activity_at ? new Date(top.last_activity_at) : null
+          const lastRel = lastActivity ? formatRelative(lastActivity) : '—'
+          const initials = (top.name || '·').trim().split(/\s+/).slice(0, 2).map(s => s.charAt(0).toUpperCase()).join('')
+          return (
+            <div className="cl-card cl-card--top">
+              <div className="cl-card__rib">TOP CLIENT</div>
+              <button type="button" className="cl-card__tap" onClick={() => { hapticTap(); navigate(`/clients/${top.id}`) }}>
+                <div className="cl-card__hdr">
+                  <div className="cl-card__avatar" aria-hidden="true">{initials || '·'}</div>
+                  <div className="cl-card__main">
+                    <div className="cl-card__name">{top.name || 'Unnamed client'}</div>
+                    <div className="cl-card__kind">{top.company_name || 'Lifetime billing leader'}</div>
+                  </div>
+                  <div className="cl-card__amt">
+                    <div className="cl-card__amt-val">{money(r.lifetime)}</div>
+                    <div className="cl-card__amt-lbl">Lifetime</div>
+                  </div>
+                </div>
+                <div className="cl-card__strip">
+                  <div className="cl-strip-cell">
+                    <div className="cl-strip-cell__lbl">Active</div>
+                    <div className={`cl-strip-cell__val${r.activeCount > 0 ? ' cl-strip-cell__val--gold' : ''}`}>
+                      {r.activeCount > 0 ? `${r.activeCount} ${r.activeCount === 1 ? 'job' : 'jobs'}` : '—'}
+                    </div>
+                  </div>
+                  <div className="cl-strip-cell">
+                    <div className="cl-strip-cell__lbl">Owes</div>
+                    <div className={`cl-strip-cell__val${r.outstanding > 0 ? ' cl-strip-cell__val--alert' : ''}`}>
+                      {r.outstanding > 0 ? money(r.outstanding) : '—'}
+                    </div>
+                  </div>
+                  <div className="cl-strip-cell">
+                    <div className="cl-strip-cell__lbl">Last</div>
+                    <div className="cl-strip-cell__val">{lastRel}</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          )
+        })()}
         {/* Single black-glass list container with hairline dividers — premium
             iOS list pattern. Each row is a tap target into /clients/:id;
             the heavier per-card chrome (lifetime stamp, contact row,
