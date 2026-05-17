@@ -43,18 +43,17 @@
 }
 
 /* ================================================================
-   ZERO-ITALICS POLICY
-   User direction: "across the whole mobile and desktop there should
-   be 0 italics." Strips italic rendering from every <em> tag, every
-   .fh-font-serif-italic accent (the gold-italic word treatment used
-   on Notifications / Settings / Analytics / DesktopHome), and any
-   ad-hoc italic classes. The serif font face is preserved where it
-   was paired with the italic, so the visual hierarchy still reads
-   premium — just upright now.
+   ZERO-ITALICS POLICY — REMOVED 5/17.
+   The 5/17 design handoff (FieldHorse v3 Premium Design) explicitly
+   uses gold-italic Instrument Serif as the hero accent on H1 display
+   titles ("Know your <em>numbers.</em>") — see .gold-italic in
+   global.css and the design's tokens.css. The prior policy was
+   stripping that intentional accent and reading as uniformly
+   upright, which is NOT what the design wants. Italics are now
+   permitted but should be scarce: design-spec usage is HERO accents
+   only, never decorative body italic. The .gold-italic and
+   .fh-font-serif-italic utility classes carry the intent.
    ================================================================ */
-em, i, .fh-font-serif-italic, [class*="--italic"] {
-  font-style: normal !important;
-}
 
 /* ================================================================
    COMMAND PALETTE — top-anchored, viewport-safe, FieldHorse-dark.
