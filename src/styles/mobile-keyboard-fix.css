@@ -43,17 +43,38 @@
 }
 
 /* ================================================================
-   ZERO-ITALICS POLICY — REMOVED 5/17.
-   The 5/17 design handoff (FieldHorse v3 Premium Design) explicitly
-   uses gold-italic Instrument Serif as the hero accent on H1 display
-   titles ("Know your <em>numbers.</em>") — see .gold-italic in
-   global.css and the design's tokens.css. The prior policy was
-   stripping that intentional accent and reading as uniformly
-   upright, which is NOT what the design wants. Italics are now
-   permitted but should be scarce: design-spec usage is HERO accents
-   only, never decorative body italic. The .gold-italic and
-   .fh-font-serif-italic utility classes carry the intent.
+   ZERO-ITALICS POLICY — REINSTATED 5/17 (user explicit: "no italics
+   anywhere on the app"). Loaded last so cascade-equal selectors win.
+   Strips italic styling from every accent class + raw <em>/<i> tag
+   while preserving the gold gradient color treatment, so accent
+   words still read as gold but upright.
    ================================================================ */
+em,
+i,
+.gold-italic,
+.fh-font-serif-italic,
+.v3-h1 em,
+.v3-h1 .v3-h1__accent,
+.dt-jobs__h1 em,
+.dt-home__h1 em,
+.fh-voice-hero__transcript-placeholder,
+.fh-home__greet-btn.is-empty {
+  font-style: normal !important;
+  font-family: var(--font-body) !important;
+}
+/* Keep the gold gradient color treatment on the accent utility classes
+   — only the italic + serif-substitution is being killed. */
+.gold-italic,
+.fh-font-serif-italic,
+.v3-h1 em,
+.dt-jobs__h1 em,
+.dt-home__h1 em {
+  background: linear-gradient(95deg, #B17F1F 0%, #E6B14B 45%, #C9963A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.005em;
+}
 
 /* ================================================================
    COMMAND PALETTE — top-anchored, viewport-safe, FieldHorse-dark.
