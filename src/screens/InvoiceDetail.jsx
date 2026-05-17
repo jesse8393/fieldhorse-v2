@@ -87,6 +87,11 @@ export default function InvoiceDetail() {
   // Builds the PDF locally, uploads to job-files, posts the storage_path
   // to /api/send-invoice for server-side Resend send + activity log.
   const [sending, setSending] = useState(false)
+  // Sent flag flips back to false after 2.4s so the Send button
+  // briefly morphs to green ✓ "Sent" on success — mirrors the Compose
+  // pattern. Gives the operator visual confirmation that's hard to
+  // miss vs relying on the toast alone.
+  const [sent, setSent] = useState(false)
 
   const refresh = async () => {
     if (!user?.id || !id) return
@@ -273,9 +278,14 @@ export default function InvoiceDetail() {
       const sendBody = await sendRes.json().catch(() => ({}))
 
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
+        // Make the failure mode obvious — the prior "we saved the PDF
+        // for you" toast got missed and the operator thought tapping
+        // Send had silently downloaded. Now the toast leads with the
+        // ACTUAL problem (email not configured) and explicitly names
+        // the local download as a fallback.
         toastError(
-          'Email sender is not configured yet',
-          'The PDF is saved to Files. Add Resend keys in Netlify env to enable direct send.'
+          "Email NOT sent — sender isn't configured",
+          'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
         )
         downloadPdf(result)
         return
@@ -285,6 +295,8 @@ export default function InvoiceDetail() {
       }
 
       toastSuccess(`Invoice sent to ${contact.email}`, result.filename)
+      setSent(true)
+      setTimeout(() => setSent(false), 2400)
       refresh()
     } catch (e) {
       toastError("Couldn't send invoice", e?.message || 'Try again')
@@ -628,26 +640,33 @@ export default function InvoiceDetail() {
           type="button"
           onClick={() => { hapticTap(); handleSendInvoice() }}
           disabled={sending || !contact.email}
-          title={!contact.email ? 'Add a client email first' : undefined}
+          title={!contact.email ? 'Add a client email first' : 'Email the invoice to the client'}
           style={{
             flex: 1,
             minHeight: 48,
             padding: '12px 14px',
             borderRadius: 12,
-            background: 'var(--v3-surface-2)',
-            border: '1px solid var(--v3-border-strong)',
-            color: (sending || !contact.email) ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+            background: sent
+              ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
+              : 'var(--v3-surface-2)',
+            border: sent
+              ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
+              : '1px solid var(--v3-border-strong)',
+            color: sent
+              ? '#0a0a0a'
+              : (sending || !contact.email) ? 'var(--v3-text-muted)' : 'var(--v3-text)',
             fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
             cursor: sending ? 'wait' : (!contact.email ? 'not-allowed' : 'pointer'),
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
             touchAction: 'manipulation',
-            opacity: !contact.email ? 0.55 : 1
+            opacity: !contact.email ? 0.55 : 1,
+            transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
           }}
         >
-          <Send size={14} aria-hidden="true" />
-          {sending ? 'Sending…' : 'Send'}
+          {sent ? <CheckCircle2 size={14} aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
+          {sent ? 'Sent' : sending ? 'Sending…' : 'Email'}
         </button>
         <button
           type="button"
@@ -670,7 +689,7 @@ export default function InvoiceDetail() {
           }}
         >
           <FileDown size={14} aria-hidden="true" />
-          {generating ? 'Generating…' : 'PDF'}
+          {generating ? 'Generating…' : 'Download'}
         </button>
         <button
           type="button"
