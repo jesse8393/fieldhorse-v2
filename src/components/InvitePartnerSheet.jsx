@@ -106,7 +106,13 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         if (data?.sender_not_configured) {
           setSendFallbackReason('Email sender is not configured yet — share the link manually below.')
         } else if (data?.send_failed) {
-          setSendFallbackReason("We couldn't send the email automatically — share the link manually below.")
+          // Surface the actual provider error (e.g. "Domain not verified",
+          // "Invalid API key") so the operator can act on it instead of
+          // silently being shoved to copy/share. Was previously hidden
+          // behind a generic message — debugging required Netlify log dive.
+          const detail = data?.detail || 'Unknown provider error'
+          const status = data?.provider_status ? ` (HTTP ${data.provider_status})` : ''
+          setSendFallbackReason(`Email send failed${status}: ${detail}`)
         }
         setReadyUrl(data.invite_url)
       } else {

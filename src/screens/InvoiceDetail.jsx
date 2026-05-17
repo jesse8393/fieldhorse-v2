@@ -278,11 +278,6 @@ export default function InvoiceDetail() {
       const sendBody = await sendRes.json().catch(() => ({}))
 
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
-        // Make the failure mode obvious — the prior "we saved the PDF
-        // for you" toast got missed and the operator thought tapping
-        // Send had silently downloaded. Now the toast leads with the
-        // ACTUAL problem (email not configured) and explicitly names
-        // the local download as a fallback.
         toastError(
           "Email NOT sent — sender isn't configured",
           'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
@@ -291,7 +286,13 @@ export default function InvoiceDetail() {
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        throw new Error(sendBody?.detail || sendBody?.error || 'Email send failed.')
+        // Surface the actual provider error (Resend message + HTTP status)
+        // so the operator sees exactly why the send failed instead of
+        // hunting through Netlify function logs. Was previously hidden
+        // behind a generic "Email send failed." string.
+        const detail = sendBody?.detail || sendBody?.error || 'Unknown provider error'
+        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
+        throw new Error(`Resend rejected${status}: ${detail}`)
       }
 
       toastSuccess(`Invoice sent to ${contact.email}`, result.filename)
