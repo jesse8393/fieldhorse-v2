@@ -7,6 +7,7 @@ import {
 import { hapticTap, hapticMedium } from '../../lib/haptics.js'
 import { stageColor } from '../../lib/stages.js'
 import OverviewTab from '../../screens/ContactDetail/tabs/Overview.jsx'
+import QuoteTab from '../../screens/ContactDetail/tabs/Quote.jsx'
 import DetailsTab from '../../screens/ContactDetail/tabs/Details.jsx'
 import FinancialsTab from '../../screens/ContactDetail/tabs/Financials.jsx'
 import FilesTab from '../../screens/ContactDetail/tabs/Files.jsx'
@@ -228,8 +229,19 @@ export default function DesktopJobDetail({
         ))}
       </nav>
 
-      {/* WORK AREA */}
-      <div className="dt-jobdetail__work">
+      {/* WORK AREA — 5/17 chrome unification: Quote tab now also renders
+          inside DesktopJobDetail so all 5 tabs share the same back
+          button, eyebrow, financial strip, and tab nav (fixes the
+          5/13 audit's "two design systems on one page" complaint where
+          Overview used the dt-jobdetail chrome but Quote dropped to the
+          mobile shell with different back button + uppercase tabs).
+          When Quote is active we hide the right rail so the Quote
+          builder's 2-pane workspace (.v3-screen--quote-active) gets
+          full width — its own approval/context column lives inside the
+          tab. */}
+      <div
+        className={`dt-jobdetail__work${tab === 'quote' ? ' dt-jobdetail__work--quote' : ''}`}
+      >
         <div className="dt-jobdetail__main">
           {tab === 'overview' && (
             <OverviewTab
@@ -249,6 +261,15 @@ export default function DesktopJobDetail({
               onOpenLogPayment={onOpenLogPayment}
               onOpenInvitePartner={onOpenInvitePartner}
               onOpenApproveQuote={onOpenApproveQuote}
+            />
+          )}
+          {tab === 'quote' && (
+            <QuoteTab
+              contact={contact}
+              userId={userId}
+              fetchAll={fetchAll}
+              patch={patch}
+              onOpenApprove={onOpenApproveQuote}
             />
           )}
           {tab === 'details' && (
@@ -286,39 +307,41 @@ export default function DesktopJobDetail({
           )}
         </div>
 
-        <aside className="dt-jobdetail__rail">
-          <NextActionCard
-            nextAction={nextAction}
-            nextTodo={nextTodo}
-            onTodoDone={onTodoDone}
-            onOpenAddEvent={onOpenAddEvent}
-            onOpenApproveQuote={onOpenApproveQuote}
-            stage={stageKey}
-            onGoToQuote={() => setTab('quote')}
-          />
-          <ClientCard
-            contact={contact}
-            clientSummary={clientSummary}
-            phoneHref={phoneHref}
-            smsHref={smsHref}
-            emailHref={emailHref}
-            onClientNav={onClientNav}
-            onOpenInvitePartner={onOpenInvitePartner}
-          />
-          <ScheduleCard
-            scheduleItems={scheduleItems}
-            scheduleCount={scheduleCount}
-            onOpenAddEvent={onOpenAddEvent}
-          />
-          {(balance || 0) > 0.5 && (
-            <BalanceCard
-              balance={balance}
-              paid={paid}
-              contract={contractValue}
-              onLogPayment={onOpenLogPayment}
+        {tab !== 'quote' && (
+          <aside className="dt-jobdetail__rail">
+            <NextActionCard
+              nextAction={nextAction}
+              nextTodo={nextTodo}
+              onTodoDone={onTodoDone}
+              onOpenAddEvent={onOpenAddEvent}
+              onOpenApproveQuote={onOpenApproveQuote}
+              stage={stageKey}
+              onGoToQuote={() => setTab('quote')}
             />
-          )}
-        </aside>
+            <ClientCard
+              contact={contact}
+              clientSummary={clientSummary}
+              phoneHref={phoneHref}
+              smsHref={smsHref}
+              emailHref={emailHref}
+              onClientNav={onClientNav}
+              onOpenInvitePartner={onOpenInvitePartner}
+            />
+            <ScheduleCard
+              scheduleItems={scheduleItems}
+              scheduleCount={scheduleCount}
+              onOpenAddEvent={onOpenAddEvent}
+            />
+            {(balance || 0) > 0.5 && (
+              <BalanceCard
+                balance={balance}
+                paid={paid}
+                contract={contractValue}
+                onLogPayment={onOpenLogPayment}
+              />
+            )}
+          </aside>
+        )}
       </div>
     </div>
   )

@@ -186,15 +186,18 @@ export default function ContactDetail() {
     )
   }
 
-  // Phase 8 — desktop dispatch. At >=900px AND tab is not quote, render
-  // DesktopJobDetail (header + tabs + 2-col workspace + sticky context
-  // rail). Quote tab on desktop falls through to the existing flow,
-  // which Phase 4 already gave a proper 2-pane workspace via the
-  // .v3-screen--quote-active wrapper. Mobile <900px uses the existing
-  // Header + StageTimeline + SegmentedTabs + tab content layout
-  // verbatim. Modals stay mounted at the wrapper level so both
-  // branches can dispatch them.
-  const useDesktopShell = isDesktop && tab !== 'quote'
+  // Phase 8 — desktop dispatch. At >=900px every tab (including Quote)
+  // renders through DesktopJobDetail so the back button + eyebrow +
+  // tab nav stay visually consistent. The Quote tab's 2-pane workspace
+  // (.v3-screen--quote-active wrapper) is preserved; DesktopJobDetail
+  // hides its right context rail when tab === 'quote' so the Quote
+  // builder gets full width. 5/17 chrome unification — fixes the 5/13
+  // audit's "two design systems on one page" finding where switching
+  // to Quote on desktop swapped the entire chrome.
+  // Mobile <900px continues to use the Header + StageTimeline +
+  // SegmentedTabs + tab content flow verbatim. Modals stay mounted at
+  // the wrapper level so both branches can dispatch them.
+  const useDesktopShell = isDesktop
 
   return (
     <div
