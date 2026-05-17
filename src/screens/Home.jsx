@@ -293,11 +293,24 @@ export default function Home() {
       actions.sort((a, b) => a.urgency - b.urgency)
       const topActions = actions.slice(0, 5)
 
-      // Stage breakdown for the Pipeline card footer (mockup: Won/Active/Lead).
-      // Won = closed, Active = job + invoice, Lead = lead + quote.
+      // Stage breakdown for the Pipeline card footer — 3 chips that
+      // partition the funnel and match the Jobs tab filters one-to-one
+      // so a tap on a chip lands on a tab with the same count.
+      //   Lead  = stage in (lead, quote)       → /jobs?stage=lead
+      //   Doing = stage = job                  → /jobs?stage=active (tab "Doing")
+      //   Won   = stage in (invoice, closed)   → /jobs?stage=won
+      //
+      // 5/13 audit changes:
+      //   • Won was previously stage='closed' only — now matches the
+      //     canonical WON_STAGES from rollups.js (invoice + closed) so
+      //     Home agrees with the Jobs "Won" tab + Reports "Won YTD".
+      //   • Active was previously stage in (job, invoice) which read as
+      //     "all the work in progress" but conflicted with the Jobs
+      //     header's "active" reading (ACTIVE_STAGES count). We narrow
+      //     it to stage='job' so it matches the Jobs "Doing" tab exactly.
       const stageCounts = {
-        won:    contacts.filter((c) => c.stage === 'closed').length,
-        active: contacts.filter((c) => c.stage === 'job' || c.stage === 'invoice').length,
+        won:    contacts.filter((c) => c.stage === 'invoice' || c.stage === 'closed').length,
+        active: contacts.filter((c) => c.stage === 'job').length,
         lead:   contacts.filter((c) => c.stage === 'lead' || c.stage === 'quote').length
       }
 
@@ -733,7 +746,9 @@ export default function Home() {
         }}>
           {stageBreakdown == null ? '—' : (
             <>
-              <StageChip count={stageBreakdown.active} label="active" stage="active" navigate={navigate} />
+              {/* "doing" label matches the renamed Jobs "Doing" tab so a
+                  tap on this chip lands on a tab with the same count. */}
+              <StageChip count={stageBreakdown.active} label="doing" stage="active" navigate={navigate} />
               <span aria-hidden="true">·</span>
               <StageChip count={stageBreakdown.won} label="won" stage="won" navigate={navigate} />
               <span aria-hidden="true">·</span>
