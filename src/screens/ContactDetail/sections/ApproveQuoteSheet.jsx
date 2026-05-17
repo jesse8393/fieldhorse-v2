@@ -519,7 +519,6 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
             value={signatureData || ''}
             onChange={(e) => setSignatureData(e.target.value)}
             placeholder={name || 'Customer types their name'}
-            style={{ fontStyle: 'italic' }}
           />
           <span style={{
             fontSize: 11, lineHeight: 1.45,
