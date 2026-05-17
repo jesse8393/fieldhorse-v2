@@ -230,6 +230,151 @@ select:focus-visible,
 .fh-font-serif-italic { font-family: var(--font-serif); font-style: italic; }
 
 /* ============================================================
+   DISPATCH CARD — ported from v3 design handoff (5/17).
+   Source: styles-refine.css lines 145-249, paired with
+   screens-schedule-estimate.jsx::ScheduleScreen. Replaces the old
+   fh-timeline row pattern on Schedule's Day view. Design's
+   --surface/--ink/--good tokens map to FieldHorse's v3-* equivalents.
+   ============================================================ */
+.dispatch-card {
+  margin: 0 0 10px;
+  background: var(--v3-surface);
+  border: 1px solid var(--v3-border);
+  border-radius: 14px;
+  overflow: hidden;
+  list-style: none;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.dispatch-card.is-live {
+  border-color: color-mix(in srgb, var(--v3-success) 35%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--v3-success) 6%, transparent), var(--v3-surface));
+}
+.dispatch-card__top {
+  padding: 14px 16px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.dispatch-card__time {
+  flex-shrink: 0;
+  text-align: center;
+  min-width: 56px;
+  padding: 4px 0;
+}
+.dispatch-card__hr {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--v3-text);
+  font-variant-numeric: tabular-nums;
+}
+.dispatch-card__ap {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--v3-text-muted);
+  margin-top: 3px;
+}
+.dispatch-card.is-live .dispatch-card__hr { color: var(--v3-success-bright); }
+.dispatch-card__body { flex: 1; min-width: 0; }
+.dispatch-card__head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.dispatch-card__title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v3-text);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+.dispatch-card__sub {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dispatch-card__addr {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+.dispatch-state-pill {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.dispatch-state-pill--live {
+  background: color-mix(in srgb, var(--v3-success) 20%, transparent);
+  color: var(--v3-success-bright);
+  border: 1px solid color-mix(in srgb, var(--v3-success) 35%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dispatch-state-pill--live::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--v3-success-bright);
+  box-shadow: 0 0 6px var(--v3-success-bright);
+  animation: fhLivePulse 1.4s ease-in-out infinite;
+}
+@keyframes fhLivePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.dispatch-state-pill--up {
+  background: var(--v3-surface-2);
+  color: var(--v3-text-muted);
+  border: 1px solid var(--v3-border);
+}
+.dispatch-state-pill--done {
+  background: var(--v3-primary-soft);
+  color: var(--v3-primary-bright);
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent);
+}
+.dispatch-state-pill--default {
+  background: var(--v3-surface-2);
+  color: var(--v3-text-muted);
+  border: 1px solid var(--v3-border);
+}
+.dispatch-card__tap {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.dispatch-card__tap:focus-visible {
+  outline: 2px solid var(--v3-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================
    JOBS SCREEN — design handoff alignment (5/17).
    Mobile Jobs header pattern from screens-jobs.jsx:
      <h1.jobs-title>Jobs <span gold>& Pipeline</span></h1>
