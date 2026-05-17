@@ -877,14 +877,16 @@ export default function Home() {
             subline={dealsAtRisk?.quotesAttention > 0 ? 'Need follow up' : null}
             onTap={() => navigate('/jobs?stage=quote')}
           />
-          {/* V3-HOME-1D: tone changed warn(amber) → danger(red). Behind/
-              overdue is a recovery state, not a gold opportunity state. */}
+          {/* Tone flips danger→primary only when jobsBehind === 0. A red
+              "0 BEHIND" reads as an alarm when it's actually the all-clear
+              state (~audit 5/13). Non-zero stays danger so the operator
+              still gets the urgent red read when work has actually slipped. */}
           <CompactKpi
-            tone="danger"
+            tone={jobsBehind > 0 ? 'danger' : 'primary'}
             icon={CalendarClock}
             value={jobsBehind}
             label="Jobs Behind"
-            subline={jobsBehind > 0 ? 'Reschedule' : 'Overdue work'}
+            subline={jobsBehind > 0 ? 'Reschedule' : 'All on track'}
             onTap={() => navigate('/schedule')}
           />
         </div>
