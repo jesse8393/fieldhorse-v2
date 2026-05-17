@@ -13,6 +13,43 @@ import './styles/v3.css'
 // Loaded LAST so cascade-equal rules win. See file header for context.
 import './styles/mobile-keyboard-fix.css'
 
+/*
+ * ONE-TIME SERVICE WORKER KILL SWITCH (5/17)
+ * ------------------------------------------------------
+ * The previous VitePWA config did not set skipWaiting, so every shipped
+ * update sat in the SW "waiting" state and never activated until every
+ * tab closed. End result for the user: weeks of merged design work
+ * never reached the browser.
+ *
+ * This block runs ONCE per browser. It unregisters any installed SW,
+ * deletes every Cache Storage entry, sets a localStorage flag so it
+ * never runs again, then hard-reloads. After reload the new SW (now
+ * built with skipWaiting + clientsClaim) installs cleanly.
+ *
+ * Safe because:
+ *   - guarded by `fh-sw-killed-v2` flag, runs exactly once per browser
+ *   - the reload is a one-shot, can't loop (flag is set BEFORE reload)
+ *   - on browsers without serviceWorker (rare) it's a no-op
+ */
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  const KILL_KEY = 'fh-sw-killed-v2'
+  if (!localStorage.getItem(KILL_KEY)) {
+    localStorage.setItem(KILL_KEY, '1')
+    Promise.all([
+      navigator.serviceWorker.getRegistrations().then((regs) =>
+        Promise.all(regs.map((r) => r.unregister()))
+      ),
+      'caches' in window
+        ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        : Promise.resolve()
+    ])
+      .catch(() => {})
+      .finally(() => {
+        location.reload()
+      })
+  }
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AppErrorBoundary>
