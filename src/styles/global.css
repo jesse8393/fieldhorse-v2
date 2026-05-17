@@ -4212,14 +4212,20 @@ a {
     transition: background-color 140ms var(--ease);
     -webkit-tap-highlight-color: transparent;
   }
-  .dt-clients__row:hover { background: rgba(255, 255, 255, 0.02); }
+  .dt-clients__row:hover { background: rgba(255, 255, 255, 0.025); }
+  /* Selected row — neutral surface lift + thin neutral inset highlight on
+     the left, NOT a gold stripe + gold wash. User feedback: prior gold
+     treatment read as "stuck hovering on a button" because the same gold
+     accent that the featured TOP CLIENT card uses was duplicated on the
+     list row. */
   .dt-clients__row.is-selected {
-    background: rgba(228, 190, 111, 0.06);
-    border-left: 2px solid var(--field-gold);
-    padding-left: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 2px 0 0 var(--rule-strong, rgba(255, 255, 255, 0.18));
   }
+  /* Top client — no per-row tint. The featured TOP CLIENT card above the
+     list already carries the emphasis. */
   .dt-clients__row.is-top:not(.is-selected) {
-    background: rgba(228, 190, 111, 0.025);
+    background: transparent;
   }
   .dt-clients__row-av {
     flex-shrink: 0;
@@ -4234,12 +4240,13 @@ a {
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.04em;
-    color: var(--field-gold-bright);
+    color: var(--ink-muted);
   }
-  .dt-clients__row.is-top .dt-clients__row-av,
+  /* Selected row avatar — quiet surface lift, no gold gradient. */
   .dt-clients__row.is-selected .dt-clients__row-av {
-    background: linear-gradient(135deg, #3a2a18, #1a1208);
-    border-color: rgba(228, 190, 111, 0.30);
+    background: var(--surface-3, rgba(255, 255, 255, 0.06));
+    border-color: var(--rule-strong, rgba(255, 255, 255, 0.18));
+    color: var(--ink-strong);
   }
   .dt-clients__row-main {
     flex: 1;
