@@ -342,6 +342,10 @@ select:focus-visible,
   animation: fhLivePulse 1.4s ease-in-out infinite;
 }
 @keyframes fhLivePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes fh-rec-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
 .dispatch-state-pill--up {
   background: var(--v3-surface-2);
   color: var(--v3-text-muted);
