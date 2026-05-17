@@ -6,6 +6,7 @@ import BrandLogoPicker from '../components/BrandLogoPicker.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
+import { reverseGeocode } from '../lib/weather.js'
 // useTheme import removed 5/17 with APPEARANCE section — restore alongside
 // the toggle when full light-theme parity ships.
 // import { useTheme } from '../contexts/ThemeContext.jsx'
@@ -152,6 +153,23 @@ export default function Settings() {
       refresh()
     })
   }
+
+  // Reverse-geocode the saved coords so the Settings location card
+  // surfaces "Murfreesboro, TN" instead of the raw 35.838 / -86.470
+  // figures the 5/13 audit flagged. Helper lives in lib/weather.js
+  // (used by Forecast page already) with a per-coord cache so the
+  // fetch only fires once per coord pair per session.
+  const [locationLabel, setLocationLabel] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    const lat = profile?.location_lat
+    const lon = profile?.location_lon
+    if (lat == null || lon == null) { setLocationLabel(''); return }
+    reverseGeocode(lat, lon).then((label) => {
+      if (!cancelled && label) setLocationLabel(label)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [profile?.location_lat, profile?.location_lon])
 
   const { stagger, item } = useFhMotion()
 
@@ -328,11 +346,57 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* MARKET PIN */}
+      {/* MARKET PIN — 5/17 audit fix: surface the city name reverse-geocoded
+          from the saved coords ("Murfreesboro, TN") instead of the raw
+          LAT/LON pair the audit called out as unfriendly. Raw coords stay
+          available as muted secondary text so the operator can still
+          eyeball precision when needed. */}
       <Section variants={item} title={<>Where you <em>work.</em></>}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Meta label="Lat" value={profile?.location_lat ? profile.location_lat.toFixed(3) : '—'} />
-          <Meta label="Lon" value={profile?.location_lon ? profile.location_lon.toFixed(3) : '—'} />
+          <div style={{
+            flex: 1,
+            minWidth: 180,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            padding: '10px 14px',
+            borderRadius: 12,
+            background: 'var(--surface-2)',
+            border: '1px solid var(--rule)'
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-muted)'
+            }}>
+              Service area
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 15,
+              fontWeight: 600,
+              color: 'var(--ink-strong)',
+              lineHeight: 1.2
+            }}>
+              {profile?.location_lat
+                ? (locationLabel || 'Locating…')
+                : 'Not pinned'}
+            </span>
+            {profile?.location_lat && (
+              <span style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: 10,
+                color: 'var(--ink-faint)',
+                fontVariantNumeric: 'tabular-nums',
+                letterSpacing: '0.02em'
+              }}>
+                {profile.location_lat.toFixed(3)}, {profile.location_lon?.toFixed(3) || '—'}
+              </span>
+            )}
+          </div>
           <motion.button
             type="button"
             whileTap={{ scale: 0.97 }}
