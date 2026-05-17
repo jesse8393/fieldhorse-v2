@@ -35,6 +35,33 @@ function buildEmptyForm() {
   }
 }
 
+// Per-field character limits — added 5/17 to address the audit's
+// concern about runaway / pasted nonsense ending up in production
+// (e.g. "CXVCXVXV"-style strings appearing on customer-facing
+// surfaces). HTML maxLength on the input element AND a programmatic
+// clamp in the set() helper so paste flows are also covered.
+// Values picked to fit real human entries with comfortable room:
+//   name        — full name + suffix
+//   phone       — international format with formatting glyphs
+//   email       — RFC max
+//   address     — long urban address with apt + city + state
+//   company     — long LLC names
+//   job_title   — descriptive job names
+//   notes       — paragraph of context
+//   referred_by — full name + qualifier
+//   amount      — millions with decimal
+const FIELD_LIMITS = {
+  name: 120,
+  phone: 40,
+  email: 254,
+  address: 240,
+  company: 160,
+  job_title: 140,
+  notes: 4000,
+  referred_by: 160,
+  amount: 14
+}
+
 const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a new lead. Extract structured data from what they said. Return ONLY a single JSON object with these keys — use null for anything not clearly mentioned:
 {
   "name": string or null,
@@ -93,7 +120,15 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   // until the insert actually succeeds. Prevents the "03/03 even on error" bug.
   const currentStep = committed ? 3 : 1
 
-  function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
+  function set(k, v) {
+    // Clamp at per-field length cap (see FIELD_LIMITS above). The
+    // maxLength HTML attribute handles typing, but paste flows can
+    // still drop a long string in — clamp programmatically so the
+    // form state never holds more than FIELD_LIMITS[k] characters.
+    const limit = FIELD_LIMITS[k]
+    const safe = (typeof v === 'string' && limit) ? v.slice(0, limit) : v
+    setForm((f) => ({ ...f, [k]: safe }))
+  }
 
   // Document intelligence — Phase 19/#1. Hands the captured/pasted image
   // to Claude Vision, applies the parsed fields on top of whatever the
@@ -454,12 +489,15 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         />
       </SheetField>
 
-      {/* Contact */}
+      {/* Contact — maxLength on each input matches FIELD_LIMITS so the
+          browser blocks typing past the cap. set() also clamps in JS
+          so paste flows can't bypass. */}
       <SheetField label="Name" code="01·NAME">
         <input
           autoFocus
           value={form.name}
           onChange={(e) => set('name', e.target.value)}
+          maxLength={FIELD_LIMITS.name}
           placeholder="Homeowner or company"
         />
       </SheetField>
@@ -471,6 +509,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
             inputMode="tel"
             value={form.phone}
             onChange={(e) => set('phone', e.target.value)}
+            maxLength={FIELD_LIMITS.phone}
             placeholder="(555) 555-0100"
           />
         </SheetField>
@@ -480,6 +519,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
             inputMode="email"
             value={form.email}
             onChange={(e) => set('email', e.target.value)}
+            maxLength={FIELD_LIMITS.email}
             placeholder="name@domain.com"
           />
         </SheetField>
@@ -489,6 +529,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         <input
           value={form.address}
           onChange={(e) => set('address', e.target.value)}
+          maxLength={FIELD_LIMITS.address}
           placeholder="1234 Main St · Murfreesboro, TN"
         />
       </SheetField>
@@ -501,6 +542,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         <input
           value={form.company}
           onChange={(e) => set('company', e.target.value)}
+          maxLength={FIELD_LIMITS.company}
           placeholder="(optional) Acme Construction LLC"
         />
       </SheetField>
@@ -538,6 +580,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         <input
           value={form.job_title}
           onChange={(e) => set('job_title', e.target.value)}
+          maxLength={FIELD_LIMITS.job_title}
           placeholder="Kitchen remodel + island"
         />
       </SheetField>
@@ -555,6 +598,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
           rows={3}
           value={form.notes}
           onChange={(e) => set('notes', e.target.value)}
+          maxLength={FIELD_LIMITS.notes}
           placeholder="Context, timing, referral source…"
         />
       </SheetField>
