@@ -269,32 +269,42 @@ export default function Schedule() {
 
   return (
     <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))', position: 'relative', background: 'var(--v3-bg)' }}>
-      {/* SUMMARY PANEL — black-glass cockpit. Eyebrow + title + today/
-          upcoming counts. The FAB at bottom-right is the single
-          thumb-reachable add-event control; an inline header CTA used
-          to live here but was removed in 1F-2 to avoid duplicating the
-          FAB action. The empty-state CTA inside DayView still renders
-          when zero events as a discoverability prompt. */}
-      <motion.div
-        variants={item}
-        className="v3-section v3-section--primary-quiet"
-        style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 18px' }}
-      >
-        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
-          Schedule
-        </span>
-        <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}>
-          Today, planned.
+      {/* COMPACT HEADER — matches design's app-head--titled pattern.
+          Eyebrow gives context ("Tue · May 20 · 4 visits"), h1 anchors
+          the screen. Stats live inline under the eyebrow instead of
+          inside a heavy black-glass panel. */}
+      <motion.div variants={item} style={{ padding: '14px 20px 4px' }}>
+        <div style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: 'var(--v3-primary)',
+          marginBottom: 6
+        }}>
+          {cursor.toLocaleDateString(undefined, { weekday: 'short' })} ·{' '}
+          {cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          {(events && events.length > 0) && (
+            <> · {events.length} {events.length === 1 ? 'visit' : 'visits'}</>
+          )}
+        </div>
+        <h1 style={{
+          margin: 0,
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(28px, 8vw, 38px)',
+          lineHeight: 1, letterSpacing: '0.01em',
+          color: 'var(--v3-text)'
+        }}>
+          {sameDay(cursor, startOfDay(new Date()))
+            ? 'Today'
+            : cursor.toLocaleDateString(undefined, { weekday: 'long' })}
         </h1>
-        {/* Today + Upcoming summary — surfaces the already-loaded upcoming
-            7-day window so the operator gets a forward read without
-            scrolling. Hidden until at least one stream has data so the
-            panel doesn't render an empty stat row. */}
-        {(events || upcoming.length > 0) && (
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, marginTop: 14, flexWrap: 'wrap' }}>
-            <SummaryStat label={view === 'day' ? 'Today' : view === 'week' ? 'This week' : 'Visible'} value={events ? events.length : '—'} tone="gold" />
-            <span aria-hidden="true" style={{ width: 1, height: 18, background: 'var(--v3-border)' }} />
-            <SummaryStat label="Upcoming · 7d" value={upcoming.length} tone="muted" />
+        {upcoming.length > 0 && (
+          <div style={{
+            marginTop: 4,
+            fontFamily: 'var(--font-body)', fontSize: 12,
+            color: 'var(--v3-text-muted)'
+          }}>
+            {upcoming.length} upcoming in next 7 days
           </div>
         )}
       </motion.div>
@@ -362,8 +372,11 @@ export default function Schedule() {
 
       {/* WEEK STRIP — 7 cells anchored to Monday. Highlighted cell = cursor;
           ring around today (when not selected). Tap any day to jump. */}
-      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
-        <div className="fh-week-strip">
+      {/* DISPATCH STRIP — slim 52px day pills, design's dispatch-day pattern.
+          Today gets a bright gold gradient; selected (non-today) gets a
+          gold-soft tint with a subtle border accent. */}
+      <motion.div variants={item}>
+        <div className="dispatch-strip">
           {Array.from({ length: 7 }, (_, i) => {
             const today = startOfDay(new Date())
             const cursorDow = (cursor.getDay() + 6) % 7
@@ -372,98 +385,33 @@ export default function Schedule() {
             const isToday = sameDay(day, today)
             const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase().slice(0, 3)
             const dayNum = day.getDate()
-            // 5/17 weather overlay — look up the daily forecast for
-            // this cell. forecastFor is null when the cell sits outside
-            // the 7-day forecast horizon, in which case we render no
-            // badge (silent, not "—").
             const forecastFor = dailyForecast[dayKey(day)] || null
+            const hasJobsPip = forecastFor && forecastFor.precipProb >= 50
             return (
-              <motion.button
+              <button
                 key={day.toISOString()}
                 type="button"
-                whileTap={{ scale: 0.94 }}
                 onClick={() => { hapticTap(); setCursor(startOfDay(day)); setView('day') }}
                 aria-pressed={isSelected}
-                style={{
-                  position: 'relative',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: 4,
-                  padding: '10px 4px',
-                  borderRadius: 12,
-                  background: isSelected ? 'var(--v3-surface-2)' : 'var(--v3-surface)',
-                  border: isSelected
-                    ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
-                    : isToday
-                      ? '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)'
-                      : '1px solid var(--v3-border-strong)',
-                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
-                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text)',
-                  cursor: 'pointer',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
+                className={`dispatch-day${isToday ? ' is-today' : ''}${isSelected && !isToday ? ' is-selected' : ''}`}
               >
-                <span style={{
-                  fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-                  letterSpacing: '0.14em',
-                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
-                }}>
-                  {dayName}
-                </span>
-                <span style={{
-                  fontFamily: 'var(--font-display)', fontSize: 18,
-                  letterSpacing: '0.02em',
-                  color: isSelected ? 'var(--v3-primary)' : 'var(--v3-text)',
-                  fontVariantNumeric: 'tabular-nums', lineHeight: 1
-                }}>
-                  {dayNum}
-                </span>
-                {/* Weather badge — small high temp + precip indicator
-                    when rain probability is meaningful. Renders only
-                    when the forecast horizon covers this day. The
-                    badge is muted on non-selected cells so it doesn't
-                    fight with the date number for attention. */}
+                <span className="dispatch-day__dow">{dayName}</span>
+                <span className="dispatch-day__num">{dayNum}</span>
                 {forecastFor && forecastFor.high != null && (
                   <span style={{
-                    marginTop: 2,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 3,
                     fontFamily: 'var(--font-body)',
                     fontSize: 9,
                     fontWeight: 600,
                     lineHeight: 1,
-                    letterSpacing: '0.02em',
-                    color: forecastFor.precipProb >= 60
-                      ? 'var(--v3-stage-lead)'
-                      : isSelected
-                        ? 'var(--v3-primary)'
-                        : 'var(--v3-text-muted)',
-                    fontVariantNumeric: 'tabular-nums'
+                    color: isToday ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
+                    fontVariantNumeric: 'tabular-nums',
+                    marginTop: 2
                   }}>
                     {Math.round(forecastFor.high)}°
-                    {forecastFor.precipProb >= 40 && (
-                      <span aria-label={`${Math.round(forecastFor.precipProb)}% chance of precipitation`}>
-                        · {Math.round(forecastFor.precipProb)}%
-                      </span>
-                    )}
                   </span>
                 )}
-                {isToday && !isSelected && (
-                  <span aria-hidden="true" style={{
-                    width: 4, height: 4, borderRadius: '50%',
-                    background: 'var(--v3-primary)', marginTop: 1
-                  }} />
-                )}
-                {isSelected && (
-                  <span aria-hidden="true" style={{
-                    position: 'absolute',
-                    left: '20%', right: '20%', bottom: 4,
-                    height: 2, borderRadius: 2,
-                    background: 'var(--v3-primary)',
-                    boxShadow: '0 0 6px rgba(201, 150, 58, 0.35)'
-                  }} />
-                )}
-              </motion.button>
+                {hasJobsPip && !isToday && <span className="dispatch-day__pip" />}
+              </button>
             )
           })}
         </div>
@@ -673,99 +621,162 @@ const chevBtnStyle = {
 }
 
 function DayView({ events, now, onClick, onDelete, onAdd }) {
-  if (events.length === 0) {
-    return (
-      <div style={{
-        // Tightened from 40/28 → 22/20 and the icon avatar from 52 → 40
-        // so the empty state reads as a quick prompt, not a full
-        // billboard card occupying most of the timeline area.
-        padding: '22px 20px',
-        borderRadius: 16,
-        background: 'var(--v3-surface)',
-        border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
-        textAlign: 'center',
-        fontFamily: 'var(--font-body)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 12
-      }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 12,
-          background: 'var(--v3-surface-2)',
-          border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
-          display: 'grid', placeItems: 'center',
-          color: 'var(--v3-primary)'
-        }}>
-          <CalendarIcon size={18} aria-hidden="true" />
-        </div>
-        <div>
-          <h3 style={{
-            margin: 0,
-            fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em',
-            color: 'var(--v3-text)'
-          }}>
-            Nothing scheduled — fill your day.
-          </h3>
-          <p style={{
-            margin: '6px 0 0',
-            fontSize: 12,
-            color: 'var(--v3-text-muted)',
-            lineHeight: 1.45,
-            maxWidth: 320
-          }}>
-            Crew runs smoother when the day's on the board. Queue up the first job.
-          </p>
-        </div>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.97 }}
-          whileHover={{ y: -2 }}
-          transition={{ type: 'spring', stiffness: 620, damping: 28 }}
-          onClick={() => { hapticTap(); onAdd?.() }}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '11px 18px', borderRadius: 12, border: 'none',
-            background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-            letterSpacing: '0.04em', cursor: 'pointer',
-            boxShadow: 'var(--v3-gold-glow)',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-        >
-          <Plus size={14} />
-          Schedule a job
-        </motion.button>
-      </div>
-    )
-  }
+  // Per-status counts — drive the All/Live/Upcoming/Done toggle badges
+  // and let the filter persist even when zero of a bucket exists today.
+  const [stateFilter, setStateFilter] = useState('all')
+
+  const counts = useMemo(() => {
+    const c = { all: events.length, live: 0, upcoming: 0, done: 0 }
+    for (const e of events) {
+      const s = deriveStatus(e, now)
+      if (s === 'On Site' || s === 'In Progress') c.live++
+      else if (s === 'Done') c.done++
+      else c.upcoming++
+    }
+    return c
+  }, [events, now])
+
+  const filtered = useMemo(() => {
+    if (stateFilter === 'all') return events
+    return events.filter((e) => {
+      const s = deriveStatus(e, now)
+      if (stateFilter === 'live') return s === 'On Site' || s === 'In Progress'
+      if (stateFilter === 'done') return s === 'Done'
+      return s === 'Upcoming' || s === 'Scheduled'
+    })
+  }, [events, stateFilter, now])
+
   return (
-    <ul className="fh-timeline" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {events.map((e, i) => {
-        const status = deriveStatus(e, now)
-        const start = fmtTime(e.start_at)
-        const end = e.end_at ? fmtTime(e.end_at) : null
-        const primary = e.fh_contacts?.name || e.title || 'Untitled'
-        const secondary = e.fh_contacts?.name && e.title ? e.title : (e.description || (e.contact_id ? '' : 'Manual event'))
-        const initial = (primary || '·').trim().charAt(0).toUpperCase()
-        return (
-          <ScheduleRow
-            key={e.id}
-            index={i}
-            primary={primary}
-            secondary={secondary}
-            startStr={start}
-            endStr={end}
-            status={status}
-            initial={initial}
-            onClick={() => e.contact_id && onClick(e.contact_id)}
-            onDelete={onDelete ? () => onDelete(e.id) : undefined}
-            isClickable={Boolean(e.contact_id)}
-          />
+    <>
+      {/* DISPATCH STATE TOGGLE — All / Live / Upcoming / Done. Always
+          visible (even on empty days) so the operator immediately sees
+          the state taxonomy and can filter live work. Ported from the
+          v3 design's dispatch-state pattern. */}
+      <div className="dispatch-state" role="tablist" aria-label="Filter schedule by status">
+        {[
+          { id: 'all',      label: 'All',      count: counts.all },
+          { id: 'live',     label: 'Live',     count: counts.live },
+          { id: 'upcoming', label: 'Upcoming', count: counts.upcoming },
+          { id: 'done',     label: 'Done',     count: counts.done }
+        ].map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            role="tab"
+            aria-selected={stateFilter === opt.id}
+            className={`dispatch-state__opt${stateFilter === opt.id ? ' is-on' : ''}`}
+            onClick={() => { hapticTap(); setStateFilter(opt.id) }}
+          >
+            {opt.label} <b>{opt.count}</b>
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        events.length === 0 ? (
+          // True empty day — designed empty state with dispatch aesthetic.
+          <div style={{
+            margin: '0 20px',
+            padding: '24px 20px',
+            borderRadius: 16,
+            background: 'linear-gradient(180deg, var(--v3-surface), var(--v3-surface-2))',
+            border: '1px dashed color-mix(in srgb, var(--v3-primary) 32%, var(--v3-border-strong))',
+            textAlign: 'center',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #2a1f10, #1a1208)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+              color: 'var(--v3-primary)',
+              display: 'grid', placeItems: 'center',
+              boxShadow: 'inset 0 1px 0 rgba(228,190,111,0.15), 0 0 16px rgba(228,190,111,0.18)'
+            }}>
+              <CalendarIcon size={18} aria-hidden="true" />
+            </div>
+            <div>
+              <div style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 22, lineHeight: 1.1,
+                letterSpacing: '0.01em',
+                color: 'var(--v3-text)'
+              }}>
+                Day's clear.
+              </div>
+              <p style={{
+                margin: '6px 0 0',
+                fontFamily: 'var(--font-body)',
+                fontSize: 12,
+                color: 'var(--v3-text-muted)',
+                lineHeight: 1.45,
+                maxWidth: 280
+              }}>
+                Queue up a job and your crew sees it the second they open the app.
+              </p>
+            </div>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { hapticTap(); onAdd?.() }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '11px 20px', borderRadius: 12,
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                background: 'linear-gradient(180deg, var(--v3-primary-hot, var(--v3-primary)) 0%, var(--v3-primary) 100%)',
+                color: 'var(--v3-on-primary)',
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                cursor: 'pointer',
+                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 6px 18px rgba(201, 150, 58, 0.32)',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              <Plus size={13} strokeWidth={2.6} />
+              Schedule a job
+            </motion.button>
+          </div>
+        ) : (
+          // Filtered-empty (events exist, just none in this bucket).
+          <div style={{
+            margin: '0 20px',
+            padding: '20px',
+            borderRadius: 14,
+            border: '1px dashed var(--v3-border-strong)',
+            color: 'var(--v3-text-muted)',
+            fontFamily: 'var(--font-body)', fontSize: 13,
+            textAlign: 'center'
+          }}>
+            Nothing in <strong style={{ color: 'var(--v3-text)' }}>{stateFilter}</strong> for this day.
+          </div>
         )
-      })}
-    </ul>
+      ) : (
+        <ul className="fh-timeline" style={{ listStyle: 'none', padding: 0, margin: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map((e, i) => {
+            const status = deriveStatus(e, now)
+            const start = fmtTime(e.start_at)
+            const end = e.end_at ? fmtTime(e.end_at) : null
+            const primary = e.fh_contacts?.name || e.title || 'Untitled'
+            const secondary = e.fh_contacts?.name && e.title ? e.title : (e.description || (e.contact_id ? '' : 'Manual event'))
+            const initial = (primary || '·').trim().charAt(0).toUpperCase()
+            return (
+              <ScheduleRow
+                key={e.id}
+                index={i}
+                primary={primary}
+                secondary={secondary}
+                startStr={start}
+                endStr={end}
+                status={status}
+                initial={initial}
+                onClick={() => e.contact_id && onClick(e.contact_id)}
+                onDelete={onDelete ? () => onDelete(e.id) : undefined}
+                isClickable={Boolean(e.contact_id)}
+              />
+            )
+          })}
+        </ul>
+      )}
+    </>
   )
 }
 
