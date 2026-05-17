@@ -352,10 +352,33 @@ function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
     })
   }
 
-  return rows.sort((a, b) => {
+  const sorted = rows.sort((a, b) => {
     const da = a.timestamp ? new Date(a.timestamp).getTime() : 0
     const db = b.timestamp ? new Date(b.timestamp).getTime() : 0
     return db - da
+  })
+
+  // 5/17 — collapse duplicate activity rows that come from the same
+  // logical event written multiple times. The 5/13 audit flagged
+  // "Roof-Deck-Chimney · Approved quote for Jeff Roy" appearing 4×
+  // on the feed; root cause is upstream (approveQuote() in lib/stages.js
+  // and possibly fn_approve_quote_version trigger both insert into
+  // fh_schedule on the same approval, doubling per re-approval). Fixing
+  // the write path is invasive — a content-key dedupe at display time
+  // is the safe fix that addresses the visible symptom.
+  //
+  // Dedupe key = (type | title | detail | day-bucket). Notes stay
+  // unique because their `key` already encodes the unique row id and
+  // we don't strip per-row; payments stay unique because each payment
+  // amount/date combo is rarely identical. Only schedule rows with
+  // truly-identical content on the same day collapse.
+  const seen = new Set()
+  return sorted.filter((r) => {
+    const dayBucket = r.timestamp ? String(r.timestamp).slice(0, 10) : 'no-date'
+    const content = `${r.type}|${(r.title || '').trim()}|${(r.detail || '').trim()}|${dayBucket}`
+    if (seen.has(content)) return false
+    seen.add(content)
+    return true
   })
 }
 
