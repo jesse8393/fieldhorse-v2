@@ -47,12 +47,20 @@ export default function Settings() {
   const [licenseNumber, setLicenseNumber] = useState(profile?.license_number || '')
   const [insuredText, setInsuredText] = useState(profile?.insured_text || '')
   const [warrantyDefault, setWarrantyDefault] = useState(profile?.warranty_default || '')
-  // Dedupe on read — older onboarding flows wrote duplicates into
-  // profile.services so the count shown ("24 picked") didn't match the
-  // 12 visible chips. We persist the deduped version on next save.
+  // Dedupe + canonicalize on read. Older onboarding flows wrote both
+  // duplicates AND ghost entries (typos, deprecated names like
+  // "Painters" / "Drywaller") into profile.services. The chip
+  // renderer iterates the canonical SERVICES list so ghost entries
+  // never render as chips — but the counter used to read the raw
+  // length, producing the audit's "24 picked but only 12 chips"
+  // discrepancy. We now also intersect with SERVICES so the count
+  // matches what the user can actually see. Persists on next save.
   const [services, setServices] = useState(() => {
     const arr = profile?.services || []
-    return Array.from(new Set(arr.map((s) => String(s || '').trim()).filter(Boolean)))
+    const canonical = new Set(SERVICES)
+    return Array.from(new Set(
+      arr.map((s) => String(s || '').trim()).filter((s) => s && canonical.has(s))
+    ))
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -98,7 +106,12 @@ export default function Settings() {
     setLicenseNumber(profile?.license_number || '')
     setInsuredText(profile?.insured_text || '')
     setWarrantyDefault(profile?.warranty_default || '')
-    setServices(Array.from(new Set((profile?.services || []).map((s) => String(s || '').trim()).filter(Boolean))))
+    setServices(() => {
+      const canonical = new Set(SERVICES)
+      return Array.from(new Set(
+        (profile?.services || []).map((s) => String(s || '').trim()).filter((s) => s && canonical.has(s))
+      ))
+    })
   }, [profile])
 
   async function saveDisplayName() {
