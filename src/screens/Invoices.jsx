@@ -107,6 +107,30 @@ export default function Invoices() {
     return out
   }, [rows])
 
+  // Month-to-date collection pace — payments logged in the current
+  // calendar month vs the trailing-3-month monthly average. Surfaces
+  // as the cockpit's "X collected this month · pace ±Y% vs avg" tip
+  // (ported from owed-hero__tip in the design handoff).
+  const collectionPace = useMemo(() => {
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1).getTime()
+    let monthCollected = 0
+    let priorTotal = 0
+    for (const p of payments) {
+      const t = p.paid_on ? new Date(p.paid_on).getTime() : new Date(p.created_at).getTime()
+      const amt = Number(p.amount || 0)
+      if (t >= startOfMonth) monthCollected += amt
+      else if (t >= threeMonthsAgo) priorTotal += amt
+    }
+    const priorMonthlyAvg = priorTotal / 3
+    let deltaPct = null
+    if (priorMonthlyAvg > 0) {
+      deltaPct = Math.round(((monthCollected - priorMonthlyAvg) / priorMonthlyAvg) * 100)
+    }
+    return { monthCollected, deltaPct }
+  }, [payments])
+
   const company = useMemo(() => ({
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
@@ -201,14 +225,28 @@ export default function Invoices() {
           glass treatment shipped on Schedule/Notes/Home cockpits. */}
       <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
         <div style={{
+          position: 'relative',
           padding: '14px 16px',
           borderRadius: 16,
           background: 'var(--v3-surface-glass)',
           backdropFilter: 'blur(14px) saturate(1.1)',
           WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+          overflow: 'hidden'
         }}>
+          {/* Gold radial sweep behind the hero number — ported from
+              owed-hero__sweep in the design handoff. Adds the premium
+              "money sits on warm light" feel without changing layout. */}
+          <span aria-hidden="true" style={{
+            position: 'absolute',
+            top: '-40%',
+            right: '-15%',
+            width: '70%',
+            height: '180%',
+            background: 'radial-gradient(45% 30% at 50% 50%, rgba(228, 190, 111, 0.14), transparent 70%)',
+            pointerEvents: 'none'
+          }} />
           {/* Top row: section eyebrow + state chip (urgency lives here, not in the total) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <Eyebrow tone="gold">
@@ -236,7 +274,7 @@ export default function Invoices() {
 
           {/* Aging visualization + 3-cell breakdown */}
           {!loading && totals.total > 0 && (
-            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--v3-border)' }}>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--v3-border)', position: 'relative' }}>
               <AgingBar totals={totals} />
               <div style={{
                 marginTop: 10,
@@ -262,6 +300,46 @@ export default function Invoices() {
                   )
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Month-to-date collection pace — positive momentum signal that
+              balances the alarm of outstanding totals. Ported from
+              owed-hero__tip in the design handoff. */}
+          {!loading && collectionPace.monthCollected > 0 && (
+            <div style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: '1px solid var(--v3-border)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              color: 'var(--v3-text-muted)',
+              position: 'relative'
+            }}>
+              <Check size={11} aria-hidden="true" color="var(--v3-success-bright)" strokeWidth={2.4} />
+              <span>
+                <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>
+                  {fmtMoney(collectionPace.monthCollected)}
+                </span>
+                {' collected this month'}
+                {collectionPace.deltaPct !== null && (
+                  <>
+                    {' · pace '}
+                    <span style={{
+                      color: collectionPace.deltaPct >= 0
+                        ? 'var(--v3-success-bright)'
+                        : 'var(--v3-danger-bright)',
+                      fontWeight: 600
+                    }}>
+                      {collectionPace.deltaPct >= 0 ? '+' : ''}{collectionPace.deltaPct}%
+                    </span>
+                    {' vs avg'}
+                  </>
+                )}
+              </span>
             </div>
           )}
         </div>
