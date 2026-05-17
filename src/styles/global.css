@@ -1921,9 +1921,16 @@ a {
     padding: 18px 4px 14px;
     font-family: var(--font-display);
     font-size: 22px;
-    letter-spacing: 0.10em;
+    letter-spacing: 0.04em;
     color: var(--ink-strong);
-    text-transform: uppercase;
+    /* text-transform: uppercase removed 5/17 — the 5/13 audit flagged
+       "sidebar shows PARKER CONSTRUCTION COMPANY, settings input shows
+       Parker Construction Co." as a name mismatch. They were the same
+       field, just rendered upper here. Preserve the operator's typed
+       casing so the sidebar matches what they see in Settings and what
+       the customer sees on proposals/invoices. The --system modifier
+       below keeps uppercase for the FIELD/HORSE wordmark fallback (it's
+       always a brand mark, never a typed value). */
     line-height: 1;
     text-align: center;
     overflow-wrap: anywhere;
@@ -1932,6 +1939,9 @@ a {
      wordmark, drop the system label above (it would just say the
      same thing) and tighten letter-spacing back to the badge value. */
   .fh-desktop-sidebar__co-wordmark--system {
+    /* FIELD/HORSE fallback — always uppercase brand wordmark, regardless
+       of the base rule which now preserves the typed company-name casing. */
+    text-transform: uppercase;
     letter-spacing: 0.12em;
     gap: 2px;
   }

@@ -12,12 +12,9 @@ import {
   Upload,
   CloudSun,
   Settings as SettingsIcon,
-  Moon,
-  Sun,
   LogOut
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { useTheme } from '../contexts/ThemeContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 
 /**
@@ -59,7 +56,6 @@ const SECONDARY_NAV = [
 export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { signOut, user } = useAuth()
-  const { theme, toggleTheme } = useTheme()
   const { profile } = useProfile()
 
   const userEmail = user?.email || ''
@@ -146,15 +142,13 @@ export default function DesktopSidebar() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          className="fh-desktop-sidebar__icon-btn"
-          onClick={() => toggleTheme()}
-          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-        >
-          {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
-        </button>
+        {/* Theme toggle hidden 5/17 — the light theme was half-implemented
+            (only repainted cards, left the sidebar + canvas dark per the
+            5/13 audit). Restore the button once full light parity ships
+            in tokens.css / global.css. The button used to live here:
+              <button onClick={toggleTheme}><Moon|Sun /></button>
+            ThemeContext still drives the data-theme attribute so the
+            current theme (dark by default) keeps rendering correctly. */}
         <button
           type="button"
           className="fh-desktop-sidebar__icon-btn"

@@ -6,7 +6,9 @@ import BrandLogoPicker from '../components/BrandLogoPicker.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
-import { useTheme } from '../contexts/ThemeContext.jsx'
+// useTheme import removed 5/17 with APPEARANCE section — restore alongside
+// the toggle when full light-theme parity ships.
+// import { useTheme } from '../contexts/ThemeContext.jsx'
 import { toastSuccess } from '../lib/toast.js'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
@@ -30,7 +32,7 @@ const DEV_BUILD = typeof import.meta !== 'undefined' && import.meta.env && impor
 export default function Settings() {
   const { user, signOut } = useAuth()
   const { profile, upsertProfile, refresh } = useProfile()
-  const { theme, toggleTheme } = useTheme()
+  // const { theme, toggleTheme } = useTheme() // ← restore with APPEARANCE section
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
@@ -343,19 +345,16 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* APPEARANCE */}
-      <Section variants={item} title={<>Light or <em>dark.</em></>}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
-          <Switch
-            checked={theme === 'dark'}
-            onCheckedChange={() => toggleTheme()}
-            aria-label="Toggle dark theme"
-          />
-          <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-strong)' }}>
-            {theme === 'dark' ? 'Dark theme' : 'Light theme'}
-          </span>
-        </div>
-      </Section>
+      {/* APPEARANCE section hidden 5/17 — light-theme parity is incomplete
+          (only repaints cards, leaves sidebar + canvas dark per the 5/13
+          audit). Audit recommendation was "either ship full light-mode
+          support or hide the toggle until parity exists." Restoring this
+          section is the right move once full parity ships. Original block:
+            <Section title={<>Light or <em>dark.</em></>}>
+              <Switch checked={theme === 'dark'} onCheckedChange={toggleTheme}/>
+              ...
+            </Section>
+       */}
 
       {/* ACCOUNT */}
       <Section variants={item} title={<>Your <em>session.</em></>}>
