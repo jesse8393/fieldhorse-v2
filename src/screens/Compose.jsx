@@ -432,19 +432,18 @@ export default function Compose() {
                 </Eyebrow>
               </div>
 
-              {/* Draft hero — lives directly on the panel, not in a nested box */}
-              <pre style={{
-                margin: 0,
-                padding: 0,
-                fontFamily: 'var(--font-body)',
-                fontSize: 15,
-                lineHeight: 1.6,
-                color: 'var(--v3-text)',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word'
-              }}>
-                {draft}
-              </pre>
+              {/* Draft hero — channel-appropriate rendering. Ported from the
+                  v3 design (screens-compose-nav.jsx cmp2-hero variants):
+                    sms   → iPhone-style chat bubble with phone bar + recipient
+                    email → envelope-style card with FROM / TO / SUBJECT rows
+                    voice → script panel labelled "your voice cloned" */}
+              <DraftHero
+                channel={channel}
+                draft={draft}
+                contact={contact}
+                profile={profile}
+                intent={intent}
+              />
 
               {/* Action row — 5/17 Compose-end-to-end port.
                   Per the design's CTA bar (screens-compose-nav.jsx)
@@ -700,6 +699,182 @@ function ContextChip({ children, tone = 'default' }) {
 function countWords(s) {
   if (!s) return 0
   return s.trim().split(/\s+/).filter(Boolean).length
+}
+
+/* ============================================================
+   DraftHero — channel-appropriate visualization of the draft.
+   Mirrors the v3 design's cmp2-hero pattern (screens-compose-
+   nav.jsx) so the operator sees what the client will receive,
+   not just plain text on a panel.
+   ============================================================ */
+function DraftHero({ channel, draft, contact, profile, intent }) {
+  if (channel === 'sms') {
+    return <SmsHero draft={draft} contact={contact} />
+  }
+  if (channel === 'email') {
+    return <EmailHero draft={draft} contact={contact} profile={profile} intent={intent} />
+  }
+  return <VoiceHero draft={draft} />
+}
+
+function SmsHero({ draft, contact }) {
+  const initials = (contact?.name || '·').trim().split(/\s+/).slice(0, 2).map((s) => s.charAt(0).toUpperCase()).join('') || '·'
+  const now = new Date()
+  const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const dayStr = now.toLocaleDateString([], { weekday: 'short' }).toUpperCase()
+  return (
+    <div style={{
+      borderRadius: 14,
+      border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))',
+      background: 'linear-gradient(180deg, var(--v3-surface-2), var(--v3-surface))',
+      overflow: 'hidden'
+    }}>
+      {/* Phone status bar */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '8px 14px',
+        borderBottom: '1px solid var(--v3-border)',
+        fontFamily: 'var(--font-display)',
+        fontSize: 11,
+        letterSpacing: '0.02em',
+        color: 'var(--v3-text-muted)'
+      }}>
+        <span>{timeStr}</span>
+        <span style={{ display: 'inline-flex', gap: 4, opacity: 0.7 }}>
+          <span style={{ width: 16, height: 8, borderRadius: 2, border: '1px solid currentColor', display: 'inline-block', position: 'relative' }}>
+            <span style={{ position: 'absolute', inset: 1, width: '70%', background: 'currentColor', borderRadius: 1 }} />
+          </span>
+        </span>
+      </div>
+      {/* Recipient header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '12px 14px',
+        borderBottom: '1px solid var(--v3-border)'
+      }}>
+        <div aria-hidden="true" style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #2a1f10, #1a1208)',
+          border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
+          color: 'var(--v3-primary)',
+          fontFamily: 'var(--font-display)', fontSize: 12,
+          display: 'grid', placeItems: 'center',
+          flexShrink: 0
+        }}>{initials}</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {contact?.name || 'New recipient'}
+          </div>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+            {contact?.phone || 'No phone on file'}
+          </div>
+        </div>
+      </div>
+      {/* Bubble */}
+      <div style={{ padding: '16px 14px 18px' }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontSize: 10,
+          letterSpacing: '0.18em', color: 'var(--v3-text-muted)',
+          textAlign: 'center', marginBottom: 10
+        }}>
+          {dayStr} · {timeStr}
+        </div>
+        <div style={{
+          maxWidth: '85%',
+          marginLeft: 'auto',
+          padding: '10px 14px',
+          borderRadius: '18px 18px 6px 18px',
+          background: 'linear-gradient(180deg, var(--v3-primary-hot), var(--v3-primary))',
+          color: 'var(--v3-on-primary)',
+          fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.45,
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          boxShadow: '0 4px 14px rgba(201, 150, 58, 0.22)'
+        }}>
+          {draft}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EmailHero({ draft, contact, profile, intent }) {
+  const fromName = profile?.company_name || profile?.full_name || 'Sender'
+  const fromAddr = profile?.company_email || profile?.email || ''
+  const subjectGuess = contact?.job_title || intent || `Message from ${fromName}`
+  return (
+    <div style={{
+      borderRadius: 14,
+      border: '1px solid var(--v3-border-strong)',
+      background: 'var(--v3-surface-2)',
+      overflow: 'hidden'
+    }}>
+      <div style={{
+        padding: '12px 14px',
+        borderBottom: '1px solid var(--v3-border)',
+        display: 'flex', flexDirection: 'column', gap: 4,
+        fontFamily: 'var(--font-body)', fontSize: 12,
+        color: 'var(--v3-text-muted)'
+      }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <span style={{ width: 44, fontSize: 10, letterSpacing: '0.18em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>From</span>
+          <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{fromName}{fromAddr ? ` <${fromAddr}>` : ''}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <span style={{ width: 44, fontSize: 10, letterSpacing: '0.18em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>To</span>
+          <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>
+            {contact?.name || 'Recipient'}{contact?.email ? ` <${contact.email}>` : ''}
+          </span>
+        </div>
+        <div style={{
+          marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 16,
+          color: 'var(--v3-text)', letterSpacing: '0.005em'
+        }}>
+          {subjectGuess}
+        </div>
+      </div>
+      <pre style={{
+        margin: 0, padding: '14px 16px',
+        fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.55,
+        color: 'var(--v3-text)',
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        background: 'var(--v3-surface)'
+      }}>
+        {draft}
+      </pre>
+    </div>
+  )
+}
+
+function VoiceHero({ draft }) {
+  return (
+    <div style={{
+      borderRadius: 14,
+      border: '1px solid var(--v3-border-strong)',
+      background: 'linear-gradient(180deg, var(--v3-surface-2), var(--v3-surface))',
+      padding: '14px 16px',
+      display: 'flex', flexDirection: 'column', gap: 10
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontSize: 10,
+        fontWeight: 700, letterSpacing: '0.18em',
+        textTransform: 'uppercase', color: 'var(--v3-primary)'
+      }}>
+        Script · read this aloud
+      </div>
+      <pre style={{
+        margin: 0,
+        fontFamily: 'var(--font-body)', fontSize: 15, lineHeight: 1.6,
+        color: 'var(--v3-text)',
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+      }}>
+        {draft}
+      </pre>
+    </div>
+  )
 }
 
 const selectStyle = {
