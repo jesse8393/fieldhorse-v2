@@ -378,6 +378,121 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* SCHEDULE — slim day strip + state toggle (5/17 design alignment).
+   Ports dispatch-strip + dispatch-day + dispatch-state from
+   styles-refine.css. Replaces heavy day-card squares with slim
+   52px pills; today gets a bright gold gradient. */
+.dispatch-strip {
+  margin: 4px 0 14px;
+  padding: 0 20px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.dispatch-strip::-webkit-scrollbar { display: none; }
+.dispatch-day {
+  flex-shrink: 0;
+  width: 52px;
+  padding: 10px 0;
+  background: var(--v3-surface);
+  border: 1px solid var(--v3-border);
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.dispatch-day:hover { border-color: var(--v3-border-strong); }
+.dispatch-day__dow {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--v3-text-muted);
+  text-transform: uppercase;
+}
+.dispatch-day__num {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--v3-text);
+  font-variant-numeric: tabular-nums;
+}
+.dispatch-day__pip {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--v3-primary);
+  margin-top: 2px;
+}
+.dispatch-day.is-today {
+  background: linear-gradient(180deg, var(--v3-primary-hot, var(--v3-primary)), var(--v3-primary));
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(228, 190, 111, 0.25);
+}
+.dispatch-day.is-today .dispatch-day__dow,
+.dispatch-day.is-today .dispatch-day__num { color: var(--v3-on-primary); }
+.dispatch-day.is-today .dispatch-day__pip { background: var(--v3-on-primary); }
+.dispatch-day.is-selected:not(.is-today) {
+  border-color: color-mix(in srgb, var(--v3-primary) 50%, transparent);
+  background: var(--v3-primary-soft);
+}
+
+/* All / Live / Upcoming / Done — segmented pill toggle that filters
+   the dispatch list by status. Always visible above the day rows. */
+.dispatch-state {
+  margin: 4px 20px 12px;
+  display: inline-flex;
+  gap: 0;
+  background: var(--v3-surface);
+  border: 1px solid var(--v3-border);
+  border-radius: 99px;
+  padding: 3px;
+  max-width: calc(100% - 40px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dispatch-state::-webkit-scrollbar { display: none; }
+.dispatch-state__opt {
+  padding: 7px 14px;
+  background: none;
+  border: 0;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--v3-text-muted);
+  cursor: pointer;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 160ms ease, color 160ms ease;
+}
+.dispatch-state__opt b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 11px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+.dispatch-state__opt.is-on {
+  background: var(--v3-primary-soft);
+  color: var(--v3-primary);
+}
+.dispatch-state__opt.is-on b { opacity: 1; color: var(--v3-primary); }
+
 /* ============================================================
    JOB DETAIL — cockpit headline hero from design handoff.
    Ported from styles-refine.css .cockpit-headline. Re-tokenized
