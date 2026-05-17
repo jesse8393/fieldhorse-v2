@@ -149,7 +149,18 @@ export default function Jobs() {
       .filter((c) => ACTIVE_STAGES.includes(c.stage))
       .reduce((s, c) => s + Number(c.amount || 0), 0)
     const activeCount = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage)).length
-    return { pipeline, activeCount }
+    const totalCount = contacts.length
+    // "Need eyes" — active-stage jobs with no update in 7+ days. Matches
+    // the design's stats line ("X total · $Y in motion · Z need eyes") and
+    // the audit's intuitive read of stale work that needs operator
+    // attention. Excludes closed/lost since they're terminal.
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const needEyesCount = contacts.filter((c) => {
+      if (!ACTIVE_STAGES.includes(c.stage)) return false
+      const last = new Date(c.updated_at || c.created_at || 0).getTime()
+      return Number.isFinite(last) && last < sevenDaysAgo
+    }).length
+    return { pipeline, activeCount, totalCount, needEyesCount }
   }, [contacts])
 
   const tabCounts = useMemo(() => {
@@ -288,31 +299,41 @@ export default function Jobs() {
       animate="show"
       style={{ position: 'relative' }}
     >
-      {/* HEADER — title + caption subline. Mockup uses a quiet
-          "{count} active · ${total} total" caption rather than a
-          display-font command bar; the count + total still surface,
-          just in a calmer hierarchy that lets the cards lead. */}
+      {/* HEADER — design handoff (5/17) pattern:
+            <h1.jobs-title>Jobs <span gold>& Pipeline</span></h1>
+            <div.jobs-stats>
+              <b.stamp>N</b> total · <b.stamp>$X</b> in motion ·
+              <span.alert><b.stamp>N</b> need eyes</span>
+            </div>
+          The gold accent on "& Pipeline" matches the design's
+          color="var(--gold-bright)" span. Stats use .stamp (Bebas Neue
+          + tabular-nums) for every number. "Need eyes" only renders
+          when there's actually stale work — keeps the row clean when
+          the operator is on top of things. */}
       <motion.div className="fh-jobs__head" variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <h1
-            style={{ margin: 0, fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}
-          >
-            Jobs & Pipeline
+          <h1 className="jobs-title">
+            Jobs{' '}
+            <span style={{ color: 'var(--v3-primary-bright)' }}>& Pipeline</span>
           </h1>
-          <div className="v3-caption" style={{ marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+          <div className="jobs-stats">
             {loading ? (
               // V3-JOBS-1: avoid the misleading "0 active" first-paint
               // state — show a quiet loading hint until data hydrates.
-              <span>Loading…</span>
+              <span style={{ color: 'var(--v3-text-muted)' }}>Loading…</span>
             ) : (
               <>
-                <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{summary.activeCount}</span>
-                <span> active</span>
+                <span><b>{summary.totalCount}</b> total</span>
                 {summary.pipeline > 0 && (
                   <>
-                    <span style={{ margin: '0 6px', color: 'var(--v3-text-faint)' }}>·</span>
-                    <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{kFormat(summary.pipeline)}</span>
-                    <span> total</span>
+                    <span className="dot-sep">·</span>
+                    <span><b>{kFormat(summary.pipeline)}</b> in motion</span>
+                  </>
+                )}
+                {summary.needEyesCount > 0 && (
+                  <>
+                    <span className="dot-sep">·</span>
+                    <span className="jobs-stats__alert"><b>{summary.needEyesCount}</b> need eyes</span>
                   </>
                 )}
               </>

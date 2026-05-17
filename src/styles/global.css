@@ -230,6 +230,58 @@ select:focus-visible,
 .fh-font-serif-italic { font-family: var(--font-serif); font-style: italic; }
 
 /* ============================================================
+   JOBS SCREEN — design handoff alignment (5/17).
+   Mobile Jobs header pattern from screens-jobs.jsx:
+     <h1.jobs-title>Jobs <span gold>& Pipeline</span></h1>
+     <div.jobs-stats>
+       <span><b.stamp>N</b> total</span>
+       <span.dot-sep>·</span>
+       <span><b.stamp>$X</b> in motion</span>
+       <span.dot-sep>·</span>
+       <span.jobs-stats__alert><b.stamp>N</b> need eyes</span>
+     </div>
+   ============================================================ */
+.jobs-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 28px;
+  letter-spacing: -0.025em;
+  line-height: 1.0;
+  color: var(--v3-text);
+}
+.jobs-stats {
+  margin-top: 8px;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v3-text-muted);
+  flex-wrap: wrap;
+}
+.jobs-stats b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  font-size: 16px;
+  color: var(--v3-primary-bright);
+  letter-spacing: 0.02em;
+}
+.dot-sep { color: var(--v3-text-faint); }
+.jobs-stats__alert { color: var(--v3-danger-bright); }
+.jobs-stats__alert b { color: var(--v3-danger-bright); }
+.job-divider {
+  display: flex; align-items: center; gap: 12px;
+  padding: 4px 16px 14px;
+}
+.job-divider__line {
+  flex: 1; height: 1px; background: var(--v3-border);
+}
+.job-divider__lbl {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.18em;
+  color: var(--v3-text-faint); text-transform: uppercase;
+}
+
+/* ============================================================
    DESIGN UTILITY CLASSES — sourced from the 5/17 design handoff
    (tokens.css in the v3-premium-design bundle). These are the
    exact patterns the designer uses across every screen file.
