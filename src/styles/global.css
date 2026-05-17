@@ -230,6 +230,386 @@ select:focus-visible,
 .fh-font-serif-italic { font-family: var(--font-serif); font-style: italic; }
 
 /* ============================================================
+   DISPATCH CARD — ported from v3 design handoff (5/17).
+   Source: styles-refine.css lines 145-249, paired with
+   screens-schedule-estimate.jsx::ScheduleScreen. Replaces the old
+   fh-timeline row pattern on Schedule's Day view. Design's
+   --surface/--ink/--good tokens map to FieldHorse's v3-* equivalents.
+   ============================================================ */
+.dispatch-card {
+  margin: 0 0 10px;
+  background: var(--v3-surface);
+  border: 1px solid var(--v3-border);
+  border-radius: 14px;
+  overflow: hidden;
+  list-style: none;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.dispatch-card.is-live {
+  border-color: color-mix(in srgb, var(--v3-success) 35%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--v3-success) 6%, transparent), var(--v3-surface));
+}
+.dispatch-card__top {
+  padding: 14px 16px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.dispatch-card__time {
+  flex-shrink: 0;
+  text-align: center;
+  min-width: 56px;
+  padding: 4px 0;
+}
+.dispatch-card__hr {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--v3-text);
+  font-variant-numeric: tabular-nums;
+}
+.dispatch-card__ap {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--v3-text-muted);
+  margin-top: 3px;
+}
+.dispatch-card.is-live .dispatch-card__hr { color: var(--v3-success-bright); }
+.dispatch-card__body { flex: 1; min-width: 0; }
+.dispatch-card__head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.dispatch-card__title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v3-text);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+.dispatch-card__sub {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dispatch-card__addr {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+.dispatch-state-pill {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.dispatch-state-pill--live {
+  background: color-mix(in srgb, var(--v3-success) 20%, transparent);
+  color: var(--v3-success-bright);
+  border: 1px solid color-mix(in srgb, var(--v3-success) 35%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dispatch-state-pill--live::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--v3-success-bright);
+  box-shadow: 0 0 6px var(--v3-success-bright);
+  animation: fhLivePulse 1.4s ease-in-out infinite;
+}
+@keyframes fhLivePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.dispatch-state-pill--up {
+  background: var(--v3-surface-2);
+  color: var(--v3-text-muted);
+  border: 1px solid var(--v3-border);
+}
+.dispatch-state-pill--done {
+  background: var(--v3-primary-soft);
+  color: var(--v3-primary-bright);
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent);
+}
+.dispatch-state-pill--default {
+  background: var(--v3-surface-2);
+  color: var(--v3-text-muted);
+  border: 1px solid var(--v3-border);
+}
+.dispatch-card__tap {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.dispatch-card__tap:focus-visible {
+  outline: 2px solid var(--v3-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   JOB DETAIL — cockpit headline hero from design handoff.
+   Ported from styles-refine.css .cockpit-headline. Re-tokenized
+   to --v3-* and used by CockpitHeadline in Overview.jsx — shows
+   the contract value as the hero number with a billed/remaining
+   progress bar underneath.
+   ============================================================ */
+.cockpit-headline {
+  padding: 16px 18px;
+  background: linear-gradient(180deg, var(--v3-surface), var(--v3-surface-2));
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 28%, var(--v3-border-strong));
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 240, 210, 0.05) inset, 0 10px 28px rgba(0, 0, 0, 0.42);
+}
+.cockpit-headline::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 60%;
+  height: 200%;
+  background: radial-gradient(40% 30% at 50% 50%, rgba(228, 190, 111, 0.12), transparent 70%);
+  pointer-events: none;
+}
+.cockpit-headline__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+.cockpit-headline__lbl {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--v3-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.cockpit-headline__amt {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1;
+  color: var(--v3-text);
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-headline__sub {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  margin-top: 5px;
+}
+.cockpit-headline__r { text-align: right; }
+.cockpit-headline__margin {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--v3-success-bright, #7BB58E);
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-headline__bar {
+  position: relative;
+  height: 6px;
+  background: var(--v3-border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.cockpit-headline__bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--v3-primary), var(--v3-primary-bright, var(--v3-primary)));
+  border-radius: 99px;
+}
+.cockpit-headline__bar-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--v3-text-muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-headline__bar-meta b {
+  color: var(--v3-primary);
+  font-weight: 400;
+}
+
+/* ============================================================
+   CLIENTS SCREEN — featured top-client card from design handoff.
+   Ported from styles-workflows.css .cl-card / .cl-card--top /
+   .cl-card__rib / .cl-card__strip. Re-tokenized to --v3-* and
+   used by FeaturedClientCard in Clients.jsx.
+   ============================================================ */
+.cl-card {
+  position: relative;
+  background: linear-gradient(180deg, #1a1410 0%, var(--v3-surface) 60%);
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong));
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 14px 38px rgba(0, 0, 0, 0.45);
+  margin: 4px 0 14px;
+}
+.cl-card--top::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 80% 0%, rgba(228, 190, 111, 0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+.cl-card__rib {
+  position: absolute;
+  top: 0;
+  right: 18px;
+  padding: 4px 11px;
+  background: linear-gradient(180deg, var(--v3-primary-bright, var(--v3-primary)), var(--v3-primary));
+  color: #1a1208;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  border-radius: 0 0 6px 6px;
+  z-index: 2;
+}
+.cl-card__hdr {
+  padding: 18px 16px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+.cl-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #2a1f10, #1a1208);
+  color: var(--v3-primary);
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent);
+  box-shadow: inset 0 1px 0 rgba(228, 190, 111, 0.15);
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.cl-card__main { flex: 1; min-width: 0; }
+.cl-card__name {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--v3-text);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cl-card__kind {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  margin-top: 3px;
+}
+.cl-card__amt { text-align: right; flex-shrink: 0; }
+.cl-card__amt-val {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--v3-primary);
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cl-card__amt-lbl {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--v3-text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.cl-card__strip {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--v3-border);
+  background: rgba(0, 0, 0, 0.22);
+}
+.cl-strip-cell {
+  flex: 1;
+  padding: 10px 14px;
+}
+.cl-strip-cell + .cl-strip-cell {
+  border-left: 1px solid var(--v3-border);
+}
+.cl-strip-cell__lbl {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--v3-text-muted);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+.cl-strip-cell__val {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--v3-text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.cl-strip-cell__val--gold { color: var(--v3-primary); }
+.cl-strip-cell__val--alert { color: var(--v3-danger-bright); }
+
+.cl-card__tap {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.cl-card__tap:focus-visible {
+  outline: 2px solid var(--v3-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================
    JOBS SCREEN — design handoff alignment (5/17).
    Mobile Jobs header pattern from screens-jobs.jsx:
      <h1.jobs-title>Jobs <span gold>& Pipeline</span></h1>

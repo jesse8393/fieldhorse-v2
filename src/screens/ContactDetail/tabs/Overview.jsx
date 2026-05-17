@@ -165,6 +165,12 @@ export default function OverviewTab({
     onOpenAddEvent?.()
   }
 
+  const contractValue = Number(contact?.amount || 0)
+  const paidNum = Number(paid || 0)
+  const remaining = Math.max(0, contractValue - paidNum)
+  const billedPct = contractValue > 0 ? Math.min(1, paidNum / contractValue) : 0
+  const showCockpit = contractValue > 0 && (contact?.stage === 'job' || contact?.stage === 'invoice' || contact?.stage === 'closed')
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '8px 20px 32px' }}>
 
@@ -177,6 +183,41 @@ export default function OverviewTab({
           patch={patch}
           onExitEdit={onExitEdit}
         />
+      )}
+
+      {/* COCKPIT HEADLINE — contract-value hero. Ported from the v3 design
+          handoff (.cockpit-headline). Only renders once the job has a real
+          contract value AND has moved past quote — before that, the
+          NextActionCard is still the right primary focus. */}
+      {showCockpit && (
+        <div className="cockpit-headline">
+          <div className="cockpit-headline__top">
+            <div>
+              <div className="cockpit-headline__lbl">Contract value</div>
+              <div className="cockpit-headline__amt">{money(contractValue)}</div>
+              <div className="cockpit-headline__sub">
+                {contact?.invoice_no ? `Invoice #${contact.invoice_no} · ` : ''}
+                {billedPct >= 1 ? 'Paid in full' : `${Math.round(billedPct * 100)}% collected`}
+              </div>
+            </div>
+            <div className="cockpit-headline__r">
+              <div className="cockpit-headline__lbl">Health</div>
+              <div className="cockpit-headline__margin" style={{
+                color: health.score >= 75 ? 'var(--v3-success-bright, #7BB58E)'
+                  : health.score >= 50 ? 'var(--v3-primary)'
+                  : 'var(--v3-danger-bright)'
+              }}>{health.score}%</div>
+              <div className="cockpit-headline__sub">{health.label}</div>
+            </div>
+          </div>
+          <div className="cockpit-headline__bar">
+            <div className="cockpit-headline__bar-fill" style={{ width: `${billedPct * 100}%` }} />
+          </div>
+          <div className="cockpit-headline__bar-meta">
+            <span><b>{money(paidNum)}</b> collected</span>
+            <span>{money(remaining)} remaining</span>
+          </div>
+        </div>
       )}
 
       {/* PRIMARY ROW — NextAction + HealthDonut. Stacks on mobile, side-by-side ≥768px. */}

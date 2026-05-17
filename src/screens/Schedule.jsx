@@ -795,163 +795,109 @@ function deriveStatus(e, now) {
   return 'Scheduled'
 }
 
-function ScheduleRow({ index, primary, secondary, startStr, endStr, status, initial, onClick, onDelete, isClickable }) {
-  const tone = STATUS_TONE[status] || STATUS_TONE.Scheduled
+// Status → dispatch-state-pill variant + label mapping.
+// 5/17 — ported from v3 design (screens-schedule-estimate.jsx +
+// styles-refine.css). LIVE shows the pulsing dot; UP NEXT and UPCOMING
+// share the muted "up" pill; DONE uses the soft-gold "done" pill;
+// SCHEDULED falls back to the neutral "default" pill.
+const PILL_FOR_STATUS = {
+  'On Site':     { variant: 'live',    label: 'LIVE' },
+  'In Progress': { variant: 'live',    label: 'LIVE' },
+  'Upcoming':    { variant: 'up',      label: 'UP NEXT' },
+  'Scheduled':   { variant: 'default', label: 'UPCOMING' },
+  'Done':        { variant: 'done',    label: 'DONE' }
+}
+
+// Split "8:15 AM" into ["8:15", "AM"] for the dispatch-card time
+// column (HR stamp above, AM/PM small caption below). Falls back to
+// the full string if no space is present.
+function splitTime(s) {
+  if (!s) return ['—', '']
+  const idx = s.lastIndexOf(' ')
+  if (idx < 0) return [s, '']
+  return [s.slice(0, idx), s.slice(idx + 1)]
+}
+
+function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onClick, onDelete, isClickable }) {
+  // 5/17 — full visual port of the v3 design's dispatch-card pattern
+  // (replaces the prior glass-row with status spine). Time column on
+  // the left as HR/AM stamp, title + sub on the right, state pill at
+  // the head-row top-right, optional secondary detail line below.
+  // The contact avatar/initial was removed — the design's pattern
+  // drops it (and reserves the bottom of the card for a future crew
+  // row when crews data ships). Delete affordance moves to a top-right
+  // absolute trash button so the card surface stays clean.
+  const pill = PILL_FOR_STATUS[status] || PILL_FOR_STATUS.Scheduled
+  const isLive = pill.variant === 'live'
+  const [hrPart, apPart] = splitTime(startStr)
+
   return (
     <motion.li
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={isClickable ? { y: -2, backgroundColor: 'var(--v3-surface-3)' } : undefined}
+      whileHover={isClickable ? { y: -2 } : undefined}
       transition={{
         opacity: { delay: Math.min(index * 0.04, 0.25), duration: 0.24, ease: [0.2, 0.8, 0.2, 1] },
-        y: { type: 'spring', stiffness: 620, damping: 28 },
-        backgroundColor: { type: 'spring', stiffness: 620, damping: 28 }
+        y: { type: 'spring', stiffness: 620, damping: 28 }
       }}
-      style={{
-        position: 'relative',
-        display: 'flex', alignItems: 'stretch', gap: 14,
-        padding: '14px 14px',
-        borderRadius: 14,
-        background: 'var(--v3-surface-glass)',
-        backdropFilter: 'blur(14px) saturate(1.1)',
-        WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
-        border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.25)',
-        overflow: 'hidden'
-      }}
+      className={`dispatch-card${isLive ? ' is-live' : ''}`}
+      style={{ position: 'relative' }}
     >
-      {/* Status-color spine — drives the at-a-glance dispatch read.
-          Glow softened from 55 to 33 hex alpha so the spine stays a
-          thin accent line rather than a full halo across the row. */}
-      <span aria-hidden="true" style={{
-        position: 'absolute',
-        left: 0, top: 12, bottom: 12,
-        width: 3,
-        borderRadius: '0 3px 3px 0',
-        background: tone.color,
-        boxShadow: `0 0 8px ${tone.color}33`
-      }} />
-
-      {/* Time column — start over end, narrow handle on the left */}
-      <div style={{
-        flexShrink: 0,
-        width: 64,
-        display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingLeft: 6,
-        paddingRight: 12,
-        borderRight: '1px solid var(--v3-border)'
-      }}>
-        <span style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 15,
-          letterSpacing: '0.02em',
-          color: 'var(--v3-text)',
-          fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1.05
-        }}>
-          {startStr}
-        </span>
-        {endStr && (
-          <span style={{
-            marginTop: 3,
-            fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            color: 'var(--v3-text-muted)',
-            fontVariantNumeric: 'tabular-nums',
-            letterSpacing: '0.04em'
-          }}>
-            {endStr}
-          </span>
-        )}
-      </div>
-
-      {/* Body — primary (job/client) + secondary (description) */}
       <button
         type="button"
+        className="dispatch-card__tap"
         onClick={isClickable ? onClick : undefined}
-        style={{
-          flex: 1, minWidth: 0,
-          display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          gap: 3,
-          background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
-          cursor: isClickable ? 'pointer' : 'default',
-          color: 'var(--v3-text)',
-          WebkitTapHighlightColor: 'transparent'
-        }}
+        disabled={!isClickable}
       >
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 14, fontWeight: 700,
-          letterSpacing: '-0.01em',
-          color: 'var(--v3-text)',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-        }}>
-          {primary}
-        </div>
-        {secondary && (
-          <div style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 11,
-            color: 'var(--v3-text-muted)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-          }}>
-            {secondary}
+        <div className="dispatch-card__top">
+          <div className="dispatch-card__time">
+            <div className="dispatch-card__hr">{hrPart}</div>
+            {apPart && <div className="dispatch-card__ap">{apPart}</div>}
           </div>
-        )}
-      </button>
-
-      {/* Right cluster — status pill + avatar (single, contact initial) */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          padding: '4px 10px',
-          borderRadius: 999,
-          background: tone.soft,
-          border: `1px solid ${tone.border}`,
-          color: tone.color,
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          whiteSpace: 'nowrap'
-        }}>
-          <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: tone.color }} />
-          {status}
-        </span>
-        <div aria-hidden="true" style={{
-          width: 30, height: 30,
-          borderRadius: '50%',
-          background: 'var(--v3-surface-2)',
-          border: '1px solid var(--v3-border-strong)',
-          display: 'grid', placeItems: 'center',
-          fontFamily: 'var(--font-display)',
-          fontSize: 13,
-          letterSpacing: '0.04em',
-          color: 'var(--v3-text)'
-        }}>
-          {initial}
+          <div className="dispatch-card__body">
+            <div className="dispatch-card__head-row">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="dispatch-card__title">{primary}</div>
+                {secondary && (
+                  <div className="dispatch-card__sub">{secondary}</div>
+                )}
+              </div>
+              <span className={`dispatch-state-pill dispatch-state-pill--${pill.variant}`}>
+                {pill.label}
+              </span>
+            </div>
+            {endStr && (
+              <div className="dispatch-card__addr">
+                <Clock size={10} aria-hidden="true" />
+                Ends {endStr}
+              </div>
+            )}
+          </div>
         </div>
-        {onDelete && (
-          <button
-            type="button"
-            onClick={(ev) => { ev.stopPropagation(); onDelete() }}
-            aria-label="Delete event"
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              border: 'none', background: 'transparent',
-              color: 'var(--v3-text-muted)',
-              cursor: 'pointer', display: 'grid', placeItems: 'center',
-              opacity: 0.55,
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
-            onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.55'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
-          >
-            <Trash2 size={13} />
-          </button>
-        )}
-      </div>
+      </button>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(ev) => { ev.stopPropagation(); onDelete() }}
+          aria-label="Delete event"
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            width: 32, height: 32, borderRadius: 8,
+            border: 'none', background: 'transparent',
+            color: 'var(--v3-text-muted)',
+            cursor: 'pointer', display: 'grid', placeItems: 'center',
+            opacity: 0.45,
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'opacity 160ms ease, color 160ms ease'
+          }}
+          onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
+          onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.45'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
     </motion.li>
   )
 }
