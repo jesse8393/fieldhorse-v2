@@ -4446,6 +4446,17 @@ a {
     gap: 18px;
     align-items: start;
   }
+  /* 5/17 chrome unification: Quote tab now renders inside
+     DesktopJobDetail so the back button + tab nav stay consistent
+     across all 5 tabs. The Quote builder has its own 2-pane workspace
+     (.v3-screen--quote-active in global.css) so the desktop right
+     rail collapses when tab === 'quote' — Quote gets the full canvas
+     width. Fixes the 5/13 audit's "two design systems on one page"
+     complaint where switching Overview → Quote swapped the entire
+     chrome to a different design system. */
+  .dt-jobdetail__work--quote {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .dt-jobdetail__main {
     min-width: 0;
     /* Existing tab components were tuned for mobile gutters. Drop the

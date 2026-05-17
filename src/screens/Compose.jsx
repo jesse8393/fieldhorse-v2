@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine } from 'lucide-react'
+import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -39,6 +39,10 @@ export default function Compose() {
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
+  // Real-send state (email channel only). Sent flag flips back to false
+  // after 2.4s so the operator can send again if needed.
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -98,6 +102,69 @@ export default function Compose() {
     if (!contact) return
     if (channel === 'sms' && contact.phone) window.location.href = `sms:${contact.phone}?body=${encodeURIComponent(draft)}`
     if (channel === 'email' && contact.email) window.location.href = `mailto:${contact.email}?body=${encodeURIComponent(draft)}`
+  }
+
+  // Real server-side email send via Resend (POST /api/send-message).
+  // Mirrors the multi-tenant sender pattern used by send-quote +
+  // send-invoice: From = "<Your Company> via FieldHorse", Reply-To =
+  // company_email. Server logs activity to fh_notes on success so the
+  // sent message shows up in the job's activity feed.
+  //
+  // Falls back to the mailto: handoff (sendAction) when the server
+  // returns 503 sender_not_configured — operators on a non-Resend
+  // deploy can still ship the draft through their mail client.
+  async function handleSendEmail() {
+    if (!contact?.email || !draft || sending) return
+    setSending(true)
+    setError('')
+    try {
+      // Subject derived from intent + contact context — short and honest.
+      const subjectGuess = contact.job_title
+        ? `Re: ${contact.job_title}`
+        : intent || `Message from ${profile?.company_name || 'your contractor'}`
+      const res = await fetch('/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          sender_user_id: user.id,
+          recipient_email: contact.email,
+          recipient_name: contact.name || null,
+          subject: subjectGuess,
+          body: draft
+        })
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (res.status === 503 && data?.error === 'sender_not_configured') {
+        // Friendly fallback — open the mail client with the draft prefilled.
+        toastSuccess('Opening email app', 'Direct send not configured — pasting into your mail client.')
+        sendAction()
+        return
+      }
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.detail || data?.error || 'Email send failed.')
+      }
+
+      hapticSuccess()
+      setSent(true)
+      toastSuccess(`Email sent to ${contact.email}`, `${draft.length} chars · ${countWords(draft)} words`)
+      setTimeout(() => setSent(false), 2400)
+    } catch (e) {
+      setError(e?.message || 'Could not send the message. Try again.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  // Re-run the generator with the same channel/intent/contact/context.
+  // Audit complaint: "Only post-generation action is Copy." Regenerate
+  // closes that gap — the operator can spin a fresh take without
+  // walking back through the form.
+  function regenerate() {
+    hapticMedium()
+    setSent(false)
+    generate()
   }
 
   const { stagger, item } = useFhMotion()
@@ -379,7 +446,28 @@ export default function Compose() {
                 {draft}
               </pre>
 
-              {/* Action row */}
+              {/* Action row — 5/17 Compose-end-to-end port.
+                  Per the design's CTA bar (screens-compose-nav.jsx)
+                  and the 5/13 audit complaint that "Compose dead-ends
+                  at Copy", three actions on the row:
+
+                    Regenerate    — spin a fresh take, same prompt
+                    Copy          — secondary, always available
+                    Send (PRIMARY) — channel-aware:
+                      email + contact email → POST /api/send-message
+                          (real Resend send; falls back to mailto: on
+                          503 sender_not_configured)
+                      sms + contact phone   → native sms: handoff
+                          (no SMS provider wired yet; Twilio is a
+                          future branch)
+                      voice                 → disabled "Voicemail
+                          script" pill — operator reads the script
+                          aloud after copying
+
+                  Send button labels: Send email / Open SMS / Script.
+                  Disabled when contact lacks the right contact channel
+                  (no email for email channel etc.) with a friendly
+                  hint via title. */}
               <div style={{
                 display: 'flex',
                 gap: 8,
@@ -389,6 +477,30 @@ export default function Compose() {
                 flexWrap: 'wrap',
                 justifyContent: 'flex-end'
               }}>
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={loading}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '10px 14px',
+                    minHeight: 40,
+                    borderRadius: 10,
+                    background: 'var(--v3-surface-2)',
+                    border: '1px solid var(--v3-border-strong)',
+                    color: loading ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: loading ? 'default' : 'pointer',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
+                >
+                  <RotateCw size={13} />
+                  Regenerate
+                </button>
                 <button
                   type="button"
                   onClick={copy}
@@ -416,6 +528,7 @@ export default function Compose() {
                   <button
                     type="button"
                     disabled
+                    title="Copy the script and call the client to read it aloud."
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -433,12 +546,14 @@ export default function Compose() {
                     }}
                   >
                     <Mic size={13} />
-                    Voicemail script
+                    Script
                   </button>
-                ) : contact && (
+                ) : channel === 'email' ? (
                   <button
                     type="button"
-                    onClick={sendAction}
+                    onClick={handleSendEmail}
+                    disabled={sending || !contact?.email}
+                    title={!contact?.email ? 'Add a client email first' : undefined}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -447,20 +562,65 @@ export default function Compose() {
                       minHeight: 40,
                       borderRadius: 10,
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-                      background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                      color: 'var(--v3-on-primary)',
+                      background: sent
+                        ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
+                        : (sending || !contact?.email)
+                          ? 'var(--v3-surface-2)'
+                          : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                      color: (sending || !contact?.email)
+                        ? 'var(--v3-text-muted)'
+                        : 'var(--v3-on-primary)',
                       fontFamily: 'var(--font-body)',
                       fontSize: 12,
                       fontWeight: 700,
                       letterSpacing: '0.06em',
                       textTransform: 'uppercase',
-                      cursor: 'pointer',
+                      cursor: (sending || !contact?.email) ? 'not-allowed' : 'pointer',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+                      boxShadow: (sending || !contact?.email)
+                        ? 'none'
+                        : '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)',
+                      opacity: !contact?.email ? 0.6 : 1
+                    }}
+                  >
+                    {sent ? <Check size={13} /> : <Send size={13} />}
+                    {sent ? 'Sent' : sending ? 'Sending…' : 'Send email'}
+                  </button>
+                ) : (
+                  /* SMS channel — keep the native handoff. No in-app SMS
+                     provider yet (Twilio integration is a future branch). */
+                  <button
+                    type="button"
+                    onClick={sendAction}
+                    disabled={!contact?.phone}
+                    title={!contact?.phone ? 'Add a client phone first' : undefined}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '10px 14px',
+                      minHeight: 40,
+                      borderRadius: 10,
+                      border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                      background: contact?.phone
+                        ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+                        : 'var(--v3-surface-2)',
+                      color: contact?.phone ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      cursor: contact?.phone ? 'pointer' : 'not-allowed',
+                      WebkitTapHighlightColor: 'transparent',
+                      boxShadow: contact?.phone
+                        ? '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+                        : 'none',
+                      opacity: !contact?.phone ? 0.6 : 1
                     }}
                   >
                     <Send size={13} />
-                    Open {channel === 'email' ? 'email' : 'SMS'}
+                    Open SMS
                   </button>
                 )}
               </div>
