@@ -206,6 +206,36 @@ export default function Schedule() {
     [weather, profile?.services]
   )
 
+  // 5/17 — daily forecast map keyed by YYYY-MM-DD so the Week strip
+  // can render a tiny high/precip badge under each date. Addresses the
+  // 5/13 audit's "Schedule should have a weather overlay (you already
+  // have the forecast data!)" complaint. getWeather now fetches 7
+  // days (was 3) so a full visible week has data. Cells outside the
+  // forecast horizon fall back to no badge — silent, not "—".
+  const dailyForecast = useMemo(() => {
+    const d = weather?.daily
+    if (!d?.time?.length) return {}
+    const out = {}
+    for (let i = 0; i < d.time.length; i++) {
+      out[d.time[i]] = {
+        high: d.temperature_2m_max?.[i],
+        low: d.temperature_2m_min?.[i],
+        precipProb: d.precipitation_probability_max?.[i] ?? 0,
+        precipIn: d.precipitation_sum?.[i] ?? 0
+      }
+    }
+    return out
+  }, [weather])
+
+  function dayKey(d) {
+    // Local-time YYYY-MM-DD, NOT toISOString (which converts to UTC and
+    // can skew the date by one day for east-of-UTC locales like CDT/CST).
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
@@ -342,6 +372,11 @@ export default function Schedule() {
             const isToday = sameDay(day, today)
             const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase().slice(0, 3)
             const dayNum = day.getDate()
+            // 5/17 weather overlay — look up the daily forecast for
+            // this cell. forecastFor is null when the cell sits outside
+            // the 7-day forecast horizon, in which case we render no
+            // badge (silent, not "—").
+            const forecastFor = dailyForecast[dayKey(day)] || null
             return (
               <motion.button
                 key={day.toISOString()}
@@ -382,6 +417,37 @@ export default function Schedule() {
                 }}>
                   {dayNum}
                 </span>
+                {/* Weather badge — small high temp + precip indicator
+                    when rain probability is meaningful. Renders only
+                    when the forecast horizon covers this day. The
+                    badge is muted on non-selected cells so it doesn't
+                    fight with the date number for attention. */}
+                {forecastFor && forecastFor.high != null && (
+                  <span style={{
+                    marginTop: 2,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    lineHeight: 1,
+                    letterSpacing: '0.02em',
+                    color: forecastFor.precipProb >= 60
+                      ? 'var(--v3-stage-lead)'
+                      : isSelected
+                        ? 'var(--v3-primary)'
+                        : 'var(--v3-text-muted)',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    {Math.round(forecastFor.high)}°
+                    {forecastFor.precipProb >= 40 && (
+                      <span aria-label={`${Math.round(forecastFor.precipProb)}% chance of precipitation`}>
+                        · {Math.round(forecastFor.precipProb)}%
+                      </span>
+                    )}
+                  </span>
+                )}
                 {isToday && !isSelected && (
                   <span aria-hidden="true" style={{
                     width: 4, height: 4, borderRadius: '50%',

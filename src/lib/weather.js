@@ -45,7 +45,7 @@ export async function getWeather(lat = MURFREESBORO.lat, lon = MURFREESBORO.lon)
     wind_speed_unit: 'mph',
     precipitation_unit: 'inch',
     timezone: 'auto',
-    forecast_days: 3
+    forecast_days: 7
   })
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
   if (!res.ok) throw new Error('weather fetch failed')
