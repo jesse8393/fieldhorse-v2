@@ -83,26 +83,50 @@ export default function Analytics() {
     // 'closed' only, so any job sitting in 'invoice' read as $0 won.
     const wonYTD = wonYTDFn(contacts)
     const profitYTD = profitYTDFn(contacts)
-    // Close rate as 0..1 from the shared helper, * 100 for the %.
-    // Phase 11 stabilization: sample-size guard. With only 1-2
-    // terminal jobs the rate reads as 100% / 0% which is misleading.
-    // Need at least 3 terminal jobs (won + lost) to surface a value;
-    // below that we display "—" via the KPI null branch.
+    // Close rate honesty guard (5/17 — replaces Phase 11's sample-size-3
+    // guard which still showed 100% when an operator had 3+ wins and 0
+    // losses). Requires BOTH at least one won AND at least one lost so
+    // the denominator (won + lost) is meaningful, and a total sample
+    // of at least 3 so a single 1-of-1 win doesn't read as 100%.
+    // Below either threshold the KPI tile renders "—" via its null branch.
     const wonCount = contacts.filter((c) => c.stage === 'invoice' || c.stage === 'closed').length
     const lostTerminalCount = contacts.filter((c) => c.stage === 'lost').length
     const terminalSample = wonCount + lostTerminalCount
-    const closeRate = terminalSample >= 3 ? closeRateFn(contacts) * 100 : null
-    // Avg margin as 0..1 from the shared helper, * 100 for the %.
-    // Phase 11 stabilization: cost-data guard. avgMarginFn returns 1.0
-    // (100%) when won jobs have null/zero cost — `(amount - 0) / amount`
-    // = 1. That's a fake 100% that confuses operators. Only surface
-    // the value when at least one won job has positive cost data.
-    const wonHasCost = contacts.some((c) =>
+    const closeRate = (wonCount >= 1 && lostTerminalCount >= 1 && terminalSample >= 3)
+      ? closeRateFn(contacts) * 100
+      : null
+    // Subtitle tells the operator what's holding the value back when null,
+    // OR contextualizes the sample size when present.
+    const closeRateNote = (closeRate == null)
+      ? (lostTerminalCount === 0
+          ? 'No lost deals logged yet'
+          : wonCount === 0
+            ? 'No wins yet'
+            : `Need ${3 - terminalSample} more closed deal${3 - terminalSample === 1 ? '' : 's'}`)
+      : `${wonCount} won · ${lostTerminalCount} lost`
+    // Avg margin honesty guard (5/17 — replaces the wonHasCost gate
+    // which allowed wildly high averages when most wins had no cost
+    // recorded). The shared avgMarginFn counts (amount - 0)/amount as
+    // 100% margin for cost-less wins, dragging the average up to
+    // 88-100% even when only one job actually has cost data. We now
+    // compute the average across ONLY wins with positive cost — those
+    // are the rows where margin is mathematically real. If fewer than
+    // 1 such row exists, the KPI renders "—".
+    const winsWithCost = contacts.filter((c) =>
       (c.stage === 'invoice' || c.stage === 'closed') &&
       Number(c.amount) > 0 &&
       Number(c.cost) > 0
     )
-    const avgMargin = wonHasCost ? avgMarginFn(contacts) * 100 : null
+    const avgMargin = winsWithCost.length >= 1
+      ? (winsWithCost.reduce((s, c) => {
+          const a = Number(c.amount || 0)
+          const k = Number(c.cost || 0)
+          return s + (a - k) / a
+        }, 0) / winsWithCost.length) * 100
+      : null
+    const avgMarginNote = (avgMargin == null)
+      ? 'Log a job cost to enable'
+      : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'}`
     const leads = contacts.filter((c) => c.stage === 'lead').length
     const quotes = contacts.filter((c) => c.stage === 'quote').length
     const jobs = contacts.filter((c) => c.stage === 'job').length
@@ -110,7 +134,12 @@ export default function Analytics() {
     const lostCount = contacts.filter((c) => c.stage === 'lost').length
     const milesYTD = mileage.reduce((s, m) => s + Number(m.miles || 0), 0)
     const mileageDeduction = milesYTD * 0.67
-    return { pipeline, wonYTD, profitYTD, avgMargin, leads, quotes, jobs, closedCount, lostCount, closeRate, milesYTD, mileageDeduction }
+    return {
+      pipeline, wonYTD, profitYTD, avgMargin, avgMarginNote,
+      leads, quotes, jobs, closedCount, lostCount,
+      closeRate, closeRateNote,
+      milesYTD, mileageDeduction
+    }
   }, [contacts, mileage])
 
   const byStage = useMemo(() => {
@@ -197,8 +226,8 @@ export default function Analytics() {
               <KPI label="Pipeline"          to={stats.pipeline}         format={fmtMoneyCompact} Icon={TrendingUp} gold />
               <KPI label="Won YTD"           to={stats.wonYTD}           format={fmtMoneyCompact} Icon={DollarSign} gold />
               <KPI label="Profit YTD"        to={stats.profitYTD}        format={fmtMoneyCompact} Icon={DollarSign} gold />
-              <KPI label="Avg Margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} />
-              <KPI label="Close Rate"        to={stats.closeRate}        format={fmtPct}          Icon={Target} />
+              <KPI label="Avg Margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} note={stats.avgMarginNote} />
+              <KPI label="Close Rate"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
               <KPI label="Active Leads"      to={stats.leads}            format={fmtInt}          Icon={TrendingUp} />
               <KPI label="Miles YTD"         to={stats.milesYTD}         format={fmtInt}          Icon={Car} />
               <KPI label="Mileage Deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
@@ -390,7 +419,7 @@ export default function Analytics() {
   )
 }
 
-function KPI({ label, to, format, Icon, gold }) {
+function KPI({ label, to, format, Icon, gold, note }) {
   return (
     <div
       style={{
@@ -451,6 +480,20 @@ function KPI({ label, to, format, Icon, gold }) {
           <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />
         )}
       </div>
+      {note && (
+        <div style={{
+          marginTop: 6,
+          fontFamily: 'var(--font-body)',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.04em',
+          color: to == null ? 'var(--v3-text-muted)' : 'var(--v3-text-muted)',
+          lineHeight: 1.3,
+          opacity: 0.85
+        }}>
+          {note}
+        </div>
+      )}
     </div>
   )
 }
