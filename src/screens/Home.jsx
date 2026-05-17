@@ -494,23 +494,40 @@ export default function Home() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
-            {now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-          </span>
-          <div style={{
-            marginTop: 4,
+          <span style={{
             fontFamily: 'var(--font-body)',
-            fontSize: 14,
-            fontWeight: 500,
-            letterSpacing: '-0.005em',
-            color: 'var(--v3-text-muted)',
-            lineHeight: 1.3,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--v3-primary)'
+          }}>
+            {now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+            {' · '}
+            {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          </span>
+          {/* Hero greeting — ports the design's "Good morning, *Jesse.*" pattern
+              with the italic gold accent on the first name. font-display so the
+              greeting reads as a screen title, not a caption. */}
+          <h1 style={{
+            margin: '4px 0 0',
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(24px, 7vw, 32px)',
+            lineHeight: 1.05,
+            letterSpacing: '0.01em',
+            color: 'var(--v3-text)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           }}>
-            {greetingPrefix()} {firstName}.
-          </div>
+            {greetingPrefix().replace(',', '')}, <em style={{
+              fontFamily: 'var(--font-serif, "Instrument Serif", serif)',
+              fontStyle: 'italic',
+              fontWeight: 400,
+              color: 'var(--v3-primary)',
+              letterSpacing: 0
+            }}>{firstName}.</em>
+          </h1>
         </div>
 
         {hasCoords ? (
@@ -716,46 +733,72 @@ export default function Home() {
           Total Pipeline
         </div>
 
-        {/* Decorative gold hairline sweep — 60px wide, 1px tall, fades
-            from gold to transparent. Not a chart, not a sparkline; just
-            a brand luminance accent under the financial label. */}
-        <span aria-hidden="true" style={{
-          display: 'block',
-          marginTop: 6,
-          width: 60,
-          height: 1,
-          background: 'linear-gradient(90deg, color-mix(in srgb, var(--v3-primary) 35%, transparent), transparent)'
-        }} />
+        {/* Gold sparkline — synthesized ascending wave that anchors the
+            pipeline number visually. Ports the design's pipeline-hero__spark
+            (screens-home.jsx). 14-point ascending curve so the trend reads
+            as "going up and to the right" without requiring real time-series
+            data to be wired through yet. */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 320 60"
+          preserveAspectRatio="none"
+          style={{ display: 'block', width: '100%', height: 48, marginTop: 10 }}
+        >
+          <defs>
+            <linearGradient id="fh-pipeline-sparkfill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#E4BE6F" stopOpacity="0.32" />
+              <stop offset="100%" stopColor="#E4BE6F" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0,46 L26,42 L52,38 L78,30 L104,34 L130,28 L156,32 L182,22 L208,28 L234,18 L260,22 L286,12 L320,8 L320,60 L0,60 Z"
+            fill="url(#fh-pipeline-sparkfill)"
+          />
+          <path
+            d="M0,46 L26,42 L52,38 L78,30 L104,34 L130,28 L156,32 L182,22 L208,28 L234,18 L260,22 L286,12 L320,8"
+            fill="none"
+            stroke="#E4BE6F"
+            strokeWidth="1.5"
+          />
+          <circle cx="320" cy="8" r="3" fill="#E4BE6F" />
+          <circle cx="320" cy="8" r="6" fill="#E4BE6F" opacity="0.18" />
+        </svg>
 
-        {/* Stage caption — three inline tap chips that filter the Jobs
-            tab. stopPropagation so the outer card tap (→ /jobs) doesn't
-            fire alongside. Renders an em dash while data hydrates so the
-            row never reads as "0/0/0". */}
-        <div style={{
-          marginTop: 10,
-          fontFamily: 'var(--font-body)',
-          fontSize: 11,
-          fontWeight: 500,
-          color: 'var(--v3-text-muted)',
-          fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1.3,
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 6,
-          flexWrap: 'wrap'
-        }}>
-          {stageBreakdown == null ? '—' : (
-            <>
-              {/* "doing" label matches the renamed Jobs "Doing" tab so a
-                  tap on this chip lands on a tab with the same count. */}
-              <StageChip count={stageBreakdown.active} label="doing" stage="active" navigate={navigate} />
-              <span aria-hidden="true">·</span>
-              <StageChip count={stageBreakdown.won} label="won" stage="won" navigate={navigate} />
-              <span aria-hidden="true">·</span>
-              <StageChip count={stageBreakdown.lead} label="lead" stage="lead" navigate={navigate} />
-            </>
-          )}
-        </div>
+        {/* Won / Active / Lead breakdown — ports the design's pipeline-hero__breakdown.
+            Three cells, colored dot + label + stamp amount + count. Each cell
+            is a tap target → Jobs filtered by that stage. */}
+        {stageBreakdown != null && (
+          <div style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--v3-border)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 12
+          }}>
+            <PipelineBreakdownCell
+              dotColor="var(--v3-success-bright, #7BB58E)"
+              label="Won"
+              count={stageBreakdown.won}
+              tone="success"
+              onClick={(e) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=won') }}
+            />
+            <PipelineBreakdownCell
+              dotColor="var(--v3-primary)"
+              label="Active"
+              count={stageBreakdown.active}
+              tone="gold"
+              onClick={(e) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=active') }}
+            />
+            <PipelineBreakdownCell
+              dotColor="#6B7CA8"
+              label="Lead"
+              count={stageBreakdown.lead}
+              tone="muted"
+              onClick={(e) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=lead') }}
+            />
+          </div>
+        )}
       </motion.div>
 
       {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
@@ -1591,6 +1634,80 @@ function nameInitials(name) {
 /* StageChip — inline "<count> <label>" tap target inside the pipeline
    card breakdown. stopPropagation so the outer card tap (→ /jobs)
    doesn't double-fire when one of the chips is pressed. */
+/* ============================================================
+   PipelineBreakdownCell — one tap-cell inside the pipeline hero's
+   3-up breakdown row. Ported from the v3 design's
+   pipeline-hero__breakdown (screens-home.jsx .brk pattern).
+
+   Layout:
+     ● Label
+     $stamp value
+     N segments
+   ============================================================ */
+function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }) {
+  const valueColor = tone === 'success'
+    ? 'var(--v3-success-bright, #7BB58E)'
+    : tone === 'gold'
+      ? 'var(--v3-primary)'
+      : 'var(--v3-text)'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        textAlign: 'left',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        minWidth: 0
+      }}
+    >
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontFamily: 'var(--font-body)',
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        color: 'var(--v3-text-muted)'
+      }}>
+        <span aria-hidden="true" style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: dotColor,
+          boxShadow: `0 0 8px ${dotColor}`
+        }} />
+        {label}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 20,
+        lineHeight: 1,
+        color: valueColor,
+        fontVariantNumeric: 'tabular-nums',
+        letterSpacing: '0.01em'
+      }}>
+        {count}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-body)',
+        fontSize: 10,
+        fontWeight: 500,
+        color: 'var(--v3-text-muted)',
+        letterSpacing: '0.02em'
+      }}>
+        {count === 1 ? 'deal' : 'deals'}
+      </div>
+    </button>
+  )
+}
+
 function StageChip({ count, label, stage, navigate }) {
   return (
     <button
