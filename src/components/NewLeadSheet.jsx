@@ -89,8 +89,26 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
   const [voiceState, setVoiceState] = useState('idle') // idle | listening | parsing | error | denied
   const [transcript, setTranscript] = useState('')
   const [committed, setCommitted] = useState(false)
+  // Live elapsed-seconds counter for the listening state. Mirrors the
+  // RECORDING · 0:42 chip in the v3 design (screens-workflows.jsx
+  // lead-pro-mic__lbl) — tells the operator the mic is alive and how
+  // long they've been talking.
+  const [voiceElapsed, setVoiceElapsed] = useState(0)
   const recognitionRef = useRef(null)
   const heldRef = useRef(false)
+
+  useEffect(() => {
+    if (voiceState !== 'listening') {
+      setVoiceElapsed(0)
+      return
+    }
+    const t0 = Date.now()
+    setVoiceElapsed(0)
+    const id = setInterval(() => {
+      setVoiceElapsed(Math.floor((Date.now() - t0) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [voiceState])
 
   useEffect(() => {
     if (!open) {
@@ -414,10 +432,40 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       <div className="fh-voice-hero">
         <div className="fh-voice-hero__head">
           <span className="fh-voice-hero__label">Fast capture</span>
-          {/* Removed the "AI · SONNET 4" version chip — it implies a
-              specific live model that may not be reachable, and the
-              version detail isn't useful to the user. The voice +
-              parse flow surfaces real errors when AI is down. */}
+          {/* RECORDING · 0:42 chip — ported from lead-pro-mic__lbl in
+              the v3 design. Live elapsed timer + pulsing red dot tells
+              the operator the mic is open and how long they've been
+              talking. Only renders during the listening state. */}
+          {voiceState === 'listening' && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '3px 9px',
+              borderRadius: 999,
+              background: 'color-mix(in srgb, var(--v3-danger) 14%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--v3-danger) 38%, transparent)',
+              color: 'var(--v3-danger-bright)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              <span aria-hidden="true" style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: 'var(--v3-danger-bright)',
+                boxShadow: '0 0 6px var(--v3-danger-bright)',
+                animation: 'fh-rec-pulse 1100ms ease-in-out infinite'
+              }} />
+              REC
+              <b style={{ fontFamily: 'var(--font-display)', fontWeight: 400, letterSpacing: '0.04em' }}>
+                {Math.floor(voiceElapsed / 60)}:{String(voiceElapsed % 60).padStart(2, '0')}
+              </b>
+            </span>
+          )}
         </div>
         <p className="fh-voice-hero__desc">One sentence. AI fills every field.</p>
         <button
