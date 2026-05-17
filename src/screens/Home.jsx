@@ -520,13 +520,11 @@ export default function Home() {
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           }}>
-            {greetingPrefix().replace(',', '')}, <em style={{
-              fontFamily: 'var(--font-serif, "Instrument Serif", serif)',
-              fontStyle: 'italic',
-              fontWeight: 400,
+            {greetingPrefix().replace(',', '')},{' '}
+            <span style={{
               color: 'var(--v3-primary)',
               letterSpacing: 0
-            }}>{firstName}.</em>
+            }}>{firstName}.</span>
           </h1>
         </div>
 
