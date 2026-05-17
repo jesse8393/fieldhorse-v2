@@ -19,7 +19,8 @@ import DesktopScheduleWorkspace from '../components/desktop/DesktopScheduleWorks
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' }
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' }
 ]
 
 function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x }
@@ -452,6 +453,19 @@ export default function Schedule() {
               events={events}
               onClick={(id) => navigate(`/jobs/${id}`)}
               onDelete={requestDeleteEvent}
+            />
+          )}
+          {events != null && view === 'month' && (
+            // 5/17 — month view was implemented in MonthView() but never
+            // exposed in the VIEWS toggle. Wiring it in gives the
+            // contractor the long-horizon planner audit flagged as
+            // missing. Range memo already returns a 6-week window so
+            // events outside the visible month still hydrate their
+            // day badges. Tapping a day jumps to that day in Day view.
+            <MonthView
+              cursor={cursor}
+              events={events}
+              onDay={(d) => { hapticTap(); setCursor(startOfDay(d)); setView('day') }}
             />
           )}
         </motion.div>
