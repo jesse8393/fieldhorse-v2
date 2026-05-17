@@ -21,15 +21,21 @@ import { fetchCoverPhotosByJob } from '../lib/photos.js'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
 // Tabs collapse 6 raw stages to 5 honest groupings.
+//
+// 5/13 audit flagged a labeling collision: the header summary showed
+// "14 ACTIVE" (count of every contact in ACTIVE_STAGES = lead+quote+
+// job+invoice) while a tab below it was also labeled "Active" but
+// only matched stage='job' (7 rows). Same word, two definitions, and
+// the operator couldn't reconcile the numbers. We renamed the tab to
+// "Doing" so the words are honest: header "Active" means everything
+// in the pipeline, tab "Doing" means stage='job' specifically (the
+// pipeline-depth filter). The tab id ('active') is unchanged so the
+// Phase 11 ?stage=active deep-link from Home still routes here.
 const TABS = [
   { id: 'all',    label: 'All',    match: () => true },
   { id: 'lead',   label: 'Lead',   match: (c) => c.stage === 'lead' },
   { id: 'quote',  label: 'Quote',  match: (c) => c.stage === 'quote' },
-  // Jobs page "Active" is a pipeline-depth filter (job-stage only).
-  // The Home "Crews on site" KPI intentionally differs — it counts
-  // job-stage contacts with a scheduled fh_schedule entry in the next
-  // 7 days. Different purposes, different numbers by design.
-  { id: 'active', label: 'Active', match: (c) => c.stage === 'job' },
+  { id: 'active', label: 'Doing',  match: (c) => c.stage === 'job' },
   { id: 'won',    label: 'Won',    match: (c) => c.stage === 'invoice' || c.stage === 'closed' }
 ]
 

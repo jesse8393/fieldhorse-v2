@@ -130,15 +130,16 @@
   --v3-surface-glass: rgba(28, 24, 20, 0.72); /* NEW — backdrop-filter pairing */
 
   /* ---------- Text — warm linen, not pure white ---------- */
-  --v3-text:        #F2EDE4;
-  --v3-text-muted:  rgba(242, 237, 228, 0.55);
-  --v3-text-faint:  rgba(242, 237, 228, 0.38); /* NEW — captions, metadata */
+  --v3-text:           #F2EDE4;
+  --v3-text-secondary: rgba(242, 237, 228, 0.78); /* 5/17 NEW — matches design --ink-2 (secondary body text) */
+  --v3-text-muted:     rgba(242, 237, 228, 0.55);
+  --v3-text-faint:     rgba(242, 237, 228, 0.38); /* NEW — captions, metadata */
 
   /* ---------- Hairlines — warm-tinted, lower alpha ---------- */
   --v3-border:        rgba(255, 240, 210, 0.06);
   --v3-border-mid:    rgba(255, 240, 210, 0.10); /* NEW intermediate */
   --v3-border-strong: rgba(255, 240, 210, 0.18);
-  --v3-border-gold:   rgba(201, 150, 58, 0.10);  /* gold hairline (1A-3: 0.18→0.10 — barely there) */
+  --v3-border-gold:   rgba(201, 150, 58, 0.28);  /* 5/17 restore to design spec --hair-gold (was 0.10 from Phase 1A-3 softening) */
   --v3-glass-tint:    rgba(255, 240, 210, 0.04); /* warm-tinted now */
 
   /* ---------- Brand gold — cooled to canonical ---------- */
@@ -147,7 +148,7 @@
   --v3-primary-bright: #E8B865; /* NEW — icon glyph gold */
   --v3-primary-deep:   #8C6F30;
   --v3-primary-soft:   rgba(201, 150, 58, 0.14);
-  --v3-primary-glow:   rgba(228, 190, 111, 0.06); /* gold ambient halo (1A-3: 0.12→0.06 — nearly invisible) */
+  --v3-primary-glow:   rgba(228, 190, 111, 0.22); /* 5/17 restore to design spec --gold-glow (was 0.06 from Phase 1A-3 softening) */
 
   /* ---------- Stage palette — muted jewel (NEW token set) ----------
      Lead = steel-blue, Quote = burnished bronze, Active = moss green,

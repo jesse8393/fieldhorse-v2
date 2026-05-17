@@ -8,7 +8,8 @@ import {
   DollarSign,
   ExternalLink,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Send
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -82,6 +83,10 @@ export default function InvoiceDetail() {
   const [error, setError] = useState('')
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
+  // Send Invoice state — mirrors Send Proposal flow on the Quote tab.
+  // Builds the PDF locally, uploads to job-files, posts the storage_path
+  // to /api/send-invoice for server-side Resend send + activity log.
+  const [sending, setSending] = useState(false)
 
   const refresh = async () => {
     if (!user?.id || !id) return
@@ -180,6 +185,111 @@ export default function InvoiceDetail() {
       toastError("Couldn't generate PDF", e?.message || 'Try again')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  // Build the same invoice PDF that handleGeneratePDF builds, but
+  // instead of downloading it locally, upload to job-files and POST
+  // to /api/send-invoice. Server downloads via service role, attaches
+  // to a Resend send with the contractor's company name as the
+  // display-name + Reply-To. Mirrors the Send Proposal flow on the
+  // Quote tab.
+  async function handleSendInvoice() {
+    if (!contact || sending) return
+    if (!contact.email) {
+      toastError('Add a client email first', 'Open the linked job to add an email.')
+      return
+    }
+    setSending(true)
+    try {
+      const result = await generateInvoice({
+        company,
+        contact: {
+          name: contact.name || 'Client',
+          address: contact.address || '',
+          phone: contact.phone || '',
+          email: contact.email || ''
+        },
+        lineItems: [
+          {
+            description: contact.job_title || 'Construction services per agreement',
+            qty: 1,
+            rate: totals.amount,
+            amount: totals.amount
+          },
+          ...(totals.paid > 0 ? [{
+            description: 'Less: payments received',
+            qty: 1,
+            rate: -totals.paid,
+            amount: -totals.paid
+          }] : [])
+        ],
+        taxRate: 0,
+        notes: totals.paid > 0
+          ? `Balance due reflects ${fmtMoney(totals.paid)} previously received.`
+          : '',
+        dueDate: '',
+        invoiceId: contact.id
+      })
+      if (!result?.doc) throw new Error('PDF generator returned no document')
+
+      // Upload to job-files so the server can pull it with service role.
+      const blob = result.doc.output('blob')
+      const rowId = crypto.randomUUID()
+      const path = `${user.id}/${contact.id}/${rowId}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from('job-files')
+        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+      if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
+      // Audit row (best-effort).
+      try {
+        await supabase.from('fh_job_files').insert({
+          id: rowId,
+          user_id: user.id,
+          job_id: contact.id,
+          filename: result.filename,
+          storage_path: path,
+          mime_type: 'application/pdf',
+          size_bytes: blob.size || 0,
+          kind: 'file'
+        })
+      } catch (e) {
+        console.warn('[invoice] fh_job_files row insert failed', e)
+      }
+
+      const sendRes = await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          sender_user_id: user.id,
+          recipient_email: contact.email,
+          recipient_name: contact.name || null,
+          storage_path: path,
+          filename: result.filename,
+          amount_due: totals.balance
+        })
+      })
+      const sendBody = await sendRes.json().catch(() => ({}))
+
+      if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
+        toastError(
+          'Email sender is not configured yet',
+          'The PDF is saved to Files. Add Resend keys in Netlify env to enable direct send.'
+        )
+        downloadPdf(result)
+        return
+      }
+      if (!sendRes.ok || !sendBody?.ok) {
+        throw new Error(sendBody?.detail || sendBody?.error || 'Email send failed.')
+      }
+
+      toastSuccess(`Invoice sent to ${contact.email}`, result.filename)
+      refresh()
+    } catch (e) {
+      toastError("Couldn't send invoice", e?.message || 'Try again')
+    } finally {
+      setSending(false)
     }
   }
 
@@ -497,10 +607,13 @@ export default function InvoiceDetail() {
         </button>
       </motion.div>
 
-      {/* STICKY ACTION BAR — Generate PDF + Collect Payment.
-          Sits above the BottomNav (which is `position: fixed; bottom: 0`
-          with its own safe-area inset). Padding-bottom raises us above
-          the dock; gradient softens the transition into the page. */}
+      {/* STICKY ACTION BAR — Send + Generate PDF + Collect Payment.
+          Three-button row: Send (email the invoice), PDF (local download),
+          Collect (log a payment). Send is new (5/17 invoice-send port);
+          Generate PDF + Collect Payment behavior unchanged. Sits above
+          the BottomNav (position: fixed; bottom: 0 with safe-area).
+          Padding-bottom raises us above the dock; gradient softens the
+          transition into the page. */}
       <div style={{
         position: 'fixed',
         left: 0, right: 0,
@@ -511,6 +624,31 @@ export default function InvoiceDetail() {
         display: 'flex', gap: 8,
         pointerEvents: 'none'
       }}>
+        <button
+          type="button"
+          onClick={() => { hapticTap(); handleSendInvoice() }}
+          disabled={sending || !contact.email}
+          title={!contact.email ? 'Add a client email first' : undefined}
+          style={{
+            flex: 1,
+            minHeight: 48,
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: 'var(--v3-surface-2)',
+            border: '1px solid var(--v3-border-strong)',
+            color: (sending || !contact.email) ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            cursor: sending ? 'wait' : (!contact.email ? 'not-allowed' : 'pointer'),
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            WebkitTapHighlightColor: 'transparent',
+            pointerEvents: 'auto',
+            touchAction: 'manipulation',
+            opacity: !contact.email ? 0.55 : 1
+          }}
+        >
+          <Send size={14} aria-hidden="true" />
+          {sending ? 'Sending…' : 'Send'}
+        </button>
         <button
           type="button"
           onClick={() => { hapticTap(); handleGeneratePDF() }}
@@ -532,7 +670,7 @@ export default function InvoiceDetail() {
           }}
         >
           <FileDown size={14} aria-hidden="true" />
-          {generating ? 'Generating…' : 'Invoice PDF'}
+          {generating ? 'Generating…' : 'PDF'}
         </button>
         <button
           type="button"

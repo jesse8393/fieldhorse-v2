@@ -229,6 +229,40 @@ select:focus-visible,
 .fh-font-serif { font-family: var(--font-serif); }
 .fh-font-serif-italic { font-family: var(--font-serif); font-style: italic; }
 
+/* ============================================================
+   DESIGN UTILITY CLASSES — sourced from the 5/17 design handoff
+   (tokens.css in the v3-premium-design bundle). These are the
+   exact patterns the designer uses across every screen file.
+
+   .stamp        — every number/amount/timestamp/KPI value.
+                   Bebas Neue, tabular-nums, hairline tracking.
+   .gold-italic  — hero accent on H1 display titles only.
+                   Instrument Serif italic + gold gradient text-fill.
+                   Reserved for the *one* accent word in a hero
+                   headline (e.g. "Know your <em>numbers.</em>"),
+                   never decorative.
+
+   These classes match the design's `tokens.css` exactly so a screen
+   file copied from the handoff renders with the right type voices.
+   ============================================================ */
+.stamp {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  letter-spacing: 0.005em;
+}
+.gold-italic {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  background: linear-gradient(95deg, #B17F1F 0%, #E6B14B 45%, #C9963A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.01em;
+}
+
 /* Raised cards — drop onto KPI tiles, job cards, client rows, weekly target.
    Brand rule: surfaces lift off the base; never float in the void. */
 .fh-card-raised {
