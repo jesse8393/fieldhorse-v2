@@ -375,6 +375,101 @@ select:focus-visible,
 }
 
 /* ============================================================
+   JOB DETAIL — cockpit headline hero from design handoff.
+   Ported from styles-refine.css .cockpit-headline. Re-tokenized
+   to --v3-* and used by CockpitHeadline in Overview.jsx — shows
+   the contract value as the hero number with a billed/remaining
+   progress bar underneath.
+   ============================================================ */
+.cockpit-headline {
+  padding: 16px 18px;
+  background: linear-gradient(180deg, var(--v3-surface), var(--v3-surface-2));
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 28%, var(--v3-border-strong));
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 240, 210, 0.05) inset, 0 10px 28px rgba(0, 0, 0, 0.42);
+}
+.cockpit-headline::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 60%;
+  height: 200%;
+  background: radial-gradient(40% 30% at 50% 50%, rgba(228, 190, 111, 0.12), transparent 70%);
+  pointer-events: none;
+}
+.cockpit-headline__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+.cockpit-headline__lbl {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--v3-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.cockpit-headline__amt {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1;
+  color: var(--v3-text);
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-headline__sub {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--v3-text-muted);
+  margin-top: 5px;
+}
+.cockpit-headline__r { text-align: right; }
+.cockpit-headline__margin {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--v3-success-bright, #7BB58E);
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-headline__bar {
+  position: relative;
+  height: 6px;
+  background: var(--v3-border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.cockpit-headline__bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--v3-primary), var(--v3-primary-bright, var(--v3-primary)));
+  border-radius: 99px;
+}
+.cockpit-headline__bar-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--v3-text-muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-headline__bar-meta b {
+  color: var(--v3-primary);
+  font-weight: 400;
+}
+
+/* ============================================================
    CLIENTS SCREEN — featured top-client card from design handoff.
    Ported from styles-workflows.css .cl-card / .cl-card--top /
    .cl-card__rib / .cl-card__strip. Re-tokenized to --v3-* and
