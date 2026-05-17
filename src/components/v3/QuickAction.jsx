@@ -1,6 +1,15 @@
 import { motion } from 'framer-motion'
 import { hapticTap } from '../../lib/haptics.js'
 
+// QuickAction — single Home tile in the 5-up launcher row.
+//
+// Visual: ALL tiles share the same surface treatment so the row reads
+// as a uniform launcher. `primary` was previously a full gold gradient
+// across the whole tile (background + border + icon + label), which
+// made the Add Lead tile look like it was stuck in a pressed state —
+// "yellow and stuck" per user feedback. Now `primary` only adds a
+// subtle gold accent to the icon tile; the surrounding tile, border,
+// and label are identical to non-primary tiles.
 export default function QuickAction({ icon: Icon, label, primary = false, onTap }) {
   return (
     <motion.button
@@ -16,10 +25,8 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
         gap: 8,
         padding: '14px 8px',
         borderRadius: 'var(--v3-radius-card)',
-        background: primary
-          ? 'linear-gradient(180deg, rgba(212,175,55,0.14), rgba(212,175,55,0.04))'
-          : 'var(--v3-surface-2)',
-        border: `1px solid ${primary ? 'rgba(212,175,55,0.35)' : 'var(--v3-border)'}`,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
         color: 'var(--v3-text)',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
@@ -34,8 +41,12 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
           borderRadius: 12,
           display: 'grid',
           placeItems: 'center',
-          background: primary ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${primary ? 'rgba(212,175,55,0.40)' : 'var(--v3-border)'}`,
+          background: primary
+            ? 'color-mix(in srgb, var(--v3-primary) 14%, transparent)'
+            : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${primary
+            ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
+            : 'var(--v3-border)'}`,
           color: primary ? 'var(--v3-primary)' : 'var(--v3-text)'
         }}
       >
@@ -49,7 +60,7 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
           letterSpacing: '-0.005em',
           textAlign: 'center',
           lineHeight: 1.2,
-          color: primary ? 'var(--v3-primary)' : 'var(--v3-text)'
+          color: 'var(--v3-text)'
         }}
       >
         {label}
