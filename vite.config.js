@@ -8,6 +8,17 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // skipWaiting + clientsClaim — without these, a deployed update
+      // sits in the SW "waiting" state and never activates until every
+      // tab is closed. Result: "I shipped the change but nothing's
+      // live" because the SW keeps serving the old cached bundle on
+      // every visit. With both true, the new SW takes over on the next
+      // page load and the new assets are served immediately.
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true
+      },
       includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Fieldhorse',
