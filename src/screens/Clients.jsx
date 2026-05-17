@@ -500,6 +500,11 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
   // staggered entrance compounds across N rows, the hover doesn't fire
   // on touch, and AnimatePresence layout cost was a measurable hit on
   // mid-range iPhones. Plain button + cheap whileTap is enough.
+  // The featured TOP CLIENT card above the list already highlights the
+  // top earner — re-highlighting the same row in the list with gold
+  // background + gold avatar + "TOP" pill made it look like a stuck
+  // "selected" state ("yellow and stuck" per user). All rows now share
+  // the same neutral treatment; the featured card carries the emphasis.
   return (
     <button
       type="button"
@@ -511,9 +516,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
         gap: 12,
         width: '100%',
         padding: '12px 14px',
-        background: isTop
-          ? 'color-mix(in srgb, var(--v3-primary) 6%, transparent)'
-          : 'transparent',
+        background: 'transparent',
         border: 'none',
         borderBottom: isLast ? 'none' : '1px solid var(--v3-border)',
         color: 'var(--v3-text)',
@@ -525,23 +528,17 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
         transition: 'background 160ms ease'
       }}
     >
-      {/* Avatar — 40px tile. Highlight tile when client is the top
-          earner so the visual hierarchy reads at a glance. */}
       <div aria-hidden="true" style={{
         flexShrink: 0,
         width: 40, height: 40,
         borderRadius: 10,
-        background: isTop
-          ? 'linear-gradient(135deg, color-mix(in srgb, var(--v3-primary) 18%, var(--v3-surface-2)), var(--v3-surface-2))'
-          : 'var(--v3-surface-2)',
-        border: isTop
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
-          : '1px solid var(--v3-border)',
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border)',
         display: 'grid', placeItems: 'center',
         fontFamily: 'var(--font-display)',
         fontSize: 14,
         letterSpacing: '0.04em',
-        color: isTop ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+        color: 'var(--v3-text-muted)'
       }}>
         {(c.name || '·').trim().charAt(0).toUpperCase()}
       </div>
@@ -559,16 +556,6 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
           }}>
             {c.name || 'Unnamed client'}
           </span>
-          {isTop && (
-            <span style={{
-              flexShrink: 0,
-              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: 'var(--v3-primary)'
-            }}>
-              · TOP
-            </span>
-          )}
         </div>
         <span style={{
           fontFamily: 'var(--font-body)',
