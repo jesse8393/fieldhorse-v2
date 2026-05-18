@@ -14,7 +14,12 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.js'
-import { invoiceNumber as docInvoiceNumber } from '../components/documents/numbers.js'
+import {
+  invoiceNumber as docInvoiceNumber,
+  proposalNumber as docProposalNumber
+} from '../components/documents/numbers.js'
+import { mapItemsToScope } from '../components/documents/mapItems.js'
+import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.jsx'
 
 const FIELD_GOLD = [200, 161, 84]      // #C8A154
 const ONYX = [18, 18, 18]              // #121212
@@ -945,6 +950,30 @@ function parseBrandAccentRgb(hex) {
  *                                  approvalNote, baseTotal, approvedAt }
  * @returns {{ doc: jsPDF, filename: string, number: string }}
  */
+/**
+ * Generate a branded proposal PDF — v3 letterhead (Phase 4b parity).
+ *
+ * Mirrors src/components/documents/ProposalTemplate.jsx section-for-
+ * section so the customer sees the same render whether the contractor
+ * previewed it on-screen or received it as an email attachment.
+ *
+ * Sections (multi-page flowing layout — letterhead repeats per page):
+ *   1. Letterhead + title + meta grid (page 1 only)
+ *   2. Project overview               (boilerplate copy or override)
+ *   3. Scope of work                  (per-trade cards from fh_quote_items)
+ *   4. Optional upgrades              (is_optional=true items, with pricing)
+ *   5. Pricing summary                (Project Investment hero in serif)
+ *   6. Payment terms                  (50/40/10 default, configurable)
+ *   7. Warranty                       (company.warranty_default when set)
+ *   8. Exclusions                     (is_excluded items + exclusions text)
+ *   9. Insurance (optional, hidden when no payload)
+ *  10. Approval / signature           (blank by default; stamped when approved)
+ *
+ * White-label: company.name / logo_url / brand_accent_hex drive every
+ * customer-visible byte. The app's name never appears.
+ *
+ * @returns {{ doc: jsPDF, filename: string, number: string }}
+ */
 export async function generateQuote({
   company = {},
   contact = {},
@@ -953,17 +982,19 @@ export async function generateQuote({
   terms = '',
   exclusions = '',
   expiresAt = null,
-  status = 'draft', // eslint-disable-line no-unused-vars
+  status = 'draft',
   quoteId,
   approval = null,
-  photos = []
+  photos = [],
+  insurance = null,
+  paymentSchedule = null
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 16
+  const contentWidth = pageWidth - margin * 2
 
-  // Pre-load the contractor's logo + project photos in parallel. All
-  // three loaders return null on failure so the page renderers can fall
-  // through to graceful placeholders / wordmark — image fetch never
-  // blocks PDF generation.
   const [logo, loadedPhotos] = await Promise.all([
     company?.logo_url
       ? loadLogoForPdf(company.logo_url, { maxDimension: 720 })
@@ -971,41 +1002,758 @@ export async function generateQuote({
     preloadProposalPhotos(photos)
   ])
 
-  const ctx = buildProposalCtx({
-    doc, company, contact, items, scope, terms, exclusions, expiresAt,
-    quoteId, logo, approval, photos: loadedPhotos
-  })
+  const brandGold = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
+  const number = docProposalNumber(company?.name, quoteId || contact?.id)
+  const issuedAt = new Date()
 
-  // === PAGE 1 — COVER (no header strip, no footer band) ===
-  drawCoverPage(doc, ctx)
-
-  // === PAGE 2 — PROJECT + SCOPE ===
-  doc.addPage()
-  drawPageHeaderStrip(doc, ctx)
-  drawProjectAndScopePage(doc, ctx)
-
-  // === PAGE 3 — INVESTMENT ===
-  doc.addPage()
-  drawPageHeaderStrip(doc, ctx)
-  drawInvestmentPage(doc, ctx)
-
-  // === PAGE 4 — TERMS · ACCEPTANCE ===
-  doc.addPage()
-  drawPageHeaderStrip(doc, ctx)
-  drawTermsAndAcceptancePage(doc, ctx)
-
-  // Final pass — total page count + footer on every page except the cover.
-  const total = doc.internal.getNumberOfPages()
-  for (let p = 2; p <= total; p++) {
-    doc.setPage(p)
-    drawProposalPageFooter(doc, ctx, p, total)
+  // Map items into the section-grouped shape the template uses.
+  const mapped = mapItemsToScope(items)
+  const exclusionsArray = [
+    ...(mapped.exclusions || []),
+    ...((exclusions || '').split(/\n+/).map((s) => s.trim()).filter(Boolean))
+  ]
+  const pricing = {
+    baseTotal: mapped.baseTotal,
+    upgradeTotal: mapped.upgradeTotal,
+    discount: 0,
+    taxRate: 0
   }
+  const grandTotal = Math.max(0, pricing.baseTotal + pricing.upgradeTotal - pricing.discount)
+  const warranty = (company?.warranty_default || '').trim()
+
+  // Distribute project photos to scope sections by section_tag (or
+  // first-come-first-serve when no tag set). Each card gets at most 4.
+  const photosBySection = groupPhotosBySection(loadedPhotos)
+
+  const ctx = {
+    doc, pageWidth, pageHeight, margin, contentWidth,
+    company, contact, brandGold, logo,
+    number, issuedAt, expiresAt, status,
+    scope, terms, exclusionsArray, warranty,
+    approval, insurance,
+    pricing, grandTotal,
+    paymentSchedule: paymentSchedule || DEFAULT_PAYMENT_SCHEDULE,
+    scopeSections: mapped.scopeSections,
+    upgrades: mapped.upgrades,
+    photosBySection
+  }
+
+  // ============================================================
+  // PAGE 1 — letterhead + title + meta
+  // ============================================================
+  let cursor = drawProposalLetterhead(ctx, { page: 1 })
+
+  // 2. Project overview
+  cursor = drawProjectOverviewSection(ctx, cursor)
+
+  // 3. Scope of work (per-trade cards)
+  if (ctx.scopeSections.length > 0) {
+    cursor = drawScopeOfWorkSection(ctx, cursor)
+  }
+
+  // 4. Optional upgrades
+  if (ctx.upgrades.length > 0) {
+    cursor = drawUpgradesSection(ctx, cursor)
+  }
+
+  // 5. Pricing summary
+  cursor = drawPricingSummarySection(ctx, cursor)
+
+  // 6. Payment terms
+  cursor = drawPaymentTermsSection(ctx, cursor)
+
+  // 7. Warranty
+  if (warranty) {
+    cursor = drawWarrantySection(ctx, cursor)
+  }
+
+  // 8. Exclusions
+  if (exclusionsArray.length > 0) {
+    cursor = drawExclusionsSection(ctx, cursor)
+  }
+
+  // 9. Insurance (optional — auto-hides via the helper)
+  if (insurance) {
+    cursor = drawInsuranceSection(ctx, cursor)
+  }
+
+  // 10. Approval — keep on the same page when it fits, otherwise paginate.
+  cursor = drawApprovalSection(ctx, cursor)
+
+  // Footers + page numbers on every page
+  drawProposalFooters(ctx)
 
   return {
     doc,
-    filename: `Quote_${ctx.number}_${(contact?.name || 'client').replace(/\s+/g, '_')}.pdf`,
-    number: ctx.number
+    filename: `Proposal_${number}_${(contact?.name || 'client').replace(/\s+/g, '_')}.pdf`,
+    number
   }
+}
+
+// ============================================================
+// V3 proposal section drawers
+// All take `ctx` (the shared render context) and `cursor` (current Y
+// position) and return the new cursor Y. Each handles its own page-
+// break check via ensureSpace(ctx, neededHeight).
+// ============================================================
+
+function drawProposalLetterhead(ctx, { page }) {
+  const { doc, pageWidth, margin, brandGold, company, logo, contact, number, issuedAt, expiresAt, status, contentWidth } = ctx
+
+  // Top brand-accent rule
+  doc.setFillColor(...brandGold)
+  doc.rect(0, 0, pageWidth, 1.6, 'F')
+
+  const letterheadY = 10
+  const logoBoxSize = 18
+
+  drawLetterheadLogo(doc, {
+    x: margin, y: letterheadY, size: logoBoxSize, company, logo, brandGold
+  })
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(0.6)
+  doc.text((company?.name || 'MY COMPANY').toUpperCase(), margin + logoBoxSize + 6, letterheadY + 7.5)
+  doc.setCharSpace(0)
+
+  const tagline = buildLetterheadTagline(company)
+  if (tagline) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...INK_MUTED)
+    doc.text(tagline, margin + logoBoxSize + 6, letterheadY + 13)
+  }
+
+  drawStatusPill(doc, {
+    x: pageWidth - margin, y: letterheadY + 6,
+    label: proposalStatusLabel(status), brandGold
+  })
+
+  // Continuation pages skip the title + meta block (just letterhead +
+  // a thin "PROPOSAL · #" eyebrow so the reader knows what they're in).
+  if (page > 1) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.8)
+    doc.text(`PROPOSAL · ${number} · CONTINUED`, margin, letterheadY + logoBoxSize + 8)
+    doc.setCharSpace(0)
+    return letterheadY + logoBoxSize + 16
+  }
+
+  // Title block
+  const titleY = letterheadY + logoBoxSize + 12
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(...brandGold)
+  doc.setCharSpace(0.8)
+  doc.text('PROPOSAL', margin, titleY)
+  doc.setCharSpace(0)
+
+  const titleText = (contact?.job_title || 'Construction services').trim()
+  doc.setFont('times', 'bold')
+  let titleSize = 22
+  doc.setFontSize(titleSize)
+  while (doc.getTextWidth(titleText) > contentWidth && titleSize > 14) {
+    titleSize -= 1
+    doc.setFontSize(titleSize)
+  }
+  doc.setTextColor(...ONYX)
+  doc.text(titleText, margin, titleY + 9)
+
+  if (contact?.address) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(...INK_MUTED)
+    doc.text(String(contact.address), margin, titleY + 15)
+  }
+
+  // Meta grid
+  const metaY = titleY + 26
+  drawMetaGrid(doc, {
+    x: margin, y: metaY, width: contentWidth,
+    cols: [
+      { label: 'CLIENT',       value: contact?.name || '—' },
+      { label: 'ISSUED',       value: today() },
+      { label: 'VALID UNTIL',  value: expiresAt ? formatLongDate(new Date(expiresAt)) : 'Open' },
+      { label: 'PROPOSAL #',   value: number, stamp: true, valueColor: brandGold }
+    ]
+  })
+  return metaY + 18
+}
+
+function proposalStatusLabel(status) {
+  switch (String(status || 'draft').toLowerCase()) {
+    case 'approved': return 'APPROVED'
+    case 'sent':     return 'SENT'
+    case 'expired':  return 'EXPIRED'
+    case 'rejected': return 'REJECTED'
+    default:         return 'PROPOSAL'
+  }
+}
+
+// Page-break helper. If the requested block height doesn't fit before
+// the page bottom (with footer clearance), open a new page, redraw the
+// continuation letterhead, and return the fresh cursor Y.
+function ensureSpace(ctx, cursor, needed) {
+  const { doc, pageHeight } = ctx
+  const footerClearance = 16
+  if (cursor + needed <= pageHeight - footerClearance) return cursor
+  doc.addPage()
+  return drawProposalLetterhead(ctx, { page: 2 })
+}
+
+function drawProjectOverviewSection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, company, contact, scope } = ctx
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 40)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'PROJECT OVERVIEW',
+    title: "What we'll build",
+    brandGold
+  })
+  cursor += 14
+
+  const body = scope?.trim()
+    || buildProposalOverviewCopy(company?.name, contact?.address)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10.5)
+  doc.setTextColor(...ONYX)
+  const wrapped = doc.splitTextToSize(body, contentWidth)
+  // Page-break for very long overview
+  cursor = drawTextWithPageBreak(ctx, wrapped, cursor, 5)
+  return cursor + 6
+}
+
+function buildProposalOverviewCopy(companyName, address) {
+  const c = (companyName && String(companyName).trim()) || 'Our company'
+  const a = (address && String(address).trim()) || 'the project site'
+  return `${c} proposes the following scope of work for the improvement and restoration of the property located at ${a}. Our team will provide labor, materials, project coordination, site protection, cleanup, and installation services necessary to complete the project in accordance with manufacturer standards and applicable code requirements.`
+}
+
+function drawScopeOfWorkSection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, scopeSections } = ctx
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 60)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: `SCOPE OF WORK · ${scopeSections.length} SECTION${scopeSections.length === 1 ? '' : 'S'}`,
+    title: 'Trades and materials',
+    brandGold
+  })
+  cursor += 14
+
+  for (const section of scopeSections) {
+    cursor = drawScopeCard(ctx, cursor, {
+      title: section.title,
+      items: section.items,
+      showPricing: false
+    })
+    cursor += 6
+  }
+  return cursor
+}
+
+function drawUpgradesSection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, upgrades } = ctx
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 60)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'OPTIONAL UPGRADES',
+    title: 'Add at any time',
+    brandGold
+  })
+  cursor += 14
+
+  for (const section of upgrades) {
+    cursor = drawScopeCard(ctx, cursor, {
+      title: section.title,
+      items: section.items,
+      showPricing: true
+    })
+    cursor += 6
+  }
+  return cursor
+}
+
+// Per-trade scope card. Mirrors ScopeSectionCard.jsx visually:
+//   - title row
+//   - line items list (with optional pricing column)
+function drawScopeCard(ctx, cursor, { title, items, showPricing }) {
+  const { doc, margin, contentWidth, brandGold } = ctx
+
+  // Estimate card height: header (10) + per-item (≈ 8) + padding (10)
+  const estimated = 20 + (items.length * 9)
+  cursor = ensureSpace(ctx, cursor, estimated)
+
+  const cardX = margin
+  const cardY = cursor
+  const cardW = contentWidth
+  const padding = 6
+
+  // Card title bar
+  doc.setFont('times', 'bold')
+  doc.setFontSize(13)
+  doc.setTextColor(...ONYX)
+  doc.text(title || 'Untitled section', cardX + padding, cardY + 8)
+
+  let rowY = cardY + 14
+  doc.setDrawColor(...brandGold)
+  doc.setLineWidth(0.4)
+  doc.line(cardX, rowY, cardX + cardW, rowY)
+  rowY += 4
+
+  // Items
+  for (const it of items) {
+    const qty = Number(it.qty || 1)
+    const rate = Number(it.rate || 0)
+    const amount = Number(it.amount != null ? it.amount : qty * rate)
+    const subline = [
+      qty !== 1 ? `${qty}${it.unit ? ` ${it.unit}` : ''} × ${money(rate)}` : '',
+      it.notes
+    ].filter(Boolean).join(' · ')
+
+    // Title (wrap)
+    const titleMax = showPricing ? cardW - padding * 2 - 36 : cardW - padding * 2
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10.5)
+    doc.setTextColor(...ONYX)
+    const wrapped = doc.splitTextToSize(it.description || '—', titleMax)
+    doc.text(wrapped, cardX + padding, rowY + 4)
+    let bottom = rowY + 4 + (wrapped.length - 1) * 5
+
+    if (subline) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(...INK_MUTED)
+      doc.text(subline, cardX + padding, bottom + 4.5)
+      bottom += 4.5
+    }
+
+    if (showPricing) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10.5)
+      doc.setTextColor(...ONYX)
+      doc.text(money(amount), cardX + cardW - padding, rowY + 4, { align: 'right' })
+    }
+
+    rowY = bottom + 5
+    // Inter-item hairline
+    doc.setDrawColor(232, 228, 216)
+    doc.setLineWidth(0.15)
+    doc.line(cardX + padding, rowY - 2.5, cardX + cardW - padding, rowY - 2.5)
+  }
+
+  // Card border (drawn last so it overlays cleanly)
+  const cardH = rowY - cardY + 2
+  doc.setDrawColor(232, 228, 216)
+  doc.setLineWidth(0.3)
+  doc.roundedRect(cardX, cardY, cardW, cardH, 1.5, 1.5, 'S')
+
+  return cardY + cardH + 2
+}
+
+function drawPricingSummarySection(ctx, cursor) {
+  const { doc, pageWidth, margin, contentWidth, brandGold, pricing, grandTotal } = ctx
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 70)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'PRICING SUMMARY',
+    title: 'Investment',
+    brandGold
+  })
+  cursor += 14
+
+  // Card
+  const cardX = margin
+  const cardY = cursor
+  const cardW = contentWidth
+  // Reserve enough height: subordinate rows + hero
+  const rowCount = 1 + (pricing.upgradeTotal > 0 ? 1 : 0) + (pricing.discount > 0 ? 1 : 0) + (pricing.taxRate > 0 ? 1 : 0)
+  const cardH = 24 + rowCount * 6 + 24
+
+  doc.setFillColor(251, 248, 241)
+  doc.setDrawColor(213, 207, 190)
+  doc.setLineWidth(0.3)
+  doc.roundedRect(cardX, cardY, cardW, cardH, 1.5, 1.5, 'FD')
+
+  let rowY = cardY + 8
+  drawPricingRow(doc, cardX + 10, cardW - 20, rowY, 'Base scope', money(pricing.baseTotal))
+  rowY += 6
+  if (pricing.upgradeTotal > 0) {
+    drawPricingRow(doc, cardX + 10, cardW - 20, rowY, 'Selected upgrades', money(pricing.upgradeTotal))
+    rowY += 6
+  }
+  if (pricing.discount > 0) {
+    drawPricingRow(doc, cardX + 10, cardW - 20, rowY, 'Discount', `-${money(pricing.discount)}`, true)
+    rowY += 6
+  }
+  if (pricing.taxRate > 0) {
+    drawPricingRow(doc, cardX + 10, cardW - 20, rowY, `Tax · ${(pricing.taxRate * 100).toFixed(2)}%`, money(pricing.baseTotal * pricing.taxRate))
+    rowY += 6
+  }
+
+  // Hero divider + Project Investment label + amount
+  rowY += 4
+  doc.setDrawColor(...brandGold)
+  doc.setLineWidth(0.4)
+  doc.line(cardX + 10, rowY, cardX + cardW - 10, rowY)
+  rowY += 8
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.6)
+  doc.text('PROJECT INVESTMENT', cardX + 10, rowY)
+  doc.setCharSpace(0)
+
+  doc.setFont('times', 'bold')
+  doc.setFontSize(26)
+  doc.setTextColor(...brandGold)
+  doc.text(money(grandTotal), cardX + cardW - 10, rowY + 3, { align: 'right' })
+
+  return cardY + cardH + 6
+}
+
+function drawPricingRow(doc, x, w, y, label, value, muted = false) {
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(...INK_MUTED)
+  doc.text(label, x, y)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...(muted ? INK_MUTED : ONYX))
+  doc.text(value, x + w, y, { align: 'right' })
+}
+
+function drawPaymentTermsSection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, paymentSchedule, grandTotal } = ctx
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 30 + paymentSchedule.length * 12)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'PAYMENT TERMS',
+    title: 'Milestone schedule',
+    brandGold
+  })
+  cursor += 14
+
+  for (let i = 0; i < paymentSchedule.length; i++) {
+    const row = paymentSchedule[i]
+    const pct = Number(row.pct || 0)
+    const amt = Math.round(grandTotal * (pct / 100))
+
+    const rowY = cursor + 7
+
+    // Stamped percent
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.setTextColor(...brandGold)
+    doc.text(`${pct}%`, margin, rowY)
+
+    // Label + sub
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10.5)
+    doc.setTextColor(...ONYX)
+    doc.text(row.label || '—', margin + 22, rowY)
+    if (row.sub) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(...INK_MUTED)
+      doc.text(row.sub, margin + 22, rowY + 5)
+    }
+
+    // Amount
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10.5)
+    doc.setTextColor(...ONYX)
+    doc.text(money(amt), margin + contentWidth, rowY, { align: 'right' })
+
+    cursor += 13
+    if (i < paymentSchedule.length - 1) {
+      doc.setDrawColor(232, 228, 216)
+      doc.setLineWidth(0.15)
+      doc.line(margin, cursor - 1, margin + contentWidth, cursor - 1)
+    }
+  }
+  return cursor + 6
+}
+
+function drawWarrantySection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, warranty } = ctx
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 40)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'WARRANTY',
+    title: 'What we stand behind',
+    brandGold
+  })
+  cursor += 14
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10.5)
+  doc.setTextColor(...ONYX)
+  const wrapped = doc.splitTextToSize(warranty, contentWidth)
+  cursor = drawTextWithPageBreak(ctx, wrapped, cursor, 5)
+  return cursor + 6
+}
+
+function drawExclusionsSection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, exclusionsArray } = ctx
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 30 + exclusionsArray.length * 7)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'EXCLUSIONS',
+    title: 'Not included in this proposal',
+    brandGold
+  })
+  cursor += 14
+
+  for (const exclusion of exclusionsArray) {
+    cursor = ensureSpace(ctx, cursor, 8)
+    // Bullet dot
+    doc.setFillColor(...INK_MUTED)
+    doc.circle(margin + 1.5, cursor + 1, 0.8, 'F')
+    // Text (wrap)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(...ONYX)
+    const wrapped = doc.splitTextToSize(exclusion, contentWidth - 8)
+    doc.text(wrapped, margin + 6, cursor + 2)
+    cursor += Math.max(6, wrapped.length * 4.5) + 1
+  }
+  return cursor + 4
+}
+
+function drawInsuranceSection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, insurance } = ctx
+
+  const fields = [
+    { label: 'Claim number',     value: insurance.claim_number },
+    { label: 'Carrier',          value: insurance.carrier },
+    { label: 'Adjuster',         value: insurance.adjuster },
+    { label: 'Deductible',       value: insurance.deductible != null ? money(insurance.deductible) : '' },
+    { label: 'RCV',              value: insurance.rcv != null ? money(insurance.rcv) : '' },
+    { label: 'ACV',              value: insurance.acv != null ? money(insurance.acv) : '' },
+    { label: 'Depreciation',     value: insurance.depreciation != null ? money(insurance.depreciation) : '' },
+    { label: 'Supplement',       value: insurance.supplement_amount != null ? money(insurance.supplement_amount) : '' },
+    { label: 'Mortgage company', value: insurance.mortgage_company }
+  ].filter((f) => f.value)
+  if (!fields.length) return cursor
+
+  cursor += 6
+  cursor = ensureSpace(ctx, cursor, 50 + Math.ceil(fields.length / 3) * 14)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'INSURANCE CLAIM',
+    title: 'Carrier-side details',
+    brandGold
+  })
+  cursor += 14
+
+  // Card backdrop
+  const cardY = cursor
+  const cardH = Math.ceil(fields.length / 3) * 14 + 6
+  doc.setFillColor(251, 248, 241)
+  doc.setDrawColor(...brandGold)
+  doc.setLineWidth(0.4)
+  doc.roundedRect(margin, cardY, contentWidth, cardH, 1.5, 1.5, 'FD')
+
+  // 3-col grid
+  const colW = contentWidth / 3
+  fields.forEach((f, i) => {
+    const col = i % 3
+    const row = Math.floor(i / 3)
+    const cx = margin + colW * col + 8
+    const cy = cardY + 7 + row * 14
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.6)
+    doc.text(f.label.toUpperCase(), cx, cy)
+    doc.setCharSpace(0)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(...ONYX)
+    doc.text(String(f.value), cx, cy + 5)
+  })
+
+  return cardY + cardH + 6
+}
+
+function drawApprovalSection(ctx, cursor) {
+  const { doc, margin, contentWidth, brandGold, company, contact, approval } = ctx
+
+  cursor += 8
+  cursor = ensureSpace(ctx, cursor, 90)
+
+  drawSectionHeading(doc, {
+    x: margin, y: cursor, width: contentWidth,
+    eyebrow: 'APPROVAL',
+    title: 'Authorization to proceed',
+    brandGold
+  })
+  cursor += 14
+
+  // Authorization paragraph
+  const copy = 'By signing below, the customer authorizes the company to perform the work outlined in this proposal and agrees to the terms and conditions contained herein.'
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(...ONYX)
+  const wrapped = doc.splitTextToSize(copy, contentWidth)
+  doc.text(wrapped, margin, cursor)
+  cursor += wrapped.length * 4.8 + 8
+
+  // Two signature fields side by side
+  const colW = (contentWidth - 12) / 2
+  const sigY = cursor + 22
+  const labelY = sigY + 4
+
+  // Left — Client
+  drawSignatureField(ctx, {
+    x: margin, y: cursor, w: colW,
+    label: 'Client signature',
+    name: approval?.clientName || contact?.name,
+    dataUrl: approval?.mode === 'approved' ? approval?.clientSignatureDataUrl : null,
+    date: approval?.mode === 'approved' && approval?.clientApprovedAt
+      ? formatLongDate(new Date(approval.clientApprovedAt)) : ''
+  })
+
+  // Right — Contractor
+  drawSignatureField(ctx, {
+    x: margin + colW + 12, y: cursor, w: colW,
+    label: 'Contractor signature',
+    name: company?.name,
+    dataUrl: approval?.mode === 'approved' ? approval?.contractorSignatureDataUrl : null,
+    date: approval?.mode === 'approved' && approval?.contractorApprovedAt
+      ? formatLongDate(new Date(approval.contractorApprovedAt)) : ''
+  })
+
+  return cursor + 40
+}
+
+function drawSignatureField(ctx, { x, y, w, label, name, dataUrl, date }) {
+  const { doc } = ctx
+
+  // Stamped signature image (if approved)
+  if (dataUrl) {
+    try {
+      doc.addImage(dataUrl, 'PNG', x, y, Math.min(w, 60), 18)
+    } catch {
+      // fall through to typed name
+      doc.setFont('times', 'italic')
+      doc.setFontSize(18)
+      doc.setTextColor(...INK_MUTED)
+      doc.text(name || '', x, y + 14)
+    }
+  } else if (name) {
+    // Typed name in italic when present
+    doc.setFont('times', 'italic')
+    doc.setFontSize(16)
+    doc.setTextColor(...INK_MUTED)
+    doc.text(name, x, y + 16)
+  }
+
+  // Signature line
+  doc.setDrawColor(...ONYX)
+  doc.setLineWidth(0.4)
+  doc.line(x, y + 22, x + w, y + 22)
+
+  // Label + date row
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.6)
+  doc.text(label.toUpperCase(), x, y + 27)
+  doc.setCharSpace(0)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(`Date${date ? `: ${date}` : ''}`, x + w, y + 27, { align: 'right' })
+}
+
+function drawTextWithPageBreak(ctx, lines, cursor, lineHeight) {
+  for (const line of lines) {
+    cursor = ensureSpace(ctx, cursor, lineHeight + 1)
+    ctx.doc.text(line, ctx.margin, cursor + lineHeight - 1)
+    cursor += lineHeight
+  }
+  return cursor
+}
+
+// Drawn last after all sections so we know totalPages.
+function drawProposalFooters(ctx) {
+  const { doc, pageWidth, pageHeight, company } = ctx
+
+  const trustParts = [
+    company?.license_number ? `LIC #${String(company.license_number).trim()}` : '',
+    company?.insured_text ? String(company.insured_text).trim() : ''
+  ].filter(Boolean)
+  const contactParts = [
+    company?.name,
+    company?.phone,
+    company?.email,
+    company?.website
+  ]
+    .map((s) => (s && String(s).trim()) || '')
+    .filter(Boolean)
+  const trustLine = trustParts.join(' · ').toUpperCase()
+  const contactLine = contactParts.join(' · ')
+
+  const total = doc.internal.getNumberOfPages()
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p)
+
+    // Hairline
+    doc.setDrawColor(220, 215, 205)
+    doc.setLineWidth(0.2)
+    doc.line(16, pageHeight - 16, pageWidth - 16, pageHeight - 16)
+
+    // Left — contact line
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...INK_MUTED)
+    if (contactLine) doc.text(contactLine, 16, pageHeight - 10)
+
+    // Right — page number + trust (alternate lines)
+    doc.text(`Page ${p} of ${total}`, pageWidth - 16, pageHeight - 10, { align: 'right' })
+    if (trustLine && p === total) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.text(trustLine, pageWidth - 16, pageHeight - 6, { align: 'right' })
+    }
+  }
+}
+
+function groupPhotosBySection(photos = []) {
+  const map = new Map()
+  for (const p of photos || []) {
+    const key = (p.section_tag || 'General').trim() || 'General'
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(p)
+  }
+  return map
 }
 
 /* ============================================================
