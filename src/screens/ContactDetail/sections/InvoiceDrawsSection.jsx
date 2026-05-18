@@ -484,12 +484,15 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
 function Shell({ children }) {
   return (
-    <div style={{
-      background: 'var(--v3-surface)',
-      border: '1px solid var(--v3-border)',
-      borderRadius: 14,
-      overflow: 'hidden'
-    }}>
+    <div
+      className="fh-draws"
+      style={{
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        borderRadius: 14,
+        overflow: 'hidden'
+      }}
+    >
       {children}
     </div>
   )
@@ -563,7 +566,8 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }) {
 function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }) {
   // Four KPIs in a row at the top of the section so the contractor
   // sees what they're working with at a glance. Numbers wrap on
-  // narrow widths via responsive flex.
+  // narrow widths via responsive flex; desktop CSS forces a single
+  // row + larger type via the .fh-draws-summary class.
   const cells = [
     { label: 'Contract total', value: money(contractTotal) },
     { label: 'Drawn so far',   value: money(drawsIssued) },
@@ -571,21 +575,21 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }) {
     { label: 'Unbilled',       value: money(unbilled),       color: 'var(--v3-primary-bright)' }
   ]
   return (
-    <div style={{
+    <div className="fh-draws-summary" style={{
       display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
       gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--v3-border)',
       background: 'rgba(0, 0, 0, 0.18)'
     }}>
       {cells.map((c) => (
-        <div key={c.label}>
-          <div style={{
+        <div key={c.label} className="fh-draws-summary__cell">
+          <div className="fh-draws-summary__label" style={{
             fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
             letterSpacing: '0.14em', color: 'var(--v3-text-muted)',
             textTransform: 'uppercase'
           }}>
             {c.label}
           </div>
-          <div style={{
+          <div className="fh-draws-summary__value" style={{
             marginTop: 4,
             fontFamily: 'var(--font-body)', fontSize: 16, fontWeight: 700,
             color: c.color || 'var(--v3-text)',
@@ -642,7 +646,7 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
   const isOverdue = draw.status === 'overdue'
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 14, padding: '14px 16px', alignItems: 'flex-start' }}>
+    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 14, padding: '14px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
         letterSpacing: '0.04em', color: 'var(--v3-primary-bright)',
@@ -743,7 +747,7 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }) {
   }
 
   return (
-    <div style={{ padding: 16, background: 'var(--v3-surface-2)', borderTop: isNew ? 'none' : '1px solid var(--v3-border)' }}>
+    <div className="fh-draws-editor" style={{ padding: 16, background: 'var(--v3-surface-2)', borderTop: isNew ? 'none' : '1px solid var(--v3-border)' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 10 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={labelStyle}>Title</span>

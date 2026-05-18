@@ -9676,3 +9676,49 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-skel-stat::after { animation: none; opacity: 0.5; }
 }
 
+/* ============================================================
+   Desktop layout for the Invoice Draws section
+   (Financials → Draws sub-tab on ContactDetail).
+   Mobile-first defaults live inline on the component; these
+   overrides take over at >=900px to make the per-draw billing
+   experience feel native on the wider canvas.
+   ============================================================ */
+@media (min-width: 900px) {
+  /* Section shell — slightly more lift + breathing room */
+  .fh-draws {
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 22px rgba(0,0,0,0.18);
+  }
+
+  /* Summary KPIs — force a single 4-col row + larger numbers */
+  .fh-draws-summary {
+    grid-template-columns: repeat(4, 1fr) !important;
+    padding: 18px 22px !important;
+    gap: 28px !important;
+  }
+  .fh-draws-summary__value {
+    font-size: 20px !important;
+  }
+
+  /* Draw row — widen to 4-col layout: stamp | content | amount | actions
+     so action buttons don't wrap under the amount on the wider canvas. */
+  .fh-draws-row {
+    grid-template-columns: 90px minmax(0, 1fr) 140px auto !important;
+    align-items: center !important;
+    padding: 16px 22px !important;
+    gap: 18px !important;
+  }
+  /* On desktop, the price + actions column splits — push the price
+     up next to the title and let the actions sit on their own end. */
+  .fh-draws-row > div:nth-child(3) {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 12px !important;
+  }
+
+  /* Editor — more padding, cap field max-widths so a long contract
+     name doesn't stretch the input to absurd lengths on a 1280 canvas */
+  .fh-draws-editor {
+    padding: 20px 24px !important;
+  }
+}
