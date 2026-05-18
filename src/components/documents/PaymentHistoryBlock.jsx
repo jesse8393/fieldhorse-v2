@@ -17,6 +17,20 @@ function methodLabel(m) {
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
+// Pretty label for the payment kind tag (migration 022). 'other' and
+// undefined render no tag — keeps a clean row for the common cash-job
+// case where every payment is just "a payment".
+function kindBadge(k) {
+  if (!k || k === 'other') return null
+  const map = {
+    deposit:   { label: 'DEPOSIT',   tone: DOC_COLORS.gold },
+    progress:  { label: 'PROGRESS',  tone: DOC_COLORS.gold },
+    final:     { label: 'FINAL',     tone: DOC_COLORS.signalGreen },
+    retainage: { label: 'RETAINAGE', tone: DOC_COLORS.slate }
+  }
+  return map[k] || null
+}
+
 export default function PaymentHistoryBlock({ payments = [] }) {
   if (!payments?.length) return null
 
@@ -56,18 +70,35 @@ export default function PaymentHistoryBlock({ payments = [] }) {
             {shortDate(p.paid_on || p.created_at)}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ ...typeStyle('bodyBold'), color: DOC_COLORS.ink }}>
-              {methodLabel(p.method)}
+            <div style={{ ...typeStyle('bodyBold'), color: DOC_COLORS.ink, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>{methodLabel(p.method)}</span>
               {p.reference && (
                 <span
                   style={{
                     ...typeStyle('sub'),
                     color: DOC_COLORS.inkMuted,
-                    marginLeft: 8,
                     fontWeight: 400
                   }}
                 >
                   · {p.reference}
+                </span>
+              )}
+              {kindBadge(p.kind) && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: `color-mix(in srgb, ${kindBadge(p.kind).tone} 14%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${kindBadge(p.kind).tone} 35%, transparent)`,
+                    color: kindBadge(p.kind).tone,
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.16em'
+                  }}
+                >
+                  {kindBadge(p.kind).label}
                 </span>
               )}
             </div>

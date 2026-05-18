@@ -193,6 +193,7 @@ export default function InvoiceTemplate({
           previouslyPaid={pp}
           thisInvoice={thisInvoice}
           balanceRemaining={balanceRemaining}
+          payments={payments}
           company={company}
         />
       </section>

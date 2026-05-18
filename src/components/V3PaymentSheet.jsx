@@ -36,9 +36,22 @@ const METHODS = [
  * translate3d so the iOS keyboard never covers the amount field. The
  * inner form has overflow:auto so the focused input stays reachable.
  */
+// Payment kinds (migration 022). Tags a payment so the invoice
+// balance can call out retainage / deposits separately from ongoing
+// progress payments. Most contracts only use one or two of these —
+// "other" is the safe default for cash-job one-shot payments.
+const PAYMENT_KINDS = [
+  { value: 'deposit',   label: 'Deposit' },
+  { value: 'progress',  label: 'Progress' },
+  { value: 'final',     label: 'Final' },
+  { value: 'retainage', label: 'Retainage' },
+  { value: 'other',     label: 'Other' }
+]
+
 export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) {
   const [amount, setAmount] = useState(balance > 0 ? String(Math.round(balance)) : '')
   const [method, setMethod] = useState('check')
+  const [kind, setKind] = useState('other')
   const [reference, setReference] = useState('')
   const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
@@ -91,7 +104,9 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
     setSaving(true)
     try {
       // logPayment normalizes method internally; 'other' falls through.
-      await logPayment(contact, { amount: numeric, method, reference, paid_on: paidOn })
+      // kind (migration 022) tags the payment for the invoice balance
+      // breakdown (deposit / progress / final / retainage / other).
+      await logPayment(contact, { amount: numeric, method, kind, reference, paid_on: paidOn })
       hapticTap()
       // Brief in-sheet success state before close so the operator sees
       // the confirmation, App-Store style, instead of an instant dismiss.
@@ -398,6 +413,58 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
                         }}
                       >
                         {m.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* KIND — tags the payment for the invoice balance
+                  breakdown (deposit / progress / final / retainage).
+                  Default 'other' is fine for a one-shot cash-job
+                  payment; the contractor opts in to a specific kind
+                  when it matters (commercial retainage, insurance
+                  deductible callout, deposit-then-final flow). */}
+              <div>
+                <span style={{
+                  display: 'block',
+                  fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+                  letterSpacing: '0.16em', textTransform: 'uppercase',
+                  color: 'var(--v3-text-muted)',
+                  marginBottom: 8
+                }}>
+                  Kind
+                </span>
+                <div role="radiogroup" aria-label="Payment kind" style={{
+                  display: 'flex', gap: 6, flexWrap: 'wrap'
+                }}>
+                  {PAYMENT_KINDS.map((k) => {
+                    const on = kind === k.value
+                    return (
+                      <button
+                        key={k.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => { hapticTap(); setKind(k.value) }}
+                        style={{
+                          minHeight: 36,
+                          padding: '7px 12px',
+                          borderRadius: 999,
+                          background: on ? 'var(--v3-primary-soft)' : 'var(--v3-surface)',
+                          border: on
+                            ? '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)'
+                            : '1px solid var(--v3-border)',
+                          color: on ? 'var(--v3-primary)' : 'var(--v3-text-secondary)',
+                          fontFamily: 'var(--font-body)', fontSize: 12,
+                          fontWeight: on ? 700 : 500,
+                          cursor: 'pointer',
+                          WebkitTapHighlightColor: 'transparent',
+                          touchAction: 'manipulation',
+                          transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease'
+                        }}
+                      >
+                        {k.label}
                       </button>
                     )
                   })}

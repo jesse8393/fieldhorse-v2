@@ -603,6 +603,14 @@ export async function generateInvoice({
     : (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
   const ti = Math.max(0, total)
   const br = Math.max(0, ct - pp)
+  // Retainage callout (migration 022). When the contractor has tagged
+  // any payments as kind='retainage', split them out from the "paid"
+  // total so the customer sees what's held back vs already collected.
+  const retainage = (payments || [])
+    .filter((p) => p?.kind === 'retainage')
+    .reduce((s, p) => s + Number(p.amount || 0), 0)
+  const hasRetainage = retainage > 0
+  const progressPaid = Math.max(0, pp - retainage)
 
   if (cursorY > pageHeight - 60) { doc.addPage(); cursorY = 20 }
   drawSectionHeading(doc, {
@@ -619,18 +627,27 @@ export async function generateInvoice({
   const bsLeftW = contentWidth * 0.55
   const bsRowsTop = cursorY + 2
 
-  // Card backdrop
+  // Card backdrop — grows when retainage adds a fourth row
+  const cardH = hasRetainage ? 36 : 30
   doc.setFillColor(251, 248, 241)
   doc.setDrawColor(213, 207, 190)
   doc.setLineWidth(0.25)
-  doc.roundedRect(bsLeftX, cursorY, contentWidth, 30, 1.5, 1.5, 'FD')
+  doc.roundedRect(bsLeftX, cursorY, contentWidth, cardH, 1.5, 1.5, 'FD')
 
-  // Left rows
-  const rows3 = [
-    ['Contract total',    money(ct)],
-    ['Previously paid',   pp > 0 ? `-${money(pp)}` : money(0)],
-    ['This invoice',      money(ti)]
-  ]
+  // Left rows — "Previously paid" splits when retainage is present so
+  // the customer reads progress vs hold-back as distinct amounts.
+  const rows3 = hasRetainage
+    ? [
+        ['Contract total',  money(ct)],
+        ['Progress paid',   `-${money(progressPaid)}`],
+        ['Retainage held',  `-${money(retainage)}`],
+        ['This invoice',    money(ti)]
+      ]
+    : [
+        ['Contract total',  money(ct)],
+        ['Previously paid', pp > 0 ? `-${money(pp)}` : money(0)],
+        ['This invoice',    money(ti)]
+      ]
   let r3Y = bsRowsTop + 6
   rows3.forEach((r) => {
     doc.setFont('helvetica', 'normal')
@@ -655,7 +672,7 @@ export async function generateInvoice({
   doc.setTextColor(...(br > 0.5 ? brandGold : SIGNAL_GREEN))
   doc.text(br > 0.5 ? money(br) : 'PAID', bsRightX - 5, cursorY + 22, { align: 'right' })
 
-  cursorY += 38
+  cursorY += cardH + 8
 
   // ============================================================
   // 10. PAYMENT INSTRUCTIONS
