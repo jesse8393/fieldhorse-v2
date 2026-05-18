@@ -10,7 +10,7 @@ import { dateInputToTimestamp } from '../../../lib/dueDate.js'
 import QuoteItemsSection from '../sections/QuoteItems.jsx'
 import QuoteTermsSection from '../sections/QuoteTerms.jsx'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
-import { ProposalTemplate } from '../../../components/documents'
+import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
 
 /**
  * QUOTE tab — the formal sellable scope. Lead → Quote → Approved Job
@@ -612,51 +612,6 @@ function DocumentPreviewPane({ company, contact, items, loading }) {
  * is_optional=true split out to `upgrades`; is_excluded=true items
  * become bullet strings under `exclusions`.
  */
-function mapItemsToScope(items = []) {
-  const groups = []
-  const groupIndex = new Map()
-  const upgradeBuckets = []
-  const exclusions = []
-  let baseTotal = 0
-  let upgradeTotal = 0
-
-  for (const it of items) {
-    const amt = Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0)))
-    if (it.is_excluded) {
-      const label = it.description || 'Excluded scope'
-      exclusions.push(label)
-      continue
-    }
-    const sectionTitle = (it.section || 'General').trim() || 'General'
-    if (it.is_optional) {
-      upgradeTotal += amt
-      let bucket = upgradeBuckets.find((b) => b.title === sectionTitle)
-      if (!bucket) {
-        bucket = { id: `upgrade:${sectionTitle}`, title: sectionTitle, items: [] }
-        upgradeBuckets.push(bucket)
-      }
-      bucket.items.push(it)
-      continue
-    }
-    baseTotal += amt
-    let i = groupIndex.get(sectionTitle)
-    if (i == null) {
-      i = groups.length
-      groupIndex.set(sectionTitle, i)
-      groups.push({ id: `sec:${sectionTitle}`, title: sectionTitle, items: [] })
-    }
-    groups[i].items.push(it)
-  }
-
-  return {
-    scopeSections: groups,
-    upgrades: upgradeBuckets,
-    exclusions,
-    baseTotal,
-    upgradeTotal
-  }
-}
-
 /* ============================================================
    ClearDraftBand — destructive action to wipe the working draft
    (line items + scope/terms/exclusions/expiration + reset status).
