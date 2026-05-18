@@ -564,6 +564,40 @@ function DocumentPreviewPane({ company, contact, items, loading, insurance = nul
     : status === 'expired' ? 'expired'
     : 'draft'
 
+  // When the quote is approved, pull the most recent approval snapshot
+  // so the preview can stamp the captured signature + date onto the
+  // ApprovalBlock. Stays null for draft / sent / expired quotes — the
+  // block then renders blank signature lines.
+  const [approval, setApproval] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    if (status !== 'approved' || !contact?.id) {
+      setApproval(null)
+      return
+    }
+    ;(async () => {
+      const { data } = await supabase
+        .from('fh_quote_versions')
+        .select('approved_by_name, approved_at, signature_kind, signature_data, approval_method')
+        .eq('contact_id', contact.id)
+        .eq('status', 'approved')
+        .order('approved_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (cancelled || !data) return
+      const isDrawn = data.signature_kind === 'drawn'
+      setApproval({
+        mode: 'approved',
+        clientName: data.approved_by_name,
+        clientSignatureDataUrl: isDrawn ? data.signature_data : null,
+        clientApprovedAt: data.approved_at,
+        contractorSignatureDataUrl: null,
+        contractorApprovedAt: null
+      })
+    })()
+    return () => { cancelled = true }
+  }, [status, contact?.id])
+
   return (
     <div
       style={{
@@ -608,6 +642,7 @@ function DocumentPreviewPane({ company, contact, items, loading, insurance = nul
           exclusions={exclusions}
           insurance={insurance}
           changeOrders={changeOrders}
+          approval={approval}
           meta={{
             issuedAt: contact?.quote_sent_at || contact?.created_at,
             expiresAt: contact?.quote_expires_at || null
@@ -1206,7 +1241,7 @@ async function loadProjectPhotosForPdf(jobId, userId) {
   if (!jobId || !userId) return []
   const { data, error } = await supabase
     .from('fh_job_files')
-    .select('id, storage_path, caption, kind, uploaded_at')
+    .select('id, storage_path, caption, section_tag, kind, uploaded_at')
     .eq('job_id', jobId)
     .eq('user_id', userId)
     .eq('kind', 'photo')
@@ -1223,9 +1258,15 @@ async function loadProjectPhotosForPdf(jobId, userId) {
           .from('job-photos')
           .createSignedUrl(row.storage_path, 60 * 60)
         if (signErr || !signedRes?.signedUrl) return null
+        // section_tag (migration 020) is the source of truth; legacy
+        // photos that used the caption-as-tag convention before the
+        // column existed fall back so they still distribute correctly.
+        const tag = (row.section_tag || '').trim()
+          || (row.caption || '').trim()
+          || null
         return {
           url: signedRes.signedUrl,
-          section_tag: (row.caption || '').trim() || null,
+          section_tag: tag,
           caption: row.caption || null
         }
       } catch {
