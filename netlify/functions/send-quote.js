@@ -7,20 +7,24 @@
 // company name in the display name and Reply-To, then flip
 // proposal_status='sent' + quote_sent_at + log activity to fh_notes.
 //
-// Phase 1 sender policy (intentional):
-//   From: `${Company Name} via FieldHorse <notifications@fieldhorse.io>`
+// White-label sender policy:
+//   From:     `${Company Name} <notifications@fieldhorse.io>`
 //   Reply-To: company_email || sender's auth email
+// The customer sees ONLY the contractor's company name in the From
+// display. The shared sender mailbox is the technical envelope and
+// stays opaque — no "via FieldHorse" leaks anywhere in the inbox.
 //
-// True custom sender domains (quotes@parkerconstructioncompany.com) come
-// in Phase 2 once each tenant has completed DNS verification. The
-// "via FieldHorse" wording keeps the customer's mailbox client (Apple
-// Mail / Gmail) from showing a generic "noreply" — they see the
-// contractor's brand alongside the verified-sender domain.
+// True per-tenant sender domains (quotes@parkerconstructioncompany.com)
+// remain the Phase 2 plan once each tenant completes DNS verification.
+// Until then this display-name-only white-labeling is what the
+// customer reads.
 //
 // Env vars (server-only — no VITE_ prefix):
 //   RESEND_API_KEY              — required to actually send
 //   SEND_EMAIL_FROM             — required, e.g. notifications@fieldhorse.io
-//   SEND_EMAIL_FROM_NAME        — optional, default "FieldHorse"
+//   SEND_EMAIL_FROM_NAME        — optional, default "Notifications" (used
+//                                  ONLY when the contractor has no
+//                                  company_name on file)
 //   APP_BASE_URL                — optional, default https://fieldhorse.io
 //   SUPABASE_URL                — required for service-role lookups
 //   SUPABASE_SERVICE_ROLE_KEY   — required, bypasses RLS for owner check
@@ -44,7 +48,7 @@ export default async (request) => {
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
-  const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'FieldHorse'
+  const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'Notifications'
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({
@@ -131,14 +135,14 @@ export default async (request) => {
   const arrayBuffer = await fileBlob.arrayBuffer()
   const base64Pdf = Buffer.from(arrayBuffer).toString('base64')
 
-  // 4. Compose the email. Display name shows the contractor's brand
-  // alongside the FieldHorse-verified sending domain — this is the
-  // multi-tenant Phase-1 pattern. When companyName is empty we fall
-  // back to the SEND_EMAIL_FROM_NAME default so the from line never
-  // reads as a bare email address.
-  const fromName = companyName
-    ? `${companyName} via ${SEND_EMAIL_FROM_NAME}`
-    : SEND_EMAIL_FROM_NAME
+  // 4. Compose the email.
+  // White-label From header — the customer sees ONLY the contractor's
+  // company name. The shared sender mailbox (whatever domain Resend
+  // authenticates) is the technical envelope but its display name
+  // belongs to the contractor. No "via FieldHorse" leaks to the
+  // recipient inbox. Falls back to the env name only when company_name
+  // is empty (incomplete contractor profile).
+  const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
   const subject = `Proposal${contact.job_title ? ` — ${contact.job_title}` : ''}`
   const safeRecipientName = (recipient_name || contact.name || '').trim()
