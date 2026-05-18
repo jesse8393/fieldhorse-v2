@@ -27,11 +27,18 @@ function writeLastJobType(value) {
   try { window.localStorage.setItem(LAST_JOB_TYPE_KEY, value) } catch {}
 }
 
-function buildEmptyForm() {
+function buildEmptyForm(initialStage = 'lead') {
+  // initialStage seeds the Stage chip when the sheet is opened. Defaults
+  // to 'lead' (the original behavior); flips to 'job' when the entry
+  // point was the Home "New Job" tile so the operator isn't dropped into
+  // a Lead-shaped form they then have to re-tag.
+  const seedStage = (initialStage === 'job' || initialStage === 'quote' || initialStage === 'lead')
+    ? initialStage
+    : 'lead'
   return {
     name: '', phone: '', email: '', address: '', company: '',
     job_title: '', job_type: readLastJobType(), amount: '', notes: '', referred_by: '',
-    stage: 'lead'
+    stage: seedStage
   }
 }
 
@@ -77,8 +84,8 @@ const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a n
 }
 Return ONLY the JSON. No prose, no fences.`
 
-export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
-  const [form, setForm] = useState(buildEmptyForm)
+export default function NewLeadSheet({ open, userId, initialStage = 'lead', onClose, onCreated }) {
+  const [form, setForm] = useState(() => buildEmptyForm(initialStage))
   const [client, setClient] = useState(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -112,7 +119,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
 
   useEffect(() => {
     if (!open) {
-      setForm(buildEmptyForm())
+      setForm(buildEmptyForm(initialStage))
       setClient(null)
       setErr('')
       setTranscript('')
@@ -121,7 +128,16 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       setCommitted(false)
       setTemplateSlug('')
     }
-  }, [open])
+  }, [open, initialStage])
+
+  // When the sheet re-opens with a different initialStage (e.g. Home
+  // "New Job" tile after a prior "Add Lead"), bump the Stage chip to
+  // match so the operator doesn't have to retag. Only fires on open —
+  // user edits to the chip mid-flow are preserved.
+  useEffect(() => {
+    if (open) setForm((f) => ({ ...f, stage: initialStage }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialStage])
 
   // When the trade changes, drop any template that no longer applies.
   // Avoids the user picking "Roof tear-off" then switching to Kitchen
@@ -397,16 +413,23 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
     }))
   }
 
+  // Title noun follows the Stage chip so the surface is always honest:
+  // open via "New Job" → title is "New job."; user retags to Lead → flips
+  // to "New lead." On success it flips to "{Noun} captured." so the same
+  // language carries through. Quote uses its own noun for the same reason.
+  const stageNoun = form.stage === 'job' ? 'job' : form.stage === 'quote' ? 'quote' : 'lead'
+  const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
+
   return (
     <ActionSheet
       open={open}
       variantClass="fh-asheet--v2"
-      title={committed ? 'Lead captured.' : 'New lead.'}
-      accentWord={committed ? 'captured' : 'lead'}
-      sectionLabel="New lead"
+      title={committed ? `${NounCap} captured.` : `New ${stageNoun}.`}
+      accentWord={committed ? 'captured' : stageNoun}
+      sectionLabel={`New ${stageNoun}`}
       stepCount={3}
       currentStep={currentStep}
-      commitLabel={saving ? 'Committing…' : committed ? 'Captured' : 'Commit lead'}
+      commitLabel={saving ? 'Committing…' : committed ? 'Captured' : `Commit ${stageNoun}`}
       commitBusy={saving}
       commitDisabled={!form.name.trim() || committed}
       onClose={onClose}
