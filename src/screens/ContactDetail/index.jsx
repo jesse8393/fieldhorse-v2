@@ -286,6 +286,7 @@ export default function ContactDetail() {
             payments={payments}
             scheduleItems={scheduleItems}
             todos={todos}
+            changeOrders={changeOrders}
             paid={paid}
             balance={balance}
             userId={user?.id}

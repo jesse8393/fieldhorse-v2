@@ -17,6 +17,7 @@ import {
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.jsx'
 import { computeJobHealth } from '../lib/jobHealth.js'
+import ActivityLog from '../sections/ActivityLog.jsx'
 import { resolveNextAction } from '../lib/jobNextAction.js'
 import { money } from '../lib/format.js'
 
@@ -44,6 +45,7 @@ export default function OverviewTab({
   payments = [],
   scheduleItems = [],
   todos = [],
+  changeOrders = [],
   paid,
   balance,
   userId,
@@ -309,6 +311,17 @@ export default function OverviewTab({
           onClick={() => { hapticTap(); onOpenInvitePartner?.() }}
         />
       </div>
+
+      {/* ACTIVITY LOG — chronological feed synthesized from existing
+          arrays (notes, payments, schedule, change orders, contact
+          metadata). Auto-hides on a brand-new job with no events. */}
+      <ActivityLog
+        contact={contact}
+        notes={notes}
+        payments={payments}
+        scheduleItems={scheduleItems}
+        changeOrders={changeOrders}
+      />
 
       {/* Inline grid CSS — mobile-first stack, 1.5fr/1fr at ≥768px */}
       <style>{`
