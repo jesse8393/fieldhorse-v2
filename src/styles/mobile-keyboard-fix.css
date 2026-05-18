@@ -122,6 +122,12 @@ i,
   left: 50% !important;
   right: auto !important;
   bottom: auto !important;
+  /* Tailwind 4 sets the new CSS `translate:` property (independent of
+     `transform`) via ui:translate-x-[-50%] ui:translate-y-[-50%]. Killing
+     `translate` AND setting our own `transform` is required — otherwise
+     the translateY(-50%) from Tailwind still applies and yanks the
+     dialog ~250px above the viewport (audit found x:-44, y:-233). */
+  translate: none !important;
   transform: translateX(-50%) !important;
   z-index: 110 !important;
   width: min(calc(100% - 24px), 560px) !important;
