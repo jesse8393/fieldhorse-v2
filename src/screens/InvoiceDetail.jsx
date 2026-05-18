@@ -627,16 +627,19 @@ export default function InvoiceDetail() {
           the BottomNav (position: fixed; bottom: 0 with safe-area).
           Padding-bottom raises us above the dock; gradient softens the
           transition into the page. */}
-      <div style={{
-        position: 'fixed',
-        left: 0, right: 0,
-        bottom: 'calc(56px + env(safe-area-inset-bottom))',
-        padding: '10px 16px 10px',
-        background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--v3-bg) 92%, transparent) 32%, var(--v3-bg) 64%)',
-        zIndex: 30,
-        display: 'flex', gap: 8,
-        pointerEvents: 'none'
-      }}>
+      <div
+        className="fh-invoice-actionbar"
+        style={{
+          position: 'fixed',
+          left: 0, right: 0,
+          bottom: 'calc(56px + env(safe-area-inset-bottom))',
+          padding: '10px 16px 10px',
+          background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--v3-bg) 92%, transparent) 32%, var(--v3-bg) 64%)',
+          zIndex: 30,
+          display: 'flex', gap: 8,
+          pointerEvents: 'none'
+        }}
+      >
         <button
           type="button"
           onClick={() => { hapticTap(); handleSendInvoice() }}
