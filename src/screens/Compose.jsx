@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -404,9 +404,13 @@ export default function Compose() {
         </div>
       </motion.div>
 
-      {/* OUTPUT COCKPIT — black-glass panel, draft-as-hero */}
-      <AnimatePresence mode="wait">
-        {draft ? (
+      {/* OUTPUT COCKPIT — black-glass panel, draft-as-hero.
+          AnimatePresence mode="wait" was preventing the draft panel from
+          ever mounting after generate succeeded — the empty-state's
+          missing exit animation caused the wait to never resolve. Switched
+          to plain conditional render so the draft hero always appears the
+          instant `draft` state flips truthy. */}
+      {draft ? (
           <motion.div
             key="draft"
             variants={item}
@@ -648,7 +652,6 @@ export default function Compose() {
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
     </motion.div>
   )
 }
@@ -794,17 +797,38 @@ function SmsHero({ draft, contact }) {
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           boxShadow: '0 4px 14px rgba(201, 150, 58, 0.22)'
         }}>
-          {draft}
+          {stripMarkdown(draft)}
         </div>
       </div>
     </div>
   )
 }
 
+// Strip the markdown wrappers (** and __ for bold, * and _ for italic,
+// fenced code blocks, headings) that Claude sometimes emits so the
+// recipient doesn't see literal asterisks in the email body. Audit flagged
+// "**Subject: ...**" rendering with raw asterisks visible.
+function stripMarkdown(text) {
+  if (!text) return ''
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '$1')
+    .replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
+}
+
 function EmailHero({ draft, contact, profile, intent }) {
   const fromName = profile?.company_name || profile?.full_name || 'Sender'
   const fromAddr = profile?.company_email || profile?.email || ''
-  const subjectGuess = contact?.job_title || intent || `Message from ${fromName}`
+  const cleaned = stripMarkdown(draft)
+  // Pull a "Subject:" line out of the body if the AI wrote one, so the
+  // subject header gets it and the body doesn't repeat it.
+  const subjectMatch = cleaned.match(/^\s*Subject\s*:\s*(.+?)\s*$/m)
+  const extractedSubject = subjectMatch ? subjectMatch[1].trim() : ''
+  const body = subjectMatch ? cleaned.replace(subjectMatch[0], '').replace(/^\n+/, '') : cleaned
+  const subjectGuess = extractedSubject || contact?.job_title || intent || `Message from ${fromName}`
   return (
     <div style={{
       borderRadius: 14,
@@ -843,7 +867,7 @@ function EmailHero({ draft, contact, profile, intent }) {
         whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         background: 'var(--v3-surface)'
       }}>
-        {draft}
+        {body}
       </pre>
     </div>
   )
@@ -871,7 +895,7 @@ function VoiceHero({ draft }) {
         color: 'var(--v3-text)',
         whiteSpace: 'pre-wrap', wordBreak: 'break-word'
       }}>
-        {draft}
+        {stripMarkdown(draft)}
       </pre>
     </div>
   )

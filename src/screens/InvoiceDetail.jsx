@@ -638,9 +638,20 @@ export default function InvoiceDetail() {
       }}>
         <button
           type="button"
-          onClick={() => { hapticTap(); handleSendInvoice() }}
-          disabled={sending || !contact.email}
-          title={!contact.email ? 'Add a client email first' : 'Email the invoice to the client'}
+          onClick={() => {
+            hapticTap()
+            // No client email on file — explain to the user instead of
+            // silently no-op'ing (was the audit's #1 critical failure).
+            if (!contact.email) {
+              toastError(
+                'Add a client email first',
+                `${contact.name || 'This client'} has no email on file. Open the linked job → edit details → add an email, then try again.`
+              )
+              return
+            }
+            handleSendInvoice()
+          }}
+          disabled={sending}
           style={{
             flex: 1,
             minHeight: 48,
@@ -654,14 +665,14 @@ export default function InvoiceDetail() {
               : '1px solid var(--v3-border-strong)',
             color: sent
               ? '#0a0a0a'
-              : (sending || !contact.email) ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+              : sending ? 'var(--v3-text-muted)' : 'var(--v3-text)',
             fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
-            cursor: sending ? 'wait' : (!contact.email ? 'not-allowed' : 'pointer'),
+            cursor: sending ? 'wait' : 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
             touchAction: 'manipulation',
-            opacity: !contact.email ? 0.55 : 1,
+            opacity: 1,
             transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
           }}
         >
