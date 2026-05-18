@@ -25,6 +25,7 @@ import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { useAuth } from '../../../contexts/AuthContext.jsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
 import { toastSuccess, toastError } from '../../../lib/toast.js'
+import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 
 function money(n) {
   const v = Number(n || 0)
@@ -125,6 +126,65 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     } catch (e) {
       toastError("Couldn't save draw", e?.message || 'Try again.')
       return false
+    }
+  }
+
+  // Auto-create draws from the proposal's payment terms. Uses the
+  // ProposalTemplate default schedule (50 / 40 / 10) unless the
+  // contractor has overridden it elsewhere — that override path isn't
+  // wired yet, so v1 always uses the canonical default. Each draw's
+  // title comes from the schedule's label; amount = pct × contractTotal
+  // (which already includes approved change orders).
+  //
+  // Guarded against duplicate generation: only enabled when zero draws
+  // exist on the contract. Re-running after deletion is fine.
+  async function handleGenerateFromTerms() {
+    if (!contact?.id || !userId) return
+    if (draws.length > 0) {
+      toastError(
+        'Draws already exist',
+        'Delete or void the existing draws first if you want to start over from terms.'
+      )
+      return
+    }
+    if (contractTotal <= 0) {
+      toastError(
+        'No contract total yet',
+        'Set the contract amount (or add quote items) before generating draws.'
+      )
+      return
+    }
+    const schedule = DEFAULT_PAYMENT_SCHEDULE
+    setBusyId('__generate__')
+    try {
+      // Build N rows + insert sequentially so the BEFORE INSERT trigger
+      // assigns sequence_numbers 1, 2, 3 deterministically. Batch insert
+      // would race the sequence assignment.
+      let createdCount = 0
+      for (const row of schedule) {
+        const pct = Number(row.pct || 0)
+        const amount = Math.round(contractTotal * (pct / 100))
+        const { error } = await supabase.from('fh_invoices').insert({
+          contact_id: contact.id,
+          user_id: userId,
+          sequence_number: 0, // trigger assigns next
+          title: `${pct}% — ${row.label}`,
+          amount,
+          status: 'draft',
+          notes: row.sub || null
+        })
+        if (error) throw error
+        createdCount++
+      }
+      toastSuccess(
+        `Generated ${createdCount} draws`,
+        `Pre-filled from ${schedule.map((s) => `${s.pct}%`).join(' / ')} payment terms`
+      )
+      await fetchDraws()
+    } catch (e) {
+      toastError("Couldn't generate draws", e?.message || 'Try again.')
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -260,6 +320,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         count={draws.length}
         canAdd={!creating && editingId == null}
         onAdd={() => setCreating(true)}
+        canGenerate={!loading && draws.length === 0 && contractTotal > 0 && !creating && editingId == null}
+        onGenerate={handleGenerateFromTerms}
+        generating={busyId === '__generate__'}
       />
       <Summary
         contractTotal={contractTotal}
@@ -320,13 +383,14 @@ function Shell({ children }) {
   )
 }
 
-function Header({ count, canAdd, onAdd }) {
+function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8,
       padding: '12px 16px',
       borderBottom: '1px solid var(--v3-border)',
-      background: 'var(--v3-surface-2)'
+      background: 'var(--v3-surface-2)',
+      flexWrap: 'wrap'
     }}>
       <FileText size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
       <span style={{
@@ -341,23 +405,45 @@ function Header({ count, canAdd, onAdd }) {
           </span>
         )}
       </span>
-      {canAdd && (
-        <button
-          type="button"
-          onClick={onAdd}
-          style={{
-            marginLeft: 'auto',
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '6px 10px', borderRadius: 8,
-            background: 'transparent', border: '1px solid var(--v3-border-strong)',
-            color: 'var(--v3-text)',
-            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          <Plus size={12} aria-hidden="true" /> Add draw
-        </button>
-      )}
+      <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
+        {canGenerate && (
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={generating}
+            title="Pre-fill three draws from the proposal's 50 / 40 / 10 payment terms"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 10px', borderRadius: 8,
+              background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+              color: 'var(--v3-primary-bright)',
+              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+              letterSpacing: '0.04em',
+              cursor: generating ? 'wait' : 'pointer',
+              opacity: generating ? 0.7 : 1
+            }}
+          >
+            {generating ? 'Generating…' : 'Generate from terms'}
+          </button>
+        )}
+        {canAdd && (
+          <button
+            type="button"
+            onClick={onAdd}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 10px', borderRadius: 8,
+              background: 'transparent', border: '1px solid var(--v3-border-strong)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <Plus size={12} aria-hidden="true" /> Add draw
+          </button>
+        )}
+      </div>
     </div>
   )
 }
