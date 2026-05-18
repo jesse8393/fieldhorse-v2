@@ -65,6 +65,7 @@ export default function ContactDetail() {
   const {
     contact, subs, expenses, payments, inspections, notes,
     scheduleItems, scheduleCount, todos, clientSummary,
+    insurance, changeOrders,
     paid, balance, loading, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
@@ -305,6 +306,8 @@ export default function ContactDetail() {
             fetchAll={fetchAll}
             patch={patch}
             onOpenApprove={() => setApproveOpen(true)}
+            insurance={insurance}
+            changeOrders={changeOrders}
           />
         )}
         {tab === 'details' && (
@@ -317,6 +320,7 @@ export default function ContactDetail() {
             patch={patch}
             onOpenAddEvent={() => setEventOpen(true)}
             onOpenInvitePartner={() => setInviteOpen(true)}
+            insurance={insurance}
           />
         )}
         {tab === 'financials' && (

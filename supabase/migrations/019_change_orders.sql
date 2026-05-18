@@ -1,5 +1,5 @@
 -- =============================================================
--- Migration 019 — CHANGE ORDERS (DRAFT — NOT YET APPLIED)
+-- Migration 019 — CHANGE ORDERS
 -- =============================================================
 --
 -- Adds a child table to track change orders against a contract. A change
@@ -11,9 +11,6 @@
 -- Schema kept narrow on purpose — the line items live in fh_quote_items
 -- (with a new optional change_order_id FK in migration 020 if needed),
 -- so this table is just the header + approval metadata.
---
--- File extension intentionally `.sql.draft` so Supabase CLI does NOT
--- pick it up automatically. Rename to `.sql` after review.
 --
 -- =============================================================
 
@@ -93,7 +90,7 @@ create policy "fh_change_orders_partner_read" on public.fh_change_orders
   using (
     status = 'approved' and exists (
       select 1 from public.fh_job_partners p
-      where p.contact_id = fh_change_orders.contact_id
+      where p.job_id = fh_change_orders.contact_id
         and p.partner_user_id = auth.uid()
         and p.status = 'accepted'
     )

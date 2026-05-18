@@ -5,6 +5,7 @@ import TodosSection from '../sections/Todos.jsx'
 import ScheduledSection from '../sections/Scheduled.jsx'
 import InspectionsSection from '../sections/Inspections.jsx'
 import InvitePartnerSection from '../sections/InvitePartner.jsx'
+import InsuranceSection from '../sections/InsuranceSection.jsx'
 
 /**
  * DETAILS tab — sub-tab router for the work-plan side of a job.
@@ -23,6 +24,7 @@ const SUB_TABS = [
   { id: 'todos',       label: 'To-dos' },
   { id: 'scheduled',   label: 'Scheduled' },
   { id: 'inspections', label: 'Inspections' },
+  { id: 'insurance',   label: 'Insurance' },
   { id: 'partner',     label: 'Partner' }
 ]
 
@@ -34,7 +36,8 @@ export default function DetailsTab({
   fetchAll,
   patch,
   onOpenAddEvent,
-  onOpenInvitePartner
+  onOpenInvitePartner,
+  insurance
 }) {
   const [sub, setSub] = useState('milestones')
 
@@ -88,6 +91,14 @@ export default function DetailsTab({
             userId={userId}
             fetchAll={fetchAll}
             patch={patch}
+          />
+        )}
+        {sub === 'insurance' && (
+          <InsuranceSection
+            contact={contact}
+            userId={userId}
+            insurance={insurance}
+            onChange={() => fetchAll?.()}
           />
         )}
         {sub === 'partner' && (

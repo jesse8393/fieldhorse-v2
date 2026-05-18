@@ -80,6 +80,15 @@ export default function InvoiceDetail() {
 
   const [contact, setContact] = useState(null)
   const [payments, setPayments] = useState([])
+  // Insurance claim payload (migration 018). One-to-one with the
+  // contact. Owner-only RLS, so this is null for partner viewers.
+  // Flows into both the InvoiceTemplate preview's InsuranceModeBlock
+  // and the generateInvoice PDF call below.
+  const [insurance, setInsurance] = useState(null)
+  // Change orders against the contract (migration 019). Approved COs
+  // bump the contract total on the balance summary; non-approved
+  // entries still surface as a section so the customer sees them.
+  const [changeOrders, setChangeOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [paying, setPaying] = useState(false)
@@ -108,18 +117,22 @@ export default function InvoiceDetail() {
       // the client's email/phone/address when the denormalized fields
       // on the job row are empty. Migration 007 stamped client_id on
       // every contact, so the link should always exist.
-      const [{ data: c, error: cErr }, { data: ps }] = await Promise.all([
+      const [{ data: c, error: cErr }, { data: ps }, { data: ins }, { data: co }] = await Promise.all([
         supabase
           .from('fh_contacts')
           .select('*, fh_clients(name, email, phone, address)')
           .eq('id', id)
           .maybeSingle(),
-        supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false })
+        supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
+        supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle(),
+        supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
       ])
       if (cErr) throw cErr
       if (!c) throw new Error('Invoice not found')
       setContact(c)
       setPayments(ps || [])
+      setInsurance(ins || null)
+      setChangeOrders(co || [])
     } catch (e) {
       setError(e?.message || 'Could not load invoice')
     } finally {
@@ -208,7 +221,9 @@ export default function InvoiceDetail() {
         invoiceId: contact.id,
         payments,
         contractTotal: totals.amount,
-        previouslyPaid: totals.paid
+        previouslyPaid: totals.paid,
+        insurance,
+        changeOrders
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
@@ -258,7 +273,9 @@ export default function InvoiceDetail() {
         invoiceId: contact.id,
         payments,
         contractTotal: totals.amount,
-        previouslyPaid: totals.paid
+        previouslyPaid: totals.paid,
+        insurance,
+        changeOrders
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
 
@@ -847,6 +864,8 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
           dueDate: contact.due_at || null
         }}
         status={docStatus}
+        insurance={insurance}
+        changeOrders={changeOrders}
       />
     </motion.div>
   )
