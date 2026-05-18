@@ -14,14 +14,19 @@
 //   - Status updates differ (no proposal_status flip on invoice send;
 //     the stage is already 'invoice' or downstream of it).
 //
-// Phase 1 sender policy (matches send-quote):
-//   From:     `${Company Name} via FieldHorse <notifications@fieldhorse.io>`
+// White-label sender policy (matches send-quote / send-message):
+//   From:     `${Company Name} <notifications@fieldhorse.io>`
 //   Reply-To: company_email || sender's auth email
+// The customer sees ONLY the contractor's company name in the From
+// display. The shared sender mailbox is the technical envelope and
+// stays opaque — no "via FieldHorse" leaks anywhere in the inbox.
 //
 // Env vars (server-only — no VITE_ prefix):
 //   RESEND_API_KEY              — required to actually send
 //   SEND_EMAIL_FROM             — required, e.g. notifications@fieldhorse.io
-//   SEND_EMAIL_FROM_NAME        — optional, default "FieldHorse"
+//   SEND_EMAIL_FROM_NAME        — optional, default "Notifications" (used
+//                                  ONLY when the contractor has no
+//                                  company_name on file)
 //   APP_BASE_URL                — optional, default https://fieldhorse.io
 //   SUPABASE_URL                — required for service-role lookups
 //   SUPABASE_SERVICE_ROLE_KEY   — required, bypasses RLS for owner check
@@ -44,7 +49,7 @@ export default async (request) => {
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
-  const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'FieldHorse'
+  const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'Notifications'
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({
@@ -128,9 +133,13 @@ export default async (request) => {
   const base64Pdf = Buffer.from(arrayBuffer).toString('base64')
 
   // 4. Compose the email.
-  const fromName = companyName
-    ? `${companyName} via ${SEND_EMAIL_FROM_NAME}`
-    : SEND_EMAIL_FROM_NAME
+  // White-label From header — customer sees ONLY the contractor's
+  // company name. The shared sender mailbox is the technical envelope
+  // (its domain is what Resend authenticates against), but its display
+  // name belongs to the contractor. No "via FieldHorse" leaks to the
+  // recipient. Falls back to the env name only when company_name is
+  // empty (incomplete profile).
+  const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
   const jobTitle = contact.job_title || 'your project'
   const amountLabel = formatMoneyLabel(amount_due ?? contact.amount)

@@ -69,7 +69,12 @@ export default function Compose() {
         ? `Recipient: ${contact.name}. Job: ${contact.job_title || contact.job_type || 'unknown'}. Stage: ${contact.stage}. Amount: $${contact.amount || 0}.`
         : 'Recipient: generic contact (not yet linked to a job).'
       const res = await claudeMessage({
-        system: `You are Fieldhorse AI Compose. Write a ${ch.label} message for a contractor. ${ch.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sender is ${profile?.company_name || 'the contractor'}.`,
+        // White-label: the AI is the contractor's own messaging
+        // assistant from the customer's perspective. No app-attributable
+        // phrasing in the system prompt — the recipient never knows a
+        // platform exists. Sender identity comes from the contractor's
+        // profile.company_name with a neutral fallback.
+        system: `You are a messaging assistant for a contractor's business. Write a ${ch.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
         messages: [{ role: 'user', content: `Intent: ${intent}\n${contactLine}\nExtra context: ${context || 'none'}\n\nReturn only the message text, no preamble.` }],
         maxTokens: 500
       })

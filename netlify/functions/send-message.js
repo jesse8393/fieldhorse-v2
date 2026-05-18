@@ -11,14 +11,19 @@
 // contractor's company name in the display name + Reply-To, then log
 // activity to fh_notes.
 //
-// Phase 1 sender policy (matches send-quote / send-invoice):
-//   From:     `${Company Name} via FieldHorse <notifications@fieldhorse.io>`
+// White-label sender policy (matches send-quote / send-invoice):
+//   From:     `${Company Name} <notifications@fieldhorse.io>`
 //   Reply-To: company_email || sender's auth email
+// The customer sees ONLY the contractor's company name in the From
+// display. The shared sender mailbox is the technical envelope and
+// stays opaque — the recipient never reads "via FieldHorse" anywhere.
 //
 // Env vars (server-only — no VITE_ prefix):
 //   RESEND_API_KEY              — required to actually send
 //   SEND_EMAIL_FROM             — required, e.g. notifications@fieldhorse.io
-//   SEND_EMAIL_FROM_NAME        — optional, default "FieldHorse"
+//   SEND_EMAIL_FROM_NAME        — optional, default "Notifications" (used
+//                                  ONLY when the contractor has no
+//                                  company_name on file)
 //   SUPABASE_URL                — required for service-role lookups
 //   SUPABASE_SERVICE_ROLE_KEY   — required, bypasses RLS for owner check
 //
@@ -40,7 +45,13 @@ export default async (request) => {
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
-  const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'FieldHorse'
+  // White-label: when the operator has set a company_name in their
+  // profile, the From header reads as that company alone — never
+  // "Company via FieldHorse" in the customer's inbox. The env-var
+  // fallback only kicks in when the contractor has no company_name
+  // on file (rare; signals an incomplete profile). The default
+  // fallback name stays neutral instead of the app's name.
+  const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'Notifications'
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({ error: 'server_misconfigured', message: 'Server is missing Supabase credentials.' }, 500)
@@ -111,15 +122,22 @@ export default async (request) => {
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
   const replyTo = (profile?.company_email || profile?.email || '').trim()
-  const fromName = companyName ? `${companyName} via ${SEND_EMAIL_FROM_NAME}` : SEND_EMAIL_FROM_NAME
+  // White-label From header — the customer's inbox shows ONLY the
+  // contractor's company name. The shared sender mailbox (notifications@
+  // fieldhorse.io or whichever address SEND_EMAIL_FROM resolves to) is
+  // the technical envelope but its display name belongs to the
+  // contractor. No "via FieldHorse" leaks to the recipient.
+  // Falls back to SEND_EMAIL_FROM_NAME only when the contractor has
+  // no company_name on file at all.
+  const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
 
   const finalSubject = (subject || '').trim()
-    || (contact?.job_title ? `Re: ${contact.job_title}` : `Message from ${companyName || 'your contractor'}`)
+    || (contact?.job_title ? `Re: ${contact.job_title}` : `Message from ${companyName || fromName}`)
 
   // Compose HTML by paragraphizing the plain-text body. Email clients
   // render plain text differently; sending both keeps it consistent.
-  const html = renderMessageHtml({ body: trimmedBody, senderLine: companyName || 'Your contractor', companyName })
+  const html = renderMessageHtml({ body: trimmedBody, senderLine: companyName || fromName, companyName })
 
   const resendPayload = {
     from: fromHeader,
