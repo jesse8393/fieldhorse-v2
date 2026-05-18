@@ -20,6 +20,7 @@ import { hapticTap } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { Eyebrow, StampNumber } from '../components/v3'
 import V3PaymentSheet from '../components/V3PaymentSheet.jsx'
+import { InvoiceTemplate } from '../components/documents'
 
 /**
  * InvoiceDetail — read-only mobile invoice surface at /invoices/:id.
@@ -83,6 +84,11 @@ export default function InvoiceDetail() {
   const [error, setError] = useState('')
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
+  // 'detail' = existing list-style breakdown (default — original UX).
+  // 'document' = new InvoiceTemplate preview (Phase 2 — opt-in so the
+  // toggle is reversible and the existing flow stays untouched until
+  // the operator chooses to switch).
+  const [viewMode, setViewMode] = useState('detail')
   // Send Invoice state — mirrors Send Proposal flow on the Quote tab.
   // Builds the PDF locally, uploads to job-files, posts the storage_path
   // to /api/send-invoice for server-side Resend send + activity log.
@@ -406,9 +412,28 @@ export default function InvoiceDetail() {
             Invoice
           </Eyebrow>
         </span>
-        {/* Right-side spacer so the eyebrow stays visually centered */}
-        <span style={{ width: 60 }} aria-hidden="true" />
+        {/* View toggle — Detail (default, original UX) vs Document
+            (new InvoiceTemplate preview). Reversible; lives in the
+            header so the operator can flip without scrolling. Sized
+            to match the back-chevron button so the eyebrow stays
+            visually centered. */}
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </motion.div>
+
+      {viewMode === 'document' ? (
+        <DocumentPreviewPane
+          company={company}
+          contact={contact}
+          resolved={resolved}
+          payments={payments}
+          totals={totals}
+          status={status}
+          item={item}
+        />
+      ) : null}
+      {viewMode === 'document' ? null : (
+      <>
+      {/* ─── Existing list-style detail surface (preserved verbatim) ─── */}
 
       {/* HERO CARD — status pill + total + balance + paid progress */}
       <motion.div variants={item} style={{ padding: '4px 16px 12px' }}>
@@ -640,6 +665,8 @@ export default function InvoiceDetail() {
           <ExternalLink size={14} aria-hidden="true" color="var(--v3-text-muted)" />
         </button>
       </motion.div>
+      </>
+      )}
 
       {/* STICKY ACTION BAR — Send + Generate PDF + Collect Payment.
           Three-button row: Send (email the invoice), PDF (local download),
@@ -769,6 +796,113 @@ export default function InvoiceDetail() {
         )}
       </AnimatePresence>
     </motion.div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   Phase 2 — Document preview pane.
+   Mounts the new InvoiceTemplate from src/components/documents
+   inside the same screen, behind an opt-in ViewModeToggle. Mapping
+   is read-only: pulls already-loaded contact + payments + totals
+   out of state and shapes them into the template's prop contract.
+   No new queries; no schema changes.
+   ───────────────────────────────────────────────────────── */
+function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item }) {
+  const docStatus = (() => {
+    const tone = status?.tone
+    if (tone === 'good')   return 'paid'
+    if (tone === 'danger') return 'overdue'
+    if (tone === 'muted')  return 'closed'
+    return 'outstanding'
+  })()
+
+  return (
+    <motion.div
+      variants={item}
+      style={{
+        // Cream backdrop so the white letter-paper reads as a real
+        // document on the otherwise-dark v3 surface.
+        padding: '8px 12px calc(132px + env(safe-area-inset-bottom, 0px))',
+        background: '#2a2520'
+      }}
+    >
+      <InvoiceTemplate
+        company={company}
+        contact={{
+          id: contact.id,
+          name: resolved.name,
+          address: resolved.address,
+          phone: resolved.phone,
+          email: resolved.email,
+          job_title: contact.job_title
+        }}
+        project={{
+          title: contact.job_title || 'Construction services',
+          address: resolved.address
+        }}
+        contractTotal={totals.amount}
+        payments={payments}
+        previouslyPaid={totals.paid}
+        thisInvoice={totals.balance}
+        balanceRemaining={totals.balance}
+        meta={{
+          issuedAt: contact.created_at,
+          dueDate: contact.due_at || null
+        }}
+        status={docStatus}
+      />
+    </motion.div>
+  )
+}
+
+function ViewModeToggle({ value, onChange }) {
+  const opts = [
+    { v: 'detail',   label: 'Detail' },
+    { v: 'document', label: 'Document' }
+  ]
+  return (
+    <div
+      role="tablist"
+      aria-label="View mode"
+      style={{
+        display: 'inline-flex',
+        padding: 2,
+        borderRadius: 999,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        flexShrink: 0
+      }}
+    >
+      {opts.map((o) => {
+        const on = value === o.v
+        return (
+          <button
+            key={o.v}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => { if (!on) { hapticTap(); onChange(o.v) } }}
+            style={{
+              padding: '6px 10px',
+              minHeight: 32,
+              borderRadius: 999,
+              border: 0,
+              background: on ? 'var(--v3-primary-soft)' : 'transparent',
+              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: on ? 'default' : 'pointer',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

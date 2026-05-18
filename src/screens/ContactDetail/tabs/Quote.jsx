@@ -10,6 +10,7 @@ import { dateInputToTimestamp } from '../../../lib/dueDate.js'
 import QuoteItemsSection from '../sections/QuoteItems.jsx'
 import QuoteTermsSection from '../sections/QuoteTerms.jsx'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
+import { ProposalTemplate } from '../../../components/documents'
 
 /**
  * QUOTE tab — the formal sellable scope. Lead → Quote → Approved Job
@@ -72,6 +73,37 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     })()
     return () => { alive = false }
   }, [contact?.id, contact?.updated_at, userId])
+
+  // Phase 2 — opt-in Document preview using the new ProposalTemplate.
+  // 'builder' = existing CRUD editor (default, unchanged UX).
+  // 'document' = full HTML preview that mirrors what the customer will
+  // see. The Send / Download / Approve actions on the right rail stay
+  // available in both modes so the operator can flip between editing
+  // the draft and reviewing the customer-facing render without losing
+  // their seat.
+  const [docMode, setDocMode] = useState('builder')
+  const [docItems, setDocItems] = useState([])
+  const [docItemsLoading, setDocItemsLoading] = useState(false)
+  useEffect(() => {
+    if (docMode !== 'document' || !contact?.id || !userId) return
+    let alive = true
+    setDocItemsLoading(true)
+    ;(async () => {
+      const { data } = await supabase
+        .from('fh_quote_items')
+        .select('*')
+        .eq('contact_id', contact.id)
+        .eq('user_id', userId)
+        .order('sort_order', { ascending: true })
+      if (alive) {
+        setDocItems(data || [])
+        setDocItemsLoading(false)
+      }
+    })()
+    return () => { alive = false }
+    // contact.updated_at flips after every CRUD via the trigger from
+    // 011_quote_items so the preview re-fetches without an extra sub.
+  }, [docMode, contact?.id, contact?.updated_at, userId])
 
   const [busy, setBusy] = useState(null) // 'preview' | 'download' | 'send' | null
   const disabled = baseCount === 0 || busy !== null
@@ -386,21 +418,33 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
             duplicated by the WorkspaceHead eyebrow. CSS hides this
             instance on desktop so the head reads as the single
             identity moment. */}
-        <div className="fh-quote-workspace__status-mobile">
+        <div className="fh-quote-workspace__status-mobile" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <StatusPill status={status} />
+          <QuoteViewToggle value={docMode} onChange={setDocMode} />
         </div>
 
-        <QuoteItemsSection
-          jobId={contact?.id}
-          userId={userId}
-          onContactRefresh={fetchAll}
-        />
+        {docMode === 'document' ? (
+          <DocumentPreviewPane
+            company={company}
+            contact={contact}
+            items={docItems}
+            loading={docItemsLoading}
+          />
+        ) : (
+          <>
+            <QuoteItemsSection
+              jobId={contact?.id}
+              userId={userId}
+              onContactRefresh={fetchAll}
+            />
 
-        <QuoteTermsSection
-          contact={contact}
-          patch={patch}
-          valuesRef={termsValuesRef}
-        />
+            <QuoteTermsSection
+              contact={contact}
+              patch={patch}
+              valuesRef={termsValuesRef}
+            />
+          </>
+        )}
       </div>
 
       <aside className="fh-quote-workspace__side">
@@ -437,6 +481,180 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       </aside>
     </div>
   )
+}
+
+/* ============================================================
+   Phase 2/3 — Quote view toggle + ProposalTemplate preview pane.
+   Builder mode = existing CRUD editor (untouched). Document mode
+   replaces the builder pane with the customer-facing render so the
+   contractor can see exactly what's about to ship.
+   ============================================================ */
+function QuoteViewToggle({ value, onChange }) {
+  const opts = [
+    { v: 'builder',  label: 'Builder' },
+    { v: 'document', label: 'Document' }
+  ]
+  return (
+    <div
+      role="tablist"
+      aria-label="Quote view"
+      style={{
+        display: 'inline-flex',
+        padding: 2,
+        borderRadius: 999,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        flexShrink: 0
+      }}
+    >
+      {opts.map((o) => {
+        const on = value === o.v
+        return (
+          <button
+            key={o.v}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => { if (!on) { hapticTap(); onChange(o.v) } }}
+            style={{
+              padding: '6px 12px',
+              minHeight: 32,
+              borderRadius: 999,
+              border: 0,
+              background: on ? 'var(--v3-primary-soft)' : 'transparent',
+              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: on ? 'default' : 'pointer',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function DocumentPreviewPane({ company, contact, items, loading }) {
+  // Group line items by their `section` field so each trade renders
+  // as its own ScopeSectionCard. Order is preserved (groupByOrdered).
+  // Optional items (is_optional=true) split into the upgrades array;
+  // excluded items become a bullet list under "Exclusions".
+  const { scopeSections, upgrades, exclusions, baseTotal, upgradeTotal } = mapItemsToScope(items)
+  const status = (contact?.proposal_status || 'draft').toLowerCase()
+  const docStatus = status === 'approved' ? 'approved'
+    : status === 'sent' ? 'sent'
+    : status === 'expired' ? 'expired'
+    : 'draft'
+
+  return (
+    <div
+      style={{
+        padding: '8px 0 24px',
+        // Cream backdrop so the white letter-paper sits visibly on
+        // the dark workspace surface without floating.
+        background: '#2a2520',
+        margin: '0 -16px',
+        paddingLeft: 12,
+        paddingRight: 12,
+        borderRadius: 8
+      }}
+    >
+      {loading && (
+        <div style={{
+          padding: '24px',
+          textAlign: 'center',
+          color: 'var(--v3-text-muted)',
+          fontFamily: 'var(--font-body)',
+          fontSize: 13
+        }}>
+          Loading preview…
+        </div>
+      )}
+      {!loading && (
+        <ProposalTemplate
+          company={company}
+          contact={contact}
+          project={{
+            title: contact?.job_title || contact?.name || 'Construction services',
+            address: contact?.address || ''
+          }}
+          scopeSections={scopeSections}
+          upgrades={upgrades}
+          pricing={{
+            baseTotal,
+            upgradeTotal,
+            discount: 0,
+            taxRate: 0
+          }}
+          warrantyText={contact?.terms_text || company?.warranty_default || ''}
+          exclusions={exclusions}
+          meta={{
+            issuedAt: contact?.quote_sent_at || contact?.created_at,
+            expiresAt: contact?.quote_expires_at || null
+          }}
+          status={docStatus}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Translate flat fh_quote_items rows into the ProposalTemplate's
+ * scope-section shape. Sections are derived from the free-text
+ * `section` column (preserved order — first-seen wins). Items with
+ * is_optional=true split out to `upgrades`; is_excluded=true items
+ * become bullet strings under `exclusions`.
+ */
+function mapItemsToScope(items = []) {
+  const groups = []
+  const groupIndex = new Map()
+  const upgradeBuckets = []
+  const exclusions = []
+  let baseTotal = 0
+  let upgradeTotal = 0
+
+  for (const it of items) {
+    const amt = Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0)))
+    if (it.is_excluded) {
+      const label = it.description || 'Excluded scope'
+      exclusions.push(label)
+      continue
+    }
+    const sectionTitle = (it.section || 'General').trim() || 'General'
+    if (it.is_optional) {
+      upgradeTotal += amt
+      let bucket = upgradeBuckets.find((b) => b.title === sectionTitle)
+      if (!bucket) {
+        bucket = { id: `upgrade:${sectionTitle}`, title: sectionTitle, items: [] }
+        upgradeBuckets.push(bucket)
+      }
+      bucket.items.push(it)
+      continue
+    }
+    baseTotal += amt
+    let i = groupIndex.get(sectionTitle)
+    if (i == null) {
+      i = groups.length
+      groupIndex.set(sectionTitle, i)
+      groups.push({ id: `sec:${sectionTitle}`, title: sectionTitle, items: [] })
+    }
+    groups[i].items.push(it)
+  }
+
+  return {
+    scopeSections: groups,
+    upgrades: upgradeBuckets,
+    exclusions,
+    baseTotal,
+    upgradeTotal
+  }
 }
 
 /* ============================================================
