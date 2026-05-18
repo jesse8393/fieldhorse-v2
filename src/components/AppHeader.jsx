@@ -9,16 +9,13 @@ function openPalette() {
   window.dispatchEvent(new CustomEvent('fh:open-palette'))
 }
 
-// Mobile-only: the shadcn CommandPalette dialog has known positioning
-// fights with iOS Chrome's keyboard UI — it renders clipped in the
-// upper-left and iOS Find on Page intercepts. On mobile width, route
-// the search button to /jobs (which has a real inline search input)
-// instead of opening the broken popover.
-function openSearch(navigate) {
-  if (typeof window !== 'undefined' && window.innerWidth < 900) {
-    navigate('/jobs')
-    return
-  }
+// Single entry point — dispatches `fh:open-palette`. CommandPalette
+// only opens at >=900px width; MobileSearchOverlay only opens at
+// <900px. Both gate themselves so we never get a dual-open. The old
+// mobile-routes-to-/jobs hack was a workaround for the cmdk popover
+// rendering clipped on iOS — superseded by the dedicated mobile
+// overlay.
+function openSearch() {
   openPalette()
 }
 
@@ -115,7 +112,7 @@ export default function AppHeader() {
         <button
           type="button"
           aria-label="Search everything"
-          onClick={() => openSearch(navigate)}
+          onClick={() => openSearch()}
           className="fh-header-search-btn"
           style={{
             width: 34,

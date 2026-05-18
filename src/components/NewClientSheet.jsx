@@ -124,11 +124,15 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
           // GPU-friendly and doesn't fight Vaul's own bottom: 0 anchor.
           transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
           transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
-          // Cap height to visualViewport so internal scroll always works
-          // even after the keyboard rises. 24px matches ActionSheet.
+          // Cap height so internal scroll always works even after the
+          // keyboard rises. Use 100vh (fixed full window height) instead
+          // of 100dvh — on iOS Safari dvh also shrinks when the keyboard
+          // opens, so subtracting kbd from 100dvh double-counted and
+          // collapsed the drawer to a sliver showing only the last
+          // fields. 24px matches ActionSheet's top breathing room.
           maxHeight: kbd
-            ? `calc(100dvh - ${kbd}px - env(safe-area-inset-top) - 24px)`
-            : `calc(100dvh - env(safe-area-inset-top) - 24px)`
+            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
+            : `calc(100vh - env(safe-area-inset-top) - 24px)`
         }}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
