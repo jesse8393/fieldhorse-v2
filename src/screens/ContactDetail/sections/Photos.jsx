@@ -14,6 +14,27 @@ import ActionSheet from '../../../components/ActionSheet.jsx'
 const BUCKET = 'job-photos'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per photo
 
+// Curated section options for the photo-tagging picker. Free-text
+// "Other…" branch lets the contractor add a custom label when their
+// trade isn't on this list (matches the section names they use in
+// fh_quote_items.section). The PDF photos-by-section distributor
+// matches strings exactly, so picker labels here mirror what shows
+// up in scope cards.
+const SCOPE_SECTIONS = [
+  'Demolition',
+  'Roofing',
+  'Exterior',
+  'Interior',
+  'Concrete',
+  'Framing',
+  'Electrical',
+  'Plumbing',
+  'HVAC',
+  'Finishes',
+  'Allowances',
+  'Site work'
+]
+
 /**
  * Photos section — fh_job_files where kind='photo'.
  *
@@ -183,6 +204,22 @@ export default function PhotosSection({ jobId, userId }) {
       .eq('id', rowId)
       .eq('user_id', userId)
     if (error) toastError("Couldn't save caption", error.message)
+  }
+
+  // Tagging a photo to a scope section ("Roofing", "Demolition", …) lets
+  // the proposal PDF + on-screen ProposalTemplate distribute the photo
+  // to the matching ScopeSectionCard so the customer sees evidence per
+  // trade. Column added by migration 020; the PDF loader falls back to
+  // the photo caption for older rows.
+  async function saveSectionTag(rowId, nextTag) {
+    const trimmed = (nextTag || '').trim()
+    setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, section_tag: trimmed || null } : r))
+    const { error } = await supabase
+      .from('fh_job_files')
+      .update({ section_tag: trimmed || null })
+      .eq('id', rowId)
+      .eq('user_id', userId)
+    if (error) toastError("Couldn't save section tag", error.message)
   }
 
   // Open the destructive-confirm sheet for this photo. The actual
@@ -430,6 +467,26 @@ export default function PhotosSection({ jobId, userId }) {
                     AI…
                   </div>
                 )}
+                {/* Section tag badge — bottom-right when set. Lets the
+                    operator scan the grid and see which photos still
+                    need to be tagged to a scope section. */}
+                {r.section_tag && !captioning && (
+                  <div style={{
+                    position: 'absolute', bottom: 4, right: 4,
+                    padding: '3px 7px', borderRadius: 6,
+                    background: 'color-mix(in srgb, var(--v3-primary) 80%, transparent)',
+                    color: 'var(--v3-on-primary, #1a1208)',
+                    fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    maxWidth: 'calc(100% - 12px)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {r.section_tag}
+                  </div>
+                )}
               </motion.button>
             )
           })}
@@ -448,6 +505,7 @@ export default function PhotosSection({ jobId, userId }) {
             onNext={() => goLightbox(1)}
             onClose={closeLightbox}
             onSaveCaption={(c) => saveCaption(lightboxRow.id, c)}
+            onSaveSectionTag={(t) => saveSectionTag(lightboxRow.id, t)}
             onDelete={() => { closeLightbox(); remove(lightboxRow) }}
           />
         )}
@@ -481,10 +539,43 @@ export default function PhotosSection({ jobId, userId }) {
    PhotoLightbox — full-screen image with caption editor + nav
    ============================================================ */
 
-function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onDelete }) {
+function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete }) {
   const [caption, setCaption] = useState(row.caption || '')
+  const [sectionTag, setSectionTag] = useState(row.section_tag || '')
+  const [customTag, setCustomTag] = useState('')
+  const [showCustom, setShowCustom] = useState(false)
 
-  useEffect(() => { setCaption(row.caption || '') }, [row.id, row.caption])
+  useEffect(() => {
+    setCaption(row.caption || '')
+    const tag = row.section_tag || ''
+    setSectionTag(tag)
+    setShowCustom(!!tag && !SCOPE_SECTIONS.includes(tag))
+    setCustomTag(tag && !SCOPE_SECTIONS.includes(tag) ? tag : '')
+  }, [row.id, row.caption, row.section_tag])
+
+  function pickSection(value) {
+    if (value === '__custom__') {
+      setShowCustom(true)
+      return
+    }
+    setShowCustom(false)
+    setCustomTag('')
+    setSectionTag(value)
+    onSaveSectionTag?.(value)
+  }
+
+  function commitCustom() {
+    const trimmed = customTag.trim()
+    setSectionTag(trimmed)
+    onSaveSectionTag?.(trimmed)
+  }
+
+  function clearTag() {
+    setSectionTag('')
+    setShowCustom(false)
+    setCustomTag('')
+    onSaveSectionTag?.('')
+  }
 
   return (
     <>
@@ -604,8 +695,93 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           )}
         </div>
 
+        {/* Section tag picker — chooses which scope card the photo
+            attaches to on the proposal. Auto-saves on pick. */}
+        <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{
+              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.16em', textTransform: 'uppercase',
+              color: 'var(--v3-primary)'
+            }}>
+              Scope section
+            </span>
+            {sectionTag && (
+              <button
+                type="button"
+                onClick={clearTag}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: 'rgba(255, 255, 255, 0.55)',
+                  fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+                  cursor: 'pointer', padding: 0
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {SCOPE_SECTIONS.map((opt) => {
+              const on = !showCustom && sectionTag === opt
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => pickSection(opt)}
+                  style={{
+                    padding: '6px 11px', borderRadius: 999,
+                    background: on
+                      ? 'color-mix(in srgb, var(--v3-primary) 22%, transparent)'
+                      : 'rgba(255, 255, 255, 0.06)',
+                    border: on
+                      ? '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)'
+                      : '1px solid rgba(255, 255, 255, 0.12)',
+                    color: on ? 'var(--v3-primary-bright, #E8B865)' : 'rgba(255, 255, 255, 0.78)',
+                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    fontWeight: on ? 700 : 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {opt}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => pickSection('__custom__')}
+              style={{
+                padding: '6px 11px', borderRadius: 999,
+                background: showCustom ? 'rgba(255, 255, 255, 0.10)' : 'transparent',
+                border: '1px dashed rgba(255, 255, 255, 0.22)',
+                color: 'rgba(255, 255, 255, 0.78)',
+                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Other…
+            </button>
+          </div>
+          {showCustom && (
+            <input
+              type="text"
+              value={customTag}
+              onChange={(e) => setCustomTag(e.target.value)}
+              onBlur={commitCustom}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
+              placeholder="Type a section name (e.g. Stairs)"
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 10,
+                background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#fff', fontFamily: 'var(--font-body)',
+                fontSize: 13, outline: 'none'
+              }}
+            />
+          )}
+        </div>
+
         {/* Caption editor */}
-        <div style={{ padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
             letterSpacing: '0.16em', textTransform: 'uppercase',
