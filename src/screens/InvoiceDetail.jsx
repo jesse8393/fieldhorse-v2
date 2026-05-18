@@ -98,8 +98,16 @@ export default function InvoiceDetail() {
     setLoading(true)
     setError('')
     try {
+      // Join fh_clients via client_id so the invoice can fall back to
+      // the client's email/phone/address when the denormalized fields
+      // on the job row are empty. Migration 007 stamped client_id on
+      // every contact, so the link should always exist.
       const [{ data: c, error: cErr }, { data: ps }] = await Promise.all([
-        supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
+        supabase
+          .from('fh_contacts')
+          .select('*, fh_clients(name, email, phone, address)')
+          .eq('id', id)
+          .maybeSingle(),
         supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false })
       ])
       if (cErr) throw cErr
@@ -112,6 +120,19 @@ export default function InvoiceDetail() {
       setLoading(false)
     }
   }
+
+  // Resolved client info — prefer the denormalized job-row fields, fall
+  // back to fh_clients (the source of truth when edits happen on the
+  // client card and the job row stayed empty).
+  const resolved = useMemo(() => {
+    const cli = contact?.fh_clients || {}
+    return {
+      name:    contact?.name    || cli.name    || '',
+      email:   contact?.email   || cli.email   || '',
+      phone:   contact?.phone   || cli.phone   || '',
+      address: contact?.address || cli.address || ''
+    }
+  }, [contact])
 
   useEffect(() => { refresh() }, [user?.id, id])
 
@@ -157,10 +178,10 @@ export default function InvoiceDetail() {
       const result = await generateInvoice({
         company,
         contact: {
-          name: contact.name || 'Client',
-          address: contact.address || '',
-          phone: contact.phone || '',
-          email: contact.email || ''
+          name: resolved.name || 'Client',
+          address: resolved.address,
+          phone: resolved.phone,
+          email: resolved.email
         },
         lineItems: [
           {
@@ -201,8 +222,8 @@ export default function InvoiceDetail() {
   // Quote tab.
   async function handleSendInvoice() {
     if (!contact || sending) return
-    if (!contact.email) {
-      toastError('Add a client email first', 'Open the linked job to add an email.')
+    if (!resolved.email) {
+      toastError('Add a client email first', 'Open the linked client or job to add an email.')
       return
     }
     setSending(true)
@@ -210,10 +231,10 @@ export default function InvoiceDetail() {
       const result = await generateInvoice({
         company,
         contact: {
-          name: contact.name || 'Client',
-          address: contact.address || '',
-          phone: contact.phone || '',
-          email: contact.email || ''
+          name: resolved.name || 'Client',
+          address: resolved.address,
+          phone: resolved.phone,
+          email: resolved.email
         },
         lineItems: [
           {
@@ -268,8 +289,8 @@ export default function InvoiceDetail() {
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: user.id,
-          recipient_email: contact.email,
-          recipient_name: contact.name || null,
+          recipient_email: resolved.email,
+          recipient_name: resolved.name || null,
           storage_path: path,
           filename: result.filename,
           amount_due: totals.balance
@@ -295,7 +316,7 @@ export default function InvoiceDetail() {
         throw new Error(`Resend rejected${status}: ${detail}`)
       }
 
-      toastSuccess(`Invoice sent to ${contact.email}`, result.filename)
+      toastSuccess(`Invoice sent to ${resolved.email}`, result.filename)
       setSent(true)
       setTimeout(() => setSent(false), 2400)
       refresh()
@@ -425,7 +446,7 @@ export default function InvoiceDetail() {
               color: 'var(--v3-text)', letterSpacing: '-0.01em',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
             }}>
-              {contact.name || 'Unnamed client'}
+              {resolved.name || 'Unnamed client'}
             </span>
             {contact.job_title && (
               <span style={{
@@ -503,14 +524,14 @@ export default function InvoiceDetail() {
             }}>
               {contact.job_title || 'Construction services per agreement'}
             </div>
-            {contact.address && (
+            {resolved.address && (
               <div style={{
                 marginTop: 3,
                 fontFamily: 'var(--font-body)', fontSize: 11,
                 color: 'var(--v3-text-muted)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
               }}>
-                {contact.address}
+                {resolved.address}
               </div>
             )}
           </div>
@@ -646,10 +667,10 @@ export default function InvoiceDetail() {
             hapticTap()
             // No client email on file — explain to the user instead of
             // silently no-op'ing (was the audit's #1 critical failure).
-            if (!contact.email) {
+            if (!resolved.email) {
               toastError(
                 'Add a client email first',
-                `${contact.name || 'This client'} has no email on file. Open the linked job → edit details → add an email, then try again.`
+                `${resolved.name || 'This client'} has no email on file. Open the linked client → edit details → add an email, then try again.`
               )
               return
             }
