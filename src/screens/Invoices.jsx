@@ -36,6 +36,20 @@ function bucketFor(days) {
   return '60+'
 }
 
+// Resolve client info for a job row: prefer the denormalized fields on
+// the job, fall back to the joined fh_clients row. Edits to the client
+// card don't propagate back to the job row, so the linked client is
+// the source of truth when the job row is stale or empty.
+function resolveClient(job) {
+  const cli = job?.fh_clients || {}
+  return {
+    name:    job?.name    || cli.name    || '',
+    email:   job?.email   || cli.email   || '',
+    phone:   job?.phone   || cli.phone   || '',
+    address: job?.address || cli.address || ''
+  }
+}
+
 function fmtMoney(n) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
@@ -59,8 +73,12 @@ export default function Invoices() {
   const refresh = async () => {
     if (!user) return
     setLoading(true)
+    // Join fh_clients so each job row can fall back to the linked
+    // client's email/name/phone/address when the denormalized fields
+    // on the job row are empty (typical when the client is added or
+    // edited later from the Client card, not the job).
     const [{ data: js }, { data: ps }] = await Promise.all([
-      supabase.from('fh_contacts').select('*').eq('user_id', user.id).in('stage', ['job', 'invoice', 'closed']).order('created_at', { ascending: false }),
+      supabase.from('fh_contacts').select('*, fh_clients(name, email, phone, address)').eq('user_id', user.id).in('stage', ['job', 'invoice', 'closed']).order('created_at', { ascending: false }),
       supabase.from('fh_payments').select('*').eq('user_id', user.id)
     ])
     setJobs(js || [])
@@ -157,13 +175,14 @@ export default function Invoices() {
     try {
       // generateInvoice() became async in 4D-2D — pre-fetches the
       // contractor's logo via loadLogoForPdf before rendering.
+      const c = resolveClient(row.job)
       const result = await generateInvoice({
         company,
         contact: {
-          name: row.job.name || row.job.client_name || 'Client',
-          address: row.job.address || '',
-          phone: row.job.phone || '',
-          email: row.job.email || ''
+          name: c.name || row.job.client_name || 'Client',
+          address: c.address,
+          phone: c.phone,
+          email: c.email
         },
         lineItems: [
           {
@@ -211,8 +230,9 @@ export default function Invoices() {
   async function handleSendEmail(row) {
     const job = row?.job
     if (!user || !job) return
-    if (!job.email) {
-      toastError('Add a client email first', `Open the linked job to add an email for ${job.name || 'this client'}.`)
+    const c = resolveClient(job)
+    if (!c.email) {
+      toastError('Add a client email first', `Open the linked client to add an email for ${c.name || 'this client'}.`)
       return
     }
     setSendingId(job.id)
@@ -220,10 +240,10 @@ export default function Invoices() {
       const result = await generateInvoice({
         company,
         contact: {
-          name: job.name || 'Client',
-          address: job.address || '',
-          phone: job.phone || '',
-          email: job.email || ''
+          name: c.name || 'Client',
+          address: c.address,
+          phone: c.phone,
+          email: c.email
         },
         lineItems: [
           { description: job.job_title || 'Construction services per agreement', qty: 1, rate: row.amount, amount: row.amount },
@@ -250,8 +270,8 @@ export default function Invoices() {
         body: JSON.stringify({
           contact_id: job.id,
           sender_user_id: user.id,
-          recipient_email: job.email,
-          recipient_name: job.name || null,
+          recipient_email: c.email,
+          recipient_name: c.name || null,
           storage_path: path,
           filename: result.filename,
           amount_due: row.balance
@@ -269,7 +289,7 @@ export default function Invoices() {
         throw new Error(`Resend rejected${status}: ${detail}`)
       }
 
-      toastSuccess(`Invoice sent to ${job.email}`, result.filename)
+      toastSuccess(`Invoice sent to ${c.email}`, result.filename)
       setSentId(job.id)
       setTimeout(() => setSentId(null), 2400)
       refresh()
@@ -786,7 +806,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }) {
               type="button"
               onClick={onEmail}
               disabled={isSending}
-              title={!row.job?.email ? 'Add a client email first on the linked job' : 'Email the invoice to the client'}
+              title={!resolveClient(row.job).email ? 'Add a client email first on the linked client' : 'Email the invoice to the client'}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
