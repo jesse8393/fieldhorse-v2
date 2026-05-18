@@ -10,7 +10,7 @@ import { reverseGeocode } from '../lib/weather.js'
 // useTheme import removed 5/17 with APPEARANCE section — restore alongside
 // the toggle when full light-theme parity ships.
 // import { useTheme } from '../contexts/ThemeContext.jsx'
-import { toastSuccess } from '../lib/toast.js'
+import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { Switch } from '@/components/ui/switch'
@@ -47,6 +47,12 @@ export default function Settings() {
   const [licenseNumber, setLicenseNumber] = useState(profile?.license_number || '')
   const [insuredText, setInsuredText] = useState(profile?.insured_text || '')
   const [warrantyDefault, setWarrantyDefault] = useState(profile?.warranty_default || '')
+  // Brand accent hex (validated #RRGGBB by migration 015's CHECK
+  // constraint). Drives every gold accent on the customer-visible
+  // surfaces — top rule on each PDF, status pills, eyebrows, hero
+  // money numbers. Empty → save as null → downstream pdf.js +
+  // template tokens fall back to the system default (#C8A154).
+  const [brandAccentHex, setBrandAccentHex] = useState(profile?.brand_accent_hex || '')
   // Dedupe + canonicalize on read. Older onboarding flows wrote both
   // duplicates AND ghost entries (typos, deprecated names like
   // "Painters" / "Drywaller") into profile.services. The chip
@@ -106,6 +112,7 @@ export default function Settings() {
     setLicenseNumber(profile?.license_number || '')
     setInsuredText(profile?.insured_text || '')
     setWarrantyDefault(profile?.warranty_default || '')
+    setBrandAccentHex(profile?.brand_accent_hex || '')
     setServices(() => {
       const canonical = new Set(SERVICES)
       return Array.from(new Set(
@@ -135,6 +142,24 @@ export default function Settings() {
       const t = (s || '').trim()
       return t.length === 0 ? null : t
     }
+    // Validate brand accent before save. Migration 015's CHECK
+    // constraint will reject anything off-format with an opaque
+    // Postgres error; catching it here lets us surface a friendly
+    // toast instead.
+    const rawAccent = (brandAccentHex || '').trim()
+    let safeAccent = null
+    if (rawAccent) {
+      if (!/^#[0-9a-fA-F]{6}$/.test(rawAccent)) {
+        toastError(
+          'Brand color must be a #RRGGBB hex',
+          `"${rawAccent}" doesn't look like a 6-digit hex (e.g. #C8A154). Settings not saved.`
+        )
+        setSaving(false)
+        return
+      }
+      safeAccent = rawAccent.toLowerCase()
+    }
+
     await upsertProfile({
       company_name: companyName,
       company_phone: nullIfBlank(companyPhone),
@@ -144,6 +169,7 @@ export default function Settings() {
       license_number: nullIfBlank(licenseNumber),
       insured_text: nullIfBlank(insuredText),
       warranty_default: nullIfBlank(warrantyDefault),
+      brand_accent_hex: safeAccent,
       services
     })
     refresh()
@@ -324,6 +350,18 @@ export default function Settings() {
               onChange={(e) => setWarrantyDefault(e.target.value)}
               placeholder="One-year workmanship warranty on all installed labor. Manufacturer warranties pass through to the customer."
               style={{ ...brandInputStyle, resize: 'vertical', lineHeight: 1.45 }}
+            />
+          </BrandField>
+
+          <BrandField
+            label="Brand accent color"
+            optional
+            hint="Drives the gold rule on each PDF, status pills, eyebrows, and the hero money number on proposals + invoices. Leave blank to use the FieldHorse default."
+          >
+            <BrandColorEditor
+              value={brandAccentHex}
+              onChange={setBrandAccentHex}
+              companyName={companyName}
             />
           </BrandField>
         </div>
@@ -674,4 +712,171 @@ const brandInputStyle = {
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box'
+}
+
+/**
+ * Brand color editor — native color picker + hex input + live preview
+ * strip showing how the chosen color will render on customer-facing
+ * surfaces (top rule, status pill, eyebrow, hero money number).
+ *
+ * Validation is deferred to save() so the editor stays permissive
+ * while the operator's typing — the picker + preset palette can only
+ * emit valid hex, but the manual hex input could be mid-type.
+ */
+const COLOR_PRESETS = [
+  { hex: '#C8A154', name: 'FieldGold (default)' },
+  { hex: '#1F3A93', name: 'Indigo' },
+  { hex: '#0E7C66', name: 'Forest' },
+  { hex: '#9E2B25', name: 'Brick' },
+  { hex: '#1A1814', name: 'Onyx' }
+]
+
+function BrandColorEditor({ value, onChange, companyName }) {
+  const v = (value || '').trim()
+  const isHex = /^#[0-9a-fA-F]{6}$/.test(v)
+  const previewColor = isHex ? v : '#C8A154'
+  const usingDefault = !isHex
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Input row: color picker swatch + hex text input + reset */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <label
+          aria-label="Pick brand color"
+          style={{
+            position: 'relative',
+            width: 44, height: 44, borderRadius: 12,
+            background: previewColor,
+            border: '1px solid var(--rule)',
+            cursor: 'pointer',
+            flexShrink: 0,
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+          }}
+        >
+          <input
+            type="color"
+            value={isHex ? v : '#c8a154'}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+          />
+        </label>
+        <input
+          type="text"
+          value={v}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#C8A154"
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          style={{
+            ...brandInputStyle,
+            flex: 1,
+            fontFamily: 'var(--font-mono, var(--font-body))',
+            fontVariantNumeric: 'tabular-nums',
+            textTransform: 'lowercase'
+          }}
+        />
+        {v && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            style={{
+              padding: '8px 10px', borderRadius: 8,
+              background: 'transparent', border: '1px solid var(--rule)',
+              color: 'var(--ink-muted)', fontFamily: 'var(--font-body)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer'
+            }}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      {/* Preset palette — common contractor brand colors */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {COLOR_PRESETS.map((p) => {
+          const isOn = isHex && v.toLowerCase() === p.hex.toLowerCase()
+          return (
+            <button
+              key={p.hex}
+              type="button"
+              onClick={() => onChange(p.hex)}
+              aria-label={`Use ${p.name}`}
+              title={p.name}
+              style={{
+                width: 28, height: 28, borderRadius: 8,
+                background: p.hex,
+                border: isOn ? '2px solid var(--ink-strong)' : '1px solid var(--rule)',
+                cursor: 'pointer',
+                padding: 0
+              }}
+            />
+          )
+        })}
+      </div>
+
+      {/* Live preview — shows how the chosen color renders on the
+          three most identity-loaded customer-visible surfaces. */}
+      <div style={{
+        marginTop: 4,
+        padding: '14px 16px',
+        background: '#FBF8F1',
+        border: '1px solid #E8E4D8',
+        borderRadius: 10,
+        display: 'flex', flexDirection: 'column', gap: 10
+      }}>
+        {/* Top rule */}
+        <div style={{ height: 3, background: previewColor, borderRadius: 99 }} />
+        {/* Eyebrow + hero number row */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
+          <div>
+            <div style={{
+              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
+              letterSpacing: '0.18em', color: previewColor, textTransform: 'uppercase'
+            }}>
+              Invoice
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 20, fontWeight: 600,
+              letterSpacing: '0.06em',
+              color: '#1A1814', marginTop: 2,
+              textTransform: 'uppercase'
+            }}>
+              {(companyName || 'My Company').toUpperCase()}
+            </div>
+          </div>
+          {/* Status pill */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '4px 9px', borderRadius: 999,
+            background: `color-mix(in srgb, ${previewColor} 16%, white)`,
+            border: `1px solid ${previewColor}`,
+            color: previewColor,
+            fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
+            letterSpacing: '0.18em', textTransform: 'uppercase'
+          }}>
+            Sample
+          </span>
+        </div>
+        {/* Hero money */}
+        <div style={{
+          fontFamily: 'var(--font-serif, Georgia, serif)',
+          fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em',
+          color: previewColor, lineHeight: 1
+        }}>
+          $24,400
+        </div>
+      </div>
+
+      {usingDefault && (
+        <span style={{
+          fontFamily: 'var(--font-body)', fontSize: 11,
+          color: 'var(--ink-faint, var(--ink-muted))'
+        }}>
+          Using the FieldHorse default. Pick a preset, paste a hex (e.g. <code>#1F3A93</code>), or tap the swatch to choose your own.
+        </span>
+      )}
+    </div>
+  )
 }
