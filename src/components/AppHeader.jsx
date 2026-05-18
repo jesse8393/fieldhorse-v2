@@ -9,6 +9,19 @@ function openPalette() {
   window.dispatchEvent(new CustomEvent('fh:open-palette'))
 }
 
+// Mobile-only: the shadcn CommandPalette dialog has known positioning
+// fights with iOS Chrome's keyboard UI — it renders clipped in the
+// upper-left and iOS Find on Page intercepts. On mobile width, route
+// the search button to /jobs (which has a real inline search input)
+// instead of opening the broken popover.
+function openSearch(navigate) {
+  if (typeof window !== 'undefined' && window.innerWidth < 900) {
+    navigate('/jobs')
+    return
+  }
+  openPalette()
+}
+
 /**
  * AppHeader — the shared top bar.
  *
@@ -102,15 +115,17 @@ export default function AppHeader() {
         <button
           type="button"
           aria-label="Search everything"
-          onClick={openPalette}
+          onClick={() => openSearch(navigate)}
           className="fh-header-search-btn"
           style={{
             width: 34,
             height: 34,
             minWidth: 34,
             borderRadius: 8,
-            background: 'var(--surface-2)',
-            border: '1px solid var(--rule)',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
             display: 'grid',
             placeItems: 'center',
             color: 'var(--ink-strong)',
@@ -119,7 +134,7 @@ export default function AppHeader() {
             transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
           }}
         >
-          <Search size={13} />
+          <Search size={14} />
         </button>
         <NotificationsBell />
         <button
@@ -132,8 +147,10 @@ export default function AppHeader() {
             height: 34,
             minWidth: 34,
             borderRadius: 8,
-            background: 'var(--surface-2)',
-            border: '1px solid var(--rule)',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
             display: 'grid',
             placeItems: 'center',
             color: 'var(--ink-strong)',
@@ -142,7 +159,7 @@ export default function AppHeader() {
             transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
           }}
         >
-          <NotebookPen size={13} />
+          <NotebookPen size={14} />
         </button>
       </div>
     </header>
