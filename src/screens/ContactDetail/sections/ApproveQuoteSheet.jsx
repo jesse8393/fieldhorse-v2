@@ -625,7 +625,35 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
  */
 async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userId }) {
   try {
+    // Approval shape — keys match what the v3 ApprovalBlock /
+    // drawApprovalSection consume (Phase 4b). The new draw helper
+    // gates on approval.mode === 'approved' to decide whether to
+    // stamp the signature image / name + date over the blank lines;
+    // drawn signatures land via clientSignatureDataUrl, typed via
+    // clientName italic rendering when no dataUrl is present.
+    //
+    // Legacy camelCase keys (versionNumber, signatureKind, etc.) are
+    // retained on the same object for the older certificate-page
+    // metadata renderer that's been replaced — keeping them costs
+    // nothing and survives any consumer that still reads them.
+    const isDrawn = confirmed.signature_kind === 'drawn'
+    const isTyped = confirmed.signature_kind === 'typed'
     const approval = {
+      // v3 ApprovalBlock shape
+      mode: 'approved',
+      clientName: confirmed.approved_by_name,
+      clientSignatureDataUrl: isDrawn ? confirmed.signature_data : null,
+      // Typed signatures stamp as italic name + date — pass the typed
+      // text through clientName when it differs from the printed name.
+      // (drawApprovalSection renders italic name only when dataUrl is
+      // null, so this is safe for both branches.)
+      clientApprovedAt: confirmed.approved_at,
+      // Contractor side stays blank — the contractor's countersign
+      // happens out-of-band today; the field remains an empty line on
+      // the cert for them to physically sign when handing over.
+      contractorSignatureDataUrl: null,
+      contractorApprovedAt: null,
+      // Legacy fields — preserved for any reader still on the old shape.
       versionNumber: confirmed.version_number,
       quoteNumber: snapshot?.quote_number || null,
       method: confirmed.approval_method,
@@ -634,12 +662,9 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
       approvalNote: confirmed.approval_note || '',
       baseTotal: Number(confirmed.base_total || 0),
       approvedAt: confirmed.approved_at,
-      // 4C-4b: signature payload — read from confirmed row, not local
-      // state, so the artifact reflects what actually persisted.
-      // Rendered into the certificate by 4C-4c; ignored by current
-      // generateQuote.
       signatureKind: confirmed.signature_kind || null,
-      signatureData: confirmed.signature_data || null
+      signatureData: confirmed.signature_data || null,
+      isTyped
     }
 
     // Use snapshot for content; fall back to fresh inputs if any field

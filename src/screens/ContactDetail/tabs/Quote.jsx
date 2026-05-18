@@ -564,6 +564,40 @@ function DocumentPreviewPane({ company, contact, items, loading, insurance = nul
     : status === 'expired' ? 'expired'
     : 'draft'
 
+  // When the quote is approved, pull the most recent approval snapshot
+  // so the preview can stamp the captured signature + date onto the
+  // ApprovalBlock. Stays null for draft / sent / expired quotes — the
+  // block then renders blank signature lines.
+  const [approval, setApproval] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    if (status !== 'approved' || !contact?.id) {
+      setApproval(null)
+      return
+    }
+    ;(async () => {
+      const { data } = await supabase
+        .from('fh_quote_versions')
+        .select('approved_by_name, approved_at, signature_kind, signature_data, approval_method')
+        .eq('contact_id', contact.id)
+        .eq('status', 'approved')
+        .order('approved_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (cancelled || !data) return
+      const isDrawn = data.signature_kind === 'drawn'
+      setApproval({
+        mode: 'approved',
+        clientName: data.approved_by_name,
+        clientSignatureDataUrl: isDrawn ? data.signature_data : null,
+        clientApprovedAt: data.approved_at,
+        contractorSignatureDataUrl: null,
+        contractorApprovedAt: null
+      })
+    })()
+    return () => { cancelled = true }
+  }, [status, contact?.id])
+
   return (
     <div
       style={{
@@ -608,6 +642,7 @@ function DocumentPreviewPane({ company, contact, items, loading, insurance = nul
           exclusions={exclusions}
           insurance={insurance}
           changeOrders={changeOrders}
+          approval={approval}
           meta={{
             issuedAt: contact?.quote_sent_at || contact?.created_at,
             expiresAt: contact?.quote_expires_at || null
