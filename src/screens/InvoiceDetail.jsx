@@ -184,31 +184,31 @@ export default function InvoiceDetail() {
       const result = await generateInvoice({
         company,
         contact: {
+          id: contact.id,
           name: resolved.name || 'Client',
           address: resolved.address,
           phone: resolved.phone,
-          email: resolved.email
+          email: resolved.email,
+          job_title: contact.job_title
         },
+        // Single canonical line — the new template renders a full
+        // Balance Summary section underneath, so we no longer need
+        // to inject a synthetic "Less: payments received" row.
         lineItems: [
           {
             description: contact.job_title || 'Construction services per agreement',
             qty: 1,
             rate: totals.amount,
             amount: totals.amount
-          },
-          ...(totals.paid > 0 ? [{
-            description: 'Less: payments received',
-            qty: 1,
-            rate: -totals.paid,
-            amount: -totals.paid
-          }] : [])
+          }
         ],
         taxRate: 0,
-        notes: totals.paid > 0
-          ? `Balance due reflects ${fmtMoney(totals.paid)} previously received.`
-          : '',
+        notes: '',
         dueDate: '',
-        invoiceId: contact.id
+        invoiceId: contact.id,
+        payments,
+        contractTotal: totals.amount,
+        previouslyPaid: totals.paid
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
@@ -237,10 +237,12 @@ export default function InvoiceDetail() {
       const result = await generateInvoice({
         company,
         contact: {
+          id: contact.id,
           name: resolved.name || 'Client',
           address: resolved.address,
           phone: resolved.phone,
-          email: resolved.email
+          email: resolved.email,
+          job_title: contact.job_title
         },
         lineItems: [
           {
@@ -248,20 +250,15 @@ export default function InvoiceDetail() {
             qty: 1,
             rate: totals.amount,
             amount: totals.amount
-          },
-          ...(totals.paid > 0 ? [{
-            description: 'Less: payments received',
-            qty: 1,
-            rate: -totals.paid,
-            amount: -totals.paid
-          }] : [])
+          }
         ],
         taxRate: 0,
-        notes: totals.paid > 0
-          ? `Balance due reflects ${fmtMoney(totals.paid)} previously received.`
-          : '',
+        notes: '',
         dueDate: '',
-        invoiceId: contact.id
+        invoiceId: contact.id,
+        payments,
+        contractTotal: totals.amount,
+        previouslyPaid: totals.paid
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
 
