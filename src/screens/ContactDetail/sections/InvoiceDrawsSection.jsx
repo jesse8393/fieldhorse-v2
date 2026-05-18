@@ -251,6 +251,45 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     insured_text: profile?.insured_text || ''
   }
 
+  // Shared per-draw PDF builder. Used by both Download (local save)
+  // and Send (upload to job-files + POST to /api/send-invoice). The
+  // job_title slot carries "Draw N of M — {label}" so the invoice
+  // letterhead title reflects which draw the customer is receiving.
+  async function buildDrawPdf(draw) {
+    const allActiveDraws = draws.filter((d) => d.status !== 'void')
+    const drawCount = allActiveDraws.length
+    const drawTitle = draw.title?.trim()
+      || `Draw ${draw.sequence_number} of ${drawCount}`
+
+    return generateInvoice({
+      company,
+      contact: {
+        id: contact.id,
+        name: contact.name || 'Client',
+        address: contact.address,
+        phone: contact.phone,
+        email: contact.email,
+        job_title: `${drawTitle} — ${contact.job_title || 'Construction services'}`
+      },
+      lineItems: [
+        {
+          description: drawTitle,
+          qty: 1,
+          rate: draw.amount,
+          amount: draw.amount
+        }
+      ],
+      notes: draw.notes || '',
+      dueDate: draw.due_at ? shortDate(draw.due_at) : '',
+      invoiceId: draw.id,
+      payments,
+      contractTotal,
+      previouslyPaid,
+      insurance,
+      changeOrders
+    })
+  }
+
   // Build a single-draw PDF — reuses generateInvoice with this draw's
   // amount routed to thisInvoice + balanceRemaining computed from the
   // current paid total. Lets each draw print its own letterhead with
@@ -259,44 +298,116 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     if (busyId) return
     setBusyId(draw.id)
     try {
-      const allActiveDraws = draws.filter((d) => d.status !== 'void')
-      const drawCount = allActiveDraws.length
-      const idx = allActiveDraws.findIndex((d) => d.id === draw.id) + 1
-      const drawTitle = draw.title?.trim()
-        || `Draw ${draw.sequence_number} of ${drawCount}`
-
-      const result = await generateInvoice({
-        company,
-        contact: {
-          id: contact.id,
-          name: contact.name || 'Client',
-          address: contact.address,
-          phone: contact.phone,
-          email: contact.email,
-          job_title: `${drawTitle} — ${contact.job_title || 'Construction services'}`
-        },
-        lineItems: [
-          {
-            description: drawTitle,
-            qty: 1,
-            rate: draw.amount,
-            amount: draw.amount
-          }
-        ],
-        notes: draw.notes || '',
-        dueDate: draw.due_at ? shortDate(draw.due_at) : '',
-        invoiceId: draw.id,
-        payments,
-        contractTotal,
-        previouslyPaid,
-        insurance,
-        changeOrders
-      })
+      const result = await buildDrawPdf(draw)
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
       toastSuccess('Draw PDF downloaded', result.filename)
     } catch (e) {
       toastError("Couldn't generate PDF", e?.message || 'Try again.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  // Email a single draw via the existing /api/send-invoice Netlify
+  // function. Mirrors the InvoiceDetail send flow exactly: build PDF →
+  // upload to job-files (server uses service-role to pull it) → POST
+  // to send-invoice → flip the draw's status to 'sent' on success.
+  //
+  // Requires the contact to have an email on file. The recipient
+  // resolution lives at this surface (uses the linked client's email
+  // as fallback when the contact row's email is empty, matching the
+  // pattern in Invoices.jsx).
+  async function handleSend(draw) {
+    if (busyId) return
+    if (!user?.id) return
+    // Use contact.email directly. The fh_clients-join fallback the
+    // Invoices list does isn't available in useJobData yet, so an
+    // empty contact email surfaces a friendly toast pointing the
+    // operator at the right place to fill it in.
+    const recipientEmail = (contact?.email || '').trim()
+    if (!recipientEmail) {
+      toastError(
+        'Add a client email first',
+        `Open ${contact?.name || 'this contact'} to add an email, then try again.`
+      )
+      return
+    }
+    setBusyId(draw.id)
+    try {
+      const result = await buildDrawPdf(draw)
+      if (!result?.doc) throw new Error('PDF generator returned no document')
+
+      // Upload to private job-files bucket so the server can fetch
+      // with service role + attach to the Resend send.
+      const blob = result.doc.output('blob')
+      const rowId = crypto.randomUUID()
+      const path = `${user.id}/${contact.id}/${rowId}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from('job-files')
+        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+      if (upErr) throw new Error(`Couldn't save the draw PDF: ${upErr.message}`)
+
+      // Audit row — best-effort, never blocks the send.
+      try {
+        await supabase.from('fh_job_files').insert({
+          id: rowId,
+          user_id: user.id,
+          job_id: contact.id,
+          filename: result.filename,
+          storage_path: path,
+          mime_type: 'application/pdf',
+          size_bytes: blob.size || 0,
+          kind: 'file'
+        })
+      } catch (e) {
+        console.warn('[draw] fh_job_files row insert failed', e)
+      }
+
+      const sendRes = await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          sender_user_id: user.id,
+          recipient_email: recipientEmail,
+          recipient_name: contact.name || null,
+          storage_path: path,
+          filename: result.filename,
+          amount_due: draw.amount
+        })
+      })
+      const sendBody = await sendRes.json().catch(() => ({}))
+
+      if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
+        // Same fallback InvoiceDetail uses — download so the operator
+        // can email manually while they set up Resend env.
+        toastError(
+          "Email NOT sent — sender isn't configured",
+          'Downloaded the PDF so you can email it manually.'
+        )
+        downloadPdf(result)
+        return
+      }
+      if (!sendRes.ok || !sendBody?.ok) {
+        const detail = sendBody?.detail || sendBody?.error || 'Unknown provider error'
+        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
+        throw new Error(`Resend rejected${status}: ${detail}`)
+      }
+
+      // Flip the draw to 'sent' so the row badge updates immediately.
+      // Skip if the draw is already paid (don't downgrade a paid draw
+      // back to sent just because the contractor re-sent the PDF).
+      if (draw.status !== 'paid') {
+        await supabase
+          .from('fh_invoices')
+          .update({ status: 'sent', issued_at: draw.issued_at || new Date().toISOString() })
+          .eq('id', draw.id)
+      }
+      toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
+      await fetchDraws()
+    } catch (e) {
+      toastError("Couldn't send draw", e?.message || 'Try again.')
     } finally {
       setBusyId(null)
     }
@@ -362,6 +473,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           onVoid={handleVoid}
           onDelete={handleDelete}
           onDownload={handleDownload}
+          onSend={handleSend}
         />
       )}
     </Shell>
@@ -487,7 +599,7 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }) {
   )
 }
 
-function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload }) {
+function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }) {
   if (draws.length === 0) {
     return (
       <div style={{
@@ -512,6 +624,7 @@ function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave
               readOnly={readOnly}
               onEdit={() => onEdit?.(d.id)}
               onDownload={() => onDownload?.(d)}
+              onSend={() => onSend?.(d)}
               onMarkPaid={() => onMarkPaid?.(d)}
               onVoid={() => onVoid?.(d)}
               onDelete={() => onDelete?.(d)}
@@ -523,7 +636,7 @@ function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave
   )
 }
 
-function Row({ draw, busy, readOnly, onEdit, onDownload, onMarkPaid, onVoid, onDelete }) {
+function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete }) {
   const isPaid = draw.status === 'paid'
   const isVoid = draw.status === 'void'
   const isOverdue = draw.status === 'overdue'
@@ -570,6 +683,11 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onMarkPaid, onVoid, onD
         </div>
         {!readOnly && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {!isVoid && (
+              <IconBtn onClick={onSend} disabled={busy} title="Email to client" aria-label="Email draw to client">
+                <Send size={12} aria-hidden="true" />
+              </IconBtn>
+            )}
             {!isVoid && (
               <IconBtn onClick={onDownload} disabled={busy} title="Download PDF" aria-label="Download draw PDF">
                 <Download size={12} aria-hidden="true" />
