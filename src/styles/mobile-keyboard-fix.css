@@ -43,6 +43,22 @@
 }
 
 /* ================================================================
+   INVOICE STICKY ACTION BAR — desktop sidebar overlap fix (5/17).
+   The bar is position:fixed; left:0 so on mobile it spans the
+   viewport. On desktop the 256px sidebar sat ON TOP of the Email
+   button (the leftmost button), making it invisible. Inset the
+   left edge past the sidebar at >=900px so all three buttons
+   render in the visible content area. Also drop the bottom nav
+   offset since desktop has no bottom nav.
+   ================================================================ */
+@media (min-width: 900px) {
+  .fh-invoice-actionbar {
+    left: 256px !important;
+    bottom: 12px !important;
+  }
+}
+
+/* ================================================================
    ZERO-ITALICS POLICY — REINSTATED 5/17 (user explicit: "no italics
    anywhere on the app"). Loaded last so cascade-equal selectors win.
    Strips italic styling from every accent class + raw <em>/<i> tag
