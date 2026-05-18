@@ -9,6 +9,7 @@ import { hapticTap } from '../../../lib/haptics.js'
 import { dateInputToTimestamp } from '../../../lib/dueDate.js'
 import QuoteItemsSection from '../sections/QuoteItems.jsx'
 import QuoteTermsSection from '../sections/QuoteTerms.jsx'
+import ChangeOrdersSection from '../sections/ChangeOrdersSection.jsx'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
 
@@ -29,7 +30,7 @@ import { ProposalTemplate, mapItemsToScope } from '../../../components/documents
  *
  * Customer portal / e-sign / email send live in later phases.
  */
-export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenApprove }) {
+export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenApprove, insurance = null, changeOrders = [] }) {
   const { profile } = useProfile()
 
   const status = useMemo(() => deriveStatus(contact), [
@@ -208,7 +209,9 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       expiresAt: pendingExpiresIso,
       status: contact.proposal_status || 'draft',
       quoteId: contact.id,
-      photos
+      photos,
+      insurance,
+      changeOrders
     })
     if (!result?.doc) throw new Error('PDF generator returned no document')
     return result
@@ -429,6 +432,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
             contact={contact}
             items={docItems}
             loading={docItemsLoading}
+            insurance={insurance}
+            changeOrders={changeOrders}
           />
         ) : (
           <>
@@ -442,6 +447,13 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
               contact={contact}
               patch={patch}
               valuesRef={termsValuesRef}
+            />
+
+            <ChangeOrdersSection
+              contact={contact}
+              userId={userId}
+              changeOrders={changeOrders}
+              onChange={() => fetchAll?.()}
             />
           </>
         )}
@@ -540,7 +552,7 @@ function QuoteViewToggle({ value, onChange }) {
   )
 }
 
-function DocumentPreviewPane({ company, contact, items, loading }) {
+function DocumentPreviewPane({ company, contact, items, loading, insurance = null, changeOrders = [] }) {
   // Group line items by their `section` field so each trade renders
   // as its own ScopeSectionCard. Order is preserved (groupByOrdered).
   // Optional items (is_optional=true) split into the upgrades array;
@@ -594,6 +606,8 @@ function DocumentPreviewPane({ company, contact, items, loading }) {
           }}
           warrantyText={contact?.terms_text || company?.warranty_default || ''}
           exclusions={exclusions}
+          insurance={insurance}
+          changeOrders={changeOrders}
           meta={{
             issuedAt: contact?.quote_sent_at || contact?.created_at,
             expiresAt: contact?.quote_expires_at || null

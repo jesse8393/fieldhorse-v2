@@ -14,6 +14,7 @@ export { default as InvoiceBalanceBlock } from './InvoiceBalanceBlock.jsx'
 export { default as PaymentHistoryBlock } from './PaymentHistoryBlock.jsx'
 export { default as InsuranceModeBlock } from './InsuranceModeBlock.jsx'
 export { default as BillToBlock } from './BillToBlock.jsx'
+export { default as ChangeOrdersBlock } from './ChangeOrdersBlock.jsx'
 
 export { default as ProposalTemplate } from './ProposalTemplate.jsx'
 export { default as InvoiceTemplate } from './InvoiceTemplate.jsx'

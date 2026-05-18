@@ -26,6 +26,7 @@ import PricingSummaryCard from './PricingSummaryCard.jsx'
 import PaymentTermsBlock, { DEFAULT_PAYMENT_SCHEDULE } from './PaymentTermsBlock.jsx'
 import ApprovalBlock from './ApprovalBlock.jsx'
 import InsuranceModeBlock from './InsuranceModeBlock.jsx'
+import ChangeOrdersBlock from './ChangeOrdersBlock.jsx'
 import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
 import { longDate, cityState } from './format.js'
 import { proposalNumber } from './numbers.js'
@@ -63,6 +64,7 @@ export default function ProposalTemplate({
   warrantyText,
   exclusions = [],
   insurance = null,
+  changeOrders = [],
   approval = null,
   meta = {},
   status = 'draft',
@@ -165,6 +167,20 @@ export default function ProposalTemplate({
               />
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ─── Change orders (when present, before pricing so the
+              customer sees what got added before the final number) ─── */}
+      {(changeOrders || []).filter((co) => co?.status !== 'void').length > 0 && (
+        <section>
+          <SectionHeading
+            company={company}
+            eyebrow="Change orders"
+            title="Contract amendments"
+            meta={`${(changeOrders || []).filter((co) => co?.status !== 'void').length} order${changeOrders.length === 1 ? '' : 's'}`}
+          />
+          <ChangeOrdersBlock changeOrders={changeOrders} company={company} />
         </section>
       )}
 

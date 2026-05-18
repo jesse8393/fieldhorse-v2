@@ -37,6 +37,14 @@ export function useJobData(id, userId) {
   // this parent fetch is a snapshot used only by NextAction.
   const [todos, setTodos] = useState([])
   const [clientSummary, setClientSummary] = useState(null)
+  // Insurance claim payload (1-to-1 with contact, migration 018). Owner-
+  // only RLS; partner viewers always see null. Loaded lazily after the
+  // contact row resolves because the FK lookup depends on contact.id.
+  const [insurance, setInsurance] = useState(null)
+  // Change orders against the contract (migration 019). Approved COs are
+  // partner-readable; drafts are owner-only. Aggregated into the contract
+  // total on the Invoice template's balance summary.
+  const [changeOrders, setChangeOrders] = useState([])
 
   const fetchAll = useCallback(async () => {
     if (!userId || !id) return
@@ -48,7 +56,7 @@ export function useJobData(id, userId) {
     // contact + every child tab empty. Owner queries return the same data
     // they always did; partner queries now return the shared job + its
     // subs/expenses/payments/inspections/notes/schedule/todos.
-    const [c, s, e, p, i, n, sch, td] = await Promise.all([
+    const [c, s, e, p, i, n, sch, td, ins, co] = await Promise.all([
       supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
       supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
@@ -56,7 +64,12 @@ export function useJobData(id, userId) {
       supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
-      supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: false })
+      supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: false }),
+      // Insurance is 1-to-1; maybeSingle is safe. RLS hides this row from
+      // partners, so partner viewers always get null — matches design.
+      supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle(),
+      // Change orders ordered by sequence so CO #1 is first in the list.
+      supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
     ])
 
     const contactRow = c.data || null
@@ -68,6 +81,8 @@ export function useJobData(id, userId) {
     setNotes(n.data || [])
     setScheduleItems(sch.data || [])
     setTodos(td.data || [])
+    setInsurance(ins.data || null)
+    setChangeOrders(co.data || [])
 
     // Multi-tenant guard preserved: migration 007 RLS denies partner reads on
     // fh_clients, but the JS guard avoids issuing a guaranteed-empty request.
@@ -145,6 +160,8 @@ export function useJobData(id, userId) {
     scheduleCount,
     todos,
     clientSummary,
+    insurance,
+    changeOrders,
     // derived
     paid,
     balance,

@@ -1,5 +1,5 @@
 -- =============================================================
--- Migration 018 — INSURANCE CLAIMS (DRAFT — NOT YET APPLIED)
+-- Migration 018 — INSURANCE CLAIMS
 -- =============================================================
 --
 -- Adds a one-to-one table for insurance-restoration jobs (roofing, water,
@@ -9,9 +9,6 @@
 -- One row per fh_contacts.id, lifecycle bound to the contact via CASCADE
 -- delete. Owner-only RLS — partners do NOT see the inviter's insurance
 -- payloads (matches the pattern in 007_clients.sql).
---
--- File extension intentionally `.sql.draft` so Supabase CLI does NOT
--- pick it up automatically. Rename to `.sql` after review.
 --
 -- =============================================================
 

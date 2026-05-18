@@ -23,6 +23,7 @@ import BillToBlock from './BillToBlock.jsx'
 import PaymentHistoryBlock from './PaymentHistoryBlock.jsx'
 import InvoiceBalanceBlock from './InvoiceBalanceBlock.jsx'
 import InsuranceModeBlock from './InsuranceModeBlock.jsx'
+import ChangeOrdersBlock from './ChangeOrdersBlock.jsx'
 import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
 import { money, longDate } from './format.js'
 import { invoiceNumber } from './numbers.js'
@@ -63,8 +64,17 @@ export default function InvoiceTemplate({
   meta = {},
   status = 'outstanding',
   notes,
-  insurance = null
+  insurance = null,
+  changeOrders = []
 }) {
+  // Approved change orders bump the contract total. Drafts and rejected
+  // COs are excluded from the math — they're not part of the contract
+  // yet. Surfaces visually + arithmetically here so the customer sees
+  // one cohesive number.
+  const approvedCOAdjustment = (changeOrders || [])
+    .filter((co) => co?.status === 'approved')
+    .reduce((s, co) => s + Number(co.amount || 0), 0)
+  const adjustedContractTotal = Number(contractTotal || 0) + approvedCOAdjustment
   const gold = resolveBrandGold(company)
   const number = meta.number || invoiceNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
@@ -145,6 +155,19 @@ export default function InvoiceTemplate({
         />
       </section>
 
+      {/* ─── Change orders (when present) ─────────────── */}
+      {(changeOrders || []).filter((co) => co?.status !== 'void').length > 0 && (
+        <section>
+          <SectionHeading
+            company={company}
+            eyebrow="Change orders"
+            title="Contract amendments"
+            meta={`${(changeOrders || []).filter((co) => co?.status !== 'void').length} order${changeOrders.length === 1 ? '' : 's'}`}
+          />
+          <ChangeOrdersBlock changeOrders={changeOrders} company={company} />
+        </section>
+      )}
+
       {/* ─── 6. Payment history (when present) ─────────── */}
       {payments.length > 0 && (
         <section>
@@ -166,7 +189,7 @@ export default function InvoiceTemplate({
           title="Balance summary"
         />
         <InvoiceBalanceBlock
-          contractTotal={contractTotal || total}
+          contractTotal={adjustedContractTotal || contractTotal || total}
           previouslyPaid={pp}
           thisInvoice={thisInvoice}
           balanceRemaining={balanceRemaining}
