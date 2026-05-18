@@ -29,6 +29,11 @@ export default function InvoiceBalanceBlock({
   thisInvoice = null,    // null → derived from contractTotal − previouslyPaid
   balanceRemaining = null, // null → derived: same as thisInvoice in the
                             // single-invoice case; passed in for progress billing
+  payments = [],          // optional — when present, retainage rows
+                          //   (kind='retainage') get called out on a
+                          //   separate line so the customer sees what
+                          //   the contractor is holding back vs already
+                          //   collected.
   company
 }) {
   const gold = resolveBrandGold(company)
@@ -37,11 +42,28 @@ export default function InvoiceBalanceBlock({
   const ti = thisInvoice != null ? Number(thisInvoice) : Math.max(0, ct - pp)
   const br = balanceRemaining != null ? Number(balanceRemaining) : ti
 
+  // Sum retainage-tagged payments. When > 0, surfaces as its own
+  // subordinate row + the "Previously paid" row label flips to
+  // "Progress paid" so the meaning is unambiguous.
+  const retainage = (payments || [])
+    .filter((p) => p?.kind === 'retainage')
+    .reduce((s, p) => s + Number(p.amount || 0), 0)
+  const hasRetainage = retainage > 0
+
   const subordinate = [
-    { label: 'Contract total',    value: money(ct) },
-    { label: 'Previously paid',   value: pp > 0 ? `−${money(pp)}` : money(0), muted: pp > 0 },
-    { label: 'This invoice',      value: money(ti) }
-  ]
+    { label: 'Contract total', value: money(ct) },
+    {
+      label: hasRetainage ? 'Progress paid' : 'Previously paid',
+      value: pp > 0 ? `−${money(pp - retainage)}` : money(0),
+      muted: pp > 0
+    },
+    hasRetainage && {
+      label: 'Retainage held',
+      value: `−${money(retainage)}`,
+      muted: true
+    },
+    { label: 'This invoice', value: money(ti) }
+  ].filter(Boolean)
 
   return (
     <section

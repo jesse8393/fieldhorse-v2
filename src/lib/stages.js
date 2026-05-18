@@ -74,12 +74,16 @@ export async function markLost(contact) {
   return transitionStage(contact, 'lost')
 }
 
-export async function logPayment(contact, { amount, method, reference, paid_on }) {
+export async function logPayment(contact, { amount, method, kind, reference, paid_on }) {
   const payload = {
     user_id: contact.user_id,
     contact_id: contact.id,
     amount: Number(amount) || 0,
     method: method || 'check',
+    // kind tags the payment for the invoice balance breakdown.
+    // Whitelist-validated by the migration 022 check constraint;
+    // defaults to 'other' so legacy callers stay valid.
+    kind: ['deposit','progress','final','retainage','other'].includes(kind) ? kind : 'other',
     reference: reference || null,
     paid_on: paid_on || new Date().toISOString().slice(0, 10)
   }
