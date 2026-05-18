@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Receipt, FileDown, DollarSign, ChevronRight, Check } from 'lucide-react'
+import { Receipt, FileDown, DollarSign, ChevronRight, Check, Send, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -50,6 +50,10 @@ export default function Invoices() {
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
   const [payingRow, setPayingRow] = useState(null)
+  // Which row is mid-send (job.id) and which just succeeded — drives
+  // the per-row Email button's loading + green Sent morph.
+  const [sendingId, setSendingId] = useState(null)
+  const [sentId, setSentId] = useState(null)
   const confirm = useConfirm()
 
   const refresh = async () => {
@@ -196,6 +200,84 @@ export default function Invoices() {
   // through the existing pipeline (auto-close cascade preserved).
   function openPaymentSheet(row) {
     setPayingRow(row)
+  }
+
+  // Email an invoice straight from the Money Owed list — mirrors the
+  // handleSendInvoice flow on InvoiceDetail (build PDF → upload to
+  // job-files → POST /api/send-invoice). The user reported clicking
+  // "Invoice PDF" expecting it to send; only the inner detail page
+  // had a real Send button. This wires it into the list so the
+  // operator never has to dive into the detail page just to email.
+  async function handleSendEmail(row) {
+    const job = row?.job
+    if (!user || !job) return
+    if (!job.email) {
+      toastError('Add a client email first', `Open the linked job to add an email for ${job.name || 'this client'}.`)
+      return
+    }
+    setSendingId(job.id)
+    try {
+      const result = await generateInvoice({
+        company,
+        contact: {
+          name: job.name || 'Client',
+          address: job.address || '',
+          phone: job.phone || '',
+          email: job.email || ''
+        },
+        lineItems: [
+          { description: job.job_title || 'Construction services per agreement', qty: 1, rate: row.amount, amount: row.amount },
+          ...(row.paid > 0 ? [{ description: 'Less: payments received', qty: 1, rate: -row.paid, amount: -row.paid }] : [])
+        ],
+        taxRate: 0,
+        notes: row.paid > 0 ? `Balance due reflects ${fmtMoney(row.paid)} previously received.` : '',
+        dueDate: '',
+        invoiceId: job.id
+      })
+      if (!result?.doc) throw new Error('PDF generator returned no document')
+
+      const blob = result.doc.output('blob')
+      const rowId = crypto.randomUUID()
+      const path = `${user.id}/${job.id}/${rowId}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from('job-files')
+        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+      if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
+
+      const sendRes = await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: job.id,
+          sender_user_id: user.id,
+          recipient_email: job.email,
+          recipient_name: job.name || null,
+          storage_path: path,
+          filename: result.filename,
+          amount_due: row.balance
+        })
+      })
+      const sendBody = await sendRes.json().catch(() => ({}))
+
+      if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
+        toastError("Email NOT sent — sender isn't configured", 'Add Resend keys in Netlify env then try again.')
+        return
+      }
+      if (!sendRes.ok || !sendBody?.ok) {
+        const detail = sendBody?.detail || sendBody?.error || 'Unknown provider error'
+        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
+        throw new Error(`Resend rejected${status}: ${detail}`)
+      }
+
+      toastSuccess(`Invoice sent to ${job.email}`, result.filename)
+      setSentId(job.id)
+      setTimeout(() => setSentId(null), 2400)
+      refresh()
+    } catch (e) {
+      toastError("Couldn't send invoice", e?.message || 'Try again')
+    } finally {
+      setSendingId(null)
+    }
   }
 
   const { stagger, item } = useFhMotion()
@@ -381,6 +463,9 @@ export default function Invoices() {
               <PaymentCard
                 key={r.job.id}
                 row={r}
+                isSending={sendingId === r.job.id}
+                isSent={sentId === r.job.id}
+                onEmail={() => handleSendEmail(r)}
                 onPDF={() => handleGeneratePDF(r)}
                 onPaid={async () => {
                   // Phase 11 stabilization — confirm before opening the
@@ -540,7 +625,7 @@ function AgingBar({ totals }) {
      └──────────────────────────────────────────────────┘
    Functions preserved: PDF generation + mark paid via parent props.
    ============================================================ */
-function PaymentCard({ row, onPDF, onPaid }) {
+function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }) {
   const { job, amount, paid, balance, ageDays, bucket, isOutstanding } = row
   const bucketMeta = AGING_BUCKETS.find((b) => b.id === bucket) || AGING_BUCKETS[0]
   const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0
@@ -685,14 +770,48 @@ function PaymentCard({ row, onPDF, onPaid }) {
           </div>
         </div>
 
-        {/* Action row: PDF + Mark Paid (only on outstanding) */}
+        {/* Action row: Email + PDF + Mark Paid (only on outstanding) */}
         {isOutstanding && (
           <div style={{
             display: 'flex',
             gap: 8,
             justifyContent: 'flex-end',
-            paddingTop: 4
+            paddingTop: 4,
+            flexWrap: 'wrap'
           }}>
+            {/* Email — primary send action. Mirrors the Send button on
+                InvoiceDetail. User shouldn't have to dive into the detail
+                page just to email the client. */}
+            <button
+              type="button"
+              onClick={onEmail}
+              disabled={isSending}
+              title={!row.job?.email ? 'Add a client email first on the linked job' : 'Email the invoice to the client'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 14px',
+                minHeight: 40,
+                borderRadius: 10,
+                border: isSent
+                  ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
+                  : '1px solid var(--v3-border-strong)',
+                background: isSent
+                  ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
+                  : 'var(--v3-surface-2)',
+                color: isSent ? '#0a0a0a' : (isSending ? 'var(--v3-text-muted)' : 'var(--v3-text)'),
+                fontFamily: 'var(--font-body)',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: isSending ? 'wait' : 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
+              }}
+            >
+              {isSent ? <CheckCircle2 size={13} /> : <Send size={13} />}
+              {isSent ? 'Sent' : isSending ? 'Sending…' : 'Email'}
+            </button>
             <button
               type="button"
               onClick={onPDF}
@@ -713,7 +832,7 @@ function PaymentCard({ row, onPDF, onPaid }) {
                 WebkitTapHighlightColor: 'transparent'
               }}
             >
-              <FileDown size={13} /> Invoice PDF
+              <FileDown size={13} /> Download
             </button>
             <button
               type="button"
