@@ -59,6 +59,10 @@ export default function Jobs() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
+  // Initial stage for the New-Lead sheet. Defaults to 'lead'; flips to
+  // 'job' when the entry point was the Home "New Job" quick action
+  // (which passes ?asStage=job). Keeps the title + default chip honest.
+  const [addInitialStage, setAddInitialStage] = useState('lead')
   const [justAddedId, setJustAddedId] = useState(null)
   const [drawerContact, setDrawerContact] = useState(null)
   // Cover photos by job_id. Populated alongside contacts; ONE batch query
@@ -109,8 +113,18 @@ export default function Jobs() {
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
+      // ?asStage=job|quote|lead seeds the sheet's default stage so the
+      // Home "New Job" tile opens the sheet pre-configured for a job
+      // instead of a lead. Whitelisted to known stage values; anything
+      // else falls back to 'lead' (the original default).
+      const requested = searchParams.get('asStage')
+      const seed = requested === 'job' || requested === 'quote' || requested === 'lead'
+        ? requested
+        : 'lead'
+      setAddInitialStage(seed)
       setAddOpen(true)
       searchParams.delete('new')
+      searchParams.delete('asStage')
       setSearchParams(searchParams, { replace: true })
     }
   }, [searchParams, setSearchParams])
@@ -275,14 +289,16 @@ export default function Jobs() {
         <NewLeadSheet
           open={addOpen}
           userId={user?.id}
+          initialStage={addInitialStage}
           onClose={() => setAddOpen(false)}
           onCreated={async (created) => {
             setAddOpen(false)
             if (created?.id) setJustAddedId(created.id)
             await load()
             setTimeout(() => setJustAddedId(null), 1200)
+            const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
             toastSuccess(
-              'New lead added',
+              `New ${noun} added`,
               created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
             )
           }}
@@ -498,14 +514,16 @@ export default function Jobs() {
       <NewLeadSheet
         open={addOpen}
         userId={user?.id}
+        initialStage={addInitialStage}
         onClose={() => setAddOpen(false)}
         onCreated={async (created) => {
           setAddOpen(false)
           if (created?.id) setJustAddedId(created.id)
           await load()
           setTimeout(() => setJustAddedId(null), 1200)
+          const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
           toastSuccess(
-            'New lead added',
+            `New ${noun} added`,
             created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
           )
         }}

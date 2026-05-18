@@ -6,7 +6,6 @@ import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.js'
 import ActionSheet from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
-import SpecTabs from '../components/SpecTabs.jsx'
 import { FloatingActionButton } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -417,14 +416,36 @@ export default function Schedule() {
         </div>
       </motion.div>
 
-      {/* DAY / WEEK TABS — narrower, sits above the timeline */}
+      {/* DAY / WEEK / MONTH toggle — uses the same dispatch-state pill
+          pattern as the ALL/LIVE/UPCOMING/DONE row below it, so the two
+          toggles read as siblings. Replaced the older SpecTabs boxy
+          chips that didn't match the rest of the v3 dispatch-* family. */}
       <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
-        <SpecTabs
-          options={VIEWS}
-          value={view}
-          onChange={setView}
-          ariaLabel="Calendar view"
-        />
+        <div
+          className="dispatch-state"
+          role="tablist"
+          aria-label="Calendar view"
+          style={{ marginLeft: 0, marginRight: 0 }}
+        >
+          {VIEWS.map((opt) => {
+            const on = view === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                className={`dispatch-state__opt${on ? ' is-on' : ''}`}
+                onClick={() => {
+                  if (!on) hapticTap()
+                  setView(opt.value)
+                }}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
       </motion.div>
 
       {/* Swipe-detector wraps the per-view body. Horizontal pointer drag

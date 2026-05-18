@@ -5,6 +5,7 @@ import AppHeader from './AppHeader.jsx'
 import BottomNav from './BottomNav.jsx'
 import DesktopSidebar from './DesktopSidebar.jsx'
 import CommandPalette from './CommandPalette.jsx'
+import MobileSearchOverlay from './MobileSearchOverlay.jsx'
 import Toaster from './Toaster.jsx'
 import RouteErrorBoundary from './RouteErrorBoundary.jsx'
 
@@ -164,6 +165,7 @@ export default function AppShell() {
 
       <BottomNav />
       <CommandPalette />
+      <MobileSearchOverlay />
 
       {/* Existing custom toaster stays — Sonner runs alongside it */}
       <Toaster />

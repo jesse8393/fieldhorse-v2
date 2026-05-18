@@ -78,8 +78,14 @@ export default function CommandPalette() {
     window.addEventListener('keydown', onKey)
 
     // Also listen for an in-app event so AppHeader's search button
-    // (touch devices) can open the palette without needing a ref.
-    function onOpenEvt() { setOpen(true) }
+    // can open the palette without needing a ref. Desktop-only — at
+    // phone widths MobileSearchOverlay takes the event; the cmdk
+    // popover doesn't render correctly on iOS Safari + Chrome.
+    function onOpenEvt() {
+      if (typeof window !== 'undefined' && window.innerWidth >= 900) {
+        setOpen(true)
+      }
+    }
     window.addEventListener('fh:open-palette', onOpenEvt)
 
     return () => {

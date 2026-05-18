@@ -27,11 +27,18 @@ function writeLastJobType(value) {
   try { window.localStorage.setItem(LAST_JOB_TYPE_KEY, value) } catch {}
 }
 
-function buildEmptyForm() {
+function buildEmptyForm(initialStage = 'lead') {
+  // initialStage seeds the Stage chip when the sheet is opened. Defaults
+  // to 'lead' (the original behavior); flips to 'job' when the entry
+  // point was the Home "New Job" tile so the operator isn't dropped into
+  // a Lead-shaped form they then have to re-tag.
+  const seedStage = (initialStage === 'job' || initialStage === 'quote' || initialStage === 'lead')
+    ? initialStage
+    : 'lead'
   return {
     name: '', phone: '', email: '', address: '', company: '',
     job_title: '', job_type: readLastJobType(), amount: '', notes: '', referred_by: '',
-    stage: 'lead'
+    stage: seedStage
   }
 }
 
@@ -77,8 +84,8 @@ const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a n
 }
 Return ONLY the JSON. No prose, no fences.`
 
-export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
-  const [form, setForm] = useState(buildEmptyForm)
+export default function NewLeadSheet({ open, userId, initialStage = 'lead', onClose, onCreated }) {
+  const [form, setForm] = useState(() => buildEmptyForm(initialStage))
   const [client, setClient] = useState(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -112,7 +119,7 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
 
   useEffect(() => {
     if (!open) {
-      setForm(buildEmptyForm())
+      setForm(buildEmptyForm(initialStage))
       setClient(null)
       setErr('')
       setTranscript('')
@@ -121,7 +128,16 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
       setCommitted(false)
       setTemplateSlug('')
     }
-  }, [open])
+  }, [open, initialStage])
+
+  // When the sheet re-opens with a different initialStage (e.g. Home
+  // "New Job" tile after a prior "Add Lead"), bump the Stage chip to
+  // match so the operator doesn't have to retag. Only fires on open —
+  // user edits to the chip mid-flow are preserved.
+  useEffect(() => {
+    if (open) setForm((f) => ({ ...f, stage: initialStage }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialStage])
 
   // When the trade changes, drop any template that no longer applies.
   // Avoids the user picking "Roof tear-off" then switching to Kitchen
@@ -397,16 +413,23 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
     }))
   }
 
+  // Title noun follows the Stage chip so the surface is always honest:
+  // open via "New Job" → title is "New job."; user retags to Lead → flips
+  // to "New lead." On success it flips to "{Noun} captured." so the same
+  // language carries through. Quote uses its own noun for the same reason.
+  const stageNoun = form.stage === 'job' ? 'job' : form.stage === 'quote' ? 'quote' : 'lead'
+  const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
+
   return (
     <ActionSheet
       open={open}
       variantClass="fh-asheet--v2"
-      title={committed ? 'Lead captured.' : 'New lead.'}
-      accentWord={committed ? 'captured' : 'lead'}
-      sectionLabel="New lead"
+      title={committed ? `${NounCap} captured.` : `New ${stageNoun}.`}
+      accentWord={committed ? 'captured' : stageNoun}
+      sectionLabel={`New ${stageNoun}`}
       stepCount={3}
       currentStep={currentStep}
-      commitLabel={saving ? 'Committing…' : committed ? 'Captured' : 'Commit lead'}
+      commitLabel={saving ? 'Committing…' : committed ? 'Captured' : `Commit ${stageNoun}`}
       commitBusy={saving}
       commitDisabled={!form.name.trim() || committed}
       onClose={onClose}
@@ -428,90 +451,86 @@ export default function NewLeadSheet({ open, userId, onClose, onCreated }) {
         </div>
       )}
 
-      {/* Voice capture hero */}
-      <div className="fh-voice-hero">
-        <div className="fh-voice-hero__head">
-          <span className="fh-voice-hero__label">Fast capture</span>
-          {/* RECORDING · 0:42 chip — ported from lead-pro-mic__lbl in
-              the v3 design. Live elapsed timer + pulsing red dot tells
-              the operator the mic is open and how long they've been
-              talking. Only renders during the listening state. */}
-          {voiceState === 'listening' && (
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '3px 9px',
-              borderRadius: 999,
-              background: 'color-mix(in srgb, var(--v3-danger) 14%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--v3-danger) 38%, transparent)',
-              color: 'var(--v3-danger-bright)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              lineHeight: 1,
-              fontVariantNumeric: 'tabular-nums'
-            }}>
-              <span aria-hidden="true" style={{
-                width: 7, height: 7, borderRadius: '50%',
-                background: 'var(--v3-danger-bright)',
-                boxShadow: '0 0 6px var(--v3-danger-bright)',
-                animation: 'fh-rec-pulse 1100ms ease-in-out infinite'
-              }} />
-              REC
-              <b style={{ fontFamily: 'var(--font-display)', fontWeight: 400, letterSpacing: '0.04em' }}>
-                {Math.floor(voiceElapsed / 60)}:{String(voiceElapsed % 60).padStart(2, '0')}
-              </b>
-            </span>
-          )}
-        </div>
-        <p className="fh-voice-hero__desc">One sentence. AI fills every field.</p>
+      {/* v3 mic block — horizontal layout: circular gold mic on the left,
+          label / title / hint stacked on the right. Replaces the older
+          full-width tap-to-speak hero. Title + hint adapt to voice state
+          so the operator always knows what's happening without needing
+          to read a separate chip. Ports lead-pro-mic from the design
+          handoff (screens-workflows.jsx + styles-refine.css). */}
+      <div className="fh-vmic">
         <button
           type="button"
-          className={`fh-voice-hero__btn${voiceState === 'listening' ? ' is-recording' : ''}${voiceState === 'denied' ? ' is-denied' : ''}`}
+          className={[
+            'fh-vmic__btn',
+            voiceState === 'listening' ? 'is-on' : '',
+            voiceState === 'denied' ? 'is-denied' : ''
+          ].filter(Boolean).join(' ')}
           aria-label={voiceState === 'listening' ? 'Stop voice capture' : 'Start voice capture'}
           disabled={voiceState === 'parsing' || saving}
           onClick={onVoiceTap}
         >
-          <svg className="fh-voice-hero__mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="3" width="6" height="12" rx="3" />
-            <path d="M5 11 V12 A7 7 0 0 0 19 12 V11" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-            <line x1="8" y1="22" x2="16" y2="22" />
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="2" width="6" height="11" rx="3" />
+            <path d="M19 10a7 7 0 0 1-14 0M12 19v3" />
           </svg>
-          <span className="fh-voice-hero__btnLabel">{voiceLabel}</span>
         </button>
-        <div
-          className={[
-            'fh-voice-hero__transcript',
-            voiceState === 'listening' ? 'is-listening' : '',
-            voiceState === 'parsing' ? 'is-parsing' : '',
-            transcript ? 'is-result' : '',
-            !transcript && voiceState === 'idle' ? 'is-idle' : ''
-          ].filter(Boolean).join(' ')}
-          aria-live="polite"
-        >
-          {voiceState === 'listening' && !transcript && 'Listening…'}
-          {voiceState === 'parsing' && !transcript && 'Parsing…'}
-          {transcript && `"${transcript}"`}
-          {voiceState === 'idle' && !transcript && (
-            <span className="fh-voice-hero__transcript-placeholder">
-              Transcribed text will appear here
-            </span>
-          )}
+        <div className="fh-vmic__main">
+          <div className="fh-vmic__lbl">
+            {voiceState === 'listening' && <span className="fh-vmic__pulse" aria-hidden="true" />}
+            {voiceState === 'listening' ? 'Recording' :
+             voiceState === 'parsing'   ? 'Parsing'   :
+             voiceState === 'denied'    ? 'Mic blocked' :
+             voiceState === 'error'     ? 'Unavailable' :
+             'Fast capture'}
+            {voiceState === 'listening' && (
+              <b className="fh-vmic__elapsed">
+                {Math.floor(voiceElapsed / 60)}:{String(voiceElapsed % 60).padStart(2, '0')}
+              </b>
+            )}
+          </div>
+          <div className="fh-vmic__title">
+            {voiceState === 'listening' ? 'Capturing your lead…' :
+             voiceState === 'parsing'   ? 'Filling the fields' :
+             voiceState === 'denied'    ? 'Enable mic to use voice' :
+             voiceState === 'error'     ? 'Voice not available here' :
+             'One sentence. AI fills every field.'}
+          </div>
+          <div className={`fh-vmic__hint${voiceState === 'denied' || voiceState === 'error' ? ' is-error' : ''}`}>
+            {voiceState === 'listening' ? 'Tap mic to stop · transcript appears below' :
+             voiceState === 'parsing'   ? 'Hang tight — applying values to the form…' :
+             voiceState === 'denied'    ? 'Enable mic in browser settings, then tap again.' :
+             voiceState === 'error'     ? 'Fill the fields manually below.' :
+             'Tap the mic, talk like you would to a coworker.'}
+          </div>
         </div>
-        {voiceState === 'denied' && (
-          <p className="fh-voice-hero__note">
-            Mic access needed for voice capture. Enable it in browser settings and try again.
-          </p>
-        )}
-        {voiceState === 'error' && (
-          <p className="fh-voice-hero__note">
-            Voice capture isn't available on this browser. Fill the fields manually.
-          </p>
-        )}
+      </div>
+
+      {/* Compact transcript rail — only renders when something has been
+          said (or is mid-parse). Mirrors the v3 transcript-rail:
+          play glyph + transcript preview + WORDS stamp. */}
+      {(transcript || voiceState === 'parsing') && (
+        <div className="fh-vtrail" aria-live="polite">
+          <div className="fh-vtrail__icn" aria-hidden="true">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="m6 4 14 8L6 20z"/></svg>
+          </div>
+          <div className="fh-vtrail__main">
+            <div className="fh-vtrail__txt">
+              {transcript ? `"${transcript}"` : 'Parsing transcript…'}
+            </div>
+            <div className="fh-vtrail__meta">
+              {transcript
+                ? `${transcript.trim().split(/\s+/).filter(Boolean).length} words${voiceState === 'listening' ? ' · live' : voiceState === 'parsing' ? ' · parsing' : ''}`
+                : 'Working'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section divider — flips the surface from "voice capture" mode
+          to "edit fields" mode. Mirrors section-lbl from styles-refine. */}
+      <div className="fh-vsection">
+        <span>Lead details</span>
+        <span className="fh-vsection__hint">tap any field to edit</span>
       </div>
 
       {/* Document intelligence — Phase 19/#1. Photo of a paper bid /

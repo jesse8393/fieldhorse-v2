@@ -176,13 +176,23 @@ export default function Invoices() {
       // generateInvoice() became async in 4D-2D — pre-fetches the
       // contractor's logo via loadLogoForPdf before rendering.
       const c = resolveClient(row.job)
+      // Pull payments for this job so the new PDF's Balance Summary +
+      // Payment History sections render with real data instead of the
+      // synthetic "Less: payments received" row the old generator used.
+      const { data: jobPayments } = await supabase
+        .from('fh_payments')
+        .select('*')
+        .eq('contact_id', row.job.id)
+        .order('paid_on', { ascending: false })
       const result = await generateInvoice({
         company,
         contact: {
+          id: row.job.id,
           name: c.name || row.job.client_name || 'Client',
           address: c.address,
           phone: c.phone,
-          email: c.email
+          email: c.email,
+          job_title: row.job.job_title
         },
         lineItems: [
           {
@@ -190,20 +200,15 @@ export default function Invoices() {
             qty: 1,
             rate: row.amount,
             amount: row.amount
-          },
-          ...(row.paid > 0 ? [{
-            description: 'Less: payments received',
-            qty: 1,
-            rate: -row.paid,
-            amount: -row.paid
-          }] : [])
+          }
         ],
         taxRate: 0,
-        notes: row.paid > 0
-          ? `Balance due reflects ${fmtMoney(row.paid)} previously received.`
-          : '',
+        notes: '',
         dueDate: '',
-        invoiceId: row.job.id
+        invoiceId: row.job.id,
+        payments: jobPayments || [],
+        contractTotal: row.amount,
+        previouslyPaid: row.paid
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
@@ -237,22 +242,31 @@ export default function Invoices() {
     }
     setSendingId(job.id)
     try {
+      const { data: jobPayments } = await supabase
+        .from('fh_payments')
+        .select('*')
+        .eq('contact_id', job.id)
+        .order('paid_on', { ascending: false })
       const result = await generateInvoice({
         company,
         contact: {
+          id: job.id,
           name: c.name || 'Client',
           address: c.address,
           phone: c.phone,
-          email: c.email
+          email: c.email,
+          job_title: job.job_title
         },
         lineItems: [
-          { description: job.job_title || 'Construction services per agreement', qty: 1, rate: row.amount, amount: row.amount },
-          ...(row.paid > 0 ? [{ description: 'Less: payments received', qty: 1, rate: -row.paid, amount: -row.paid }] : [])
+          { description: job.job_title || 'Construction services per agreement', qty: 1, rate: row.amount, amount: row.amount }
         ],
         taxRate: 0,
-        notes: row.paid > 0 ? `Balance due reflects ${fmtMoney(row.paid)} previously received.` : '',
+        notes: '',
         dueDate: '',
-        invoiceId: job.id
+        invoiceId: job.id,
+        payments: jobPayments || [],
+        contractTotal: row.amount,
+        previouslyPaid: row.paid
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
 

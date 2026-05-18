@@ -823,7 +823,7 @@ export default function Home() {
           }}
         >
           <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
-          <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1&asStage=job')} />
           <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
           <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
           <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
