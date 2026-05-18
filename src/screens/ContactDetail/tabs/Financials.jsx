@@ -3,6 +3,7 @@ import { SegmentedTabs } from '../../../components/v3'
 import SubsSection from '../sections/Subs.jsx'
 import ExpensesSection from '../sections/Expenses.jsx'
 import InvoiceSection from '../sections/Invoice.jsx'
+import InvoiceDrawsSection from '../sections/InvoiceDrawsSection.jsx'
 
 /**
  * FINANCIALS tab — sub-tab router for cost + revenue surfaces.
@@ -15,7 +16,8 @@ import InvoiceSection from '../sections/Invoice.jsx'
 const SUB_TABS = [
   { id: 'subs',     label: 'Subs' },
   { id: 'expenses', label: 'Expenses' },
-  { id: 'invoice',  label: 'Invoice' }
+  { id: 'invoice',  label: 'Invoice' },
+  { id: 'draws',    label: 'Draws' }
 ]
 
 export default function FinancialsTab({
@@ -27,7 +29,9 @@ export default function FinancialsTab({
   balance,
   userId,
   fetchAll,
-  onOpenLogPayment
+  onOpenLogPayment,
+  insurance,
+  changeOrders
 }) {
   // Default sub = invoice when there's money owed; otherwise subs.
   const defaultSub = balance > 0.5 ? 'invoice' : 'subs'
@@ -66,6 +70,15 @@ export default function FinancialsTab({
             paid={paid}
             balance={balance}
             onOpenLogPayment={onOpenLogPayment}
+          />
+        )}
+        {sub === 'draws' && (
+          <InvoiceDrawsSection
+            contact={contact}
+            payments={payments}
+            changeOrders={changeOrders}
+            insurance={insurance}
+            userId={userId}
           />
         )}
       </div>

@@ -335,6 +335,8 @@ export default function ContactDetail() {
             fetchAll={fetchAll}
             patch={patch}
             onOpenLogPayment={() => setPayModalOpen(true)}
+            insurance={insurance}
+            changeOrders={changeOrders}
           />
         )}
         {tab === 'files' && (
