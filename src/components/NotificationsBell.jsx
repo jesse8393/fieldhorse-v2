@@ -107,8 +107,10 @@ export default function NotificationsBell() {
           height: 34,
           minWidth: 34,
           borderRadius: 8,
-          background: 'var(--surface-2)',
-          border: '1px solid var(--rule)',
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           display: 'grid',
           placeItems: 'center',
           color: 'var(--ink-strong)',
@@ -118,7 +120,7 @@ export default function NotificationsBell() {
           transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
         }}
       >
-        <Bell size={13} />
+        <Bell size={14} />
         {unread > 0 && (
           <span
             aria-hidden="true"
