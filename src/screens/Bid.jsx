@@ -1,24 +1,32 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calculator, Sparkles, Copy, Check, FileText } from 'lucide-react'
+import { Calculator, Sparkles, Copy, Check, FileText, Briefcase } from 'lucide-react'
 import { RATE_CARD, TRADE_LABELS } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
-import { toastSuccess } from '../lib/toast.js'
+import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
+import { supabase } from '../lib/supabase.js'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import CountUp from '../components/fx/CountUp.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
 import { FilterPill } from '../components/v3'
 
-const SYSTEM = `You are Fieldhorse AI Bid Engine. Given a scope description from a contractor, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Return ONLY JSON.`
+// White-label: internal-only tool but no app-attributable phrasing
+// just in case any of the output is shown to a customer downstream.
+const SYSTEM = `You are an estimating assistant for a contractor's business. Given a scope description, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Never mention any platform, app, or tool by name in your output. Return ONLY JSON.`
 
 const TRADES = Object.keys(RATE_CARD)
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 function formatThousands(n) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
 
 export default function Bid() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [scope, setScope] = useState('')
   const [marginPct, setMarginPct] = useState(25)
   const [generating, setGenerating] = useState(false)
@@ -27,6 +35,7 @@ export default function Bid() {
   const [picks, setPicks] = useState([])
   const [jobType, setJobType] = useState('')
   const [copied, setCopied] = useState(false)
+  const [pushing, setPushing] = useState(false)
 
   const total = useMemo(() => {
     if (!bid) return null
@@ -74,6 +83,83 @@ export default function Bid() {
 
   function togglePick(t) {
     setPicks((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
+  }
+
+  // Push the AI bid into a real job: creates a new fh_contacts row at
+  // stage='quote' with the recommended price as contact.amount, then
+  // inserts one fh_quote_items row per AI line item (rate = high end of
+  // the range, so the operator can dial back rather than up — easier
+  // negotiation pattern). Navigates to /jobs/:id?tab=quote so the
+  // contractor lands in the editor ready to refine before sending.
+  //
+  // Single-shot insert per item — concurrent inserts are fine, the
+  // recalc trigger from migration 011 keeps fh_contacts.amount in
+  // sync with the sum of base items.
+  async function pushToJob() {
+    if (!bid || !total || !user?.id || pushing) return
+    setPushing(true)
+    try {
+      const recommendedPrice = Math.round(total.withMargin)
+      const jobTitle = bid.summary
+        || (jobType ? `${capitalize(jobType)} project` : 'New estimate')
+
+      // 1. Create the contact (stage='quote' so it lands in the
+      //    Pipeline at the right column).
+      const { data: contact, error: cErr } = await supabase
+        .from('fh_contacts')
+        .insert({
+          user_id: user.id,
+          name: 'New estimate',
+          job_title: jobTitle,
+          job_type: jobType || null,
+          amount: recommendedPrice,
+          stage: 'quote',
+          scope_text: scope || null,
+          notes: [
+            bid.assumptions?.length ? `Assumptions:\n${bid.assumptions.map((a) => `• ${a}`).join('\n')}` : '',
+            bid.risks?.length ? `Risks:\n${bid.risks.map((r) => `• ${r}`).join('\n')}` : ''
+          ].filter(Boolean).join('\n\n') || null
+        })
+        .select('*')
+        .single()
+      if (cErr) throw cErr
+
+      // 2. Insert one fh_quote_items row per AI line item. Use the
+      //    high end of the rate range as the rate — gives the
+      //    contractor room to negotiate down rather than scrambling
+      //    to add charges later.
+      const items = (bid.line_items || []).map((li, idx) => ({
+        user_id: user.id,
+        contact_id: contact.id,
+        section: TRADE_LABELS[picks[0]] || 'Scope',
+        description: li.name + (li.notes ? ` — ${li.notes}` : ''),
+        qty: Number(li.qty || 1),
+        unit: li.unit || null,
+        rate: Number(li.rate_high ?? li.rate_low ?? 0),
+        amount: Number(li.qty || 1) * Number(li.rate_high ?? li.rate_low ?? 0),
+        is_optional: false,
+        is_excluded: false,
+        sort_order: idx
+      })).filter((row) => row.rate > 0 || row.amount > 0)
+
+      if (items.length > 0) {
+        const { error: iErr } = await supabase.from('fh_quote_items').insert(items)
+        if (iErr) throw iErr
+      }
+
+      hapticSuccess()
+      toastSuccess(
+        'Pushed to a new job',
+        `${items.length} line item${items.length === 1 ? '' : 's'} added · ${money(recommendedPrice)}`
+      )
+      // Land on the Quote tab so the contractor can refine + send.
+      navigate(`/jobs/${contact.id}?tab=quote`)
+    } catch (e) {
+      console.error('[bid] pushToJob failed:', e)
+      toastError("Couldn't create job from bid", e?.message || 'Try again.')
+    } finally {
+      setPushing(false)
+    }
   }
 
   async function copyEstimate() {
@@ -366,27 +452,54 @@ export default function Bid() {
                 <Sparkles size={11} />
                 Recommended Price · {marginPct}% margin
               </span>
-              <button
-                type="button"
-                onClick={copyEstimate}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '6px 10px',
-                  borderRadius: 8,
-                  border: '1px solid var(--v3-border-strong)',
-                  background: 'var(--v3-surface-2)',
-                  color: 'var(--v3-text)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                {copied ? <Check size={12} /> : <Copy size={12} />}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
+              <div style={{ display: 'inline-flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={copyEstimate}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    border: '1px solid var(--v3-border-strong)',
+                    background: 'var(--v3-surface-2)',
+                    color: 'var(--v3-text)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+                <button
+                  type="button"
+                  onClick={pushToJob}
+                  disabled={pushing}
+                  title="Create a new job at stage='quote' with these line items pre-filled, ready to refine + send"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                    background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
+                    color: '#1a1208',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    cursor: pushing ? 'wait' : 'pointer',
+                    opacity: pushing ? 0.7 : 1
+                  }}
+                >
+                  <Briefcase size={12} />
+                  {pushing ? 'Creating…' : 'Push to job'}
+                </button>
+              </div>
             </div>
 
             {/* Headline price */}
