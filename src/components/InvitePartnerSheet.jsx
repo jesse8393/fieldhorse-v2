@@ -24,6 +24,7 @@ import { Mail, Send, Users, X, Copy, Check, Share2, UserPlus } from 'lucide-reac
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticTap } from '../lib/haptics.js'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 import { loadPastPartners, PARTNER_ROLES } from '../lib/partners.js'
 
 function friendlyInviteError(code) {
@@ -46,10 +47,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
   const [recipientEmail, setRecipientEmail] = useState('')
   const [copied, setCopied] = useState(false)
   const [pastPartners, setPastPartners] = useState([])
-  // iOS keyboard offset (visualViewport math) — keeps the drawer above
-  // the keyboard so the commit button stays reachable.
-  const [kbd, setKbd] = useState(0)
-  const formRef = useRef(null)
+  const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
   const copyTimer = useRef(null)
 
   // Reset state every time the sheet closes so reopening starts clean.
@@ -78,25 +76,6 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     })()
     return () => { alive = false }
   }, [open, readyUrl, contactId])
-
-  // Track iOS keyboard for drawer lift.
-  useEffect(() => {
-    if (!open) return
-    const vv = window.visualViewport
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      setKbd(0)
-    }
-  }, [open])
 
   function pickPast(p) {
     hapticTap()
@@ -233,17 +212,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{
-          maxWidth: '100%',
-          overflowX: 'hidden',
-          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
-          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
-          maxHeight: kbd
-            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
-            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -283,15 +252,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
             ref={formRef}
             onSubmit={submit}
             style={{
-              padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              boxSizing: 'border-box',
-              maxWidth: '100%',
-              minWidth: 0,
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
+              ...formStyle(),
               flex: 1,
               minHeight: 0
             }}

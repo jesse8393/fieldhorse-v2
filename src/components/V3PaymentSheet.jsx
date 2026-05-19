@@ -18,6 +18,7 @@ import { DollarSign, Check, X } from 'lucide-react'
 import { logPayment } from '../lib/pipeline.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticTap } from '../lib/haptics.js'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -51,44 +52,10 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
   const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [kbd, setKbd] = useState(0)
-  const formRef = useRef(null)
   // Drawer always opens when this component is mounted; parent controls
   // mount via AnimatePresence. The local open=true keeps Vaul happy.
   const [open, setOpen] = useState(true)
-
-  // iOS keyboard lift
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
-  }, [])
-
-  // Focus-scroll inside the form on iOS Safari (fixed overflow containers
-  // don't auto-scroll the focused field into view).
-  useEffect(() => {
-    const form = formRef.current
-    if (!form) return
-    function onFocusIn(e) {
-      const t = e.target
-      if (!t || !t.matches?.('input, textarea, select')) return
-      setTimeout(() => {
-        try { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } catch {}
-      }, 280)
-    }
-    form.addEventListener('focusin', onFocusIn)
-    return () => form.removeEventListener('focusin', onFocusIn)
-  }, [])
+  const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   async function submit(e) {
     e?.preventDefault()
@@ -127,17 +94,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
     <Drawer open={open} onOpenChange={requestClose}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{
-          maxWidth: '100%',
-          overflowX: 'hidden',
-          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
-          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
-          maxHeight: kbd
-            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
-            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -196,13 +153,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
           <form
             ref={formRef}
             onSubmit={submit}
-            style={{
-              padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
-              display: 'flex', flexDirection: 'column', gap: 14,
-              boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
-              overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-              flex: 1, minHeight: 0
-            }}
+            style={formStyle({ gap: 14 })}
           >
             {/* AMOUNT — display-font input */}
             <div>

@@ -9,6 +9,7 @@ import { hapticStageChange, hapticTap } from '../../../lib/haptics.js'
 import { approveQuote as pipelineApproveQuote } from '../../../lib/pipeline.js'
 import { generateQuote } from '../../../lib/pdf.js'
 import SignaturePad from '../../../components/SignaturePad.jsx'
+import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.js'
 
 /**
  * Approve Quote sheet — Phase 4C-2.
@@ -85,28 +86,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   const [loadingItems, setLoadingItems] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
-  // iOS keyboard tracking — pushes the drawer above the keyboard so the
-  // Approve button stays reachable while typing customer name / note.
-  const [kbd, setKbd] = useState(0)
-  const formRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    const vv = window.visualViewport
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      setKbd(0)
-    }
-  }, [open])
+  const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   // Reset every time the sheet opens, then fetch fresh items so the
   // snapshot reflects truth-of-the-moment (not a stale cache from the
@@ -423,17 +403,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     <Drawer open={open} onOpenChange={(v) => { if (!v && !submitting) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{
-          maxWidth: '100%',
-          overflowX: 'hidden',
-          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
-          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
-          maxHeight: kbd
-            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
-            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -458,13 +428,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         <form
           ref={formRef}
           onSubmit={(e) => { e.preventDefault(); handleCommit() }}
-          style={{
-            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
-            display: 'flex', flexDirection: 'column', gap: 14,
-            boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
-            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-            flex: 1, minHeight: 0
-          }}
+          style={formStyle({ gap: 14 })}
         >
           {err && (
             <div role="alert" style={{
