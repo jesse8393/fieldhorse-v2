@@ -2204,6 +2204,8 @@ a {
 }
 .fh-app__main {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   /* Reserve room for the iOS status bar / Dynamic Island. Every screen
      header used to slide up under the system chrome — "JOBS & PIPELINE"
      and "$155K IN MOTION" stat row both rendered behind the iOS time
@@ -2228,6 +2230,24 @@ a {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  /* Children that opt in via marginTop:auto (e.g. ScreenCloser) get
+     pushed to the bottom of the viewport on under-filled screens so
+     the trailing black void stops reading as a gap before the bottom
+     nav. */
+}
+
+/* Every primary screen flex-columns its content so ScreenCloser's
+   marginTop:auto can claim the trailing space. Also enforces a
+   min-height matching the visible viewport (minus shell chrome) so
+   the screen always extends to fill — was leaving 30%+ empty void
+   on sparse dashboards. */
+.v3-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px) - 96px - env(safe-area-inset-bottom, 0px));
 }
 /* Mobile-frame — today's default for every non-desktop-flipped route.
    Centered ~440px premium mobile frame on tablet+ so non-phone

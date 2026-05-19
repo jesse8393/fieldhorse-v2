@@ -32,3 +32,9 @@ export { default as PostedByChip } from './PostedByChip.jsx'
    for stage (lead/quote/job/invoice/closed/lost), Top Deal, Approved,
    Cold. Replaces the prior mix of inline StagePill + ad-hoc chips. */
 export { default as StatusPill } from './StatusPill.jsx'
+
+/* "You've reached the bottom" footer affordance that closes off
+   scrollable screens so empty space doesn't read as a gap before the
+   bottom nav. marginTop:auto inside a flex column pushes it to the
+   bottom on under-filled screens. */
+export { default as ScreenCloser } from './ScreenCloser.jsx'

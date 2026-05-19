@@ -11,7 +11,7 @@ import { rollupByClient } from '../lib/rollups.js'
 import { findDuplicateClusters } from '../lib/clientMerge.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.jsx'
-import { FilterPill, Eyebrow, StampNumber, FloatingActionButton } from '../components/v3'
+import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
 import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.jsx'
 import { useIsDesktop } from '../lib/useMediaQuery.js'
 
@@ -497,6 +497,13 @@ export default function Clients() {
       </motion.div>
 
       {/* end of grid */}
+
+      <ScreenCloser
+        variant="cta"
+        caption={`${rows.length} ${rows.length === 1 ? 'account' : 'accounts'} on file.`}
+        ctaLabel="Add another client"
+        onCta={() => setAddOpen(true)}
+      />
 
       <NewClientSheet
         open={addOpen}

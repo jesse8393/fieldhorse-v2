@@ -8,7 +8,7 @@ import {
 import NewLeadSheet from '../components/NewLeadSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import SwipeableRow from '../components/SwipeableRow.jsx'
-import { JobCard, FilterPill, FloatingActionButton } from '../components/v3'
+import { JobCard, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
 import DesktopJobsBoard from '../components/desktop/DesktopJobsBoard.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -552,6 +552,10 @@ export default function Jobs() {
         onClick={() => setAddOpen(true)}
         ariaLabel="New lead"
         hideOnDesktop
+      />
+
+      <ScreenCloser
+        caption={`${filtered.length} ${filtered.length === 1 ? 'job' : 'jobs'} in this view.`}
       />
     </motion.div>
   )
