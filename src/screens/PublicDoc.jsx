@@ -16,42 +16,46 @@
 // Anyone with the token can view; the server-side function gates
 // expiry / revocation / not-found.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   ProposalTemplate,
   InvoiceTemplate,
   mapItemsToScope
 } from '../components/documents'
+import ApproveProposalBar from '../components/public/ApproveProposalBar.jsx'
 
 export default function PublicDoc() {
   const { token } = useParams()
   const [state, setState] = useState({ loading: true, data: null, error: null })
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!token) return
+    try {
+      const res = await fetch(`/api/public-link?token=${encodeURIComponent(token)}`)
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body?.ok) {
+        setState({ loading: false, data: null, error: body?.message || 'This link is no longer available.' })
+        return
+      }
+      setState({ loading: false, data: body, error: null })
+      // Brand the browser tab as the contractor's, not ours.
+      const co = body.company?.name || 'Document'
+      const proj = body.contact?.job_title || body.contact?.name || ''
+      document.title = `${co}${proj ? ` — ${proj}` : ''}`
+    } catch (e) {
+      setState({ loading: false, data: null, error: 'Could not load this document. Check the link and try again.' })
+    }
+  }, [token])
+
+  useEffect(() => {
     let cancelled = false
     ;(async () => {
-      try {
-        const res = await fetch(`/api/public-link?token=${encodeURIComponent(token)}`)
-        const body = await res.json().catch(() => ({}))
-        if (cancelled) return
-        if (!res.ok || !body?.ok) {
-          setState({ loading: false, data: null, error: body?.message || 'This link is no longer available.' })
-          return
-        }
-        setState({ loading: false, data: body, error: null })
-        // Brand the browser tab as the contractor's, not ours.
-        const co = body.company?.name || 'Document'
-        const proj = body.contact?.job_title || body.contact?.name || ''
-        document.title = `${co}${proj ? ` — ${proj}` : ''}`
-      } catch (e) {
-        if (cancelled) return
-        setState({ loading: false, data: null, error: 'Could not load this document. Check the link and try again.' })
-      }
+      if (cancelled) return
+      await load()
     })()
     return () => { cancelled = true }
-  }, [token])
+  }, [load])
 
   const { loading, data, error } = state
 
@@ -66,8 +70,53 @@ export default function PublicDoc() {
     >
       {loading && <Loading />}
       {!loading && error && <ErrorState message={error} />}
-      {!loading && data && data.kind === 'proposal' && <ProposalView data={data} />}
+      {!loading && data && data.kind === 'proposal' && (
+        <>
+          <ProposalView data={data} />
+          {(data.contact?.proposal_status || '').toLowerCase() !== 'approved' && (
+            <ApproveProposalBar
+              token={token}
+              companyName={data.company?.name || ''}
+              contactName={data.contact?.name || ''}
+              contractTotal={Number(data.contact?.amount || 0) || null}
+              initialName={data.contact?.name || ''}
+              onApproved={load}
+            />
+          )}
+          {(data.contact?.proposal_status || '').toLowerCase() === 'approved' && (
+            <ApprovedNote companyName={data.company?.name} />
+          )}
+        </>
+      )}
       {!loading && data && data.kind === 'invoice'  && <InvoiceView  data={data} />}
+    </div>
+  )
+}
+
+function ApprovedNote({ companyName }) {
+  return (
+    <div
+      style={{
+        maxWidth: 760,
+        margin: '24px auto 0',
+        padding: '20px 24px',
+        borderRadius: 6,
+        background: 'rgba(72, 130, 95, 0.10)',
+        border: '1px solid rgba(72, 130, 95, 0.40)',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        color: '#1A1814',
+        textAlign: 'center'
+      }}
+    >
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: '0.18em',
+        textTransform: 'uppercase', color: '#48825F', marginBottom: 6
+      }}>
+        Proposal approved
+      </div>
+      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5 }}>
+        {companyName ? `${companyName} has` : 'The contractor has'} a record of your approval. They'll be in touch with next steps.
+      </p>
     </div>
   )
 }
