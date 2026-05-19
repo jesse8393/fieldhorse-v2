@@ -30,18 +30,33 @@ export default function Analytics() {
   const { user } = useAuth()
   const [contacts, setContacts] = useState([])
   const [mileage, setMileage] = useState([])
+  // Financial detail tables — unlocked the deeper "Reports & Insights"
+  // section below the original 8 KPI tiles. fh_clients fetched so the
+  // top-revenue list can show client names without N+1 lookups.
+  const [payments, setPayments] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [changeOrders, setChangeOrders] = useState([])
+  const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [logOpen, setLogOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const [{ data: c }, { data: m }] = await Promise.all([
+    const [{ data: c }, { data: m }, { data: p }, { data: inv }, { data: co }, { data: cli }] = await Promise.all([
       supabase.from('fh_contacts').select('*').eq('user_id', user.id),
-      supabase.from('fh_mileage').select('*').eq('user_id', user.id).order('drove_on', { ascending: false })
+      supabase.from('fh_mileage').select('*').eq('user_id', user.id).order('drove_on', { ascending: false }),
+      supabase.from('fh_payments').select('*').eq('user_id', user.id),
+      supabase.from('fh_invoices').select('*').eq('user_id', user.id),
+      supabase.from('fh_change_orders').select('*').eq('user_id', user.id),
+      supabase.from('fh_clients').select('id, name').eq('user_id', user.id)
     ])
     setContacts(c || [])
     setMileage(m || [])
+    setPayments(p || [])
+    setInvoices(inv || [])
+    setChangeOrders(co || [])
+    setClients(cli || [])
     setLoading(false)
   }, [user])
 
@@ -151,6 +166,117 @@ export default function Analytics() {
   }, [contacts])
 
   const maxStageValue = Math.max(...byStage.map((b) => b.value), 1)
+
+  // ──────────────────────────────────────────────────────────────
+  // Deeper insights — computed from the financial detail tables.
+  // ──────────────────────────────────────────────────────────────
+
+  // Revenue by month — last 6 calendar months of fh_payments,
+  // bucketed by paid_on. Drives the inline bar chart.
+  const revenueByMonth = useMemo(() => {
+    const now = new Date()
+    const buckets = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const next = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+      const total = payments.reduce((s, p) => {
+        const when = new Date(p.paid_on || p.created_at)
+        if (Number.isNaN(when.getTime())) return s
+        if (when >= d && when < next) return s + Number(p.amount || 0)
+        return s
+      }, 0)
+      buckets.push({
+        label: d.toLocaleDateString(undefined, { month: 'short' }),
+        total: Math.round(total)
+      })
+    }
+    return buckets
+  }, [payments])
+  const maxMonthlyRevenue = Math.max(...revenueByMonth.map((b) => b.total), 1)
+
+  // Win rate by job_type. won = stage='closed' (or 'invoice' if you
+  // count signed work as won); lost = stage='lost'. Skips types with
+  // fewer than 2 outcomes so a single lucky/unlucky job doesn't
+  // dominate the table.
+  const winRateByType = useMemo(() => {
+    const map = new Map()
+    for (const c of contacts) {
+      const k = c.job_type || 'Other'
+      if (c.stage !== 'closed' && c.stage !== 'lost') continue
+      const cur = map.get(k) || { type: k, won: 0, lost: 0 }
+      if (c.stage === 'closed') cur.won++
+      else cur.lost++
+      map.set(k, cur)
+    }
+    return Array.from(map.values())
+      .filter((r) => r.won + r.lost >= 2)
+      .map((r) => ({
+        ...r,
+        total: r.won + r.lost,
+        pct: Math.round((r.won / (r.won + r.lost)) * 100)
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6)
+  }, [contacts])
+
+  // Top revenue clients — sums payments per contact_id, then maps to
+  // the linked fh_clients.name when available. Falls back to the
+  // contact name. Last 90 days only (active book of business, not
+  // ancient history).
+  const topClients = useMemo(() => {
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+    const contactById = new Map(contacts.map((c) => [c.id, c]))
+    const clientById = new Map(clients.map((c) => [c.id, c]))
+    const totals = new Map()
+    for (const p of payments) {
+      const when = new Date(p.paid_on || p.created_at)
+      if (Number.isNaN(when.getTime()) || when < cutoff) continue
+      const c = contactById.get(p.contact_id)
+      const clientName = c?.client_id ? clientById.get(c.client_id)?.name : null
+      const key = clientName || c?.name || 'Unknown'
+      totals.set(key, (totals.get(key) || 0) + Number(p.amount || 0))
+    }
+    return Array.from(totals.entries())
+      .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+  }, [payments, contacts, clients])
+  const maxTopClient = Math.max(...topClients.map((t) => t.amount), 1)
+
+  // Retainage outstanding — sum of fh_payments tagged retainage
+  // across all contracts. This is what's been held back but not
+  // released yet; the contractor sees a single KPI.
+  const retainageOutstanding = useMemo(() => {
+    return payments
+      .filter((p) => p?.kind === 'retainage')
+      .reduce((s, p) => s + Number(p.amount || 0), 0)
+  }, [payments])
+
+  // Average deposit lag — days from quote_sent_at to first payment
+  // on the same contact, averaged across the last N closed deals.
+  // Tracks how long the customer typically sits on a signed proposal
+  // before sending the first check.
+  const avgDepositLagDays = useMemo(() => {
+    const firstPaymentByContact = new Map()
+    for (const p of payments) {
+      const when = new Date(p.paid_on || p.created_at)
+      if (Number.isNaN(when.getTime())) continue
+      const prev = firstPaymentByContact.get(p.contact_id)
+      if (!prev || when < prev) firstPaymentByContact.set(p.contact_id, when)
+    }
+    const lags = []
+    for (const c of contacts) {
+      if (!c.quote_sent_at) continue
+      const first = firstPaymentByContact.get(c.id)
+      if (!first) continue
+      const sent = new Date(c.quote_sent_at)
+      const days = Math.max(0, (first - sent) / (24 * 60 * 60 * 1000))
+      if (Number.isFinite(days)) lags.push(days)
+    }
+    if (lags.length === 0) return null
+    const avg = lags.reduce((s, d) => s + d, 0) / lags.length
+    return { avg: Math.round(avg), sample: lags.length }
+  }, [contacts, payments])
 
   const { stagger, item } = useFhMotion()
 
@@ -406,6 +532,113 @@ export default function Analytics() {
               </div>
             )}
           </motion.section>
+
+          {/* DEEPER INSIGHTS — financial detail surfaced from
+              fh_payments / fh_invoices / fh_change_orders that the
+              top-tile dashboard doesn't dig into. Five mini-cards on
+              one rail; auto-hides individual cards when there's no
+              data to show so the section never reads as empty boxes. */}
+          <motion.section variants={item} style={{ padding: '8px 20px 16px' }}>
+            <SectionHeader label="Deeper insights" />
+            <div style={{
+              marginTop: 12,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: 12
+            }}>
+              {/* Revenue by month */}
+              <InsightCard title="Revenue · last 6 months">
+                <RevenueBars data={revenueByMonth} maxValue={maxMonthlyRevenue} />
+              </InsightCard>
+
+              {/* Win rate by type */}
+              {winRateByType.length > 0 && (
+                <InsightCard title="Win rate by job type">
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {winRateByType.map((r) => (
+                      <li key={r.type} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text)' }}>
+                          {r.type}
+                        </span>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                          {r.won}/{r.total}
+                        </span>
+                        <span style={{
+                          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                          color: r.pct >= 60 ? 'var(--v3-success-bright, #4ade80)'
+                            : r.pct >= 40 ? 'var(--v3-primary-bright)'
+                            : 'var(--v3-text-muted)',
+                          fontVariantNumeric: 'tabular-nums', minWidth: 38, textAlign: 'right'
+                        }}>
+                          {r.pct}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </InsightCard>
+              )}
+
+              {/* Top revenue clients (90d) */}
+              {topClients.length > 0 && (
+                <InsightCard title="Top clients · 90 days">
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {topClients.map((c) => (
+                      <li key={c.name}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                          <span style={{
+                            fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text)',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%'
+                          }}>
+                            {c.name}
+                          </span>
+                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-success-bright, #4ade80)', fontVariantNumeric: 'tabular-nums' }}>
+                            {money(c.amount)}
+                          </span>
+                        </div>
+                        <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${(c.amount / maxTopClient) * 100}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, var(--v3-primary-deep), var(--v3-primary))'
+                          }} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </InsightCard>
+              )}
+
+              {/* Retainage held + deposit lag — two stat blocks combined */}
+              <InsightCard title="Cash collection telemetry">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                      Retainage held
+                    </div>
+                    <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 26, color: retainageOutstanding > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-text-muted)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                      {money(retainageOutstanding)}
+                    </div>
+                    <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                      Tagged retainage payments across the book
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                      Avg deposit lag
+                    </div>
+                    <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--v3-text)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                      {avgDepositLagDays ? `${avgDepositLagDays.avg}d` : '—'}
+                    </div>
+                    <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                      {avgDepositLagDays
+                        ? `Quote sent → first payment, n=${avgDepositLagDays.sample}`
+                        : 'No deposits matched to sent quotes yet'}
+                    </div>
+                  </div>
+                </div>
+              </InsightCard>
+            </div>
+          </motion.section>
         </>
       )}
 
@@ -416,6 +649,57 @@ export default function Analytics() {
         onSaved={() => { setLogOpen(false); load(); toastSuccess('Miles logged', 'Deduction updated') }}
       />
     </motion.div>
+  )
+}
+
+function InsightCard({ title, children }) {
+  return (
+    <div style={{
+      padding: '16px 18px',
+      background: 'var(--v3-surface)',
+      border: '1px solid var(--v3-border)',
+      borderRadius: 14,
+      display: 'flex', flexDirection: 'column', gap: 12
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+        letterSpacing: '0.16em', textTransform: 'uppercase',
+        color: 'var(--v3-primary-bright)'
+      }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function RevenueBars({ data, maxValue }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.length}, 1fr)`, gap: 6, alignItems: 'flex-end', height: 80 }}>
+      {data.map((b) => {
+        const heightPct = (b.total / maxValue) * 100
+        return (
+          <div key={b.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div title={money(b.total)} style={{
+              width: '100%',
+              height: `${Math.max(2, heightPct)}%`,
+              background: b.total > 0
+                ? 'linear-gradient(180deg, var(--v3-primary-bright), var(--v3-primary))'
+                : 'rgba(255,255,255,0.06)',
+              borderRadius: 4,
+              minHeight: 2
+            }} />
+            <div style={{
+              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 600,
+              color: 'var(--v3-text-muted)', letterSpacing: '0.04em',
+              textTransform: 'uppercase'
+            }}>
+              {b.label}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
