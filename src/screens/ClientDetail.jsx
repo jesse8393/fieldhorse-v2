@@ -362,10 +362,10 @@ export default function ClientDetail() {
         {tab === 'overview' && (
           isEditing
             ? <OverviewEdit client={client} onCommit={async (patch) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
-            : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} />
+            : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} onOpen={(jobId) => navigate(`/jobs/${jobId}`)} />
+          <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId) => navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
@@ -503,9 +503,14 @@ function CockpitMetric({ label, tone = 'default', size = 'md', children }) {
    live in the cockpit header above)
    ============================================================ */
 
-function OverviewRead({ client, lifetime, outstanding, activeCount }) {
+function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], payments = [], onJump }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 0 24px' }}>
+
+      {/* PIPELINE DISTRIBUTION — counts + value per stage, jumps to Projects */}
+      {jobs.length > 0 && (
+        <PipelineDistribution jobs={jobs} payments={payments} onJump={onJump} />
+      )}
 
       {/* CONTACT INFO CARD — phone / email / address as separate rows */}
       <div style={{
@@ -817,97 +822,385 @@ function OverviewEdit({ client, onCommit, onCancel }) {
 }
 
 /* ============================================================
-   ProjectsList — jobs linked to this client
+   PipelineDistribution — overview mini-card. Counts + value per
+   stage; tapping a row jumps to Projects (parent owns tab state).
    ============================================================ */
 
-function ProjectsList({ jobs, onOpen }) {
-  if (jobs.length === 0) {
-    return <EmptyCard label="No projects linked to this client yet." />
-  }
+const PIPELINE_ROWS = [
+  { id: 'lead',    label: 'Leads' },
+  { id: 'quote',   label: 'Quotes' },
+  { id: 'job',     label: 'Active jobs' },
+  { id: 'invoice', label: 'Invoicing' },
+  { id: 'closed',  label: 'Closed' },
+  { id: 'lost',    label: 'Lost' }
+]
+
+function PipelineDistribution({ jobs, payments = [], onJump }) {
+  const buckets = useMemo(() => {
+    const out = Object.fromEntries(PIPELINE_ROWS.map((r) => [r.id, { count: 0, value: 0 }]))
+    for (const j of jobs) {
+      const b = out[j.stage]
+      if (!b) continue
+      b.count += 1
+      b.value += Number(j.amount || 0)
+    }
+    return out
+  }, [jobs])
+  const totalRevenue = useMemo(
+    () => (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0),
+    [payments]
+  )
+  const visible = PIPELINE_ROWS.filter((r) => buckets[r.id].count > 0)
+  if (visible.length === 0) return null
+  const totalActive = visible.reduce((s, r) => s + buckets[r.id].count, 0)
+
   return (
-    <div style={{ padding: '12px 0 24px' }}>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {jobs.map((j) => {
-          const c = stageColor(j.stage)
+    <section style={{
+      background: 'var(--v3-surface)',
+      border: '1px solid var(--v3-border-strong)',
+      borderRadius: 16,
+      overflow: 'hidden',
+      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+    }}>
+      <header style={{
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+        gap: 8, padding: '14px 18px 8px'
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
+        }}>
+          Pipeline
+        </span>
+        {totalRevenue > 0 && (
+          <span style={{
+            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: 'var(--v3-success-bright, #4ade80)'
+          }}>
+            {money(totalRevenue)} collected
+          </span>
+        )}
+      </header>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {visible.map((r) => {
+          const b = buckets[r.id]
+          const c = stageColor(r.id)
+          const pct = totalActive > 0 ? Math.round((b.count / totalActive) * 100) : 0
           return (
-            <li key={j.id}>
-              <motion.button
+            <li key={r.id}>
+              <button
                 type="button"
-                whileTap={{ scale: 0.99 }}
-                whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
-                transition={{ type: 'spring', stiffness: 620, damping: 28 }}
-                onClick={() => { hapticTap(); onOpen(j.id) }}
+                onClick={() => { hapticTap(); onJump?.() }}
                 style={{
                   width: '100%',
-                  position: 'relative',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '14px 14px 14px 20px',
-                  borderRadius: 14,
-                  background: '#171511',
-                  border: '1px solid var(--v3-border-strong)',
-                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+                  display: 'grid',
+                  gridTemplateColumns: '8px 1fr auto',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '11px 18px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderTop: '1px solid var(--v3-border)',
                   textAlign: 'left',
+                  color: 'inherit',
                   cursor: 'pointer',
-                  color: 'var(--v3-text)',
-                  overflow: 'hidden',
                   WebkitTapHighlightColor: 'transparent'
                 }}
               >
                 <span aria-hidden="true" style={{
-                  position: 'absolute',
-                  left: 0, top: 12, bottom: 12,
-                  width: 3,
-                  borderRadius: '0 3px 3px 0',
-                  background: c,
-                  boxShadow: `0 0 12px ${c}66`
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: c, boxShadow: `0 0 10px ${c}66`
                 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ minWidth: 0 }}>
                   <div style={{
                     fontFamily: 'var(--font-body)',
-                    fontSize: 14, fontWeight: 700,
-                    letterSpacing: '-0.005em',
-                    color: 'var(--v3-text)',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                    fontSize: 13, fontWeight: 600,
+                    color: 'var(--v3-text)', lineHeight: 1.2
                   }}>
-                    {j.name || 'Untitled'}
+                    {r.label}
+                  </div>
+                  <div style={{
+                    marginTop: 4,
+                    height: 4, borderRadius: 999,
+                    background: 'rgba(255,255,255,0.05)',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${Math.max(pct, 4)}%`,
+                      height: '100%',
+                      background: c,
+                      borderRadius: 999
+                    }} />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 14,
+                    color: 'var(--v3-text)',
+                    fontVariantNumeric: 'tabular-nums',
+                    lineHeight: 1
+                  }}>
+                    {b.count}
                   </div>
                   <div style={{
                     marginTop: 3,
                     fontFamily: 'var(--font-body)',
-                    fontSize: 11,
+                    fontSize: 10, fontWeight: 600,
                     color: 'var(--v3-text-muted)',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                    fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {j.job_title || j.job_type || '—'}
+                    {money(b.value)}
                   </div>
                 </div>
-                <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                  <div style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 16,
-                    color: 'var(--v3-primary)',
-                    letterSpacing: '0.02em',
-                    fontVariantNumeric: 'tabular-nums',
-                    lineHeight: 1
-                  }}>
-                    {money(j.amount)}
-                  </div>
-                  <div style={{
-                    marginTop: 4,
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: '0.16em', textTransform: 'uppercase',
-                    color: c
-                  }}>
-                    {j.stage}
-                  </div>
-                </div>
-              </motion.button>
+              </button>
             </li>
           )
         })}
       </ul>
+    </section>
+  )
+}
+
+/* ============================================================
+   ProjectsList — jobs linked to this client, with stage filter
+   chips + per-row paid/balance bar + relative-time stamp.
+   ============================================================ */
+
+const PROJECT_FILTERS = [
+  { id: 'all',    label: 'All' },
+  { id: 'active', label: 'Active', match: (j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage) },
+  { id: 'won',    label: 'Won',    match: (j) => j.stage === 'closed' },
+  { id: 'lost',   label: 'Lost',   match: (j) => j.stage === 'lost' }
+]
+
+function relTime(input) {
+  if (!input) return ''
+  const d = input instanceof Date ? input : new Date(input)
+  if (Number.isNaN(d.getTime())) return ''
+  const diffMs = Date.now() - d.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'now'
+  if (diffMin < 60) return `${diffMin}m`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay < 7) return `${diffDay}d`
+  if (diffDay < 30) return `${Math.floor(diffDay / 7)}w`
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function ProjectsList({ jobs, payments = [], onOpen }) {
+  const [filter, setFilter] = useState('all')
+
+  const paidByJob = useMemo(() => {
+    const m = new Map()
+    for (const p of payments || []) {
+      if (!p.contact_id) continue
+      m.set(p.contact_id, (m.get(p.contact_id) || 0) + Number(p.amount || 0))
+    }
+    return m
+  }, [payments])
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return jobs
+    const cfg = PROJECT_FILTERS.find((f) => f.id === filter)
+    return cfg ? jobs.filter(cfg.match) : jobs
+  }, [jobs, filter])
+
+  if (jobs.length === 0) {
+    return <EmptyCard label="No projects linked to this client yet." />
+  }
+
+  return (
+    <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* Filter chips — dispatch-state pill pattern */}
+      <div role="tablist" aria-label="Project filter" style={{
+        display: 'flex', gap: 6, padding: 3,
+        borderRadius: 999,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+      }}>
+        {PROJECT_FILTERS.map((f) => {
+          const active = filter === f.id
+          const count = f.id === 'all' ? jobs.length : jobs.filter(f.match).length
+          return (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => { hapticTap(); setFilter(f.id) }}
+              style={{
+                flex: 1,
+                padding: '7px 10px',
+                borderRadius: 999,
+                border: 'none',
+                background: active ? 'var(--v3-primary)' : 'transparent',
+                color: active ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.10em', textTransform: 'uppercase',
+                fontVariantNumeric: 'tabular-nums',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'background 0.15s, color 0.15s'
+              }}
+            >
+              {f.label} <span style={{ opacity: 0.65, fontWeight: 600 }}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyCard label="No projects in this filter." />
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map((j) => {
+            const c = stageColor(j.stage)
+            const amount = Number(j.amount || 0)
+            const paid = paidByJob.get(j.id) || 0
+            const billable = j.stage === 'job' || j.stage === 'invoice' || j.stage === 'closed'
+            const balance = Math.max(0, amount - paid)
+            const pct = amount > 0 ? Math.min(100, Math.round((paid / amount) * 100)) : 0
+            const stamp = relTime(j.updated_at)
+            return (
+              <li key={j.id}>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.99 }}
+                  whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
+                  transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+                  onClick={() => { hapticTap(); onOpen(j.id) }}
+                  style={{
+                    width: '100%',
+                    position: 'relative',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                    padding: '14px 14px 14px 20px',
+                    borderRadius: 14,
+                    background: '#171511',
+                    border: '1px solid var(--v3-border-strong)',
+                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    color: 'var(--v3-text)',
+                    overflow: 'hidden',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
+                >
+                  <span aria-hidden="true" style={{
+                    position: 'absolute',
+                    left: 0, top: 12, bottom: 12,
+                    width: 3,
+                    borderRadius: '0 3px 3px 0',
+                    background: c,
+                    boxShadow: `0 0 12px ${c}66`
+                  }} />
+
+                  {/* Row 1 — title + amount */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 14, fontWeight: 700,
+                        letterSpacing: '-0.005em',
+                        color: 'var(--v3-text)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>
+                        {j.name || 'Untitled'}
+                      </div>
+                      <div style={{
+                        marginTop: 3,
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 11,
+                        color: 'var(--v3-text-muted)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>
+                        {j.job_title || j.job_type || '—'}
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                      <div style={{
+                        fontFamily: 'var(--font-display)',
+                        fontSize: 16,
+                        color: 'var(--v3-primary)',
+                        letterSpacing: '0.02em',
+                        fontVariantNumeric: 'tabular-nums',
+                        lineHeight: 1
+                      }}>
+                        {money(amount)}
+                      </div>
+                      <div style={{
+                        marginTop: 4,
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: '0.16em', textTransform: 'uppercase',
+                        color: c
+                      }}>
+                        {j.stage}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2 — paid bar (only when there's money to track) */}
+                  {amount > 0 && billable && (
+                    <div>
+                      <div style={{
+                        height: 4, borderRadius: 999,
+                        background: 'rgba(255,255,255,0.05)',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${pct}%`,
+                          height: '100%',
+                          background: pct >= 100 ? 'var(--v3-success-bright, #4ade80)' : c,
+                          borderRadius: 999
+                        }} />
+                      </div>
+                      <div style={{
+                        marginTop: 6,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: 8,
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 10, fontWeight: 600,
+                        letterSpacing: '0.06em',
+                        color: 'var(--v3-text-muted)',
+                        fontVariantNumeric: 'tabular-nums'
+                      }}>
+                        <span>
+                          {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
+                        </span>
+                        <span style={{ color: balance > 0 ? 'var(--v3-danger-bright, #f5a294)' : 'var(--v3-success-bright, #4ade80)' }}>
+                          {balance > 0 ? `${money(balance)} due` : 'Paid in full'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3 — last-touch stamp */}
+                  {stamp && (
+                    <div style={{
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 10, fontWeight: 600,
+                      letterSpacing: '0.08em', textTransform: 'uppercase',
+                      color: 'var(--v3-text-faint, var(--v3-text-muted))',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      Updated {stamp} ago
+                    </div>
+                  )}
+                </motion.button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
