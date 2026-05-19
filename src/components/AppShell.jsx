@@ -86,6 +86,7 @@ function layoutForPath(pathname) {
   if (pathname === '/import') return 'responsive'
   if (pathname === '/pour-window') return 'responsive'
   if (pathname === '/notes') return 'responsive'
+  if (pathname === '/activity') return 'responsive'
   // Phase 4: Job Detail (`/jobs/:id`) is the host of the Estimate
   // workspace (Quote tab) and gets the responsive canvas. Non-quote
   // tabs (Overview / Details / Financials / Files) inherit the wider

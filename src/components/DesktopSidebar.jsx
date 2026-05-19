@@ -12,7 +12,8 @@ import {
   Upload,
   CloudSun,
   Settings as SettingsIcon,
-  LogOut
+  LogOut,
+  Activity as ActivityIcon
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -43,6 +44,7 @@ const PRIMARY_NAV = [
 ]
 
 const SECONDARY_NAV = [
+  { to: '/activity',    label: 'Activity',      Icon: ActivityIcon },
   { to: '/bid',         label: 'Estimates',     Icon: Calculator },
   { to: '/invoices',    label: 'Invoices',      Icon: Receipt },
   { to: '/analytics',   label: 'Reports',       Icon: BarChart3 },
