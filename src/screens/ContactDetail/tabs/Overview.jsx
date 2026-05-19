@@ -19,6 +19,7 @@ import TimeClockCard from '../../../components/TimeClockCard.jsx'
 import { computeJobHealth } from '../lib/jobHealth.js'
 import ActivityLog from '../sections/ActivityLog.jsx'
 import { resolveNextAction } from '../lib/jobNextAction.js'
+import ClientPicker from '../../../components/ClientPicker.jsx'
 import { money } from '../lib/format.js'
 
 /**
@@ -497,6 +498,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
   // fh_clients denies partner reads — owner-only by design).
   const [linkedClient, setLinkedClient] = useState(null)
   const [hydrating, setHydrating] = useState(false)
+  // Pending client_id change tracked separately so the diff at commit()
+  // time can include it without polluting the EDITABLE_FIELDS form
+  // shape. null = no change, '' = explicit unlink, uuid = new link.
+  const [pendingClientId, setPendingClientId] = useState(null)
 
   // Reset form whenever the underlying contact changes (e.g. a partner edit
   // streams in via realtime mid-edit). Keeps the form authoritative for
@@ -575,6 +580,11 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
       const normalizedNext = next ?? (f.kind === 'number' ? null : '')
       if (normalizedNext !== normalizedCur) diff[f.key] = next
     }
+    // Client link change rides the same diff. Sentinel "" → null (unlink).
+    if (pendingClientId !== null) {
+      const cleaned = pendingClientId || null
+      if (cleaned !== (contact.client_id || null)) diff.client_id = cleaned
+    }
     if (Object.keys(diff).length === 0) {
       onExitEdit?.()
       return
@@ -583,6 +593,27 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
     await patch(diff)
     setSaving(false)
     onExitEdit?.()
+  }
+
+  // Called when the operator picks (or clears) a client via the
+  // ClientPicker below. Auto-hydrates empty form fields with the
+  // picked client's values — same merge policy as NewLeadSheet's
+  // handleClientChange. User-typed values are never clobbered.
+  function handleClientLink(picked) {
+    if (!picked) {
+      setPendingClientId('') // sentinel for explicit unlink
+      setLinkedClient(null)
+      return
+    }
+    setPendingClientId(picked.id)
+    setLinkedClient(picked)
+    setForm((prev) => ({
+      ...prev,
+      name:    prev.name?.trim()    ? prev.name    : picked.name    || '',
+      phone:   prev.phone?.trim()   ? prev.phone   : picked.phone   || '',
+      email:   prev.email?.trim()   ? prev.email   : picked.email   || '',
+      address: prev.address?.trim() ? prev.address : picked.address || ''
+    }))
   }
 
   return (
@@ -637,6 +668,31 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
             <XIcon size={14} aria-hidden="true" />
           </button>
         </div>
+      </div>
+
+      {/* LINKED CLIENT — controlled ClientPicker. Picks auto-hydrate
+          empty fields on the form (same merge policy as NewLeadSheet)
+          and commit the new client_id alongside the regular field
+          diff. Clearing the picker queues an unlink. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{
+          fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
+          letterSpacing: '0.14em', color: 'var(--v3-text-muted)',
+          textTransform: 'uppercase'
+        }}>
+          Linked client
+        </span>
+        <ClientPicker
+          userId={userId}
+          value={linkedClient || (contact?.client_id ? { id: contact.client_id, name: '' } : null)}
+          onChange={handleClientLink}
+        />
+        <span style={{
+          fontFamily: 'var(--font-body)', fontSize: 11,
+          color: 'var(--v3-text-muted)', lineHeight: 1.4
+        }}>
+          Picking a client auto-fills any empty fields below. Your typed values are preserved.
+        </span>
       </div>
 
       <div className="v3-edit-grid">
