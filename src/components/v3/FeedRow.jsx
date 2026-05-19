@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Hammer, FileText, Receipt, Camera, Activity } from 'lucide-react'
+import { Hammer, FileText, Receipt, Camera, Activity, Trash2 } from 'lucide-react'
 import Pill from './Pill.jsx'
 import { hapticTap } from '../../lib/haptics.js'
 
@@ -36,10 +36,15 @@ export default function FeedRow({
   timestamp,
   pillTone,
   pillLabel,
-  onTap
+  onTap,
+  onDelete,
+  deleteLabel = 'Delete'
 }) {
   const Icon = ICONS[type] || ICONS.default
   const tone = TONE[type] || TONE.default
+  // Tap only fires when there's an onTap AND no nested delete control was
+  // clicked. Delete owns its own click + haptic; we stop propagation in
+  // the delete handler so the row's onTap doesn't also fire.
   const interactive = !!onTap
 
   const Tag = interactive ? motion.button : motion.div
@@ -110,6 +115,30 @@ export default function FeedRow({
         </div>
       </div>
       {pillLabel ? <Pill tone={pillTone || 'success'}>{pillLabel}</Pill> : null}
+      {onDelete && (
+        <button
+          type="button"
+          aria-label={deleteLabel}
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            hapticTap()
+            onDelete()
+          }}
+          style={{
+            flexShrink: 0,
+            width: 32, height: 32, borderRadius: 10,
+            background: 'transparent',
+            border: '1px solid var(--v3-border)',
+            color: 'var(--v3-text-muted)',
+            display: 'grid', placeItems: 'center',
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+        >
+          <Trash2 size={13} aria-hidden="true" />
+        </button>
+      )}
     </Tag>
   )
 }

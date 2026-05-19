@@ -175,8 +175,10 @@ export default function StageTimeline({ currentStage }) {
               lineHeight: 1.2,
               opacity: isFuture ? 0.7 : 1
             }}>
-              {/* Mockup uses "Active" for the job stage, "Won" for closed */}
-              {stageId === 'job' ? 'Active' : stageId === 'closed' ? 'Won' : meta.label}
+              {/* "Active" reads better than "Job" for the in-progress
+                  stage; "Complete" matches contractor vocab better than
+                  "Won" / "Closed" (the DB key stays 'closed'). */}
+              {stageId === 'job' ? 'Active' : stageId === 'closed' ? 'Complete' : meta.label}
             </span>
           </div>
         )

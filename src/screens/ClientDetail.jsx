@@ -972,7 +972,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }) {
 const PROJECT_FILTERS = [
   { id: 'all',    label: 'All' },
   { id: 'active', label: 'Active', match: (j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage) },
-  { id: 'won',    label: 'Won',    match: (j) => j.stage === 'closed' },
+  { id: 'won',    label: 'Complete', match: (j) => j.stage === 'closed' },
   { id: 'lost',   label: 'Lost',   match: (j) => j.stage === 'lost' }
 ]
 
