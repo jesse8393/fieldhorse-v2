@@ -2204,6 +2204,12 @@ a {
 }
 .fh-app__main {
   flex: 1;
+  /* Reserve room for the iOS status bar / Dynamic Island. Every screen
+     header used to slide up under the system chrome — "JOBS & PIPELINE"
+     and "$155K IN MOTION" stat row both rendered behind the iOS time
+     because the AppShell didn't reserve top safe-area. Doing it once
+     here covers every route. */
+  padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
   /* V3-SYSTEM-1A2: base shell — no width cap here. Phase 1 of the
      Responsive Desktop Command Center: the cap moved from this element

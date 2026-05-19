@@ -695,42 +695,68 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
 
       {filtered.length === 0 ? (
         events.length === 0 ? (
-          // True empty day — designed empty state with dispatch aesthetic.
+          // True empty day — premium hero treatment. The previous version
+          // was a small card floating in the middle of a sea of black;
+          // a billion-dollar app fills the space with a confident
+          // statement, not a footnote.
           <div style={{
-            margin: '0 20px',
-            padding: '24px 20px',
-            borderRadius: 16,
-            background: 'linear-gradient(180deg, var(--v3-surface), var(--v3-surface-2))',
-            border: '1px dashed color-mix(in srgb, var(--v3-primary) 32%, var(--v3-border-strong))',
+            margin: '24px 20px 0',
+            padding: '56px 24px',
+            minHeight: '46vh',
+            borderRadius: 20,
+            background:
+              'radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--v3-primary) 12%, transparent) 0%, transparent 60%),' +
+              'linear-gradient(180deg, var(--v3-surface), var(--v3-surface-2))',
+            border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))',
+            boxShadow:
+              'inset 0 1px 0 rgba(255, 240, 210, 0.06),' +
+              '0 24px 64px -28px rgba(0, 0, 0, 0.65)',
             textAlign: 'center',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 18,
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            {/* Halo glow behind the icon */}
+            <div aria-hidden="true" style={{
+              position: 'absolute',
+              top: '20%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 220, height: 220, borderRadius: '50%',
+              background: 'radial-gradient(circle, color-mix(in srgb, var(--v3-primary) 22%, transparent) 0%, transparent 70%)',
+              pointerEvents: 'none',
+              filter: 'blur(8px)'
+            }} />
             <div style={{
-              width: 44, height: 44, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #2a1f10, #1a1208)',
-              border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-              color: 'var(--v3-primary)',
+              width: 72, height: 72, borderRadius: 20,
+              background: 'linear-gradient(135deg, #3a2a18, #1a1208)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)',
+              color: 'var(--v3-primary-bright, var(--v3-primary))',
               display: 'grid', placeItems: 'center',
-              boxShadow: 'inset 0 1px 0 rgba(228,190,111,0.15), 0 0 16px rgba(228,190,111,0.18)'
+              boxShadow:
+                'inset 0 1px 0 rgba(228,190,111,0.22),' +
+                '0 0 28px rgba(228,190,111,0.28),' +
+                '0 12px 28px rgba(0,0,0,0.45)',
+              position: 'relative', zIndex: 1
             }}>
-              <CalendarIcon size={18} aria-hidden="true" />
+              <CalendarIcon size={28} aria-hidden="true" strokeWidth={1.8} />
             </div>
-            <div>
+            <div style={{ position: 'relative', zIndex: 1 }}>
               <div style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 22, lineHeight: 1.1,
-                letterSpacing: '0.01em',
+                fontSize: 32, lineHeight: 1.05,
+                letterSpacing: '-0.005em',
                 color: 'var(--v3-text)'
               }}>
                 Day's clear.
               </div>
               <p style={{
-                margin: '6px 0 0',
+                margin: '10px auto 0',
                 fontFamily: 'var(--font-body)',
-                fontSize: 12,
+                fontSize: 14,
                 color: 'var(--v3-text-muted)',
-                lineHeight: 1.45,
-                maxWidth: 280
+                lineHeight: 1.5,
+                maxWidth: 320
               }}>
                 Queue up a job and your crew sees it the second they open the app.
               </p>
@@ -740,19 +766,23 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
               whileTap={{ scale: 0.97 }}
               onClick={() => { hapticTap(); onAdd?.() }}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '11px 20px', borderRadius: 12,
+                marginTop: 6,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '14px 24px', borderRadius: 14,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                 background: 'linear-gradient(180deg, var(--v3-primary-hot, var(--v3-primary)) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
                 cursor: 'pointer',
-                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 6px 18px rgba(201, 150, 58, 0.32)',
-                WebkitTapHighlightColor: 'transparent'
+                boxShadow:
+                  '0 0 0 3px rgba(228, 190, 111, 0.14),' +
+                  '0 12px 28px rgba(201, 150, 58, 0.42)',
+                WebkitTapHighlightColor: 'transparent',
+                position: 'relative', zIndex: 1
               }}
             >
-              <Plus size={13} strokeWidth={2.6} />
+              <Plus size={14} strokeWidth={2.6} />
               Schedule a job
             </motion.button>
           </div>

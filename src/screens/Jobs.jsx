@@ -86,7 +86,10 @@ export default function Jobs() {
     const [contactsRes, photoMap] = await Promise.all([
       supabase
         .from('fh_contacts')
-        .select('*, fh_clients(name)')
+        // Embed client phone + email so the tile-peek action sheet's
+        // Call / Text / Email tiles can fall back to the client's
+        // contact info when the job row itself has none.
+        .select('*, fh_clients(name, phone, email)')
         .order('updated_at', { ascending: false }),
       fetchCoverPhotosByJob(user.id).catch(() => ({}))
     ])
@@ -217,6 +220,13 @@ export default function Jobs() {
     if (!next) closeDrawer()
   }
 
+  // Effective contact info for the tile-peek action sheet. The job row
+  // (fh_contacts) often has no phone/email of its own — those live on
+  // the linked fh_clients row. Falling back to client info means the
+  // operator can Call / Text / Email even when the job is bare.
+  const peekPhone = drawerContact?.phone || drawerContact?.fh_clients?.phone || ''
+  const peekEmail = drawerContact?.email || drawerContact?.fh_clients?.email || ''
+
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
@@ -255,20 +265,20 @@ export default function Jobs() {
               <ActionTile
                 icon={MessageSquare}
                 label="Text"
-                disabled={!drawerContact?.phone}
-                href={drawerContact?.phone ? `sms:${drawerContact.phone}` : undefined}
+                disabled={!peekPhone}
+                href={peekPhone ? `sms:${peekPhone}` : undefined}
               />
               <ActionTile
                 icon={Mail}
                 label="Email"
-                disabled={!drawerContact?.email}
-                href={drawerContact?.email ? `mailto:${drawerContact.email}` : undefined}
+                disabled={!peekEmail}
+                href={peekEmail ? `mailto:${peekEmail}` : undefined}
               />
               <ActionTile
                 icon={Phone}
                 label="Call"
-                disabled={!drawerContact?.phone}
-                href={drawerContact?.phone ? `tel:${drawerContact.phone}` : undefined}
+                disabled={!peekPhone}
+                href={peekPhone ? `tel:${peekPhone}` : undefined}
               />
               <ActionTile
                 icon={ExternalLink}
@@ -429,25 +439,28 @@ export default function Jobs() {
         )}
         <AnimatePresence>
           {filtered.map((c, i) => {
+            // Fall back to client phone when the job row doesn't have
+            // one, same as the action sheet treatment above.
+            const rowPhone = c.phone || c.fh_clients?.phone || ''
             const swipeActions = []
-            if (c.phone) {
+            if (rowPhone) {
               swipeActions.push({
                 icon: <PhoneIcon size={18} />,
                 label: `Call ${c.name || 'contact'}`,
                 color: 'rgba(46, 204, 113, 0.22)',
                 fg: 'var(--v3-success-bright)',
-                onClick: () => { window.location.href = `tel:${c.phone}` }
+                onClick: () => { window.location.href = `tel:${rowPhone}` }
               })
               swipeActions.push({
                 icon: <MsgIcon size={18} />,
                 label: `Text ${c.name || 'contact'}`,
                 color: 'rgba(212, 175, 55, 0.18)',
                 fg: 'var(--v3-primary)',
-                onClick: () => { window.location.href = `sms:${c.phone}` }
+                onClick: () => { window.location.href = `sms:${rowPhone}` }
               })
             }
             return (
-              <SwipeableRow key={c.id} actions={swipeActions} disabled={!c.phone}>
+              <SwipeableRow key={c.id} actions={swipeActions} disabled={!rowPhone}>
                 <JobCard
                   contact={c}
                   index={i}

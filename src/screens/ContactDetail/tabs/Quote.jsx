@@ -461,8 +461,18 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         {/* StatusPill is mobile-primary identity; on desktop it's
             duplicated by the WorkspaceHead eyebrow. CSS hides this
             instance on desktop so the head reads as the single
-            identity moment. */}
-        <div className="fh-quote-workspace__status-mobile" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            identity moment.
+
+            Horizontal padding + a vertical breathing line keeps the
+            pill + toggle from kissing the tab underline above. */}
+        <div className="fh-quote-workspace__status-mobile" style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          padding: '12px 20px 4px',
+          flexWrap: 'wrap'
+        }}>
           <StatusPill status={status} />
           <QuoteViewToggle value={docMode} onChange={setDocMode} />
         </div>

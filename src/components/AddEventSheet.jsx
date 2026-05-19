@@ -9,12 +9,13 @@
 // loop (every N days × 4 follow-ups), same default time, same contact
 // pre-selection from defaultContactId.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Calendar as CalendarIcon, Check, X } from 'lucide-react'
 import { hapticTap } from '../lib/haptics.js'
 import { supabase } from '../lib/supabase.js'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 
 export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '' }) {
   const [title, setTitle] = useState('')
@@ -25,8 +26,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   const [recurs, setRecurs] = useState(false)
   const [recurDays, setRecurDays] = useState(7)
   const [saving, setSaving] = useState(false)
-  const [kbd, setKbd] = useState(0)
-  const formRef = useRef(null)
+  const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   useEffect(() => {
     if (!userId) return
@@ -45,25 +45,6 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
       setContactId(defaultContactId)
     }
   }, [open, defaultContactId])
-
-  // iOS keyboard lift
-  useEffect(() => {
-    if (!open) return
-    const vv = window.visualViewport
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      setKbd(0)
-    }
-  }, [open])
 
   async function save(e) {
     e?.preventDefault?.()
@@ -103,17 +84,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
     <Drawer open={open} onOpenChange={(v) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{
-          maxWidth: '100%',
-          overflowX: 'hidden',
-          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
-          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
-          maxHeight: kbd
-            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
-            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -138,13 +109,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
         <form
           ref={formRef}
           onSubmit={save}
-          style={{
-            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
-            display: 'flex', flexDirection: 'column', gap: 12,
-            boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
-            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-            flex: 1, minHeight: 0
-          }}
+          style={formStyle()}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={labelStyle}>Title *</span>

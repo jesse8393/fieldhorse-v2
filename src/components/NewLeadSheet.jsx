@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Sparkles, Check, X } from 'lucide-react'
-import { SheetField, SheetChipRow, SheetMoneyField, haptic } from './ActionSheet.jsx'
+import { haptic } from './ActionSheet.jsx'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 import ClientPicker from './ClientPicker.jsx'
 import DocIntakeButton from './DocIntakeButton.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -99,27 +100,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   const [voiceState, setVoiceState] = useState('idle') // idle | listening | parsing | error | denied
   const [transcript, setTranscript] = useState('')
   const [committed, setCommitted] = useState(false)
-  // iOS keyboard offset — lifts the drawer above the soft keyboard so
-  // the commit button stays reachable while typing fields below.
-  const [kbd, setKbd] = useState(0)
-
-  useEffect(() => {
-    if (!open) return
-    const vv = window.visualViewport
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      setKbd(0)
-    }
-  }, [open])
+  const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
   // Live elapsed-seconds counter for the listening state. Mirrors the
   // RECORDING · 0:42 chip in the v3 design (screens-workflows.jsx
   // lead-pro-mic__lbl) — tells the operator the mic is alive and how
@@ -448,17 +429,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
     <Drawer open={open} onOpenChange={(v) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{
-          maxWidth: '100%',
-          overflowX: 'hidden',
-          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
-          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
-          maxHeight: kbd
-            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
-            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -481,14 +452,9 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
         </DrawerHeader>
 
         <form
+          ref={formRef}
           onSubmit={(e) => { e.preventDefault(); commit() }}
-          style={{
-            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
-            display: 'flex', flexDirection: 'column', gap: 12,
-            boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
-            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-            flex: 1, minHeight: 0
-          }}
+          style={formStyle()}
         >
           {/* Commit error banner */}
           {err && (
@@ -600,130 +566,136 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
         />
       </div>
 
-      {/* Client link — optional, picks an existing fh_clients row or
-          inline-creates one so this new job inherits client_id. Picking
-          a client mirrors the name onto the form (handleClientChange). */}
-      <SheetField label="Client">
-        <ClientPicker
-          userId={userId}
-          value={client}
-          onChange={handleClientChange}
-        />
-      </SheetField>
+          {/* Client link — optional, picks an existing fh_clients row or
+              inline-creates one so this new job inherits client_id. */}
+          <V3Field label="Client">
+            <ClientPicker
+              userId={userId}
+              value={client}
+              onChange={handleClientChange}
+            />
+          </V3Field>
 
-      {/* Contact — maxLength on each input matches FIELD_LIMITS so the
-          browser blocks typing past the cap. set() also clamps in JS
-          so paste flows can't bypass. */}
-      <SheetField label="Name" code="01·NAME">
-        <input
-          autoFocus
-          value={form.name}
-          onChange={(e) => set('name', e.target.value)}
-          maxLength={FIELD_LIMITS.name}
-          placeholder="Homeowner or company"
-        />
-      </SheetField>
+          {/* Contact — maxLength on each input matches FIELD_LIMITS so the
+              browser blocks typing past the cap. set() also clamps in JS
+              so paste flows can't bypass. */}
+          <V3Field label="Name">
+            <input
+              autoFocus
+              value={form.name}
+              onChange={(e) => set('name', e.target.value)}
+              maxLength={FIELD_LIMITS.name}
+              placeholder="Homeowner or company"
+              style={V3_INPUT}
+            />
+          </V3Field>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-        <SheetField label="Phone" code="02·PHN">
-          <input
-            type="tel"
-            inputMode="tel"
-            value={form.phone}
-            onChange={(e) => set('phone', e.target.value)}
-            maxLength={FIELD_LIMITS.phone}
-            placeholder="(555) 555-0100"
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <V3Field label="Phone">
+              <input
+                type="tel"
+                inputMode="tel"
+                value={form.phone}
+                onChange={(e) => set('phone', e.target.value)}
+                maxLength={FIELD_LIMITS.phone}
+                placeholder="(555) 555-0100"
+                style={V3_INPUT}
+              />
+            </V3Field>
+            <V3Field label="Email">
+              <input
+                type="email"
+                inputMode="email"
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+                maxLength={FIELD_LIMITS.email}
+                placeholder="name@domain.com"
+                style={V3_INPUT}
+              />
+            </V3Field>
+          </div>
+
+          <V3Field label="Address">
+            <input
+              value={form.address}
+              onChange={(e) => set('address', e.target.value)}
+              maxLength={FIELD_LIMITS.address}
+              placeholder="1234 Main St · Murfreesboro, TN"
+              style={V3_INPUT}
+            />
+          </V3Field>
+
+          <V3Field label="Company">
+            <input
+              value={form.company}
+              onChange={(e) => set('company', e.target.value)}
+              maxLength={FIELD_LIMITS.company}
+              placeholder="(optional) Acme Construction LLC"
+              style={V3_INPUT}
+            />
+          </V3Field>
+
+          <V3ChipRow
+            label="Stage"
+            value={form.stage}
+            options={STAGE_OPTIONS}
+            onChange={(v) => set('stage', v)}
           />
-        </SheetField>
-        <SheetField label="Email" code="03·EML">
-          <input
-            type="email"
-            inputMode="email"
-            value={form.email}
-            onChange={(e) => set('email', e.target.value)}
-            maxLength={FIELD_LIMITS.email}
-            placeholder="name@domain.com"
+
+          <V3ChipRow
+            label="Job type"
+            value={form.job_type}
+            options={JOB_TYPES}
+            onChange={(v) => set('job_type', v)}
           />
-        </SheetField>
-      </div>
 
-      <SheetField label="Address" code="04·ADR">
-        <input
-          value={form.address}
-          onChange={(e) => set('address', e.target.value)}
-          maxLength={FIELD_LIMITS.address}
-          placeholder="1234 Main St · Murfreesboro, TN"
-        />
-      </SheetField>
+          {availableTemplates.length > 0 && (
+            <TemplatePickerInline
+              templates={availableTemplates}
+              value={templateSlug}
+              onChange={setTemplateSlug}
+            />
+          )}
 
-      {/* Company — hydrates from the linked client's company_name on
-          existing-client selection. The lead row itself doesn't store
-          company; the link to fh_clients carries it via client_id, so
-          this field is reassurance + edit-before-save only. */}
-      <SheetField label="Company" code="04B·CO">
-        <input
-          value={form.company}
-          onChange={(e) => set('company', e.target.value)}
-          maxLength={FIELD_LIMITS.company}
-          placeholder="(optional) Acme Construction LLC"
-        />
-      </SheetField>
+          <V3Field label="Job title">
+            <input
+              value={form.job_title}
+              onChange={(e) => set('job_title', e.target.value)}
+              maxLength={FIELD_LIMITS.job_title}
+              placeholder="Kitchen remodel + island"
+              style={V3_INPUT}
+            />
+          </V3Field>
 
-      {/* Stage */}
-      <SheetChipRow
-        label="Stage"
-        code="05·STG"
-        value={form.stage}
-        options={STAGE_OPTIONS}
-        onChange={(v) => set('stage', v)}
-      />
+          <V3Field label="Amount">
+            <div style={{ position: 'relative' }}>
+              <span aria-hidden="true" style={{
+                position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 16,
+                pointerEvents: 'none'
+              }}>$</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.amount}
+                onChange={(e) => set('amount', e.target.value.replace(/[^\d.]/g, ''))}
+                maxLength={FIELD_LIMITS.amount}
+                placeholder="0"
+                style={{ ...V3_INPUT, paddingLeft: 30, fontVariantNumeric: 'tabular-nums' }}
+              />
+            </div>
+          </V3Field>
 
-      {/* Job type */}
-      <SheetChipRow
-        label="Job type"
-        code="06·TYP"
-        value={form.job_type}
-        options={JOB_TYPES}
-        onChange={(v) => set('job_type', v)}
-      />
-
-      {/* Templates — auto-create milestones on commit. Only renders if
-          the chosen job_type has matching templates. Picking a template
-          shows a count + label so the user knows what they're getting. */}
-      {availableTemplates.length > 0 && (
-        <TemplatePickerInline
-          templates={availableTemplates}
-          value={templateSlug}
-          onChange={setTemplateSlug}
-        />
-      )}
-
-      <SheetField label="Job title" code="07·TTL">
-        <input
-          value={form.job_title}
-          onChange={(e) => set('job_title', e.target.value)}
-          maxLength={FIELD_LIMITS.job_title}
-          placeholder="Kitchen remodel + island"
-        />
-      </SheetField>
-
-      {/* Amount */}
-      <SheetMoneyField
-        label="Amount"
-        code="08·AMT"
-        value={form.amount}
-        onChange={(v) => set('amount', v)}
-      />
-
-      <SheetField label="Notes" code="09·NTS">
-        <textarea
-          rows={3}
-          value={form.notes}
-          onChange={(e) => set('notes', e.target.value)}
-          maxLength={FIELD_LIMITS.notes}
-          placeholder="Context, timing, referral source…"
-        />
-      </SheetField>
+          <V3Field label="Notes">
+            <textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => set('notes', e.target.value)}
+              maxLength={FIELD_LIMITS.notes}
+              placeholder="Context, timing, referral source…"
+              style={{ ...V3_INPUT, resize: 'vertical', minHeight: 84 }}
+            />
+          </V3Field>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 6 }}>
             <button
@@ -774,8 +746,8 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
 function TemplatePickerInline({ templates, value, onChange }) {
   const picked = templates.find((t) => t.slug === value) || null
   return (
-    <SheetField label="Template">
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
+    <V3Field label="Template">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         <TemplateChip
           active={!value}
           onClick={() => onChange('')}
@@ -800,7 +772,81 @@ function TemplatePickerInline({ templates, value, onChange }) {
           </span>
         </div>
       )}
-    </SheetField>
+    </V3Field>
+  )
+}
+
+/* ─── v3 field primitives — match the inline pattern in NewClientSheet
+       so this sheet stops looking foggy/sepia compared to its siblings.
+       Inputs are boxed (not underlined), chips use the gold-tinted
+       pill rather than the dark+gold gradient from the legacy
+       fh-asheet-chip CSS. ─── */
+
+const V3_LABEL = {
+  fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+  textTransform: 'uppercase', color: 'var(--ink-muted)'
+}
+
+const V3_INPUT = {
+  padding: '11px 14px',
+  borderRadius: 12,
+  background: 'var(--surface-2)',
+  border: '1px solid var(--rule)',
+  color: 'var(--ink-strong)',
+  fontFamily: 'var(--font-body)',
+  fontSize: 14,
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+  scrollMarginTop: 96,
+  scrollMarginBottom: 120
+}
+
+function V3Field({ label, children }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={V3_LABEL}>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function V3ChipRow({ label, value, options, onChange }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={V3_LABEL}>{label}</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {options.map((opt) => {
+          const active = value === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              style={{
+                padding: '7px 12px',
+                borderRadius: 999,
+                border: active
+                  ? '1px solid rgba(201,150,58,0.4)'
+                  : '1px solid var(--rule)',
+                background: active
+                  ? 'rgba(201,150,58,0.14)'
+                  : 'var(--surface-2)',
+                color: active
+                  ? 'var(--field-gold-bright)'
+                  : 'var(--ink-muted)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 12, fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 160ms ease'
+              }}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

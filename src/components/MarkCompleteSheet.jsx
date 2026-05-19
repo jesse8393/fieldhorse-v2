@@ -17,6 +17,7 @@ import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 import { generateCertificate, downloadPdf } from '../lib/pdf.js'
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
@@ -44,8 +45,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
   const [saving, setSaving] = useState(false)
   const [existing, setExisting] = useState(null)
   const [totals, setTotals] = useState({ paid: 0, photoCount: 0 })
-  const [kbd, setKbd] = useState(0)
-  const formRef = useRef(null)
+  const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   const balance = Math.max(0, Number(contact?.amount || 0) - totals.paid)
   const isReopening = !!existing
@@ -79,24 +79,6 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     })()
     return () => { alive = false }
   }, [open, userId, contact?.id, contact?.name])
-
-  useEffect(() => {
-    if (!open) return
-    const vv = window.visualViewport
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      setKbd(0)
-    }
-  }, [open])
 
   async function submit(e) {
     e?.preventDefault?.()
@@ -280,17 +262,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     <Drawer open={open} onOpenChange={(v) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={{
-          maxWidth: '100%',
-          overflowX: 'hidden',
-          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
-          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
-          maxHeight: kbd
-            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
-            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
@@ -318,13 +290,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
         <form
           ref={formRef}
           onSubmit={submit}
-          style={{
-            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
-            display: 'flex', flexDirection: 'column', gap: 14,
-            boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
-            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-            flex: 1, minHeight: 0
-          }}
+          style={formStyle({ gap: 14 })}
         >
           {loading ? (
             <div style={{
