@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Briefcase, ChevronRight } from 'lucide-react'
+import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useFhMotion } from '../lib/motion.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { rollupByClient } from '../lib/rollups.js'
+import { findDuplicateClusters } from '../lib/clientMerge.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
+import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.jsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton } from '../components/v3'
 import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.jsx'
 import { useIsDesktop } from '../lib/useMediaQuery.js'
@@ -29,6 +31,7 @@ export default function Clients() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all') // 'all' | 'active' | 'recent'
   const [addOpen, setAddOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
 
   // Rollups computed live from jobs + payments instead of trusting the
   // stale fh_clients.total_lifetime_value / active_jobs_count columns.
@@ -66,6 +69,14 @@ export default function Clients() {
   // Map<client_id, { lifetime, outstanding, activeCount, ... }> — built
   // once per (jobs|payments) change. Per-row lookup is O(1).
   const rollupMap = useMemo(() => rollupByClient(jobs, payments), [jobs, payments])
+
+  // Duplicate detection — runs every time the client roster changes.
+  // Match policy lives in lib/clientMerge.js (phone or email normalized).
+  const duplicateClusters = useMemo(() => findDuplicateClusters(rows), [rows])
+  const duplicateCount = useMemo(
+    () => duplicateClusters.reduce((s, c) => s + c.members.length, 0),
+    [duplicateClusters]
+  )
 
   function rollupFor(clientId) {
     return rollupMap.get(clientId) || { lifetime: 0, outstanding: 0, activeCount: 0, wonCount: 0, paidTotal: 0 }
@@ -164,8 +175,11 @@ export default function Clients() {
           screenStats={screenStats}
           topClientId={topClientId}
           totalLifetime={totalLifetime}
+          duplicateClusters={duplicateClusters}
+          duplicateCount={duplicateCount}
           onOpenClient={(id) => navigate(`/clients/${id}`)}
           onNewClient={() => setAddOpen(true)}
+          onReviewDuplicates={() => setMergeOpen(true)}
         />
         <NewClientSheet
           open={addOpen}
@@ -176,6 +190,13 @@ export default function Clients() {
             if (client?.id) navigate(`/clients/${client.id}`)
             else load()
           }}
+        />
+        <MergeDuplicatesSheet
+          open={mergeOpen}
+          userId={user?.id}
+          clusters={duplicateClusters}
+          onClose={() => setMergeOpen(false)}
+          onMerged={load}
         />
       </>
     )
@@ -273,6 +294,61 @@ export default function Clients() {
           ))}
         </div>
       </motion.div>
+
+      {/* DUPLICATES BANNER — only when clusters detected. Tapping opens
+          the merge sheet. */}
+      {!loading && duplicateClusters.length > 0 && (
+        <motion.div variants={item} style={{ padding: '0 20px 12px' }}>
+          <button
+            type="button"
+            onClick={() => { hapticMedium(); setMergeOpen(true) }}
+            style={{
+              width: '100%',
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 14px',
+              borderRadius: 14,
+              background: 'color-mix(in srgb, var(--v3-primary) 10%, var(--v3-surface))',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)',
+              color: 'var(--v3-text)',
+              textAlign: 'left',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <span aria-hidden="true" style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: 'var(--v3-primary-soft)',
+              border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+              color: 'var(--v3-primary)',
+              display: 'grid', placeItems: 'center', flexShrink: 0
+            }}>
+              <AlertTriangle size={14} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                color: 'var(--v3-text)', lineHeight: 1.2
+              }}>
+                {duplicateCount} possible {duplicateCount === 1 ? 'duplicate' : 'duplicates'} found
+              </div>
+              <div style={{
+                marginTop: 2,
+                fontFamily: 'var(--font-body)', fontSize: 11,
+                color: 'var(--v3-text-muted)'
+              }}>
+                {duplicateClusters.length} {duplicateClusters.length === 1 ? 'cluster' : 'clusters'} sharing a phone or email
+              </div>
+            </div>
+            <span style={{
+              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+              color: 'var(--v3-primary)'
+            }}>
+              Review →
+            </span>
+          </button>
+        </motion.div>
+      )}
 
       {/* GRID LAYOUT — 1/2/3 col responsive (320px min). Each client is a
           tall vertical tile, not a wide row. */}
@@ -431,6 +507,13 @@ export default function Clients() {
           if (client?.id) navigate(`/clients/${client.id}`)
           else load()
         }}
+      />
+      <MergeDuplicatesSheet
+        open={mergeOpen}
+        userId={user?.id}
+        clusters={duplicateClusters}
+        onClose={() => setMergeOpen(false)}
+        onMerged={load}
       />
       <FloatingActionButton
         onClick={() => setAddOpen(true)}
