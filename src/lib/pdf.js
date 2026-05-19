@@ -514,6 +514,110 @@ function drawDocDisclaimer(doc, opts) {
   doc.text(lines, margin, pageHeight - 14 - (lines.length - 1) * 4)
 }
 
+// ============================================================
+// Project photos block — embeds tagged section photos into the PDF.
+// Pre-fetches each signed URL through loadImageForPdf (same loader as
+// the logo), groups by section_tag, and renders a 3-up grid on the
+// proposal / 2-up on the invoice. Page-break aware so a long section
+// can split across pages without truncating the last row.
+// ============================================================
+async function drawProjectPhotosBlock(doc, opts) {
+  const { photos, margin, pageWidth, pageHeight, startY, brandRGB, compact = false } = opts
+  if (!Array.isArray(photos) || photos.length === 0) return startY
+
+  // Pre-load all images in parallel. Drops any failures so a single
+  // expired URL doesn't break the block.
+  const loaded = await Promise.all(
+    photos.map(async (p) => {
+      if (!p?.url) return null
+      const img = await loadImageForPdf(p.url, { maxDimension: 900 }).catch(() => null)
+      if (!img) return null
+      return { ...p, img }
+    })
+  )
+  const valid = loaded.filter(Boolean)
+  if (valid.length === 0) return startY
+
+  // Group by section_tag — empty tag falls into a single 'Project
+  // photos' bucket so untagged uploads still surface.
+  const groups = new Map()
+  for (const p of valid) {
+    const tag = (p.section_tag || '').trim() || 'Project photos'
+    if (!groups.has(tag)) groups.set(tag, [])
+    groups.get(tag).push(p)
+  }
+
+  const cols = compact ? 2 : 3
+  const gap = 4
+  const innerWidth = pageWidth - margin * 2
+  const cellW = (innerWidth - gap * (cols - 1)) / cols
+  const cellH = cellW * 0.75 // 4:3 aspect
+
+  let cursor = startY
+
+  // Section header — gold-rule + label, same idiom as the certificate
+  if (cursor > pageHeight - 50) { doc.addPage(); cursor = 18 }
+  doc.setDrawColor(...brandRGB)
+  doc.setLineWidth(0.6)
+  doc.line(margin, cursor, margin + 18, cursor)
+  cursor += 4
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(0.8)
+  doc.text('PROJECT PHOTOS', margin, cursor + 2)
+  doc.setCharSpace(0)
+  cursor += 6
+
+  for (const [tag, arr] of groups.entries()) {
+    // Per-section sub-label only when there's more than one group —
+    // a single bucket reads cleanly without a noisy header.
+    if (groups.size > 1) {
+      if (cursor > pageHeight - 30) { doc.addPage(); cursor = 18 }
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...INK_MUTED)
+      doc.setCharSpace(0.6)
+      doc.text(String(tag).toUpperCase(), margin, cursor + 3)
+      doc.setCharSpace(0)
+      cursor += 6
+    }
+
+    // Cap to 6 per group to keep the layout from sprawling.
+    const display = arr.slice(0, 6)
+    for (let i = 0; i < display.length; i += cols) {
+      const row = display.slice(i, i + cols)
+      // Page-break check — leave room for the image + caption line.
+      if (cursor + cellH + 8 > pageHeight - 20) {
+        doc.addPage()
+        cursor = 18
+      }
+      row.forEach((p, j) => {
+        const x = margin + j * (cellW + gap)
+        try {
+          doc.addImage(p.img.dataUrl, p.img.format || 'PNG', x, cursor, cellW, cellH)
+        } catch {
+          // Tainted/bad image — draw a placeholder rect so the layout
+          // doesn't collapse around it.
+          doc.setFillColor(...RAW_LINEN)
+          doc.rect(x, cursor, cellW, cellH, 'F')
+        }
+        if (p.caption) {
+          const cap = doc.splitTextToSize(p.caption, cellW)
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7)
+          doc.setTextColor(...INK_MUTED)
+          doc.text(cap.slice(0, 1), x, cursor + cellH + 3)
+        }
+      })
+      cursor += cellH + (display.some((p) => p.caption) ? 6 : 4)
+    }
+    cursor += 2
+  }
+
+  return cursor + 4
+}
+
 function formatDocDate(d) {
   if (!d) return ''
   const dt = d instanceof Date ? d : new Date(d)
@@ -559,7 +663,8 @@ export async function generateInvoice({
   contractTotal,
   previouslyPaid,
   insurance = null,
-  changeOrders = []
+  changeOrders = [],
+  photos = []
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -694,6 +799,17 @@ export async function generateInvoice({
     doc.setFontSize(10)
     const wrapped = doc.splitTextToSize(notes, pageWidth - margin * 2)
     doc.text(wrapped, margin, cursor)
+    cursor += wrapped.length * 4.5
+  }
+
+  // 6b. Project photos — quiet 2-up strip, capped at 4. Invoice tone
+  // is "here's the work you paid for", not the proposal's sales pitch.
+  if (Array.isArray(photos) && photos.length > 0) {
+    cursor = await drawProjectPhotosBlock(doc, {
+      photos: photos.slice(0, 4),
+      margin, pageWidth, pageHeight, startY: cursor + 8, brandRGB,
+      compact: true
+    })
   }
 
   // 7. Disclaimer (every page footer)
@@ -1040,6 +1156,15 @@ export async function generateQuote({
     doc.setCharSpace(0)
     cursor += 4
     cursor = drawDocItemsTable(doc, { startY: cursor, rows: upgradeRows, brandRGB, margin, pageWidth })
+  }
+
+  // Project photos — pre-load the signed URLs into base64 PNGs through
+  // the same logo loader so the PDF carries embedded imagery. Renders
+  // a grouped grid by section_tag below the items + upgrades tables.
+  if (Array.isArray(photos) && photos.length > 0) {
+    cursor = await drawProjectPhotosBlock(doc, {
+      photos, margin, pageWidth, pageHeight, startY: cursor + 6, brandRGB
+    })
   }
 
   // Editorial detail blocks (payment terms, warranty, exclusions)

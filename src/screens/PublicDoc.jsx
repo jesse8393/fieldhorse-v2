@@ -160,7 +160,7 @@ function ErrorState({ message }) {
 }
 
 function ProposalView({ data }) {
-  const { contact, company, items, changeOrders, insurance } = data
+  const { contact, company, items, changeOrders, insurance, photos } = data
   const mapped = mapItemsToScope(items)
   const exclusionsArray = [
     ...(mapped.exclusions || []),
@@ -186,6 +186,7 @@ function ProposalView({ data }) {
       exclusions={exclusionsArray}
       insurance={insurance}
       changeOrders={changeOrders}
+      photos={photos || []}
       meta={{
         issuedAt: contact?.quote_sent_at || contact?.created_at,
         expiresAt: contact?.quote_expires_at || null
@@ -196,7 +197,7 @@ function ProposalView({ data }) {
 }
 
 function InvoiceView({ data }) {
-  const { contact, company, payments, changeOrders, insurance } = data
+  const { contact, company, payments, changeOrders, insurance, photos } = data
   const paid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
   const contractTotal = Number(contact?.amount || 0)
   const balance = Math.max(0, contractTotal - paid)
@@ -220,6 +221,7 @@ function InvoiceView({ data }) {
       status={balance < 0.5 ? 'paid' : 'outstanding'}
       insurance={insurance}
       changeOrders={changeOrders}
+      photos={photos || []}
     />
   )
 }

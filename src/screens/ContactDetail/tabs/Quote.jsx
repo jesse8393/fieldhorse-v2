@@ -92,20 +92,25 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // their seat.
   const [docMode, setDocMode] = useState('builder')
   const [docItems, setDocItems] = useState([])
+  const [docPhotos, setDocPhotos] = useState([])
   const [docItemsLoading, setDocItemsLoading] = useState(false)
   useEffect(() => {
     if (docMode !== 'document' || !contact?.id || !userId) return
     let alive = true
     setDocItemsLoading(true)
     ;(async () => {
-      const { data } = await supabase
-        .from('fh_quote_items')
-        .select('*')
-        .eq('contact_id', contact.id)
-        .eq('user_id', userId)
-        .order('sort_order', { ascending: true })
+      const [{ data: items }, photos] = await Promise.all([
+        supabase
+          .from('fh_quote_items')
+          .select('*')
+          .eq('contact_id', contact.id)
+          .eq('user_id', userId)
+          .order('sort_order', { ascending: true }),
+        loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
+      ])
       if (alive) {
-        setDocItems(data || [])
+        setDocItems(items || [])
+        setDocPhotos(photos || [])
         setDocItemsLoading(false)
       }
     })()
@@ -467,6 +472,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
             company={company}
             contact={contact}
             items={docItems}
+            photos={docPhotos}
             loading={docItemsLoading}
             insurance={insurance}
             changeOrders={changeOrders}
@@ -590,7 +596,7 @@ function QuoteViewToggle({ value, onChange }) {
   )
 }
 
-function DocumentPreviewPane({ company, contact, items, loading, insurance = null, changeOrders = [] }) {
+function DocumentPreviewPane({ company, contact, items, photos = [], loading, insurance = null, changeOrders = [] }) {
   // Group line items by their `section` field so each trade renders
   // as its own ScopeSectionCard. Order is preserved (groupByOrdered).
   // Optional items (is_optional=true) split into the upgrades array;
@@ -680,6 +686,7 @@ function DocumentPreviewPane({ company, contact, items, loading, insurance = nul
           exclusions={exclusions}
           insurance={insurance}
           changeOrders={changeOrders}
+          photos={photos}
           approval={approval}
           meta={{
             issuedAt: contact?.quote_sent_at || contact?.created_at,

@@ -41,7 +41,8 @@ export default function InvoiceTemplate({
   status = 'outstanding',
   notes,
   insurance = null,
-  changeOrders = []
+  changeOrders = [],
+  photos = []   // [{ url, section_tag, caption }] — quiet strip at end
 }) {
   const number = meta.number || invoiceNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
@@ -150,6 +151,51 @@ export default function InvoiceTemplate({
 
       {/* Insurance */}
       <InsuranceModeBlock insurance={insurance} company={company} />
+
+      {/* Project photos — final strip. On invoices the photos serve as
+          a quiet "here's the work you paid for" footnote rather than
+          a sales pitch, so we cap at 4 and skip the section grouping
+          the proposal uses. */}
+      {photos.length > 0 && (
+        <section>
+          <SectionLabel>Project photos</SectionLabel>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+            gap: 8
+          }}>
+            {photos.slice(0, 4).map((p, i) => p?.url && (
+              <figure key={i} style={{ margin: 0 }}>
+                <div style={{
+                  width: '100%',
+                  aspectRatio: '4 / 3',
+                  background: '#e8e2d4',
+                  borderRadius: 4,
+                  overflow: 'hidden'
+                }}>
+                  <img
+                    src={p.url}
+                    alt={p.caption || p.section_tag || 'Project photo'}
+                    loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+                {(p.caption || p.section_tag) && (
+                  <figcaption style={{
+                    marginTop: 4,
+                    fontFamily: DOC_FONTS.body,
+                    fontSize: 10,
+                    color: DOC_COLORS.inkMuted,
+                    lineHeight: 1.35
+                  }}>
+                    {p.caption || p.section_tag}
+                  </figcaption>
+                )}
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
     </DocumentShell>
   )
 }
