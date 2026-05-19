@@ -52,10 +52,13 @@ export default async (request) => {
     return json({ error: 'invalid_json' }, 400)
   }
 
-  const { job_id, partner_email, invited_by_user_id, send_email } = body || {}
+  const { job_id, partner_email, invited_by_user_id, send_email, partner_name, partner_role } = body || {}
   if (!job_id || !partner_email || !invited_by_user_id) {
     return json({ error: 'missing_fields', required: ['job_id', 'partner_email', 'invited_by_user_id'] }, 400)
   }
+
+  const normalizedName = String(partner_name || '').trim() || null
+  const normalizedRole = String(partner_role || '').trim() || null
 
   const normalizedEmail = String(partner_email).toLowerCase().trim()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -88,6 +91,8 @@ export default async (request) => {
       job_id,
       invited_by_user_id,
       partner_email: normalizedEmail,
+      partner_name: normalizedName,
+      partner_role: normalizedRole,
       status: 'pending'
     })
     .select('invite_token')
@@ -106,6 +111,21 @@ export default async (request) => {
         console.error('[partner-invite] unique-violation resend lookup failed', { insErr, reErr })
         return json({ error: 'db_insert_failed', detail: insErr.message, code: insErr.code }, 500)
       }
+      // Backfill name + role on the existing invite if the operator
+      // re-sent with new identity info. Quiet — we don't care about
+      // failures here.
+      if (normalizedName || normalizedRole) {
+        const patch = {}
+        if (normalizedName) patch.partner_name = normalizedName
+        if (normalizedRole) patch.partner_role = normalizedRole
+        try {
+          await supabase
+            .from('fh_job_partners')
+            .update(patch)
+            .eq('job_id', job_id)
+            .eq('partner_email', normalizedEmail)
+        } catch {}
+      }
       const resentUrl = buildInviteUrl(request, existing.invite_token)
       const resentSendResult = send_email
         ? await sendInviteEmail({
@@ -114,7 +134,9 @@ export default async (request) => {
             ownerUserId: invited_by_user_id,
             recipientEmail: normalizedEmail,
             inviteUrl: resentUrl,
-            jobName: ownedJob.name
+            jobName: ownedJob.name,
+            partnerName: normalizedName,
+            partnerRole: normalizedRole
           })
         : { skipped: true }
       return json({
@@ -150,7 +172,9 @@ export default async (request) => {
         ownerUserId: invited_by_user_id,
         recipientEmail: normalizedEmail,
         inviteUrl: newUrl,
-        jobName: ownedJob.name
+        jobName: ownedJob.name,
+        partnerName: normalizedName,
+        partnerRole: normalizedRole
       })
     : { skipped: true }
 
@@ -167,7 +191,7 @@ export default async (request) => {
 // response and let the client decide how to surface the outcome (success
 // vs. fall back to copy/share). The token has already been issued by the
 // time this runs, so the invite link is valid even if email fails.
-async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail, inviteUrl, jobName }) {
+async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail, inviteUrl, jobName, partnerName, partnerRole }) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
   const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'FieldHorse'
@@ -191,18 +215,25 @@ async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail,
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
   const replyTo = (profile?.company_email || profile?.email || '').trim()
-  const fromName = companyName
-    ? `${companyName} via ${SEND_EMAIL_FROM_NAME}`
-    : SEND_EMAIL_FROM_NAME
+  // White-label sender policy: the From name is the contractor's brand,
+  // never "Contractor via FieldHorse". Falls back to the platform default
+  // only when the contractor hasn't filled in their company name yet.
+  const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
   const senderLine = companyName || 'Your contractor'
   const safeJob = jobName || 'a job'
-  const subject = `Co-manage ${safeJob} on FieldHorse`
+  const greetingName = (partnerName || '').trim()
+  const roleLabel = (partnerRole || '').trim()
+  const subject = greetingName
+    ? `${greetingName} — co-manage ${safeJob}`
+    : `Co-manage ${safeJob}`
 
   const text = [
-    'You have been invited to co-manage a job.',
+    greetingName ? `Hi ${greetingName},` : 'Hi,',
     '',
-    `${senderLine} added you to: ${safeJob}.`,
+    roleLabel
+      ? `${senderLine} added you as ${aOrAn(roleLabel)} on ${safeJob}.`
+      : `${senderLine} added you as a partner on ${safeJob}.`,
     '',
     'Open this link to accept the invite:',
     inviteUrl,
@@ -212,7 +243,10 @@ async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail,
     `— ${senderLine}`
   ].join('\n')
 
-  const html = renderInviteHtml({ senderLine, jobName: safeJob, inviteUrl, companyName })
+  const html = renderInviteHtml({
+    senderLine, jobName: safeJob, inviteUrl, companyName,
+    partnerName: greetingName, partnerRole: roleLabel
+  })
 
   const payload = {
     from: fromHeader,
@@ -262,10 +296,14 @@ async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail,
   }
 }
 
-function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName }) {
+function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName, partnerName, partnerRole }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
+  const greeting = partnerName ? `Hi ${safe(partnerName)},` : 'Hi,'
+  const roleClause = partnerRole
+    ? `as ${aOrAn(partnerRole)} <strong style="color:#c9963a;">${safe(partnerRole)}</strong>`
+    : 'as a partner'
   return `<!doctype html>
 <html lang="en">
 <body style="margin:0;padding:0;background:#f7f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f1f1f;line-height:1.55;">
@@ -277,7 +315,8 @@ function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName }) {
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:600;color:#1f1f1f;letter-spacing:-0.01em;">You've been invited to co-manage <em style="color:#c9963a;">${safe(jobName)}</em>.</h1>
         </td></tr>
         <tr><td style="padding:16px 32px;">
-          <p style="margin:0;font-size:15px;color:#1f1f1f;">${safe(senderLine)} added you as a partner on this job. You will only see this specific job — no other contacts, rates, or data from their account.</p>
+          <p style="margin:0 0 10px;font-size:15px;color:#1f1f1f;">${greeting}</p>
+          <p style="margin:0;font-size:15px;color:#1f1f1f;">${safe(senderLine)} added you ${roleClause} on this job. You will only see this specific job — no other contacts, rates, or data from their account.</p>
         </td></tr>
         <tr><td style="padding:8px 32px 24px;" align="left">
           <a href="${safe(inviteUrl)}" style="display:inline-block;background:#c9963a;color:#1a1a1a;text-decoration:none;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0.06em;">Accept Invite</a>
@@ -295,6 +334,12 @@ function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName }) {
   </table>
 </body>
 </html>`
+}
+
+function aOrAn(noun) {
+  if (!noun) return 'a partner'
+  const first = String(noun).trim().charAt(0).toLowerCase()
+  return ('aeiou'.includes(first) ? 'an ' : 'a ') + noun
 }
 
 function buildInviteUrl(request, token) {
