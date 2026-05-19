@@ -75,20 +75,43 @@ export async function markLost(contact) {
 }
 
 export async function logPayment(contact, { amount, method, kind, reference, paid_on }) {
+  const normalizedAmount = Number(amount) || 0
+  const normalizedKind = ['deposit','progress','final','retainage','other'].includes(kind) ? kind : 'other'
   const payload = {
     user_id: contact.user_id,
     contact_id: contact.id,
-    amount: Number(amount) || 0,
+    amount: normalizedAmount,
     method: method || 'check',
     // kind tags the payment for the invoice balance breakdown.
     // Whitelist-validated by the migration 022 check constraint;
     // defaults to 'other' so legacy callers stay valid.
-    kind: ['deposit','progress','final','retainage','other'].includes(kind) ? kind : 'other',
+    kind: normalizedKind,
     reference: reference || null,
     paid_on: paid_on || new Date().toISOString().slice(0, 10)
   }
   const { error: insErr } = await supabase.from('fh_payments').insert(payload)
   if (insErr) return { error: insErr }
+
+  // Write a notification for the contractor's own inbox so the bell
+  // badge pings when a payment is recorded (even if they recorded it
+  // themselves — confirms the entry landed and surfaces on Activity).
+  // Best-effort; never blocks the main return path.
+  try {
+    const money = normalizedAmount.toLocaleString(undefined, {
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: 0, maximumFractionDigits: 0
+    })
+    const kindTag = normalizedKind !== 'other' ? ` · ${normalizedKind}` : ''
+    await supabase.from('fh_notifications').insert({
+      user_id: contact.user_id,
+      kind: 'payment_received',
+      title: `Payment received · ${money}`,
+      body: `${contact.name || 'Client'}${kindTag}`,
+      link: `/jobs/${contact.id}?tab=financials`
+    })
+  } catch {
+    // RLS denial / migration 008 not applied → silently skip
+  }
 
   // Re-check balance
   const { data: pays } = await supabase
