@@ -76,10 +76,19 @@ export function useDrawerKeyboard(open) {
   const drawerStyle = {
     maxWidth: '100%',
     overflowX: 'hidden',
-    // Cap height to the safe-area viewport so the drawer can't bleed
-    // into the iOS status bar / Dynamic Island. No translate3d — that
-    // is what caused the header overlap when the keyboard opened.
-    maxHeight: 'calc(100vh - env(safe-area-inset-top) - 24px)',
+    // Cap height so the drawer always fits between the iOS status
+    // bar / Dynamic Island and whatever the keyboard is covering.
+    // The previous version only subtracted safe-area, so when the
+    // keyboard rose the drawer extended *behind* it and the focused
+    // field disappeared.
+    maxHeight: `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`,
+    // Anchor above the keyboard. Vaul's default position is
+    // bottom:0; pinning bottom:kbd lifts the entire drawer up by
+    // the keyboard height so the form never overlaps it. Doing
+    // it via 'bottom' (not transform) keeps Vaul's slide-in/out
+    // animation intact.
+    bottom: kbd > 0 ? `${kbd}px` : undefined,
+    transition: 'bottom 220ms cubic-bezier(0.16, 1, 0.3, 1), max-height 220ms cubic-bezier(0.16, 1, 0.3, 1)',
     display: 'flex',
     flexDirection: 'column'
   }
@@ -89,9 +98,10 @@ export function useDrawerKeyboard(open) {
       paddingTop: 6,
       paddingLeft: 20,
       paddingRight: 20,
-      // Padding-bottom expands by keyboard height so the focused input
-      // can scroll above the keyboard without being clipped.
-      paddingBottom: `calc(${kbd}px + max(20px, env(safe-area-inset-bottom)))`,
+      // No keyboard padding here anymore — the drawer itself moves
+      // above the keyboard via the bottom:kbd offset above, so the
+      // form just needs its normal bottom safe-area inset.
+      paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
       display: 'flex',
       flexDirection: 'column',
       gap: 12,
