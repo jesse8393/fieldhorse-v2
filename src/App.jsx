@@ -23,6 +23,7 @@ const Clients        = lazy(() => import('./screens/Clients.jsx'))
 const ClientDetail   = lazy(() => import('./screens/ClientDetail.jsx'))
 const Notes          = lazy(() => import('./screens/Notes.jsx'))
 const Schedule       = lazy(() => import('./screens/Schedule.jsx'))
+const Activity       = lazy(() => import('./screens/Activity.jsx'))
 const Bid            = lazy(() => import('./screens/Bid.jsx'))
 const Compose        = lazy(() => import('./screens/Compose.jsx'))
 const Analytics      = lazy(() => import('./screens/Analytics.jsx'))
@@ -88,6 +89,7 @@ export default function App() {
           <Route path="/clients/:id" element={<ClientDetail />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/activity" element={<Activity />} />
           <Route path="/bid" element={<Bid />} />
           <Route path="/compose" element={<Compose />} />
           <Route path="/analytics" element={<Analytics />} />

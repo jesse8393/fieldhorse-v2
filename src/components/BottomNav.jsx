@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon } from 'lucide-react'
 import Icon from './icons/Icon.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { to: '/jobs',        label: 'Jobs & Pipeline',     Icon: Briefcase },
   { to: '/clients',     label: 'Clients',             Icon: Users },
   { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
+  { to: '/activity',    label: 'Activity',            Icon: ActivityIcon },
   { to: '/bid',         label: 'Estimates',           Icon: Calculator },
   { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
   { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 },
