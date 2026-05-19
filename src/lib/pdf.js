@@ -514,6 +514,110 @@ function drawDocDisclaimer(doc, opts) {
   doc.text(lines, margin, pageHeight - 14 - (lines.length - 1) * 4)
 }
 
+// ============================================================
+// Project photos block — embeds tagged section photos into the PDF.
+// Pre-fetches each signed URL through loadImageForPdf (same loader as
+// the logo), groups by section_tag, and renders a 3-up grid on the
+// proposal / 2-up on the invoice. Page-break aware so a long section
+// can split across pages without truncating the last row.
+// ============================================================
+async function drawProjectPhotosBlock(doc, opts) {
+  const { photos, margin, pageWidth, pageHeight, startY, brandRGB, compact = false } = opts
+  if (!Array.isArray(photos) || photos.length === 0) return startY
+
+  // Pre-load all images in parallel. Drops any failures so a single
+  // expired URL doesn't break the block.
+  const loaded = await Promise.all(
+    photos.map(async (p) => {
+      if (!p?.url) return null
+      const img = await loadImageForPdf(p.url, { maxDimension: 900 }).catch(() => null)
+      if (!img) return null
+      return { ...p, img }
+    })
+  )
+  const valid = loaded.filter(Boolean)
+  if (valid.length === 0) return startY
+
+  // Group by section_tag — empty tag falls into a single 'Project
+  // photos' bucket so untagged uploads still surface.
+  const groups = new Map()
+  for (const p of valid) {
+    const tag = (p.section_tag || '').trim() || 'Project photos'
+    if (!groups.has(tag)) groups.set(tag, [])
+    groups.get(tag).push(p)
+  }
+
+  const cols = compact ? 2 : 3
+  const gap = 4
+  const innerWidth = pageWidth - margin * 2
+  const cellW = (innerWidth - gap * (cols - 1)) / cols
+  const cellH = cellW * 0.75 // 4:3 aspect
+
+  let cursor = startY
+
+  // Section header — gold-rule + label, same idiom as the certificate
+  if (cursor > pageHeight - 50) { doc.addPage(); cursor = 18 }
+  doc.setDrawColor(...brandRGB)
+  doc.setLineWidth(0.6)
+  doc.line(margin, cursor, margin + 18, cursor)
+  cursor += 4
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(0.8)
+  doc.text('PROJECT PHOTOS', margin, cursor + 2)
+  doc.setCharSpace(0)
+  cursor += 6
+
+  for (const [tag, arr] of groups.entries()) {
+    // Per-section sub-label only when there's more than one group —
+    // a single bucket reads cleanly without a noisy header.
+    if (groups.size > 1) {
+      if (cursor > pageHeight - 30) { doc.addPage(); cursor = 18 }
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...INK_MUTED)
+      doc.setCharSpace(0.6)
+      doc.text(String(tag).toUpperCase(), margin, cursor + 3)
+      doc.setCharSpace(0)
+      cursor += 6
+    }
+
+    // Cap to 6 per group to keep the layout from sprawling.
+    const display = arr.slice(0, 6)
+    for (let i = 0; i < display.length; i += cols) {
+      const row = display.slice(i, i + cols)
+      // Page-break check — leave room for the image + caption line.
+      if (cursor + cellH + 8 > pageHeight - 20) {
+        doc.addPage()
+        cursor = 18
+      }
+      row.forEach((p, j) => {
+        const x = margin + j * (cellW + gap)
+        try {
+          doc.addImage(p.img.dataUrl, p.img.format || 'PNG', x, cursor, cellW, cellH)
+        } catch {
+          // Tainted/bad image — draw a placeholder rect so the layout
+          // doesn't collapse around it.
+          doc.setFillColor(...RAW_LINEN)
+          doc.rect(x, cursor, cellW, cellH, 'F')
+        }
+        if (p.caption) {
+          const cap = doc.splitTextToSize(p.caption, cellW)
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7)
+          doc.setTextColor(...INK_MUTED)
+          doc.text(cap.slice(0, 1), x, cursor + cellH + 3)
+        }
+      })
+      cursor += cellH + (display.some((p) => p.caption) ? 6 : 4)
+    }
+    cursor += 2
+  }
+
+  return cursor + 4
+}
+
 function formatDocDate(d) {
   if (!d) return ''
   const dt = d instanceof Date ? d : new Date(d)
@@ -559,7 +663,8 @@ export async function generateInvoice({
   contractTotal,
   previouslyPaid,
   insurance = null,
-  changeOrders = []
+  changeOrders = [],
+  photos = []
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -694,6 +799,17 @@ export async function generateInvoice({
     doc.setFontSize(10)
     const wrapped = doc.splitTextToSize(notes, pageWidth - margin * 2)
     doc.text(wrapped, margin, cursor)
+    cursor += wrapped.length * 4.5
+  }
+
+  // 6b. Project photos — quiet 2-up strip, capped at 4. Invoice tone
+  // is "here's the work you paid for", not the proposal's sales pitch.
+  if (Array.isArray(photos) && photos.length > 0) {
+    cursor = await drawProjectPhotosBlock(doc, {
+      photos: photos.slice(0, 4),
+      margin, pageWidth, pageHeight, startY: cursor + 8, brandRGB,
+      compact: true
+    })
   }
 
   // 7. Disclaimer (every page footer)
@@ -1040,6 +1156,15 @@ export async function generateQuote({
     doc.setCharSpace(0)
     cursor += 4
     cursor = drawDocItemsTable(doc, { startY: cursor, rows: upgradeRows, brandRGB, margin, pageWidth })
+  }
+
+  // Project photos — pre-load the signed URLs into base64 PNGs through
+  // the same logo loader so the PDF carries embedded imagery. Renders
+  // a grouped grid by section_tag below the items + upgrades tables.
+  if (Array.isArray(photos) && photos.length > 0) {
+    cursor = await drawProjectPhotosBlock(doc, {
+      photos, margin, pageWidth, pageHeight, startY: cursor + 6, brandRGB
+    })
   }
 
   // Editorial detail blocks (payment terms, warranty, exclusions)
@@ -1957,6 +2082,253 @@ async function preloadProposalPhotos(input) {
 
 /**
  * Utility: save a jsPDF doc from the result of generate* functions.
+/**
+ * Generate a one-page Certificate of Completion PDF from a saved
+ * fh_closeouts row. Same editorial chrome as the invoice/proposal —
+ * branded logo letterhead, gold rule, parties block — followed by:
+ *
+ *   • Project block — name + address + completion date
+ *   • Warranty block — start date + duration + computed end date
+ *   • Sign-off block — customer name + method + signed-on date
+ *   • Closing notes (when present)
+ *   • Final figures (contract / paid / balance)
+ *   • Two-line signature/date footer the customer can sign on paper
+ *
+ * Returns { doc, filename } so the existing downloadPdf() helper can
+ * trip the browser save. Async because drawDocLogo loads the brand
+ * image (via loadLogoForPdf).
+ */
+export async function generateCertificate({
+  company = {},
+  contact = {},
+  closeout = {},
+  options = {}
+} = {}) {
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 18
+
+  const brandRGB = parseBrandRGB(company.brand_accent_hex) || FIELD_GOLD
+  const logo = company.logo_url ? await loadLogoForPdf(company.logo_url) : null
+
+  // Cream paper backdrop
+  doc.setFillColor(...RAW_LINEN)
+  doc.rect(0, 0, pageWidth, pageHeight, 'F')
+
+  // Letterhead — logo on left, COMPLETION CERTIFICATE on right
+  const closedAt = closeout.closed_at || closeout.signoff_at || new Date().toISOString()
+  let cursor = drawDocLetterhead(doc, {
+    pageWidth, margin,
+    docType: 'COMPLETION CERTIFICATE',
+    number: shortDocNumber(closeout.id || contact.id) || '—',
+    issuedAt: closedAt,
+    company, logo, brandRGB
+  })
+
+  // Recipient + sender
+  cursor = drawDocParties(doc, {
+    pageWidth, margin,
+    y: cursor + 4,
+    recipient: contact,
+    company
+  })
+
+  cursor += 8
+
+  // Headline — large serif-ish (jsPDF doesn't ship a serif by default,
+  // helvetica bold reads as the closest premium analog at this size).
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(24)
+  doc.setTextColor(...ONYX)
+  doc.text('Certificate of Completion', margin, cursor)
+  cursor += 8
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(11)
+  doc.setTextColor(...INK_MUTED)
+  const subline = `${company.name || 'Contractor'} certifies that the work described below was completed for ${contact.name || 'the customer'} on ${formatDocDate(closedAt)}.`
+  const sublines = doc.splitTextToSize(subline, pageWidth - margin * 2)
+  doc.text(sublines, margin, cursor)
+  cursor += sublines.length * 5 + 4
+
+  // Section: Project
+  cursor = drawCertSection(doc, {
+    margin, pageWidth, y: cursor, brandRGB,
+    label: 'Project',
+    rows: [
+      { k: 'Job', v: contact.job_title || contact.name || '—' },
+      { k: 'Address', v: contact.address || '—' },
+      { k: 'Completed on', v: formatDocDate(closedAt) }
+    ]
+  })
+
+  // Section: Warranty
+  const months = Number(closeout.warranty_months) || 0
+  const warrantyStart = closeout.warranty_start_date || null
+  const warrantyEnd = warrantyStart && months > 0 ? addMonthsIso(warrantyStart, months) : null
+  cursor = drawCertSection(doc, {
+    margin, pageWidth, y: cursor, brandRGB,
+    label: 'Warranty',
+    rows: months > 0
+      ? [
+          { k: 'Coverage', v: months === 12 ? '1 year' : months === 24 ? '2 years' : `${months} months` },
+          { k: 'Starts', v: warrantyStart ? formatDocDate(warrantyStart) : '—' },
+          { k: 'Through', v: warrantyEnd ? formatDocDate(warrantyEnd) : '—' }
+        ]
+      : [
+          { k: 'Coverage', v: 'No express warranty included.' }
+        ]
+  })
+
+  // Section: Sign-off
+  const methodLabel = ({
+    verbal: 'Verbal confirmation',
+    text: 'Text confirmation',
+    email: 'Email confirmation',
+    in_person: 'In-person walkthrough',
+    signature_typed: 'Typed signature'
+  })[closeout.signoff_method] || 'Verbal confirmation'
+  cursor = drawCertSection(doc, {
+    margin, pageWidth, y: cursor, brandRGB,
+    label: 'Customer sign-off',
+    rows: [
+      { k: 'Signed by', v: closeout.signoff_name || contact.name || '—' },
+      { k: 'Method', v: methodLabel },
+      { k: 'Signed on', v: closeout.signoff_at ? formatDocDate(closeout.signoff_at) : formatDocDate(closedAt) }
+    ]
+  })
+
+  // Closing notes
+  if (closeout.notes && String(closeout.notes).trim()) {
+    cursor = drawCertSection(doc, {
+      margin, pageWidth, y: cursor, brandRGB,
+      label: 'Closing notes',
+      bodyText: String(closeout.notes).trim()
+    })
+  }
+
+  // Final figures
+  const contract = Number(closeout.final_amount || contact.amount || 0)
+  const paid = Number(closeout.paid_at_close || 0)
+  const balance = Math.max(0, contract - paid)
+  cursor = drawCertSection(doc, {
+    margin, pageWidth, y: cursor, brandRGB,
+    label: 'Final figures',
+    rows: [
+      { k: 'Contract', v: moneyCompact(contract) },
+      { k: 'Paid to date', v: moneyCompact(paid) },
+      { k: balance > 0 ? 'Outstanding' : 'Status', v: balance > 0 ? moneyCompact(balance) : 'Paid in full' }
+    ]
+  })
+
+  // Physical signature footer — two underlines for customer + contractor.
+  // Positioned a fixed distance above the page bottom so re-flow doesn't
+  // shove it off-page when notes/sections grow.
+  const sigY = Math.max(cursor + 14, pageHeight - 50)
+  drawCertSignatureLines(doc, { y: sigY, margin, pageWidth })
+
+  // Disclaimer
+  drawDocDisclaimer(doc, {
+    pageWidth, pageHeight, margin,
+    text: 'Issuance of this certificate confirms that work was completed in accordance with the contracted scope. Warranty terms above govern the express coverage period; latent defects outside the scope are excluded. Past-due balances may accrue at 1.5% per month.'
+  })
+
+  const safeName = (contact.name || 'completion').replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 40)
+  const stamp = new Date(closedAt).toISOString().slice(0, 10)
+  const filename = options.filename || `Certificate-${safeName}-${stamp}.pdf`
+  return { doc, filename }
+}
+
+function drawCertSection(doc, opts) {
+  const { margin, pageWidth, y, brandRGB, label, rows, bodyText } = opts
+  let cursor = y
+
+  // Brand-color eyebrow rule
+  doc.setDrawColor(...brandRGB)
+  doc.setLineWidth(0.6)
+  doc.line(margin, cursor, margin + 18, cursor)
+  cursor += 4
+
+  // Label
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(...brandRGB)
+  doc.setCharSpace(0.8)
+  doc.text(String(label || '').toUpperCase(), margin, cursor + 2)
+  doc.setCharSpace(0)
+  cursor += 6
+
+  if (bodyText) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.setTextColor(...ONYX)
+    const lines = doc.splitTextToSize(bodyText, pageWidth - margin * 2)
+    doc.text(lines, margin, cursor + 4)
+    cursor += lines.length * 5 + 6
+    return cursor + 2
+  }
+
+  for (const row of rows || []) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...INK_MUTED)
+    doc.text(String(row.k || '').toUpperCase(), margin, cursor + 4)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(...ONYX)
+    doc.text(String(row.v || '—'), pageWidth - margin, cursor + 4, { align: 'right' })
+    cursor += 7
+  }
+  return cursor + 4
+}
+
+function drawCertSignatureLines(doc, { y, margin, pageWidth }) {
+  const colW = (pageWidth - margin * 2 - 12) / 2
+  const leftX = margin
+  const rightX = margin + colW + 12
+
+  doc.setDrawColor(...ONYX)
+  doc.setLineWidth(0.3)
+  doc.line(leftX, y, leftX + colW, y)
+  doc.line(rightX, y, rightX + colW, y)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.6)
+  doc.text('CUSTOMER SIGNATURE', leftX, y + 4)
+  doc.text('CONTRACTOR SIGNATURE', rightX, y + 4)
+
+  // Date stubs
+  const dateY = y + 14
+  doc.setLineWidth(0.3)
+  doc.line(leftX, dateY, leftX + 50, dateY)
+  doc.line(rightX, dateY, rightX + 50, dateY)
+  doc.text('DATE', leftX, dateY + 4)
+  doc.text('DATE', rightX, dateY + 4)
+  doc.setCharSpace(0)
+}
+
+function addMonthsIso(isoDate, months) {
+  const d = new Date(isoDate)
+  if (Number.isNaN(d.getTime())) return null
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
+
+function parseBrandRGB(hex) {
+  if (!hex) return null
+  const clean = String(hex).replace('#', '').trim()
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return null
+  return [
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16)
+  ]
+}
+
+/**
  * Triggers the browser download.
  */
 export function downloadPdf(result) {

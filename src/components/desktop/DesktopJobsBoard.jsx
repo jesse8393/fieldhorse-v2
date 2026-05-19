@@ -61,7 +61,7 @@ const TABS = [
   { id: 'lead',   label: 'Lead' },
   { id: 'quote',  label: 'Quote' },
   { id: 'active', label: 'Active' },
-  { id: 'won',    label: 'Won' }
+  { id: 'won',    label: 'Complete' }
 ]
 
 function money(n) {

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Lock, AlertTriangle } from 'lucide-react'
-import ActionSheet, { SheetField, SheetChipRow } from '../../../components/ActionSheet.jsx'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
+import { Lock, AlertTriangle, ShieldCheck, X, Check } from 'lucide-react'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { supabase } from '../../../lib/supabase.js'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { toastError, toastSuccess } from '../../../lib/toast.js'
@@ -40,8 +41,11 @@ const METHODS = [
   { value: 'in_person',        label: 'In person' },
   { value: 'signature_drawn',  label: 'Signature (drawn)' },
   { value: 'signature_typed',  label: 'Signature (typed)' },
-  // 4C-5 reserved — public customer-facing approval link.
-  { value: 'esign_link',       label: 'Customer link', disabled: true, hint: 'Customer link coming soon.' }
+  // Customer e-sign writes its own approval through /api/public-link-approve
+  // when the customer hits the share link, so this chip is reserved as a
+  // hint pointing operators at that flow instead of being a recordable
+  // method here. Disabled with explanatory hint.
+  { value: 'esign_link',       label: 'Customer link', disabled: true, hint: 'Customers can sign themselves via Quote → Share link. Those approvals are recorded automatically.' }
 ]
 
 function money(n) {
@@ -81,6 +85,28 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   const [loadingItems, setLoadingItems] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
+  // iOS keyboard tracking — pushes the drawer above the keyboard so the
+  // Approve button stays reachable while typing customer name / note.
+  const [kbd, setKbd] = useState(0)
+  const formRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const vv = window.visualViewport
+    if (!vv) return
+    function update() {
+      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+      setKbd(next > 40 ? next : 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      setKbd(0)
+    }
+  }, [open])
 
   // Reset every time the sheet opens, then fetch fresh items so the
   // snapshot reflects truth-of-the-moment (not a stale cache from the
@@ -377,246 +403,377 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     }
   }
 
+  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const fieldStyle = {
+    padding: '11px 14px',
+    borderRadius: 12,
+    background: 'var(--surface-2)',
+    border: '1px solid var(--rule)',
+    color: 'var(--ink-strong)',
+    fontFamily: 'var(--font-body)',
+    fontSize: 14,
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+    scrollMarginTop: 96,
+    scrollMarginBottom: 120
+  }
+
   return (
-    <ActionSheet
-      open={open}
-      title={'Approve quote.'}
-      accentWord="Approve"
-      sectionLabel="Approve"
-      stepCount={2}
-      currentStep={submitting ? 2 : 1}
-      commitLabel={submitting ? 'Approving…' : 'Approve quote'}
-      commitBusy={submitting}
-      commitBusyLabel="Approving…"
-      commitDisabled={commitDisabled}
-      onClose={onClose}
-      onCommit={handleCommit}
-    >
-      {err && (
-        <div className="fh-sheet-error" role="alert">
-          <span className="fh-sheet-error__dot" aria-hidden="true" />
-          <span className="fh-sheet-error__text">{err}</span>
-          <button
-            type="button"
-            className="fh-sheet-error__dismiss"
-            aria-label="Dismiss error"
-            onClick={() => setErr('')}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* SUMMARY */}
-      <div style={{
-        padding: '12px 14px', borderRadius: 12,
-        background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
-        display: 'flex', flexDirection: 'column', gap: 6
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-          gap: 10, flexWrap: 'wrap'
-        }}>
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            color: 'var(--v3-text)'
-          }}>
-            {contact?.name || 'Job'}
-            {contact?.job_title ? ` · ${contact.job_title}` : ''}
-          </span>
-          <span style={{
-            fontFamily: 'var(--font-display)', fontSize: 18, lineHeight: 1,
-            color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums'
-          }}>
-            {money(totals.base)}
-          </span>
-        </div>
-        <div style={{
-          fontFamily: 'var(--font-body)', fontSize: 11,
-          color: 'var(--v3-text-muted)'
-        }}>
-          {loadingItems
-            ? 'Loading items…'
-            : `${totals.baseCount} base · ${totals.optionalCount} optional${totals.optional > 0 ? ` (${money(totals.optional)})` : ''} · ${totals.excludedCount} excluded`}
-        </div>
-        {contact?.proposal_status === 'sent' && contact?.quote_sent_at && (
-          <div style={{
-            fontFamily: 'var(--font-body)', fontSize: 11,
-            color: 'var(--v3-text-muted)'
-          }}>
-            Sent {relativeAgo(contact.quote_sent_at)}
+    <Drawer open={open} onOpenChange={(v) => { if (!v && !submitting) onClose?.() }}>
+      <DrawerContent
+        className="ui:max-w-full ui:overflow-x-hidden"
+        style={{
+          maxWidth: '100%',
+          overflowX: 'hidden',
+          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
+          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+          maxHeight: kbd
+            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
+            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+            <ShieldCheck size={12} />
+            Approve
           </div>
-        )}
-      </div>
+          <DrawerTitle asChild>
+            <h2
+              className="fh-font-serif"
+              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+            >
+              Lock the approved quote.
+            </h2>
+          </DrawerTitle>
+          <DrawerDescription
+            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+          >
+            Creates a permanent record of what <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this customer'}</strong> agreed to. Future edits to items or terms won't change this snapshot.
+          </DrawerDescription>
+        </DrawerHeader>
 
-      {/* Lock notice */}
-      <div style={{
-        display: 'flex', alignItems: 'flex-start', gap: 8,
-        padding: '10px 12px', borderRadius: 10,
-        background: 'var(--v3-primary-soft)',
-        border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)'
-      }}>
-        <Lock size={14} aria-hidden="true" style={{ color: 'var(--v3-primary)', marginTop: 2, flexShrink: 0 }} />
-        <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
-          color: 'var(--v3-text)'
-        }}>
-          This creates a saved approval record — a permanent record of what the customer agreed to. Different from sending the PDF (Send Quote). Edits made later won't change what was approved.
-        </span>
-      </div>
-
-      {expiresExpired && (
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 8,
-          padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(179, 58, 58, 0.10)',
-          border: '1px solid rgba(179, 58, 58, 0.40)'
-        }}>
-          <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--v3-danger-bright, #D26A6A)', marginTop: 2, flexShrink: 0 }} />
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
-            color: 'var(--v3-text)'
-          }}>
-            This quote expired on {shortDate(contact?.quote_expires_at)}. You can still approve it — confirm the customer is OK with the original price.
-          </span>
-        </div>
-      )}
-
-      {/* METHOD — inline so the disabled `Customer link` chip can carry
-          its own muted style + 'Coming soon' hint without touching the
-          shared SheetChipRow primitive. */}
-      <div className="fh-asheet-field">
-        <span className="fh-asheet-field__k">How was it approved?</span>
-        <div className="fh-asheet-chips" role="radiogroup" aria-label="How was it approved?">
-          {METHODS.map((opt) => {
-            const on = method === opt.value
-            const dis = !!opt.disabled
-            return (
+        <form
+          ref={formRef}
+          onSubmit={(e) => { e.preventDefault(); handleCommit() }}
+          style={{
+            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
+            display: 'flex', flexDirection: 'column', gap: 14,
+            boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
+            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+            flex: 1, minHeight: 0
+          }}
+        >
+          {err && (
+            <div role="alert" style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '10px 12px', borderRadius: 10,
+              background: 'rgba(179, 58, 58, 0.10)',
+              border: '1px solid rgba(179, 58, 58, 0.40)',
+              color: 'var(--ink-strong)',
+              fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45
+            }}>
+              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #b3493b)', marginTop: 2, flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{err}</span>
               <button
-                key={opt.value}
                 type="button"
-                role="radio"
-                aria-checked={on}
-                aria-disabled={dis}
-                disabled={dis}
-                title={opt.hint || undefined}
-                className={`fh-asheet-chip${on ? ' is-on' : ''}`}
-                style={dis
-                  ? { opacity: 0.45, cursor: 'not-allowed' }
-                  : undefined}
-                onClick={() => { if (!dis) handleMethodChange(opt.value) }}
+                aria-label="Dismiss error"
+                onClick={() => setErr('')}
+                style={{
+                  background: 'transparent', border: 'none', padding: 0,
+                  color: 'var(--ink-muted)', cursor: 'pointer',
+                  fontSize: 16, lineHeight: 1
+                }}
               >
-                {opt.label}
+                ×
               </button>
-            )
-          })}
-        </div>
-      </div>
+            </div>
+          )}
 
-      {/* SIGNATURE — drawn canvas or typed input depending on method.
-          Optional even when a signature method is selected (per spec:
-          'do not block verbal/text/email/in-person approvals' AND
-          'signature is optional even when signature method is selected'). */}
-      {method === 'signature_drawn' && (
-        <SignaturePad
-          value={signatureData}
-          onChange={setSignatureData}
-          label="Customer signature"
-          hint="Optional — use this when the customer signs in person."
-          height={150}
-        />
-      )}
-      {method === 'signature_typed' && (
-        <SheetField label="Customer signature">
-          <input
-            type="text"
-            value={signatureData || ''}
-            onChange={(e) => setSignatureData(e.target.value)}
-            placeholder={name || 'Customer types their name'}
-          />
-          <span style={{
-            fontSize: 11, lineHeight: 1.45,
-            color: 'var(--ink-faint, var(--ink-muted))',
-            fontFamily: 'var(--font-body)',
-            marginTop: 4,
-            display: 'block'
+          {/* SUMMARY card */}
+          <div style={{
+            padding: '12px 14px', borderRadius: 12,
+            background: 'var(--surface-2)', border: '1px solid var(--rule)',
+            display: 'flex', flexDirection: 'column', gap: 6
           }}>
-            Optional — use this when the customer signs in person.
-          </span>
-        </SheetField>
-      )}
+            <div style={{
+              display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+              gap: 10, flexWrap: 'wrap'
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                color: 'var(--ink-strong)'
+              }}>
+                {contact?.name || 'Job'}
+                {contact?.job_title ? ` · ${contact.job_title}` : ''}
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-display)', fontSize: 18, lineHeight: 1,
+                color: 'var(--field-gold-bright)', fontVariantNumeric: 'tabular-nums'
+              }}>
+                {money(totals.base)}
+              </span>
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-body)', fontSize: 11,
+              color: 'var(--ink-muted)'
+            }}>
+              {loadingItems
+                ? 'Loading items…'
+                : `${totals.baseCount} base · ${totals.optionalCount} optional${totals.optional > 0 ? ` (${money(totals.optional)})` : ''} · ${totals.excludedCount} excluded`}
+            </div>
+            {contact?.proposal_status === 'sent' && contact?.quote_sent_at && (
+              <div style={{
+                fontFamily: 'var(--font-body)', fontSize: 11,
+                color: 'var(--ink-muted)'
+              }}>
+                Sent {relativeAgo(contact.quote_sent_at)}
+              </div>
+            )}
+          </div>
 
-      {/* NAME */}
-      <SheetField label="Approved by">
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={contact?.name || 'Customer name'}
-        />
-      </SheetField>
-
-      {/* EMAIL (optional) */}
-      <SheetField label="Email (optional)">
-        <input
-          type="email"
-          inputMode="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="name@domain.com"
-        />
-      </SheetField>
-
-      {/* NOTE */}
-      <SheetField label="Note (optional)">
-        <textarea
-          rows={2}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Confirmed by phone Friday morning, deposit on Monday."
-        />
-      </SheetField>
-
-      {/* MOVE TO JOB */}
-      <label style={{
-        display: 'flex', alignItems: 'flex-start', gap: 10,
-        padding: '10px 12px', borderRadius: 10,
-        background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
-        cursor: 'pointer'
-      }}>
-        <input
-          type="checkbox"
-          checked={moveToJob}
-          onChange={(e) => setMoveToJob(e.target.checked)}
-          style={{ marginTop: 2, accentColor: 'var(--v3-primary)' }}
-        />
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
-            color: 'var(--v3-text)'
+          {/* Lock notice */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            padding: '10px 12px', borderRadius: 10,
+            background: 'rgba(201,150,58,0.10)',
+            border: '1px solid rgba(201,150,58,0.30)'
           }}>
-            Move to Job and schedule kickoff
-          </span>
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 11, lineHeight: 1.45,
-            color: 'var(--v3-text-muted)'
-          }}>
-            Advances stage to Job and adds a kickoff to your calendar tomorrow 9–5. Uncheck if you're approving paperwork before the start date is set.
-          </span>
-        </span>
-      </label>
+            <Lock size={14} aria-hidden="true" style={{ color: 'var(--field-gold-bright)', marginTop: 2, flexShrink: 0 }} />
+            <span style={{
+              fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
+              color: 'var(--ink-strong)'
+            }}>
+              Different from sending the PDF. Use this when the customer says yes — line items, scope, and terms freeze at this moment.
+            </span>
+          </div>
 
-      {totals.baseCount === 0 && !loadingItems && (
-        <div style={{
-          padding: '10px 12px', borderRadius: 10,
-          background: 'var(--v3-surface-2)', border: '1px dashed var(--v3-border-strong)',
-          fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
-          color: 'var(--v3-text-muted)'
-        }}>
-          Add at least one base line item on the Quote tab before approving.
-        </div>
-      )}
-    </ActionSheet>
+          {expiresExpired && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '10px 12px', borderRadius: 10,
+              background: 'rgba(179, 58, 58, 0.10)',
+              border: '1px solid rgba(179, 58, 58, 0.40)'
+            }}>
+              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #b3493b)', marginTop: 2, flexShrink: 0 }} />
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
+                color: 'var(--ink-strong)'
+              }}>
+                This quote expired on {shortDate(contact?.quote_expires_at)}. You can still approve — just confirm the customer is OK with the original price.
+              </span>
+            </div>
+          )}
+
+          {/* METHOD chips */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={labelStyle}>How was it approved?</span>
+            <div role="radiogroup" aria-label="How was it approved?" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {METHODS.map((opt) => {
+                const on = method === opt.value
+                const dis = !!opt.disabled
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-disabled={dis}
+                    disabled={dis || submitting}
+                    title={opt.hint || undefined}
+                    onClick={() => { if (!dis) handleMethodChange(opt.value) }}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: 999,
+                      border: on
+                        ? '1px solid rgba(201,150,58,0.4)'
+                        : '1px solid var(--rule)',
+                      background: on
+                        ? 'rgba(201,150,58,0.14)'
+                        : 'var(--surface-2)',
+                      color: dis
+                        ? 'var(--ink-faint, var(--ink-muted))'
+                        : on
+                          ? 'var(--field-gold-bright)'
+                          : 'var(--ink-muted)',
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 12, fontWeight: 700,
+                      cursor: dis ? 'not-allowed' : (submitting ? 'wait' : 'pointer'),
+                      opacity: dis ? 0.5 : 1,
+                      transition: 'all 160ms ease'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            {METHODS.find((m) => m.value === 'esign_link')?.hint && (
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: 11,
+                color: 'var(--ink-faint, var(--ink-muted))', lineHeight: 1.45
+              }}>
+                {METHODS.find((m) => m.value === 'esign_link').hint}
+              </span>
+            )}
+          </div>
+
+          {/* SIGNATURE */}
+          {method === 'signature_drawn' && (
+            <SignaturePad
+              value={signatureData}
+              onChange={setSignatureData}
+              label="Customer signature"
+              hint="Optional — use this when the customer signs in person."
+              height={150}
+            />
+          )}
+          {method === 'signature_typed' && (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={labelStyle}>Customer signature</span>
+              <input
+                type="text"
+                value={signatureData || ''}
+                onChange={(e) => setSignatureData(e.target.value)}
+                placeholder={name || 'Customer types their name'}
+                disabled={submitting}
+                style={fieldStyle}
+              />
+              <span style={{
+                fontSize: 11, lineHeight: 1.45,
+                color: 'var(--ink-faint, var(--ink-muted))',
+                fontFamily: 'var(--font-body)'
+              }}>
+                Optional — use this when the customer signs in person.
+              </span>
+            </label>
+          )}
+
+          {/* NAME */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={labelStyle}>Approved by *</span>
+            <input
+              type="text"
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={contact?.name || 'Customer name'}
+              disabled={submitting}
+              required
+              style={fieldStyle}
+            />
+          </label>
+
+          {/* EMAIL (optional) */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={labelStyle}>Email (optional)</span>
+            <input
+              type="email"
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@domain.com"
+              disabled={submitting}
+              style={fieldStyle}
+            />
+          </label>
+
+          {/* NOTE */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={labelStyle}>Note (optional)</span>
+            <textarea
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Confirmed by phone Friday morning, deposit on Monday."
+              disabled={submitting}
+              style={{ ...fieldStyle, resize: 'vertical', minHeight: 64 }}
+            />
+          </label>
+
+          {/* MOVE TO JOB */}
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            padding: '10px 12px', borderRadius: 10,
+            background: 'var(--surface-2)', border: '1px solid var(--rule)',
+            cursor: submitting ? 'wait' : 'pointer'
+          }}>
+            <input
+              type="checkbox"
+              checked={moveToJob}
+              disabled={submitting}
+              onChange={(e) => setMoveToJob(e.target.checked)}
+              style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--field-gold-bright)' }}
+            />
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                color: 'var(--ink-strong)'
+              }}>
+                Move to Job and schedule kickoff
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: 11, lineHeight: 1.45,
+                color: 'var(--ink-muted)'
+              }}>
+                Advances stage to Job and adds a kickoff to your calendar tomorrow 9–5. Uncheck if you're approving paperwork before the start date is set.
+              </span>
+            </span>
+          </label>
+
+          {totals.baseCount === 0 && !loadingItems && (
+            <div style={{
+              padding: '10px 12px', borderRadius: 10,
+              background: 'var(--surface-2)', border: '1px dashed var(--rule)',
+              fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
+              color: 'var(--ink-muted)'
+            }}>
+              Add at least one base line item on the Quote tab before approving.
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              disabled={submitting}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '12px 14px', borderRadius: 12,
+                background: 'var(--surface-2)', border: '1px solid var(--rule)',
+                color: 'var(--ink-strong)',
+                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                cursor: submitting ? 'wait' : 'pointer'
+              }}
+            >
+              <X size={14} />
+              Cancel
+            </button>
+            <motion.button
+              type="submit"
+              whileTap={{ scale: commitDisabled ? 1 : 0.98 }}
+              disabled={commitDisabled}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 14px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                color: 'var(--onyx)',
+                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                cursor: commitDisabled ? 'not-allowed' : 'pointer',
+                boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
+                opacity: commitDisabled ? 0.55 : 1
+              }}
+            >
+              <Check size={14} />
+              {submitting ? 'APPROVING…' : 'APPROVE QUOTE'}
+            </motion.button>
+          </div>
+        </form>
+      </DrawerContent>
+    </Drawer>
   )
 }
 

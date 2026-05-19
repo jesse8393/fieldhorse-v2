@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
   { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 },
   { to: '/subs',        label: 'Sub Directory',       Icon: Hammer },
+  { to: '/partners',    label: 'Partners',            Icon: Users },
   { to: '/compose',     label: 'AI Compose',          Icon: MessageSquare },
   { to: '/import',      label: 'Import Data',         Icon: Upload },
   { to: '/pour-window', label: 'Forecast',            Icon: CloudSun },

@@ -74,7 +74,8 @@ export default async function handler(req) {
     { data: payments },
     { data: changeOrders },
     { data: insurance },
-    { data: invoices }
+    { data: invoices },
+    { data: photoRows }
   ] = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('id', link.contact_id).maybeSingle(),
     supabase.from('profiles').select('*').eq('user_id', link.user_id).maybeSingle(),
@@ -82,8 +83,42 @@ export default async function handler(req) {
     supabase.from('fh_payments').select('*').eq('contact_id', link.contact_id).order('paid_on', { ascending: false }),
     supabase.from('fh_change_orders').select('*').eq('contact_id', link.contact_id).order('sequence_number', { ascending: true }),
     supabase.from('fh_insurance_claims').select('*').eq('contact_id', link.contact_id).maybeSingle(),
-    supabase.from('fh_invoices').select('*').eq('contact_id', link.contact_id).order('sequence_number', { ascending: true })
+    supabase.from('fh_invoices').select('*').eq('contact_id', link.contact_id).order('sequence_number', { ascending: true }),
+    supabase
+      .from('fh_job_files')
+      .select('id, storage_path, caption, section_tag, uploaded_at')
+      .eq('job_id', link.contact_id)
+      .eq('kind', 'photo')
+      .order('uploaded_at', { ascending: true })
+      .limit(12)
   ])
+
+  // Sign photo URLs server-side so the public viewer can render them
+  // directly without a second round-trip. 24h TTL — generous enough
+  // that an emailed link can be reopened the next day but not so long
+  // that revoked photos linger indefinitely. Failures filter out so a
+  // single bad row doesn't kill the response.
+  let photos = []
+  if (Array.isArray(photoRows) && photoRows.length > 0) {
+    const paths = photoRows.map((r) => r.storage_path).filter(Boolean)
+    if (paths.length > 0) {
+      const { data: signedRes } = await supabase.storage
+        .from('job-photos')
+        .createSignedUrls(paths, 60 * 60 * 24)
+      const signedByPath = new Map((signedRes || []).map((s) => [s.path, s.signedUrl]))
+      photos = photoRows
+        .map((r) => {
+          const url = signedByPath.get(r.storage_path)
+          if (!url) return null
+          return {
+            url,
+            section_tag: (r.section_tag || '').trim() || (r.caption || '').trim() || null,
+            caption: r.caption || null
+          }
+        })
+        .filter(Boolean)
+    }
+  }
 
   if (!contact) {
     return json({ error: 'gone', message: 'This document is no longer available.' }, 404)
@@ -160,7 +195,8 @@ export default async function handler(req) {
     payments: payments || [],
     changeOrders: changeOrders || [],
     insurance: insurance || null,
-    invoices: invoices || []
+    invoices: invoices || [],
+    photos
   })
 }
 

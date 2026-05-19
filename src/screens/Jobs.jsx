@@ -36,7 +36,7 @@ const TABS = [
   { id: 'lead',   label: 'Lead',   match: (c) => c.stage === 'lead' },
   { id: 'quote',  label: 'Quote',  match: (c) => c.stage === 'quote' },
   { id: 'active', label: 'Doing',  match: (c) => c.stage === 'job' },
-  { id: 'won',    label: 'Won',    match: (c) => c.stage === 'invoice' || c.stage === 'closed' }
+  { id: 'won',    label: 'Complete', match: (c) => c.stage === 'invoice' || c.stage === 'closed' }
 ]
 
 function money(n) {

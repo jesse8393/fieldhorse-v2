@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.jsx'
+import RateCardEditor from '../components/settings/RateCardEditor.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -395,6 +396,13 @@ export default function Settings() {
             )
           })}
         </div>
+      </Section>
+
+      {/* RATE CARD — per-tenant overrides for the AI bid engine. Edits
+          persist to fh_rate_cards (migration 026); Bid.jsx loads the
+          merged view on mount via loadUserRateCard(). */}
+      <Section variants={item} title={<>Your <em>rates.</em></>} sub="Override the AI bid defaults or add trades you bid often.">
+        <RateCardEditor />
       </Section>
 
       {/* MARKET PIN — 5/17 audit fix: surface the city name reverse-geocoded

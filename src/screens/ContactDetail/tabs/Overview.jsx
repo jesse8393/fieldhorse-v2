@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, X as XIcon } from 'lucide-react'
+import { Plus, Pencil, X as XIcon, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
+import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import {
   startQuote, approveQuote, markComplete, reopen
 } from '../../../lib/pipeline.js'
@@ -58,9 +59,37 @@ export default function OverviewTab({
   onOpenAddEvent,
   onOpenLogPayment,
   onOpenInvitePartner,
-  onOpenApproveQuote
+  onOpenApproveQuote,
+  onOpenMarkComplete
 }) {
   const [actionLoading, setActionLoading] = useState(false)
+  const confirm = useConfirm()
+
+  // Delete a logged payment row. Used by the trash icon on payment
+  // rows in the Recent Activity list. We confirm because payments are
+  // financial records and an accidental delete here would silently
+  // change the job's paid/balance numbers.
+  async function deletePayment(paymentId, amount) {
+    if (!paymentId || !userId) return
+    const ok = await confirm({
+      title: 'Delete this payment?',
+      body: `Removes a ${fmtMoney(amount)} payment from this job. This can't be undone — re-log it if you delete by mistake.`,
+      destructive: true,
+      confirmLabel: 'Delete payment'
+    })
+    if (!ok) return
+    const { error } = await supabase
+      .from('fh_payments')
+      .delete()
+      .eq('id', paymentId)
+      .eq('user_id', userId)
+    if (error) {
+      toastError("Couldn't delete payment", error.message)
+      return
+    }
+    toastSuccess('Payment deleted', `${fmtMoney(amount)} removed`)
+    await fetchAll?.()
+  }
 
   const health = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
@@ -267,6 +296,8 @@ export default function OverviewTab({
                   timestamp={row.timestamp}
                   pillTone={row.pillTone}
                   pillLabel={row.pillLabel}
+                  onDelete={row.paymentId ? () => deletePayment(row.paymentId, row.paymentAmount) : undefined}
+                  deleteLabel="Delete payment"
                 />
                 {row.userId && (
                   <PostedByChip
@@ -313,6 +344,13 @@ export default function OverviewTab({
           label="Invite partner"
           onClick={() => { hapticTap(); onOpenInvitePartner?.() }}
         />
+        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
+          <SecondaryAction
+            icon={ShieldCheck}
+            label={contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
+            onClick={() => { hapticTap(); onOpenMarkComplete?.() }}
+          />
+        )}
       </div>
 
       {/* ACTIVITY LOG — chronological feed synthesized from existing
@@ -382,7 +420,9 @@ function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
       pillTone: 'success',
       pillLabel: 'PAID',
       userId: p.user_id || null,
-      verb: 'posted'
+      verb: 'posted',
+      paymentId: p.id,
+      paymentAmount: p.amount
     })
   }
 

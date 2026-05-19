@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Calculator, Sparkles, Copy, Check, FileText, Briefcase, BookmarkPlus, Trash2, X } from 'lucide-react'
-import { RATE_CARD, TRADE_LABELS } from '../lib/rateCard.js'
+import { RATE_CARD, TRADE_LABELS, loadUserRateCard } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
@@ -18,6 +18,10 @@ import { FilterPill } from '../components/v3'
 // just in case any of the output is shown to a customer downstream.
 const SYSTEM = `You are an estimating assistant for a contractor's business. Given a scope description, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Never mention any platform, app, or tool by name in your output. Return ONLY JSON.`
 
+// Trades shown in the chip picker — driven by the seed. The user's
+// custom keys still flow through into the prompt + manual-fill rows
+// via the merged rate card; we just don't surface them as suggested
+// pre-checks because they're user-specific.
 const TRADES = Object.keys(RATE_CARD)
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
@@ -43,6 +47,14 @@ export default function Bid() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateNamePrompt, setTemplateNamePrompt] = useState('')
+  // Merged rate card (seed defaults + user overrides + custom trades).
+  // Falls back to RATE_CARD before load resolves so the screen is
+  // usable instantly on first paint.
+  const [userRates, setUserRates] = useState(() => {
+    const m = {}
+    for (const [k, v] of Object.entries(RATE_CARD)) m[k] = { ...v, label: TRADE_LABELS[k] || k }
+    return m
+  })
 
   async function fetchTemplates() {
     if (!user?.id) return
@@ -53,6 +65,18 @@ export default function Bid() {
     setTemplates(data || [])
   }
   useEffect(() => { fetchTemplates() }, [user?.id])
+
+  // Fetch user rate-card overrides once per session. Falls back silently
+  // to the seed defaults on error.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!user?.id) return
+      const { merged } = await loadUserRateCard(user.id)
+      if (!cancelled) setUserRates(merged)
+    })()
+    return () => { cancelled = true }
+  }, [user?.id])
 
   const total = useMemo(() => {
     if (!bid) return null
@@ -69,7 +93,9 @@ export default function Bid() {
     setErr('')
     setBid(null)
     try {
-      const rateText = TRADES.map((k) => `${k}: $${RATE_CARD[k].low}–$${RATE_CARD[k].high} per ${RATE_CARD[k].unit}`).join('; ')
+      const rateText = Object.keys(userRates)
+        .map((k) => `${k}: $${userRates[k].low}–$${userRates[k].high} per ${userRates[k].unit}`)
+        .join('; ')
       const res = await claudeMessage({
         system: `${SYSTEM}\n\nRate card: ${rateText}`,
         messages: [{
@@ -611,12 +637,12 @@ export default function Bid() {
                     summary: scope,
                     job_type: jobType || 'Renovation',
                     line_items: (picks.length ? picks : ['gc']).map((trade) => ({
-                      name: TRADE_LABELS[trade] || trade,
+                      name: userRates[trade]?.label || TRADE_LABELS[trade] || trade,
                       trade,
                       qty: 1,
-                      unit: RATE_CARD[trade]?.unit || 'lot',
-                      rate_low: RATE_CARD[trade]?.low || 0,
-                      rate_high: RATE_CARD[trade]?.high || 0,
+                      unit: userRates[trade]?.unit || RATE_CARD[trade]?.unit || 'lot',
+                      rate_low: userRates[trade]?.low ?? RATE_CARD[trade]?.low ?? 0,
+                      rate_high: userRates[trade]?.high ?? RATE_CARD[trade]?.high ?? 0,
                       notes: ''
                     })),
                     risks: [],

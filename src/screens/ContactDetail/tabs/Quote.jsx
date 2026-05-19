@@ -34,10 +34,17 @@ import { mintPublicLink } from '../../../lib/publicLink.js'
 export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenApprove, insurance = null, changeOrders = [] }) {
   const { profile } = useProfile()
 
-  const status = useMemo(() => deriveStatus(contact), [
+  // "Past quote" = pipeline stage already advanced beyond the quoting
+  // phase. The job has been started / invoiced / closed, which means
+  // the proposal was implicitly approved even if proposal_status was
+  // never flipped through the Approve button (legacy / manual advance).
+  const pastQuote = ['job', 'invoice', 'closed'].includes(contact?.stage)
+
+  const status = useMemo(() => deriveStatus(contact, pastQuote), [
     contact?.proposal_status,
     contact?.quote_sent_at,
-    contact?.quote_expires_at
+    contact?.quote_expires_at,
+    pastQuote
   ])
 
   const company = useMemo(() => ({
@@ -85,20 +92,25 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // their seat.
   const [docMode, setDocMode] = useState('builder')
   const [docItems, setDocItems] = useState([])
+  const [docPhotos, setDocPhotos] = useState([])
   const [docItemsLoading, setDocItemsLoading] = useState(false)
   useEffect(() => {
     if (docMode !== 'document' || !contact?.id || !userId) return
     let alive = true
     setDocItemsLoading(true)
     ;(async () => {
-      const { data } = await supabase
-        .from('fh_quote_items')
-        .select('*')
-        .eq('contact_id', contact.id)
-        .eq('user_id', userId)
-        .order('sort_order', { ascending: true })
+      const [{ data: items }, photos] = await Promise.all([
+        supabase
+          .from('fh_quote_items')
+          .select('*')
+          .eq('contact_id', contact.id)
+          .eq('user_id', userId)
+          .order('sort_order', { ascending: true }),
+        loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
+      ])
       if (alive) {
-        setDocItems(data || [])
+        setDocItems(items || [])
+        setDocPhotos(photos || [])
         setDocItemsLoading(false)
       }
     })()
@@ -114,7 +126,9 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   const hasClientEmail = Boolean((contact?.email || '').trim())
   const sendDisabled = disabled || !hasClientEmail
   const sendDisabledReason = baseCount === 0
-    ? 'Add at least one base line item to enable Send.'
+    ? (pastQuote
+        ? "This job is past the quote phase. There's nothing to send unless you rebuild the proposal."
+        : 'Add at least one base line item to enable Send.')
     : !hasClientEmail
       ? "Add a client email first so we know where to send."
       : null
@@ -458,6 +472,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
             company={company}
             contact={contact}
             items={docItems}
+            photos={docPhotos}
             loading={docItemsLoading}
             insurance={insurance}
             changeOrders={changeOrders}
@@ -509,6 +524,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           contact={contact}
           baseCount={baseCount}
           busy={busy}
+          pastQuote={pastQuote}
           onOpenApprove={onOpenApprove}
         />
 
@@ -580,7 +596,7 @@ function QuoteViewToggle({ value, onChange }) {
   )
 }
 
-function DocumentPreviewPane({ company, contact, items, loading, insurance = null, changeOrders = [] }) {
+function DocumentPreviewPane({ company, contact, items, photos = [], loading, insurance = null, changeOrders = [] }) {
   // Group line items by their `section` field so each trade renders
   // as its own ScopeSectionCard. Order is preserved (groupByOrdered).
   // Optional items (is_optional=true) split into the upgrades array;
@@ -670,6 +686,7 @@ function DocumentPreviewPane({ company, contact, items, loading, insurance = nul
           exclusions={exclusions}
           insurance={insurance}
           changeOrders={changeOrders}
+          photos={photos}
           approval={approval}
           meta={{
             issuedAt: contact?.quote_sent_at || contact?.created_at,
@@ -901,13 +918,18 @@ function ContextCard({ contact, status }) {
    small "Approve a new version" link so re-approval requires an
    intentional tap (no accidental double-approval). Phase 4C-2.
    ============================================================ */
-function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
+function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprove }) {
   const status = (contact?.proposal_status || 'draft').toLowerCase()
-  const isApproved = status === 'approved'
+  const explicitlyApproved = status === 'approved'
+  // Either the operator pressed Approve, or the pipeline has already
+  // advanced past quote — in both cases the proposal is effectively
+  // locked from the customer's POV.
+  const isApproved = explicitlyApproved || (pastQuote && status !== 'rejected')
   const canApprove = !isApproved && baseCount > 0 && !busy
-  const approvedAt = contact?.updated_at && isApproved ? contact.updated_at : null
+  const approvedAt = contact?.updated_at && explicitlyApproved ? contact.updated_at : null
 
   if (isApproved) {
+    const implicit = !explicitlyApproved && pastQuote
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', gap: 10,
@@ -923,7 +945,7 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
             letterSpacing: '0.10em', textTransform: 'uppercase',
             color: 'var(--v3-good, #6FB387)'
           }}>
-            Quote approved
+            {implicit ? 'Approved · job stage' : 'Quote approved'}
           </span>
         </div>
         <p style={{
@@ -932,7 +954,9 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
           fontSize: 11, lineHeight: 1.5,
           color: 'var(--v3-text-muted)'
         }}>
-          Approval saved{approvedAt ? ` · ${shortDate(approvedAt)}` : ''}. Future edits to items, scope, terms, or exclusions don't change what the customer agreed to.
+          {implicit
+            ? 'This job has already moved past the quote phase, so the proposal is treated as approved. Lock the snapshot below if you want to freeze the current line items, scope, and terms as the official approved version.'
+            : `Approval saved${approvedAt ? ` · ${shortDate(approvedAt)}` : ''}. Future edits to items, scope, terms, or exclusions don't change what the customer agreed to.`}
         </p>
         <button
           type="button"
@@ -947,7 +971,7 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
             cursor: 'pointer'
           }}
         >
-          Approve a new version
+          {implicit ? 'Lock the snapshot' : 'Approve a new version'}
         </button>
       </div>
     )
@@ -1139,7 +1163,7 @@ function PrimaryButton({ icon, label, onClick, disabled }) {
    takes precedence over status when expired so the operator
    sees the urgent state regardless of how the row was last saved.
    ============================================================ */
-function deriveStatus(contact) {
+function deriveStatus(contact, pastQuote = false) {
   const raw = (contact?.proposal_status || 'draft').toLowerCase()
   const sentIso = contact?.quote_sent_at || null
   const expIso = contact?.quote_expires_at || null
@@ -1157,6 +1181,18 @@ function deriveStatus(contact) {
   else if (raw === 'viewed') { tone = 'gold'; sub = relativeAgo(sentIso, 'Sent') }
   else if (raw === 'approved') { tone = 'good'; sub = relativeAgo(sentIso, 'Sent') }
   else if (raw === 'rejected') { tone = 'danger' }
+
+  // Job has advanced past the quote phase but the explicit Approve
+  // button was never tapped (manual stage advance, legacy data, etc).
+  // Treat as approved so the pill / banner / approve band don't keep
+  // claiming "Draft" on a job that's already invoicing or closed.
+  // Rejected stays rejected — that's a terminal "lost" state.
+  if (pastQuote && raw !== 'approved' && raw !== 'rejected') {
+    label = 'Approved'
+    tone = 'good'
+    sub = 'Implied by job stage'
+    return { label, tone, sub }
+  }
 
   if (isExpired) {
     label = 'Expired'

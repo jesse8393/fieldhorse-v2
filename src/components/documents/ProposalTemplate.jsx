@@ -44,7 +44,9 @@ export default function ProposalTemplate({
   approval = null,
   meta = {},
   status = 'draft',
-  showInternalNotes = false
+  showInternalNotes = false,
+  photos = []             // [{ url, section_tag, caption }] — tagged
+                          // photos surface grouped under Project photos.
 }) {
   const number = meta.number || proposalNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
@@ -135,6 +137,15 @@ export default function ProposalTemplate({
         </section>
       )}
 
+      {/* Project photos — grouped by section_tag with an untagged
+          remainder at the end. Quiet treatment, magazine-style, sits
+          between Insurance and Payment Terms so the reader has visual
+          proof before the legal text. Renders nothing when there are
+          no photos in scope. */}
+      {photos.length > 0 && (
+        <ProjectPhotosBlock photos={photos} company={company} />
+      )}
+
       {/* Insurance */}
       <InsuranceModeBlock insurance={insurance} company={company} />
 
@@ -166,6 +177,89 @@ export default function ProposalTemplate({
 }
 
 /* ─── Internal blocks ─── */
+
+function ProjectPhotosBlock({ photos, company }) {
+  // Group by section_tag. Untagged photos collect into a single
+  // 'Other' bucket so they still render but stay visually separate.
+  const groups = new Map()
+  for (const p of photos) {
+    if (!p?.url) continue
+    const tag = (p.section_tag || '').trim() || 'Project photos'
+    if (!groups.has(tag)) groups.set(tag, [])
+    groups.get(tag).push(p)
+  }
+  const entries = Array.from(groups.entries())
+  if (entries.length === 0) return null
+
+  return (
+    <section>
+      <SectionLabel>Project photos</SectionLabel>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {entries.map(([tag, arr]) => (
+          <div key={tag}>
+            {entries.length > 1 && (
+              <div style={{
+                fontFamily: DOC_FONTS.body,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: DOC_COLORS.inkMuted,
+                marginBottom: 8
+              }}>
+                {tag}
+              </div>
+            )}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 8
+            }}>
+              {arr.slice(0, 6).map((p, i) => (
+                <figure key={`${tag}-${i}`} style={{ margin: 0 }}>
+                  <div style={{
+                    width: '100%',
+                    aspectRatio: '4 / 3',
+                    background: '#e8e2d4',
+                    borderRadius: 4,
+                    overflow: 'hidden'
+                  }}>
+                    <img
+                      src={p.url}
+                      alt={p.caption || tag}
+                      loading="lazy"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block'
+                      }}
+                    />
+                  </div>
+                  {p.caption && (
+                    <figcaption style={{
+                      marginTop: 4,
+                      fontFamily: DOC_FONTS.body,
+                      fontSize: 10,
+                      color: DOC_COLORS.inkMuted,
+                      lineHeight: 1.35,
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical'
+                    }}>
+                      {p.caption}
+                    </figcaption>
+                  )}
+                </figure>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 function SectionLabel({ children }) {
   return (
