@@ -104,7 +104,16 @@ export default async function handler(req) {
     warranty_default: profile.warranty_default || ''
   } : { name: 'My Company' }
 
-  // 4. Bump view counter — best-effort, never blocks the response.
+  // 4. Bump view counter + maybe write a contractor notification —
+  //    both best-effort, neither blocks the response.
+  //
+  //    Notification debounce: only insert a fresh "viewed" row when
+  //    the link hasn't been viewed in the last hour. Otherwise a
+  //    customer refreshing the page would spam the contractor's
+  //    inbox. Read-only refreshes still bump view_count + last_viewed_at.
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+  const shouldNotify = !link.last_viewed_at || new Date(link.last_viewed_at) < oneHourAgo
+
   supabase
     .from('fh_public_links')
     .update({
@@ -113,6 +122,17 @@ export default async function handler(req) {
     })
     .eq('id', link.id)
     .then(() => {}, () => {})
+
+  if (shouldNotify) {
+    const kindLabel = link.kind === 'invoice' ? 'invoice' : 'proposal'
+    supabase.from('fh_notifications').insert({
+      user_id: link.user_id,
+      kind: 'public_link_viewed',
+      title: `Customer viewed your ${kindLabel}`,
+      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
+      link: `/jobs/${link.contact_id}`
+    }).then(() => {}, () => {})
+  }
 
   return json({
     ok: true,

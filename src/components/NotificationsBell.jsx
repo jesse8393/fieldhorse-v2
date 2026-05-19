@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare } from 'lucide-react'
+import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare, Eye, ShieldCheck, FileEdit } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -10,11 +10,14 @@ import { hapticTap } from '../lib/haptics.js'
 // Map notification kind → icon + accent color. Add cases as new kinds
 // are introduced server-side; default falls back to Inbox + steel.
 const KIND_META = {
-  partner_accepted:  { Icon: Users,           color: 'var(--field-gold-bright)' },
-  inspection_logged: { Icon: ClipboardCheck,  color: 'var(--signal-green)' },
-  payment_received:  { Icon: DollarSign,      color: 'var(--signal-green)' },
-  schedule_change:   { Icon: Calendar,        color: 'var(--field-gold-bright)' },
-  sub_responded:     { Icon: MessageSquare,   color: 'var(--field-gold-bright)' }
+  partner_accepted:   { Icon: Users,           color: 'var(--field-gold-bright)' },
+  inspection_logged:  { Icon: ClipboardCheck,  color: 'var(--signal-green)' },
+  payment_received:   { Icon: DollarSign,      color: 'var(--signal-green)' },
+  schedule_change:    { Icon: Calendar,        color: 'var(--field-gold-bright)' },
+  sub_responded:      { Icon: MessageSquare,   color: 'var(--field-gold-bright)' },
+  public_link_viewed: { Icon: Eye,             color: 'var(--field-gold-bright)' },
+  quote_approved:     { Icon: ShieldCheck,     color: 'var(--signal-green)' },
+  change_order_added: { Icon: FileEdit,        color: 'var(--field-gold-bright)' }
 }
 function metaFor(kind) {
   return KIND_META[kind] || { Icon: Inbox, color: 'var(--ink-muted)' }
