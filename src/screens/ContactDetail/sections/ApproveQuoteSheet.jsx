@@ -349,6 +349,20 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         `Quote approved${archiveNote}${stageNote}`,
         `Approved version ${confirmed.version_number} · ${money(totals.base)}`
       )
+
+      // Write a contractor inbox notification (migration 008). Tap-
+      // through lands on the job. Best-effort — never breaks the
+      // approval flow on RLS / missing-table.
+      try {
+        await supabase.from('fh_notifications').insert({
+          user_id: userId,
+          kind: 'quote_approved',
+          title: `Quote approved · ${money(totals.base)}`,
+          body: `${contact?.name || 'Client'} signed off via ${method}`,
+          link: `/jobs/${contact.id}`
+        })
+      } catch {}
+
       onApproved?.()
       onClose?.()
     } catch (e) {

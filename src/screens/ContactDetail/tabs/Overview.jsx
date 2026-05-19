@@ -185,6 +185,7 @@ export default function OverviewTab({
           contact={contact}
           patch={patch}
           onExitEdit={onExitEdit}
+          userId={userId}
         />
       )}
 
@@ -488,18 +489,80 @@ const EDITABLE_FIELDS = [
   { key: 'notes',       label: 'Notes',       kind: 'textarea', placeholder: 'Anything else…',    col: 1 }
 ]
 
-function EditFieldsCard({ contact, patch, onExitEdit }) {
+function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
   const [form, setForm] = useState(() => buildForm(contact))
   const [saving, setSaving] = useState(false)
+  // Linked fh_clients row used for the "Pull from client" button. Loaded
+  // only when contact has a client_id + caller is the owner (RLS on
+  // fh_clients denies partner reads — owner-only by design).
+  const [linkedClient, setLinkedClient] = useState(null)
+  const [hydrating, setHydrating] = useState(false)
 
   // Reset form whenever the underlying contact changes (e.g. a partner edit
   // streams in via realtime mid-edit). Keeps the form authoritative for
   // changed fields while reflecting truth for untouched ones.
   useEffect(() => { setForm(buildForm(contact)) }, [contact?.id])
 
+  // Lazy-load the linked client when present. Skips silently when the
+  // contact has no client link or RLS denies (partner viewer).
+  useEffect(() => {
+    let cancelled = false
+    if (!contact?.client_id || !userId) { setLinkedClient(null); return }
+    ;(async () => {
+      const { data } = await supabase
+        .from('fh_clients')
+        .select('id, name, company_name, phone, email, address')
+        .eq('id', contact.client_id)
+        .maybeSingle()
+      if (!cancelled) setLinkedClient(data || null)
+    })()
+    return () => { cancelled = true }
+  }, [contact?.client_id, userId])
+
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }))
   }
+
+  // Pull from the linked client — fills empty form fields with the
+  // client's values. Never clobbers anything the user has typed on
+  // the form. Surfaces only when there's at least one field to fill.
+  function hydrateFromClient() {
+    if (!linkedClient) return
+    setHydrating(true)
+    setForm((prev) => {
+      const next = { ...prev }
+      const mapping = {
+        name:    linkedClient.name,
+        phone:   linkedClient.phone,
+        email:   linkedClient.email,
+        address: linkedClient.address
+      }
+      for (const [k, v] of Object.entries(mapping)) {
+        const cur = (prev[k] || '').toString().trim()
+        if (!cur && v) next[k] = v
+      }
+      return next
+    })
+    setTimeout(() => setHydrating(false), 250)
+  }
+
+  // Which fields would actually change if the user tapped "Pull from
+  // client"? Drives whether the button surfaces at all.
+  const fieldsToFill = (() => {
+    if (!linkedClient) return []
+    const fields = []
+    const checks = [
+      ['name',    linkedClient.name],
+      ['phone',   linkedClient.phone],
+      ['email',   linkedClient.email],
+      ['address', linkedClient.address]
+    ]
+    for (const [k, v] of checks) {
+      const cur = (form[k] || '').toString().trim()
+      if (!cur && v) fields.push(k)
+    }
+    return fields
+  })()
 
   async function commit() {
     if (saving) return
@@ -540,19 +603,40 @@ function EditFieldsCard({ contact, patch, onExitEdit }) {
           <Pencil size={12} aria-hidden="true" />
           Editing job fields
         </div>
-        <button
-          type="button"
-          onClick={onExitEdit}
-          aria-label="Cancel edit"
-          style={{
-            width: 32, height: 32, borderRadius: 9,
-            background: 'transparent', border: '1px solid var(--v3-border)',
-            color: 'var(--v3-text-muted)', cursor: 'pointer',
-            display: 'grid', placeItems: 'center'
-          }}
-        >
-          <XIcon size={14} aria-hidden="true" />
-        </button>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {fieldsToFill.length > 0 && (
+            <button
+              type="button"
+              onClick={hydrateFromClient}
+              disabled={hydrating}
+              title={`Fill ${fieldsToFill.length} empty field${fieldsToFill.length === 1 ? '' : 's'} from the linked client (${linkedClient?.name || 'client'})`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '6px 11px', borderRadius: 8,
+                background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                color: 'var(--v3-primary-bright)',
+                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.04em', cursor: 'pointer'
+              }}
+            >
+              {hydrating ? 'Filling…' : `Use client info · ${fieldsToFill.length}`}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onExitEdit}
+            aria-label="Cancel edit"
+            style={{
+              width: 32, height: 32, borderRadius: 9,
+              background: 'transparent', border: '1px solid var(--v3-border)',
+              color: 'var(--v3-text-muted)', cursor: 'pointer',
+              display: 'grid', placeItems: 'center'
+            }}
+          >
+            <XIcon size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div className="v3-edit-grid">
