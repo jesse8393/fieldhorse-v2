@@ -160,11 +160,15 @@ export default function MobileSearchOverlay() {
               maxWidth: 560, margin: '0 auto'
             }}
           >
-            {/* Sticky search header */}
+            {/* Sticky search header. The padding shorthand has to
+                merge the safe-area-inset-top inline — declaring
+                paddingTop above a padding shorthand is a no-op
+                because the shorthand wins, which buried the close
+                button + input under the iOS status bar / Dynamic
+                Island. */}
             <div
               style={{
-                paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
-                padding: '10px 14px 12px',
+                padding: 'calc(env(safe-area-inset-top, 0px) + 10px) 14px 12px',
                 display: 'flex', alignItems: 'center', gap: 8
               }}
             >
