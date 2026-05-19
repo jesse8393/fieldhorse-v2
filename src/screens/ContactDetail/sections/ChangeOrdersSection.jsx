@@ -88,6 +88,28 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       }
       if (res.error) throw res.error
       toastSuccess(payload.id ? 'Change order updated' : 'Change order added', `CO #${res.data?.sequence_number || ''}`.trim())
+
+      // Notification on NEW change orders only — updates / approvals
+      // don't ping the bell to avoid noise on every minor edit. The
+      // approval-side notification can be wired separately if useful.
+      // Best-effort; never blocks the save.
+      if (!payload.id && res.data) {
+        try {
+          const moneyStr = Number(res.data.amount || 0).toLocaleString(undefined, {
+            style: 'currency', currency: 'USD',
+            minimumFractionDigits: 0, maximumFractionDigits: 0
+          })
+          const sign = res.data.amount >= 0 ? '+' : '−'
+          await supabase.from('fh_notifications').insert({
+            user_id: userId,
+            kind: 'change_order_added',
+            title: `CO #${res.data.sequence_number} added · ${sign}${Math.abs(res.data.amount) > 0 ? moneyStr : '$0'}`,
+            body: `${contact?.name || 'Job'} · ${res.data.title || 'Change order'}`,
+            link: `/jobs/${contact.id}?tab=quote`
+          })
+        } catch {}
+      }
+
       onChange?.()
       return true
     } catch (e) {
