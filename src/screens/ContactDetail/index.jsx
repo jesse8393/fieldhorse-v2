@@ -16,6 +16,7 @@ import { SkeletonBlock, SkeletonList } from '../../components/Skeleton.jsx'
 import ActionSheet from '../../components/ActionSheet.jsx'
 import AddEventSheet from '../../components/AddEventSheet.jsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.jsx'
+import MarkCompleteSheet from '../../components/MarkCompleteSheet.jsx'
 import V3PaymentSheet from '../../components/V3PaymentSheet.jsx'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -127,6 +128,7 @@ export default function ContactDetail() {
   // and the Quote tab ApproveBand both open the same sheet without
   // duplicating state. Phase 4C-2.
   const [approveOpen, setApproveOpen] = useState(false)
+  const [completeOpen, setCompleteOpen] = useState(false)
   // Edit mode is a flag the Overview tab + section editors read.
   // Header EDIT button toggles + jumps to overview if currently on another tab.
   const [isEditing, setIsEditing] = useState(false)
@@ -242,6 +244,7 @@ export default function ContactDetail() {
           onOpenAddEvent={() => setEventOpen(true)}
           onOpenInvitePartner={() => setInviteOpen(true)}
           onOpenApproveQuote={() => setApproveOpen(true)}
+          onOpenMarkComplete={() => setCompleteOpen(true)}
         />
       ) : (
       <>
@@ -299,6 +302,7 @@ export default function ContactDetail() {
             onOpenLogPayment={() => setPayModalOpen(true)}
             onOpenInvitePartner={() => setInviteOpen(true)}
             onOpenApproveQuote={() => setApproveOpen(true)}
+            onOpenMarkComplete={() => setCompleteOpen(true)}
           />
         )}
         {tab === 'quote' && (
@@ -379,6 +383,14 @@ export default function ContactDetail() {
         contactId={contact.id}
         contactName={contact.name}
         invitedByUserId={user?.id}
+      />
+
+      <MarkCompleteSheet
+        open={completeOpen}
+        userId={user?.id}
+        contact={contact}
+        onClose={() => setCompleteOpen(false)}
+        onSaved={fetchAll}
       />
 
       <ApproveQuoteSheet

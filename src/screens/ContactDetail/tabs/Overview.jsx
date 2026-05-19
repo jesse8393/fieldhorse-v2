@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, X as XIcon } from 'lucide-react'
+import { Plus, Pencil, X as XIcon, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import {
@@ -59,7 +59,8 @@ export default function OverviewTab({
   onOpenAddEvent,
   onOpenLogPayment,
   onOpenInvitePartner,
-  onOpenApproveQuote
+  onOpenApproveQuote,
+  onOpenMarkComplete
 }) {
   const [actionLoading, setActionLoading] = useState(false)
   const confirm = useConfirm()
@@ -343,6 +344,13 @@ export default function OverviewTab({
           label="Invite partner"
           onClick={() => { hapticTap(); onOpenInvitePartner?.() }}
         />
+        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
+          <SecondaryAction
+            icon={ShieldCheck}
+            label={contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
+            onClick={() => { hapticTap(); onOpenMarkComplete?.() }}
+          />
+        )}
       </div>
 
       {/* ACTIVITY LOG — chronological feed synthesized from existing
