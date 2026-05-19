@@ -6,6 +6,7 @@
 
 export { default as DocumentShell } from './DocumentShell.jsx'
 export { default as SectionHeading } from './SectionHeading.jsx'
+export { default as LineItemsTable } from './LineItemsTable.jsx'
 export { default as ScopeSectionCard } from './ScopeSectionCard.jsx'
 export { default as PricingSummaryCard } from './PricingSummaryCard.jsx'
 export { default as PaymentTermsBlock, DEFAULT_PAYMENT_SCHEDULE } from './PaymentTermsBlock.jsx'
