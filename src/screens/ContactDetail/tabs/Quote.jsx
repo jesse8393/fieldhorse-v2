@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Eye, Download, Send, ShieldCheck, Lock, Trash2 } from 'lucide-react'
+import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
@@ -12,6 +12,7 @@ import QuoteTermsSection from '../sections/QuoteTerms.jsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.jsx'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
+import { mintPublicLink } from '../../../lib/publicLink.js'
 
 /**
  * QUOTE tab — the formal sellable scope. Lead → Quote → Approved Job
@@ -300,6 +301,32 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     }
   }
 
+  // Mint a public share link for this proposal + copy to clipboard.
+  // Mirrors the InvoiceDetail share flow. The customer opens /p/{token}
+  // → ProposalTemplate renders with the contractor's branding, no auth.
+  async function handleShare() {
+    if (!contact?.id || !userId) return
+    hapticTap()
+    setBusy('share')
+    try {
+      const link = await mintPublicLink({
+        contactId: contact.id,
+        userId,
+        kind: 'proposal'
+      })
+      try {
+        await navigator.clipboard.writeText(link.url)
+        toastSuccess('Share link copied', 'Send via text, email, however you like.')
+      } catch {
+        toastSuccess('Share link ready', link.url)
+      }
+    } catch (e) {
+      toastError("Couldn't mint share link", e?.message || 'Try again.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function handleSend() {
     if (disabled) return
     // Phase 1 send-by-email — require a client email. The Send button is
@@ -475,6 +502,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           onPreview={handlePreview}
           onDownload={handleDownload}
           onSend={handleSend}
+          onShare={handleShare}
         />
 
         <ApproveBand
@@ -985,7 +1013,7 @@ function ApproveBand({ contact, baseCount, busy, onOpenApprove }) {
 /* ============================================================
    Action bar — Preview / Download / Send Quote
    ============================================================ */
-function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend }) {
+function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend, onShare }) {
   const helperLine = sendDisabledReason
     ? sendDisabledReason
     : 'Generates the proposal PDF and emails it directly to the client. Marks the quote as sent on success. This is not the same as Approve — use Approve when the customer says yes.'
@@ -1022,6 +1050,12 @@ function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason
           icon={<Download size={14} aria-hidden="true" />}
           label={busy === 'download' ? 'Building…' : 'Download'}
           onClick={onDownload}
+          disabled={disabled}
+        />
+        <SecondaryButton
+          icon={<LinkIcon size={14} aria-hidden="true" />}
+          label={busy === 'share' ? 'Minting…' : 'Share link'}
+          onClick={onShare}
           disabled={disabled}
         />
         <PrimaryButton

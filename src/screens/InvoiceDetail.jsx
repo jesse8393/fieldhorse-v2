@@ -9,13 +9,15 @@ import {
   ExternalLink,
   Clock,
   CheckCircle2,
-  Send
+  Send,
+  Link as LinkIcon
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { generateInvoice, downloadPdf } from '../lib/pdf.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
+import { mintPublicLink } from '../lib/publicLink.js'
 import { hapticTap } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { Eyebrow, StampNumber } from '../components/v3'
@@ -107,6 +109,7 @@ export default function InvoiceDetail() {
   // pattern. Gives the operator visual confirmation that's hard to
   // miss vs relying on the toast alone.
   const [sent, setSent] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   const refresh = async () => {
     if (!user?.id || !id) return
@@ -241,6 +244,35 @@ export default function InvoiceDetail() {
   // to a Resend send with the contractor's company name as the
   // display-name + Reply-To. Mirrors the Send Proposal flow on the
   // Quote tab.
+  // Mint a public share link for this invoice and copy it to the
+  // clipboard. The customer opens the link → /p/{token} → sees the
+  // branded InvoiceTemplate (no auth required, no app branding).
+  // Resolution happens server-side via service role; the table
+  // itself stays opaque to anonymous PostgREST traffic.
+  async function handleShare() {
+    if (!contact?.id || !user?.id || sharing) return
+    setSharing(true)
+    try {
+      const link = await mintPublicLink({
+        contactId: contact.id,
+        userId: user.id,
+        kind: 'invoice'
+      })
+      try {
+        await navigator.clipboard.writeText(link.url)
+        toastSuccess('Share link copied', 'Send it however you want — text, email, anything.')
+      } catch {
+        // Clipboard write blocked (Safari permission) — still show
+        // the link so the operator can long-press to copy.
+        toastSuccess('Share link ready', link.url)
+      }
+    } catch (e) {
+      toastError("Couldn't mint share link", e?.message || 'Try again.')
+    } finally {
+      setSharing(false)
+    }
+  }
+
   async function handleSendInvoice() {
     if (!contact || sending) return
     if (!resolved.email) {
@@ -744,6 +776,30 @@ export default function InvoiceDetail() {
         >
           {sent ? <CheckCircle2 size={14} aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
           {sent ? 'Sent' : sending ? 'Sending…' : 'Email'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { hapticTap(); handleShare() }}
+          disabled={sharing}
+          title="Mint a public share link the customer can open in any browser"
+          style={{
+            flex: 1,
+            minHeight: 48,
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: 'var(--v3-surface-2)',
+            border: '1px solid var(--v3-border-strong)',
+            color: sharing ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            cursor: sharing ? 'wait' : 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            WebkitTapHighlightColor: 'transparent',
+            pointerEvents: 'auto',
+            touchAction: 'manipulation'
+          }}
+        >
+          <LinkIcon size={14} aria-hidden="true" />
+          {sharing ? 'Minting…' : 'Share link'}
         </button>
         <button
           type="button"
