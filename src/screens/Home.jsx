@@ -23,7 +23,7 @@ import { getWeather, MURFREESBORO } from '../lib/weather.js'
 import { ACTIVE_STAGES } from '../lib/stages.js'
 import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
-import { QuickAction, SectionHeader } from '../components/v3'
+import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
 import HomeActivityCard from '../components/HomeActivityCard.jsx'
 import { hapticTap } from '../lib/haptics.js'
 // V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
@@ -1040,6 +1040,8 @@ export default function Home() {
           )}
         </div>
       </motion.div>
+
+      <ScreenCloser caption="Tap the + on Jobs to add a lead, or open Schedule to plan crew visits." />
 
     </motion.div>
   )

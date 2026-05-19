@@ -6,7 +6,7 @@ import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.js'
 import ActionSheet from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
-import { FloatingActionButton } from '../components/v3'
+import { FloatingActionButton, ScreenCloser } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
@@ -518,6 +518,8 @@ export default function Schedule() {
           iconStrokeWidth={2.5}
         />
       )}
+
+      <ScreenCloser caption="Tap a day above to plan the week ahead." />
 
       <AddEventSheet
         open={addOpen}
