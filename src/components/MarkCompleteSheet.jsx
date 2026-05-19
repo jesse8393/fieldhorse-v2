@@ -12,9 +12,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
-import { Check, ShieldCheck, X, Calendar as CalendarIcon, Trash2 } from 'lucide-react'
+import { Check, ShieldCheck, X, Calendar as CalendarIcon, Trash2, Download } from 'lucide-react'
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
+import { useProfile } from '../contexts/ProfileContext.jsx'
+import { generateCertificate, downloadPdf } from '../lib/pdf.js'
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals
@@ -31,6 +33,7 @@ function todayIso() {
 }
 
 export default function MarkCompleteSheet({ open, userId, contact, onClose, onSaved }) {
+  const { profile } = useProfile()
   const [warrantyStart, setWarrantyStart] = useState(todayIso())
   const [warrantyMonths, setWarrantyMonths] = useState(12)
   const [signoffMethod, setSignoffMethod] = useState('verbal')
@@ -142,6 +145,33 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     } catch (err) {
       hapticError()
       toastError("Couldn't reopen", err?.message || 'Unknown error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function downloadCertificate() {
+    if (!isReopening || saving) return
+    setSaving(true)
+    try {
+      const company = {
+        name: profile?.company_name || profile?.full_name || 'My Company',
+        address: profile?.company_address || '',
+        phone: profile?.company_phone || '',
+        email: profile?.company_email || profile?.email || '',
+        website: profile?.company_website || '',
+        logo_url: profile?.logo_url || null,
+        brand_accent_hex: profile?.brand_accent_hex || null,
+        license_number: profile?.license_number || '',
+        insured_text: profile?.insured_text || ''
+      }
+      const result = await generateCertificate({ company, contact, closeout: existing })
+      downloadPdf(result)
+      hapticSuccess()
+      toastSuccess('Certificate ready', result.filename)
+    } catch (err) {
+      hapticError()
+      toastError("Couldn't build certificate", err?.message || 'Unknown error')
     } finally {
       setSaving(false)
     }
@@ -332,6 +362,31 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                   style={{ ...fieldStyle, resize: 'vertical', minHeight: 84 }}
                 />
               </label>
+
+              {/* Download certificate — only when a closeout is on file.
+                  Full-width dedicated row above the action grid so it
+                  doesn't crowd the Cancel / Save / Reopen trio. */}
+              {isReopening && (
+                <button
+                  type="button"
+                  onClick={() => { hapticTap(); downloadCertificate() }}
+                  disabled={saving}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '11px 14px', borderRadius: 12,
+                    background: 'var(--surface-2)',
+                    border: '1px solid color-mix(in srgb, var(--field-gold-bright) 35%, transparent)',
+                    color: 'var(--field-gold-bright)',
+                    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                    letterSpacing: '0.06em', textTransform: 'uppercase',
+                    cursor: saving ? 'wait' : 'pointer',
+                    marginTop: 4
+                  }}
+                >
+                  <Download size={13} />
+                  Download Certificate of Completion
+                </button>
+              )}
 
               {/* Actions */}
               <div style={{
