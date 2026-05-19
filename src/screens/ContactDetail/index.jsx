@@ -65,7 +65,7 @@ export default function ContactDetail() {
   const {
     contact, subs, expenses, payments, inspections, notes,
     scheduleItems, scheduleCount, todos, clientSummary,
-    insurance, changeOrders,
+    insurance, changeOrders, stageTransitions,
     paid, balance, loading, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
@@ -287,6 +287,7 @@ export default function ContactDetail() {
             scheduleItems={scheduleItems}
             todos={todos}
             changeOrders={changeOrders}
+            stageTransitions={stageTransitions}
             paid={paid}
             balance={balance}
             userId={user?.id}

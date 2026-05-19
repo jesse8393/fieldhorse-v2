@@ -34,12 +34,24 @@ function money(n) {
   })
 }
 
+// Tone matrix for stage transitions. Closed = good (collected),
+// lost = bad, everything else = gold-toned progress.
+const STAGE_TONE = {
+  closed: 'green',
+  lost:   'red',
+  invoice: 'gold',
+  job:    'gold',
+  quote:  'gold',
+  lead:   'neutral'
+}
+
 export function composeActivityEvents({
   contact,
   notes = [],
   payments = [],
   scheduleItems = [],
-  changeOrders = []
+  changeOrders = [],
+  stageTransitions = []
 }) {
   const out = []
 
@@ -69,19 +81,32 @@ export function composeActivityEvents({
     })
   }
 
-  // 3. Stage milestones — the contact's current stage as a single
-  //    "now at" marker. We don't have a stage history table; the
-  //    updated_at + stage pair is the best we can do without one.
-  if (contact?.stage && contact.stage !== 'lead') {
+  // 3. Stage milestones — prefer the real fh_stage_transitions table
+  //    (migration 023) when populated. Falls back to a synthetic "now
+  //    at" marker for pre-migration contacts that have no history rows.
+  if (stageTransitions && stageTransitions.length > 0) {
+    for (const t of stageTransitions) {
+      const tone = STAGE_TONE[t.to_stage] || 'gold'
+      out.push({
+        id: `stage_t:${t.id}`,
+        when: new Date(t.transitioned_at),
+        kind: 'stage',
+        title: t.from_stage
+          ? `${capitalize(t.from_stage)} → ${capitalize(t.to_stage)}`
+          : `Created at ${capitalize(t.to_stage)}`,
+        sub: null,
+        tone
+      })
+    }
+  } else if (contact?.stage && contact.stage !== 'lead') {
+    // Legacy fallback for contacts created before migration 023
     out.push({
       id: `stage:${contact.id}:${contact.stage}`,
       when: new Date(contact.updated_at || contact.created_at),
       kind: 'stage',
       title: `Stage: ${capitalize(contact.stage)}`,
       sub: null,
-      tone: contact.stage === 'closed' ? 'green'
-        : contact.stage === 'lost' ? 'red'
-        : 'gold'
+      tone: STAGE_TONE[contact.stage] || 'gold'
     })
   }
 

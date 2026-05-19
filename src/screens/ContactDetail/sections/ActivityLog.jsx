@@ -64,11 +64,12 @@ export default function ActivityLog({
   notes = [],
   payments = [],
   scheduleItems = [],
-  changeOrders = []
+  changeOrders = [],
+  stageTransitions = []
 }) {
   const events = useMemo(
-    () => composeActivityEvents({ contact, notes, payments, scheduleItems, changeOrders }),
-    [contact, notes, payments, scheduleItems, changeOrders]
+    () => composeActivityEvents({ contact, notes, payments, scheduleItems, changeOrders, stageTransitions }),
+    [contact, notes, payments, scheduleItems, changeOrders, stageTransitions]
   )
   const [expanded, setExpanded] = useState(false)
 

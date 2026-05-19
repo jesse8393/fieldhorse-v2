@@ -45,6 +45,11 @@ export function useJobData(id, userId) {
   // partner-readable; drafts are owner-only. Aggregated into the contract
   // total on the Invoice template's balance summary.
   const [changeOrders, setChangeOrders] = useState([])
+  // Stage transition history (migration 023). Owner write via the
+  // AFTER UPDATE trigger; partner read for shared jobs. Feeds the
+  // activity log so the timeline shows real lead→quote→job→invoice
+  // milestones instead of one synthetic "now at" marker.
+  const [stageTransitions, setStageTransitions] = useState([])
 
   const fetchAll = useCallback(async () => {
     if (!userId || !id) return
@@ -56,7 +61,7 @@ export function useJobData(id, userId) {
     // contact + every child tab empty. Owner queries return the same data
     // they always did; partner queries now return the shared job + its
     // subs/expenses/payments/inspections/notes/schedule/todos.
-    const [c, s, e, p, i, n, sch, td, ins, co] = await Promise.all([
+    const [c, s, e, p, i, n, sch, td, ins, co, st] = await Promise.all([
       supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
       supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
@@ -69,7 +74,10 @@ export function useJobData(id, userId) {
       // partners, so partner viewers always get null — matches design.
       supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle(),
       // Change orders ordered by sequence so CO #1 is first in the list.
-      supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
+      supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true }),
+      // Stage transitions ordered chronologically so the activity log
+      // can render lead→quote→job→… as a sequence.
+      supabase.from('fh_stage_transitions').select('*').eq('contact_id', id).order('transitioned_at', { ascending: true })
     ])
 
     const contactRow = c.data || null
@@ -83,6 +91,7 @@ export function useJobData(id, userId) {
     setTodos(td.data || [])
     setInsurance(ins.data || null)
     setChangeOrders(co.data || [])
+    setStageTransitions(st.data || [])
 
     // Multi-tenant guard preserved: migration 007 RLS denies partner reads on
     // fh_clients, but the JS guard avoids issuing a guaranteed-empty request.
@@ -162,6 +171,7 @@ export function useJobData(id, userId) {
     clientSummary,
     insurance,
     changeOrders,
+    stageTransitions,
     // derived
     paid,
     balance,

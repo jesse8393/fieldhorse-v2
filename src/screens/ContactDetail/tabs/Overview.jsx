@@ -46,6 +46,7 @@ export default function OverviewTab({
   scheduleItems = [],
   todos = [],
   changeOrders = [],
+  stageTransitions = [],
   paid,
   balance,
   userId,
@@ -321,6 +322,7 @@ export default function OverviewTab({
         payments={payments}
         scheduleItems={scheduleItems}
         changeOrders={changeOrders}
+        stageTransitions={stageTransitions}
       />
 
       {/* Inline grid CSS — mobile-first stack, 1.5fr/1fr at ≥768px */}
