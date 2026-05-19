@@ -12,10 +12,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
-import { Check, ShieldCheck, X, Calendar as CalendarIcon, Trash2, Download } from 'lucide-react'
+import { Check, ShieldCheck, X, Calendar as CalendarIcon, Trash2, Download, Send } from 'lucide-react'
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { useProfile } from '../contexts/ProfileContext.jsx'
+import { supabase } from '../lib/supabase.js'
 import { generateCertificate, downloadPdf } from '../lib/pdf.js'
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
@@ -150,28 +151,110 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     }
   }
 
+  function buildCompanyPayload() {
+    return {
+      name: profile?.company_name || profile?.full_name || 'My Company',
+      address: profile?.company_address || '',
+      phone: profile?.company_phone || '',
+      email: profile?.company_email || profile?.email || '',
+      website: profile?.company_website || '',
+      logo_url: profile?.logo_url || null,
+      brand_accent_hex: profile?.brand_accent_hex || null,
+      license_number: profile?.license_number || '',
+      insured_text: profile?.insured_text || ''
+    }
+  }
+
   async function downloadCertificate() {
     if (!isReopening || saving) return
     setSaving(true)
     try {
-      const company = {
-        name: profile?.company_name || profile?.full_name || 'My Company',
-        address: profile?.company_address || '',
-        phone: profile?.company_phone || '',
-        email: profile?.company_email || profile?.email || '',
-        website: profile?.company_website || '',
-        logo_url: profile?.logo_url || null,
-        brand_accent_hex: profile?.brand_accent_hex || null,
-        license_number: profile?.license_number || '',
-        insured_text: profile?.insured_text || ''
-      }
-      const result = await generateCertificate({ company, contact, closeout: existing })
+      const result = await generateCertificate({ company: buildCompanyPayload(), contact, closeout: existing })
       downloadPdf(result)
       hapticSuccess()
       toastSuccess('Certificate ready', result.filename)
     } catch (err) {
       hapticError()
       toastError("Couldn't build certificate", err?.message || 'Unknown error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function sendCertificate() {
+    if (!isReopening || saving) return
+    const recipient = (contact?.email || '').trim()
+    if (!recipient) {
+      hapticError()
+      toastError('Add a client email first', 'Open the client card to add an email, then resend.')
+      return
+    }
+    setSaving(true)
+    try {
+      // 1. Build the PDF in-memory, then upload to job-files so the
+      //    server function can pull it via service role for the Resend
+      //    attachment. Mirrors the QuoteTab send-quote flow.
+      const result = await generateCertificate({ company: buildCompanyPayload(), contact, closeout: existing })
+      const blob = result.doc.output('blob')
+      const rowId = crypto.randomUUID()
+      const path = `${userId}/${contact.id}/${rowId}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from('job-files')
+        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+      if (upErr) {
+        throw new Error(`Couldn't save the certificate PDF: ${upErr.message}`)
+      }
+      // Index it on fh_job_files so it shows up in the Files tab.
+      // Soft-fail if the audit row insert errors — the file itself
+      // already landed and the email send doesn't depend on it.
+      try {
+        await supabase.from('fh_job_files').insert({
+          id: rowId,
+          user_id: userId,
+          job_id: contact.id,
+          filename: result.filename,
+          storage_path: path,
+          mime_type: 'application/pdf',
+          size_bytes: blob.size || 0,
+          kind: 'file'
+        })
+      } catch (e) {
+        console.warn('[mark-complete] fh_job_files insert failed', e)
+      }
+
+      // 2. Server send.
+      const sendRes = await fetch('/api/send-certificate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          sender_user_id: userId,
+          recipient_email: recipient,
+          recipient_name: contact.name || null,
+          storage_path: path,
+          filename: result.filename
+        })
+      })
+      const sendBody = await sendRes.json().catch(() => ({}))
+
+      if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
+        toastError(
+          'Email sender is not configured yet',
+          'The PDF is saved to Files — share it manually.'
+        )
+        downloadPdf(result)
+        return
+      }
+      if (!sendRes.ok || !sendBody?.ok) {
+        throw new Error(sendBody?.detail || sendBody?.error || 'Email send failed.')
+      }
+
+      hapticSuccess()
+      toastSuccess(`Certificate sent to ${recipient}`, result.filename)
+      onSaved?.()
+    } catch (err) {
+      hapticError()
+      toastError("Couldn't send certificate", err?.message || 'Unknown error')
     } finally {
       setSaving(false)
     }
@@ -363,29 +446,36 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                 />
               </label>
 
-              {/* Download certificate — only when a closeout is on file.
-                  Full-width dedicated row above the action grid so it
-                  doesn't crowd the Cancel / Save / Reopen trio. */}
+              {/* Certificate row — only when a closeout is on file.
+                  Two buttons share one row: Download keeps the file
+                  local; Send dispatches the email via /api/send-certificate.
+                  Sits above the Cancel / Save / Reopen action grid. */}
               {isReopening && (
-                <button
-                  type="button"
-                  onClick={() => { hapticTap(); downloadCertificate() }}
-                  disabled={saving}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '11px 14px', borderRadius: 12,
-                    background: 'var(--surface-2)',
-                    border: '1px solid color-mix(in srgb, var(--field-gold-bright) 35%, transparent)',
-                    color: 'var(--field-gold-bright)',
-                    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-                    letterSpacing: '0.06em', textTransform: 'uppercase',
-                    cursor: saving ? 'wait' : 'pointer',
-                    marginTop: 4
-                  }}
-                >
-                  <Download size={13} />
-                  Download Certificate of Completion
-                </button>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 8,
+                  marginTop: 4
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => { hapticTap(); downloadCertificate() }}
+                    disabled={saving}
+                    style={certificateBtnStyle('ghost', saving)}
+                  >
+                    <Download size={13} />
+                    Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { hapticTap(); sendCertificate() }}
+                    disabled={saving}
+                    style={certificateBtnStyle('solid', saving)}
+                  >
+                    <Send size={13} />
+                    Send to client
+                  </button>
+                </div>
               )}
 
               {/* Actions */}
@@ -455,6 +545,32 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       </DrawerContent>
     </Drawer>
   )
+}
+
+function certificateBtnStyle(variant, busy) {
+  const base = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: '11px 12px', borderRadius: 12,
+    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+    letterSpacing: '0.06em', textTransform: 'uppercase',
+    cursor: busy ? 'wait' : 'pointer',
+    opacity: busy ? 0.7 : 1
+  }
+  if (variant === 'solid') {
+    return {
+      ...base,
+      border: 'none',
+      background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+      color: 'var(--onyx)',
+      boxShadow: '0 6px 16px rgba(201,150,58,0.3)'
+    }
+  }
+  return {
+    ...base,
+    background: 'var(--surface-2)',
+    border: '1px solid color-mix(in srgb, var(--field-gold-bright) 35%, transparent)',
+    color: 'var(--field-gold-bright)'
+  }
 }
 
 function chipStyle(active, disabled) {
