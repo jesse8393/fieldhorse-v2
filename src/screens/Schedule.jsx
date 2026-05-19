@@ -946,20 +946,23 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
           aria-label="Delete event"
           style={{
             position: 'absolute',
-            top: 8,
+            // Bottom-right instead of top-right — top-right is where
+            // the LIVE / UP NEXT status pill lives, and stacking the
+            // trash icon next to it looked crowded ("UP NEXT🗑️").
+            bottom: 8,
             right: 8,
-            width: 32, height: 32, borderRadius: 8,
+            width: 28, height: 28, borderRadius: 8,
             border: 'none', background: 'transparent',
             color: 'var(--v3-text-muted)',
             cursor: 'pointer', display: 'grid', placeItems: 'center',
-            opacity: 0.45,
+            opacity: 0.35,
             WebkitTapHighlightColor: 'transparent',
             transition: 'opacity 160ms ease, color 160ms ease'
           }}
           onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
-          onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.45'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
+          onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.35'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
         >
-          <Trash2 size={13} />
+          <Trash2 size={12} />
         </button>
       )}
     </motion.li>
