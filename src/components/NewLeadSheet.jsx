@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField, haptic } from './ActionSheet.jsx'
+import { motion } from 'framer-motion'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
+import { Sparkles, Check, X } from 'lucide-react'
+import { SheetField, SheetChipRow, SheetMoneyField, haptic } from './ActionSheet.jsx'
 import ClientPicker from './ClientPicker.jsx'
 import DocIntakeButton from './DocIntakeButton.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -96,6 +99,27 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   const [voiceState, setVoiceState] = useState('idle') // idle | listening | parsing | error | denied
   const [transcript, setTranscript] = useState('')
   const [committed, setCommitted] = useState(false)
+  // iOS keyboard offset — lifts the drawer above the soft keyboard so
+  // the commit button stays reachable while typing fields below.
+  const [kbd, setKbd] = useState(0)
+
+  useEffect(() => {
+    if (!open) return
+    const vv = window.visualViewport
+    if (!vv) return
+    function update() {
+      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+      setKbd(next > 40 ? next : 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      setKbd(0)
+    }
+  }, [open])
   // Live elapsed-seconds counter for the listening state. Mirrors the
   // RECORDING · 0:42 chip in the v3 design (screens-workflows.jsx
   // lead-pro-mic__lbl) — tells the operator the mic is alive and how
@@ -421,35 +445,66 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
 
   return (
-    <ActionSheet
-      open={open}
-      variantClass="fh-asheet--v2"
-      title={committed ? `${NounCap} captured.` : `New ${stageNoun}.`}
-      accentWord={committed ? 'captured' : stageNoun}
-      sectionLabel={`New ${stageNoun}`}
-      stepCount={3}
-      currentStep={currentStep}
-      commitLabel={saving ? 'Committing…' : committed ? 'Captured' : `Commit ${stageNoun}`}
-      commitBusy={saving}
-      commitDisabled={!form.name.trim() || committed}
-      onClose={onClose}
-      onCommit={commit}
-    >
-      {/* Commit error banner */}
-      {err && (
-        <div className="fh-sheet-error" role="alert">
-          <span className="fh-sheet-error__dot" aria-hidden="true" />
-          <span className="fh-sheet-error__text">{err}</span>
-          <button
-            type="button"
-            className="fh-sheet-error__dismiss"
-            aria-label="Dismiss error"
-            onClick={() => setErr('')}
+    <Drawer open={open} onOpenChange={(v) => { if (!v && !saving) onClose?.() }}>
+      <DrawerContent
+        className="ui:max-w-full ui:overflow-x-hidden"
+        style={{
+          maxWidth: '100%',
+          overflowX: 'hidden',
+          transform: kbd ? `translate3d(0, -${kbd}px, 0)` : undefined,
+          transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+          maxHeight: kbd
+            ? `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`
+            : `calc(100vh - env(safe-area-inset-top) - 24px)`,
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+            <Sparkles size={12} />
+            New {stageNoun}
+          </div>
+          <DrawerTitle asChild>
+            <h2
+              className="fh-font-serif"
+              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+            >
+              {committed ? `${NounCap} captured.` : `New ${stageNoun}.`}
+            </h2>
+          </DrawerTitle>
+          <DrawerDescription
+            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
-            ×
-          </button>
-        </div>
-      )}
+            Tap the mic for fast capture, scan a doc for vision parsing, or fill the fields below.
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <form
+          onSubmit={(e) => { e.preventDefault(); commit() }}
+          style={{
+            padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
+            display: 'flex', flexDirection: 'column', gap: 12,
+            boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
+            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+            flex: 1, minHeight: 0
+          }}
+        >
+          {/* Commit error banner */}
+          {err && (
+            <div className="fh-sheet-error" role="alert">
+              <span className="fh-sheet-error__dot" aria-hidden="true" />
+              <span className="fh-sheet-error__text">{err}</span>
+              <button
+                type="button"
+                className="fh-sheet-error__dismiss"
+                aria-label="Dismiss error"
+                onClick={() => setErr('')}
+              >
+                ×
+              </button>
+            </div>
+          )}
 
       {/* v3 mic block — horizontal layout: circular gold mic on the left,
           label / title / hint stacked on the right. Replaces the older
@@ -670,7 +725,45 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
         />
       </SheetField>
 
-    </ActionSheet>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 6 }}>
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              disabled={saving}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '12px 14px', borderRadius: 12,
+                background: 'var(--surface-2)', border: '1px solid var(--rule)',
+                color: 'var(--ink-strong)',
+                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                cursor: saving ? 'wait' : 'pointer'
+              }}
+            >
+              <X size={14} />
+              Cancel
+            </button>
+            <motion.button
+              type="submit"
+              whileTap={{ scale: (!form.name.trim() || committed || saving) ? 1 : 0.98 }}
+              disabled={!form.name.trim() || committed || saving}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 14px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
+                color: 'var(--onyx)',
+                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                cursor: (!form.name.trim() || committed || saving) ? 'not-allowed' : 'pointer',
+                boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
+                opacity: (!form.name.trim() || committed || saving) ? 0.55 : 1
+              }}
+            >
+              <Check size={14} />
+              {saving ? 'COMMITTING…' : committed ? 'CAPTURED' : `COMMIT ${stageNoun.toUpperCase()}`}
+            </motion.button>
+          </div>
+        </form>
+      </DrawerContent>
+    </Drawer>
   )
 }
 
