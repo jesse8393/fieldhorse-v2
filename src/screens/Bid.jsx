@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calculator, Sparkles, Copy, Check, FileText, Briefcase } from 'lucide-react'
+import { Calculator, Sparkles, Copy, Check, FileText, Briefcase, BookmarkPlus, Trash2, X } from 'lucide-react'
 import { RATE_CARD, TRADE_LABELS } from '../lib/rateCard.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { JOB_TYPES } from '../lib/jobTypes.js'
@@ -36,6 +36,23 @@ export default function Bid() {
   const [jobType, setJobType] = useState('')
   const [copied, setCopied] = useState(false)
   const [pushing, setPushing] = useState(false)
+  // Templates library (migration 024). Loaded on mount + after every
+  // save/delete so the picker stays fresh. saving is per-instance
+  // (only one save action in flight at a time).
+  const [templates, setTemplates] = useState([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateNamePrompt, setTemplateNamePrompt] = useState('')
+
+  async function fetchTemplates() {
+    if (!user?.id) return
+    const { data } = await supabase
+      .from('fh_estimate_templates')
+      .select('*')
+      .order('updated_at', { ascending: false })
+    setTemplates(data || [])
+  }
+  useEffect(() => { fetchTemplates() }, [user?.id])
 
   const total = useMemo(() => {
     if (!bid) return null
@@ -162,6 +179,69 @@ export default function Bid() {
     }
   }
 
+  // Save the current bid output as a reusable template. Naming is
+  // a quick in-page prompt — the operator types the template name
+  // inline and hits save. Cancel resets the prompt without writing.
+  async function saveAsTemplate() {
+    if (!bid || !total || !user?.id || savingTemplate) return
+    const name = (templateNamePrompt || '').trim()
+      || bid.summary
+      || (jobType ? `${capitalize(jobType)} template` : 'Untitled estimate')
+    setSavingTemplate(true)
+    try {
+      const { error } = await supabase.from('fh_estimate_templates').insert({
+        user_id: user.id,
+        name,
+        description: bid.summary || null,
+        job_type: jobType || null,
+        line_items: bid.line_items || [],
+        total_low:  bid.total_low ?? null,
+        total_high: bid.total_high ?? null
+      })
+      if (error) throw error
+      hapticSuccess()
+      toastSuccess('Saved to templates', name)
+      setTemplateNamePrompt('')
+      await fetchTemplates()
+    } catch (e) {
+      toastError("Couldn't save template", e?.message || 'Try again.')
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  // Load a saved template into the current bid state — skips the AI
+  // round trip entirely. The operator can refine + push to a job
+  // from there as if they'd just generated it.
+  function loadTemplate(t) {
+    setBid({
+      summary: t.description || t.name,
+      line_items: t.line_items || [],
+      total_low:  t.total_low,
+      total_high: t.total_high,
+      assumptions: [],
+      risks: []
+    })
+    if (t.job_type) setJobType(t.job_type)
+    setScope(`Loaded from template: ${t.name}`)
+    setPickerOpen(false)
+    hapticSuccess()
+    toastSuccess('Template loaded', t.name)
+  }
+
+  async function deleteTemplate(t) {
+    if (!t?.id) return
+    if (!window.confirm(`Delete "${t.name}" from your templates?`)) return
+    try {
+      const { error } = await supabase.from('fh_estimate_templates').delete().eq('id', t.id)
+      if (error) throw error
+      toastSuccess('Template deleted', t.name)
+      await fetchTemplates()
+    } catch (e) {
+      toastError("Couldn't delete", e?.message || 'Try again.')
+    }
+  }
+
   async function copyEstimate() {
     if (!bid || !total) return
     const lines = [
@@ -237,6 +317,133 @@ export default function Bid() {
           </p>
         </div>
       </motion.div>
+
+      {/* TEMPLATES RAIL — surfaces saved estimate templates above the
+          scope input so the operator can load a previous bid as a
+          starting point instead of typing or re-running the AI. Only
+          renders when at least one template exists. */}
+      {templates.length > 0 && (
+        <motion.div
+          variants={item}
+          style={{ padding: '0 var(--v3-gutter) 10px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{
+              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.16em', textTransform: 'uppercase',
+              color: 'var(--v3-text-muted)'
+            }}>
+              Your templates
+              <span style={{ marginLeft: 6, color: 'var(--v3-text-faint, var(--v3-text-muted))' }}>
+                · {templates.length}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setPickerOpen((v) => !v)}
+              style={{
+                background: 'transparent', border: 'none',
+                color: 'var(--v3-primary-bright)',
+                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.04em', cursor: 'pointer', padding: 0
+              }}
+            >
+              {pickerOpen ? 'Hide' : 'Browse all'}
+            </button>
+          </div>
+          {pickerOpen ? (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {templates.map((t) => (
+                <li key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center', padding: '10px 12px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => loadTemplate(t)}
+                    style={{
+                      background: 'transparent', border: 'none', padding: 0,
+                      textAlign: 'left', cursor: 'pointer',
+                      color: 'var(--v3-text)', minWidth: 0,
+                      display: 'flex', flexDirection: 'column', gap: 2
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.name}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                      {(t.line_items || []).length} item{(t.line_items || []).length === 1 ? '' : 's'}
+                      {t.total_high ? ` · ${money(t.total_high)}` : ''}
+                      {t.job_type ? ` · ${capitalize(t.job_type)}` : ''}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => loadTemplate(t)}
+                    style={{
+                      padding: '6px 10px', borderRadius: 8,
+                      background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                      color: 'var(--v3-primary-bright)',
+                      fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+                      letterSpacing: '0.04em', cursor: 'pointer'
+                    }}
+                  >
+                    Load
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteTemplate(t)}
+                    aria-label={`Delete template ${t.name}`}
+                    style={{
+                      width: 26, height: 26, borderRadius: 6,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent',
+                      border: '1px solid rgba(232, 90, 87, 0.35)',
+                      color: 'var(--v3-danger-bright, #f5a294)', cursor: 'pointer'
+                    }}
+                  >
+                    <Trash2 size={12} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {templates.slice(0, 6).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => loadTemplate(t)}
+                  style={{
+                    padding: '7px 12px', borderRadius: 999,
+                    background: 'var(--v3-surface)',
+                    border: '1px solid var(--v3-border-strong)',
+                    color: 'var(--v3-text)',
+                    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis'
+                  }}
+                >
+                  {t.name}
+                </button>
+              ))}
+              {templates.length > 6 && (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  style={{
+                    padding: '7px 12px', borderRadius: 999,
+                    background: 'transparent', border: '1px dashed var(--v3-border-strong)',
+                    color: 'var(--v3-text-muted)',
+                    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  +{templates.length - 6} more
+                </button>
+              )}
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* SCOPE INPUT CARD — primary workspace */}
       <motion.div
@@ -452,7 +659,31 @@ export default function Bid() {
                 <Sparkles size={11} />
                 Recommended Price · {marginPct}% margin
               </span>
-              <div style={{ display: 'inline-flex', gap: 6 }}>
+              <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={saveAsTemplate}
+                  disabled={savingTemplate}
+                  title="Save this bid as a reusable template"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    border: '1px solid var(--v3-border-strong)',
+                    background: 'var(--v3-surface-2)',
+                    color: 'var(--v3-text)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: savingTemplate ? 'wait' : 'pointer',
+                    opacity: savingTemplate ? 0.7 : 1
+                  }}
+                >
+                  <BookmarkPlus size={12} />
+                  {savingTemplate ? 'Saving…' : 'Save template'}
+                </button>
                 <button
                   type="button"
                   onClick={copyEstimate}
