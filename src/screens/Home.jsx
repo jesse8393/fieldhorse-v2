@@ -24,6 +24,7 @@ import { ACTIVE_STAGES } from '../lib/stages.js'
 import { useFhMotion } from '../lib/motion.js'
 import CountUp from '../components/fx/CountUp.jsx'
 import { QuickAction, SectionHeader } from '../components/v3'
+import HomeActivityCard from '../components/HomeActivityCard.jsx'
 import { hapticTap } from '../lib/haptics.js'
 // V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
 // same batch helper Jobs already uses (one query + one signed-URL
@@ -828,6 +829,14 @@ export default function Home() {
           <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
           <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
         </div>
+      </motion.div>
+
+      {/* ─────────── RECENT ACTIVITY — cross-job feed ───────────
+          Compact 5-row card that surfaces the same data as /activity
+          on the dashboard surface. Auto-hides on a brand-new account
+          with no events. "See all" links through to /activity. */}
+      <motion.div variants={item} style={{ padding: '8px 20px 14px' }}>
+        <HomeActivityCard />
       </motion.div>
 
       {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
