@@ -1,66 +1,42 @@
 // src/components/documents/ProposalTemplate.jsx
 //
-// Customer-facing HTML preview of a contractor proposal. Composes the
-// shared document primitives in the spec order:
+// Customer-facing HTML preview of a contractor proposal — restrained
+// editorial layout matching the reference estimate. Composes:
 //
-//   1. Cover / header              (handled by DocumentShell)
-//   2. Project overview            (boilerplate + project address)
-//   3. Scope of work               (ScopeSectionCard × N, no pricing)
-//   4. Materials                   (ScopeSectionCard with bullets)
-//   5. Optional upgrades           (ScopeSectionCard with showPricing)
-//   6. Pricing summary             (PricingSummaryCard)
-//   7. Payment terms               (PaymentTermsBlock)
-//   8. Warranty                    (paragraph block)
-//   9. Exclusions                  (bullet list)
-//  10. Insurance (optional)        (InsuranceModeBlock — auto-hides)
-//  11. Approval / signature        (ApprovalBlock)
+//   1. DocumentShell           (logo + ESTIMATE/PROPOSAL # + recipient / sender)
+//   2. LineItemsTable          (dark header bar + multi-line desc rows)
+//   3. Totals block            (right-aligned, bordered TOTAL box)
+//   4. Optional upgrades       (when items.is_optional present)
+//   5. Optional change orders  (when changeOrders has entries)
+//   6. Optional insurance      (when insurance payload present)
+//   7. Payment terms paragraph (configurable, defaults to 50/40/10)
+//   8. Approval section        (signature lines)
+//   9. Disclaimer paragraph    (DocumentShell footer)
 //
-// Pure presentation: this component does not read Supabase or compute
-// totals. The parent screen (Quote tab / preview pane) gathers + maps
-// data and hands it down as props.
+// The reference layout is calm-and-confident. Where the prior version
+// stacked many bordered cards, this one leans on whitespace + a single
+// dark items table as the visual anchor. The brand_accent_hex drives
+// the table header bar so each contractor's identity still shows.
 
 import DocumentShell from './DocumentShell.jsx'
-import SectionHeading from './SectionHeading.jsx'
-import ScopeSectionCard from './ScopeSectionCard.jsx'
-import PricingSummaryCard from './PricingSummaryCard.jsx'
-import PaymentTermsBlock, { DEFAULT_PAYMENT_SCHEDULE } from './PaymentTermsBlock.jsx'
-import ApprovalBlock from './ApprovalBlock.jsx'
+import LineItemsTable from './LineItemsTable.jsx'
 import InsuranceModeBlock from './InsuranceModeBlock.jsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.jsx'
-import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
-import { longDate, cityState } from './format.js'
+import { DOC_COLORS, DOC_FONTS } from './tokens.js'
+import { money } from './format.js'
 import { proposalNumber } from './numbers.js'
 
-/**
- * @param {object}   props
- * @param {object}   props.company         (see DocumentShell)
- * @param {object}   props.contact         { name, address, phone, email, job_title }
- * @param {object}   props.project         { title, address, snapshot? }
- * @param {Array}    props.scopeSections   [{ id, title, description, bullets?,
- *                                              items?, photos?, internalNote? }]
- * @param {Array}    [props.upgrades]      optional [{ title, description, items, ... }]
- *                                          rendered separately with showPricing=true
- * @param {object}   props.pricing         { baseTotal, upgradeTotal, discount, taxRate }
- * @param {Array}    [props.paymentSchedule] override DEFAULT_PAYMENT_SCHEDULE
- * @param {string}   [props.warrantyText]
- * @param {Array}    [props.exclusions]    array of strings (bullets)
- * @param {object}   [props.insurance]     forwarded to InsuranceModeBlock
- * @param {object}   [props.approval]      { mode, clientName, clientSignatureDataUrl,
- *                                            clientApprovedAt, contractorSignatureDataUrl,
- *                                            contractorApprovedAt }
- * @param {object}   [props.meta]          { issuedAt, expiresAt, number } — number derived
- *                                          from company name + contact.id when not provided
- * @param {string}   [props.status]        'draft' | 'sent' | 'approved' | 'expired'
- * @param {boolean}  [props.showInternalNotes=false]  forward to scope cards
- */
+const DEFAULT_PAYMENT_COPY = '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
+const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, owner-requested additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
+
 export default function ProposalTemplate({
   company = {},
   contact = {},
   project,
-  scopeSections = [],
-  upgrades = [],
+  scopeSections = [],     // legacy — flattened into rows
+  upgrades = [],          // is_optional items, rendered as a second table
   pricing = { baseTotal: 0, upgradeTotal: 0, discount: 0, taxRate: 0 },
-  paymentSchedule = DEFAULT_PAYMENT_SCHEDULE,
+  paymentSchedule = null, // unused in v2 — payment terms are a paragraph now
   warrantyText,
   exclusions = [],
   insurance = null,
@@ -70,254 +46,373 @@ export default function ProposalTemplate({
   status = 'draft',
   showInternalNotes = false
 }) {
-  const gold = resolveBrandGold(company)
-
   const number = meta.number || proposalNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
   const expiresAt = meta.expiresAt || null
-  const resolvedProject = project || {
-    title: contact?.job_title || 'Construction services',
-    address: contact?.address || ''
-  }
 
-  const overviewCopy = buildOverviewCopy(company?.name, resolvedProject.address)
+  // Flatten scope sections + their items into a single list of table
+  // rows. Section title becomes the row's title; items collapse into
+  // descriptionLines so the customer sees one clean "Concrete add on /
+  // 12x14.5 concrete / 5x4 concrete" row per trade.
+  const baseRows = scopeSections.map((sec) => ({
+    id: sec.id,
+    title: sec.title,
+    descriptionLines: (sec.items || []).map((it) => {
+      const qty = Number(it.qty || 1)
+      const unit = it.unit ? ` ${it.unit}` : ''
+      return qty !== 1
+        ? `${qty}${unit} · ${it.description || '—'}`
+        : (it.description || '—')
+    }),
+    qty: 1,
+    rate: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
+    amount: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+  }))
 
-  const total = computeTotal(pricing)
+  const upgradeRows = upgrades.map((sec) => ({
+    id: sec.id,
+    title: sec.title,
+    descriptionLines: (sec.items || []).map((it) => it.description || '—'),
+    qty: 1,
+    rate: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
+    amount: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+  }))
+
+  // Approved change orders bump the contract total in the on-screen
+  // grand total. They render as their own table row too so the
+  // customer sees what got added.
+  const coAdjustment = (changeOrders || [])
+    .filter((co) => co?.status === 'approved')
+    .reduce((s, co) => s + Number(co.amount || 0), 0)
+
+  const subtotal = Math.max(0, Number(pricing.baseTotal || 0))
+  const upgradeSubtotal = Math.max(0, Number(pricing.upgradeTotal || 0))
+  const discount = Math.max(0, Number(pricing.discount || 0))
+  const tax = (subtotal - discount) * Number(pricing.taxRate || 0)
+  const grandTotal = Math.max(0, subtotal - discount + tax + coAdjustment)
+
+  const statusChip = statusToChip(status)
 
   return (
     <DocumentShell
       company={company}
-      docTypeEyebrow="PROPOSAL"
-      title={resolvedProject.title}
-      project={resolvedProject}
-      status={statusPill(status, gold)}
-      metaCols={[
-        { label: 'CLIENT',        value: contact?.name || '—' },
-        { label: 'ISSUED',        value: longDate(issuedAt) },
-        { label: 'VALID UNTIL',   value: expiresAt ? longDate(expiresAt) : 'Open' },
-        { label: 'PROPOSAL #',    value: number, accent: true }
-      ]}
+      docType="ESTIMATE"
+      number={shortNumber(number)}
+      issuedAt={issuedAt}
+      recipient={contact}
+      status={statusChip}
+      footer={DEFAULT_DISCLAIMER}
     >
-      {/* ─── 2. Project overview ──────────────────────── */}
-      <section style={{ breakInside: 'avoid' }}>
-        <SectionHeading
-          company={company}
-          eyebrow="Project overview"
-          title="What we'll build"
-        />
-        <p
-          style={{
-            ...typeStyle('body'),
-            color: DOC_COLORS.inkMid,
-            margin: 0,
-            maxWidth: '64ch'
-          }}
-        >
-          {overviewCopy}
-        </p>
-      </section>
+      {/* Items table */}
+      {baseRows.length > 0 && (
+        <LineItemsTable rows={baseRows} company={company} />
+      )}
 
-      {/* ─── 3 + 4. Scope of work (incl. materials cards) ─── */}
-      {scopeSections.length > 0 && (
+      {/* Totals — right-aligned with the boxed TOTAL */}
+      <TotalsBlock
+        subtotal={subtotal}
+        discount={discount}
+        tax={tax}
+        taxRate={pricing.taxRate || 0}
+        coAdjustment={coAdjustment}
+        grandTotal={grandTotal}
+      />
+
+      {/* Optional upgrades — separate table to keep base/upgrade
+          arithmetic obvious. */}
+      {upgradeRows.length > 0 && (
         <section>
-          <SectionHeading
-            company={company}
-            eyebrow="Scope of work"
-            title="Trades and materials"
-            meta={`${scopeSections.length} section${scopeSections.length === 1 ? '' : 's'}`}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {scopeSections.map((s) => (
-              <ScopeSectionCard
-                key={s.id || s.title}
-                title={s.title}
-                description={s.description}
-                bullets={s.bullets}
-                items={s.items}
-                photos={s.photos}
-                internalNote={s.internalNote}
-                showPricing={false}
-                showInternalNotes={showInternalNotes}
-              />
-            ))}
-          </div>
+          <SectionLabel>Optional upgrades</SectionLabel>
+          <LineItemsTable rows={upgradeRows} company={company} />
         </section>
       )}
 
-      {/* ─── 5. Optional upgrades ───────────────────────── */}
-      {upgrades.length > 0 && (
-        <section>
-          <SectionHeading
-            company={company}
-            eyebrow="Optional upgrades"
-            title="Add at any time"
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {upgrades.map((u) => (
-              <ScopeSectionCard
-                key={u.id || u.title}
-                title={u.title}
-                description={u.description}
-                bullets={u.bullets}
-                items={u.items}
-                photos={u.photos}
-                internalNote={u.internalNote}
-                showPricing={true}
-                showInternalNotes={showInternalNotes}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ─── Change orders (when present, before pricing so the
-              customer sees what got added before the final number) ─── */}
+      {/* Change orders */}
       {(changeOrders || []).filter((co) => co?.status !== 'void').length > 0 && (
         <section>
-          <SectionHeading
-            company={company}
-            eyebrow="Change orders"
-            title="Contract amendments"
-            meta={`${(changeOrders || []).filter((co) => co?.status !== 'void').length} order${changeOrders.length === 1 ? '' : 's'}`}
-          />
+          <SectionLabel>Contract amendments</SectionLabel>
           <ChangeOrdersBlock changeOrders={changeOrders} company={company} />
         </section>
       )}
 
-      {/* ─── 6. Pricing summary ─────────────────────────── */}
-      <section>
-        <SectionHeading
-          company={company}
-          eyebrow="Pricing summary"
-          title="Investment"
-        />
-        <PricingSummaryCard
-          company={company}
-          baseTotal={pricing.baseTotal}
-          upgradeTotal={pricing.upgradeTotal}
-          discount={pricing.discount}
-          taxRate={pricing.taxRate}
-          heroLabel="Project investment"
-        />
-      </section>
-
-      {/* ─── 7. Payment terms ───────────────────────────── */}
-      <section>
-        <SectionHeading
-          company={company}
-          eyebrow="Payment terms"
-          title="Milestone schedule"
-        />
-        <PaymentTermsBlock
-          total={total}
-          schedule={paymentSchedule}
-          company={company}
-        />
-      </section>
-
-      {/* ─── 8. Warranty ────────────────────────────────── */}
-      {warrantyText && (
-        <section style={{ breakInside: 'avoid' }}>
-          <SectionHeading company={company} eyebrow="Warranty" title="What we stand behind" />
-          <p
-            style={{
-              ...typeStyle('body'),
-              color: DOC_COLORS.inkMid,
-              margin: 0,
-              whiteSpace: 'pre-wrap',
-              maxWidth: '64ch'
-            }}
-          >
-            {warrantyText}
-          </p>
-        </section>
-      )}
-
-      {/* ─── 9. Exclusions ──────────────────────────────── */}
-      {exclusions.length > 0 && (
-        <section style={{ breakInside: 'avoid' }}>
-          <SectionHeading company={company} eyebrow="Exclusions" title="Not included in this proposal" />
-          <ul
-            style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6
-            }}
-          >
-            {exclusions.map((x, i) => (
-              <li
-                key={i}
-                style={{
-                  ...typeStyle('body'),
-                  color: DOC_COLORS.inkMid,
-                  display: 'grid',
-                  gridTemplateColumns: '14px 1fr',
-                  gap: 8,
-                  alignItems: 'baseline'
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: 'inline-block',
-                    width: 4,
-                    height: 4,
-                    borderRadius: '50%',
-                    background: DOC_COLORS.inkMuted,
-                    marginTop: 6
-                  }}
-                />
-                <span>{x}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* ─── 10. Insurance mode (optional) ──────────────── */}
+      {/* Insurance */}
       <InsuranceModeBlock insurance={insurance} company={company} />
 
-      {/* ─── 11. Approval / signature ───────────────────── */}
-      <section>
-        <SectionHeading company={company} eyebrow="Approval" title="Authorization to proceed" />
-        <ApprovalBlock
-          company={company}
-          contractorName={company?.name}
-          mode={approval?.mode || 'blank'}
-          clientName={approval?.clientName || contact?.name}
-          clientSignatureDataUrl={approval?.clientSignatureDataUrl}
-          clientApprovedAt={approval?.clientApprovedAt}
-          contractorSignatureDataUrl={approval?.contractorSignatureDataUrl}
-          contractorApprovedAt={approval?.contractorApprovedAt}
-        />
+      {/* Payment terms + warranty + exclusions as a single editorial
+          block instead of three card sections — matches the reference
+          calm. */}
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <Detail label="PAYMENT TERMS">
+          {DEFAULT_PAYMENT_COPY}
+        </Detail>
+        {warrantyText && (
+          <Detail label="WARRANTY">{warrantyText}</Detail>
+        )}
+        {exclusions.length > 0 && (
+          <Detail label="EXCLUSIONS">
+            {exclusions.join(' · ')}
+          </Detail>
+        )}
       </section>
+
+      {/* Signature lines */}
+      <ApprovalLines
+        company={company}
+        contact={contact}
+        approval={approval}
+      />
     </DocumentShell>
   )
 }
 
-function buildOverviewCopy(companyName, address) {
-  const c = (companyName && String(companyName).trim()) || 'Our company'
-  const a = (address && String(address).trim()) || 'the project site'
-  return `${c} proposes the following scope of work for the improvement and restoration of the property located at ${a}. Our team will provide labor, materials, project coordination, site protection, cleanup, and installation services necessary to complete the project in accordance with manufacturer standards and applicable code requirements.`
+/* ─── Internal blocks ─── */
+
+function SectionLabel({ children }) {
+  return (
+    <div
+      style={{
+        fontFamily: DOC_FONTS.body,
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        color: DOC_COLORS.ink,
+        marginBottom: 10
+      }}
+    >
+      {children}
+    </div>
+  )
 }
 
-function computeTotal({ baseTotal = 0, upgradeTotal = 0, discount = 0, taxRate = 0 }) {
-  const base = Number(baseTotal || 0)
-  const up = Number(upgradeTotal || 0)
-  const disc = Math.max(0, Number(discount || 0))
-  const preTax = Math.max(0, base + up - disc)
-  return preTax + preTax * Number(taxRate || 0)
+function Detail({ label, children }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: DOC_FONTS.body,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          color: DOC_COLORS.ink,
+          marginBottom: 4
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: DOC_FONTS.body,
+          fontSize: 13,
+          color: DOC_COLORS.inkMid,
+          lineHeight: 1.5
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
 }
 
-function statusPill(status, gold) {
-  switch (status) {
+function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTotal }) {
+  return (
+    <section
+      style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginTop: -8
+      }}
+    >
+      <div style={{ minWidth: 320 }}>
+        {(discount > 0 || taxRate > 0 || coAdjustment !== 0) && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10 }}>
+            <tbody>
+              <Row label="Subtotal" value={money(subtotal, { cents: true })} />
+              {discount > 0 && <Row label="Discount" value={`−${money(discount, { cents: true })}`} muted />}
+              {taxRate > 0 && <Row label={`Tax · ${(taxRate * 100).toFixed(2)}%`} value={money(tax, { cents: true })} />}
+              {coAdjustment !== 0 && <Row label="Approved change orders" value={`${coAdjustment >= 0 ? '+' : ''}${money(coAdjustment, { cents: true })}`} />}
+            </tbody>
+          </table>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: 18,
+            paddingTop: 6
+          }}
+        >
+          <span
+            style={{
+              fontFamily: DOC_FONTS.body,
+              fontSize: 14,
+              fontWeight: 600,
+              color: DOC_COLORS.ink
+            }}
+          >
+            Total
+          </span>
+          <span
+            style={{
+              fontFamily: DOC_FONTS.body,
+              fontSize: 16,
+              fontWeight: 700,
+              color: DOC_COLORS.ink,
+              border: `1px solid ${DOC_COLORS.ink}`,
+              padding: '8px 18px',
+              borderRadius: 2,
+              minWidth: 130,
+              textAlign: 'right',
+              fontVariantNumeric: 'tabular-nums'
+            }}
+          >
+            {money(grandTotal, { cents: true })}
+          </span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Row({ label, value, muted }) {
+  return (
+    <tr>
+      <td
+        style={{
+          padding: '6px 0',
+          fontFamily: DOC_FONTS.body,
+          fontSize: 13,
+          color: DOC_COLORS.inkMuted,
+          textAlign: 'left'
+        }}
+      >
+        {label}
+      </td>
+      <td
+        style={{
+          padding: '6px 0',
+          fontFamily: DOC_FONTS.body,
+          fontSize: 13,
+          color: muted ? DOC_COLORS.inkMuted : DOC_COLORS.ink,
+          fontWeight: 600,
+          textAlign: 'right',
+          fontVariantNumeric: 'tabular-nums'
+        }}
+      >
+        {value}
+      </td>
+    </tr>
+  )
+}
+
+function ApprovalLines({ company, contact, approval }) {
+  const stamped = approval?.mode === 'approved'
+  return (
+    <section style={{ marginTop: 12 }}>
+      <SectionLabel>Approval</SectionLabel>
+      <p style={{
+        margin: '0 0 18px',
+        fontFamily: DOC_FONTS.body,
+        fontSize: 12,
+        lineHeight: 1.5,
+        color: DOC_COLORS.inkMid,
+        maxWidth: '60ch'
+      }}>
+        By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+        <SigLine
+          label="Client signature"
+          name={approval?.clientName || contact?.name}
+          dataUrl={stamped ? approval?.clientSignatureDataUrl : null}
+          date={stamped ? approval?.clientApprovedAt : ''}
+        />
+        <SigLine
+          label="Contractor signature"
+          name={company?.name}
+          dataUrl={stamped ? approval?.contractorSignatureDataUrl : null}
+          date={stamped ? approval?.contractorApprovedAt : ''}
+        />
+      </div>
+    </section>
+  )
+}
+
+function SigLine({ label, name, dataUrl, date }) {
+  return (
+    <div>
+      <div
+        style={{
+          height: 56,
+          display: 'flex',
+          alignItems: 'flex-end',
+          borderBottom: `1px solid ${DOC_COLORS.ink}`,
+          paddingBottom: 4
+        }}
+      >
+        {dataUrl ? (
+          <img src={dataUrl} alt="Signature" style={{ maxHeight: 48, maxWidth: '100%' }} />
+        ) : name ? (
+          <span
+            style={{
+              fontFamily: "'Caveat', 'Snell Roundhand', cursive",
+              fontSize: 24,
+              color: DOC_COLORS.inkMid
+            }}
+          >
+            {name}
+          </span>
+        ) : null}
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          fontFamily: DOC_FONTS.body,
+          fontSize: 10,
+          color: DOC_COLORS.inkMuted
+        }}
+      >
+        <span style={{ fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+          {label}
+        </span>
+        <span style={{ fontSize: 11 }}>
+          Date{date ? `: ${shortDateOnly(date)}` : ''}
+        </span>
+      </div>
+      {name && (
+        <div style={{ marginTop: 3, fontSize: 11, color: DOC_COLORS.inkMuted }}>
+          {name}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function shortDateOnly(d) {
+  if (!d) return ''
+  const dt = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(dt.getTime())) return ''
+  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function shortNumber(num) {
+  // Reference layout shows "#62" — drop the prefix + year. Keep only
+  // the trailing seed segment so the # reads short on the doc.
+  if (!num) return ''
+  const parts = String(num).split('-')
+  return parts[parts.length - 1] || String(num)
+}
+
+function statusToChip(status) {
+  switch (String(status || 'draft').toLowerCase()) {
     case 'approved': return { label: 'APPROVED', tone: 'green' }
-    case 'expired':  return { label: 'EXPIRED',  tone: 'red' }
     case 'sent':     return { label: 'SENT',     tone: 'gold' }
-    case 'draft':
+    case 'expired':  return { label: 'EXPIRED',  tone: 'red' }
+    case 'rejected': return { label: 'REJECTED', tone: 'red' }
     default:         return { label: 'DRAFT',    tone: 'slate' }
   }
 }

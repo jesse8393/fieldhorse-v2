@@ -1,58 +1,61 @@
 // src/components/documents/DocumentShell.jsx
 //
-// Letter-paper preview wrapper for proposals + invoices. Renders the
-// shared chrome: brand-accent top rule, letterhead row (logo + company
-// name + tagline + status pill), title block (eyebrow + project title),
-// meta grid (CLIENT / dates / number / project address), body content
-// (children), and an editorial footer.
+// Letter-paper wrapper — restrained editorial layout matching the
+// "Estimate #62" reference the contractor approved. Premium feel via
+// confident whitespace + a single dark logo block + minimal hairlines.
 //
-// Pure presentation — no data fetching, no Supabase calls. Both
-// ProposalTemplate and InvoiceTemplate compose this shell with their
-// own meta + body.
+// Layout (top → bottom):
 //
-// Responsive: the letter paper renders at 8.5" wide on desktop and
-// scales to fit narrower viewports while preserving its proportions
-// (so the customer's mobile preview reads the same as desktop). All
-// internal spacing uses the shared DOC_SPACE tokens.
+//   ┌────────────────────────────────────────────────────────────┐
+//   │  [LOGO]                              {DOC_TYPE} #{NUMBER}  │
+//   │                                      ─────────────────     │
+//   │                                      SENT ON:              │
+//   │                                      {issued date}         │
+//   │                                                             │
+//   │  ──────────────────         ──────────────────────         │
+//   │  RECIPIENT:                  SENDER:                       │
+//   │  {client name + address}     {company name + address}      │
+//   │                              {phone / email / website}     │
+//   │                                                             │
+//   │  {children — body sections}                                 │
+//   └────────────────────────────────────────────────────────────┘
+//
+// Replaces the prior gold-accent letterhead. Type stays sans-serif
+// (DM Sans) throughout — the reference is calm-and-confident, not
+// editorial-display. brand_accent_hex still drives the table header
+// bar on the items table inside children + the logo monogram fallback
+// frame, so each contractor's brand color still surfaces without
+// overwhelming the doc.
 
-import {
-  DOC_COLORS, DOC_FONTS, DOC_SPACE, typeStyle,
-  resolveBrandGold, resolveBrandGoldSoft
-} from './tokens.js'
-import { cityState } from './format.js'
+import { DOC_COLORS, DOC_FONTS, DOC_SPACE, resolveBrandGold } from './tokens.js'
 
 /**
- * @param {object}  props
- * @param {object}  props.company         { name, address, phone, email, website,
- *                                            logo_url, brand_accent_hex,
- *                                            license_number, insured_text }
- * @param {string}  props.docTypeEyebrow  'PROPOSAL' / 'INVOICE'
- * @param {string}  props.title           Project title (e.g. "Roof, deck & chimney")
- * @param {Array}   props.metaCols        [{ label, value, accent?: bool, color?: string }, ...]
- *                                          Each col stamps a label over a value. 2-4 cols renders cleanly.
- * @param {object}  [props.status]        { label, tone: 'gold'|'green'|'red'|'slate' } optional pill
- * @param {object}  [props.project]       { title, address } — surfaced under the title when present
- * @param {ReactNode} props.children      Body sections (scope, totals, terms, etc.)
+ * @param {object}    props
+ * @param {object}    props.company
+ * @param {string}    props.docType       — 'ESTIMATE' | 'PROPOSAL' | 'INVOICE'
+ * @param {string}    props.number        — full doc number
+ * @param {Date|string} [props.issuedAt]  — sent / issued date
+ * @param {object}    props.recipient     — { name, address, phone, email }
+ * @param {object}    [props.status]      — { label, tone } small chip top-right
+ * @param {ReactNode} props.children      — body (items table, totals, etc.)
+ * @param {ReactNode} [props.footer]      — fine-print paragraph at bottom
  */
 export default function DocumentShell({
   company = {},
-  docTypeEyebrow,
-  title,
-  metaCols = [],
+  docType,
+  number,
+  issuedAt,
+  recipient = {},
   status = null,
-  project = null,
-  children
+  children,
+  footer
 }) {
-  const gold = resolveBrandGold(company)
-  const goldSoft = resolveBrandGoldSoft(company)
-  const tagline = buildTagline(company)
+  const brand = resolveBrandGold(company)
 
   return (
     <article
       className="fh-doc-shell"
-      data-doc-shell="true"
       style={{
-        // Letter paper. Caps at 8.5"; flexes down on narrow viewports.
         width: '100%',
         maxWidth: `${DOC_SPACE.pageWidthPx}px`,
         minHeight: `${DOC_SPACE.pageMinHeightPx}px`,
@@ -61,153 +64,58 @@ export default function DocumentShell({
         color: DOC_COLORS.ink,
         fontFamily: DOC_FONTS.body,
         position: 'relative',
-        // Subtle paper shadow + cream rule so the preview reads as a
-        // real document rather than a flat web card.
         boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 24px 48px -24px rgba(0,0,0,0.25)',
         borderRadius: 4,
         overflow: 'hidden'
       }}
     >
-      {/* Top brand-accent rule */}
-      <div style={{ height: 4, background: gold }} aria-hidden="true" />
-
-      {/* Body */}
       <div
         style={{
-          padding: `${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx + 24}px`,
+          padding: `${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx + 20}px`,
           display: 'flex',
           flexDirection: 'column',
-          gap: `${DOC_SPACE.blockGap}px`
+          gap: 28
         }}
       >
-        {/* ─── Letterhead row ──────────────────────────── */}
+        {/* ─── Header row ─────────────────────────────────── */}
         <header
           style={{
             display: 'grid',
-            gridTemplateColumns: 'auto 1fr auto',
-            alignItems: 'center',
-            gap: 16
+            gridTemplateColumns: '1fr 1fr',
+            gap: 24,
+            alignItems: 'flex-start'
           }}
         >
-          <LogoBlock company={company} gold={gold} />
-
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontFamily: DOC_FONTS.display,
-                fontSize: 24,
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                color: DOC_COLORS.ink,
-                lineHeight: 1.05,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {(company?.name || 'My Company').toUpperCase()}
-            </div>
-            {tagline && (
-              <div
-                style={{
-                  marginTop: 4,
-                  ...typeStyle('sub'),
-                  color: DOC_COLORS.inkMuted
-                }}
-              >
-                {tagline}
-              </div>
-            )}
-          </div>
-
-          {status && <StatusPill {...status} brandGold={gold} brandGoldSoft={goldSoft} />}
+          <LogoBlock company={company} brand={brand} />
+          <DocMetaBlock
+            docType={docType}
+            number={number}
+            issuedAt={issuedAt}
+            status={status}
+          />
         </header>
 
-        {/* ─── Title block ─────────────────────────────── */}
-        <section>
-          <div
-            style={{
-              ...typeStyle('eyebrow'),
-              color: gold
-            }}
-          >
-            {docTypeEyebrow}
-          </div>
-          <h1
-            style={{
-              ...typeStyle('h1'),
-              color: DOC_COLORS.ink,
-              margin: '6px 0 0',
-              wordBreak: 'break-word'
-            }}
-          >
-            {title || 'Untitled'}
-          </h1>
-          {project?.address && (
-            <div
-              style={{
-                marginTop: 6,
-                ...typeStyle('sub'),
-                color: DOC_COLORS.inkMuted
-              }}
-            >
-              {project.address}
-            </div>
-          )}
-        </section>
+        {/* ─── Recipient / Sender ─────────────────────────── */}
+        <PartiesBlock recipient={recipient} company={company} />
 
-        {/* ─── Meta grid ──────────────────────────────── */}
-        {metaCols.length > 0 && (
-          <section>
-            <div style={{ height: 1, background: DOC_COLORS.rule, marginBottom: 14 }} aria-hidden="true" />
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${metaCols.length}, minmax(0, 1fr))`,
-                gap: 16
-              }}
-            >
-              {metaCols.map((col, i) => (
-                <div key={i} style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      ...typeStyle('label'),
-                      color: DOC_COLORS.inkMuted,
-                      marginBottom: 6
-                    }}
-                  >
-                    {col.label}
-                  </div>
-                  <div
-                    style={{
-                      ...typeStyle(col.accent ? 'stamp' : 'bodyBold'),
-                      color: col.color || (col.accent ? gold : DOC_COLORS.ink),
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
-                  >
-                    {col.value || '—'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ─── Body ──────────────────────────────────── */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: `${DOC_SPACE.blockGap}px`
-          }}
-        >
+        {/* ─── Body — items table, totals, supporting sections ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {children}
         </div>
 
-        {/* ─── Footer ────────────────────────────────── */}
-        <Footer company={company} gold={gold} />
+        {/* ─── Footer fine print ──────────────────────────── */}
+        {footer && (
+          <footer
+            style={{
+              marginTop: 4,
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: DOC_COLORS.inkMuted
+            }}
+          >
+            {footer}
+          </footer>
+        )}
       </div>
     </article>
   )
@@ -217,7 +125,7 @@ export default function DocumentShell({
    Internal blocks
    ───────────────────────────────────────────────────────── */
 
-function LogoBlock({ company, gold }) {
+function LogoBlock({ company, brand }) {
   const hasLogo = !!company?.logo_url
   const monogram = (company?.name || 'MC')
     .split(/\s+/)
@@ -228,7 +136,7 @@ function LogoBlock({ company, gold }) {
     .replace(/[^A-Z]/g, '')
     .slice(0, 2) || 'MC'
 
-  const size = 56
+  const size = 96
 
   if (hasLogo) {
     return (
@@ -236,35 +144,31 @@ function LogoBlock({ company, gold }) {
         style={{
           width: size,
           height: size,
-          border: `1px solid ${gold}`,
+          background: brand,
           borderRadius: 4,
-          background: DOC_COLORS.paperSoft,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          overflow: 'hidden',
-          flexShrink: 0
+          overflow: 'hidden'
         }}
       >
         <img
           src={company.logo_url}
           alt={`${company?.name || 'Company'} logo`}
           style={{
-            maxWidth: size - 8,
-            maxHeight: size - 8,
+            maxWidth: size - 10,
+            maxHeight: size - 10,
             objectFit: 'contain',
             display: 'block'
           }}
           onError={(e) => {
-            // Fall through to monogram visually by swapping the img
-            // for a text node when the URL fails / 403s.
             const parent = e.currentTarget.parentNode
             if (parent && parent.dataset.monogramFallback !== 'on') {
               parent.dataset.monogramFallback = 'on'
               e.currentTarget.style.display = 'none'
               const span = document.createElement('span')
               span.textContent = monogram
-              span.style.cssText = `font-family:${DOC_FONTS.display};font-size:18px;letter-spacing:0.06em;color:${gold};font-weight:600;`
+              span.style.cssText = `font-family:${DOC_FONTS.display};font-size:28px;letter-spacing:0.08em;color:white;font-weight:600;`
               parent.appendChild(span)
             }
           }}
@@ -273,23 +177,21 @@ function LogoBlock({ company, gold }) {
     )
   }
 
+  // Monogram fallback — dark brand-accent square with white initials.
   return (
     <div
       style={{
         width: size,
         height: size,
-        border: `1px solid ${gold}`,
+        background: brand,
         borderRadius: 4,
-        background: DOC_COLORS.paperSoft,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: gold,
+        display: 'grid',
+        placeItems: 'center',
+        color: '#ffffff',
         fontFamily: DOC_FONTS.display,
-        fontSize: 18,
+        fontSize: 32,
         fontWeight: 600,
-        letterSpacing: '0.06em',
-        flexShrink: 0
+        letterSpacing: '0.06em'
       }}
     >
       {monogram}
@@ -297,25 +199,145 @@ function LogoBlock({ company, gold }) {
   )
 }
 
-function StatusPill({ label, tone = 'gold', brandGold, brandGoldSoft }) {
-  const palette = {
-    gold:  { bg: brandGoldSoft, color: brandGold, border: brandGold },
-    green: { bg: 'color-mix(in srgb, #48825F 12%, white)', color: '#2E6346', border: '#48825F' },
-    red:   { bg: 'color-mix(in srgb, #B33A3A 12%, white)', color: '#8A2A2A', border: '#B33A3A' },
-    slate: { bg: '#F0EFEC', color: '#5C6168', border: '#C8C5BD' }
-  }[tone] || { bg: brandGoldSoft, color: brandGold, border: brandGold }
+function DocMetaBlock({ docType, number, issuedAt, status }) {
+  return (
+    <div style={{ textAlign: 'right' }}>
+      <div
+        style={{
+          fontFamily: DOC_FONTS.body,
+          fontSize: 26,
+          fontWeight: 700,
+          letterSpacing: '0.01em',
+          color: DOC_COLORS.ink,
+          marginBottom: 12
+        }}
+      >
+        {docType?.toUpperCase()} #{number}
+      </div>
+      <div style={{ height: 1, background: DOC_COLORS.ink, opacity: 0.85, marginBottom: 14 }} />
+      <div
+        style={{
+          fontFamily: DOC_FONTS.body,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: DOC_COLORS.ink,
+          marginBottom: 6
+        }}
+      >
+        Sent on:
+      </div>
+      <div
+        style={{
+          fontFamily: DOC_FONTS.body,
+          fontSize: 13,
+          color: DOC_COLORS.ink
+        }}
+      >
+        {formatLongDate(issuedAt) || '—'}
+      </div>
+      {status && (
+        <div style={{ marginTop: 12 }}>
+          <StatusChip {...status} />
+        </div>
+      )}
+    </div>
+  )
+}
 
+function PartiesBlock({ recipient, company }) {
+  return (
+    <section
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 24
+      }}
+    >
+      <Party label="RECIPIENT" name={recipient?.name} lines={[
+        recipient?.address,
+        [recipient?.phone, recipient?.email].filter(Boolean).join(' · ')
+      ].filter(Boolean)} />
+      <Party label="SENDER" name={company?.name} lines={[
+        company?.address,
+        company?.phone ? `Phone: ${company.phone}` : '',
+        company?.email ? `Email: ${company.email}` : '',
+        company?.website ? `Website: ${company.website}` : ''
+      ].filter(Boolean)} />
+    </section>
+  )
+}
+
+function Party({ label, name, lines }) {
+  return (
+    <div>
+      <div style={{ height: 1, background: DOC_COLORS.ink, opacity: 0.85, marginBottom: 14 }} />
+      <div
+        style={{
+          fontFamily: DOC_FONTS.body,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: DOC_COLORS.ink,
+          marginBottom: 8
+        }}
+      >
+        {label}:
+      </div>
+      <div
+        style={{
+          fontFamily: DOC_FONTS.body,
+          fontSize: 15,
+          fontWeight: 700,
+          color: DOC_COLORS.ink,
+          marginBottom: 4,
+          wordBreak: 'break-word'
+        }}
+      >
+        {name || '—'}
+      </div>
+      {lines.map((line, i) => (
+        <div
+          key={i}
+          style={{
+            fontFamily: DOC_FONTS.body,
+            fontSize: 13,
+            color: DOC_COLORS.inkMid,
+            lineHeight: 1.5,
+            marginTop: i === 0 ? 0 : 2
+          }}
+        >
+          {line}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function StatusChip({ label, tone = 'neutral' }) {
+  const palette = {
+    neutral: { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' },
+    gold:    { bg: '#F4ECD8', fg: '#8A6F2A', br: '#C8A154' },
+    green:   { bg: '#E8F2EC', fg: '#2E6346', br: '#48825F' },
+    red:     { bg: '#F4E0DE', fg: '#8A2A2A', br: '#B33A3A' },
+    slate:   { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' }
+  }[tone] || { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' }
   return (
     <span
       style={{
-        ...typeStyle('label'),
-        color: palette.color,
+        display: 'inline-block',
+        padding: '4px 10px',
+        borderRadius: 4,
         background: palette.bg,
-        border: `1px solid ${palette.border}`,
-        padding: '6px 10px',
-        borderRadius: 999,
-        whiteSpace: 'nowrap',
-        flexShrink: 0
+        border: `1px solid ${palette.br}`,
+        color: palette.fg,
+        fontFamily: DOC_FONTS.body,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase'
       }}
     >
       {label}
@@ -323,61 +345,9 @@ function StatusPill({ label, tone = 'gold', brandGold, brandGoldSoft }) {
   )
 }
 
-function Footer({ company, gold }) {
-  const trustParts = [
-    company?.license_number ? `LIC #${String(company.license_number).trim()}` : '',
-    company?.insured_text ? String(company.insured_text).trim() : ''
-  ].filter(Boolean)
-  const contactParts = [
-    company?.phone,
-    company?.email,
-    company?.website
-  ].map((s) => (s && String(s).trim()) || '').filter(Boolean)
-
-  if (!trustParts.length && !contactParts.length && !company?.name) return null
-
-  return (
-    <footer
-      style={{
-        marginTop: 12,
-        paddingTop: 14,
-        borderTop: `1px solid ${DOC_COLORS.rule}`,
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 14,
-        justifyContent: 'space-between',
-        alignItems: 'baseline'
-      }}
-    >
-      <div
-        style={{
-          ...typeStyle('sub'),
-          color: DOC_COLORS.inkMuted,
-          flex: '1 1 auto',
-          minWidth: 0
-        }}
-      >
-        {contactParts.join(' · ')}
-      </div>
-      {trustParts.length > 0 && (
-        <div
-          style={{
-            ...typeStyle('label'),
-            color: DOC_COLORS.inkFaint,
-            flexShrink: 0
-          }}
-        >
-          {trustParts.join(' · ').toUpperCase()}
-        </div>
-      )}
-    </footer>
-  )
-}
-
-function buildTagline(company) {
-  // Prefer "City, ST" extracted from company.address. Falls back to
-  // the full address when only one comma-separated token is present.
-  // Returns '' when no address is on file (the letterhead reads as
-  // just the company name in that case).
-  return cityState(company?.address || '')
+function formatLongDate(iso) {
+  if (!iso) return ''
+  const d = iso instanceof Date ? iso : new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(undefined, { month: 'long', day: '2-digit', year: 'numeric' })
 }
