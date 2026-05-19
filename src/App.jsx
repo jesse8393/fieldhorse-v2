@@ -24,6 +24,7 @@ const ClientDetail   = lazy(() => import('./screens/ClientDetail.jsx'))
 const Notes          = lazy(() => import('./screens/Notes.jsx'))
 const Schedule       = lazy(() => import('./screens/Schedule.jsx'))
 const Activity       = lazy(() => import('./screens/Activity.jsx'))
+const PublicDoc      = lazy(() => import('./screens/PublicDoc.jsx'))
 const Bid            = lazy(() => import('./screens/Bid.jsx'))
 const Compose        = lazy(() => import('./screens/Compose.jsx'))
 const Analytics      = lazy(() => import('./screens/Analytics.jsx'))
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/partner-invite/:token" element={<PartnerInvite />} />
+        <Route path="/p/:token" element={<PublicDoc />} />
         <Route
           path="/onboarding"
           element={
