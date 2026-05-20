@@ -1126,3 +1126,141 @@ export function useMarkInvoicePaid() {
     return { error }
   }
 }
+
+// ---- Unified activity feed (across payments, leads, invoices, COs, notes) ----
+export type FeedKind = 'payment' | 'lead' | 'invoice' | 'change_order' | 'note'
+export type FeedItem = {
+  id: string
+  kind: FeedKind
+  title: string
+  sub: string | null
+  amount: number | null
+  contactId: string | null
+  contactName: string | null
+  date: string
+}
+
+export function useActivityFeed(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['activityFeed', userId],
+    queryFn: async (): Promise<FeedItem[]> => {
+      const uid = userId as string
+      const [pays, leads, invs, cos, notes] = await Promise.all([
+        supabase.from('fh_payments').select('id, amount, kind, paid_on, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
+        supabase.from('fh_contacts').select('id, name, stage, amount, created_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
+        supabase.from('fh_invoices').select('id, amount, status, sequence_number, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
+        supabase.from('fh_change_orders').select('id, amount, title, status, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
+        supabase.from('fh_notes').select('id, text, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25)
+      ])
+      const items: FeedItem[] = []
+      for (const p of (pays.data ?? []) as any[]) items.push({
+        id: `pay-${p.id}`, kind: 'payment', title: 'Payment received', sub: p.kind ? String(p.kind).replace(/_/g, ' ') : null,
+        amount: Number(p.amount || 0), contactId: p.contact_id, contactName: p.fh_contacts?.name ?? null, date: p.paid_on || p.created_at || ''
+      })
+      for (const l of (leads.data ?? []) as any[]) items.push({
+        id: `lead-${l.id}`, kind: 'lead', title: 'New lead added', sub: l.stage ? String(l.stage).replace(/_/g, ' ') : null,
+        amount: l.amount ? Number(l.amount) : null, contactId: l.id, contactName: l.name ?? null, date: l.created_at || ''
+      })
+      for (const i of (invs.data ?? []) as any[]) items.push({
+        id: `inv-${i.id}`, kind: 'invoice', title: `Invoice ${i.status === 'paid' ? 'paid' : 'created'}`, sub: i.sequence_number ? `#${i.sequence_number}` : null,
+        amount: Number(i.amount || 0), contactId: i.contact_id, contactName: i.fh_contacts?.name ?? null, date: i.created_at || ''
+      })
+      for (const c of (cos.data ?? []) as any[]) items.push({
+        id: `co-${c.id}`, kind: 'change_order', title: c.title || 'Change order', sub: c.status ? String(c.status).replace(/_/g, ' ') : null,
+        amount: Number(c.amount || 0), contactId: c.contact_id, contactName: c.fh_contacts?.name ?? null, date: c.created_at || ''
+      })
+      for (const n of (notes.data ?? []) as any[]) items.push({
+        id: `note-${n.id}`, kind: 'note', title: 'Note added', sub: n.text ? String(n.text).slice(0, 80) : null,
+        amount: null, contactId: n.contact_id, contactName: n.fh_contacts?.name ?? null, date: n.created_at || ''
+      })
+      return items.filter((i) => i.date).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 60)
+    },
+    enabled: !!userId
+  })
+}
+
+// ---- Partners roster (people you've shared jobs with) ----
+export type PartnerEntry = {
+  email: string
+  name: string | null
+  role: string | null
+  jobs: { id: string; name: string | null; status: string }[]
+  accepted: number
+  pending: number
+}
+
+export function usePartners(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['partners', userId],
+    queryFn: async (): Promise<PartnerEntry[]> => {
+      const { data } = await supabase
+        .from('fh_job_partners')
+        .select('id, partner_email, partner_name, partner_role, status, accepted_at, job_id, fh_contacts(name)')
+        .eq('invited_by_user_id', userId as string)
+        .order('invited_at', { ascending: false })
+      const map = new Map<string, PartnerEntry>()
+      for (const r of (data ?? []) as any[]) {
+        const key = (r.partner_email || '').toLowerCase()
+        if (!key) continue
+        let e = map.get(key)
+        if (!e) { e = { email: r.partner_email, name: r.partner_name ?? null, role: r.partner_role ?? null, jobs: [], accepted: 0, pending: 0 }; map.set(key, e) }
+        if (!e.name && r.partner_name) e.name = r.partner_name
+        if (!e.role && r.partner_role) e.role = r.partner_role
+        const accepted = !!r.accepted_at || r.status === 'accepted'
+        e.jobs.push({ id: r.job_id, name: r.fh_contacts?.name ?? null, status: r.status })
+        if (accepted) e.accepted += 1; else e.pending += 1
+      }
+      return Array.from(map.values()).sort((a, b) => b.jobs.length - a.jobs.length)
+    },
+    enabled: !!userId
+  })
+}
+
+// ---- Estimates / proposals list (current proposal state per job) ----
+export type EstimateRow = {
+  id: string
+  name: string | null
+  amount: number
+  status: string
+  sentAt: string | null
+  expiresAt: string | null
+  expired: boolean
+}
+export type EstimatesBundle = {
+  rows: EstimateRow[]
+  openValue: number
+  acceptedValue: number
+  winRate: number
+}
+
+const ACCEPTED = new Set(['accepted', 'approved', 'won', 'signed'])
+const DECLINED = new Set(['declined', 'rejected', 'lost'])
+
+export function useEstimates(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['estimates', userId],
+    queryFn: async (): Promise<EstimatesBundle> => {
+      const { data } = await supabase
+        .from('fh_contacts')
+        .select('id, name, amount, proposal_status, quote_sent_at, quote_expires_at')
+        .eq('user_id', userId as string)
+        .order('quote_sent_at', { ascending: false, nullsFirst: false })
+      const now = Date.now()
+      const rows: EstimateRow[] = ((data ?? []) as any[])
+        .filter((c) => c.proposal_status || c.quote_sent_at)
+        .map((c) => {
+          const status = (c.proposal_status || (c.quote_sent_at ? 'sent' : 'draft')).toLowerCase()
+          const expired = !!c.quote_expires_at && new Date(c.quote_expires_at).getTime() < now && !ACCEPTED.has(status)
+          return { id: c.id, name: c.name, amount: Number(c.amount || 0), status, sentAt: c.quote_sent_at, expiresAt: c.quote_expires_at, expired }
+        })
+      let openValue = 0, acceptedValue = 0, decided = 0, won = 0
+      for (const r of rows) {
+        if (ACCEPTED.has(r.status)) { acceptedValue += r.amount; decided++; won++ }
+        else if (DECLINED.has(r.status)) { decided++ }
+        else if (!r.expired) openValue += r.amount
+      }
+      return { rows, openValue, acceptedValue, winRate: decided ? Math.round((won / decided) * 100) : 0 }
+    },
+    enabled: !!userId
+  })
+}

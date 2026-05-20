@@ -2,7 +2,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell, Receipt } from 'lucide-react-native'
+import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell, Receipt, Activity, Users, FileSignature } from 'lucide-react-native'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, Eyebrow, SectionLabel, theme } from '../../components/ui'
 
@@ -28,6 +28,9 @@ export default function MoreScreen() {
         <SectionLabel style={{ marginBottom: 10 }}>Tools</SectionLabel>
         <View style={{ gap: 10, marginBottom: 24 }}>
           <MenuRow icon={<Receipt color={theme.goldBright} size={18} />} title="Invoices & Payments" sub="Money owed, aging & mark paid" onPress={() => router.push('/invoices')} />
+          <MenuRow icon={<Activity color={theme.goldBright} size={18} />} title="Activity" sub="Payments, leads, invoices & notes" onPress={() => router.push('/activity')} />
+          <MenuRow icon={<FileSignature color={theme.goldBright} size={18} />} title="Estimates" sub="Proposals, win rate & open value" onPress={() => router.push('/estimates')} />
+          <MenuRow icon={<Users color={theme.goldBright} size={18} />} title="Partners" sub="People you've shared jobs with" onPress={() => router.push('/partners')} />
           <MenuRow icon={<BarChart3 color={theme.goldBright} size={18} />} title="Analytics" sub="Pipeline, revenue & stage breakdown" onPress={() => router.push('/analytics')} />
           <MenuRow icon={<Bell color={theme.goldBright} size={18} />} title="Notifications" sub="Activity & alerts" onPress={() => router.push('/notifications')} />
           <MenuRow icon={<Building2 color={theme.goldBright} size={18} />} title="Business profile" sub="Company info for quotes & invoices" onPress={() => router.push('/settings')} />
