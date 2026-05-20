@@ -1296,8 +1296,12 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
         // minHeight 88 → 72 so the three KPIs read as a quiet strip.
         padding: '12px 12px 10px',
         borderRadius: 12,
-        background: 'var(--v3-surface)',
+        // Lifted-panel treatment: top-lit gradient + layered shadow so
+        // the KPI tiles match the Jobs/Home card depth pass instead of
+        // reading as flat squares.
+        background: 'linear-gradient(180deg, #1a1715 0%, #121010 70%)',
         border: '1px solid var(--v3-border)',
+        boxShadow: '0 1px 0 rgba(255, 240, 210, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.36), 0 6px 16px rgba(0, 0, 0, 0.30)',
         color: 'var(--v3-text)',
         cursor: 'pointer',
         minHeight: 72,
