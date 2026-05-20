@@ -174,6 +174,22 @@ export function useLogPayment() {
   }
 }
 
+// Update a job's pipeline stage, then invalidate the detail + lists so
+// the new stage shows everywhere. Returns the supabase error (or null).
+export function useUpdateStage() {
+  const client = useQueryClient()
+  return async (input: { contactId: string; stage: string }) => {
+    const { error } = await supabase.from('fh_contacts')
+      .update({ stage: input.stage } as any)
+      .eq('id', input.contactId)
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+      client.invalidateQueries({ queryKey: queryKeys.jobs })
+    }
+    return { error }
+  }
+}
+
 // ---- Create lead ----
 // Insert a new fh_contacts row at a chosen stage, then invalidate the
 // jobs list. Mirrors the web NewLeadSheet's minimal create path.

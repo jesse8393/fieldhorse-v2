@@ -11,13 +11,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, Phone, Mail, Plus } from 'lucide-react-native'
-import { useJobDetail, useLogPayment } from '../../lib/queries'
+import { useJobDetail, useLogPayment, useUpdateStage } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E',
   invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f'
 }
+
+const STAGES = ['lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -30,10 +32,12 @@ export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending } = useJobDetail(id)
   const logPayment = useLogPayment()
+  const updateStage = useUpdateStage()
 
   const [payOpen, setPayOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [paySaving, setPaySaving] = useState(false)
+  const [stageSaving, setStageSaving] = useState<string | null>(null)
 
   const contact = data?.contact ?? null
   const payments = data?.payments ?? []
@@ -43,6 +47,13 @@ export default function JobDetailScreen() {
     const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
     return { amount, paid, balance: Math.max(0, amount - paid) }
   }, [contact, payments])
+
+  async function changeStage(next: string) {
+    if (!contact || next === contact.stage || stageSaving) return
+    setStageSaving(next)
+    await updateStage({ contactId: contact.id, stage: next })
+    setStageSaving(null)
+  }
 
   async function submitPayment() {
     const amt = Number(payAmount.replace(/[^0-9.]/g, ''))
@@ -91,6 +102,36 @@ export default function JobDetailScreen() {
           <Stat label="Contract" value={money(totals.amount)} />
           <Stat label="Paid" value={money(totals.paid)} tone="#4ade80" />
           <Stat label="Balance" value={money(totals.balance)} tone="#E8B865" />
+        </View>
+
+        {/* Stage progression */}
+        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-6 mb-2">Stage</Text>
+        <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+          {STAGES.map((s) => {
+            const active = contact.stage === s
+            const chipTint = STAGE_TINT[s]
+            return (
+              <Pressable
+                key={s}
+                onPress={() => changeStage(s)}
+                disabled={!!stageSaving}
+                className="rounded-full px-3.5 py-2 border flex-row items-center"
+                style={{
+                  gap: 6,
+                  borderColor: active ? chipTint : 'rgba(255,240,210,0.12)',
+                  backgroundColor: active ? chipTint : 'transparent'
+                }}
+              >
+                {stageSaving === s ? <ActivityIndicator size="small" color="#1A120A" /> : null}
+                <Text
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: active ? '#1A120A' : '#9b948a' }}
+                >
+                  {s}
+                </Text>
+              </Pressable>
+            )
+          })}
         </View>
 
         {/* Contact actions */}
