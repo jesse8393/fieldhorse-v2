@@ -8,6 +8,7 @@ import { View, Text, FlatList, Pressable, TextInput, ActivityIndicator } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQueryClient } from '@tanstack/react-query'
 import { useJobs, useJobsRealtime, type JobRow } from '../../lib/queries'
+import { useAuth } from '../../contexts/AuthContext'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#6B7CA8',
@@ -30,8 +31,9 @@ export default function JobsScreen() {
   const queryClient = useQueryClient()
   // userId would come from an auth context (Supabase session) in the
   // full build; realtime is wired the moment it's available.
+  const { user } = useAuth()
   const { data: jobs = [], isLoading } = useJobs()
-  useJobsRealtime(undefined, queryClient)
+  useJobsRealtime(user?.id, queryClient)
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {

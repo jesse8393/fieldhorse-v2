@@ -52,3 +52,67 @@ export function useJobsRealtime(userId: string | undefined, client: QueryClient)
     return () => { supabase.removeChannel(channel) }
   }, [userId, client])
 }
+
+// ---- Clients ----
+export type Payment = Database['public']['Tables']['fh_payments']['Row']
+
+export type ClientsBundle = {
+  clients: Client[]
+  jobs: Pick<Contact, 'id' | 'client_id' | 'amount' | 'stage'>[]
+  payments: Pick<Payment, 'contact_id' | 'amount'>[]
+}
+
+async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
+  const [clientsRes, jobsRes, paymentsRes] = await Promise.all([
+    supabase.from('fh_clients').select('*').eq('user_id', userId)
+      .order('last_activity_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false }),
+    supabase.from('fh_contacts').select('id, client_id, amount, stage').eq('user_id', userId),
+    supabase.from('fh_payments').select('contact_id, amount').eq('user_id', userId)
+  ])
+  if (clientsRes.error) throw clientsRes.error
+  return {
+    clients: (clientsRes.data ?? []) as Client[],
+    jobs: (jobsRes.data ?? []) as ClientsBundle['jobs'],
+    payments: (paymentsRes.data ?? []) as ClientsBundle['payments']
+  }
+}
+
+export function useClientsBundle(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['clients', userId],
+    queryFn: () => fetchClientsBundle(userId as string),
+    enabled: !!userId
+  })
+}
+
+// ---- Schedule (next 7 days) ----
+export type ScheduleEvent =
+  Database['public']['Tables']['fh_schedule']['Row'] & {
+    fh_contacts: Pick<Contact, 'name' | 'stage'> | null
+  }
+
+async function fetchUpcoming(userId: string): Promise<ScheduleEvent[]> {
+  const now = new Date()
+  const in7 = new Date(now)
+  in7.setDate(in7.getDate() + 7)
+  in7.setHours(23, 59, 59, 999)
+  const { data, error } = await supabase
+    .from('fh_schedule')
+    .select('*, fh_contacts(name, stage)')
+    .eq('user_id', userId)
+    .gte('start_at', now.toISOString())
+    .lt('start_at', in7.toISOString())
+    .order('start_at', { ascending: true })
+    .limit(50)
+  if (error) throw error
+  return (data ?? []) as ScheduleEvent[]
+}
+
+export function useUpcomingEvents(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['scheduleUpcoming', userId],
+    queryFn: () => fetchUpcoming(userId as string),
+    enabled: !!userId
+  })
+}
