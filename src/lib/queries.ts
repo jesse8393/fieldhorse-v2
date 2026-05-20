@@ -93,3 +93,53 @@ export function useInvalidateJobs() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: queryKeys.jobs })
 }
+
+// ---- Clients ----
+// The Clients screen needs three datasets to compute live rollups:
+// the client roster, every job (for lifetime / active counts), and
+// every payment (for outstanding). Bundled into one hook so the
+// screen gets a single loading flag, matching its prior behavior.
+
+export type ClientsBundle = {
+  clients: Client[]
+  jobs: Pick<Contact, 'id' | 'client_id' | 'amount' | 'stage'>[]
+  payments: Pick<Payment, 'contact_id' | 'amount'>[]
+}
+
+async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
+  const [clientsRes, jobsRes, paymentsRes] = await Promise.all([
+    supabase
+      .from('fh_clients')
+      .select('*')
+      .eq('user_id', userId)
+      .order('last_activity_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('fh_contacts')
+      .select('id, client_id, amount, stage')
+      .eq('user_id', userId),
+    supabase
+      .from('fh_payments')
+      .select('contact_id, amount')
+      .eq('user_id', userId)
+  ])
+  if (clientsRes.error) throw clientsRes.error
+  return {
+    clients: (clientsRes.data ?? []) as Client[],
+    jobs: (jobsRes.data ?? []) as ClientsBundle['jobs'],
+    payments: (paymentsRes.data ?? []) as ClientsBundle['payments']
+  }
+}
+
+export function useClientsBundle(userId: string | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.clients, userId],
+    queryFn: () => fetchClientsBundle(userId as string),
+    enabled: !!userId
+  })
+}
+
+export function useInvalidateClients() {
+  const client = useQueryClient()
+  return () => client.invalidateQueries({ queryKey: queryKeys.clients })
+}
