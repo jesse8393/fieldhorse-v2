@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -6,6 +7,7 @@ import {
   Upload, Trash2, ExternalLink, AlertTriangle, CheckCircle2, Plus
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { useSubDetail, subDetailKey } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.js'
@@ -73,78 +75,19 @@ export default function SubDetail() {
     catch { return (rawKey || '').trim().toLowerCase() }
   }, [rawKey])
 
-  const [subRows, setSubRows] = useState([])
-  const [contacts, setContacts] = useState({})
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const queryClient = useQueryClient()
+  const { data: bundle, isPending: loading, isError, error: queryError } = useSubDetail(key, user?.id)
+  const subRows = bundle?.subRows ?? []
+  const contacts = bundle?.contacts ?? {}
+  const profile = bundle?.profile ?? null
+  const error = isError ? (queryError?.message || 'Could not load sub') : ''
   const [creating, setCreating] = useState(false)
 
-  const load = useCallback(async () => {
-    if (!user?.id || !key) return
-    setLoading(true)
-    setError('')
-    try {
-      // Pull every sub row for this user, filter client-side to the
-      // rollup key. Sub volumes are bounded (< few hundred for any
-      // contractor); a server-side ilike would also need both phone
-      // and name conditions and a normalize() shim, so this is the
-      // pragmatic shape.
-      const [{ data: subs, error: subsErr }, { data: prof, error: profErr }] = await Promise.all([
-        supabase
-          .from('fh_subs')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('fh_sub_profiles')
-          .select('*')
-          .eq('user_id', user.id)
-      ])
-      if (subsErr) throw subsErr
-      if (profErr && profErr.code !== 'PGRST116') {
-        // PGRST116 = relation does not exist — surface a friendlier
-        // hint so the operator knows the migration hasn't run.
-        if (profErr.message?.includes('does not exist')) {
-          throw new Error('Sub profile table is missing — run migration 017_sub_profiles.sql in Supabase')
-        }
-        throw profErr
-      }
-
-      const matching = (subs || []).filter((r) => {
-        const k = (r.phone || r.name || '').toLowerCase().trim()
-        return k === key
-      })
-      setSubRows(matching)
-
-      const matchingProfile = (prof || []).find((p) => {
-        const byPhone = (p.phone || '').toLowerCase().trim()
-        const byName = (p.name || '').toLowerCase().trim()
-        return byPhone === key || byName === key
-      })
-      setProfile(matchingProfile || null)
-
-      // Hydrate contact rows for the rollup history list
-      const ids = Array.from(new Set(matching.map((r) => r.contact_id).filter(Boolean)))
-      if (ids.length > 0) {
-        const { data: cs } = await supabase
-          .from('fh_contacts')
-          .select('id, name, job_title, stage')
-          .in('id', ids)
-        const cmap = {}
-        for (const c of cs || []) cmap[c.id] = c
-        setContacts(cmap)
-      } else {
-        setContacts({})
-      }
-    } catch (e) {
-      setError(e?.message || 'Could not load sub')
-    } finally {
-      setLoading(false)
-    }
-  }, [user?.id, key])
-
-  useEffect(() => { load() }, [load])
+  // Profile create / edit writes straight to the cached bundle so the
+  // panel reflects the change without a refetch.
+  const setProfile = (next) =>
+    queryClient.setQueryData(subDetailKey(key), (prev) =>
+      prev ? { ...prev, profile: next } : prev)
 
   // Display name + phone derived from whichever source has data.
   // Profile wins when present; rollup is the fallback.
