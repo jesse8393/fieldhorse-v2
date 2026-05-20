@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, Trash2 } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { PostedByChip } from '../../../components/v3'

@@ -4,7 +4,7 @@
 // The in-app bell consumes these. Push delivery is a separate layer
 // (Apple cert + web-push via Supabase Edge Function) wired in later.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 
 export async function fetchInbox(limit = 30, userId?: string) {
   if (!userId) return []

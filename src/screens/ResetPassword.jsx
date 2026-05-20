@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Lock, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import Aurora from '../components/fx/Aurora.jsx'
 import GridPattern from '../components/fx/GridPattern.jsx'
 

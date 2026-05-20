@@ -20,7 +20,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { useAuth } from '../../../contexts/AuthContext.jsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'

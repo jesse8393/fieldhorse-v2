@@ -7,7 +7,7 @@ import ActionSheet from '../components/ActionSheet.jsx'
 import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { FloatingActionButton, ScreenCloser } from '../components/v3'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   useScheduleEvents,

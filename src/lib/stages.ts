@@ -1,5 +1,5 @@
 // Fieldhorse pipeline stages + auto-transitions
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 import type { Database } from './database.types.ts'
 
 type Contact = Database['public']['Tables']['fh_contacts']['Row']

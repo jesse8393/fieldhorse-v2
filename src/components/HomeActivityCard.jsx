@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity as ActivityIcon, DollarSign, FileEdit, Check, Briefcase, Receipt, ArrowRight } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 const PER_SOURCE = 8

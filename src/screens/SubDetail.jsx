@@ -6,7 +6,7 @@ import {
   ChevronLeft, Phone, Mail, Hammer, FileText, ShieldCheck, CreditCard,
   Upload, Trash2, ExternalLink, AlertTriangle, CheckCircle2, Plus
 } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { useSubDetail, subDetailKey } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'

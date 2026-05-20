@@ -8,7 +8,7 @@
 // Sign-off methods come from the migration's CHECK constraint — keep this
 // list in sync with the SQL or upserts will reject.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 import { transitionStage } from './stages.ts'
 import type { Database } from './database.types.ts'
 

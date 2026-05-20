@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from 'react'
 import { Shield, Save as SaveIcon, X, Trash2 } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 
 const FIELDS = [

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Receipt, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Check, X as XIcon } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.jsx'

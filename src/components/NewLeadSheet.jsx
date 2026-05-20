@@ -6,12 +6,12 @@ import { haptic } from './ActionSheet.jsx'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import ClientPicker from './ClientPicker.jsx'
 import DocIntakeButton from './DocIntakeButton.jsx'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { claudeMessage } from '../lib/anthropic.ts'
-import { parseLeadFromImage } from '../lib/docIntelligence.js'
+import { parseLeadFromImage } from '../lib/docIntelligence.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { JOB_TYPES } from '../lib/jobTypes.ts'
-import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.js'
+import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.ts'
 
 const STAGE_OPTIONS = [
   { value: 'lead', label: 'Lead' },

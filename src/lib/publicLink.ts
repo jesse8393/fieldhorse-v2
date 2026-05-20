@@ -5,7 +5,7 @@
 // 24 chars of url-safe randomness — short enough to fit in a text
 // message, long enough to be unguessable.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 
 const TOKEN_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789' // skip lookalikes
 const TOKEN_LEN = 24

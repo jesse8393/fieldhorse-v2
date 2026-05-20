@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { getWeather, MURFREESBORO } from '../lib/weather.ts'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { useFhMotion } from '../lib/motion.ts'

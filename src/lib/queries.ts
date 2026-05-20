@@ -19,7 +19,7 @@ import {
   keepPreviousData,
   type QueryClient
 } from '@tanstack/react-query'
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 import { fetchCoverPhotosByJob } from './photos.ts'
 import { loadPartnerDirectory } from './partners.ts'
 import type { Database } from './database.types.ts'

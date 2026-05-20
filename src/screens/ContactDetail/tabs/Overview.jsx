@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Pencil, X as XIcon, ShieldCheck } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import {
   startQuote, approveQuote, markComplete, reopen

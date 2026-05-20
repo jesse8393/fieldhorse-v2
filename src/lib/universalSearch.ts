@@ -17,7 +17,7 @@
 // Pagination: 6 rows per kind. Universal search is for jumping to a
 // known item, not for browsing — go to the dedicated screen for that.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 
 const PER_KIND = 6
 

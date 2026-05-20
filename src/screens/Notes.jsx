@@ -7,7 +7,7 @@ import {
   AlertTriangle, ClipboardCheck, Package, Calendar, Clock,
   ChevronRight, Activity
 } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { useNotesBundle, notesKey } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { claudeMessage } from '../lib/anthropic.ts'

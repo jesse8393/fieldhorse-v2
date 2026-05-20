@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { claudeMessage } from '../lib/anthropic.ts'
