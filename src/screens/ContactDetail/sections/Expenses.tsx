@@ -5,7 +5,10 @@ import { supabase } from '../../../lib/supabase.ts'
 import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../../../components/ActionSheet.jsx'
+import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_, SheetMoneyField as SheetMoneyField_ } from '../../../components/ActionSheet.jsx'
+const SheetField = SheetField_ as any
+const SheetChipRow = SheetChipRow_ as any
+const SheetMoneyField = SheetMoneyField_ as any
 
 const EXPENSE_CATEGORIES = [
   { value: 'Materials', label: 'Materials' },
@@ -15,7 +18,7 @@ const EXPENSE_CATEGORIES = [
   { value: 'Other',     label: 'Other' }
 ]
 
-function money(n) {
+function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -25,7 +28,7 @@ function money(n) {
  * Expenses section — fh_expenses CRUD. Every mutation calls recalcCost so
  * the job's cost number stays accurate across the app.
  */
-export default function ExpensesSection({ contact, expenses = [], userId, fetchAll }) {
+export default function ExpensesSection({ contact, expenses = [], userId, fetchAll }: any) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({
     description: '',
@@ -34,7 +37,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
     expense_date: new Date().toISOString().slice(0, 10)
   })
   const [saving, setSaving] = useState(false)
-  const total = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const total = expenses.reduce((s: any, e: any) => s + Number(e.amount || 0), 0)
 
   useEffect(() => {
     if (!open) setForm({
@@ -69,9 +72,9 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
     fetchAll?.()
   }
 
-  async function remove(id) {
+  async function remove(id: any) {
     hapticTap()
-    const snapshot = expenses.find((e) => e.id === id)
+    const snapshot = expenses.find((e: any) => e.id === id)
     const { error } = await supabase.from('fh_expenses').delete().eq('id', id).eq('user_id', userId)
     if (error) { toastError("Couldn't delete", error.message); return }
     await recalcCost(contact.id, userId)
@@ -144,7 +147,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <AnimatePresence>
-            {expenses.map((e) => (
+            {expenses.map((e: any) => (
               <motion.li
                 key={e.id}
                 layout
@@ -236,13 +239,13 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
         <SheetMoneyField
           label="Amount"
           value={form.amount}
-          onChange={(v) => setForm({ ...form, amount: v })}
+          onChange={(v: any) => setForm({ ...form, amount: v })}
         />
         <SheetChipRow
           label="Category"
           value={form.category}
           options={EXPENSE_CATEGORIES}
-          onChange={(v) => setForm({ ...form, category: v })}
+          onChange={(v: any) => setForm({ ...form, category: v })}
         />
         <SheetField label="Date">
           <input

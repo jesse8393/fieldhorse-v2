@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
 import PhotosSection from '../sections/Photos.jsx'
-import FilesSection from '../sections/Files.jsx'
+import FilesSection from '../sections/Files.tsx'
 import MessagesSection from '../sections/Messages.jsx'
 
 /**

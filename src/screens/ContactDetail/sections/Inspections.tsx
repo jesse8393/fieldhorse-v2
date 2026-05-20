@@ -14,7 +14,7 @@ const TRADES = [
   'HVAC', 'Insulation', 'Drywall', 'Paint'
 ]
 
-const RESULT_META = {
+const RESULT_META: Record<string, any> = {
   pass: { label: 'Pass', color: 'var(--v3-success-bright)', soft: 'var(--v3-success-soft)', icon: CheckCircle2 },
   fail: { label: 'Fail', color: 'var(--v3-danger-bright)',  soft: 'var(--v3-danger-soft)',  icon: XCircle },
   na:   { label: 'N/A',  color: 'var(--v3-text-muted)',     soft: 'var(--v3-glass-tint)',   icon: MinusCircle }
@@ -25,11 +25,11 @@ const RESULT_META = {
  * has_inspections toggle (gates the rest of the UI). Logging an inspection
  * fires a self-notification so the bell stays meaningful pre-server-trigger.
  */
-export default function InspectionsSection({ contact, inspections = [], userId, fetchAll, patch }) {
+export default function InspectionsSection({ contact, inspections = [], userId, fetchAll, patch }: any) {
   const enabled = !!contact?.has_inspections
 
   const byTrade = useMemo(() => {
-    const map = {}
+    const map: Record<string, any> = {}
     for (const i of inspections) {
       if (!map[i.trade]) map[i.trade] = []
       map[i.trade].push(i)
@@ -37,9 +37,9 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
     return map
   }, [inspections])
 
-  const [activeTrade, setActiveTrade] = useState(null)
+  const [activeTrade, setActiveTrade] = useState<any>(null)
 
-  async function logResult(trade, result, notes) {
+  async function logResult(trade: any, result: any, notes: any) {
     await supabase.from('fh_inspections').insert({
       user_id: userId,
       contact_id: contact.id,
@@ -87,7 +87,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
         </div>
         <Switch
           checked={enabled}
-          onCheckedChange={(v) => patch?.({ has_inspections: v })}
+          onCheckedChange={(v: any) => patch?.({ has_inspections: v })}
           aria-label="Toggle inspections tracking"
         />
       </div>
@@ -157,7 +157,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
           <InspectionLog
             open={!!activeTrade}
             trade={activeTrade}
-            onOpenChange={(v) => { if (!v) setActiveTrade(null) }}
+            onOpenChange={(v: any) => { if (!v) setActiveTrade(null) }}
             onSave={logResult}
           />
         </>
@@ -178,7 +178,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
 /**
  * InspectionLog drawer — pass / fail / N/A + notes. Wraps shadcn Vaul Drawer.
  */
-function InspectionLog({ open, trade, onOpenChange, onSave }) {
+function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
   const [result, setResult] = useState('pass')
   const [notes, setNotes] = useState('')
   useEffect(() => {

@@ -30,7 +30,7 @@ import QuoteTab from './tabs/Quote.tsx'
 import DetailsTab from './tabs/Details.tsx'
 import FinancialsTab from './tabs/Financials.tsx'
 import FilesTab from './tabs/Files.tsx'
-import ApproveQuoteSheet from './sections/ApproveQuoteSheet.jsx'
+import ApproveQuoteSheet from './sections/ApproveQuoteSheet.tsx'
 import DesktopJobDetail from '../../components/desktop/DesktopJobDetail.tsx'
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 

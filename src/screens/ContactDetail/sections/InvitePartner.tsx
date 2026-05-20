@@ -8,7 +8,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
  * contractor" capability where it makes sense contextually (Job Detail →
  * Details → Invite Partner).
  */
-export default function InvitePartnerSection({ contact, onOpenInvitePartner }) {
+export default function InvitePartnerSection({ contact, onOpenInvitePartner }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
 

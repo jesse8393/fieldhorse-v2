@@ -1,4 +1,4 @@
-// src/screens/ContactDetail/sections/InsuranceSection.jsx
+// src/screens/ContactDetail/sections/InsuranceSection.tsx
 //
 // Insurance-restoration claim form. Sits inside the Details tab as a
 // dedicated sub-tab so the 9 carrier-side fields don't pollute the
@@ -33,11 +33,11 @@ const FIELDS = [
   { key: 'mortgage_company', label: 'Mortgage company', type: 'text',  placeholder: 'Wells Fargo (when applicable)' }
 ]
 
-function emptyForm() {
-  return FIELDS.reduce((acc, f) => { acc[f.key] = ''; return acc }, {})
+function emptyForm(): Record<string, any> {
+  return FIELDS.reduce((acc: Record<string, any>, f: any) => { acc[f.key] = ''; return acc }, {} as Record<string, any>)
 }
 
-function hydrate(insurance) {
+function hydrate(insurance: any) {
   const out = emptyForm()
   if (!insurance) return out
   for (const f of FIELDS) {
@@ -47,7 +47,7 @@ function hydrate(insurance) {
   return out
 }
 
-export default function InsuranceSection({ contact, userId, insurance, onChange }) {
+export default function InsuranceSection({ contact, userId, insurance, onChange }: any) {
   const isOwner = contact && contact.user_id === userId
   const [editing, setEditing] = useState(!insurance)
   const [form, setForm] = useState(() => hydrate(insurance))
@@ -59,7 +59,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
     setEditing(!insurance && isOwner)
   }, [insurance, isOwner])
 
-  function setField(k, v) {
+  function setField(k: any, v: any) {
     setForm((prev) => ({ ...prev, [k]: v }))
   }
 
@@ -104,7 +104,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
     if (!contact?.id || !userId) return
     setSaving(true)
     try {
-      const payload = { contact_id: contact.id, user_id: userId }
+      const payload: Record<string, any> = { contact_id: contact.id, user_id: userId }
       for (const f of FIELDS) {
         const raw = String(form[f.key] || '').trim()
         if (!raw) {
@@ -115,14 +115,14 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
       }
       const { data, error } = await supabase
         .from('fh_insurance_claims')
-        .upsert(payload, { onConflict: 'contact_id' })
+        .upsert(payload as any, { onConflict: 'contact_id' })
         .select('*')
         .single()
       if (error) throw error
       toastSuccess('Insurance saved', `Claim ${data?.claim_number || ''}`.trim())
       onChange?.(data)
       setEditing(false)
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't save insurance", e?.message || 'Try again.')
     } finally {
       setSaving(false)
@@ -141,7 +141,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
       if (error) throw error
       toastSuccess('Insurance removed', '')
       onChange?.(null)
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't remove insurance", e?.message || 'Try again.')
     } finally {
       setDeleting(false)
@@ -264,7 +264,7 @@ function panelHeaderStyle() {
     textTransform: 'uppercase'
   }
 }
-function labelStyle() {
+function labelStyle(): import('react').CSSProperties {
   return {
     fontFamily: 'var(--font-body)',
     fontSize: 9,
@@ -274,7 +274,7 @@ function labelStyle() {
     textTransform: 'uppercase'
   }
 }
-function valueStyle() {
+function valueStyle(): import('react').CSSProperties {
   return {
     marginTop: 4,
     fontFamily: 'var(--font-body)',
@@ -284,7 +284,7 @@ function valueStyle() {
     wordBreak: 'break-word'
   }
 }
-function inputStyle() {
+function inputStyle(): import('react').CSSProperties {
   return {
     width: '100%',
     boxSizing: 'border-box',
@@ -346,7 +346,7 @@ function dangerGhostBtnStyle() {
   }
 }
 
-function formatMoney(n) {
+function formatMoney(n: any) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, {
     style: 'currency',

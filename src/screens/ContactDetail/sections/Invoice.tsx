@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { DollarSign, Plus } from 'lucide-react'
 import { hapticTap } from '../../../lib/haptics.ts'
 
-function money(n) {
+function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -13,7 +13,7 @@ function money(n) {
  * Payment" sheet lives in the parent shell (V3PaymentSheet) and is opened
  * via onOpenLogPayment. This section is read-mostly + one CTA.
  */
-export default function InvoiceSection({ contact, payments = [], paid = 0, balance = 0, onOpenLogPayment }) {
+export default function InvoiceSection({ contact, payments = [], paid = 0, balance = 0, onOpenLogPayment }: any) {
   const amount = Number(contact?.amount || 0)
   const pct = amount > 0 ? Math.min(100, Math.round((paid / amount) * 100)) : 0
   const isClosed = balance <= 0.5 && amount > 0
@@ -131,7 +131,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
           </div>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {payments.map((p) => (
+            {payments.map((p: any) => (
               <li key={p.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 14px', borderRadius: 12,

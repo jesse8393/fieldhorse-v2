@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
 import SubsSection from '../sections/Subs.jsx'
-import ExpensesSection from '../sections/Expenses.jsx'
-import InvoiceSection from '../sections/Invoice.jsx'
+import ExpensesSection from '../sections/Expenses.tsx'
+import InvoiceSection from '../sections/Invoice.tsx'
 import InvoiceDrawsSection from '../sections/InvoiceDrawsSection.jsx'
 
 /**

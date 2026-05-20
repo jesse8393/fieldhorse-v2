@@ -1,4 +1,4 @@
-// src/screens/ContactDetail/sections/ChangeOrdersSection.jsx
+// src/screens/ContactDetail/sections/ChangeOrdersSection.tsx
 //
 // Editor for change orders on a job. Sits at the bottom of the Quote
 // tab. Each row stamps CO # · title · description · amount · status;
@@ -17,7 +17,7 @@ import { Plus, FileEdit, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, {
     style: 'currency', currency: 'USD',
@@ -25,23 +25,23 @@ function money(n) {
   })
 }
 
-function shortDate(iso) {
+function shortDate(iso: any) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export default function ChangeOrdersSection({ contact, userId, changeOrders = [], onChange }) {
+export default function ChangeOrdersSection({ contact, userId, changeOrders = [], onChange }: any) {
   const isOwner = contact && contact.user_id === userId
-  const [editingId, setEditingId] = useState(null)
+  const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
 
   if (!isOwner) {
     // Partners can READ approved COs (per migration 019 partner policy),
     // but can't author. Render the read-only list when there are
     // approved entries; render nothing when there's nothing to show.
-    const visible = changeOrders.filter((co) => co.status === 'approved')
+    const visible = changeOrders.filter((co: any) => co.status === 'approved')
     if (visible.length === 0) return null
     return (
       <SectionShell>
@@ -54,7 +54,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
     )
   }
 
-  async function handleSave(payload) {
+  async function handleSave(payload: any) {
     if (!contact?.id || !userId) return false
     try {
       const row = {
@@ -112,13 +112,13 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
 
       onChange?.()
       return true
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't save change order", e?.message || 'Try again.')
       return false
     }
   }
 
-  async function handleApprove(co) {
+  async function handleApprove(co: any) {
     return handleSave({
       ...co,
       status: 'approved',
@@ -127,12 +127,12 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
     })
   }
 
-  async function handleVoid(co) {
+  async function handleVoid(co: any) {
     if (!window.confirm(`Void CO #${co.sequence_number}? It will stop counting toward the contract total.`)) return
     await handleSave({ ...co, status: 'void' })
   }
 
-  async function handleDelete(co) {
+  async function handleDelete(co: any) {
     if (!window.confirm(`Delete CO #${co.sequence_number}? This cannot be undone.`)) return
     try {
       const { error } = await supabase
@@ -142,7 +142,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       if (error) throw error
       toastSuccess('Change order deleted', '')
       onChange?.()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't delete change order", e?.message || 'Try again.')
     }
   }
@@ -158,16 +158,16 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         <Editor
           isNew
           initial={{ title: '', description: '', amount: '', status: 'draft' }}
-          onSave={async (payload) => { const ok = await handleSave(payload); if (ok) setCreating(false) }}
+          onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setCreating(false) }}
           onCancel={() => setCreating(false)}
         />
       )}
       <List
         changeOrders={changeOrders}
         editingId={editingId}
-        onEdit={(id) => setEditingId(id)}
+        onEdit={(id: any) => setEditingId(id)}
         onCancelEdit={() => setEditingId(null)}
-        onSave={async (payload) => { const ok = await handleSave(payload); if (ok) setEditingId(null) }}
+        onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setEditingId(null) }}
         onApprove={handleApprove}
         onVoid={handleVoid}
         onDelete={handleDelete}
@@ -178,7 +178,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
 
 /* ─── presentational sub-components ─── */
 
-function SectionShell({ children }) {
+function SectionShell({ children }: any) {
   return (
     <div style={{
       background: 'var(--v3-surface)',
@@ -191,7 +191,7 @@ function SectionShell({ children }) {
   )
 }
 
-function SectionHeader({ count, canAdd, onAdd }) {
+function SectionHeader({ count, canAdd, onAdd }: any) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8,
@@ -235,7 +235,7 @@ function SectionHeader({ count, canAdd, onAdd }) {
   )
 }
 
-function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave, onApprove, onVoid, onDelete }) {
+function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave, onApprove, onVoid, onDelete }: any) {
   if (!changeOrders.length) {
     return (
       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--v3-text-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
@@ -246,7 +246,7 @@ function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave,
   }
   return (
     <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-      {changeOrders.map((co, i) => (
+      {changeOrders.map((co: any, i: any) => (
         <li key={co.id} style={{ borderTop: i > 0 ? '1px solid var(--v3-border)' : 'none' }}>
           {editingId === co.id ? (
             <Editor
@@ -270,7 +270,7 @@ function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave,
   )
 }
 
-function Row({ co, readOnly, onEdit, onApprove, onVoid, onDelete }) {
+function Row({ co, readOnly, onEdit, onApprove, onVoid, onDelete }: any) {
   const isApproved = co.status === 'approved'
   const isVoid = co.status === 'void'
   const isDraft = co.status === 'draft'
@@ -342,7 +342,7 @@ function Row({ co, readOnly, onEdit, onApprove, onVoid, onDelete }) {
   )
 }
 
-function Editor({ initial, isNew, onSave, onCancel }) {
+function Editor({ initial, isNew, onSave, onCancel }: any) {
   const [form, setForm] = useState({
     id: initial.id || null,
     title: initial.title || '',
@@ -355,7 +355,7 @@ function Editor({ initial, isNew, onSave, onCancel }) {
   })
   const [saving, setSaving] = useState(false)
 
-  function set(k, v) { setForm((prev) => ({ ...prev, [k]: v })) }
+  function set(k: any, v: any) { setForm((prev) => ({ ...prev, [k]: v })) }
 
   async function submit() {
     if (!form.title.trim()) {
@@ -462,13 +462,13 @@ function Editor({ initial, isNew, onSave, onCancel }) {
   )
 }
 
-function Tag({ tone, children }) {
-  const palette = {
+function Tag({ tone, children }: any) {
+  const palette = ({
     muted: { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' },
     green: { bg: 'rgba(74, 222, 128, 0.12)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74, 222, 128, 0.30)' },
     gold:  { bg: 'rgba(228, 190, 111, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(228, 190, 111, 0.30)' },
     red:   { bg: 'rgba(232, 90, 87, 0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232, 90, 87, 0.30)' }
-  }[tone] || { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' }
+  } as Record<string, any>)[tone] || { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
@@ -482,7 +482,7 @@ function Tag({ tone, children }) {
   )
 }
 
-function IconBtn({ children, onClick, tone, title, ...rest }) {
+function IconBtn({ children, onClick, tone, title, ...rest }: any) {
   const danger = tone === 'danger'
   return (
     <button
@@ -508,7 +508,7 @@ const labelStyle = {
   fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
   letterSpacing: '0.14em', color: 'var(--v3-text-muted)', textTransform: 'uppercase'
 }
-const inputStyle = {
+const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
   padding: '9px 12px', borderRadius: 8,
   background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)',
