@@ -10,8 +10,8 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ChevronLeft, Phone, Mail, Plus } from 'lucide-react-native'
-import { useJobDetail, useLogPayment, useUpdateStage } from '../../lib/queries'
+import { ChevronLeft, Phone, Mail, Plus, Pencil } from 'lucide-react-native'
+import { useJobDetail, useLogPayment, useUpdateStage, useUpdateJob } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
 const STAGE_TINT: Record<string, string> = {
@@ -33,11 +33,46 @@ export default function JobDetailScreen() {
   const { data, isPending } = useJobDetail(id)
   const logPayment = useLogPayment()
   const updateStage = useUpdateStage()
+  const updateJob = useUpdateJob()
 
   const [payOpen, setPayOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [paySaving, setPaySaving] = useState(false)
   const [stageSaving, setStageSaving] = useState<string | null>(null)
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editTitle, setEditTitle] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editAmount, setEditAmount] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
+  function openEdit() {
+    if (!contact) return
+    setEditName(contact.name || '')
+    setEditTitle(contact.job_title || '')
+    setEditPhone(contact.phone || '')
+    setEditEmail(contact.email || '')
+    setEditAmount(contact.amount != null ? String(contact.amount) : '')
+    setEditOpen(true)
+  }
+
+  async function submitEdit() {
+    if (!contact || editSaving) return
+    setEditSaving(true)
+    const amt = editAmount.trim() === '' ? null : Number(editAmount.replace(/[^0-9.]/g, ''))
+    const { error } = await updateJob({
+      contactId: contact.id,
+      name: editName.trim(),
+      jobTitle: editTitle.trim() || null,
+      phone: editPhone.trim() || null,
+      email: editEmail.trim() || null,
+      amount: amt
+    })
+    setEditSaving(false)
+    if (!error) setEditOpen(false)
+  }
 
   const contact = data?.contact ?? null
   const payments = data?.payments ?? []
@@ -86,10 +121,16 @@ export default function JobDetailScreen() {
   return (
     <View className="flex-1 bg-bg">
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
-        <Pressable onPress={() => router.back()} className="flex-row items-center mb-4" style={{ gap: 4 }}>
-          <ChevronLeft color="#E8B865" size={20} />
-          <Text className="text-gold-bright font-bold">Jobs</Text>
-        </Pressable>
+        <View className="flex-row items-center justify-between mb-4">
+          <Pressable onPress={() => router.back()} className="flex-row items-center" style={{ gap: 4 }}>
+            <ChevronLeft color="#E8B865" size={20} />
+            <Text className="text-gold-bright font-bold">Jobs</Text>
+          </Pressable>
+          <Pressable onPress={openEdit} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Pencil color="#E8B865" size={16} />
+            <Text className="text-gold-bright font-bold">Edit</Text>
+          </Pressable>
+        </View>
 
         <Text className="text-ink text-3xl font-bold" numberOfLines={2}>{contact.name || 'Untitled'}</Text>
         <Text className="text-xs font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>{contact.stage}</Text>
@@ -173,6 +214,74 @@ export default function JobDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Edit job modal */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setEditOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">Edit job</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Homeowner or company"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Job title</Text>
+            <TextInput
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Kitchen remodel, roof…"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <View className="flex-row mb-4" style={{ gap: 12 }}>
+              <View className="flex-1">
+                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Phone</Text>
+                <TextInput
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  keyboardType="phone-pad"
+                  placeholder="(555) 555-5555"
+                  placeholderTextColor="rgba(242,237,228,0.4)"
+                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Value</Text>
+                <TextInput
+                  value={editAmount}
+                  onChangeText={setEditAmount}
+                  keyboardType="decimal-pad"
+                  placeholder="$0"
+                  placeholderTextColor="rgba(242,237,228,0.4)"
+                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                />
+              </View>
+            </View>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Email</Text>
+            <TextInput
+              value={editEmail}
+              onChangeText={setEditEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="name@email.com"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+            />
+            <Pressable
+              onPress={submitEdit}
+              disabled={editSaving}
+              className="rounded-xl py-4 items-center"
+              style={{ backgroundColor: editSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+            >
+              {editSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save changes</Text>}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Log payment modal */}
       <Modal visible={payOpen} transparent animationType="slide" onRequestClose={() => setPayOpen(false)}>

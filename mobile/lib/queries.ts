@@ -217,6 +217,36 @@ export function useUpdateStage() {
   }
 }
 
+// Edit a job's core fields, then invalidate the detail + lists.
+export type UpdateJobInput = {
+  contactId: string
+  name?: string
+  jobTitle?: string | null
+  phone?: string | null
+  email?: string | null
+  amount?: number | null
+}
+
+export function useUpdateJob() {
+  const client = useQueryClient()
+  return async (input: UpdateJobInput) => {
+    const patch: Record<string, unknown> = {}
+    if (input.name !== undefined) patch.name = input.name
+    if (input.jobTitle !== undefined) patch.job_title = input.jobTitle
+    if (input.phone !== undefined) patch.phone = input.phone
+    if (input.email !== undefined) patch.email = input.email
+    if (input.amount !== undefined) patch.amount = input.amount
+    const { error } = await supabase.from('fh_contacts')
+      .update(patch as any)
+      .eq('id', input.contactId)
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+      client.invalidateQueries({ queryKey: queryKeys.jobs })
+    }
+    return { error }
+  }
+}
+
 // ---- Create lead ----
 // Insert a new fh_contacts row at a chosen stage, then invalidate the
 // jobs list. Mirrors the web NewLeadSheet's minimal create path.
