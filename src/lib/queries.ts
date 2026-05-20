@@ -272,3 +272,52 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
     enabled: !!userId
   })
 }
+
+// ---- Invoices / AR ----
+// Two datasets: jobs in the active money pipeline (with the joined
+// fh_clients fallback fields) and every payment (for per-job paid
+// rollups + month-to-date collection pace). Bundled so the screen
+// keeps a single loading flag, matching its prior behavior.
+
+export type InvoiceJob = Contact & {
+  fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
+}
+
+export type InvoicesBundle = {
+  jobs: InvoiceJob[]
+  payments: Payment[]
+}
+
+async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
+  const [jobsRes, paymentsRes] = await Promise.all([
+    supabase
+      .from('fh_contacts')
+      .select('*, fh_clients(name, email, phone, address)')
+      .eq('user_id', userId)
+      .in('stage', ['job', 'invoice', 'closed'])
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('fh_payments')
+      .select('*')
+      .eq('user_id', userId)
+  ])
+  if (jobsRes.error) throw jobsRes.error
+  if (paymentsRes.error) throw paymentsRes.error
+  return {
+    jobs: (jobsRes.data ?? []) as InvoiceJob[],
+    payments: (paymentsRes.data ?? []) as Payment[]
+  }
+}
+
+export function useInvoicesBundle(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['invoices', userId],
+    queryFn: () => fetchInvoicesBundle(userId as string),
+    enabled: !!userId
+  })
+}
+
+export function useInvalidateInvoices() {
+  const client = useQueryClient()
+  return () => client.invalidateQueries({ queryKey: ['invoices'] })
+}
