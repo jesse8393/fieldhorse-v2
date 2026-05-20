@@ -6,8 +6,8 @@ export const MURFREESBORO = { lat: 35.8456, lon: -86.3903 }
 // No API key. Falls back to "{lat}, {lon}" if the call fails.
 // Tiny in-memory cache keyed to 3-decimal coord pair (~100m precision) so the
 // same location doesn't re-fetch within a session.
-const _geocodeCache = new Map()
-export async function reverseGeocode(lat, lon) {
+const _geocodeCache = new Map<string, string>()
+export async function reverseGeocode(lat: number | null | undefined, lon: number | null | undefined) {
   if (lat == null || lon == null) return null
   const key = `${lat.toFixed(3)},${lon.toFixed(3)}`
   if (_geocodeCache.has(key)) return _geocodeCache.get(key)
@@ -33,8 +33,8 @@ export async function reverseGeocode(lat, lon) {
 
 export async function getWeather(lat = MURFREESBORO.lat, lon = MURFREESBORO.lon) {
   const params = new URLSearchParams({
-    latitude: lat,
-    longitude: lon,
+    latitude: String(lat),
+    longitude: String(lon),
     current:
       'temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code,is_day',
     hourly:
@@ -45,7 +45,7 @@ export async function getWeather(lat = MURFREESBORO.lat, lon = MURFREESBORO.lon)
     wind_speed_unit: 'mph',
     precipitation_unit: 'inch',
     timezone: 'auto',
-    forecast_days: 7
+    forecast_days: '7'
   })
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
   if (!res.ok) throw new Error('weather fetch failed')
@@ -55,7 +55,16 @@ export async function getWeather(lat = MURFREESBORO.lat, lon = MURFREESBORO.lon)
 // Per-trade work-window constraints.
 // stop  = hard blocker (safety or quality ruin)
 // warn  = workable but margins tight
-export const TRADE_RULES = {
+type RuleThresholds = { tempMin?: number; tempMax?: number; rain?: number; wind?: number; humidity?: number }
+type TradeRule = { stop?: RuleThresholds; warn?: RuleThresholds }
+type WeatherSnapshot = {
+  temperature_2m?: number | null
+  precipitation?: number | null
+  wind_speed_10m?: number | null
+  relative_humidity_2m?: number | null
+}
+
+export const TRADE_RULES: Record<string, TradeRule> = {
   concrete:   { stop: { tempMin: 40, tempMax: 95, rain: 0.05, wind: 30 },
                 warn: { tempMin: 50, tempMax: 85, rain: 0.01, humidity: 85 } },
   roofing:    { stop: { tempMin: 35, tempMax: 100, rain: 0.01, wind: 20 },
@@ -80,7 +89,7 @@ export const TRADE_RULES = {
 
 // Status for a single trade given a weather snapshot.
 // Returns { status: 'go' | 'warn' | 'stop', reasons: string[] }
-export function tradeStatus(trade, snapshot) {
+export function tradeStatus(trade: string, snapshot: WeatherSnapshot | null | undefined): { status: 'go' | 'warn' | 'stop'; reasons: string[] } {
   const rules = TRADE_RULES[trade]
   if (!rules || !snapshot) return { status: 'go', reasons: [] }
   const t = snapshot.temperature_2m
@@ -88,10 +97,10 @@ export function tradeStatus(trade, snapshot) {
   const wind = snapshot.wind_speed_10m ?? 0
   const rh = snapshot.relative_humidity_2m ?? 0
 
-  const reasons = []
-  let status = 'go'
+  const reasons: string[] = []
+  let status: 'go' | 'warn' | 'stop' = 'go'
 
-  const hit = (level) => {
+  const hit = (level: 'stop' | 'warn') => {
     const r = rules[level]
     if (!r) return false
     if (r.tempMin != null && t != null && t < r.tempMin) {
@@ -123,13 +132,13 @@ export function tradeStatus(trade, snapshot) {
 }
 
 // Aggregate across all selected trades. Worst status wins.
-export function workWindow(snapshot, services = []) {
+export function workWindow(snapshot: WeatherSnapshot | null | undefined, services: string[] = []): { status: 'go' | 'warn' | 'stop'; label: string; reasons: string[] } {
   if (!snapshot) return { status: 'go', label: 'Awaiting forecast', reasons: [] }
   if (!services.length) {
     return { status: 'go', label: 'Clear to work', reasons: [] }
   }
-  let worst = 'go'
-  const allReasons = new Set()
+  let worst: 'go' | 'warn' | 'stop' = 'go'
+  const allReasons = new Set<string>()
   for (const s of services) {
     const { status, reasons } = tradeStatus(s, snapshot)
     reasons.forEach((r) => allReasons.add(r))
@@ -144,9 +153,9 @@ export function workWindow(snapshot, services = []) {
 }
 
 // Hourly go/warn/stop dots for the next N hours across selected trades.
-export function hourlyStrip(hourly, services = [], hours = 24) {
+export function hourlyStrip(hourly: any, services: string[] = [], hours = 24) {
   if (!hourly?.time) return []
-  const out = []
+  const out: { time: string; status: string; temp: number | undefined; rain: number }[] = []
   for (let i = 0; i < Math.min(hours, hourly.time.length); i++) {
     const snap = {
       temperature_2m: hourly.temperature_2m?.[i],
@@ -166,7 +175,7 @@ export function hourlyStrip(hourly, services = [], hours = 24) {
 }
 
 // Friendly weather_code label. WMO codes.
-export function weatherLabel(code) {
+export function weatherLabel(code: number | null | undefined) {
   if (code == null) return '—'
   if (code === 0) return 'Clear'
   if (code === 1) return 'Mostly clear'
@@ -182,7 +191,7 @@ export function weatherLabel(code) {
   return '—'
 }
 
-export function pourRating(current) {
+export function pourRating(current: WeatherSnapshot | null | undefined) {
   if (!current) return { label: '—', tone: 'neutral' }
   const w = workWindow(current, ['concrete'])
   const tone = w.status === 'stop' ? 'alert' : w.status === 'warn' ? 'warn' : 'ok'
