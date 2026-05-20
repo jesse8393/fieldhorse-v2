@@ -116,3 +116,60 @@ export function useUpcomingEvents(userId: string | undefined) {
     enabled: !!userId
   })
 }
+
+// ---- Job detail ----
+// One job's worth of data for the detail screen: the contact row plus
+// its payments, schedule, subs, and expenses. Mirrors the web
+// useJobData fetch (lighter — no client lookup / change orders yet).
+export type JobDetail = {
+  contact: Contact | null
+  payments: Payment[]
+  schedule: Database['public']['Tables']['fh_schedule']['Row'][]
+  subs: Database['public']['Tables']['fh_subs']['Row'][]
+  expenses: Database['public']['Tables']['fh_expenses']['Row'][]
+}
+
+async function fetchJobDetail(id: string): Promise<JobDetail> {
+  const [c, p, sch, s, e] = await Promise.all([
+    supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
+    supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
+    supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
+    supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+    supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false })
+  ])
+  return {
+    contact: (c.data ?? null) as Contact | null,
+    payments: (p.data ?? []) as Payment[],
+    schedule: (sch.data ?? []) as JobDetail['schedule'],
+    subs: (s.data ?? []) as JobDetail['subs'],
+    expenses: (e.data ?? []) as JobDetail['expenses']
+  }
+}
+
+export function useJobDetail(id: string | undefined) {
+  return useQuery({
+    queryKey: ['jobDetail', id],
+    queryFn: () => fetchJobDetail(id as string),
+    enabled: !!id
+  })
+}
+
+// Log a payment against a job, then invalidate the detail + lists so
+// balances refresh everywhere. Returns the supabase error (or null).
+export function useLogPayment() {
+  const client = useQueryClient()
+  return async (input: { contactId: string; userId: string; amount: number; method?: string; paidOn?: string }) => {
+    const { error } = await supabase.from('fh_payments').insert({
+      user_id: input.userId,
+      contact_id: input.contactId,
+      amount: input.amount,
+      method: input.method || 'check',
+      paid_on: input.paidOn || new Date().toISOString().slice(0, 10)
+    } as any)
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+      client.invalidateQueries({ queryKey: queryKeys.jobs })
+    }
+    return { error }
+  }
+}

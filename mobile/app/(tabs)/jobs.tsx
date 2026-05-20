@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react'
 import { View, Text, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useJobs, useJobsRealtime, type JobRow } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
@@ -28,6 +29,7 @@ function money(n: number | null | undefined) {
 
 export default function JobsScreen() {
   const insets = useSafeAreaInsets()
+  const router = useRouter()
   const queryClient = useQueryClient()
   // userId would come from an auth context (Supabase session) in the
   // full build; realtime is wired the moment it's available.
@@ -72,7 +74,7 @@ export default function JobsScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 8 }}
-          renderItem={({ item }) => <JobCard job={item} />}
+          renderItem={({ item }) => <JobCard job={item} onPress={() => router.push(`/jobs/${item.id}`)} />}
           ListEmptyComponent={
             <Text className="text-ink-muted text-center mt-12">No jobs in this view.</Text>
           }
@@ -82,10 +84,11 @@ export default function JobsScreen() {
   )
 }
 
-function JobCard({ job }: { job: JobRow }) {
+function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {
   const tint = STAGE_TINT[job.stage] ?? '#5C5C5C'
   return (
     <Pressable
+      onPress={onPress}
       className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center"
       style={{ gap: 12 }}
     >

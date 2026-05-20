@@ -3,8 +3,9 @@
 // headline KPIs natively. No new query — the cross-screen cache means
 // Jobs and Home share one fetch.
 import { useMemo } from 'react'
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
 import { useJobs } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -26,6 +27,7 @@ function greeting() {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets()
+  const router = useRouter()
   const { user } = useAuth()
   const { data: jobs = [], isLoading } = useJobs()
 
@@ -72,8 +74,9 @@ export default function HomeScreen() {
           ) : (
             <View style={{ gap: 8 }}>
               {recent.map((j) => (
-                <View
+                <Pressable
                   key={j.id}
+                  onPress={() => router.push(`/jobs/${j.id}`)}
                   className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
                 >
                   <View className="flex-1 pr-3">
@@ -81,7 +84,7 @@ export default function HomeScreen() {
                     <Text className="text-ink-muted text-xs mt-1" numberOfLines={1}>{j.job_title || j.job_type || '—'}</Text>
                   </View>
                   <Text className="text-gold-bright text-base font-bold">{money(Number(j.amount || 0))}</Text>
-                </View>
+                </Pressable>
               ))}
             </View>
           )}
