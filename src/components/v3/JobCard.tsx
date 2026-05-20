@@ -11,7 +11,7 @@ import StatusPill from './StatusPill.tsx'
 const COLD_DAYS = 7
 const COLD_MS = COLD_DAYS * 24 * 60 * 60 * 1000
 
-function isColdContact(contact) {
+function isColdContact(contact: any) {
   if (!contact) return false
   if (contact.stage !== 'lead' && contact.stage !== 'quote') return false
   const ts = contact.updated_at || contact.created_at
@@ -23,13 +23,13 @@ function isColdContact(contact) {
 
 // Stage progression visual (lost collapses to 0). Same constants Jobs.jsx
 // has used; centralized here so JobCard owns the per-card visual maths.
-const STAGE_STEP = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
+const STAGE_STEP: Record<string, number> = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
 const TOTAL_STAGES = 5
 
 // Stage-driven "next action" hint shown beneath the stage pill. Mirrors the
 // pipeline.ts stage default suggestions so the operator sees the same
 // primary action they'd see in the Job Detail NextActionCard.
-const NEXT_ACTION_HINT = {
+const NEXT_ACTION_HINT: Record<string, string | null> = {
   lead:    'Send a quote',
   quote:   'Get approval',
   job:     'Job in progress',
@@ -38,18 +38,18 @@ const NEXT_ACTION_HINT = {
   lost:    null
 }
 
-function money(n) {
+function money(n: number | string | null | undefined) {
   const v = Number(n || 0)
   if (!v) return '$0'
   return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
 
-function initials(name) {
+function initials(name: string | null | undefined) {
   if (!name) return '—'
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
 }
 
-function MarginBadge({ pct, hasCost }) {
+function MarginBadge({ pct, hasCost }: { pct: number; hasCost?: boolean }) {
   // No cost data → hide the row entirely. The previous "Margin —"
   // placeholder added visual noise without conveying anything.
   if (!hasCost) return null
@@ -95,15 +95,25 @@ function MarginBadge({ pct, hasCost }) {
  * - 3D tilt removed — perf win, mockup doesn't call for it.
  * - React.memo — kills re-renders when parent list updates unrelated rows.
  */
+type JobCardProps = {
+  contact: any
+  index?: number
+  isNew?: boolean
+  viewerUserId?: string
+  onOpen?: (contact: any) => void
+  photoUrl?: string | null
+  featured?: boolean
+}
+
 const JobCard = memo(function JobCard({
   contact,
   index = 0,
   isNew = false,
   viewerUserId,
   onOpen,
-  photoUrl, // optional — backend wiring to fh_photos comes later
-  featured = false // top-value/most-urgent: gold border + TOP DEAL chip
-}) {
+  photoUrl,
+  featured = false
+}: JobCardProps) {
   const stageMeta = STAGE_MAP[contact.stage]
   const stageColor = stageMeta?.color || '#5C5C5C'
   const step = STAGE_STEP[contact.stage] ?? 0
@@ -466,7 +476,7 @@ const JobCard = memo(function JobCard({
 
 // Map a stage id to a StatusPill tone. Lost folds into the muted
 // 'lost' tone; everything else has its own canonical tone variant.
-function stageToneFor(stageId) {
+function stageToneFor(stageId: string) {
   switch (stageId) {
     case 'lead':    return 'lead'
     case 'quote':   return 'quote'
@@ -483,7 +493,7 @@ function stageToneFor(stageId) {
  * 56×56 thumbnail. Shows initials inside a stage-tinted gradient when no
  * photo URL is present, matching the existing v2 avatar treatment.
  */
-function PhotoOrInitialTile({ photoUrl, name, stageColor }) {
+function PhotoOrInitialTile({ photoUrl, name, stageColor }: { photoUrl?: string | null; name?: string | null; stageColor?: string }) {
   const SIZE = 56
   if (photoUrl) {
     return (

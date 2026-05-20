@@ -17,7 +17,7 @@ const TIMELINE_STAGES = ['lead', 'quote', 'job', 'invoice', 'closed']
  * - Current dot enlarged + gold ring + label highlighted.
  * - Lost stage shows a danger banner instead of timeline progression.
  */
-export default function StageTimeline({ currentStage }) {
+export default function StageTimeline({ currentStage }: { currentStage?: string }) {
   if (currentStage === 'lost') {
     return (
       <div style={{
@@ -39,7 +39,7 @@ export default function StageTimeline({ currentStage }) {
     )
   }
 
-  const currentIdx = TIMELINE_STAGES.indexOf(currentStage)
+  const currentIdx = TIMELINE_STAGES.indexOf(currentStage ?? '')
   // unknown / unmapped → render as if we're at the very start, no dots filled
   const safeIdx = currentIdx === -1 ? -1 : currentIdx
 
