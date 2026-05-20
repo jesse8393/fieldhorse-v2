@@ -10,12 +10,14 @@ import {
   TextInput, KeyboardAvoidingView, Platform, Alert, ScrollView
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Plus } from 'lucide-react-native'
 import {
   useUpcomingEvents, useCreateEvent, useDeleteEvent, useUpdateEvent,
   useJobs, type ScheduleEvent
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, Eyebrow, GoldButton, theme } from '../../components/ui'
 
 function dayLabel(iso: string) {
   const d = new Date(iso)
@@ -130,23 +132,23 @@ export default function ScheduleScreen() {
   }, [events])
 
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top + 8 }}>
-      <View className="px-5 pb-3 flex-row items-end justify-between">
+    <View style={{ flex: 1, paddingTop: insets.top + 10 }}>
+      <ScreenBackground />
+      <View style={{ paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <View>
-          <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Schedule</Text>
-          <Text className="text-ink text-3xl font-bold">Next {range} days</Text>
+          <Eyebrow>Schedule</Eyebrow>
+          <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', letterSpacing: -0.5 }}>Next {range} days</Text>
         </View>
-        <View className="flex-row" style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
           {([7, 30] as const).map((r) => {
             const active = range === r
             return (
               <Pressable
                 key={r}
                 onPress={() => setRange(r)}
-                className="rounded-full px-3 py-1.5 border"
-                style={{ borderColor: active ? '#E8B865' : 'rgba(255,240,210,0.12)', backgroundColor: active ? '#E8B865' : 'transparent' }}
+                style={{ borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7, borderWidth: 1, borderColor: active ? theme.goldBright : theme.borderMid, backgroundColor: active ? `${theme.goldBright}26` : 'transparent' }}
               >
-                <Text className="text-xs font-bold" style={{ color: active ? '#1A120A' : '#9b948a' }}>{r}d</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? theme.goldBright : theme.inkMuted }}>{r}d</Text>
               </Pressable>
             )
           })}
@@ -154,64 +156,52 @@ export default function ScheduleScreen() {
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center"><ActivityIndicator color="#E8B865" /></View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.goldBright} /></View>
       ) : (
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100 }}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (
-            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-5 mb-2">
+            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 18, marginBottom: 10 }}>
               {section.title}
             </Text>
           )}
           renderItem={({ item }) => (
-            <Pressable
-              onPress={() => openEdit(item)}
-              className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-2 flex-row items-center"
-              style={{ gap: 12 }}
-            >
-              <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 3, backgroundColor: '#E8B865' }} />
-              <View className="flex-1">
-                <Text className="text-ink text-base font-bold" numberOfLines={1}>{item.title || 'Scheduled event'}</Text>
-                <Text className="text-ink-muted text-xs mt-1" numberOfLines={1}>
-                  {item.fh_contacts?.name || 'No job linked'}
-                </Text>
-              </View>
-              <Text className="text-gold-bright text-sm font-bold">
-                {item.start_at ? timeLabel(item.start_at) : ''}
-              </Text>
+            <Pressable onPress={() => openEdit(item)} style={{ marginBottom: 10 }}>
+              <Card accent={theme.gold}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, paddingLeft: 18 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{item.title || 'Scheduled event'}</Text>
+                    <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>{item.fh_contacts?.name || 'No job linked'}</Text>
+                  </View>
+                  <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '800' }}>{item.start_at ? timeLabel(item.start_at) : ''}</Text>
+                </View>
+              </Card>
             </Pressable>
           )}
-          ListEmptyComponent={
-            <Text className="text-ink-muted text-center mt-12">A clear stretch — nothing scheduled.</Text>
-          }
-          ListFooterComponent={
-            events.length ? <Text className="text-ink-muted text-[10px] text-center mt-4">Tap an event to edit or delete.</Text> : null
-          }
+          ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>A clear stretch — nothing scheduled.</Text>}
+          ListFooterComponent={events.length ? <Text style={{ color: theme.inkMuted, fontSize: 10, textAlign: 'center', marginTop: 16 }}>Tap an event to edit or delete.</Text> : null}
         />
       )}
 
       {/* Floating add button */}
       <Pressable
         onPress={openCreate}
-        className="absolute items-center justify-center rounded-full"
-        style={{
-          right: 20, bottom: insets.bottom + 20, width: 56, height: 56,
-          backgroundColor: '#E8B865', shadowColor: '#000', shadowOpacity: 0.4,
-          shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8
-        }}
+        style={{ position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 999, shadowColor: '#E8B865', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12 }}
       >
-        <Plus color="#1A120A" size={26} strokeWidth={2.6} />
+        <LinearGradient colors={['#F0CE86', '#E4BE6F', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>
+          <Plus color={theme.onGold} size={26} strokeWidth={2.8} />
+        </LinearGradient>
       </Pressable>
 
       {/* Create/edit event modal */}
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setAddOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
-            <Text className="text-ink text-xl font-bold mb-5">{editingId ? 'Edit event' : 'New event'}</Text>
+          <View style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderTopWidth: 1, borderColor: theme.borderMid, paddingBottom: insets.bottom + 24 }}>
+            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 20 }}>{editingId ? 'Edit event' : 'New event'}</Text>
             <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Title</Text>
             <TextInput
               value={title}
@@ -270,18 +260,13 @@ export default function ScheduleScreen() {
               })}
             </ScrollView>
 
-            {err ? <Text className="text-[#f5a294] text-xs mt-3">{err}</Text> : null}
-            <Pressable
-              onPress={submitEvent}
-              disabled={saving}
-              className="rounded-xl py-4 items-center mt-5"
-              style={{ backgroundColor: saving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
-            >
-              {saving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">{editingId ? 'Save event' : 'Create event'}</Text>}
-            </Pressable>
+            {err ? <Text style={{ color: theme.danger, fontSize: 12, marginTop: 12 }}>{err}</Text> : null}
+            <View style={{ marginTop: 20 }}>
+              <GoldButton label={editingId ? 'Save event' : 'Create event'} onPress={submitEvent} loading={saving} />
+            </View>
             {editingId ? (
-              <Pressable onPress={confirmDelete} className="rounded-xl py-3.5 items-center mt-3 border border-[rgba(232,90,87,0.3)]" style={{ backgroundColor: 'rgba(232,90,87,0.10)' }}>
-                <Text className="text-[#f5a294] font-bold">Delete event</Text>
+              <Pressable onPress={confirmDelete} style={{ borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}>
+                <Text style={{ color: theme.danger, fontWeight: '700' }}>Delete event</Text>
               </Pressable>
             ) : null}
           </View>
