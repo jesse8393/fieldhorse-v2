@@ -658,3 +658,74 @@ export function useInvalidateEstimateTemplates() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: ['estimateTemplates'] })
 }
+
+// ---- Sub detail ----
+// One sub's rollup, keyed by the normalized phone-or-name identity. We
+// pull every sub row + every sub profile for the user and match
+// client-side (sub volumes are bounded), then hydrate the contact rows
+// for the matching sub's job history. The profile is mutated locally
+// via setQueryData (create / edit), so the cache stays authoritative.
+
+export type Sub_Detail_Profile = Database['public']['Tables']['fh_sub_profiles']['Row']
+
+export type SubDetailBundle = {
+  subRows: Sub[]
+  contacts: Record<string, SubContact>
+  profile: Sub_Detail_Profile | null
+}
+
+async function fetchSubDetail(key: string, userId: string): Promise<SubDetailBundle> {
+  const [{ data: subs, error: subsErr }, { data: prof, error: profErr }] = await Promise.all([
+    supabase
+      .from('fh_subs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('fh_sub_profiles')
+      .select('*')
+      .eq('user_id', userId)
+  ])
+  if (subsErr) throw subsErr
+  if (profErr && profErr.code !== 'PGRST116') {
+    if (profErr.message?.includes('does not exist')) {
+      throw new Error('Sub profile table is missing — run migration 017_sub_profiles.sql in Supabase')
+    }
+    throw profErr
+  }
+
+  const subRows = ((subs ?? []) as Sub[]).filter((r) => {
+    const k = (r.phone || r.name || '').toLowerCase().trim()
+    return k === key
+  })
+
+  const matchingProfile = ((prof ?? []) as Sub_Detail_Profile[]).find((p) => {
+    const byPhone = (p.phone || '').toLowerCase().trim()
+    const byName = (p.name || '').toLowerCase().trim()
+    return byPhone === key || byName === key
+  }) || null
+
+  const ids = Array.from(new Set(subRows.map((r) => r.contact_id).filter(Boolean))) as string[]
+  const contacts: Record<string, SubContact> = {}
+  if (ids.length > 0) {
+    const { data: cs } = await supabase
+      .from('fh_contacts')
+      .select('id, name, job_title, stage')
+      .in('id', ids)
+    for (const c of (cs ?? []) as SubContact[]) contacts[c.id] = c
+  }
+
+  return { subRows, contacts, profile: matchingProfile }
+}
+
+export function subDetailKey(key: string | undefined) {
+  return ['subDetail', key] as const
+}
+
+export function useSubDetail(key: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: subDetailKey(key),
+    queryFn: () => fetchSubDetail(key as string, userId as string),
+    enabled: !!key && !!userId
+  })
+}
