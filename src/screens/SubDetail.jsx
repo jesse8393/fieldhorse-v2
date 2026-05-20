@@ -12,7 +12,7 @@ import { formatPhone } from '../lib/utils.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import SectionHeader from '../components/v3/SectionHeader.jsx'
+import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { Eyebrow, StampNumber } from '../components/v3'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 

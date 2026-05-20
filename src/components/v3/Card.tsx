@@ -1,15 +1,30 @@
 import { forwardRef } from 'react'
+import type { HTMLAttributes, ElementType, CSSProperties } from 'react'
 import { motion } from 'framer-motion'
 
-const PADDING = { sm: 'v3-card--padded-sm', md: 'v3-card--padded', lg: 'v3-card--padded-lg', none: '' }
-const ACCENT = {
+type CardPadding = 'sm' | 'md' | 'lg' | 'none'
+type CardAccent = 'primary' | 'success' | 'danger' | 'hero'
+
+const PADDING: Record<CardPadding, string> = { sm: 'v3-card--padded-sm', md: 'v3-card--padded', lg: 'v3-card--padded-lg', none: '' }
+const ACCENT: Record<CardAccent, string> = {
   primary: 'v3-card--accent-primary',
   success: 'v3-card--accent-success',
   danger: 'v3-card--accent-danger',
   hero: 'v3-card--hero'
 }
 
-const Card = forwardRef(function Card(
+type CardProps = HTMLAttributes<HTMLElement> & {
+  as?: ElementType
+  padding?: CardPadding
+  surface?: 1 | 2
+  accent?: CardAccent
+  flat?: boolean
+  interactive?: boolean
+  onTap?: () => void
+  style?: CSSProperties
+}
+
+const Card = forwardRef<HTMLElement, CardProps>(function Card(
   {
     as: Tag = 'div',
     padding = 'md',
@@ -38,14 +53,14 @@ const Card = forwardRef(function Card(
   if (interactive || onTap) {
     return (
       <motion.button
-        ref={ref}
+        ref={ref as any}
         type="button"
         whileTap={{ scale: 0.985 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         className={cls}
         onClick={onTap}
         style={{ textAlign: 'left', ...style }}
-        {...rest}
+        {...(rest as any)}
       >
         {children}
       </motion.button>

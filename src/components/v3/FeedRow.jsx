@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Hammer, FileText, Receipt, Camera, Activity, Trash2 } from 'lucide-react'
-import Pill from './Pill.jsx'
+import Pill from './Pill.tsx'
 import { hapticTap } from '../../lib/haptics.ts'
 
 const ICONS = {

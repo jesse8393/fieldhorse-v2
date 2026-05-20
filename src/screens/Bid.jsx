@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase.ts'
 import { useEstimateTemplates, useInvalidateEstimateTemplates } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import CountUp from '../components/fx/CountUp.jsx'
-import SectionHeader from '../components/v3/SectionHeader.jsx'
+import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill } from '../components/v3'
 
 // White-label: internal-only tool but no app-attributable phrasing

@@ -1,6 +1,16 @@
 import { ChevronRight } from 'lucide-react'
+import type { ReactNode } from 'react'
 
-export default function SectionHeader({ label, action }) {
+type SectionHeaderProps = {
+  label: ReactNode
+  action?: {
+    onTap?: () => void
+    label: ReactNode
+    showChevron?: boolean
+  }
+}
+
+export default function SectionHeader({ label, action }: SectionHeaderProps) {
   return (
     <div className="v3-section-header">
       <span className="v3-eyebrow">{label}</span>

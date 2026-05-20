@@ -1,18 +1,31 @@
 import { forwardRef } from 'react'
+import type { ButtonHTMLAttributes, ComponentType } from 'react'
 
-const VARIANT = {
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type ButtonSize = 'sm' | 'md' | 'lg'
+
+const VARIANT: Record<ButtonVariant, string> = {
   primary: 'v3-btn v3-btn--primary',
   secondary: 'v3-btn v3-btn--secondary',
   ghost: 'v3-btn v3-btn--ghost',
   danger: 'v3-btn v3-btn--danger'
 }
-const SIZE = {
+const SIZE: Record<ButtonSize, string> = {
   sm: 'v3-btn--sm',
   md: '',
   lg: 'v3-btn--lg'
 }
 
-const Button = forwardRef(function Button(
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant
+  size?: ButtonSize
+  leftIcon?: ComponentType<any>
+  rightIcon?: ComponentType<any>
+  iconOnly?: boolean
+  fullWidth?: boolean
+}
+
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = 'primary',
     size = 'md',
