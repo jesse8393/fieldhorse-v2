@@ -629,3 +629,32 @@ export function useInvalidateInvoiceDetail() {
   return (id: string | undefined) =>
     client.invalidateQueries({ queryKey: ['invoiceDetail', id] })
 }
+
+// ---- Estimate templates (Bid screen) ----
+// The saved estimate templates the bid composer can apply. RLS scopes
+// the rows to the owner, so no JS user_id filter; keyed by userId so the
+// query enables once auth resolves.
+
+export type EstimateTemplate = Database['public']['Tables']['fh_estimate_templates']['Row']
+
+async function fetchEstimateTemplates(): Promise<EstimateTemplate[]> {
+  const { data, error } = await supabase
+    .from('fh_estimate_templates')
+    .select('*')
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as EstimateTemplate[]
+}
+
+export function useEstimateTemplates(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['estimateTemplates', userId],
+    queryFn: fetchEstimateTemplates,
+    enabled: !!userId
+  })
+}
+
+export function useInvalidateEstimateTemplates() {
+  const client = useQueryClient()
+  return () => client.invalidateQueries({ queryKey: ['estimateTemplates'] })
+}

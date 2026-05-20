@@ -9,6 +9,7 @@ import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
 import { supabase } from '../lib/supabase.js'
+import { useEstimateTemplates, useInvalidateEstimateTemplates } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import CountUp from '../components/fx/CountUp.jsx'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
@@ -40,10 +41,10 @@ export default function Bid() {
   const [jobType, setJobType] = useState('')
   const [copied, setCopied] = useState(false)
   const [pushing, setPushing] = useState(false)
-  // Templates library (migration 024). Loaded on mount + after every
-  // save/delete so the picker stays fresh. saving is per-instance
-  // (only one save action in flight at a time).
-  const [templates, setTemplates] = useState([])
+  // Templates library (migration 024). Loaded via TanStack Query and
+  // invalidated after every save/delete so the picker stays fresh.
+  const { data: templates = [] } = useEstimateTemplates(user?.id)
+  const fetchTemplates = useInvalidateEstimateTemplates()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateNamePrompt, setTemplateNamePrompt] = useState('')
@@ -55,16 +56,6 @@ export default function Bid() {
     for (const [k, v] of Object.entries(RATE_CARD)) m[k] = { ...v, label: TRADE_LABELS[k] || k }
     return m
   })
-
-  async function fetchTemplates() {
-    if (!user?.id) return
-    const { data } = await supabase
-      .from('fh_estimate_templates')
-      .select('*')
-      .order('updated_at', { ascending: false })
-    setTemplates(data || [])
-  }
-  useEffect(() => { fetchTemplates() }, [user?.id])
 
   // Fetch user rate-card overrides once per session. Falls back silently
   // to the seed defaults on error.
