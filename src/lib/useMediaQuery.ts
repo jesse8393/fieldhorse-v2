@@ -16,10 +16,9 @@ import { useEffect, useState } from 'react'
  * and passes real data + handlers into both branches — the hook only
  * answers "which branch should render?".
  *
- * @param {string} query - e.g. '(min-width: 900px)'
- * @returns {boolean}
+ * @param query - e.g. '(min-width: 900px)'
  */
-export function useMediaQuery(query) {
+export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return false
     try { return window.matchMedia(query).matches } catch { return false }
@@ -27,7 +26,7 @@ export function useMediaQuery(query) {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
-    let mql
+    let mql: MediaQueryList
     try { mql = window.matchMedia(query) } catch { return }
     const update = () => setMatches(mql.matches)
     update()

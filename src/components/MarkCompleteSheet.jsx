@@ -17,7 +17,7 @@ import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { generateCertificate, downloadPdf } from '../lib/pdf.js'
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,

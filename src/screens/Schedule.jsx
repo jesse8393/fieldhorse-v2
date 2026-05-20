@@ -19,7 +19,7 @@ import { useProfile } from '../contexts/ProfileContext.jsx'
 import { getWeather, workWindow } from '../lib/weather.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import { useIsDesktop } from '../lib/useMediaQuery.js'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import DesktopScheduleWorkspace from '../components/desktop/DesktopScheduleWorkspace.jsx'
 
 const VIEWS = [

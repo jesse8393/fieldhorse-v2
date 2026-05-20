@@ -9,7 +9,7 @@ import { hapticStageChange, hapticTap } from '../../../lib/haptics.ts'
 import { approveQuote as pipelineApproveQuote } from '../../../lib/pipeline.ts'
 import { generateQuote } from '../../../lib/pdf.js'
 import SignaturePad from '../../../components/SignaturePad.jsx'
-import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.js'
+import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.ts'
 
 /**
  * Approve Quote sheet — Phase 4C-2.

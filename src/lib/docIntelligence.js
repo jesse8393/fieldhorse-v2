@@ -14,7 +14,7 @@
 // so the API key never ships to the browser.
 
 import { JOB_TYPES } from './jobTypes.ts'
-import { claudeVision, extractJson } from './anthropic.js'
+import { claudeVision, extractJson } from './anthropic.ts'
 
 const EXPENSE_CATEGORIES = ['Materials', 'Fuel', 'Permits', 'Equipment', 'Other']
 

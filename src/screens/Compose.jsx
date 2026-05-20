@@ -4,7 +4,7 @@ import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateC
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
-import { claudeMessage } from '../lib/anthropic.js'
+import { claudeMessage } from '../lib/anthropic.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
