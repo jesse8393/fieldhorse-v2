@@ -209,9 +209,9 @@ export default function Clients() {
         <div style={{
           padding: '14px 16px',
           borderRadius: 16,
-          background: 'var(--v3-surface)',
+          background: 'linear-gradient(180deg, #1b1816 0%, #121010 72%)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
         }}>
           {/* Header row: section eyebrow + state chip */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
