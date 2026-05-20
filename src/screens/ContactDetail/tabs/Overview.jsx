@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase.js'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import {
   startQuote, approveQuote, markComplete, reopen
-} from '../../../lib/pipeline.js'
+} from '../../../lib/pipeline.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.js'
 import { hapticTap, hapticStageChange } from '../../../lib/haptics.js'
 import {
@@ -38,7 +38,7 @@ import { money } from '../lib/format.js'
  *   - milestone → patch contact.milestones[i].done = true
  *   - todo      → fh_job_todos UPDATE done=true
  *   - schedule  → open AddEventSheet via onOpenAddEvent (parent owns sheet)
- *   - stage     → call pipelineFn from pipeline.js (markComplete/etc)
+ *   - stage     → call pipelineFn from pipeline.ts (markComplete/etc)
  *   - idle      → open AddEventSheet
  */
 export default function OverviewTab({
@@ -171,7 +171,7 @@ export default function OverviewTab({
           if (fn) {
             // Heavier haptic on stage boundary — matches haptics.js convention
             // that lead→quote→job→invoice transitions get hapticStageChange.
-            // pipeline.js fires its own commit haptic; this one announces the
+            // pipeline.ts fires its own commit haptic; this one announces the
             // boundary BEFORE the network call.
             hapticStageChange()
             await fn(contact)

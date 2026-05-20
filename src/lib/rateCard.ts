@@ -1,4 +1,4 @@
-// src/lib/rateCard.js
+// src/lib/rateCard.ts
 //
 // Default seed rate card for the AI Bid engine + tenant overrides loader.
 // The constants below are the shipping defaults. Per-tenant edits live in
@@ -12,7 +12,10 @@
 
 import { supabase } from './supabase.js'
 
-export const RATE_CARD = {
+export type RateSeed = { unit: string; low: number; high: number }
+export type RateEntry = RateSeed & { label?: string; custom?: boolean }
+
+export const RATE_CARD: Record<string, RateSeed> = {
   concrete:      { unit: 'sqft', low: 8,    high: 12 },
   framing:       { unit: 'lf',   low: 4,    high: 7 },
   drywall:       { unit: 'sqft', low: 2.5,  high: 4 },
@@ -27,7 +30,7 @@ export const RATE_CARD = {
   outdoorLiving: { unit: 'sqft', low: 25,   high: 65 }
 }
 
-export const TRADE_LABELS = {
+export const TRADE_LABELS: Record<string, string> = {
   concrete:      'Concrete',
   framing:       'Framing',
   drywall:       'Drywall',
@@ -46,14 +49,30 @@ export const TAGLINE = 'Built for the jobsite.'
 
 // Allowed units for the editor's unit picker. Trade-agnostic so the
 // contractor can use whichever unit makes sense for their work.
-export const RATE_UNITS = ['sqft', 'lf', 'point', 'lump', 'hr', 'cy', 'ea', 'day']
+export const RATE_UNITS: string[] = ['sqft', 'lf', 'point', 'lump', 'hr', 'cy', 'ea', 'day']
 
 // Fetch the user's saved overrides + any custom trades. Returns
 // { merged, overrides } where merged is the same shape as RATE_CARD
 // (defaults + overrides + custom keys) and overrides is the raw row
 // list keyed by trade_key (so the editor can show "you customized
 // this" badges).
-export async function loadUserRateCard(userId) {
+export type RateOverrideRow = {
+  id?: string
+  trade_key: string
+  label?: string | null
+  unit?: string | null
+  rate_low?: number | null
+  rate_high?: number | null
+  notes?: string | null
+  updated_at?: string | null
+}
+
+export type RateCardResult = {
+  merged: Record<string, RateEntry>
+  overrides: Record<string, RateOverrideRow>
+}
+
+export async function loadUserRateCard(userId: string | undefined): Promise<RateCardResult> {
   if (!userId) return { merged: { ...RATE_CARD }, overrides: {} }
 
   const { data, error } = await supabase
@@ -66,10 +85,10 @@ export async function loadUserRateCard(userId) {
     return { merged: { ...RATE_CARD }, overrides: {} }
   }
 
-  const overrides = {}
-  for (const row of data || []) overrides[row.trade_key] = row
+  const overrides: Record<string, RateOverrideRow> = {}
+  for (const row of (data || []) as RateOverrideRow[]) overrides[row.trade_key] = row
 
-  const merged = {}
+  const merged: Record<string, RateEntry> = {}
   for (const [key, seed] of Object.entries(RATE_CARD)) {
     const ov = overrides[key]
     merged[key] = ov
@@ -85,7 +104,7 @@ export async function loadUserRateCard(userId) {
 
 // Insert or update a single trade's rate. Pass userId + trade_key + a
 // patch of any subset of (label, unit, rate_low, rate_high, notes).
-export async function upsertRate({ userId, tradeKey, patch }) {
+export async function upsertRate({ userId, tradeKey, patch }: { userId: string | undefined; tradeKey: string | undefined; patch: Partial<RateOverrideRow> }) {
   if (!userId || !tradeKey) throw new Error('upsertRate: userId + tradeKey required')
   const row = {
     user_id: userId,
@@ -105,7 +124,7 @@ export async function upsertRate({ userId, tradeKey, patch }) {
 // Delete a tenant override — the trade reverts to the seed default.
 // For custom (non-seed) trades, deleting removes them from the editor
 // entirely.
-export async function resetRate({ userId, tradeKey }) {
+export async function resetRate({ userId, tradeKey }: { userId: string | undefined; tradeKey: string | undefined }) {
   if (!userId || !tradeKey) throw new Error('resetRate: userId + tradeKey required')
   const { error } = await supabase
     .from('fh_rate_cards')

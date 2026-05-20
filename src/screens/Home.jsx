@@ -303,7 +303,7 @@ export default function Home() {
       //
       // 5/13 audit changes:
       //   • Won was previously stage='closed' only — now matches the
-      //     canonical WON_STAGES from rollups.js (invoice + closed) so
+      //     canonical WON_STAGES from rollups.ts (invoice + closed) so
       //     Home agrees with the Jobs "Won" tab + Reports "Won YTD".
       //   • Active was previously stage in (job, invoice) which read as
       //     "all the work in progress" but conflicted with the Jobs

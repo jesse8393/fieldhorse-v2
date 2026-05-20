@@ -8,7 +8,7 @@ import LogMilesSheet from '../components/LogMilesSheet.jsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
-import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn } from '../lib/rollups.js'
+import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn } from '../lib/rollups.ts'
 import { toastSuccess } from '../lib/toast.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
@@ -72,7 +72,7 @@ export default function Analytics() {
   const stats = useMemo(() => {
     // Pipeline = sum of all jobs in active stages.
     const pipeline = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage)).reduce((s, c) => s + Number(c.amount || 0), 0)
-    // Won YTD + Profit YTD now share the rollups.js definition with
+    // Won YTD + Profit YTD now share the rollups.ts definition with
     // Jobs/Clients (won = stage in (invoice, closed)). Was previously
     // 'closed' only, so any job sitting in 'invoice' read as $0 won.
     const wonYTD = wonYTDFn(contacts)

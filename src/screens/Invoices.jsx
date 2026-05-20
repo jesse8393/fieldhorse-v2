@@ -510,7 +510,7 @@ export default function Invoices() {
       {/* Payment sheet — shared V3PaymentSheet from ContactDetail.
           Opens when the operator taps Mark Paid on a row, prefilled with
           that row's balance. On submit, logPayment cascades through
-          pipeline.js (auto-close on overpayment) and we refresh. */}
+          pipeline.ts (auto-close on overpayment) and we refresh. */}
       <AnimatePresence>
         {payingRow && (
           <V3PaymentSheet

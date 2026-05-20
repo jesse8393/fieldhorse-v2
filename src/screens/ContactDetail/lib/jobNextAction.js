@@ -12,7 +12,7 @@ import { dueStatus } from '../../../lib/dueDate.js'
  *   4. Stage-driven default suggestion  (per pipeline stage)
  *
  * When chain item 4 fires, the suggestion's `pipelineFn` advances the stage
- * via the existing pipeline.js cascade (markComplete, approveQuote, reopen,
+ * via the existing pipeline.ts cascade (markComplete, approveQuote, reopen,
  * etc.). This is how the v3 NextActionCard subsumes the legacy StageActions
  * row — same backend cascade, single primary action per screen.
  *

@@ -6,7 +6,7 @@
 // to the default). New custom trades go in via the "Add trade" form at
 // the bottom and use a free-form key (slugified).
 //
-// All persistence flows through lib/rateCard.js so Bid.jsx and any
+// All persistence flows through lib/rateCard.ts so Bid.jsx and any
 // future consumer pulls the same merged view via loadUserRateCard().
 
 import { useEffect, useMemo, useState } from 'react'
@@ -18,7 +18,7 @@ import { toastSuccess, toastError } from '../../lib/toast.js'
 import {
   RATE_CARD, TRADE_LABELS, RATE_UNITS,
   loadUserRateCard, upsertRate, resetRate
-} from '../../lib/rateCard.js'
+} from '../../lib/rateCard.ts'
 
 function slugify(s) {
   return String(s || '')
