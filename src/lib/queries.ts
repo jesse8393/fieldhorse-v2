@@ -577,3 +577,55 @@ export function useInvalidateAnalytics() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: ['analytics'] })
 }
+
+// ---- Invoice detail ----
+// One invoice's worth of data: the contact (with the fh_clients fallback
+// join), its payments, the one-to-one insurance claim, and the change
+// orders against the contract. The queryFn throws "Invoice not found"
+// when the contact is missing so the screen can surface query.error.
+
+export type InvoiceContact = Contact & {
+  fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
+}
+
+export type InvoiceDetailBundle = {
+  contact: InvoiceContact
+  payments: Payment[]
+  insurance: Database['public']['Tables']['fh_insurance_claims']['Row'] | null
+  changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
+}
+
+async function fetchInvoiceDetail(id: string): Promise<InvoiceDetailBundle> {
+  const [cRes, psRes, insRes, coRes] = await Promise.all([
+    supabase
+      .from('fh_contacts')
+      .select('*, fh_clients(name, email, phone, address)')
+      .eq('id', id)
+      .maybeSingle(),
+    supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
+    supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle(),
+    supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
+  ])
+  if (cRes.error) throw cRes.error
+  if (!cRes.data) throw new Error('Invoice not found')
+  return {
+    contact: cRes.data as InvoiceContact,
+    payments: (psRes.data ?? []) as Payment[],
+    insurance: (insRes.data ?? null) as InvoiceDetailBundle['insurance'],
+    changeOrders: (coRes.data ?? []) as InvoiceDetailBundle['changeOrders']
+  }
+}
+
+export function useInvoiceDetail(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: ['invoiceDetail', id],
+    queryFn: () => fetchInvoiceDetail(id as string),
+    enabled: !!id && !!userId
+  })
+}
+
+export function useInvalidateInvoiceDetail() {
+  const client = useQueryClient()
+  return (id: string | undefined) =>
+    client.invalidateQueries({ queryKey: ['invoiceDetail', id] })
+}
