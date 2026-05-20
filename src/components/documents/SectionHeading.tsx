@@ -1,4 +1,4 @@
-// src/components/documents/SectionHeading.jsx
+// src/components/documents/SectionHeading.tsx
 //
 // Small reusable header pattern used inside every document section.
 // Eyebrow on top (gold, letter-spaced, uppercase), title under it,
@@ -10,7 +10,7 @@
 
 import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
 
-export default function SectionHeading({ eyebrow, title, meta, company }) {
+export default function SectionHeading({ eyebrow, title, meta, company }: { eyebrow?: import('react').ReactNode; title?: import('react').ReactNode; meta?: import('react').ReactNode; company?: any }) {
   const gold = resolveBrandGold(company)
   return (
     <header style={{ marginBottom: 14 }}>

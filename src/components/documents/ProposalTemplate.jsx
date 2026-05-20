@@ -19,9 +19,9 @@
 // the table header bar so each contractor's identity still shows.
 
 import DocumentShell from './DocumentShell.jsx'
-import LineItemsTable from './LineItemsTable.jsx'
-import InsuranceModeBlock from './InsuranceModeBlock.jsx'
-import ChangeOrdersBlock from './ChangeOrdersBlock.jsx'
+import LineItemsTable from './LineItemsTable.tsx'
+import InsuranceModeBlock from './InsuranceModeBlock.tsx'
+import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { DOC_COLORS, DOC_FONTS } from './tokens.ts'
 import { money } from './format.ts'
 import { proposalNumber } from './numbers.ts'

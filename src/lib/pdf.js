@@ -19,7 +19,7 @@ import {
   proposalNumber as docProposalNumber
 } from '../components/documents/numbers.ts'
 import { mapItemsToScope } from '../components/documents/mapItems.ts'
-import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.jsx'
+import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.tsx'
 
 const FIELD_GOLD = [200, 161, 84]      // #C8A154
 const ONYX = [18, 18, 18]              // #121212
@@ -1950,7 +1950,7 @@ function drawProposalFooters(ctx) {
 }
 
 // Renders the Change Orders section on both the invoice + proposal PDFs.
-// Mirrors ChangeOrdersBlock.jsx visually: CO # · title · description ·
+// Mirrors ChangeOrdersBlock.tsx visually: CO # · title · description ·
 // amount (positive = additive, negative = credit in signal-green).
 function drawChangeOrdersSection(ctx, cursor) {
   const { doc, margin, contentWidth, brandGold, changeOrders } = ctx

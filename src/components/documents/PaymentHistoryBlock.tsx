@@ -1,4 +1,4 @@
-// src/components/documents/PaymentHistoryBlock.jsx
+// src/components/documents/PaymentHistoryBlock.tsx
 //
 // Reverse-chronological list of payments applied to a job. Surfaces
 // on the invoice template under "Payment history" so the customer can
@@ -10,7 +10,7 @@
 import { DOC_COLORS, typeStyle } from './tokens.ts'
 import { money, shortDate } from './format.ts'
 
-function methodLabel(m) {
+function methodLabel(m: string | null | undefined) {
   if (!m) return 'Payment'
   const lower = String(m).toLowerCase()
   if (lower === 'ach') return 'ACH'
@@ -20,9 +20,9 @@ function methodLabel(m) {
 // Pretty label for the payment kind tag (migration 022). 'other' and
 // undefined render no tag — keeps a clean row for the common cash-job
 // case where every payment is just "a payment".
-function kindBadge(k) {
+function kindBadge(k: string | null | undefined) {
   if (!k || k === 'other') return null
-  const map = {
+  const map: Record<string, { label: string; tone: string }> = {
     deposit:   { label: 'DEPOSIT',   tone: DOC_COLORS.gold },
     progress:  { label: 'PROGRESS',  tone: DOC_COLORS.gold },
     final:     { label: 'FINAL',     tone: DOC_COLORS.signalGreen },
@@ -31,7 +31,7 @@ function kindBadge(k) {
   return map[k] || null
 }
 
-export default function PaymentHistoryBlock({ payments = [] }) {
+export default function PaymentHistoryBlock({ payments = [] }: { payments?: any[] }) {
   if (!payments?.length) return null
 
   return (
@@ -89,16 +89,16 @@ export default function PaymentHistoryBlock({ payments = [] }) {
                     display: 'inline-flex',
                     padding: '2px 6px',
                     borderRadius: 4,
-                    background: `color-mix(in srgb, ${kindBadge(p.kind).tone} 14%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${kindBadge(p.kind).tone} 35%, transparent)`,
-                    color: kindBadge(p.kind).tone,
+                    background: `color-mix(in srgb, ${kindBadge(p.kind)?.tone} 14%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${kindBadge(p.kind)?.tone} 35%, transparent)`,
+                    color: kindBadge(p.kind)?.tone,
                     fontFamily: 'var(--font-body)',
                     fontSize: 9,
                     fontWeight: 700,
                     letterSpacing: '0.16em'
                   }}
                 >
-                  {kindBadge(p.kind).label}
+                  {kindBadge(p.kind)?.label}
                 </span>
               )}
             </div>

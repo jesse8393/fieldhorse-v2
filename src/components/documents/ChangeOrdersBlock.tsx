@@ -1,4 +1,4 @@
-// src/components/documents/ChangeOrdersBlock.jsx
+// src/components/documents/ChangeOrdersBlock.tsx
 //
 // Renders the list of change orders on a proposal or invoice document.
 // Each row stamps CO # · title · description · amount, with an
@@ -14,7 +14,7 @@
 import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
 import { money, shortDate } from './format.ts'
 
-export default function ChangeOrdersBlock({ changeOrders = [], company }) {
+export default function ChangeOrdersBlock({ changeOrders = [], company }: { changeOrders?: any[]; company?: any }) {
   const gold = resolveBrandGold(company)
   const items = (changeOrders || []).filter((co) => co?.status !== 'void')
   if (items.length === 0) return null

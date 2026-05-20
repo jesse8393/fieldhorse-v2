@@ -1,4 +1,4 @@
-// src/components/documents/LineItemsTable.jsx
+// src/components/documents/LineItemsTable.tsx
 //
 // Shared product/service table — dark header bar + multi-line
 // description rows. Matches the reference Estimate layout.
@@ -14,7 +14,7 @@
 import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
 import { money } from './format.ts'
 
-export default function LineItemsTable({ rows = [], company, showQty = true }) {
+export default function LineItemsTable({ rows = [], company, showQty = true }: { rows?: any[]; company?: any; showQty?: boolean }) {
   const brand = resolveBrandGold(company)
   // Dark header bar — uses the brand accent. Default contractors get
   // gold; Parker (brand_accent_hex=#1A1814 example) gets near-black,
@@ -60,7 +60,7 @@ export default function LineItemsTable({ rows = [], company, showQty = true }) {
                 )}
               </Td>
               <Td>
-                {descLines.length > 0 ? descLines.map((line, i) => (
+                {descLines.length > 0 ? descLines.map((line: string, i: number) => (
                   <div key={i} style={{ marginTop: i === 0 ? 0 : 4 }}>
                     {line}
                   </div>
@@ -81,7 +81,7 @@ export default function LineItemsTable({ rows = [], company, showQty = true }) {
   )
 }
 
-function Th({ children, align = 'left', bg, style }) {
+function Th({ children, align = 'left', bg, style }: { children?: import('react').ReactNode; align?: any; bg?: string; style?: import('react').CSSProperties }) {
   return (
     <th
       scope="col"
@@ -102,7 +102,7 @@ function Th({ children, align = 'left', bg, style }) {
   )
 }
 
-function Td({ children, align = 'left', mono = false, bold = false }) {
+function Td({ children, align = 'left', mono = false, bold = false }: { children?: import('react').ReactNode; align?: any; mono?: boolean; bold?: boolean }) {
   return (
     <td
       style={{

@@ -1,4 +1,4 @@
-// src/components/documents/PaymentTermsBlock.jsx
+// src/components/documents/PaymentTermsBlock.tsx
 //
 // Renders the payment schedule on a proposal.
 //
@@ -26,7 +26,7 @@ export default function PaymentTermsBlock({
   total = 0,
   schedule = DEFAULT_PAYMENT_SCHEDULE,
   company
-}) {
+}: { total?: number; schedule?: any[]; company?: any }) {
   const gold = resolveBrandGold(company)
   const grand = Number(total || 0)
 

@@ -1,4 +1,4 @@
-// src/components/documents/InsuranceModeBlock.jsx
+// src/components/documents/InsuranceModeBlock.tsx
 //
 // Optional block for insurance-restoration jobs (roofing, water, fire,
 // storm). Renders ONLY when the parent passes an `insurance` payload
@@ -22,7 +22,7 @@
 import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
 import { money } from './format.ts'
 
-export default function InsuranceModeBlock({ insurance = null, company }) {
+export default function InsuranceModeBlock({ insurance = null, company }: { insurance?: any; company?: any }) {
   if (!insurance) return null
   const hasAny = ['claim_number', 'carrier', 'adjuster', 'deductible', 'rcv', 'acv', 'depreciation', 'supplement_amount', 'mortgage_company']
     .some((k) => insurance[k] != null && insurance[k] !== '')
