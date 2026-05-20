@@ -1,4 +1,4 @@
-// src/screens/PublicDoc.jsx
+// src/screens/PublicDoc.tsx
 //
 // Public client-facing document page at /p/:token. Resolves the
 // token via the /api/public-link Netlify function (server-side,
@@ -27,7 +27,7 @@ import ApproveProposalBar from '../components/public/ApproveProposalBar.tsx'
 
 export default function PublicDoc() {
   const { token } = useParams()
-  const [state, setState] = useState({ loading: true, data: null, error: null })
+  const [state, setState] = useState<any>({ loading: true, data: null, error: null })
 
   const load = useCallback(async () => {
     if (!token) return
@@ -43,7 +43,7 @@ export default function PublicDoc() {
       const co = body.company?.name || 'Document'
       const proj = body.contact?.job_title || body.contact?.name || ''
       document.title = `${co}${proj ? ` — ${proj}` : ''}`
-    } catch (e) {
+    } catch (e: any) {
       setState({ loading: false, data: null, error: 'Could not load this document. Check the link and try again.' })
     }
   }, [token])
@@ -93,7 +93,7 @@ export default function PublicDoc() {
   )
 }
 
-function ApprovedNote({ companyName }) {
+function ApprovedNote({ companyName }: any) {
   return (
     <div
       style={{
@@ -136,7 +136,7 @@ function Loading() {
   )
 }
 
-function ErrorState({ message }) {
+function ErrorState({ message }: any) {
   return (
     <div
       style={{
@@ -159,12 +159,12 @@ function ErrorState({ message }) {
   )
 }
 
-function ProposalView({ data }) {
+function ProposalView({ data }: any) {
   const { contact, company, items, changeOrders, insurance, photos } = data
   const mapped = mapItemsToScope(items)
   const exclusionsArray = [
     ...(mapped.exclusions || []),
-    ...((contact?.exclusions_text || '').split(/\n+/).map((s) => s.trim()).filter(Boolean))
+    ...((contact?.exclusions_text || '').split(/\n+/).map((s: any) => s.trim()).filter(Boolean))
   ]
   return (
     <ProposalTemplate
@@ -196,9 +196,9 @@ function ProposalView({ data }) {
   )
 }
 
-function InvoiceView({ data }) {
+function InvoiceView({ data }: any) {
   const { contact, company, payments, changeOrders, insurance, photos } = data
-  const paid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+  const paid = (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
   const contractTotal = Number(contact?.amount || 0)
   const balance = Math.max(0, contractTotal - paid)
   return (

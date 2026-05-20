@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import Aurora from '../components/fx/Aurora.tsx'
 import GridPattern from '../components/fx/GridPattern.tsx'
 
-function friendlyError(code) {
+function friendlyError(code: any) {
   if (!code) return ''
   if (code === 'invite_not_found') return 'This invite link is invalid or was removed.'
   if (code === 'invite_revoked') return 'This invite was revoked by the sender.'
@@ -17,7 +17,7 @@ function friendlyError(code) {
   return "We couldn't accept this invite. Try again."
 }
 
-function isFatalError(msg) {
+function isFatalError(msg: any) {
   if (!msg) return false
   const lower = msg.toLowerCase()
   return lower.includes('invalid') || lower.includes('revoked')
@@ -38,7 +38,7 @@ export default function PartnerInvite() {
   const { token } = useParams()
   const { session, loading } = useAuth()
   const navigate = useNavigate()
-  const [info, setInfo] = useState(null)
+  const [info, setInfo] = useState<any>(null)
   const [infoErr, setInfoErr] = useState('')
   const [accepting, setAccepting] = useState(false)
   // Ref-tracked "have we already started the accept call" guard.

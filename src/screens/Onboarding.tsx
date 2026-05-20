@@ -174,8 +174,8 @@ export default function Onboarding() {
   // Onboarding is for fresh signups. Never read from an existing profile —
   // those values belong to a different session/user and leak if prefilled.
   const [companyName, setCompanyName] = useState('')
-  const [services, setServices] = useState([])
-  const [coords, setCoords] = useState(null)
+  const [services, setServices] = useState<any[]>([])
+  const [coords, setCoords] = useState<any>(null)
   const [locStatus, setLocStatus] = useState('idle') // idle | requesting | ok | error
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -188,7 +188,7 @@ export default function Onboarding() {
   if (loading) return null
   if (isOnboarded) return <Navigate to="/" replace />
 
-  function toggleService(key) {
+  function toggleService(key: any) {
     setServices((prev) => (prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]))
   }
 
@@ -212,7 +212,7 @@ export default function Onboarding() {
   // demo data so the user lands on a stocked Home instead of em-dashes."
   // Settings → Reset everything is the explicit undo path. Default true
   // because the empty-state churn rate is brutal; user can opt out.
-  async function finish({ withSeed }) {
+  async function finish({ withSeed }: any) {
     if (!canSubmit || busy) return
     setBusy(true)
     setError('')
@@ -233,7 +233,7 @@ export default function Onboarding() {
         const counts = await seedDemoData(supabase, user.id)
         hapticSuccess()
         toastSuccess('Workspace ready', `Seeded ${counts.clients} clients, ${counts.jobs} jobs, ${counts.events} events`)
-      } catch (ex) {
+      } catch (ex: any) {
         // Don't block the user — they still have a clean account, just no demo
         toastError("Couldn't seed sample data", ex?.message || 'Continuing with empty workspace.')
       }
@@ -244,7 +244,7 @@ export default function Onboarding() {
     navigate('/', { replace: true })
   }
 
-  async function onSubmit(e) {
+  async function onSubmit(e: any) {
     // Form's default submit (Enter key) seeds — matches the recommended path.
     e.preventDefault()
     finish({ withSeed: true })
@@ -291,7 +291,7 @@ export default function Onboarding() {
               <LogoUploader
                 logoUrl={null}
                 companyName={companyName}
-                onUpload={async (url) => { await upsertProfile({ logo_url: url }) }}
+                onUpload={async (url: any) => { await upsertProfile({ logo_url: url }) }}
                 size="lg"
               />
               <span className="fh-onb__logo-hint">Optional · PNG, JPG, SVG up to 2 MB</span>

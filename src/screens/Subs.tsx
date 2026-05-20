@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from "react"
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Phone, Plus, Search, Hammer, ChevronRight, MessageSquare, IdCard } from 'lucide-react'
@@ -28,7 +28,7 @@ import {
 //   lastWorked  — newest created_at across rows
 //   jobIds      — list for the expanded "history" view
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
@@ -36,10 +36,10 @@ function money(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function fmtRelativeDate(d) {
+function fmtRelativeDate(d: any) {
   if (!d) return ''
   const now = new Date()
-  const ms = now - d
+  const ms = now.getTime() - new Date(d).getTime()
   const days = Math.floor(ms / 86400000)
   if (days < 1) return 'today'
   if (days === 1) return 'yesterday'
@@ -59,7 +59,7 @@ export default function Subs() {
   const [addOpen, setAddOpen] = useState(false)
 
   const contacts = useMemo(() => {
-    const map = {}
+    const map: Record<string, any> = {}
     for (const c of bundle?.contacts ?? []) map[c.id] = c
     return map
   }, [bundle?.contacts])
@@ -115,7 +115,7 @@ export default function Subs() {
       return (
         g.name.toLowerCase().includes(needle) ||
         g.phone.toLowerCase().includes(needle) ||
-        Array.from(g.trades).some((t) => t.toLowerCase().includes(needle))
+        Array.from(g.trades).some((t: any) => t.toLowerCase().includes(needle))
       )
     })
   }, [grouped, q, tradeFilter])
@@ -282,7 +282,7 @@ export default function Subs() {
             marginTop: 10
           }}>
             <FilterPill size="sm" active={!tradeFilter} onClick={() => { hapticTap(); setTradeFilter('') }}>All</FilterPill>
-            {allTrades.map((t) => (
+            {allTrades.map((t: any) => (
               <FilterPill
                 key={t}
                 size="sm"
@@ -368,14 +368,14 @@ export default function Subs() {
      └──────────────────────────────────────────────────┘
    Preserves the prior expand/grouping/Link behavior verbatim.
    ============================================================ */
-function SubCard({ g, contacts, isTop }) {
+function SubCard({ g, contacts, isTop }: any) {
   const [expanded, setExpanded] = useState(false)
   const tradeSummary = Array.from(g.trades).join(' · ') || 'No trade set'
   const initials = g.name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
+    .map((w: any) => w[0].toUpperCase())
     .join('') || 'SB'
   const lastWorkedStr = fmtRelativeDate(g.lastWorked)
 
@@ -601,7 +601,7 @@ function SubCard({ g, contacts, isTop }) {
             flexDirection: 'column',
             gap: 2
           }}>
-            {g.rows.map((r) => {
+            {g.rows.map((r: any) => {
               const c = contacts[r.contact_id]
               return (
                 <li
@@ -696,7 +696,7 @@ function SubCard({ g, contacts, isTop }) {
    the schema default 'scheduled'. Both are meaningless without
    a job, so they're not surfaced here.
    ============================================================ */
-function AddSubDrawer({ open, userId, onClose, onCreated }) {
+function AddSubDrawer({ open, userId, onClose, onCreated }: any) {
   const [form, setForm] = useState({ name: '', trade: '', phone: '' })
   const [saving, setSaving] = useState(false)
 
@@ -705,7 +705,7 @@ function AddSubDrawer({ open, userId, onClose, onCreated }) {
     if (!open) setForm({ name: '', trade: '', phone: '' })
   }, [open])
 
-  async function save(e) {
+  async function save(e: any) {
     e?.preventDefault?.()
     if (saving) return
     const name = form.name.trim()
@@ -729,14 +729,14 @@ function AddSubDrawer({ open, userId, onClose, onCreated }) {
     onCreated?.()
   }
 
-  const fieldStyle = {
+  const fieldStyle: import('react').CSSProperties = {
     width: '100%', boxSizing: 'border-box',
     padding: '12px 14px', borderRadius: 12,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
     fontSize: 14, outline: 'none'
   }
-  const labelStyle = {
+  const labelStyle: import('react').CSSProperties = {
     fontFamily: 'var(--font-body)',
     fontSize: 10, fontWeight: 700,
     letterSpacing: '0.16em', textTransform: 'uppercase',
@@ -744,7 +744,7 @@ function AddSubDrawer({ open, userId, onClose, onCreated }) {
   }
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { if (!v) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v) onClose?.() }}>
       <DrawerContent>
         <DrawerHeader>
           <Eyebrow tone="gold">
@@ -872,7 +872,7 @@ function AddSubDrawer({ open, userId, onClose, onCreated }) {
      trades only         → muted "N trades covered"
      empty               → muted "No subs yet"
    ============================================================ */
-function SubsStateChip({ activeRecent, tradesCount, totalSubs }) {
+function SubsStateChip({ activeRecent, tradesCount, totalSubs }: any) {
   let bg, border, color, label
   if (activeRecent > 0) {
     bg = 'var(--v3-primary-soft)'

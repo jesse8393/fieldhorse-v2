@@ -39,14 +39,14 @@ export default function Login() {
       const { error } = await sendPasswordReset(email)
       if (error) throw error
       setNotice('Reset link sent. Check your email.')
-    } catch (err) {
+    } catch (err: any) {
       setError(err?.message || 'Could not send reset email.')
     } finally {
       setBusy(false)
     }
   }
 
-  async function onSubmit(e) {
+  async function onSubmit(e: any) {
     e.preventDefault()
     setError('')
     setNotice('')
@@ -68,7 +68,7 @@ export default function Login() {
           navigate('/onboarding', { replace: true })
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(err?.message || 'Authentication failed')
     } finally {
       setBusy(false)

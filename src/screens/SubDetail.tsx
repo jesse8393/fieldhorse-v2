@@ -46,7 +46,7 @@ const DOC_SLOTS = [
   { id: 'license', label: 'License',             path: 'license_path', hint: 'Trade or contractor license' }
 ]
 
-function fmtRelativeDate(d) {
+function fmtRelativeDate(d: any) {
   if (!d) return ''
   const days = Math.floor((Date.now() - d.getTime()) / 86400000)
   if (days < 1) return 'today'
@@ -57,7 +57,7 @@ function fmtRelativeDate(d) {
   return `${Math.floor(days / 365)}y ago`
 }
 
-function daysUntil(dateStr) {
+function daysUntil(dateStr: any) {
   if (!dateStr) return null
   const d = new Date(dateStr)
   if (Number.isNaN(d.getTime())) return null
@@ -85,7 +85,7 @@ export default function SubDetail() {
 
   // Profile create / edit writes straight to the cached bundle so the
   // panel reflects the change without a refetch.
-  const setProfile = (next) =>
+  const setProfile = (next: any) =>
     queryClient.setQueryData(subDetailKey(key), (prev) =>
       prev ? { ...prev, profile: next } : prev)
 
@@ -324,7 +324,7 @@ export default function SubDetail() {
       {profile && (
         <ProfileEditor
           profile={profile}
-          onSaved={(updated) => setProfile(updated)}
+          onSaved={(updated: any) => setProfile(updated)}
         />
       )}
 
@@ -343,7 +343,7 @@ export default function SubDetail() {
             overflow: 'hidden'
           }}>
             {subRows.map((r, i) => {
-              const c = contacts[r.contact_id]
+              const c = contacts[r.contact_id as string]
               return (
                 <li key={r.id}
                   style={{
@@ -395,7 +395,7 @@ export default function SubDetail() {
    ProfileEditor — five sections of editable vendor data.
    Local form state, single Save button, optimistic toast.
    ============================================================ */
-function ProfileEditor({ profile, onSaved }) {
+function ProfileEditor({ profile, onSaved }: any) {
   const [form, setForm] = useState(() => ({
     name: profile.name || '',
     company: profile.company || '',
@@ -415,7 +415,7 @@ function ProfileEditor({ profile, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
-  const setField = (k, v) => {
+  const setField = (k: any, v: any) => {
     setForm((prev) => ({ ...prev, [k]: v }))
     setDirty(true)
   }
@@ -431,7 +431,7 @@ function ProfileEditor({ profile, onSaved }) {
     setSaving(true)
     const trades = form.trades
       .split(',')
-      .map((t) => t.trim())
+      .map((t: any) => t.trim())
       .filter(Boolean)
     const payload = {
       name: form.name.trim(),
@@ -470,22 +470,22 @@ function ProfileEditor({ profile, onSaved }) {
     <>
       {/* CONTACT */}
       <Section icon={<Hammer size={11} />} label="Contact">
-        <Field label="Name" value={form.name} onChange={(v) => setField('name', v)} required />
-        <Field label="Company" value={form.company} onChange={(v) => setField('company', v)} placeholder="Vendor company name" />
+        <Field label="Name" value={form.name} onChange={(v: any) => setField('name', v)} required />
+        <Field label="Company" value={form.company} onChange={(v: any) => setField('company', v)} placeholder="Vendor company name" />
         <Row>
-          <Field label="Phone" type="tel" inputMode="tel" value={form.phone} onChange={(v) => setField('phone', v)} placeholder="(615) 555-0100" />
-          <Field label="Email" type="email" value={form.email} onChange={(v) => setField('email', v)} placeholder="vendor@email.com" />
+          <Field label="Phone" type="tel" inputMode="tel" value={form.phone} onChange={(v: any) => setField('phone', v)} placeholder="(615) 555-0100" />
+          <Field label="Email" type="email" value={form.email} onChange={(v: any) => setField('email', v)} placeholder="vendor@email.com" />
         </Row>
-        <Field label="Address" value={form.address} onChange={(v) => setField('address', v)} placeholder="Street, city, state" />
-        <Field label="Trades" value={form.trades} onChange={(v) => setField('trades', v)} placeholder="electrical, plumbing, framing" hint="Comma-separated" />
+        <Field label="Address" value={form.address} onChange={(v: any) => setField('address', v)} placeholder="Street, city, state" />
+        <Field label="Trades" value={form.trades} onChange={(v: any) => setField('trades', v)} placeholder="electrical, plumbing, framing" hint="Comma-separated" />
       </Section>
 
       {/* INSURANCE */}
       <Section icon={<ShieldCheck size={11} />} label="Insurance">
-        <Field label="Carrier" value={form.insurance_carrier} onChange={(v) => setField('insurance_carrier', v)} placeholder="State Farm, Liberty Mutual…" />
+        <Field label="Carrier" value={form.insurance_carrier} onChange={(v: any) => setField('insurance_carrier', v)} placeholder="State Farm, Liberty Mutual…" />
         <Row>
-          <Field label="Policy #" value={form.insurance_policy} onChange={(v) => setField('insurance_policy', v)} />
-          <Field label="Expires" type="date" value={form.insurance_expires_on} onChange={(v) => setField('insurance_expires_on', v)} />
+          <Field label="Policy #" value={form.insurance_policy} onChange={(v: any) => setField('insurance_policy', v)} />
+          <Field label="Expires" type="date" value={form.insurance_expires_on} onChange={(v: any) => setField('insurance_expires_on', v)} />
         </Row>
         {insExpiresInDays !== null && (
           <ExpiryNote days={insExpiresInDays} />
@@ -495,19 +495,19 @@ function ProfileEditor({ profile, onSaved }) {
       {/* BUSINESS */}
       <Section icon={<FileText size={11} />} label="Business">
         <Row>
-          <Field label="EIN" value={form.ein} onChange={(v) => setField('ein', v)} placeholder="00-0000000" />
-          <Field label="License #" value={form.license_number} onChange={(v) => setField('license_number', v)} />
+          <Field label="EIN" value={form.ein} onChange={(v: any) => setField('ein', v)} placeholder="00-0000000" />
+          <Field label="License #" value={form.license_number} onChange={(v: any) => setField('license_number', v)} />
         </Row>
       </Section>
 
       {/* PAYMENT */}
       <Section icon={<CreditCard size={11} />} label="Payment">
         <Row>
-          <SelectField label="Method" value={form.payment_method} onChange={(v) => setField('payment_method', v)} options={PAYMENT_METHODS} />
+          <SelectField label="Method" value={form.payment_method} onChange={(v: any) => setField('payment_method', v)} options={PAYMENT_METHODS} />
           <Field
             label="Handle / Account"
             value={form.payment_handle}
-            onChange={(v) => setField('payment_handle', v)}
+            onChange={(v: any) => setField('payment_handle', v)}
             placeholder={
               form.payment_method === 'zelle' ? 'name@email.com' :
               form.payment_method === 'venmo' ? '@username' :
@@ -584,11 +584,11 @@ function ProfileEditor({ profile, onSaved }) {
    stores the path in the profile row. View opens a 60-sec
    signed URL.
    ============================================================ */
-function DocumentsSection({ profile, onChanged }) {
-  const [busySlot, setBusySlot] = useState(null)
+function DocumentsSection({ profile, onChanged }: any) {
+  const [busySlot, setBusySlot] = useState<any>(null)
   const fileInputs = useRef({})
 
-  async function handleUpload(slotId, pathField, file) {
+  async function handleUpload(slotId: any, pathField: any, file: any) {
     if (!file) return
     setBusySlot(slotId)
     try {
@@ -601,7 +601,7 @@ function DocumentsSection({ profile, onChanged }) {
 
       const { data, error } = await supabase
         .from('fh_sub_profiles')
-        .update({ [pathField]: path })
+        .update({ [pathField]: path } as any)
         .eq('id', profile.id)
         .select()
         .maybeSingle()
@@ -609,14 +609,14 @@ function DocumentsSection({ profile, onChanged }) {
       onChanged?.(data)
       toastSuccess('Uploaded', `${slotId.toUpperCase()} on file`)
       hapticSuccess()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't upload", e?.message || 'Try again')
     } finally {
       setBusySlot(null)
     }
   }
 
-  async function handleRemove(slotId, pathField, currentPath) {
+  async function handleRemove(slotId: any, pathField: any, currentPath: any) {
     if (!currentPath) return
     setBusySlot(slotId)
     try {
@@ -625,21 +625,21 @@ function DocumentsSection({ profile, onChanged }) {
       await supabase.storage.from('sub-docs').remove([currentPath])
       const { data, error } = await supabase
         .from('fh_sub_profiles')
-        .update({ [pathField]: null })
+        .update({ [pathField]: null } as any)
         .eq('id', profile.id)
         .select()
         .maybeSingle()
       if (error) throw error
       onChanged?.(data)
       toastSuccess('Removed', `${slotId.toUpperCase()} cleared`)
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't remove", e?.message || 'Try again')
     } finally {
       setBusySlot(null)
     }
   }
 
-  async function handleView(currentPath) {
+  async function handleView(currentPath: any) {
     if (!currentPath) return
     const { data, error } = await supabase.storage
       .from('sub-docs')
@@ -686,7 +686,7 @@ function DocumentsSection({ profile, onChanged }) {
               </div>
 
               <input
-                ref={(el) => { fileInputs.current[slot.id] = el }}
+                ref={(el) => { (fileInputs.current as any)[slot.id] = el }}
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg,.heic"
                 onChange={(e) => {
@@ -705,7 +705,7 @@ function DocumentsSection({ profile, onChanged }) {
                 )}
                 <IconButton
                   title={onFile ? 'Replace' : 'Upload'}
-                  onClick={() => { hapticTap(); fileInputs.current[slot.id]?.click() }}
+                  onClick={() => { hapticTap(); (fileInputs.current as any)[slot.id]?.click() }}
                   disabled={busy}
                   primary
                 >
@@ -733,7 +733,7 @@ function DocumentsSection({ profile, onChanged }) {
 /* ============================================================
    Tiny presentational helpers
    ============================================================ */
-function BackButton({ onClick }) {
+function BackButton({ onClick }: any) {
   return (
     <button
       type="button"
@@ -754,7 +754,7 @@ function BackButton({ onClick }) {
   )
 }
 
-function Section({ icon, label, children }) {
+function Section({ icon, label, children }: any) {
   return (
     <motion.div className="v3-section" style={{ margin: '0 20px 18px' }}>
       <SectionHeader label={label} />
@@ -772,7 +772,7 @@ function Section({ icon, label, children }) {
   )
 }
 
-function Field({ label, value, onChange, type = 'text', inputMode, placeholder, hint, required }) {
+function Field({ label, value, onChange, type = 'text', inputMode, placeholder, hint, required }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <span style={{
@@ -806,7 +806,7 @@ function Field({ label, value, onChange, type = 'text', inputMode, placeholder, 
   )
 }
 
-function SelectField({ label, value, onChange, options }) {
+function SelectField({ label, value, onChange, options }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <span style={{
@@ -828,7 +828,7 @@ function SelectField({ label, value, onChange, options }) {
           fontSize: 13, outline: 'none', appearance: 'none'
         }}
       >
-        {options.map((o) => (
+        {options.map((o: any) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
@@ -836,7 +836,7 @@ function SelectField({ label, value, onChange, options }) {
   )
 }
 
-function Row({ children }) {
+function Row({ children }: any) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
       {children}
@@ -844,7 +844,7 @@ function Row({ children }) {
   )
 }
 
-function ExpiryNote({ days }) {
+function ExpiryNote({ days }: any) {
   const expired = days < 0
   const soon = !expired && days <= 30
   if (!expired && !soon) {
@@ -876,7 +876,7 @@ function ExpiryNote({ days }) {
   )
 }
 
-function StatusPill({ onFile }) {
+function StatusPill({ onFile }: any) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
@@ -895,7 +895,7 @@ function StatusPill({ onFile }) {
   )
 }
 
-function IconButton({ children, onClick, disabled, primary, danger, title }) {
+function IconButton({ children, onClick, disabled, primary, danger, title }: any) {
   return (
     <button
       type="button"

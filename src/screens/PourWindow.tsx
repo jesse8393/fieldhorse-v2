@@ -12,18 +12,18 @@ import CountUp from '../components/fx/CountUp.tsx'
 // Status token → brand palette mapping used across the whole screen.
 // All three statuses get a solid hex fallback so the strip doesn't render
 // transparent if a CSS var fails to resolve.
-const TONE = {
+const TONE: Record<string, any> = {
   go:   { fg: '#4ED693', bg: 'rgba(45,122,79,0.16)',  border: 'rgba(78,214,147,0.35)', label: 'Clear to work' },
   warn: { fg: '#E8B04C', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)', label: 'Tight window' },
   stop: { fg: '#E36A5B', bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
 }
 
-function statusTone(status) { return TONE[status] || TONE.go }
+function statusTone(status: any) { return TONE[status] || TONE.go }
 
-function fmtTemp(t) {
+function fmtTemp(t: any) {
   return t == null ? '—' : `${Math.round(t)}°`
 }
-function fmtHour(iso) {
+function fmtHour(iso: any) {
   try {
     const d = new Date(iso)
     const h = d.getHours()
@@ -35,7 +35,7 @@ function fmtHour(iso) {
 // Open-Meteo daily.time is `YYYY-MM-DD` with no zone. `new Date("2026-04-26")`
 // parses as UTC midnight, which lands on the *previous* day in any
 // timezone west of UTC. Append T00:00 so it parses in the local zone.
-function asLocalDate(iso) {
+function asLocalDate(iso: any) {
   if (!iso) return null
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
     const [y, m, d] = iso.split('-').map(Number)
@@ -43,23 +43,23 @@ function asLocalDate(iso) {
   }
   return new Date(iso)
 }
-function fmtDay(iso) {
+function fmtDay(iso: any) {
   try {
     const d = asLocalDate(iso)
-    return d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
+    return d!.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
   } catch { return '—' }
 }
-function fmtDate(iso) {
+function fmtDate(iso: any) {
   try {
     const d = asLocalDate(iso)
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    return d!.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   } catch { return '—' }
 }
 
 export default function PourWindow() {
   const { profile, upsertProfile, refresh } = useProfile()
   const navigate = useNavigate()
-  const [weather, setWeather] = useState(null)
+  const [weather, setWeather] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [cityName, setCityName] = useState('')
@@ -112,7 +112,7 @@ useEffect(() => {
   const daily = useMemo(() => {
     const d = weather?.daily
     if (!d?.time) return []
-    return d.time.map((t, i) => ({
+    return d.time.map((t: any, i: any) => ({
       time: t,
       tMax: d.temperature_2m_max?.[i],
       tMin: d.temperature_2m_min?.[i],
@@ -192,7 +192,7 @@ useEffect(() => {
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600 }}>
           <MapPin size={11} color="var(--field-gold-bright)" />
           {hasCoords
-            ? (cityName || `${profile.location_lat.toFixed(2)}, ${profile.location_lon.toFixed(2)}`)
+            ? (cityName || `${(profile.location_lat as any).toFixed(2)}, ${(profile.location_lon as any).toFixed(2)}`)
             : (cityName || 'Murfreesboro, TN')}
         </div>
         {err && (
@@ -363,7 +363,7 @@ useEffect(() => {
             </span>
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {daily.map((d, i) => {
+            {daily.map((d: any, i: any) => {
               // Aggregate status for a given day: worst of midday-ish hours
               const dayStatus = dayAggregateStatus(weather, services, d.time)
               const t = statusTone(dayStatus)
@@ -516,7 +516,7 @@ useEffect(() => {
 // Aggregate a whole day's status by sampling the daylight window (08:00–18:00)
 // out of the hourly array and taking the worst per-trade read. Falls back to
 // daily max values when no hourly slice matches.
-function dayAggregateStatus(weather, services, dayIso) {
+function dayAggregateStatus(weather: any, services: any, dayIso: any) {
   const h = weather?.hourly
   if (!h?.time || !dayIso) return 'go'
   const dayPrefix = dayIso.slice(0, 10) // "YYYY-MM-DD"
@@ -538,7 +538,7 @@ function dayAggregateStatus(weather, services, dayIso) {
   return worst
 }
 
-function Metric({ Icon, label, value, unit }) {
+function Metric({ Icon, label, value, unit }: any) {
   return (
     <div
       style={{
