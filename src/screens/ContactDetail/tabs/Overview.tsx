@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Pencil, X as XIcon, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
-import { useConfirm } from '../../../components/ConfirmSheet.jsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import {
   startQuote, approveQuote, markComplete, reopen
 } from '../../../lib/pipeline.ts'
@@ -20,7 +20,7 @@ import TimeClockCard from '../../../components/TimeClockCard.jsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.tsx'
 import { resolveNextAction } from '../lib/jobNextAction.ts'
-import ClientPicker from '../../../components/ClientPicker.jsx'
+import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
 
 /**

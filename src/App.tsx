@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext.tsx'
 import { useProfile } from './contexts/ProfileContext.tsx'
-import AppShell from './components/AppShell.jsx'
+import AppShell from './components/AppShell.tsx'
 
 // Eager — must be in main bundle
 //   Login: gates everything; can't lazy-load the login screen

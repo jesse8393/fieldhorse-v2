@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
-import ActionSheet from '../../../components/ActionSheet.jsx'
+import ActionSheet from '../../../components/ActionSheet.tsx'
 
 const BUCKET = 'job-files'
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB per file

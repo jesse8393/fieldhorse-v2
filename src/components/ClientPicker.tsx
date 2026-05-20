@@ -12,13 +12,13 @@ import { supabase } from '../lib/supabase.ts'
  *   onChange:     (nextValue) => void    — fires on pick / clear / inline-create
  *   userId:       auth.uid — required; scopes the lookup
  */
-export default function ClientPicker({ userId, value, onChange }) {
+export default function ClientPicker({ userId, value, onChange }: any) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
-  const ref = useRef(null)
+  const ref = useRef<any>(null)
 
   useEffect(() => {
     if (!open || !userId) return
@@ -30,12 +30,12 @@ export default function ClientPicker({ userId, value, onChange }) {
       .eq('user_id', userId)
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .limit(60)
-      .then(({ data }) => { if (!cancelled) { setRows(data || []); setLoading(false) } })
+      .then(({ data }: any) => { if (!cancelled) { setRows(data || []); setLoading(false) } })
     return () => { cancelled = true }
   }, [open, userId])
 
   useEffect(() => {
-    function onDocPointer(e) {
+    function onDocPointer(e: any) {
       if (!ref.current) return
       if (!ref.current.contains(e.target)) setOpen(false)
     }

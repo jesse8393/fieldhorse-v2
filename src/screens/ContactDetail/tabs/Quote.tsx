@@ -10,7 +10,7 @@ import { dateInputToTimestamp } from '../../../lib/dueDate.ts'
 import QuoteItemsSection from '../sections/QuoteItems.tsx'
 import QuoteTermsSection from '../sections/QuoteTerms.tsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.tsx'
-import { useConfirm } from '../../../components/ConfirmSheet.jsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 

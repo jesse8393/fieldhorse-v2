@@ -32,18 +32,18 @@ export default function DocIntakeButton({
   onParse,
   label = 'Scan doc',
   description = 'Photo, screenshot, or paste — we\'ll fill the form.'
-}) {
+}: any) {
   const [open, setOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState('')
   const [busy, setBusy] = useState(false)
-  const fileRef = useRef(null)
-  const cameraRef = useRef(null)
+  const fileRef = useRef<any>(null)
+  const cameraRef = useRef<any>(null)
 
   // Listen for clipboard paste only while open so we don't intercept
   // pastes elsewhere in the app.
   useEffect(() => {
     if (!open) return
-    function onPaste(e) {
+    function onPaste(e: any) {
       const file = imageFromClipboardEvent(e)
       if (file) {
         e.preventDefault()
@@ -55,7 +55,7 @@ export default function DocIntakeButton({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  async function handleFile(file) {
+  async function handleFile(file: any) {
     if (!file || !file.type?.startsWith('image/')) {
       toastError('Need an image', 'Use a photo, screenshot, or PNG/JPG.')
       return
@@ -70,7 +70,7 @@ export default function DocIntakeButton({
       hapticSuccess()
       setOpen(false)
       setPreviewUrl('')
-    } catch (ex) {
+    } catch (ex: any) {
       toastError("Couldn't read that image", ex?.message || 'Try a clearer shot.')
     } finally {
       setBusy(false)

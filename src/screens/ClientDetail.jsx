@@ -7,7 +7,7 @@ import {
   Phone, Mail, MapPin, Trash2, MessageSquare, Users
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
-import ActionSheet from '../components/ActionSheet.jsx'
+import ActionSheet from '../components/ActionSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'

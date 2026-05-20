@@ -1,4 +1,4 @@
-// src/components/AddEventSheet.jsx
+// src/components/AddEventSheet.tsx
 //
 // Schedule a job event (kickoff, inspection, walkthrough, recurring
 // crew day). Was on the legacy ActionSheet chrome — now uses the v3
@@ -17,12 +17,12 @@ import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 
-export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '' }) {
+export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '' }: any) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [time, setTime] = useState('08:00')
   const [contactId, setContactId] = useState(defaultContactId)
-  const [contacts, setContacts] = useState([])
+  const [contacts, setContacts] = useState<any[]>([])
   const [recurs, setRecurs] = useState(false)
   const [recurDays, setRecurDays] = useState(7)
   const [saving, setSaving] = useState(false)
@@ -30,7 +30,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
 
   useEffect(() => {
     if (!userId) return
-    supabase.from('fh_contacts').select('id, name').eq('user_id', userId).then(({ data }) => setContacts(data || []))
+    supabase.from('fh_contacts').select('id, name').eq('user_id', userId).then(({ data }: any) => setContacts(data || []))
   }, [userId])
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
     }
   }, [open, defaultContactId])
 
-  async function save(e) {
+  async function save(e: any) {
     e?.preventDefault?.()
     if (!title.trim() || saving) return
     setSaving(true)
@@ -65,7 +65,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   }
 
   const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
-  const fieldStyle = {
+  const fieldStyle: import('react').CSSProperties = {
     padding: '11px 14px',
     borderRadius: 12,
     background: 'var(--surface-2)',
@@ -81,7 +81,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   }
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { if (!v && !saving) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
         style={drawerStyle}
@@ -240,7 +240,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   )
 }
 
-function chipStyle(active, disabled) {
+function chipStyle(active: any, disabled: any) {
   return {
     padding: '7px 12px',
     borderRadius: 999,

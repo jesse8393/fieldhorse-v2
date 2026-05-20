@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_, SheetMoneyField as SheetMoneyField_ } from '../../../components/ActionSheet.jsx'
+import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_, SheetMoneyField as SheetMoneyField_ } from '../../../components/ActionSheet.tsx'
 const SheetField = SheetField_ as any
 const SheetChipRow = SheetChipRow_ as any
 const SheetMoneyField = SheetMoneyField_ as any

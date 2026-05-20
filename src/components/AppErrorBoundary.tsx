@@ -6,17 +6,17 @@ import React from 'react'
  * Without this, a thrown error anywhere in the tree would unmount the
  * entire app and the user sees a blank white/dark screen.
  */
-export default class AppErrorBoundary extends React.Component {
-  constructor(props) {
+export default class AppErrorBoundary extends React.Component<{ children?: React.ReactNode }, { error: any }> {
+  constructor(props: any) {
     super(props)
     this.state = { error: null }
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: any) {
     return { error }
   }
 
-  componentDidCatch(error, info) {
+  componentDidCatch(error: any, info: any) {
     // eslint-disable-next-line no-console
     console.error('[fieldhorse] app crash', error, info)
   }

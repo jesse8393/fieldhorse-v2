@@ -27,23 +27,23 @@ import { hapticTap } from '../lib/haptics.ts'
  * Mount once at the app root via <ConfirmProvider>.
  */
 
-const ConfirmContext = createContext(null)
+const ConfirmContext = createContext<any>(null)
 
 export function useConfirm() {
   const ctx = useContext(ConfirmContext)
   if (!ctx) {
     // Defensive fallback so a missing provider doesn't crash the app —
     // degrades to window.confirm so the call site still works.
-    return ({ title, body }) => Promise.resolve(window.confirm(`${title}\n\n${body || ''}`))
+    return ({ title, body }: any) => Promise.resolve(window.confirm(`${title}\n\n${body || ''}`))
   }
   return ctx
 }
 
-export function ConfirmProvider({ children }) {
-  const [state, setState] = useState(null)
-  const resolverRef = useRef(null)
+export function ConfirmProvider({ children }: any) {
+  const [state, setState] = useState<any>(null)
+  const resolverRef = useRef<any>(null)
 
-  const confirm = useCallback((opts) => {
+  const confirm = useCallback((opts: any) => {
     return new Promise((resolve) => {
       resolverRef.current = resolve
       setState({
@@ -56,7 +56,7 @@ export function ConfirmProvider({ children }) {
     })
   }, [])
 
-  function close(value) {
+  function close(value: any) {
     if (resolverRef.current) {
       resolverRef.current(value)
       resolverRef.current = null
@@ -72,7 +72,7 @@ export function ConfirmProvider({ children }) {
   )
 }
 
-function ConfirmSheet({ state, onCancel, onConfirm }) {
+function ConfirmSheet({ state, onCancel, onConfirm }: any) {
   if (typeof document === 'undefined') return null
 
   return createPortal(

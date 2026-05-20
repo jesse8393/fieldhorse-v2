@@ -163,7 +163,7 @@ export default function AppHeader() {
   )
 }
 
-function BrandSlot({ logoSrc, company, fullName }) {
+function BrandSlot({ logoSrc, company, fullName }: any) {
   // Mobile-header-fix: the thin-ribbon trim left the wordmark visibly
   // weak on iPhone — at clamp(12px, 2.6vw, 14px) on a 390px viewport the
   // brand max'd at 14px and read as a faint placeholder. Bumped to

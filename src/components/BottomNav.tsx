@@ -45,7 +45,7 @@ export default function BottomNav() {
   // Lock body scroll and listen for Escape while drawer is open
   useEffect(() => {
     if (!moreOpen) return
-    function onKey(e) {
+    function onKey(e: any) {
       if (e.key === 'Escape') { e.preventDefault(); setMoreOpen(false) }
     }
     window.addEventListener('keydown', onKey)
@@ -63,7 +63,7 @@ export default function BottomNav() {
     navigate('/login', { replace: true })
   }
 
-  function go(to) {
+  function go(to: any) {
     setMoreOpen(false)
     navigate(to)
   }
@@ -276,9 +276,9 @@ export default function BottomNav() {
             key={item.to}
             to={item.to}
             end={item.end}
-            className={({ isActive }) => `fh-nav__item${isActive ? ' is-active' : ''}`}
+            className={({ isActive }: any) => `fh-nav__item${isActive ? ' is-active' : ''}`}
           >
-            {({ isActive }) => (
+            {({ isActive }: any) => (
               <>
                 <span className="fh-nav__icon">
                   <Icon name={item.icon} size={20} />
@@ -320,7 +320,7 @@ export default function BottomNav() {
    as a tappable target. No per-row dividers — spacing alone
    separates items in the new compact drawer.
    ============================================================ */
-function NavRow({ item, onTap }) {
+function NavRow({ item, onTap }: any) {
   const I = item.Icon
   return (
     <button

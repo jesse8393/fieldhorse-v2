@@ -2,7 +2,7 @@
 // Reuses the same chip pattern as filter chips: 2px radius, mono uppercase,
 // diagonal gold stripe on the active option, engraved feel.
 
-import { haptic } from './ActionSheet.jsx'
+import { haptic } from './ActionSheet.tsx'
 
 export default function SpecTabs({
   options,

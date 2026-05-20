@@ -10,13 +10,13 @@ const MAX_BYTES = 1 * 1024 * 1024 // 1 MB per spec
 const ACCEPT = 'image/png,image/svg+xml'
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 365 // 1 year
 
-function extFromType(type, fallback = 'png') {
+function extFromType(type: any, fallback = 'png') {
   if (type === 'image/svg+xml') return 'svg'
   if (type === 'image/png') return 'png'
   return fallback
 }
 
-function mimeOk(type) {
+function mimeOk(type: any) {
   return type === 'image/png' || type === 'image/svg+xml'
 }
 
@@ -31,10 +31,10 @@ function mimeOk(type) {
  * - Remove deletes all logo.* objects in the user's folder and clears
  *   profiles.logo_url via onRemoved().
  */
-export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSaved, onRemoved }) {
+export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSaved, onRemoved }: any) {
   const { user } = useAuth()
-  const inputRef = useRef(null)
-  const [pendingFile, setPendingFile] = useState(null)
+  const inputRef = useRef<any>(null)
+  const [pendingFile, setPendingFile] = useState<any>(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -45,7 +45,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
     if (inputRef.current) inputRef.current.value = ''
   }
 
-  function handleFile(e) {
+  function handleFile(e: any) {
     const file = e.target.files?.[0]
     if (!file) return
     if (!mimeOk(file.type)) {
@@ -99,7 +99,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       await onSaved?.(data.signedUrl)
       toastSuccess('Logo saved', 'Header updated across the app')
       resetPicker()
-    } catch (ex) {
+    } catch (ex: any) {
       toastError("Couldn't upload logo", ex?.message || 'Try again in a moment.')
     } finally {
       setBusy(false)
@@ -116,7 +116,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       await onRemoved?.()
       toastSuccess('Logo removed', 'Header reverts to your company name')
       resetPicker()
-    } catch (ex) {
+    } catch (ex: any) {
       toastError("Couldn't remove logo", ex?.message || 'Try again in a moment.')
     } finally {
       setBusy(false)

@@ -48,7 +48,7 @@ const SYSTEM_ITEMS = [
   { id: 'settings', label: 'Settings', hint: 'Profile + billing', icon: Settings, to: '/settings' }
 ]
 
-const ICON_FOR_KIND = {
+const ICON_FOR_KIND: Record<string, any> = {
   job: Briefcase,
   client: Users,
   note: FileText,
@@ -60,7 +60,7 @@ const ICON_FOR_KIND = {
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
+  const [results, setResults] = useState<any>({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
   const [searching, setSearching] = useState(false)
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -69,7 +69,7 @@ export default function CommandPalette() {
   // from anywhere — including focused inputs (preventDefault keeps
   // the browser's "find" out of the way).
   useEffect(() => {
-    function onKey(e) {
+    function onKey(e: any) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOpen((v) => !v)
@@ -125,7 +125,7 @@ export default function CommandPalette() {
     return () => { cancelled = true; clearTimeout(t) }
   }, [query, open, user?.id])
 
-  function go(to) {
+  function go(to: any) {
     setOpen(false)
     navigate(to)
   }
@@ -133,11 +133,11 @@ export default function CommandPalette() {
   const hasQuery = query.trim().length > 0
   const hasResults = results.total > 0
 
-  function renderEntityGroup(heading, items, kindFallback) {
+  function renderEntityGroup(heading: any, items: any, kindFallback?: any) {
     if (!items.length) return null
     return (
       <CommandGroup heading={heading}>
-        {items.map((item) => {
+        {items.map((item: any) => {
           const I = ICON_FOR_KIND[item.kind || kindFallback] || FileText
           return (
             <CommandItem
@@ -167,10 +167,10 @@ export default function CommandPalette() {
     )
   }
 
-  function renderNavGroup(heading, items) {
+  function renderNavGroup(heading: any, items: any) {
     return (
       <CommandGroup heading={heading}>
-        {items.map((it) => {
+        {items.map((it: any) => {
           const I = it.icon
           return (
             <CommandItem key={it.id} value={`${it.id} ${it.label} ${it.hint}`} onSelect={() => go(it.to)} className="ui:gap-3">
