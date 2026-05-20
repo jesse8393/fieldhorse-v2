@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, Receipt } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { recalcCost } from '../../../lib/stages.ts'
-import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.js'
-import { hapticTap } from '../../../lib/haptics.js'
+import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
+import { hapticTap } from '../../../lib/haptics.ts'
 import ActionSheet, { SheetField, SheetChipRow, SheetMoneyField } from '../../../components/ActionSheet.jsx'
 
 const EXPENSE_CATEGORIES = [

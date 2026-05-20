@@ -16,8 +16,8 @@ import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { DollarSign, Check, X } from 'lucide-react'
 import { logPayment } from '../lib/pipeline.ts'
-import { toastSuccess, toastError } from '../lib/toast.js'
-import { hapticTap } from '../lib/haptics.js'
+import { toastSuccess, toastError } from '../lib/toast.ts'
+import { hapticTap } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 
 function money(n) {

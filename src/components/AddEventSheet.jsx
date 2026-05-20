@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Calendar as CalendarIcon, Check, X } from 'lucide-react'
-import { hapticTap } from '../lib/haptics.js'
+import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.js'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 

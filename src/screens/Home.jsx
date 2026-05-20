@@ -21,11 +21,11 @@ import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getWeather, MURFREESBORO } from '../lib/weather.js'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
-import { useFhMotion } from '../lib/motion.js'
+import { useFhMotion } from '../lib/motion.ts'
 import CountUp from '../components/fx/CountUp.jsx'
 import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
 import HomeActivityCard from '../components/HomeActivityCard.jsx'
-import { hapticTap } from '../lib/haptics.js'
+import { hapticTap } from '../lib/haptics.ts'
 // V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
 // same batch helper Jobs already uses (one query + one signed-URL
 // batch call, no N+1). Returns { [contactId]: signedUrl }.

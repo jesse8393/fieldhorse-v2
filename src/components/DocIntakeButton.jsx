@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Upload, Sparkles, X, Loader2 } from 'lucide-react'
 import { compressImageToDataUrl, imageFromClipboardEvent } from '../lib/docIntelligence.js'
-import { hapticTap, hapticSuccess } from './../lib/haptics.js'
-import { toastError } from '../lib/toast.js'
+import { hapticTap, hapticSuccess } from './../lib/haptics.ts'
+import { toastError } from '../lib/toast.ts'
 
 /**
  * DocIntakeButton — the entry surface for document-intelligence flows.

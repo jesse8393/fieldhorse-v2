@@ -5,7 +5,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.js'
-import { hapticTap } from '../lib/haptics.js'
+import { hapticTap } from '../lib/haptics.ts'
 
 // Map notification kind → icon + accent color. Add cases as new kinds
 // are introduced server-side; default falls back to Inbox + steel.

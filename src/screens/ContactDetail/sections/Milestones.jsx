@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Plus, Trash2 } from 'lucide-react'
-import { hapticTap } from '../../../lib/haptics.js'
+import { hapticTap } from '../../../lib/haptics.ts'
 
 /**
  * Milestones section — operator-defined checklist persisted as JSONB on

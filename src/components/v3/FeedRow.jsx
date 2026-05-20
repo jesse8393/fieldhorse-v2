@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Hammer, FileText, Receipt, Camera, Activity, Trash2 } from 'lucide-react'
 import Pill from './Pill.jsx'
-import { hapticTap } from '../../lib/haptics.js'
+import { hapticTap } from '../../lib/haptics.ts'
 
 const ICONS = {
   'crew-on-site': Hammer,

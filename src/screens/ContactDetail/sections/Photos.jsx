@@ -6,8 +6,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.js'
-import { toastError, toastSuccess } from '../../../lib/toast.js'
-import { hapticTap, hapticSuccess } from '../../../lib/haptics.js'
+import { toastError, toastSuccess } from '../../../lib/toast.ts'
+import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
 import ActionSheet from '../../../components/ActionSheet.jsx'
 

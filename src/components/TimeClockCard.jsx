@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Clock, Play, Square, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { recalcCost } from '../lib/stages.ts'
-import { toastSuccess, toastError } from '../lib/toast.js'
-import { hapticTap, hapticSuccess } from '../lib/haptics.js'
+import { toastSuccess, toastError } from '../lib/toast.ts'
+import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 
 // Time clock card — Phase 19 / Upgrade Move #A2.
 //

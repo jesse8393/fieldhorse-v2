@@ -11,7 +11,7 @@ import {
   STAGE_MAP,
   type StageId
 } from './stages.ts'
-import { toast, hapticMedium, hapticSuccess } from './toast.js'
+import { toast, hapticMedium, hapticSuccess } from './toast.ts'
 import type { Database } from './database.types.ts'
 
 type Contact = Database['public']['Tables']['fh_contacts']['Row']

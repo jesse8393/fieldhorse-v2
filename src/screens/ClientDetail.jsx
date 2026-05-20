@@ -6,14 +6,14 @@ import {
   Briefcase, Paperclip, Image as ImageIcon, Download,
   Phone, Mail, MapPin, Trash2, MessageSquare, Users
 } from 'lucide-react'
-import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.js'
+import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import ActionSheet from '../components/ActionSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useClientDetail, useInvalidateClientDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
+import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
 
 function money(n) {

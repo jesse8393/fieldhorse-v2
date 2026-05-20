@@ -5,9 +5,9 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
-import { toastSuccess } from '../lib/toast.js'
-import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
-import { useFhMotion } from '../lib/motion.js'
+import { toastSuccess } from '../lib/toast.ts'
+import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
+import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
 
 const CHANNELS = [

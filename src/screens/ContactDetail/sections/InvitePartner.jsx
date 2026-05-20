@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Users, UserPlus } from 'lucide-react'
-import { hapticTap } from '../../../lib/haptics.js'
+import { hapticTap } from '../../../lib/haptics.ts'
 
 /**
  * Invite Partner section — single-action surface that opens InvitePartnerSheet

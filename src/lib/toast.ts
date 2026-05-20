@@ -7,14 +7,23 @@ import { toast as sonnerToast } from 'sonner'
 const DEFAULT_DURATION = 4500
 const HEAVY_DURATION = 6000 // destructive actions + auto-created entities
 
+export type ToastOptions = {
+  accent?: string
+  heavy?: boolean
+  destructive?: boolean
+  duration?: number
+  variant?: 'success' | 'error' | null
+  description?: string
+}
+
 // Map legacy accent values to a Sonner variant so the dual-toaster tells the same story.
-function variantFromAccent(accent) {
+function variantFromAccent(accent: string | undefined): 'success' | 'error' | null {
   if (accent === 'green' || accent === 'job' || accent === 'closed') return 'success'
   if (accent === 'red' || accent === 'lost') return 'error'
   return null
 }
 
-export function toast(message, options = {}) {
+export function toast(message: string, options: ToastOptions = {}) {
   if (typeof window === 'undefined') return
   const heavy = options.heavy || options.destructive
   const detail = {
@@ -35,9 +44,9 @@ export function toast(message, options = {}) {
   else sonnerToast(message, sonnerOpts)
 }
 
-export const toastSuccess = (message, description) => toast(message, { variant: 'success', accent: 'green', description })
-export const toastError = (message, description) => toast(message, { variant: 'error', accent: 'red', description })
-export const toastInfo = (message, description) => toast(message, { description })
+export const toastSuccess = (message: string, description?: string) => toast(message, { variant: 'success', accent: 'green', description })
+export const toastError = (message: string, description?: string) => toast(message, { variant: 'error', accent: 'red', description })
+export const toastInfo = (message: string, description?: string) => toast(message, { description })
 
 /**
  * toastUndo — destructive-action toast with an Undo button.
@@ -59,7 +68,7 @@ export const toastInfo = (message, description) => toast(message, { description 
  *     }
  *   })
  */
-export function toastUndo(message, { description, onUndo, duration = 8000 } = {}) {
+export function toastUndo(message: string, { description, onUndo, duration = 8000 }: { description?: string; onUndo?: () => void | Promise<void>; duration?: number } = {}) {
   if (typeof window === 'undefined') return
   // Mirror to legacy fh:toast for the in-app Toaster panel
   const detail = {

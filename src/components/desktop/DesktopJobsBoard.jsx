@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Plus, Search, Star } from 'lucide-react'
-import { hapticTap, hapticMedium } from '../../lib/haptics.js'
+import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
 import { ACTIVE_STAGES } from '../../lib/stages.ts'
 
 /**

@@ -11,9 +11,9 @@ import { reverseGeocode } from '../lib/weather.js'
 // useTheme import removed 5/17 with APPEARANCE section — restore alongside
 // the toggle when full light-theme parity ships.
 // import { useTheme } from '../contexts/ThemeContext.jsx'
-import { toastSuccess, toastError } from '../lib/toast.js'
-import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
-import { useFhMotion } from '../lib/motion.js'
+import { toastSuccess, toastError } from '../lib/toast.ts'
+import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
+import { useFhMotion } from '../lib/motion.ts'
 import { Switch } from '@/components/ui/switch'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']

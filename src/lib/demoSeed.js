@@ -15,7 +15,7 @@
 //
 // Returns counts; throws on any insert error.
 
-import { hapticSuccess } from './haptics.js'
+import { hapticSuccess } from './haptics.ts'
 
 function todayAt(hour, minute = 0) {
   const d = new Date()

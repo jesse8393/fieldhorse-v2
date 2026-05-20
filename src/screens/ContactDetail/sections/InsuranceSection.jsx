@@ -19,7 +19,7 @@
 import { useEffect, useState } from 'react'
 import { Shield, Save as SaveIcon, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
-import { toastSuccess, toastError } from '../../../lib/toast.js'
+import { toastSuccess, toastError } from '../../../lib/toast.ts'
 
 const FIELDS = [
   { key: 'claim_number',     label: 'Claim number',     type: 'text',  placeholder: 'CL-2026-04812' },

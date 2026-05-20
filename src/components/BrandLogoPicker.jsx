@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Upload, Trash2, Image as ImageIcon, Check } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import { toastSuccess, toastError } from '../lib/toast.js'
+import { toastSuccess, toastError } from '../lib/toast.ts'
 
 const BUCKET = 'company-logos'
 const MAX_BYTES = 1 * 1024 * 1024 // 1 MB per spec

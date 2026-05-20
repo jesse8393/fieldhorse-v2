@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
-import { hapticSwipe, hapticTap } from '../lib/haptics.js'
+import { hapticSwipe, hapticTap } from '../lib/haptics.ts'
 
 // Generic swipe-to-reveal wrapper. Pass `actions` (array of {icon, label, color, onClick})
 // and the wrapped children. Swipe-left reveals the actions; tap outside or swipe-right

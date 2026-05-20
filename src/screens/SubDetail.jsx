@@ -10,11 +10,11 @@ import { supabase } from '../lib/supabase.js'
 import { useSubDetail, subDetailKey } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { hapticTap, hapticSuccess } from '../lib/haptics.js'
-import { useFhMotion } from '../lib/motion.js'
+import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
+import { useFhMotion } from '../lib/motion.ts'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
 import { Eyebrow, StampNumber } from '../components/v3'
-import { toastSuccess, toastError } from '../lib/toast.js'
+import { toastSuccess, toastError } from '../lib/toast.ts'
 
 // SubDetail — vendor profile surface at /subs/:key.
 //

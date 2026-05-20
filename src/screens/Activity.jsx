@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { useActivityFeed } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { useFhMotion } from '../lib/motion.js'
+import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.jsx'
 
 const PAGE_SIZE = 60

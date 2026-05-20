@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
-import { hapticMedium } from '../../lib/haptics.js'
+import { hapticMedium } from '../../lib/haptics.ts'
 
 /**
  * Canonical floating action button.

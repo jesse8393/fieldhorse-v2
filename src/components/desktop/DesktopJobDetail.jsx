@@ -4,7 +4,7 @@ import {
   CalendarPlus, Users, ShieldCheck, MapPin, Clock,
   ArrowRight, Receipt
 } from 'lucide-react'
-import { hapticTap, hapticMedium } from '../../lib/haptics.js'
+import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
 import { stageColor } from '../../lib/stages.ts'
 import OverviewTab from '../../screens/ContactDetail/tabs/Overview.jsx'
 import QuoteTab from '../../screens/ContactDetail/tabs/Quote.jsx'
