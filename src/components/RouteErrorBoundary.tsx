@@ -9,17 +9,17 @@ import React from 'react'
  * resetKey; when it changes, the boundary clears its error state so
  * the new route can render normally.
  */
-export default class RouteErrorBoundary extends React.Component {
-  constructor(props) {
+export default class RouteErrorBoundary extends React.Component<{ children?: React.ReactNode; resetKey?: any }, { error: any }> {
+  constructor(props: any) {
     super(props)
     this.state = { error: null }
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: any) {
     return { error }
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: any) {
     // Reset when the user navigates to a new route — otherwise a
     // crashed screen would leave the boundary stuck even after the
     // user clicks away to a healthy route.
@@ -29,7 +29,7 @@ export default class RouteErrorBoundary extends React.Component {
     }
   }
 
-  componentDidCatch(error, info) {
+  componentDidCatch(error: any, info: any) {
     // eslint-disable-next-line no-console
     console.error('[fieldhorse] route crash', error, info)
   }

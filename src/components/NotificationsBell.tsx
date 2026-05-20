@@ -9,7 +9,7 @@ import { hapticTap } from '../lib/haptics.ts'
 
 // Map notification kind → icon + accent color. Add cases as new kinds
 // are introduced server-side; default falls back to Inbox + steel.
-const KIND_META = {
+const KIND_META: Record<string, any> = {
   partner_accepted:   { Icon: Users,           color: 'var(--field-gold-bright)' },
   inspection_logged:  { Icon: ClipboardCheck,  color: 'var(--signal-green)' },
   payment_received:   { Icon: DollarSign,      color: 'var(--signal-green)' },
@@ -19,7 +19,7 @@ const KIND_META = {
   quote_approved:     { Icon: ShieldCheck,     color: 'var(--signal-green)' },
   change_order_added: { Icon: FileEdit,        color: 'var(--field-gold-bright)' }
 }
-function metaFor(kind) {
+function metaFor(kind: any) {
   return KIND_META[kind] || { Icon: Inbox, color: 'var(--ink-muted)' }
 }
 
@@ -27,7 +27,7 @@ export default function NotificationsBell() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
   // Single source of truth: badge count derives from rows so the
@@ -74,7 +74,7 @@ export default function NotificationsBell() {
     refresh().finally(() => setLoading(false))
   }, [open, user, refresh])
 
-  async function handleTap(row) {
+  async function handleTap(row: any) {
     hapticTap()
     if (!row.read_at && user) {
       // Optimistic update — badge falls automatically since it's

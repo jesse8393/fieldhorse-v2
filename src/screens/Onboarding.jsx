@@ -6,7 +6,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
 import { seedDemoData } from '../lib/demoSeed.ts'
-import Wordmark from '../components/Wordmark.jsx'
+import Wordmark from '../components/Wordmark.tsx'
 import LogoUploader from '../components/LogoUploader.tsx'
 
 const SERVICES = [

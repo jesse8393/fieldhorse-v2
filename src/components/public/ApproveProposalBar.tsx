@@ -1,4 +1,4 @@
-// src/components/public/ApproveProposalBar.jsx
+// src/components/public/ApproveProposalBar.tsx
 //
 // Customer-facing approval surface for the /p/:token proposal viewer.
 // Cream-paper aesthetic to match the document, not the app chrome.
@@ -17,17 +17,17 @@ export default function ApproveProposalBar({
   contractTotal,
   initialName = '',
   onApproved
-}) {
+}: any) {
   const [name, setName] = useState(initialName)
   const [authorized, setAuthorized] = useState(false)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [done, setDone] = useState(null)
+  const [done, setDone] = useState<any>(null)
 
   const ready = name.trim().length > 1 && authorized && !busy
 
-  async function submit(e) {
+  async function submit(e: any) {
     e?.preventDefault?.()
     if (!ready) return
     setBusy(true)
@@ -57,7 +57,7 @@ export default function ApproveProposalBar({
         at: body.approved_at || new Date().toISOString()
       })
       onApproved?.()
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message || 'Something went wrong.')
     } finally {
       setBusy(false)
@@ -159,13 +159,13 @@ export default function ApproveProposalBar({
   )
 }
 
-function moneyFmt(n) {
+function moneyFmt(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
 }
 
-function formatStamp(iso) {
+function formatStamp(iso: any) {
   try {
     const d = new Date(iso)
     return d.toLocaleString(undefined, {
@@ -175,7 +175,7 @@ function formatStamp(iso) {
   } catch { return '' }
 }
 
-const panelStyle = {
+const panelStyle: import('react').CSSProperties = {
   maxWidth: 760,
   margin: '24px auto 0',
   padding: '28px 28px 24px',
@@ -187,34 +187,34 @@ const panelStyle = {
   color: '#3A3833'
 }
 
-const eyebrowStyle = {
+const eyebrowStyle: import('react').CSSProperties = {
   fontSize: 11, fontWeight: 700, letterSpacing: '0.18em',
   textTransform: 'uppercase', color: '#C8A154', marginBottom: 6
 }
 
-const headlineStyle = {
+const headlineStyle: import('react').CSSProperties = {
   margin: 0,
   fontFamily: "'Cormorant Garamond', Georgia, serif",
   fontSize: 26, fontWeight: 500, color: '#1A1814',
   letterSpacing: '-0.005em'
 }
 
-const bodyStyle = {
+const bodyStyle: import('react').CSSProperties = {
   margin: '10px 0 16px',
   fontSize: 14, lineHeight: 1.55, color: '#3A3833'
 }
 
-const fieldStackStyle = {
+const fieldStackStyle: import('react').CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12
 }
 
-const labelStyle = {
+const labelStyle: import('react').CSSProperties = {
   fontSize: 10, fontWeight: 700,
   letterSpacing: '0.14em', textTransform: 'uppercase',
   color: '#6B6A66'
 }
 
-const inputStyle = {
+const inputStyle: import('react').CSSProperties = {
   padding: '11px 14px',
   borderRadius: 4,
   background: '#fffefb',
@@ -227,14 +227,14 @@ const inputStyle = {
   boxSizing: 'border-box'
 }
 
-const checkboxRowStyle = {
+const checkboxRowStyle: import('react').CSSProperties = {
   display: 'flex', alignItems: 'flex-start', gap: 10,
   margin: '6px 0 16px',
   fontSize: 12, lineHeight: 1.5, color: '#3A3833',
   cursor: 'pointer'
 }
 
-const buttonStyle = {
+const buttonStyle: import('react').CSSProperties = {
   display: 'block', width: '100%',
   padding: '14px 16px',
   borderRadius: 4, border: 'none',
@@ -246,7 +246,7 @@ const buttonStyle = {
   boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
 }
 
-const errorStyle = {
+const errorStyle: import('react').CSSProperties = {
   padding: '10px 12px',
   borderRadius: 4,
   background: 'rgba(179, 73, 59, 0.10)',
@@ -256,14 +256,14 @@ const errorStyle = {
   marginBottom: 12
 }
 
-const metaRowStyle = {
+const metaRowStyle: import('react').CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
   fontSize: 12, color: '#6B6A66',
   paddingTop: 14, marginTop: 14,
   borderTop: '1px solid #e8e2d4'
 }
 
-const dotStyle = {
+const dotStyle: import('react').CSSProperties = {
   display: 'inline-block', width: 3, height: 3, borderRadius: '50%',
   background: '#C8A154'
 }

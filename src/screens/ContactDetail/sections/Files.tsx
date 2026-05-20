@@ -4,7 +4,7 @@ import { Upload, FileText, Download, Trash2, Paperclip } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { SkeletonList } from '../../../components/Skeleton.jsx'
+import { SkeletonList } from '../../../components/Skeleton.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
 
 const BUCKET = 'job-files'

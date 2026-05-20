@@ -30,14 +30,14 @@ export default function SignaturePad({
   height = 100,
   className,
   hint = 'Optional — hand the phone to the customer to sign.'
-}) {
-  const canvasRef = useRef(null)
+}: any) {
+  const canvasRef = useRef<any>(null)
   const isDrawing = useRef(false)
-  const lastPoint = useRef(null)
+  const lastPoint = useRef<any>(null)
   // Suppress the redraw loop: when WE emit a data URL, the parent's
   // `value` prop will tick to that same string. The value-restore
   // effect compares against this ref and skips redraw if they match.
-  const lastEmitted = useRef(null)
+  const lastEmitted = useRef<any>(null)
 
   // DPR-aware sizing. Re-runs on mount + whenever the surface resizes
   // (rotation, layout shift, dev-tools resize). Saves + restores the
@@ -124,12 +124,12 @@ export default function SignaturePad({
     if (!ctx) return
     const ac = new AbortController()
 
-    function pointerPos(e) {
+    function pointerPos(e: any) {
       const r = canvas.getBoundingClientRect()
       return { x: e.clientX - r.left, y: e.clientY - r.top }
     }
 
-    function down(e) {
+    function down(e: any) {
       e.preventDefault()
       // Stop bubbling so the parent ActionSheet's framer-motion drag
       // handler doesn't pick this gesture up and dismiss the sheet
@@ -146,7 +146,7 @@ export default function SignaturePad({
       ctx.fill()
     }
 
-    function move(e) {
+    function move(e: any) {
       if (!isDrawing.current) return
       e.preventDefault()
       e.stopPropagation()
@@ -162,7 +162,7 @@ export default function SignaturePad({
       lastPoint.current = p
     }
 
-    function up(e) {
+    function up(e: any) {
       if (!isDrawing.current) return
       isDrawing.current = false
       e.stopPropagation()
@@ -184,7 +184,7 @@ export default function SignaturePad({
           lastEmitted.current = dataUrl
           onChange?.(dataUrl)
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn('[signaturepad] toDataURL failed', err)
       }
     }

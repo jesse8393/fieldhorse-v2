@@ -3,10 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 // Mount once in AppShell. Listens for window 'fh:toast' events.
 export default function Toaster() {
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState<any[]>([])
 
   useEffect(() => {
-    function onToast(e) {
+    function onToast(e: any) {
       const t = e.detail
       setItems((prev) => [...prev, t])
       setTimeout(() => {

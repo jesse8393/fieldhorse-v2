@@ -5,7 +5,7 @@ import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRigh
 import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
 import AddEventSheet from '../components/AddEventSheet.tsx'
-import { SkeletonList } from '../components/Skeleton.jsx'
+import { SkeletonList } from '../components/Skeleton.tsx'
 import { FloatingActionButton, ScreenCloser } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'

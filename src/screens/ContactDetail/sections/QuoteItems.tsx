@@ -4,7 +4,7 @@ import { Receipt, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Check, X as XIco
 import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { SkeletonList } from '../../../components/Skeleton.jsx'
+import { SkeletonList } from '../../../components/Skeleton.tsx'
 
 /**
  * Quote items section — fh_quote_items CRUD editor.

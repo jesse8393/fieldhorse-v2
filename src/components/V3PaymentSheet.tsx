@@ -1,4 +1,4 @@
-// src/components/V3PaymentSheet.jsx
+// src/components/V3PaymentSheet.tsx
 //
 // Payment recorder — NOT a card processor. Records what the contractor
 // already collected (cash / check / ACH / card receipt / other) against
@@ -20,7 +20,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 
-function money(n) {
+function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -44,7 +44,7 @@ const PAYMENT_KINDS = [
   { value: 'other',     label: 'Other' }
 ]
 
-export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) {
+export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: any) {
   const [amount, setAmount] = useState(balance > 0 ? String(Math.round(balance)) : '')
   const [method, setMethod] = useState('check')
   const [kind, setKind] = useState('other')
@@ -57,7 +57,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
   const [open, setOpen] = useState(true)
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
-  async function submit(e) {
+  async function submit(e: any) {
     e?.preventDefault()
     if (saving) return
     const numeric = Number(amount)
@@ -72,13 +72,13 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
       setSuccess(true)
       toastSuccess('Payment recorded', `${money(numeric)} · ${methodLabel(method)}`)
       setTimeout(() => { onLogged?.() }, 700)
-    } catch (err) {
+    } catch (err: any) {
       toastError("Couldn't record payment", err?.message || 'Try again in a moment.')
       setSaving(false)
     }
   }
 
-  function requestClose(v) {
+  function requestClose(v: any) {
     if (v) return
     if (saving) return
     setOpen(false)
@@ -355,7 +355,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }) 
   )
 }
 
-const fieldStyle = {
+const fieldStyle: import('react').CSSProperties = {
   padding: '11px 14px',
   borderRadius: 12,
   background: 'var(--surface-2)',
@@ -370,7 +370,7 @@ const fieldStyle = {
   scrollMarginBottom: 140
 }
 
-function chipStyle(active, disabled) {
+function chipStyle(active: any, disabled: any) {
   return {
     padding: '7px 12px',
     borderRadius: 999,
@@ -391,7 +391,7 @@ function chipStyle(active, disabled) {
   }
 }
 
-function methodLabel(value) {
+function methodLabel(value: any) {
   const m = METHODS.find((x) => x.value === value)
   return m ? m.label : 'Payment'
 }

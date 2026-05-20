@@ -22,7 +22,7 @@ import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../components/v3'
-import V3PaymentSheet from '../components/V3PaymentSheet.jsx'
+import V3PaymentSheet from '../components/V3PaymentSheet.tsx'
 import { InvoiceTemplate } from '../components/documents'
 
 /**

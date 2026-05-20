@@ -10,10 +10,10 @@ export default function SpecTabs({
   onChange,
   ariaLabel = 'View',
   size = 'md'
-}) {
+}: any) {
   return (
     <div className={`fh-spectabs fh-spectabs--${size}`} role="tablist" aria-label={ariaLabel}>
-      {options.map((opt) => {
+      {options.map((opt: any) => {
         const on = value === opt.value
         return (
           <button

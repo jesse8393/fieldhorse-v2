@@ -16,7 +16,7 @@ import {
   SectionHeader,
   PostedByChip
 } from '../../../components/v3'
-import TimeClockCard from '../../../components/TimeClockCard.jsx'
+import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.tsx'
 import { resolveNextAction } from '../lib/jobNextAction.ts'

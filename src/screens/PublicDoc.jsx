@@ -23,7 +23,7 @@ import {
   InvoiceTemplate,
   mapItemsToScope
 } from '../components/documents'
-import ApproveProposalBar from '../components/public/ApproveProposalBar.jsx'
+import ApproveProposalBar from '../components/public/ApproveProposalBar.tsx'
 
 export default function PublicDoc() {
   const { token } = useParams()
