@@ -6,7 +6,7 @@ import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { formatPhone } from '../../../lib/utils.ts'
-import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_ } from '../../../components/ActionSheet.jsx'
+import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_ } from '../../../components/ActionSheet.tsx'
 const SheetField = SheetField_ as any
 const SheetChipRow = SheetChipRow_ as any
 

@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { PostedByChip } from '../../../components/v3'
-import { useConfirm } from '../../../components/ConfirmSheet.jsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 /**
  * Messages section — communication log (fh_notes) tied to this job.

@@ -9,7 +9,7 @@ import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../..
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
-import ActionSheet from '../../../components/ActionSheet.jsx'
+import ActionSheet from '../../../components/ActionSheet.tsx'
 
 const BUCKET = 'job-photos'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per photo

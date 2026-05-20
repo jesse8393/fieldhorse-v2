@@ -1,10 +1,10 @@
 import { Suspense, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Toaster as SonnerToaster } from 'sonner'
-import AppHeader from './AppHeader.jsx'
-import BottomNav from './BottomNav.jsx'
-import DesktopSidebar from './DesktopSidebar.jsx'
-import CommandPalette from './CommandPalette.jsx'
+import AppHeader from './AppHeader.tsx'
+import BottomNav from './BottomNav.tsx'
+import DesktopSidebar from './DesktopSidebar.tsx'
+import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.jsx'
 import Toaster from './Toaster.jsx'
 import RouteErrorBoundary from './RouteErrorBoundary.jsx'
@@ -52,7 +52,7 @@ function RouteFallback() {
  * just render their mobile-first markup and the shell decides how much
  * canvas they get.
  */
-function layoutForPath(pathname) {
+function layoutForPath(pathname: any) {
   // Responsive Desktop Command Center.
   //   Phase 1: Home (`/`) — multi-column dashboard canvas.
   //   Phase 2: Jobs (`/jobs`) + Clients (`/clients`) — desktop command

@@ -11,7 +11,7 @@ export function haptic(pattern = 10) {
   }
 }
 
-function splitAccent(title, accentWord) {
+function splitAccent(title: any, accentWord: any) {
   if (!accentWord) return { before: title, accent: '', after: '' }
   const idx = title.toLowerCase().indexOf(accentWord.toLowerCase())
   if (idx < 0) return { before: title, accent: '', after: '' }
@@ -43,14 +43,14 @@ export default function ActionSheet({
   onClose,
   onCommit,
   children
-}) {
-  const sheetRef = useRef(null)
-  const bodyRef = useRef(null)
+}: any) {
+  const sheetRef = useRef<any>(null)
+  const bodyRef = useRef<any>(null)
   const dragControls = useDragControls()
 
   useEffect(() => {
     if (!open) return
-    function handleKey(e) {
+    function handleKey(e: any) {
       if (e.key === 'Escape') { e.preventDefault(); requestClose() }
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleCommit() }
     }
@@ -69,8 +69,8 @@ export default function ActionSheet({
   // away because no element formally lost focus — the focused input is
   // simply destroyed. Blurring first gives iOS the focusout event it
   // needs to dismiss the keyboard cleanly.
-  function requestClose(e) {
-    try { document.activeElement?.blur?.() } catch {}
+  function requestClose(e?: any) {
+    try { (document.activeElement as HTMLElement)?.blur?.() } catch {}
     onClose?.(e)
   }
 
@@ -82,8 +82,8 @@ export default function ActionSheet({
     const el = sheetRef.current
     if (!el || !vv) return
     function update() {
-      const vvh = vv.height
-      const kbd = Math.max(0, window.innerHeight - vvh - (vv.offsetTop || 0))
+      const vvh = vv!.height
+      const kbd = Math.max(0, window.innerHeight - vvh - (vv!.offsetTop || 0))
       el.style.setProperty('--fh-vvh', `${vvh}px`)
       el.style.setProperty('--fh-kbd', kbd > 40 ? `${kbd}px` : '0px')
     }
@@ -109,7 +109,7 @@ export default function ActionSheet({
     if (!open) return
     const body = bodyRef.current
     if (!body) return
-    function onFocusIn(e) {
+    function onFocusIn(e: any) {
       const t = e.target
       if (!t || !t.matches?.('input, textarea, select')) return
       // Skip non-text inputs (chips, radio buttons) — they're already
@@ -126,7 +126,7 @@ export default function ActionSheet({
 
   function handleCommit() {
     if (commitBusy || commitDisabled) return
-    haptic([20, 50, 20])
+    haptic([20, 50, 20] as any)
     onCommit?.()
   }
 
@@ -236,7 +236,7 @@ export default function ActionSheet({
   )
 }
 
-export function SheetField({ label, code, children }) {
+export function SheetField({ label, code, children }: any) {
   // Wrapper is a <div>, not a <label>. iOS Safari redirects taps inside a
   // <label> to the first form control, which silently swallows clicks on
   // nested buttons (e.g. ClientPicker rows in NewLeadSheet).
@@ -250,14 +250,14 @@ export function SheetField({ label, code, children }) {
   )
 }
 
-export function SheetChipRow({ label, value, options, onChange, code }) {
+export function SheetChipRow({ label, value, options, onChange, code }: any) {
   return (
     <div className="fh-asheet-field">
       <span className="fh-asheet-field__k">
         {label}
       </span>
       <div className="fh-asheet-chips" role="radiogroup" aria-label={label}>
-        {options.map((opt) => {
+        {options.map((opt: any) => {
           const on = value === opt.value
           return (
             <button
@@ -277,7 +277,7 @@ export function SheetChipRow({ label, value, options, onChange, code }) {
   )
 }
 
-export function SheetMoneyField({ label, value, onChange, code, placeholder = '0' }) {
+export function SheetMoneyField({ label, value, onChange, code, placeholder = '0' }: any) {
   return (
     <label className="fh-asheet-field">
       <span className="fh-asheet-field__k">

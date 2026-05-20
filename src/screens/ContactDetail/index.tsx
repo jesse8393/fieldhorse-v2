@@ -15,8 +15,8 @@ import { dueStatus } from '../../lib/dueDate.ts'
 import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.jsx'
 const SkeletonBlock = SkeletonBlock_ as any
 const SkeletonList = SkeletonList_ as any
-import ActionSheet from '../../components/ActionSheet.jsx'
-import AddEventSheet from '../../components/AddEventSheet.jsx'
+import ActionSheet from '../../components/ActionSheet.tsx'
+import AddEventSheet from '../../components/AddEventSheet.tsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.jsx'
 import MarkCompleteSheet from '../../components/MarkCompleteSheet.jsx'
 import V3PaymentSheet from '../../components/V3PaymentSheet.jsx'

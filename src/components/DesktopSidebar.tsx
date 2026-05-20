@@ -165,21 +165,21 @@ export default function DesktopSidebar() {
   )
 }
 
-function SidebarSection({ items, eyebrow }) {
+function SidebarSection({ items, eyebrow }: any) {
   return (
     <div className="fh-desktop-sidebar__group">
       {eyebrow && (
         <span className="fh-desktop-sidebar__eyebrow">{eyebrow}</span>
       )}
       <ul className="fh-desktop-sidebar__list">
-        {items.map((it) => {
+        {items.map((it: any) => {
           const I = it.Icon
           return (
             <li key={it.to}>
               <NavLink
                 to={it.to}
                 end={it.end}
-                className={({ isActive }) =>
+                className={({ isActive }: any) =>
                   `fh-desktop-sidebar__link${isActive ? ' is-active' : ''}`
                 }
               >

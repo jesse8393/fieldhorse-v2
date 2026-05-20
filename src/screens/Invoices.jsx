@@ -14,7 +14,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import V3PaymentSheet from '../components/V3PaymentSheet.jsx'
-import { useConfirm } from '../components/ConfirmSheet.jsx'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
 
 // Invoices / AR — v3 money command screen.
 //
