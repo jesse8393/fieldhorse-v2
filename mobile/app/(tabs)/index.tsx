@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle } from 'react-native-svg'
-import { Plus, Calendar, Users, BarChart3, DollarSign, ChevronRight, TrendingUp } from 'lucide-react-native'
-import { useJobs, useClientsBundle, useRecentActivity } from '../../lib/queries'
+import { Plus, Calendar, Users, BarChart3, DollarSign, ChevronRight, Bell, Phone, FileText, CalendarClock } from 'lucide-react-native'
+import { useJobs, useClientsBundle, useRecentActivity, useProfile, useAgenda } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, SectionLabel, theme } from '../../components/ui'
 
@@ -41,6 +41,8 @@ export default function HomeScreen() {
   const { data: jobs = [], isLoading } = useJobs()
   const { data: bundle } = useClientsBundle(user?.id)
   const { data: activity = [] } = useRecentActivity(user?.id)
+  const { data: profile } = useProfile(user?.id)
+  const { data: agenda } = useAgenda(user?.id)
 
   const stats = useMemo(() => {
     let pipeline = 0, won = 0, active = 0, lead = 0
@@ -58,13 +60,34 @@ export default function HomeScreen() {
     [...jobs].filter((j) => ACTIVE.has(j.stage ?? '')).sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0)).slice(0, 3)
   , [jobs])
 
+  const overdue = agenda?.overdue ?? []
+  const todayEvents = agenda?.today ?? []
+  const priorities = useMemo(() => ({
+    followUps: jobs.filter((j) => j.stage === 'lead').length,
+    quotes: jobs.filter((j) => j.stage === 'quote').length,
+    behind: overdue.length
+  }), [jobs, overdue.length])
+
   const name = (user?.email?.split('@')[0] || 'there')
   const display = name.charAt(0).toUpperCase() + name.slice(1)
 
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+        {/* Branded header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <LinearGradient colors={['#F0CE86', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: theme.onGold, fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>FH</Text>
+          </LinearGradient>
+          <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', flex: 1, textAlign: 'center' }} numberOfLines={1}>
+            {profile?.company_name || 'FieldHorse'}
+          </Text>
+          <Pressable onPress={() => router.push('/notifications')} hitSlop={8} style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}>
+            <Bell color={theme.goldBright} size={17} />
+          </Pressable>
+        </View>
+
         <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }}>{dateLine()}</Text>
         <Text style={{ fontSize: 28, fontWeight: '800', marginTop: 4, marginBottom: 18, letterSpacing: -0.5 }}>
           <Text style={{ color: theme.ink }}>{greeting()}, </Text>
@@ -140,6 +163,76 @@ export default function HomeScreen() {
               </>
             ) : null}
 
+            {/* Next actions */}
+            {overdue.length > 0 ? (
+              <>
+                <SectionLabel style={{ marginBottom: 10 }}>Next actions</SectionLabel>
+                <View style={{ gap: 10, marginBottom: 24 }}>
+                  {overdue.slice(0, 4).map((e) => (
+                    <Pressable key={e.id} onPress={() => e.contact_id && router.push(`/jobs/${e.contact_id}`)}>
+                      <Card accent={theme.danger}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingLeft: 16 }}>
+                          <View style={{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(232,90,87,0.12)', borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)' }}>
+                            <CalendarClock color={theme.danger} size={16} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>Reschedule {e.fh_contacts?.name || e.title || 'job'}</Text>
+                            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }}>Behind schedule</Text>
+                          </View>
+                          <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(232,90,87,0.14)', borderWidth: 1, borderColor: 'rgba(232,90,87,0.4)' }}>
+                            <Text style={{ color: theme.danger, fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>Overdue</Text>
+                          </View>
+                        </View>
+                      </Card>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {/* Today's priorities */}
+            <SectionLabel style={{ marginBottom: 10 }}>Today's priorities</SectionLabel>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
+              <Priority icon={<Phone color={theme.success} size={16} />} count={priorities.followUps} label="Follow-ups" sub="Calls to leads" tint={theme.success} />
+              <Priority icon={<FileText color="#6B7CA8" size={16} />} count={priorities.quotes} label="Quotes" sub="Need follow up" tint="#6B7CA8" />
+              <Priority icon={<CalendarClock color={theme.danger} size={16} />} count={priorities.behind} label="Behind" sub="Reschedule" tint={theme.danger} />
+            </View>
+
+            {/* Today on site */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <SectionLabel>Today on site</SectionLabel>
+              <Pressable onPress={() => router.push('/schedule')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '700' }}>Schedule</Text>
+                <ChevronRight color={theme.goldBright} size={14} />
+              </Pressable>
+            </View>
+            {todayEvents.length === 0 ? (
+              <View style={{ borderRadius: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.borderMid, paddingVertical: 28, alignItems: 'center', marginBottom: 24 }}>
+                <CalendarClock color={theme.inkFaint} size={22} />
+                <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700', marginTop: 8 }}>Nothing scheduled today.</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>Open Schedule to plan crew visits.</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10, marginBottom: 24 }}>
+                {todayEvents.map((e) => (
+                  <Pressable key={e.id} onPress={() => e.contact_id && router.push(`/jobs/${e.contact_id}`)}>
+                    <Card accent={theme.gold}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingLeft: 16 }}>
+                        <Calendar color={theme.goldBright} size={16} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>{e.title || 'Scheduled event'}</Text>
+                          <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }} numberOfLines={1}>{e.fh_contacts?.name || 'No job linked'}</Text>
+                        </View>
+                        <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '700' }}>
+                          {e.start_at ? new Date(e.start_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : ''}
+                        </Text>
+                      </View>
+                    </Card>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
             {/* Pipeline preview */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <SectionLabel>Pipeline preview</SectionLabel>
@@ -191,6 +284,21 @@ function Breakdown({ dot, label, count, onPress }: { dot: string; label: string;
       <Text style={{ color: theme.ink, fontSize: 22, fontWeight: '800', marginTop: 4 }}>{count}</Text>
       <Text style={{ color: theme.inkFaint, fontSize: 11 }}>{count === 1 ? 'deal' : 'deals'}</Text>
     </Pressable>
+  )
+}
+
+function Priority({ icon, count, label, sub, tint }: { icon: React.ReactNode; count: number; label: string; sub: string; tint: string }) {
+  return (
+    <Card style={{ flex: 1 }}>
+      <View style={{ padding: 14, minHeight: 116 }}>
+        <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${tint}1f`, borderWidth: 1, borderColor: `${tint}44` }}>
+          {icon}
+        </View>
+        <Text style={{ color: tint, fontSize: 26, fontWeight: '800', marginTop: 10 }}>{count}</Text>
+        <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '700', marginTop: 2 }}>{label}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 11, marginTop: 1 }}>{sub}</Text>
+      </View>
+    </Card>
   )
 }
 

@@ -988,3 +988,39 @@ export function useRecentActivity(userId: string | undefined) {
     enabled: !!userId
   })
 }
+
+// ---- Home: agenda (today's events + overdue events) ----
+export type AgendaEvent = ScheduleEvent
+export type Agenda = { today: AgendaEvent[]; overdue: AgendaEvent[] }
+
+export function useAgenda(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['agenda', userId],
+    queryFn: async (): Promise<Agenda> => {
+      const now = new Date()
+      const startToday = new Date(now); startToday.setHours(0, 0, 0, 0)
+      const endToday = new Date(now); endToday.setHours(23, 59, 59, 999)
+      const from = new Date(now); from.setDate(from.getDate() - 45)
+      const { data } = await supabase
+        .from('fh_schedule')
+        .select('*, fh_contacts(name, stage)')
+        .eq('user_id', userId as string)
+        .gte('start_at', from.toISOString())
+        .lte('start_at', endToday.toISOString())
+        .order('start_at', { ascending: true })
+        .limit(100)
+      const rows = (data ?? []) as AgendaEvent[]
+      const today: AgendaEvent[] = []
+      const overdue: AgendaEvent[] = []
+      for (const e of rows) {
+        if (!e.start_at) continue
+        const t = new Date(e.start_at)
+        if (t >= startToday && t <= endToday) today.push(e)
+        else if (t < startToday) overdue.push(e)
+      }
+      overdue.reverse() // most recent overdue first
+      return { today, overdue }
+    },
+    enabled: !!userId
+  })
+}
