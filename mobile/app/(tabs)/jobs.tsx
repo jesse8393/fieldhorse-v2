@@ -24,6 +24,8 @@ const STAGE_TINT: Record<string, string> = {
   lost: '#7d2a1f'
 }
 
+const STAGE_FILTERS = ['all', 'lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
+
 function money(n: number | null | undefined) {
   const v = Number(n || 0)
   if (!v) return '$0'
@@ -42,6 +44,7 @@ export default function JobsScreen() {
   useJobsRealtime(user?.id, queryClient)
   const createLead = useCreateLead()
   const [search, setSearch] = useState('')
+  const [stageFilter, setStageFilter] = useState<string>('all')
   const [addOpen, setAddOpen] = useState(false)
   const [leadName, setLeadName] = useState('')
   const [leadAmount, setLeadAmount] = useState('')
@@ -63,13 +66,14 @@ export default function JobsScreen() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return jobs
-    return jobs.filter((c) =>
-      [c.name, c.job_title, c.job_type, c.phone, c.email]
+    return jobs.filter((c) => {
+      if (stageFilter !== 'all' && c.stage !== stageFilter) return false
+      if (!q) return true
+      return [c.name, c.job_title, c.job_type, c.phone, c.email]
         .filter(Boolean)
         .some((s) => String(s).toLowerCase().includes(q))
-    )
-  }, [jobs, search])
+    })
+  }, [jobs, search, stageFilter])
 
   return (
     <View className="flex-1 bg-bg" style={{ paddingTop: insets.top + 8 }}>
@@ -85,6 +89,37 @@ export default function JobsScreen() {
           placeholder="Search jobs, contacts…"
           placeholderTextColor="rgba(242,237,228,0.45)"
           className="bg-surface border border-[rgba(255,240,210,0.10)] rounded-xl px-4 py-3 text-ink"
+        />
+      </View>
+
+      <View className="pb-3">
+        <FlatList
+          data={STAGE_FILTERS as unknown as string[]}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(s) => s}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
+          renderItem={({ item: s }) => {
+            const active = stageFilter === s
+            const chipTint = s === 'all' ? '#E8B865' : (STAGE_TINT[s] ?? '#5C5C5C')
+            return (
+              <Pressable
+                onPress={() => setStageFilter(s)}
+                className="rounded-full px-3.5 py-1.5 border"
+                style={{
+                  borderColor: active ? chipTint : 'rgba(255,240,210,0.12)',
+                  backgroundColor: active ? chipTint : 'transparent'
+                }}
+              >
+                <Text
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: active ? '#1A120A' : '#9b948a' }}
+                >
+                  {s}
+                </Text>
+              </Pressable>
+            )
+          }}
         />
       </View>
 

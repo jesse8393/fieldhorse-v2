@@ -11,11 +11,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera } from 'lucide-react-native'
+import { ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera, Calendar, Users, User } from 'lucide-react-native'
 import {
   useJobDetail, useLogPayment, useUpdateStage, useUpdateJob,
   useAddExpense, useDeletePayment, useDeleteExpense, useDeleteJob,
-  useJobPhotos, useUploadPhoto, useDeletePhoto
+  useJobPhotos, useUploadPhoto, useDeletePhoto,
+  useAddSub, useDeleteSub, useClientsBundle
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -45,9 +46,21 @@ export default function JobDetailScreen() {
   const deleteJob = useDeleteJob()
   const uploadPhoto = useUploadPhoto()
   const deletePhoto = useDeletePhoto()
+  const addSub = useAddSub()
+  const deleteSub = useDeleteSub()
   const { data: photos = [] } = useJobPhotos(id)
+  const { data: clientsBundle } = useClientsBundle(user?.id)
 
   const [photoBusy, setPhotoBusy] = useState(false)
+
+  const [subOpen, setSubOpen] = useState(false)
+  const [subName, setSubName] = useState('')
+  const [subTrade, setSubTrade] = useState('')
+  const [subPhone, setSubPhone] = useState('')
+  const [subRate, setSubRate] = useState('')
+  const [subSaving, setSubSaving] = useState(false)
+
+  const [clientPickOpen, setClientPickOpen] = useState(false)
 
   const [payOpen, setPayOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
@@ -66,6 +79,8 @@ export default function JobDetailScreen() {
   const [editPhone, setEditPhone] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editAmount, setEditAmount] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [editAddress, setEditAddress] = useState('')
   const [editSaving, setEditSaving] = useState(false)
 
   function openEdit() {
@@ -75,6 +90,8 @@ export default function JobDetailScreen() {
     setEditPhone(contact.phone || '')
     setEditEmail(contact.email || '')
     setEditAmount(contact.amount != null ? String(contact.amount) : '')
+    setEditNotes(contact.notes || '')
+    setEditAddress(contact.address || '')
     setEditOpen(true)
   }
 
@@ -88,7 +105,9 @@ export default function JobDetailScreen() {
       jobTitle: editTitle.trim() || null,
       phone: editPhone.trim() || null,
       email: editEmail.trim() || null,
-      amount: amt
+      amount: amt,
+      notes: editNotes.trim() || null,
+      address: editAddress.trim() || null
     })
     setEditSaving(false)
     if (!error) setEditOpen(false)
@@ -97,6 +116,39 @@ export default function JobDetailScreen() {
   const contact = data?.contact ?? null
   const payments = data?.payments ?? []
   const expenses = data?.expenses ?? []
+  const schedule = data?.schedule ?? []
+  const subs = data?.subs ?? []
+  const clients = clientsBundle?.clients ?? []
+  const linkedClient = contact?.client_id ? clients.find((c) => c.id === contact.client_id) ?? null : null
+
+  async function submitSub() {
+    if (!subName.trim() || !contact || !user || subSaving) return
+    setSubSaving(true)
+    const rate = subRate.trim() === '' ? undefined : Number(subRate.replace(/[^0-9.]/g, ''))
+    const { error } = await addSub({
+      userId: user.id, contactId: contact.id, name: subName.trim(),
+      trade: subTrade.trim() || undefined, phone: subPhone.trim() || undefined, rate
+    })
+    setSubSaving(false)
+    if (!error) {
+      setSubOpen(false)
+      setSubName(''); setSubTrade(''); setSubPhone(''); setSubRate('')
+    }
+  }
+
+  function confirmDeleteSub(sid: string) {
+    if (!contact) return
+    Alert.alert('Remove sub?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => deleteSub({ id: sid, contactId: contact.id }) }
+    ])
+  }
+
+  async function linkClient(clientId: string | null) {
+    if (!contact) return
+    setClientPickOpen(false)
+    await updateJob({ contactId: contact.id, clientId })
+  }
 
   const totals = useMemo(() => {
     const amount = Number(contact?.amount || 0)
@@ -280,6 +332,21 @@ export default function JobDetailScreen() {
           })}
         </View>
 
+        {/* Client link */}
+        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Client</Text>
+        <Pressable
+          onPress={() => setClientPickOpen(true)}
+          className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+        >
+          <View className="flex-row items-center flex-1" style={{ gap: 10 }}>
+            <User color="#E8B865" size={16} />
+            <Text className="text-ink text-base font-semibold" numberOfLines={1}>
+              {linkedClient ? (linkedClient.name || 'Unnamed client') : 'No client linked'}
+            </Text>
+          </View>
+          <Text className="text-gold-bright text-xs font-bold">{linkedClient ? 'Change' : 'Link'}</Text>
+        </Pressable>
+
         {/* Photos */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
           <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Photos</Text>
@@ -383,13 +450,77 @@ export default function JobDetailScreen() {
             <Text className="text-ink-muted text-[10px] mt-1">Long-press an expense to delete.</Text>
           </View>
         )}
+
+        {/* Schedule */}
+        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">Schedule</Text>
+        {schedule.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No events for this job.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {schedule.map((ev) => (
+              <View key={ev.id} className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center" style={{ gap: 10 }}>
+                <Calendar color="#E8B865" size={16} />
+                <View className="flex-1">
+                  <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{ev.title || 'Scheduled event'}</Text>
+                  <Text className="text-ink-muted text-xs mt-0.5">
+                    {ev.start_at ? new Date(ev.start_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Subs */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Subcontractors</Text>
+          <Pressable onPress={() => setSubOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Plus color="#E8B865" size={14} />
+            <Text className="text-gold-bright text-xs font-bold">Add</Text>
+          </Pressable>
+        </View>
+        {subs.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No subs on this job.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {subs.map((s) => (
+              <Pressable
+                key={s.id}
+                onLongPress={() => confirmDeleteSub(s.id)}
+                delayLongPress={350}
+                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center"
+                style={{ gap: 10 }}
+              >
+                <Users color="#E8B865" size={16} />
+                <View className="flex-1">
+                  <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{s.name || 'Subcontractor'}</Text>
+                  <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>{s.trade || s.phone || '—'}</Text>
+                </View>
+                {s.rate != null ? <Text className="text-ink-muted text-sm">{money(Number(s.rate))}</Text> : null}
+              </Pressable>
+            ))}
+            <Text className="text-ink-muted text-[10px] mt-1">Long-press a sub to remove.</Text>
+          </View>
+        )}
+
+        {/* Notes */}
+        {contact.notes ? (
+          <>
+            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Notes</Text>
+            <Text className="text-ink text-sm">{contact.notes}</Text>
+          </>
+        ) : null}
       </ScrollView>
 
       {/* Edit job modal */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setEditOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <ScrollView
+            className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]"
+            contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }}
+            style={{ maxHeight: '85%' }}
+          >
             <Text className="text-ink text-xl font-bold mb-5">Edit job</Text>
             <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
             <TextInput
@@ -439,7 +570,25 @@ export default function JobDetailScreen() {
               autoCapitalize="none"
               placeholder="name@email.com"
               placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Address</Text>
+            <TextInput
+              value={editAddress}
+              onChangeText={setEditAddress}
+              placeholder="Job site address"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Notes</Text>
+            <TextInput
+              value={editNotes}
+              onChangeText={setEditNotes}
+              multiline
+              placeholder="Anything worth remembering"
+              placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              style={{ minHeight: 72, textAlignVertical: 'top' }}
             />
             <Pressable
               onPress={submitEdit}
@@ -457,8 +606,91 @@ export default function JobDetailScreen() {
               <Trash2 color="#f5a294" size={16} />
               <Text className="text-[#f5a294] font-bold">Delete job</Text>
             </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add sub modal */}
+      <Modal visible={subOpen} transparent animationType="slide" onRequestClose={() => setSubOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setSubOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">Add subcontractor</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+            <TextInput
+              value={subName} onChangeText={setSubName} autoFocus
+              placeholder="Sub or company" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <View className="flex-row mb-4" style={{ gap: 12 }}>
+              <View className="flex-1">
+                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Trade</Text>
+                <TextInput
+                  value={subTrade} onChangeText={setSubTrade}
+                  placeholder="Electrical, framing…" placeholderTextColor="rgba(242,237,228,0.4)"
+                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                />
+              </View>
+              <View style={{ width: 110 }}>
+                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Rate</Text>
+                <TextInput
+                  value={subRate} onChangeText={setSubRate} keyboardType="decimal-pad"
+                  placeholder="$0" placeholderTextColor="rgba(242,237,228,0.4)"
+                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                />
+              </View>
+            </View>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Phone</Text>
+            <TextInput
+              value={subPhone} onChangeText={setSubPhone} keyboardType="phone-pad"
+              placeholder="(555) 555-5555" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+            />
+            <Pressable
+              onPress={submitSub}
+              disabled={subSaving}
+              className="rounded-xl py-4 items-center"
+              style={{ backgroundColor: subSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+            >
+              {subSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Add sub</Text>}
+            </Pressable>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Client picker modal */}
+      <Modal visible={clientPickOpen} transparent animationType="slide" onRequestClose={() => setClientPickOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setClientPickOpen(false)} />
+          <View className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]" style={{ maxHeight: '70%', paddingBottom: insets.bottom + 12 }}>
+            <Text className="text-ink text-xl font-bold px-6 pt-6 pb-3">Link a client</Text>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 12 }}>
+              <Pressable
+                onPress={() => linkClient(null)}
+                className="rounded-xl p-3 border border-[rgba(255,240,210,0.10)]"
+              >
+                <Text className="text-ink-muted font-semibold">No client</Text>
+              </Pressable>
+              {clients.map((c) => {
+                const active = contact.client_id === c.id
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => linkClient(c.id)}
+                    className="rounded-xl p-3 border flex-row items-center justify-between"
+                    style={{ borderColor: active ? '#E8B865' : 'rgba(255,240,210,0.10)' }}
+                  >
+                    <Text className="text-ink font-semibold" numberOfLines={1}>{c.name || 'Unnamed client'}</Text>
+                    {active ? <Text className="text-gold-bright text-xs font-bold">Linked</Text> : null}
+                  </Pressable>
+                )
+              })}
+              {clients.length === 0 ? (
+                <Text className="text-ink-muted text-sm mt-2">No clients yet — create one from the Clients tab.</Text>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       {/* Add expense modal */}

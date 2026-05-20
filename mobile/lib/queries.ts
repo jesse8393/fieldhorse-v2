@@ -113,6 +113,32 @@ export function useClientDetail(id: string | undefined) {
   })
 }
 
+// Create a standalone client, then invalidate the roster.
+export type NewClientInput = {
+  userId: string
+  name: string
+  companyName?: string
+  phone?: string
+  email?: string
+  address?: string
+}
+
+export function useCreateClient() {
+  const client = useQueryClient()
+  return async (input: NewClientInput) => {
+    const { data, error } = await supabase.from('fh_clients').insert({
+      user_id: input.userId,
+      name: input.name,
+      company_name: input.companyName || null,
+      phone: input.phone || null,
+      email: input.email || null,
+      address: input.address || null
+    } as any).select('id').single()
+    if (!error) client.invalidateQueries({ queryKey: ['clients', input.userId] })
+    return { id: (data as any)?.id as string | undefined, error }
+  }
+}
+
 // Edit a client's core fields, then invalidate the client detail + roster.
 export type UpdateClientInput = {
   clientId: string
@@ -152,27 +178,27 @@ export type ScheduleEvent =
     fh_contacts: Pick<Contact, 'name' | 'stage'> | null
   }
 
-async function fetchUpcoming(userId: string): Promise<ScheduleEvent[]> {
+async function fetchUpcoming(userId: string, days: number): Promise<ScheduleEvent[]> {
   const now = new Date()
-  const in7 = new Date(now)
-  in7.setDate(in7.getDate() + 7)
-  in7.setHours(23, 59, 59, 999)
+  const end = new Date(now)
+  end.setDate(end.getDate() + days)
+  end.setHours(23, 59, 59, 999)
   const { data, error } = await supabase
     .from('fh_schedule')
     .select('*, fh_contacts(name, stage)')
     .eq('user_id', userId)
     .gte('start_at', now.toISOString())
-    .lt('start_at', in7.toISOString())
+    .lt('start_at', end.toISOString())
     .order('start_at', { ascending: true })
-    .limit(50)
+    .limit(100)
   if (error) throw error
   return (data ?? []) as ScheduleEvent[]
 }
 
-export function useUpcomingEvents(userId: string | undefined) {
+export function useUpcomingEvents(userId: string | undefined, days = 7) {
   return useQuery({
-    queryKey: ['scheduleUpcoming', userId],
-    queryFn: () => fetchUpcoming(userId as string),
+    queryKey: ['scheduleUpcoming', userId, days],
+    queryFn: () => fetchUpcoming(userId as string, days),
     enabled: !!userId
   })
 }
@@ -258,6 +284,9 @@ export type UpdateJobInput = {
   phone?: string | null
   email?: string | null
   amount?: number | null
+  notes?: string | null
+  address?: string | null
+  clientId?: string | null
 }
 
 export function useUpdateJob() {
@@ -269,6 +298,9 @@ export function useUpdateJob() {
     if (input.phone !== undefined) patch.phone = input.phone
     if (input.email !== undefined) patch.email = input.email
     if (input.amount !== undefined) patch.amount = input.amount
+    if (input.notes !== undefined) patch.notes = input.notes
+    if (input.address !== undefined) patch.address = input.address
+    if (input.clientId !== undefined) patch.client_id = input.clientId
     const { error } = await supabase.from('fh_contacts')
       .update(patch as any)
       .eq('id', input.contactId)
@@ -276,6 +308,42 @@ export function useUpdateJob() {
       client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
     }
+    return { error }
+  }
+}
+
+// ---- Subs (subcontractors) ----
+export type NewSubInput = {
+  userId: string
+  contactId: string
+  name: string
+  trade?: string
+  phone?: string
+  rate?: number
+}
+
+export function useAddSub() {
+  const client = useQueryClient()
+  return async (input: NewSubInput) => {
+    const { error } = await supabase.from('fh_subs').insert({
+      user_id: input.userId,
+      contact_id: input.contactId,
+      name: input.name,
+      trade: input.trade || null,
+      phone: input.phone || null,
+      rate: input.rate ?? null,
+      status: 'active'
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useDeleteSub() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string }) => {
+    const { error } = await supabase.from('fh_subs').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
 }
@@ -450,6 +518,19 @@ export function useDeleteEvent() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
     const { error } = await supabase.from('fh_schedule').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['scheduleUpcoming', input.userId] })
+    return { error }
+  }
+}
+
+export function useUpdateEvent() {
+  const client = useQueryClient()
+  return async (input: { id: string; userId: string; title?: string; startAt?: string; contactId?: string | null }) => {
+    const patch: Record<string, unknown> = {}
+    if (input.title !== undefined) patch.title = input.title
+    if (input.startAt !== undefined) patch.start_at = input.startAt
+    if (input.contactId !== undefined) patch.contact_id = input.contactId
+    const { error } = await supabase.from('fh_schedule').update(patch as any).eq('id', input.id)
     if (!error) client.invalidateQueries({ queryKey: ['scheduleUpcoming', input.userId] })
     return { error }
   }
