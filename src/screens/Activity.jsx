@@ -13,14 +13,14 @@
 // No new schema. Uses indexes already in place (everything is
 // scoped by user_id via RLS).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Activity as ActivityIcon, DollarSign, FileEdit, Check, Calendar,
   Briefcase, Sparkles, Receipt, ArrowRight
 } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { useActivityFeed } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useFhMotion } from '../lib/motion.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
@@ -68,61 +68,21 @@ function timeAt(d) {
 
 export default function Activity() {
   const { user } = useAuth()
-  const [events, setEvents] = useState(null) // null = loading
+  const { data: bundle } = useActivityFeed(user?.id, PAGE_SIZE)
   const { stagger, item } = useFhMotion()
 
-  useEffect(() => {
-    if (!user?.id) return
-    let cancelled = false
-    ;(async () => {
-      // 5 parallel fetches — every event class scoped by user_id (RLS
-      // adds owner-only filter automatically; the explicit eq is
-      // defense-in-depth + makes the query plan obvious).
-      const [
-        { data: transitions },
-        { data: payments },
-        { data: changeOrders },
-        { data: invoices },
-        { data: contacts }
-      ] = await Promise.all([
-        supabase.from('fh_stage_transitions')
-          .select('id, contact_id, from_stage, to_stage, transitioned_at')
-          .eq('user_id', user.id)
-          .order('transitioned_at', { ascending: false })
-          .limit(PAGE_SIZE),
-        supabase.from('fh_payments')
-          .select('id, contact_id, amount, method, kind, paid_on, created_at')
-          .eq('user_id', user.id)
-          .order('paid_on', { ascending: false })
-          .limit(PAGE_SIZE),
-        supabase.from('fh_change_orders')
-          .select('id, contact_id, sequence_number, title, amount, status, approved_at, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(PAGE_SIZE),
-        supabase.from('fh_invoices')
-          .select('id, contact_id, sequence_number, title, amount, status, issued_at, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(PAGE_SIZE),
-        // Pull the small set of contacts the events reference. We
-        // can't predict which contact_ids until the first 4 queries
-        // return, but pulling the most-recently-touched contacts
-        // covers ~95% of events without a second round trip.
-        supabase.from('fh_contacts')
-          .select('id, name, job_title, stage')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(PAGE_SIZE * 2)
-      ])
+  // Map the raw datasets into display events. Kept in the component
+  // (not the query cache) because the mapping references icon
+  // components. events === null until the first fetch resolves so the
+  // loading state below still works.
+  const events = useMemo(() => {
+    if (!bundle) return null
+    const { transitions, payments, changeOrders, invoices, contacts } = bundle
+    const contactById = new Map((contacts || []).map((c) => [c.id, c]))
 
-      if (cancelled) return
+    const out = []
 
-      const contactById = new Map((contacts || []).map((c) => [c.id, c]))
-
-      const out = []
-
-      for (const t of transitions || []) {
+    for (const t of transitions || []) {
         out.push({
           id: `st:${t.id}`,
           when: new Date(t.transitioned_at),
@@ -183,15 +143,10 @@ export default function Activity() {
         })
       }
 
-      const sorted = out
-        .filter((e) => e.when instanceof Date && !Number.isNaN(e.when.getTime()))
-        .sort((a, b) => b.when - a.when)
-
-      setEvents(sorted)
-    })()
-
-    return () => { cancelled = true }
-  }, [user?.id])
+    return out
+      .filter((e) => e.when instanceof Date && !Number.isNaN(e.when.getTime()))
+      .sort((a, b) => b.when - a.when)
+  }, [bundle])
 
   // Group by date bucket for the section headers.
   const grouped = useMemo(() => {
