@@ -1,4 +1,4 @@
-// src/components/MarkCompleteSheet.jsx
+// src/components/MarkCompleteSheet.tsx
 //
 // "Real system" for closing a job. Collects warranty start + duration,
 // customer sign-off (method + typed name + date), an optional closing
@@ -24,7 +24,7 @@ import {
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals
 } from '../lib/closeout.ts'
 
-function moneyFmt(n) {
+function moneyFmt(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -34,7 +34,7 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function MarkCompleteSheet({ open, userId, contact, onClose, onSaved }) {
+export default function MarkCompleteSheet({ open, userId, contact, onClose, onSaved }: any) {
   const { profile } = useProfile()
   const [warrantyStart, setWarrantyStart] = useState(todayIso())
   const [warrantyMonths, setWarrantyMonths] = useState(12)
@@ -43,7 +43,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [existing, setExisting] = useState(null)
+  const [existing, setExisting] = useState<any>(null)
   const [totals, setTotals] = useState({ paid: 0, photoCount: 0 })
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
@@ -80,7 +80,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     return () => { alive = false }
   }, [open, userId, contact?.id, contact?.name])
 
-  async function submit(e) {
+  async function submit(e: any) {
     e?.preventDefault?.()
     if (saving) return
     if (signoffMethod === 'signature_typed' && !signoffName.trim()) {
@@ -108,7 +108,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       )
       onSaved?.()
       onClose?.()
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't save closeout", err?.message || 'Unknown error')
     } finally {
@@ -125,7 +125,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       toastSuccess('Job reopened', 'Stage moved back to Invoice')
       onSaved?.()
       onClose?.()
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't reopen", err?.message || 'Unknown error')
     } finally {
@@ -138,7 +138,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       name: profile?.company_name || profile?.full_name || 'My Company',
       address: profile?.company_address || '',
       phone: profile?.company_phone || '',
-      email: profile?.company_email || profile?.email || '',
+      email: profile?.company_email || (profile as any)?.email || '',
       website: profile?.company_website || '',
       logo_url: profile?.logo_url || null,
       brand_accent_hex: profile?.brand_accent_hex || null,
@@ -155,7 +155,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       downloadPdf(result)
       hapticSuccess()
       toastSuccess('Certificate ready', result.filename)
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't build certificate", err?.message || 'Unknown error')
     } finally {
@@ -200,7 +200,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
           size_bytes: blob.size || 0,
           kind: 'file'
         })
-      } catch (e) {
+      } catch (e: any) {
         console.warn('[mark-complete] fh_job_files insert failed', e)
       }
 
@@ -234,7 +234,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       hapticSuccess()
       toastSuccess(`Certificate sent to ${recipient}`, result.filename)
       onSaved?.()
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't send certificate", err?.message || 'Unknown error')
     } finally {
@@ -242,8 +242,8 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     }
   }
 
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
-  const fieldStyle = {
+  const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const fieldStyle: import('react').CSSProperties = {
     padding: '11px 14px',
     borderRadius: 12,
     background: 'var(--surface-2)',
@@ -259,7 +259,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
   }
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { if (!v && !saving) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
         style={drawerStyle}
@@ -513,7 +513,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
   )
 }
 
-function certificateBtnStyle(variant, busy) {
+function certificateBtnStyle(variant: any, busy: any) {
   const base = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
     padding: '11px 12px', borderRadius: 12,
@@ -539,7 +539,7 @@ function certificateBtnStyle(variant, busy) {
   }
 }
 
-function chipStyle(active, disabled) {
+function chipStyle(active: any, disabled: any) {
   return {
     padding: '7px 12px',
     borderRadius: 999,
@@ -560,7 +560,7 @@ function chipStyle(active, disabled) {
   }
 }
 
-function Stat({ label, value, tone = 'default' }) {
+function Stat({ label, value, tone = 'default' }: any) {
   const color = tone === 'good'
     ? 'var(--signal-green, #4ade80)'
     : tone === 'danger'

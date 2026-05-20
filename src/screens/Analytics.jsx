@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.jsx'
 import CountUp from '../components/fx/CountUp.tsx'
-import LogMilesSheet from '../components/LogMilesSheet.jsx'
+import LogMilesSheet from '../components/LogMilesSheet.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'

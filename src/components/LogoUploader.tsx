@@ -5,13 +5,13 @@ import { supabase } from '../lib/supabase.ts'
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml'
 const MAX_BYTES = 2 * 1024 * 1024 // 2 MB
 
-export default function LogoUploader({ logoUrl, companyName, onUpload, size = 'md' }) {
+export default function LogoUploader({ logoUrl, companyName, onUpload, size = 'md' }: any) {
   const { user } = useAuth()
-  const inputRef = useRef(null)
+  const inputRef = useRef<any>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  async function handleFile(e) {
+  async function handleFile(e: any) {
     const file = e.target.files?.[0]
     if (!file) return
     setErr('')
@@ -46,7 +46,7 @@ export default function LogoUploader({ logoUrl, companyName, onUpload, size = 'm
       const { data } = supabase.storage.from('logos').getPublicUrl(path)
       const url = `${data.publicUrl}?v=${Date.now()}`
       await onUpload?.(url)
-    } catch (ex) {
+    } catch (ex: any) {
       setErr(ex.message || 'Upload failed')
     } finally {
       setBusy(false)

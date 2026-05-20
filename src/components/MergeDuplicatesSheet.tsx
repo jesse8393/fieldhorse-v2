@@ -1,4 +1,4 @@
-// src/components/MergeDuplicatesSheet.jsx
+// src/components/MergeDuplicatesSheet.tsx
 //
 // Review-and-merge sheet for duplicate clients. Receives pre-detected
 // clusters from Clients.jsx; for each cluster the user picks a survivor
@@ -18,7 +18,7 @@ import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mergeClients } from '../lib/clientMerge.ts'
 
-function fmtPhone(n) {
+function fmtPhone(n: any) {
   if (!n) return ''
   const digits = String(n).replace(/\D/g, '')
   if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
@@ -26,22 +26,22 @@ function fmtPhone(n) {
   return n
 }
 
-function fmtDate(s) {
+function fmtDate(s: any) {
   if (!s) return '—'
   const d = new Date(s)
   if (Number.isNaN(d.getTime())) return '—'
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, onMerged }) {
-  const [selected, setSelected] = useState({})
-  const [busyKey, setBusyKey] = useState(null)
+export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, onMerged }: any) {
+  const [selected, setSelected] = useState<any>({})
+  const [busyKey, setBusyKey] = useState<any>(null)
   const [resolved, setResolved] = useState(() => new Set())
 
   // Reset whenever the sheet opens with a new batch
   useEffect(() => {
     if (!open) return
-    const next = {}
+    const next: Record<string, any> = {}
     for (const c of clusters || []) {
       const oldest = [...c.members].sort((a, b) => {
         const da = a.created_at ? new Date(a.created_at).getTime() : 0
@@ -56,19 +56,19 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
   }, [open, clusters])
 
   const remaining = useMemo(
-    () => (clusters || []).filter((c) => !resolved.has(c.key)),
+    () => (clusters || []).filter((c: any) => !resolved.has(c.key)),
     [clusters, resolved]
   )
 
-  async function commitMerge(cluster) {
+  async function commitMerge(cluster: any) {
     const survivorId = selected[cluster.key]
-    const survivor = cluster.members.find((m) => m.id === survivorId)
+    const survivor = cluster.members.find((m: any) => m.id === survivorId)
     if (!survivor) {
       hapticError()
       toastError('Pick a survivor', 'Tap the client to keep.')
       return
     }
-    const losers = cluster.members.filter((m) => m.id !== survivor.id)
+    const losers = cluster.members.filter((m: any) => m.id !== survivor.id)
     if (losers.length === 0) return
 
     setBusyKey(cluster.key)
@@ -85,7 +85,7 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
         return next
       })
       onMerged?.()
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't merge", err?.message || 'Unknown error')
     } finally {
@@ -94,7 +94,7 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
   }
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { if (!v && !busyKey) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !busyKey) onClose?.() }}>
       <DrawerContent
         className="vaul-drawer-content"
         style={{
@@ -170,12 +170,12 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
               No duplicate clusters left. Nice cleanup.
             </div>
           )}
-          {remaining.map((cluster) => (
+          {remaining.map((cluster: any) => (
             <ClusterCard
               key={cluster.key}
               cluster={cluster}
               survivorId={selected[cluster.key]}
-              onPick={(id) => { hapticTap(); setSelected((s) => ({ ...s, [cluster.key]: id })) }}
+              onPick={(id: any) => { hapticTap(); setSelected((s: any) => ({ ...s, [cluster.key]: id })) }}
               onCommit={() => commitMerge(cluster)}
               busy={busyKey === cluster.key}
               disabled={!!busyKey && busyKey !== cluster.key}
@@ -187,7 +187,7 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
   )
 }
 
-function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }) {
+function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: any) {
   const matchedOn = cluster.matchedOn?.length ? cluster.matchedOn.join(' & ') : 'phone/email'
   return (
     <section style={{
@@ -214,7 +214,7 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }) 
         </span>
       </header>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {cluster.members.map((m, i) => {
+        {cluster.members.map((m: any, i: any) => {
           const isSurvivor = m.id === survivorId
           return (
             <li key={m.id}>

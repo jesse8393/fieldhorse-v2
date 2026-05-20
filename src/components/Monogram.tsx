@@ -1,7 +1,7 @@
 // Fieldhorse monogram — FH mark for app icon, push, loaders.
 // Scales from 16 → 1024. Gold on onyx with subtle radial glow.
 
-export default function Monogram({ size = 48, variant = 'dark', glow = true }) {
+export default function Monogram({ size = 48, variant = 'dark', glow = true }: any) {
   const bg = variant === 'dark' ? '#0B0B0B' : '#F2EDE4'
   const ink = variant === 'dark' ? '#F2EDE4' : '#0B0B0B'
   const gold = '#C7A45A'

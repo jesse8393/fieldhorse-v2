@@ -1,4 +1,4 @@
-// src/components/HomeActivityCard.jsx
+// src/components/HomeActivityCard.tsx
 //
 // Compact "recent activity" card for Home. Brings the cross-job feed
 // from /activity onto the dashboard surface — top 5 events + a
@@ -17,7 +17,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 
 const PER_SOURCE = 8
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, {
     style: 'currency', currency: 'USD',
@@ -25,9 +25,9 @@ function money(n) {
   })
 }
 
-function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
+function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
 
-const STAGE_TONE = {
+const STAGE_TONE: Record<string, any> = {
   closed: 'green',
   lost:   'red',
   invoice: 'gold',
@@ -36,10 +36,10 @@ const STAGE_TONE = {
   lead:   'neutral'
 }
 
-function relTime(d) {
+function relTime(d: any) {
   if (!d) return ''
   const now = new Date()
-  const diffMs = now - d
+  const diffMs = now.getTime() - new Date(d).getTime()
   const diffMin = Math.floor(diffMs / 60000)
   if (diffMin < 1) return 'now'
   if (diffMin < 60) return `${diffMin}m`
@@ -52,7 +52,7 @@ function relTime(d) {
 
 export default function HomeActivityCard() {
   const { user } = useAuth()
-  const [events, setEvents] = useState(null)
+  const [events, setEvents] = useState<any>(null)
 
   useEffect(() => {
     if (!user?.id) return
@@ -110,9 +110,9 @@ export default function HomeActivityCard() {
         const kindStr = p.kind && p.kind !== 'other' ? ` · ${p.kind}` : ''
         out.push({
           id: `p:${p.id}`,
-          when: new Date(p.paid_on || p.created_at),
+          when: new Date((p.paid_on || p.created_at) as any),
           contactId: p.contact_id,
-          contact: byId.get(p.contact_id),
+          contact: byId.get(p.contact_id as string),
           icon: DollarSign,
           tone: 'green',
           title: `${money(p.amount)} received${kindStr}`
@@ -148,7 +148,7 @@ export default function HomeActivityCard() {
 
       const sorted = out
         .filter((e) => e.when instanceof Date && !Number.isNaN(e.when.getTime()))
-        .sort((a, b) => b.when - a.when)
+        .sort((a: any, b: any) => b.when.getTime() - a.when.getTime())
         .slice(0, 5)
       setEvents(sorted)
     })()
@@ -195,20 +195,20 @@ export default function HomeActivityCard() {
         </Link>
       </header>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {events.map((e, i) => <Row key={e.id} event={e} isLast={i === events.length - 1} />)}
+        {events.map((e: any, i: any) => <Row key={e.id} event={e} isLast={i === events.length - 1} />)}
       </ul>
     </section>
   )
 }
 
-function Row({ event, isLast }) {
+function Row({ event, isLast }: any) {
   const Icon = event.icon
   const palette = ({
     neutral: { bg: 'rgba(255,255,255,0.06)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' },
     gold:    { bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', fg: 'var(--v3-primary-bright)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
     green:   { bg: 'rgba(74,222,128,0.10)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74,222,128,0.30)' },
     red:     { bg: 'rgba(232,90,87,0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232,90,87,0.30)' }
-  })[event.tone || 'neutral']
+  } as Record<string, any>)[event.tone || 'neutral']
   const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
 
   return (

@@ -17,8 +17,8 @@ const SkeletonBlock = SkeletonBlock_ as any
 const SkeletonList = SkeletonList_ as any
 import ActionSheet from '../../components/ActionSheet.tsx'
 import AddEventSheet from '../../components/AddEventSheet.tsx'
-import InvitePartnerSheet from '../../components/InvitePartnerSheet.jsx'
-import MarkCompleteSheet from '../../components/MarkCompleteSheet.jsx'
+import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
+import MarkCompleteSheet from '../../components/MarkCompleteSheet.tsx'
 import V3PaymentSheet from '../../components/V3PaymentSheet.jsx'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,

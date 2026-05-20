@@ -1,7 +1,7 @@
 // Designed empty state — SVG illustration, Bebas title, DM Sans subtitle,
 // optional engraved gold CTA. Use anywhere the list has nothing to show.
 
-const ICONS = {
+const ICONS: Record<string, any> = {
   pipeline: (
     <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="12" y="20" width="56" height="40" rx="2"/>
@@ -74,7 +74,7 @@ export default function EmptyState({
   sub,
   action,
   onAction
-}) {
+}: any) {
   return (
     <div className="fh-emptystate" role="status">
       <div className="fh-emptystate__glyph" aria-hidden="true">

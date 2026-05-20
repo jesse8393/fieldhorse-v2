@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { NotebookPen, Search } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import FieldhorseBadge from './FieldhorseBadge.jsx'
+import FieldhorseBadge from './FieldhorseBadge.tsx'
 import NotificationsBell from './NotificationsBell.jsx'
 
 function openPalette() {

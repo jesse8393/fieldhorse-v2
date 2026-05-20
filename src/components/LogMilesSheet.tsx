@@ -7,13 +7,13 @@ import { toastError } from '../lib/toast.ts'
 
 const IRS_RATE = 0.67
 
-export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }) {
+export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: any) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const [droveOn, setDroveOn] = useState(today)
   const [miles, setMiles] = useState('')
   const [purpose, setPurpose] = useState('')
   const [contactId, setContactId] = useState('')
-  const [contacts, setContacts] = useState([])
+  const [contacts, setContacts] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }) {
       .select('id, name')
       .eq('user_id', userId)
       .order('name', { ascending: true })
-      .then(({ data }) => setContacts(data || []))
+      .then(({ data }: any) => setContacts(data || []))
   }, [userId, open])
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }) {
   const deduction = milesNum * IRS_RATE
   const canSave = milesNum > 0 && !saving
 
-  async function submit(e) {
+  async function submit(e: any) {
     e?.preventDefault?.()
     if (!canSave || !userId) return
     setSaving(true)
