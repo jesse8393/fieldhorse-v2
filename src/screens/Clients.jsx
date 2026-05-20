@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
-import { supabase } from '../lib/supabase.js'
 import { useFhMotion } from '../lib/motion.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.js'
 import { findDuplicateClusters } from '../lib/clientMerge.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
@@ -26,8 +26,9 @@ function money(n) {
 export default function Clients() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { data: bundle, isLoading: loading } = useClientsBundle(user?.id)
+  const rows = bundle?.clients ?? []
+  const invalidateClients = useInvalidateClients()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all') // 'all' | 'active' | 'recent'
   const [addOpen, setAddOpen] = useState(false)
@@ -36,35 +37,13 @@ export default function Clients() {
   // Rollups computed live from jobs + payments instead of trusting the
   // stale fh_clients.total_lifetime_value / active_jobs_count columns.
   // Single source of truth shared with Client detail (rollups.js).
-  const [jobs, setJobs] = useState([])
-  const [payments, setPayments] = useState([])
+  // Both come from the same Query bundle as the client roster.
+  const jobs = bundle?.jobs ?? []
+  const payments = bundle?.payments ?? []
 
-  const load = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    const [{ data: clients }, { data: js }, { data: ps }] = await Promise.all([
-      supabase
-        .from('fh_clients')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('last_activity_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('fh_contacts')
-        .select('id, client_id, amount, stage')
-        .eq('user_id', user.id),
-      supabase
-        .from('fh_payments')
-        .select('contact_id, amount')
-        .eq('user_id', user.id)
-    ])
-    setRows(clients || [])
-    setJobs(js || [])
-    setPayments(ps || [])
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => { load() }, [load])
+  // After a save/merge, invalidate the clients query so the list +
+  // rollups refresh. Replaces the old load() refetch.
+  const load = invalidateClients
 
   // Map<client_id, { lifetime, outstanding, activeCount, ... }> — built
   // once per (jobs|payments) change. Per-row lookup is O(1).
