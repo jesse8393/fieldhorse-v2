@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon } from 'lucide-react'
-import Icon from './icons/Icon.jsx'
+import Icon from './icons/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
 
