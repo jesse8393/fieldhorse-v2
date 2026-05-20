@@ -34,7 +34,7 @@ import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
  * that the parent Clients screen already fetches.
  */
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
@@ -42,12 +42,12 @@ function money(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function clientInitials(name) {
+function clientInitials(name: any) {
   if (!name) return '·'
   return String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
 }
 
-function relative(date) {
+function relative(date: any) {
   if (!date) return null
   const d = date instanceof Date ? date : new Date(date)
   if (Number.isNaN(d.getTime())) return null
@@ -82,7 +82,7 @@ export default function DesktopClientsDirectory({
   totalLifetime,
   onOpenClient,
   onNewClient
-}) {
+}: any) {
   const [selectedId, setSelectedId] = useState(null)
   // Default selection follows the filtered list — top-of-list when
   // available, with a graceful fallback when the filter empties.
@@ -91,13 +91,13 @@ export default function DesktopClientsDirectory({
       setSelectedId(null)
       return
     }
-    if (!selectedId || !filtered.some((r) => r.id === selectedId)) {
+    if (!selectedId || !filtered.some((r: any) => r.id === selectedId)) {
       setSelectedId(filtered[0].id)
     }
   }, [filtered, selectedId])
 
   const selected = useMemo(
-    () => (selectedId ? filtered?.find((r) => r.id === selectedId) || null : null),
+    () => (selectedId ? filtered?.find((r: any) => r.id === selectedId) || null : null),
     [filtered, selectedId]
   )
 
@@ -150,7 +150,7 @@ export default function DesktopClientsDirectory({
       {/* KPI STRIP */}
       <div className="dt-clients__kpis">
         <KpiCard label="Lifetime billed" value={money(totalLifetime || 0)} sub={`across ${rows?.length || 0} ${rows?.length === 1 ? 'client' : 'clients'}`} />
-        <KpiCard label="Active jobs" value={String(screenStats?.activeAccounts || 0)} sub={`${(jobs || []).filter((j) => j.stage === 'job' || j.stage === 'invoice').length} in motion`} />
+        <KpiCard label="Active jobs" value={String(screenStats?.activeAccounts || 0)} sub={`${(jobs || []).filter((j: any) => j.stage === 'job' || j.stage === 'invoice').length} in motion`} />
         <KpiCard label="Outstanding" value={money(screenStats?.outstanding || 0)} sub={`${screenStats?.owesAccounts || 0} client${screenStats?.owesAccounts === 1 ? '' : 's'} owe`} tone={screenStats?.outstanding > 0 ? 'alert' : 'muted'} />
         <KpiCard label="Avg job size" value={money(avgJobSize)} sub={`across ${(jobs || []).length} ${(jobs || []).length === 1 ? 'job' : 'jobs'}`} />
       </div>
@@ -201,7 +201,7 @@ export default function DesktopClientsDirectory({
                 <p>No clients match.</p>
               </div>
             )}
-            {!loading && (filtered || []).map((c) => {
+            {!loading && (filtered || []).map((c: any) => {
               const r = rollupFor ? rollupFor(c.id) : { lifetime: 0, outstanding: 0, activeCount: 0 }
               const isSelected = c.id === selectedId
               const isTop = c.id === topClientId
@@ -260,7 +260,7 @@ export default function DesktopClientsDirectory({
   )
 }
 
-function KpiCard({ label, value, sub, tone }) {
+function KpiCard({ label, value, sub, tone }: any) {
   return (
     <div className={`dt-card dt-kpi${tone === 'alert' ? ' dt-kpi--alert' : ''}`}>
       <span className="dt-kpi__label">{label}</span>
@@ -270,9 +270,9 @@ function KpiCard({ label, value, sub, tone }) {
   )
 }
 
-function DetailContent({ client, rollup, jobs, onOpenClient }) {
+function DetailContent({ client, rollup, jobs, onOpenClient }: any) {
   const r = rollup || { lifetime: 0, outstanding: 0, activeCount: 0 }
-  const totalAmt = (jobs || []).reduce((s, j) => s + Number(j.amount || 0), 0)
+  const totalAmt = (jobs || []).reduce((s: any, j: any) => s + Number(j.amount || 0), 0)
   const avgMargin = null  // FieldHorse doesn't track per-job cost yet — omit field.
   return (
     <div className="dt-clients__detail-inner">
@@ -314,7 +314,7 @@ function DetailContent({ client, rollup, jobs, onOpenClient }) {
           <p className="dt-clients__detail-empty-line">No jobs linked yet.</p>
         ) : (
           <ul className="dt-clients__detail-job-list">
-            {(jobs || []).slice(0, 6).map((j) => (
+            {(jobs || []).slice(0, 6).map((j: any) => (
               <li key={j.id} className="dt-clients__detail-job-row">
                 <div>
                   <span className="dt-clients__detail-job-name">
@@ -368,7 +368,7 @@ function DetailContent({ client, rollup, jobs, onOpenClient }) {
   )
 }
 
-function MiniStat({ label, value }) {
+function MiniStat({ label, value }: any) {
   return (
     <div className="dt-mini-stat">
       <span className="dt-mini-stat__l">{label}</span>

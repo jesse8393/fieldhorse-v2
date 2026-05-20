@@ -12,7 +12,7 @@ import { findDuplicateClusters } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.jsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
-import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.jsx'
+import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
 function money(n) {

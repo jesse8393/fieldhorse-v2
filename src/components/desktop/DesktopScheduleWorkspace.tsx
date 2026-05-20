@@ -33,21 +33,21 @@ import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
  * collapses to a phone-shaped column.
  */
 
-function startOfDay(d) {
+function startOfDay(d: any) {
   const x = new Date(d)
   x.setHours(0, 0, 0, 0)
   return x
 }
 
-function dayLabel(d, opts = {}) {
+function dayLabel(d: any, opts: any = {}) {
   return new Date(d).toLocaleDateString(undefined, opts)
 }
 
-function timeLabel(d) {
+function timeLabel(d: any) {
   return new Date(d).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-function eventStartMs(evt) {
+function eventStartMs(evt: any) {
   if (!evt) return 0
   const t = evt.start_at || evt.starts_at || evt.scheduled_at || evt.start_date || evt.date
   if (!t) return 0
@@ -55,13 +55,13 @@ function eventStartMs(evt) {
   return Number.isFinite(ms) ? ms : 0
 }
 
-function isSameDay(a, b) {
+function isSameDay(a: any, b: any) {
   const da = startOfDay(a)
   const db = startOfDay(b)
   return da.getTime() === db.getTime()
 }
 
-function buildWeekStrip(cursor) {
+function buildWeekStrip(cursor: any) {
   const start = startOfDay(cursor)
   start.setDate(start.getDate() - start.getDay())  // Sunday-anchored week
   return Array.from({ length: 7 }).map((_, i) => {
@@ -80,7 +80,7 @@ export default function DesktopScheduleWorkspace({
   view,
   setView,
   onAddEvent
-}) {
+}: any) {
   const today = useMemo(() => startOfDay(new Date()), [])
   const week = useMemo(() => buildWeekStrip(cursor || today), [cursor, today])
 
@@ -117,12 +117,12 @@ export default function DesktopScheduleWorkspace({
       .slice(0, 6)
       .map(([key, evts]) => ({
         date: new Date(key),
-        events: evts.sort((a, b) => eventStartMs(a) - eventStartMs(b))
+        events: evts.sort((a: any, b: any) => eventStartMs(a) - eventStartMs(b))
       }))
     return buckets
   }, [upcoming, cursor, today])
 
-  function shiftDay(delta) {
+  function shiftDay(delta: any) {
     const next = new Date(cursor || today)
     next.setDate(next.getDate() + delta)
     setCursor(startOfDay(next))
@@ -228,7 +228,7 @@ export default function DesktopScheduleWorkspace({
                   {dayLabel(bucket.date, { weekday: 'short', month: 'short', day: 'numeric' })}
                 </span>
                 <ul className="dt-schedule__rail-list">
-                  {bucket.events.slice(0, 3).map((evt) => (
+                  {bucket.events.slice(0, 3).map((evt: any) => (
                     <li key={evt.id} className="dt-schedule__rail-item">
                       <span className="dt-schedule__rail-time">{timeLabel(eventStartMs(evt))}</span>
                       <span className="dt-schedule__rail-name">
@@ -249,7 +249,7 @@ export default function DesktopScheduleWorkspace({
   )
 }
 
-function DayEventRow({ event }) {
+function DayEventRow({ event }: any) {
   const ms = eventStartMs(event)
   const time = ms ? timeLabel(ms) : '—'
   const title = event.title || event.contact_name || event.fh_contacts?.name || 'Event'

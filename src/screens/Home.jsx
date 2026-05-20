@@ -31,7 +31,7 @@ import { hapticTap } from '../lib/haptics.ts'
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
 import { fetchCoverPhotosByJob } from '../lib/photos.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import DesktopHomeCommandCenter from '../components/desktop/DesktopHomeCommandCenter.jsx'
+import DesktopHomeCommandCenter from '../components/desktop/DesktopHomeCommandCenter.tsx'
 
 /* ----------------- helpers ----------------- */
 

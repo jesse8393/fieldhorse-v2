@@ -6,11 +6,18 @@ import {
 } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
 import { stageColor } from '../../lib/stages.ts'
-import OverviewTab from '../../screens/ContactDetail/tabs/Overview.jsx'
-import QuoteTab from '../../screens/ContactDetail/tabs/Quote.jsx'
-import DetailsTab from '../../screens/ContactDetail/tabs/Details.jsx'
-import FinancialsTab from '../../screens/ContactDetail/tabs/Financials.jsx'
-import FilesTab from '../../screens/ContactDetail/tabs/Files.jsx'
+import OverviewTab_ from '../../screens/ContactDetail/tabs/Overview.jsx'
+import QuoteTab_ from '../../screens/ContactDetail/tabs/Quote.jsx'
+import DetailsTab_ from '../../screens/ContactDetail/tabs/Details.jsx'
+import FinancialsTab_ from '../../screens/ContactDetail/tabs/Financials.jsx'
+import FilesTab_ from '../../screens/ContactDetail/tabs/Files.jsx'
+// Aliased as any-prop until the ContactDetail tabs are converted to .tsx
+// with optional props; these desktop usages pass a subset by design.
+const OverviewTab = OverviewTab_ as any
+const QuoteTab = QuoteTab_ as any
+const DetailsTab = DetailsTab_ as any
+const FinancialsTab = FinancialsTab_ as any
+const FilesTab = FilesTab_ as any
 
 /**
  * DesktopJobDetail — Phase 8 desktop composition for /jobs/:id at >=900px.
@@ -52,7 +59,7 @@ const TABS = [
   { id: 'files',      label: 'Files' }
 ]
 
-const STAGE_LABEL = {
+const STAGE_LABEL: Record<string, string> = {
   lead:    'Lead',
   quote:   'Quote',
   job:     'Active',
@@ -62,22 +69,22 @@ const STAGE_LABEL = {
   lost:    'Lost'
 }
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
-function shortMoney(n) {
+function shortMoney(n: any) {
   const v = Number(n || 0)
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
   if (v >= 10_000) return `$${Math.round(v / 1_000)}K`
   return money(v)
 }
-function initials(name) {
+function initials(name: any) {
   if (!name) return '·'
   return String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
 }
 
-function nextScheduleEvent(scheduleItems) {
+function nextScheduleEvent(scheduleItems: any) {
   if (!Array.isArray(scheduleItems)) return null
   const now = Date.now()
   const upcoming = scheduleItems
@@ -100,7 +107,7 @@ export default function DesktopJobDetail({
   userId, isEditing, fetchAll, patch,
   onBack, onEdit, onMarkLost, onDelete, onClientNav, onTodoDone,
   onOpenLogPayment, onOpenAddEvent, onOpenInvitePartner, onOpenApproveQuote
-}) {
+}: any) {
   const contractValue = Number(contact?.amount || 0)
   const stageKey = String(contact?.stage || 'lead').toLowerCase()
   const stageLabel = STAGE_LABEL[stageKey] || stageKey
@@ -347,7 +354,7 @@ export default function DesktopJobDetail({
   )
 }
 
-function FinCell({ label, value, sub, progress, tone }) {
+function FinCell({ label, value, sub, progress, tone }: any) {
   return (
     <div className={`dt-jobdetail__fincell${tone === 'alert' ? ' dt-jobdetail__fincell--alert' : ''}`}>
       <span className="dt-jobdetail__fincell-label">{label}</span>
@@ -362,7 +369,7 @@ function FinCell({ label, value, sub, progress, tone }) {
   )
 }
 
-function NextActionCard({ nextAction, nextTodo, onTodoDone, onOpenAddEvent, onOpenApproveQuote, stage, onGoToQuote }) {
+function NextActionCard({ nextAction, nextTodo, onTodoDone, onOpenAddEvent, onOpenApproveQuote, stage, onGoToQuote }: any) {
   // Surface whichever action the resolver picked. Fall back to a stage-
   // aware default so the rail never reads "no next action".
   const action = nextAction || (() => {
@@ -402,7 +409,7 @@ function NextActionCard({ nextAction, nextTodo, onTodoDone, onOpenAddEvent, onOp
   )
 }
 
-function ClientCard({ contact, clientSummary, phoneHref, smsHref, emailHref, onClientNav, onOpenInvitePartner }) {
+function ClientCard({ contact, clientSummary, phoneHref, smsHref, emailHref, onClientNav, onOpenInvitePartner }: any) {
   const name = clientSummary?.name || contact?.name || '—'
   return (
     <section className="dt-card dt-jobdetail__rail-card" aria-label="Client">
@@ -458,7 +465,7 @@ function ClientCard({ contact, clientSummary, phoneHref, smsHref, emailHref, onC
   )
 }
 
-function ScheduleCard({ scheduleItems, scheduleCount, onOpenAddEvent }) {
+function ScheduleCard({ scheduleItems, scheduleCount, onOpenAddEvent }: any) {
   const upcoming = useMemo(() => {
     if (!Array.isArray(scheduleItems)) return []
     const now = Date.now()
@@ -481,7 +488,7 @@ function ScheduleCard({ scheduleItems, scheduleCount, onOpenAddEvent }) {
         <p className="dt-jobdetail__rail-empty">No upcoming events.</p>
       ) : (
         <ul className="dt-jobdetail__sched-list">
-          {upcoming.map(({ evt, ms }) => (
+          {upcoming.map(({ evt, ms }: any) => (
             <li key={evt.id} className="dt-jobdetail__sched-row">
               <span className="dt-jobdetail__sched-time">
                 {new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
@@ -504,7 +511,7 @@ function ScheduleCard({ scheduleItems, scheduleCount, onOpenAddEvent }) {
   )
 }
 
-function BalanceCard({ balance, paid, contract, onLogPayment }) {
+function BalanceCard({ balance, paid, contract, onLogPayment }: any) {
   const pct = contract > 0 ? Math.min(100, Math.round((Number(paid || 0) / contract) * 100)) : 0
   return (
     <section className="dt-card dt-jobdetail__rail-card dt-jobdetail__rail-card--alert" aria-label="Balance owed">
