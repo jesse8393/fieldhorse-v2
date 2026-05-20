@@ -1055,3 +1055,74 @@ export function useCoverPhotos(userId: string | undefined) {
     enabled: !!userId
   })
 }
+
+// ---- Invoices & Payments overview (all invoices across jobs) ----
+export type InvoiceRow = {
+  id: string
+  contactId: string | null
+  name: string | null
+  email: string | null
+  amount: number
+  status: string
+  issuedAt: string | null
+  dueAt: string | null
+  sequence: number | null
+  ageDays: number
+}
+export type InvoicesOverview = {
+  invoices: InvoiceRow[]
+  totalOutstanding: number
+  current: number
+  late: number
+  overdue: number
+  collectedThisMonth: number
+  outstandingCount: number
+}
+
+export function useInvoicesOverview(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['invoicesOverview', userId],
+    queryFn: async (): Promise<InvoicesOverview> => {
+      const [invRes, payRes] = await Promise.all([
+        supabase.from('fh_invoices').select('id, contact_id, amount, status, issued_at, due_at, sequence_number, fh_contacts(name, email)').eq('user_id', userId as string).order('issued_at', { ascending: false }),
+        supabase.from('fh_payments').select('amount, paid_on').eq('user_id', userId as string)
+      ])
+      const now = Date.now()
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const invoices: InvoiceRow[] = ((invRes.data ?? []) as any[]).map((i) => {
+        const issued = i.issued_at ? new Date(i.issued_at).getTime() : now
+        return {
+          id: i.id, contactId: i.contact_id, name: i.fh_contacts?.name ?? null, email: i.fh_contacts?.email ?? null,
+          amount: Number(i.amount || 0), status: i.status || 'draft', issuedAt: i.issued_at, dueAt: i.due_at,
+          sequence: i.sequence_number ?? null, ageDays: Math.max(0, Math.floor((now - issued) / 86400000))
+        }
+      })
+      let current = 0, late = 0, overdue = 0, totalOutstanding = 0
+      for (const inv of invoices) {
+        if (inv.status === 'paid' || inv.status === 'void') continue
+        totalOutstanding += inv.amount
+        if (inv.ageDays <= 30) current += inv.amount
+        else if (inv.ageDays <= 60) late += inv.amount
+        else overdue += inv.amount
+      }
+      const collectedThisMonth = ((payRes.data ?? []) as any[]).reduce((s, p) => {
+        const d = p.paid_on ? new Date(p.paid_on).getTime() : 0
+        return d >= monthStart.getTime() ? s + Number(p.amount || 0) : s
+      }, 0)
+      return {
+        invoices, totalOutstanding, current, late, overdue, collectedThisMonth,
+        outstandingCount: invoices.filter((i) => i.status !== 'paid' && i.status !== 'void').length
+      }
+    },
+    enabled: !!userId
+  })
+}
+
+export function useMarkInvoicePaid() {
+  const client = useQueryClient()
+  return async (input: { id: string; userId: string }) => {
+    const { error } = await supabase.from('fh_invoices').update({ status: 'paid' } as any).eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
+    return { error }
+  }
+}
