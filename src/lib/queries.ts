@@ -367,3 +367,51 @@ export function useInvalidateSubs() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: ['subs'] })
 }
+
+// ---- Notes ----
+// The 80 most recent notes plus a slim contacts list (id/name) used to
+// tag a note to a job. Bundled so the screen keeps one loading flag.
+// The screen mutates optimistically via setQueryData (see useNotesBundle
+// callers), so the cache is the single source of truth.
+
+export type Note = Database['public']['Tables']['fh_notes']['Row']
+export type NoteContact = Pick<Contact, 'id' | 'name'>
+
+export type NotesBundle = {
+  notes: Note[]
+  contacts: NoteContact[]
+}
+
+async function fetchNotesBundle(userId: string): Promise<NotesBundle> {
+  const [notesRes, contactsRes] = await Promise.all([
+    supabase
+      .from('fh_notes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(80),
+    supabase
+      .from('fh_contacts')
+      .select('id, name')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+  ])
+  if (notesRes.error) throw notesRes.error
+  if (contactsRes.error) throw contactsRes.error
+  return {
+    notes: (notesRes.data ?? []) as Note[],
+    contacts: (contactsRes.data ?? []) as NoteContact[]
+  }
+}
+
+export function notesKey(userId: string | undefined) {
+  return ['notes', userId] as const
+}
+
+export function useNotesBundle(userId: string | undefined) {
+  return useQuery({
+    queryKey: notesKey(userId),
+    queryFn: () => fetchNotesBundle(userId as string),
+    enabled: !!userId
+  })
+}
