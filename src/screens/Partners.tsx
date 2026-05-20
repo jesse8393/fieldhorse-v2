@@ -1,4 +1,4 @@
-// src/screens/Partners.jsx
+// src/screens/Partners.tsx
 //
 // Partner roster across every job. Each card represents one partner
 // (deduped by normalized email) and lists every job they're on with a
@@ -30,12 +30,12 @@ import { stageColor } from '../lib/stages.ts'
 
 const STATUS_FILTERS = [
   { id: 'all',      label: 'All',      match: () => true },
-  { id: 'pending',  label: 'Pending',  match: (p) => p.status === 'pending' },
-  { id: 'accepted', label: 'Accepted', match: (p) => p.status === 'accepted' },
-  { id: 'revoked',  label: 'Revoked',  match: (p) => p.status === 'revoked' }
+  { id: 'pending',  label: 'Pending',  match: (p: any) => p.status === 'pending' },
+  { id: 'accepted', label: 'Accepted', match: (p: any) => p.status === 'accepted' },
+  { id: 'revoked',  label: 'Revoked',  match: (p: any) => p.status === 'revoked' }
 ]
 
-function relTime(input) {
+function relTime(input: any) {
   if (!input) return ''
   const d = input instanceof Date ? input : new Date(input)
   if (Number.isNaN(d.getTime())) return ''
@@ -53,7 +53,7 @@ export default function Partners() {
   const { data: rows = [], isLoading: loading } = usePartnerDirectory(user?.id)
   const load = useInvalidatePartners()
   const [filter, setFilter] = useState('all')
-  const [busyKey, setBusyKey] = useState(null)
+  const [busyKey, setBusyKey] = useState<any>(null)
 
   const counts = useMemo(() => ({
     all: rows.length,
@@ -67,7 +67,7 @@ export default function Partners() {
     return cfg ? rows.filter(cfg.match) : rows
   }, [rows, filter])
 
-  async function resend(partner, job) {
+  async function resend(partner: any, job: any) {
     if (!user?.id || !job?.id) return
     const key = `${partner.email}|${job.partnerId}`
     setBusyKey(key)
@@ -94,7 +94,7 @@ export default function Partners() {
       } else {
         toastInfo('Link refreshed', 'Email sender skipped — share manually from the job sheet.')
       }
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't resend", err?.message || 'Unknown error')
     } finally {
@@ -102,8 +102,8 @@ export default function Partners() {
     }
   }
 
-  async function revoke(partner) {
-    const active = partner.jobs.filter((j) => j.status !== 'revoked')
+  async function revoke(partner: any) {
+    const active = partner.jobs.filter((j: any) => j.status !== 'revoked')
     if (active.length === 0) return
     const ok = await confirm({
       title: `Revoke ${partner.name || partner.email}?`,
@@ -120,7 +120,7 @@ export default function Partners() {
       hapticSuccess()
       toastSuccess('Access revoked', `${partner.email} removed from ${active.length} ${active.length === 1 ? 'job' : 'jobs'}.`)
       await load()
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't revoke", err?.message || 'Unknown error')
     } finally {
@@ -174,7 +174,7 @@ export default function Partners() {
               key={f.id}
               size="sm"
               active={filter === f.id}
-              count={counts[f.id]}
+              count={(counts as any)[f.id]}
               onClick={() => { hapticTap(); setFilter(f.id) }}
             >
               {f.label}
@@ -228,21 +228,21 @@ export default function Partners() {
   )
 }
 
-function Metric({ label, tone = 'default', children }) {
+function Metric({ label, tone = 'default', children }: any) {
   const color = tone === 'good' ? 'var(--v3-good, #6FB387)'
     : tone === 'gold' ? 'var(--v3-primary-bright)'
     : 'var(--v3-text)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
-      <StampNumber size="lg" tone={tone === 'gold' ? 'gold' : tone === 'good' ? 'good' : 'default'} style={{ color }}>
+      <StampNumber size="lg" tone={(tone === 'gold' ? 'gold' : tone === 'good' ? 'good' : 'default') as any} style={{ color }}>
         {children}
       </StampNumber>
     </div>
   )
 }
 
-function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }) {
+function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
   const initial = (partner.name || partner.email).charAt(0).toUpperCase()
   return (
     <li>
@@ -307,7 +307,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }) {
 
         {/* Jobs list */}
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {partner.jobs.map((j) => {
+          {partner.jobs.map((j: any) => {
             const k = `${partner.email}|${j.partnerId}`
             const isResending = resendingKey === k
             return (
@@ -383,7 +383,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }) {
             <Clock size={11} aria-hidden="true" />
             Last invited {relTime(partner.lastInvitedAt) || '—'}
           </span>
-          {partner.jobs.some((j) => j.status !== 'revoked') && (
+          {partner.jobs.some((j: any) => j.status !== 'revoked') && (
             <button
               type="button"
               onClick={() => onRevoke(partner)}
@@ -410,7 +410,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }) {
   )
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status }: any) {
   const palette = status === 'accepted'
     ? { bg: 'rgba(72, 130, 95, 0.14)', border: 'rgba(72, 130, 95, 0.45)', color: 'var(--v3-good, #6FB387)' }
     : status === 'revoked'
@@ -431,7 +431,7 @@ function StatusBadge({ status }) {
   )
 }
 
-function iconBtnStyle(busy) {
+function iconBtnStyle(busy: any) {
   return {
     width: 32, height: 32, borderRadius: 10,
     background: 'var(--v3-surface-2)',

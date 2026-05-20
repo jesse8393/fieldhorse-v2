@@ -29,7 +29,7 @@ const CLEANUP_TABLES = [
   'fh_contacts'
 ]
 
-const DEV_BUILD = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
+const DEV_BUILD = typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.DEV
 
 export default function Settings() {
   const { user, signOut } = useAuth()
@@ -82,20 +82,20 @@ export default function Settings() {
     setWiping(true)
     setWipeResult('')
     try {
-      const counts = {}
+      const counts: Record<string, number> = {}
       for (const table of CLEANUP_TABLES) {
         const { error, count } = await supabase
-          .from(table)
+          .from(table as any)
           .delete({ count: 'exact' })
           .eq('user_id', user.id)
         if (error) throw new Error(`${table}: ${error.message}`)
         counts[table] = count ?? 0
       }
-      const total = Object.values(counts).reduce((a, b) => a + b, 0)
+      const total = Object.values(counts).reduce((a: any, b: any) => a + b, 0)
       setWipeResult(`Cleared ${total} rows across ${CLEANUP_TABLES.length} tables.`)
       toastSuccess(`Cleared ${total} rows`, 'All test data wiped')
       setConfirmWipe(false)
-    } catch (e) {
+    } catch (e: any) {
       setWipeResult(`Wipe failed: ${e.message}`)
     } finally {
       setWiping(false)
@@ -129,7 +129,7 @@ export default function Settings() {
     refresh()
   }
 
-  function toggleService(s) {
+  function toggleService(s: any) {
     setServices((arr) => arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s])
   }
 
@@ -139,7 +139,7 @@ export default function Settings() {
     // checks. company_name keeps its existing trim-and-pass behavior so
     // legacy callers (Invoices, Quote PDF) continue reading a non-null
     // string even if the operator clears the input briefly.
-    const nullIfBlank = (s) => {
+    const nullIfBlank = (s: any) => {
       const t = (s || '').trim()
       return t.length === 0 ? null : t
     }
@@ -257,7 +257,7 @@ export default function Settings() {
             logoUrl={profile?.logo_url}
             companyName={profile?.company_name}
             fullName={profile?.full_name}
-            onSaved={async (url) => {
+            onSaved={async (url: any) => {
               await upsertProfile({ logo_url: url, logo_uploaded_at: new Date().toISOString() })
               refresh()
             }}
@@ -605,7 +605,7 @@ export default function Settings() {
   )
 }
 
-function Section({ variants, title, sub, meta, metaTone, children }) {
+function Section({ variants, title, sub, meta, metaTone, children }: any) {
   const metaBg = metaTone === 'red'
     ? { background: 'var(--v3-danger-soft)', border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)', color: 'var(--v3-danger-bright)' }
     : { background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
@@ -650,11 +650,11 @@ function Section({ variants, title, sub, meta, metaTone, children }) {
   )
 }
 
-function renderSectionTitle(node) {
+function renderSectionTitle(node: any) {
   // node is a React fragment with <em> around the accent word.
   // Wrap the <em> in a span with the italic gradient class so the rendered word is gold-italic.
   if (node && node.props && Array.isArray(node.props.children)) {
-    return node.props.children.map((child, i) => {
+    return node.props.children.map((child: any, i: any) => {
       if (child && child.type === 'em') {
         return <span key={i}>{child.props.children}</span>
       }
@@ -664,7 +664,7 @@ function renderSectionTitle(node) {
   return node
 }
 
-function Meta({ label, value }) {
+function Meta({ label, value }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', minWidth: 80 }}>
       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</span>
@@ -673,7 +673,7 @@ function Meta({ label, value }) {
   )
 }
 
-function BrandField({ label, hint, optional, children }) {
+function BrandField({ label, hint, optional, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -709,7 +709,7 @@ function BrandField({ label, hint, optional, children }) {
   )
 }
 
-const brandInputStyle = {
+const brandInputStyle: import('react').CSSProperties = {
   padding: '11px 14px',
   borderRadius: 12,
   background: 'var(--surface-2)',
@@ -739,7 +739,7 @@ const COLOR_PRESETS = [
   { hex: '#1A1814', name: 'Onyx' }
 ]
 
-function BrandColorEditor({ value, onChange, companyName }) {
+function BrandColorEditor({ value, onChange, companyName }: any) {
   const v = (value || '').trim()
   const isHex = /^#[0-9a-fA-F]{6}$/.test(v)
   const previewColor = isHex ? v : '#C8A154'

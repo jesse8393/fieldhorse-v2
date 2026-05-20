@@ -47,17 +47,17 @@ export default function Notes() {
   const [contactId, setContactId] = useState('')
   const [saving, setSaving] = useState(false)
   const [parsing, setParsing] = useState(false)
-  const [parsed, setParsed] = useState(null)
+  const [parsed, setParsed] = useState<any>(null)
   const [parseError, setParseError] = useState('')
   const [voiceState, setVoiceState] = useState('idle') // idle | listening | error
   const [focused, setFocused] = useState(false)
-  const recognitionRef = useRef(null)
+  const recognitionRef = useRef<any>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Optimistic local edits write straight to the cached notes array so
   // the feed updates without a refetch; the cache is the source of truth.
-  const patchNotes = (fn) =>
-    queryClient.setQueryData(notesKey(user?.id), (prev) =>
+  const patchNotes = (fn: any) =>
+    queryClient.setQueryData(notesKey(user?.id), (prev: any) =>
       prev ? { ...prev, notes: fn(prev.notes) } : prev)
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function Notes() {
   }, [])
 
   function startVoice() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR) {
       setVoiceState('error')
       return
@@ -79,7 +79,7 @@ export default function Notes() {
     rec.continuous = true
     rec.interimResults = true
     rec.lang = 'en-US'
-    rec.onresult = (e) => {
+    rec.onresult = (e: any) => {
       let chunk = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
         chunk += e.results[i][0].transcript
@@ -113,7 +113,7 @@ export default function Notes() {
       if (!match) throw new Error('AI returned no structured response')
       const obj = JSON.parse(match[0])
       setParsed(obj)
-    } catch (e) {
+    } catch (e: any) {
       console.error('[notes] parse failed:', e)
       setParsed(null)
       const msg = String(e?.message || '').toLowerCase()
@@ -145,30 +145,30 @@ export default function Notes() {
       setDraft('')
       setParsed(null)
       setContactId('')
-      patchNotes((n) => [data, ...n])
+      patchNotes((n: any) => [data, ...n])
       toastSuccess('Note saved', 'Synced across devices')
     }
   }
 
-  async function markDone(id) {
+  async function markDone(id: any) {
     if (!user) return
     await supabase.from('fh_notes').update({ done: true }).eq('id', id).eq('user_id', user.id)
-    patchNotes((n) => n.filter((x) => x.id !== id))
+    patchNotes((n: any) => n.filter((x: any) => x.id !== id))
   }
 
-  async function remove(id) {
+  async function remove(id: any) {
     if (!user) return
     const snapshot = notes.find((n) => n.id === id)
     const { error } = await supabase.from('fh_notes').delete().eq('id', id).eq('user_id', user.id)
     if (error) { toastError("Couldn't delete", error.message); return }
-    patchNotes((n) => n.filter((x) => x.id !== id))
+    patchNotes((n: any) => n.filter((x: any) => x.id !== id))
     toastUndo('Note deleted', {
-      description: snapshot?.parsed?.summary || (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
+      description: (snapshot as any)?.parsed?.summary || (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_notes').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
-        patchNotes((n) => [snapshot, ...n])
+        patchNotes((n: any) => [snapshot, ...n])
         toastSuccess('Restored', '')
       }
     })
@@ -195,14 +195,14 @@ export default function Notes() {
     for (const n of notes) {
       const ts = n?.created_at ? new Date(n.created_at).getTime() : 0
       if (ts && now - ts < day) recent24++
-      if (n?.parsed && (
-        n.parsed.summary ||
-        n.parsed.action_items?.length ||
-        n.parsed.risks?.length ||
-        n.parsed.follow_up_date ||
-        n.parsed.materials_needed?.length
+      if ((n as any)?.parsed && (
+        (n as any).parsed.summary ||
+        (n as any).parsed.action_items?.length ||
+        (n as any).parsed.risks?.length ||
+        (n as any).parsed.follow_up_date ||
+        (n as any).parsed.materials_needed?.length
       )) parsedCount++
-      if (n?.parsed?.risks?.length) riskCount++
+      if ((n as any)?.parsed?.risks?.length) riskCount++
     }
     return { total: notes.length, recent24, parsedCount, riskCount }
   }, [notes])
@@ -226,7 +226,7 @@ export default function Notes() {
   const actionItems = useMemo(() => {
     const out = []
     for (const n of notes) {
-      const items = n?.parsed?.action_items
+      const items = (n as any)?.parsed?.action_items
       if (Array.isArray(items)) {
         for (const txt of items) {
           out.push({ noteId: n.id, contactId: n.contact_id, text: txt, when: n.created_at })
@@ -573,7 +573,7 @@ export default function Notes() {
                 </button>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {g.items.slice(0, 3).map((n, i) => (
+                  {g.items.slice(0, 3).map((n: any, i: any) => (
                     <NoteCard
                       key={n.id}
                       note={n}
@@ -685,7 +685,7 @@ export default function Notes() {
    VoiceButton — capture-on/off toggle. Listening state turns the
    button danger-red so the operator can spot it from the corner.
    ============================================================ */
-function VoiceButton({ listening, onStart, onStop }) {
+function VoiceButton({ listening, onStart, onStop }: any) {
   return (
     <motion.button
       type="button"
@@ -728,12 +728,12 @@ function VoiceButton({ listening, onStart, onStop }) {
    Card has gold spine on the left (slightly stronger if AI-parsed),
    subtle hover lift, swipe actions for archive/delete on mobile.
    ============================================================ */
-function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArchive, onDelete }) {
+function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArchive, onDelete }: any) {
   const body = note.text || note.body || ''
-  const firstLine = (body.split('\n').find((l) => l.trim()) || '').trim()
+  const firstLine = (body.split('\n').find((l: any) => l.trim()) || '').trim()
   const title = note.parsed?.summary || firstLine.slice(0, 90) || 'Untitled note'
   const showBodyBelow = body && body.trim() !== title.trim()
-  const contact = contacts.find((c) => c.id === note.contact_id)
+  const contact = contacts.find((c: any) => c.id === note.contact_id)
   const hasParsed = !!(note.parsed && (
     note.parsed.summary ||
     note.parsed.action_items?.length ||
@@ -987,7 +987,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
    ParsedList — used inside the inline AI Summary card. One row
    per item type (action_items, risks, materials).
    ============================================================ */
-function ParsedList({ title, items, Icon, tone }) {
+function ParsedList({ title, items, Icon, tone }: any) {
   if (!items || items.length === 0) return null
   const color = tone === 'warn'
     ? 'var(--v3-danger-bright)'
@@ -1011,7 +1011,7 @@ function ParsedList({ title, items, Icon, tone }) {
         {title}
       </div>
       <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-        {items.map((it, i) => <li key={i} style={{ marginBottom: 2 }}>{it}</li>)}
+        {items.map((it: any, i: any) => <li key={i} style={{ marginBottom: 2 }}>{it}</li>)}
       </ul>
     </div>
   )
@@ -1022,7 +1022,7 @@ function ParsedList({ title, items, Icon, tone }) {
    summary panel. Display number over a small uppercase label.
    tone "gold" for AI count, "alert" for non-zero risks.
    ============================================================ */
-function CockpitStat({ label, value, tone = 'default' }) {
+function CockpitStat({ label, value, tone = 'default' }: any) {
   const color = tone === 'gold'
     ? 'var(--v3-primary)'
     : tone === 'alert'
@@ -1053,7 +1053,7 @@ function CockpitDivider() {
    formatRelativeTime — "Just now", "2h ago", "Yesterday",
    "Apr 24" / "Apr 24, 2025" depending on age. Used in NoteCard.
    ============================================================ */
-function formatRelativeTime(iso) {
+function formatRelativeTime(iso: any) {
   if (!iso) return ''
   const d = new Date(iso)
   const now = new Date()

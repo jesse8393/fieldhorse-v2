@@ -28,11 +28,11 @@ const VIEWS = [
   { value: 'month', label: 'Month' }
 ]
 
-function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x }
-function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x }
-function sameDay(a, b) { return a.toDateString() === b.toDateString() }
-function fmtDate(d) { return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }
-function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '' }
+function startOfDay(d: any) { const x = new Date(d); x.setHours(0,0,0,0); return x }
+function addDays(d: any, n: any) { const x = new Date(d); x.setDate(x.getDate() + n); return x }
+function sameDay(a: any, b: any) { return a.toDateString() === b.toDateString() }
+function fmtDate(d: any) { return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }
+function fmtTime(iso: any) { return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '' }
 
 export default function Schedule() {
   const { user } = useAuth()
@@ -96,12 +96,12 @@ export default function Schedule() {
   const load = invalidateSchedule
   const loadUpcoming = invalidateSchedule
 
-  const [weather, setWeather] = useState(null)
+  const [weather, setWeather] = useState<any>(null)
   const [addOpen, setAddOpen] = useState(false)
   // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
   // event row being deleted (for title display); deletingEvt is the
   // commit-in-flight flag.
-  const [pendingDeleteEvt, setPendingDeleteEvt] = useState(null)
+  const [pendingDeleteEvt, setPendingDeleteEvt] = useState<any>(null)
   const [deletingEvt, setDeletingEvt] = useState(false)
 
   // If the URL had ?d=YYYY-MM-DD, consume it once so the back button
@@ -118,7 +118,7 @@ export default function Schedule() {
   // Resolve the event row from id and open the destructive-confirm sheet.
   // Both DayView and WeekView delete affordances funnel through here so
   // the confirm UX is consistent and lifted out of the row components.
-  function requestDeleteEvent(evtId) {
+  function requestDeleteEvent(evtId: any) {
     if (!evtId) return
     const row = (events || []).find((e) => e.id === evtId)
       || (upcoming || []).find((e) => e.id === evtId)
@@ -126,12 +126,12 @@ export default function Schedule() {
     setPendingDeleteEvt(row)
   }
 
-  async function deleteEvent(evtId) {
+  async function deleteEvent(evtId: any) {
     if (!evtId) return
     // Snapshot before deletion so Undo can re-insert. Strip generated
     // fields and the joined relation; only re-insert the source row.
-    const snapshot = events.find((e) => e.id === evtId) || upcoming.find((e) => e.id === evtId)
-    const { error } = await supabase.from('fh_schedule').delete().eq('id', evtId).eq('user_id', user.id)
+    const snapshot = (events || []).find((e: any) => e.id === evtId) || (upcoming || []).find((e: any) => e.id === evtId)
+    const { error } = await supabase.from('fh_schedule').delete().eq("id", evtId).eq("user_id", user!.id)
     if (error) {
       toastError("Couldn't delete", error.message)
       return
@@ -158,10 +158,10 @@ export default function Schedule() {
 
   useEffect(() => {
     if (!hasCoords) return
-    getWeather(profile.location_lat, profile.location_lon).then(setWeather).catch(() => {})
+    getWeather(profile.location_lat as any, profile.location_lon as any).then(setWeather).catch(() => {})
   }, [hasCoords, profile?.location_lat, profile?.location_lon])
 
-  function shift(n) {
+  function shift(n: any) {
     if (view === 'day') setCursor((d) => addDays(d, n))
     else setCursor((d) => addDays(d, 7 * n))
   }
@@ -170,7 +170,7 @@ export default function Schedule() {
   // keeping the day-of-month if it exists in the new month, else the last
   // day. The week strip below the nav re-anchors automatically because
   // cursor changed.
-  function shiftMonth(n) {
+  function shiftMonth(n: any) {
     setCursor((d) => {
       const next = new Date(d.getFullYear(), d.getMonth() + n, 1)
       const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
@@ -194,7 +194,7 @@ export default function Schedule() {
   const dailyForecast = useMemo(() => {
     const d = weather?.daily
     if (!d?.time?.length) return {}
-    const out = {}
+    const out: Record<string, any> = {}
     for (let i = 0; i < d.time.length; i++) {
       out[d.time[i]] = {
         high: d.temperature_2m_max?.[i],
@@ -206,7 +206,7 @@ export default function Schedule() {
     return out
   }, [weather])
 
-  function dayKey(d) {
+  function dayKey(d: any) {
     // Local-time YYYY-MM-DD, NOT toISOString (which converts to UTC and
     // can skew the date by one day for east-of-UTC locales like CDT/CST).
     const y = d.getFullYear()
@@ -457,7 +457,7 @@ export default function Schedule() {
             <DayView
               events={events}
               now={new Date()}
-              onClick={(id) => navigate(`/jobs/${id}`)}
+              onClick={(id: any) => navigate(`/jobs/${id}`)}
               onDelete={requestDeleteEvent}
               onAdd={() => setAddOpen(true)}
             />
@@ -466,7 +466,7 @@ export default function Schedule() {
             <WeekView
               start={addDays(cursor, -((cursor.getDay() + 6) % 7))}
               events={events}
-              onClick={(id) => navigate(`/jobs/${id}`)}
+              onClick={(id: any) => navigate(`/jobs/${id}`)}
               onDelete={requestDeleteEvent}
             />
           )}
@@ -480,7 +480,7 @@ export default function Schedule() {
             <MonthView
               cursor={cursor}
               events={events}
-              onDay={(d) => { hapticTap(); setCursor(startOfDay(d)); setView('day') }}
+              onDay={(d: any) => { hapticTap(); setCursor(startOfDay(d)); setView('day') }}
             />
           )}
         </motion.div>
@@ -546,7 +546,7 @@ export default function Schedule() {
 // Compact stat for the cockpit summary panel — tabular display number
 // over a small uppercase label. Tone "gold" for the primary today figure,
 // "muted" for secondary reads.
-function SummaryStat({ label, value, tone = 'muted' }) {
+function SummaryStat({ label, value, tone = 'muted' }: any) {
   const valueColor = tone === 'gold' ? 'var(--v3-primary)' : 'var(--v3-text)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
@@ -568,12 +568,12 @@ function SummaryStat({ label, value, tone = 'muted' }) {
 // Lightweight pointer-based horizontal swipe wrapper. Plain pointer events
 // because framer-motion's drag swallows the page scroll on mobile. Vertical
 // motion ignores; horizontal past 60 px fires onShift(direction).
-function SwipeShell({ onShift, children }) {
-  const startRef = useRef(null)
-  function onPointerDown(e) {
+function SwipeShell({ onShift, children }: any) {
+  const startRef = useRef<any>(null)
+  function onPointerDown(e: any) {
     startRef.current = { x: e.clientX, y: e.clientY, time: Date.now() }
   }
-  function onPointerUp(e) {
+  function onPointerUp(e: any) {
     const start = startRef.current
     startRef.current = null
     if (!start) return
@@ -623,7 +623,7 @@ const chevBtnStyle = {
   WebkitTapHighlightColor: 'transparent'
 }
 
-function DayView({ events, now, onClick, onDelete, onAdd }) {
+function DayView({ events, now, onClick, onDelete, onAdd }: any) {
   // Per-status counts — drive the All/Live/Upcoming/Done toggle badges
   // and let the filter persist even when zero of a bucket exists today.
   const [stateFilter, setStateFilter] = useState('all')
@@ -641,7 +641,7 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
 
   const filtered = useMemo(() => {
     if (stateFilter === 'all') return events
-    return events.filter((e) => {
+    return events.filter((e: any) => {
       const s = deriveStatus(e, now)
       if (stateFilter === 'live') return s === 'On Site' || s === 'In Progress'
       if (stateFilter === 'done') return s === 'Done'
@@ -784,7 +784,7 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
         )
       ) : (
         <ul className="fh-timeline" style={{ listStyle: 'none', padding: 0, margin: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((e, i) => {
+          {filtered.map((e: any, i: any) => {
             const status = deriveStatus(e, now)
             const start = fmtTime(e.start_at)
             const end = e.end_at ? fmtTime(e.end_at) : null
@@ -819,7 +819,7 @@ function DayView({ events, now, onClick, onDelete, onAdd }) {
      Upcoming    — future today → gold
      Scheduled   — future, not today → gray
      Done        — past → muted gray (mockup doesn't show this; quiet) */
-const STATUS_TONE = {
+const STATUS_TONE: Record<string, any> = {
   'On Site':     { color: 'var(--v3-stage-active)', soft: 'rgba(79, 140, 94, 0.16)',   border: 'rgba(79, 140, 94, 0.40)' },
   'In Progress': { color: 'var(--v3-stage-lead)',   soft: 'rgba(107, 124, 168, 0.14)', border: 'rgba(107, 124, 168, 0.40)' },
   'Upcoming':    { color: 'var(--v3-primary)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
@@ -827,7 +827,7 @@ const STATUS_TONE = {
   'Done':        { color: 'var(--v3-text-faint)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border)' }
 }
 
-function deriveStatus(e, now) {
+function deriveStatus(e: any, now: any) {
   const start = e.start_at ? new Date(e.start_at).getTime() : null
   const end = e.end_at ? new Date(e.end_at).getTime() : null
   const t = now.getTime()
@@ -844,7 +844,7 @@ function deriveStatus(e, now) {
 // styles-refine.css). LIVE shows the pulsing dot; UP NEXT and UPCOMING
 // share the muted "up" pill; DONE uses the soft-gold "done" pill;
 // SCHEDULED falls back to the neutral "default" pill.
-const PILL_FOR_STATUS = {
+const PILL_FOR_STATUS: Record<string, any> = {
   'On Site':     { variant: 'live',    label: 'LIVE' },
   'In Progress': { variant: 'live',    label: 'LIVE' },
   'Upcoming':    { variant: 'up',      label: 'UP NEXT' },
@@ -855,14 +855,14 @@ const PILL_FOR_STATUS = {
 // Split "8:15 AM" into ["8:15", "AM"] for the dispatch-card time
 // column (HR stamp above, AM/PM small caption below). Falls back to
 // the full string if no space is present.
-function splitTime(s) {
+function splitTime(s: any) {
   if (!s) return ['—', '']
   const idx = s.lastIndexOf(' ')
   if (idx < 0) return [s, '']
   return [s.slice(0, idx), s.slice(idx + 1)]
 }
 
-function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onClick, onDelete, isClickable }) {
+function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onClick, onDelete, isClickable }: any) {
   // 5/17 — full visual port of the v3 design's dispatch-card pattern
   // (replaces the prior glass-row with status spine). Time column on
   // the left as HR/AM stamp, title + sub on the right, state pill at
@@ -949,12 +949,12 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
   )
 }
 
-function WeekView({ start, events, onClick, onDelete }) {
+function WeekView({ start, events, onClick, onDelete }: any) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
   return (
     <div className="fh-week">
       {days.map((d) => {
-        const dayEvents = events.filter((e) => sameDay(new Date(e.start_at), d))
+        const dayEvents = events.filter((e: any) => sameDay(new Date(e.start_at), d))
         return (
           <div key={d.toISOString()} className="fh-week__col">
             <header className="fh-week__head">
@@ -963,7 +963,7 @@ function WeekView({ start, events, onClick, onDelete }) {
             </header>
             <div className="fh-week__body">
               {dayEvents.length === 0 && <span className="fh-week__empty">—</span>}
-              {dayEvents.map((e) => (
+              {dayEvents.map((e: any) => (
                 <div key={e.id} className="fh-week__evt" style={{ position: 'relative' }}>
                   <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {/* Time + title used to render as inline spans with no
@@ -1003,7 +1003,7 @@ function WeekView({ start, events, onClick, onDelete }) {
   )
 }
 
-function MonthView({ cursor, events, onDay }) {
+function MonthView({ cursor, events, onDay }: any) {
   // 6-week grid (always 42 cells) so the layout is stable across
   // months. Days from the prev/next month are rendered dimmed instead
   // of as blank slots — matches every standard calendar app.
@@ -1017,7 +1017,7 @@ function MonthView({ cursor, events, onDay }) {
     <div className="fh-month">
       {['S','M','T','W','T','F','S'].map((d, i) => <span key={i} className="fh-month__dow">{d}</span>)}
       {cells.map((d) => {
-        const dayEvents = events.filter((e) => sameDay(new Date(e.start_at), d))
+        const dayEvents = events.filter((e: any) => sameDay(new Date(e.start_at), d))
         const inMonth = d.getMonth() === currentMonth
         const isToday = sameDay(d, today)
         const cls = [

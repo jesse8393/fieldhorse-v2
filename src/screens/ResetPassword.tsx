@@ -21,13 +21,13 @@ export default function ResetPassword() {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' || session) setReady(true)
     })
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: any) => {
       if (data.session) setReady(true)
     })
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  async function onSubmit(e) {
+  async function onSubmit(e: any) {
     e.preventDefault()
     setError('')
     setNotice('')
@@ -45,7 +45,7 @@ export default function ResetPassword() {
       if (error) throw error
       setNotice('Password updated. Redirecting…')
       setTimeout(() => navigate('/', { replace: true }), 1200)
-    } catch (err) {
+    } catch (err: any) {
       setError(err?.message || 'Could not update password.')
     } finally {
       setBusy(false)

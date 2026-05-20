@@ -10,31 +10,31 @@ import AppShell from './components/AppShell.tsx'
 //   Home: the post-auth landing screen; lazy here would flash a spinner
 //         on every cold app open, defeats premium feel
 import Home from './screens/Home.tsx'
-import Login from './screens/Login.jsx'
+import Login from './screens/Login.tsx'
 
 // Lazy — every other route. Each becomes its own chunk.
 // Initial JS bundle drops from ~1.47 MB to ~400 KB on first paint;
 // remaining chunks fetch on-demand as the user navigates.
-const ResetPassword  = lazy(() => import('./screens/ResetPassword.jsx'))
-const Onboarding     = lazy(() => import('./screens/Onboarding.jsx'))
-const PartnerInvite  = lazy(() => import('./screens/PartnerInvite.jsx'))
+const ResetPassword  = lazy(() => import('./screens/ResetPassword.tsx'))
+const Onboarding     = lazy(() => import('./screens/Onboarding.tsx'))
+const PartnerInvite  = lazy(() => import('./screens/PartnerInvite.tsx'))
 const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
 const ContactDetail  = lazy(() => import('./screens/ContactDetail.tsx'))
 const Clients        = lazy(() => import('./screens/Clients.tsx'))
 const ClientDetail   = lazy(() => import('./screens/ClientDetail.tsx'))
-const Notes          = lazy(() => import('./screens/Notes.jsx'))
-const Schedule       = lazy(() => import('./screens/Schedule.jsx'))
+const Notes          = lazy(() => import('./screens/Notes.tsx'))
+const Schedule       = lazy(() => import('./screens/Schedule.tsx'))
 const Activity       = lazy(() => import('./screens/Activity.tsx'))
-const PublicDoc      = lazy(() => import('./screens/PublicDoc.jsx'))
+const PublicDoc      = lazy(() => import('./screens/PublicDoc.tsx'))
 const Bid            = lazy(() => import('./screens/Bid.tsx'))
 const Compose        = lazy(() => import('./screens/Compose.tsx'))
 const Analytics      = lazy(() => import('./screens/Analytics.tsx'))
 const Importer       = lazy(() => import('./screens/Importer.tsx'))
-const Settings       = lazy(() => import('./screens/Settings.jsx'))
-const PourWindow     = lazy(() => import('./screens/PourWindow.jsx'))
-const Subs           = lazy(() => import('./screens/Subs.jsx'))
-const Partners       = lazy(() => import('./screens/Partners.jsx'))
-const SubDetail      = lazy(() => import('./screens/SubDetail.jsx'))
+const Settings       = lazy(() => import('./screens/Settings.tsx'))
+const PourWindow     = lazy(() => import('./screens/PourWindow.tsx'))
+const Subs           = lazy(() => import('./screens/Subs.tsx'))
+const Partners       = lazy(() => import('./screens/Partners.tsx'))
+const SubDetail      = lazy(() => import('./screens/SubDetail.tsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
 
