@@ -23,7 +23,7 @@ import {
 import { useActivityFeed } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useFhMotion } from '../lib/motion.ts'
-import { SkeletonList } from '../components/Skeleton.jsx'
+import { SkeletonList } from '../components/Skeleton.tsx'
 
 const PAGE_SIZE = 60
 

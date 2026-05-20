@@ -10,10 +10,10 @@ import { generateInvoice, downloadPdf } from '../lib/pdf.js'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import { SkeletonList } from '../components/Skeleton.jsx'
+import { SkeletonList } from '../components/Skeleton.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
-import V3PaymentSheet from '../components/V3PaymentSheet.jsx'
+import V3PaymentSheet from '../components/V3PaymentSheet.tsx'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 
 // Invoices / AR — v3 money command screen.

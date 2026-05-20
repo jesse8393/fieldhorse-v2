@@ -22,10 +22,10 @@ import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 //   - Hourly rate default is per-user preference (localStorage), not
 //     per-job. Future: derive from active sub on the job.
 
-const ACTIVE_PUNCH_KEY = (jobId) => `fh:timeclock:${jobId}:start`
+const ACTIVE_PUNCH_KEY = (jobId: any) => `fh:timeclock:${jobId}:start`
 const HOURLY_RATE_KEY = 'fh:timeclock:hourlyRate'
 
-function readActiveStart(jobId) {
+function readActiveStart(jobId: any) {
   if (typeof window === 'undefined') return null
   try {
     const v = window.localStorage.getItem(ACTIVE_PUNCH_KEY(jobId))
@@ -35,7 +35,7 @@ function readActiveStart(jobId) {
   } catch { return null }
 }
 
-function writeActiveStart(jobId, ts) {
+function writeActiveStart(jobId: any, ts: any) {
   if (typeof window === 'undefined') return
   try {
     if (ts == null) window.localStorage.removeItem(ACTIVE_PUNCH_KEY(jobId))
@@ -51,12 +51,12 @@ function readPreferredRate() {
   } catch { return 65 }
 }
 
-function writePreferredRate(r) {
+function writePreferredRate(r: any) {
   if (typeof window === 'undefined') return
   try { window.localStorage.setItem(HOURLY_RATE_KEY, String(r)) } catch {}
 }
 
-function fmtElapsed(ms) {
+function fmtElapsed(ms: any) {
   if (ms < 0) ms = 0
   const totalSec = Math.floor(ms / 1000)
   const h = Math.floor(totalSec / 3600)
@@ -66,14 +66,14 @@ function fmtElapsed(ms) {
   return `${m}m ${String(s).padStart(2, '0')}s`
 }
 
-export default function TimeClockCard({ contact, userId, onLogged }) {
+export default function TimeClockCard({ contact, userId, onLogged }: any) {
   const [start, setStart] = useState(() => readActiveStart(contact.id))
   const [now, setNow] = useState(Date.now())
   const [confirming, setConfirming] = useState(false)
   const [rate, setRate] = useState(readPreferredRate())
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
-  const tickRef = useRef(null)
+  const tickRef = useRef<any>(null)
 
   // Re-read on jobId change (navigation between jobs)
   useEffect(() => {
@@ -136,7 +136,7 @@ export default function TimeClockCard({ contact, userId, onLogged }) {
       // Refresh job cost / margin
       try { await recalcCost(contact.id, userId) } catch {}
       onLogged?.()
-    } catch (ex) {
+    } catch (ex: any) {
       toastError("Couldn't log time", ex?.message || 'Try again')
     } finally {
       setSaving(false)

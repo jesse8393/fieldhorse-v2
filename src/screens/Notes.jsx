@@ -14,7 +14,7 @@ import { claudeMessage } from '../lib/anthropic.ts'
 import { toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import SwipeableRow from '../components/SwipeableRow.jsx'
+import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 

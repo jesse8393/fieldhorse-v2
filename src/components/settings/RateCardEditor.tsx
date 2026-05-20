@@ -1,4 +1,4 @@
-// src/components/settings/RateCardEditor.jsx
+// src/components/settings/RateCardEditor.tsx
 //
 // Per-tenant rate card editor. Lives in the Settings screen. Lists every
 // trade from the seed RATE_CARD + every custom row the user has added;
@@ -20,7 +20,7 @@ import {
   loadUserRateCard, upsertRate, resetRate
 } from '../../lib/rateCard.ts'
 
-function slugify(s) {
+function slugify(s: any) {
   return String(s || '')
     .trim()
     .replace(/[^A-Za-z0-9 ]+/g, '')
@@ -30,17 +30,17 @@ function slugify(s) {
 
 export default function RateCardEditor() {
   const { user } = useAuth()
-  const [merged, setMerged] = useState({})
-  const [overrides, setOverrides] = useState({})
+  const [merged, setMerged] = useState<any>({})
+  const [overrides, setOverrides] = useState<any>({})
   const [loading, setLoading] = useState(true)
-  const [draft, setDraft] = useState({}) // tradeKey -> { unit, rate_low, rate_high, dirty, saving }
+  const [draft, setDraft] = useState<any>({}) // tradeKey -> { unit, rate_low, rate_high, dirty, saving }
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
 
   async function reload() {
     if (!user?.id) return
     setLoading(true)
-    const { merged, overrides } = await loadUserRateCard(user.id)
+    const { merged, overrides } = await loadUserRateCard(user!.id)
     setMerged(merged)
     setOverrides(overrides)
     setLoading(false)
@@ -57,7 +57,7 @@ export default function RateCardEditor() {
     ]
   }, [merged])
 
-  function getDraft(row) {
+  function getDraft(row: any) {
     return draft[row.key] || {
       unit: row.current?.unit || 'lump',
       rate_low: String(row.current?.low ?? 0),
@@ -66,8 +66,8 @@ export default function RateCardEditor() {
     }
   }
 
-  function setField(key, field, value) {
-    setDraft((d) => ({
+  function setField(key: any, field: any, value: any) {
+    setDraft((d: any) => ({
       ...d,
       [key]: {
         ...getDraft({ key, current: merged[key] || RATE_CARD[key] }),
@@ -77,7 +77,7 @@ export default function RateCardEditor() {
     }))
   }
 
-  async function save(row) {
+  async function save(row: any) {
     const d = getDraft(row)
     const low = Number(d.rate_low) || 0
     const high = Number(d.rate_high) || 0
@@ -86,10 +86,10 @@ export default function RateCardEditor() {
       toastError('High must be ≥ low', `${row.current?.label || row.key} rate range is invalid.`)
       return
     }
-    setDraft((dd) => ({ ...dd, [row.key]: { ...d, saving: true } }))
+    setDraft((dd: any) => ({ ...dd, [row.key]: { ...d, saving: true } }))
     try {
       await upsertRate({
-        userId: user.id,
+        userId: user!.id,
         tradeKey: row.key,
         patch: {
           label: row.current?.label || TRADE_LABELS[row.key] || row.key,
@@ -101,22 +101,22 @@ export default function RateCardEditor() {
       hapticSuccess()
       toastSuccess('Rate saved', `${row.current?.label || row.key}: $${low}–$${high}/${d.unit}`)
       await reload()
-      setDraft((dd) => {
+      setDraft((dd: any) => {
         const next = { ...dd }
         delete next[row.key]
         return next
       })
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't save rate", err?.message || 'Unknown error')
-      setDraft((dd) => ({ ...dd, [row.key]: { ...d, saving: false } }))
+      setDraft((dd: any) => ({ ...dd, [row.key]: { ...d, saving: false } }))
     }
   }
 
-  async function revert(row) {
+  async function revert(row: any) {
     if (!overrides[row.key]) {
       // No override to delete — just clear local draft.
-      setDraft((dd) => {
+      setDraft((dd: any) => {
         const next = { ...dd }
         delete next[row.key]
         return next
@@ -124,16 +124,16 @@ export default function RateCardEditor() {
       return
     }
     try {
-      await resetRate({ userId: user.id, tradeKey: row.key })
+      await resetRate({ userId: user!.id, tradeKey: row.key })
       hapticSuccess()
       toastSuccess('Reset to default', row.current?.label || row.key)
       await reload()
-      setDraft((dd) => {
+      setDraft((dd: any) => {
         const next = { ...dd }
         delete next[row.key]
         return next
       })
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't reset", err?.message || 'Unknown error')
     }
@@ -150,7 +150,7 @@ export default function RateCardEditor() {
     }
     try {
       await upsertRate({
-        userId: user.id,
+        userId: user!.id,
         tradeKey: key,
         patch: { label, unit: 'lump', rate_low: 0, rate_high: 0 }
       })
@@ -159,7 +159,7 @@ export default function RateCardEditor() {
       setNewLabel('')
       setAdding(false)
       await reload()
-    } catch (err) {
+    } catch (err: any) {
       hapticError()
       toastError("Couldn't add trade", err?.message || 'Unknown error')
     }
@@ -399,7 +399,7 @@ export default function RateCardEditor() {
   )
 }
 
-const cellInput = {
+const cellInput: import('react').CSSProperties = {
   padding: '8px 10px',
   borderRadius: 10,
   background: 'var(--surface-2)',
@@ -413,13 +413,13 @@ const cellInput = {
   fontVariantNumeric: 'tabular-nums'
 }
 
-const cellSelect = {
+const cellSelect: import('react').CSSProperties = {
   ...cellInput,
   padding: '7px 8px',
   cursor: 'pointer'
 }
 
-function iconBtn(tone, busy) {
+function iconBtn(tone: any, busy: any) {
   const palette = tone === 'primary'
     ? { bg: 'var(--field-gold, #c9963a)', fg: 'var(--on-gold, #1a1004)', border: 'rgba(201,150,58,0.4)' }
     : { bg: 'var(--surface-2)', fg: 'var(--ink-muted)', border: 'var(--rule)' }

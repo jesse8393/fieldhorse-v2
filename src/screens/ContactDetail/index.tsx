@@ -12,14 +12,14 @@ import { stageColor } from '../../lib/stages.ts'
 import { toastSuccess, toastInfo, toastError } from '../../lib/toast.ts'
 import { hapticTap, hapticError } from '../../lib/haptics.ts'
 import { dueStatus } from '../../lib/dueDate.ts'
-import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.jsx'
+import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.tsx'
 const SkeletonBlock = SkeletonBlock_ as any
 const SkeletonList = SkeletonList_ as any
 import ActionSheet from '../../components/ActionSheet.tsx'
 import AddEventSheet from '../../components/AddEventSheet.tsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
 import MarkCompleteSheet from '../../components/MarkCompleteSheet.tsx'
-import V3PaymentSheet from '../../components/V3PaymentSheet.jsx'
+import V3PaymentSheet from '../../components/V3PaymentSheet.tsx'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator

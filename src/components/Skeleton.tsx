@@ -1,7 +1,7 @@
 // Skeleton loader with gold shimmer sweep. Compose the primitives to match
 // the shape of content that's loading. Respects prefers-reduced-motion.
 
-export function SkeletonBlock({ w = '100%', h = 14, r = 2, className = '', style }) {
+export function SkeletonBlock({ w = '100%', h = 14, r = 2, className = '', style }: any) {
   return (
     <span
       className={`fh-skel ${className}`}
@@ -11,7 +11,7 @@ export function SkeletonBlock({ w = '100%', h = 14, r = 2, className = '', style
   )
 }
 
-export function SkeletonText({ lines = 2, widths = ['80%', '60%'], gap = 8 }) {
+export function SkeletonText({ lines = 2, widths = ['80%', '60%'], gap = 8 }: any) {
   return (
     <span className="fh-skel-stack" style={{ gap }} aria-hidden="true">
       {Array.from({ length: lines }, (_, i) => (
@@ -21,7 +21,7 @@ export function SkeletonText({ lines = 2, widths = ['80%', '60%'], gap = 8 }) {
   )
 }
 
-export function SkeletonCard({ avatar = true, amount = true }) {
+export function SkeletonCard({ avatar = true, amount = true }: any) {
   return (
     <div className="fh-skel-card" aria-hidden="true">
       {avatar && <SkeletonBlock w={40} h={40} r="50%" />}
@@ -39,7 +39,7 @@ export function SkeletonCard({ avatar = true, amount = true }) {
   )
 }
 
-export function SkeletonList({ rows = 4, card = true }) {
+export function SkeletonList({ rows = 4, card = true }: any) {
   return (
     <div className="fh-skel-list" aria-busy="true" role="status" aria-label="Loading">
       {Array.from({ length: rows }, (_, i) =>

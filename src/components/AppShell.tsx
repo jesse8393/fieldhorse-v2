@@ -6,8 +6,8 @@ import BottomNav from './BottomNav.tsx'
 import DesktopSidebar from './DesktopSidebar.tsx'
 import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.tsx'
-import Toaster from './Toaster.jsx'
-import RouteErrorBoundary from './RouteErrorBoundary.jsx'
+import Toaster from './Toaster.tsx'
+import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.

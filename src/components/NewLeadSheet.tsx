@@ -26,12 +26,12 @@ function readLastJobType() {
   try { return window.localStorage.getItem(LAST_JOB_TYPE_KEY) || '' } catch { return '' }
 }
 
-function writeLastJobType(value) {
+function writeLastJobType(value: any) {
   if (typeof window === 'undefined' || !value) return
   try { window.localStorage.setItem(LAST_JOB_TYPE_KEY, value) } catch {}
 }
 
-function buildEmptyForm(initialStage = 'lead') {
+function buildEmptyForm(initialStage = 'lead'): Record<string, any> {
   // initialStage seeds the Stage chip when the sheet is opened. Defaults
   // to 'lead' (the original behavior); flips to 'job' when the entry
   // point was the Home "New Job" tile so the operator isn't dropped into
@@ -61,7 +61,7 @@ function buildEmptyForm(initialStage = 'lead') {
 //   notes       — paragraph of context
 //   referred_by — full name + qualifier
 //   amount      — millions with decimal
-const FIELD_LIMITS = {
+const FIELD_LIMITS: Record<string, number> = {
   name: 120,
   phone: 40,
   email: 254,
@@ -88,9 +88,9 @@ const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a n
 }
 Return ONLY the JSON. No prose, no fences.`
 
-export default function NewLeadSheet({ open, userId, initialStage = 'lead', onClose, onCreated }) {
+export default function NewLeadSheet({ open, userId, initialStage = 'lead', onClose, onCreated }: any) {
   const [form, setForm] = useState(() => buildEmptyForm(initialStage))
-  const [client, setClient] = useState(null)
+  const [client, setClient] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   // Picked job-template slug. Reset whenever job_type changes since
@@ -106,7 +106,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   // lead-pro-mic__lbl) — tells the operator the mic is alive and how
   // long they've been talking.
   const [voiceElapsed, setVoiceElapsed] = useState(0)
-  const recognitionRef = useRef(null)
+  const recognitionRef = useRef<any>(null)
   const heldRef = useRef(false)
 
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   // until the insert actually succeeds. Prevents the "03/03 even on error" bug.
   const currentStep = committed ? 3 : 1
 
-  function set(k, v) {
+  function set(k: any, v: any) {
     // Clamp at per-field length cap (see FIELD_LIMITS above). The
     // maxLength HTML attribute handles typing, but paste flows can
     // still drop a long string in — clamp programmatically so the
@@ -174,7 +174,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   // user already typed (parsed values only fill EMPTY fields so a
   // half-typed form isn't clobbered). Toast tells the user how many
   // fields landed so they know to scan the form before submitting.
-  async function parseDoc(dataUrl) {
+  async function parseDoc(dataUrl: any) {
     const parsed = await parseLeadFromImage(dataUrl)
     let landed = 0
     setForm((prev) => {
@@ -197,7 +197,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   }
 
   function startVoice() {
-    const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
+    const SR = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
     if (!SR) { setVoiceState('error'); return }
     heldRef.current = true
     const rec = new SR()
@@ -206,7 +206,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
     rec.lang = 'en-US'
     let full = ''
     setTranscript('')
-    rec.onresult = (e) => {
+    rec.onresult = (e: any) => {
       let chunk = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
         chunk += e.results[i][0].transcript
@@ -214,7 +214,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
       full = chunk
       setTranscript(chunk)
     }
-    rec.onerror = (e) => {
+    rec.onerror = (e: any) => {
       heldRef.current = false
       if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) {
         setVoiceState('denied')
@@ -248,7 +248,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
     haptic(10)
   }
 
-  async function parseTranscript(text) {
+  async function parseTranscript(text: any) {
     setVoiceState('parsing')
     try {
       const res = await claudeMessage({
@@ -274,7 +274,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
           referred_by: parsed.referred_by || f.referred_by
         }))
       }
-    } catch (e) {
+    } catch (e: any) {
       setErr('Voice parse failed — fill the fields manually.')
     } finally {
       setVoiceState('idle')
@@ -321,7 +321,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
             }).select('id').single()
           resolvedClientId = created?.id || null
         }
-      } catch (e) {
+      } catch (e: any) {
         // Non-fatal — log and proceed with null client_id. The job still
         // saves; the user can link a client later from the job detail.
         console.warn('[lead] auto-client upsert failed', e)
@@ -367,7 +367,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
       setCommitted(true)
       setSaving(false)
       setTimeout(() => onCreated?.(data), 600)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lead commit failed:', err)
       setSaving(false)
       setErr("Couldn't save this lead. Check your connection and try again.")
@@ -382,7 +382,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
     denied: 'MIC BLOCKED'
   }[voiceState]
 
-  function onVoiceTap(e) {
+  function onVoiceTap(e: any) {
     e.preventDefault()
     // Error/denied states let the user try once more (e.g. grant permission).
     if (voiceState === 'error' || voiceState === 'denied') {
@@ -405,7 +405,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   // can keep typing in manual mode without losing what they had.
   // Defensive aliases (client_name, job_address) cover schemas that
   // surface different column names downstream.
-  function handleClientChange(next) {
+  function handleClientChange(next: any) {
     setClient(next)
     if (!next) return
     setForm((prev) => ({
@@ -426,7 +426,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { if (!v && !saving) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
         style={drawerStyle}
@@ -639,14 +639,14 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
             label="Stage"
             value={form.stage}
             options={STAGE_OPTIONS}
-            onChange={(v) => set('stage', v)}
+            onChange={(v: any) => set('stage', v)}
           />
 
           <V3ChipRow
             label="Job type"
             value={form.job_type}
             options={JOB_TYPES}
-            onChange={(v) => set('job_type', v)}
+            onChange={(v: any) => set('job_type', v)}
           />
 
           {availableTemplates.length > 0 && (
@@ -743,8 +743,8 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
 // matching template, then if a template is picked shows a small footer
 // with the milestone count + description. Visual matches SheetChipRow
 // so it feels like a 7th field, not an add-on.
-function TemplatePickerInline({ templates, value, onChange }) {
-  const picked = templates.find((t) => t.slug === value) || null
+function TemplatePickerInline({ templates, value, onChange }: any) {
+  const picked = templates.find((t: any) => t.slug === value) || null
   return (
     <V3Field label="Template">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -753,7 +753,7 @@ function TemplatePickerInline({ templates, value, onChange }) {
           onClick={() => onChange('')}
           label="Skip"
         />
-        {templates.map((t) => (
+        {templates.map((t: any) => (
           <TemplateChip
             key={t.slug}
             active={value === t.slug}
@@ -787,7 +787,7 @@ const V3_LABEL = {
   textTransform: 'uppercase', color: 'var(--ink-muted)'
 }
 
-const V3_INPUT = {
+const V3_INPUT: import('react').CSSProperties = {
   padding: '11px 14px',
   borderRadius: 12,
   background: 'var(--surface-2)',
@@ -802,7 +802,7 @@ const V3_INPUT = {
   scrollMarginBottom: 120
 }
 
-function V3Field({ label, children }) {
+function V3Field({ label, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={V3_LABEL}>{label}</span>
@@ -811,12 +811,12 @@ function V3Field({ label, children }) {
   )
 }
 
-function V3ChipRow({ label, value, options, onChange }) {
+function V3ChipRow({ label, value, options, onChange }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={V3_LABEL}>{label}</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {options.map((opt) => {
+        {options.map((opt: any) => {
           const active = value === opt.value
           return (
             <button
@@ -850,7 +850,7 @@ function V3ChipRow({ label, value, options, onChange }) {
   )
 }
 
-function TemplateChip({ active, onClick, label }) {
+function TemplateChip({ active, onClick, label }: any) {
   return (
     <button
       type="button"

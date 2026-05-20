@@ -6,9 +6,9 @@ import {
   Plus, Search, MessageSquare, Mail, Phone, ExternalLink,
   Phone as PhoneIcon, MessageSquare as MsgIcon
 } from 'lucide-react'
-import NewLeadSheet from '../components/NewLeadSheet.jsx'
-import { SkeletonList } from '../components/Skeleton.jsx'
-import SwipeableRow from '../components/SwipeableRow.jsx'
+import NewLeadSheet from '../components/NewLeadSheet.tsx'
+import { SkeletonList } from '../components/Skeleton.tsx'
+import SwipeableRow from '../components/SwipeableRow.tsx'
 import { JobCard, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
 import DesktopJobsBoard from '../components/desktop/DesktopJobsBoard.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'

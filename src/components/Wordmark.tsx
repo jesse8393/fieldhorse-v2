@@ -1,4 +1,4 @@
-export default function Wordmark({ inverse = false, size = '1rem' }) {
+export default function Wordmark({ inverse = false, size = '1rem' }: any) {
   return (
     <span
       className={`fh-wordmark-stack${inverse ? ' fh-wordmark-stack--inverse' : ''}`}

@@ -13,14 +13,14 @@ import { hapticSwipe, hapticTap } from '../lib/haptics.ts'
 // Pass-through: tap on the row content while not swiped fires children's normal handlers.
 // While swiped open, the action buttons capture taps.
 
-export default function SwipeableRow({ children, actions = [], openOffset = -120, disabled = false }) {
+export default function SwipeableRow({ children, actions = [], openOffset = -120, disabled = false }: any) {
   const x = useMotionValue(0)
   const [open, setOpen] = useState(false)
   const lastFiredOpen = useRef(false)
   // Animated background visibility — actions only show when row is dragged
   const actionsOpacity = useTransform(x, [openOffset, openOffset / 2, 0], [1, 0.5, 0])
 
-  function handleDragEnd(_, info) {
+  function handleDragEnd(_: any, info: any) {
     const offset = info.offset.x
     const velocity = info.velocity.x
     // Snap to fully open if dragged past midpoint or flicked left
@@ -65,7 +65,7 @@ export default function SwipeableRow({ children, actions = [], openOffset = -120
           opacity: actionsOpacity
         }}
       >
-        {actions.map((a, i) => (
+        {actions.map((a: any, i: any) => (
           <button
             key={i}
             type="button"

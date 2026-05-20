@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
-import { SkeletonList } from '../components/Skeleton.jsx'
+import { SkeletonList } from '../components/Skeleton.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail } from '../lib/queries.ts'
