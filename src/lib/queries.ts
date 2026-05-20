@@ -16,6 +16,7 @@ import { useEffect } from 'react'
 import {
   useQuery,
   useQueryClient,
+  keepPreviousData,
   type QueryClient
 } from '@tanstack/react-query'
 import { supabase } from './supabase.js'
@@ -142,4 +143,84 @@ export function useClientsBundle(userId: string | undefined) {
 export function useInvalidateClients() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: queryKeys.clients })
+}
+
+// ---- Schedule ----
+// Two queries: range-scoped events for the current day/week/month grid,
+// and a fixed "next 7 days" upcoming list. Range bounds are passed as
+// ISO strings so the query key stays serializable.
+
+export type ScheduleEvent =
+  Database['public']['Tables']['fh_schedule']['Row'] & {
+    fh_contacts: Pick<Contact, 'name' | 'stage'> | null
+  }
+
+async function fetchScheduleRange(userId: string, startIso: string, endIso: string): Promise<ScheduleEvent[]> {
+  const { data, error } = await supabase
+    .from('fh_schedule')
+    .select('*, fh_contacts(name, stage)')
+    .eq('user_id', userId)
+    .gte('start_at', startIso)
+    .lt('start_at', endIso)
+    .order('start_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as ScheduleEvent[]
+}
+
+export function useScheduleEvents(userId: string | undefined, startIso: string, endIso: string) {
+  return useQuery({
+    queryKey: ['schedule', userId, startIso, endIso],
+    queryFn: () => fetchScheduleRange(userId as string, startIso, endIso),
+    enabled: !!userId,
+    // Keep the prior range's events on screen while a view switch
+    // (day→week→month) refetches, matching the old setLoading guard.
+    placeholderData: keepPreviousData
+  })
+}
+
+async function fetchUpcoming(userId: string): Promise<ScheduleEvent[]> {
+  const now = new Date()
+  const in7 = new Date(now)
+  in7.setDate(in7.getDate() + 7)
+  in7.setHours(0, 0, 0, 0)
+  const { data, error } = await supabase
+    .from('fh_schedule')
+    .select('*, fh_contacts(name, stage)')
+    .eq('user_id', userId)
+    .gte('start_at', now.toISOString())
+    .lt('start_at', in7.toISOString())
+    .order('start_at', { ascending: true })
+    .limit(8)
+  if (error) throw error
+  return (data ?? []) as ScheduleEvent[]
+}
+
+export function useUpcomingEvents(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['scheduleUpcoming', userId],
+    queryFn: () => fetchUpcoming(userId as string),
+    enabled: !!userId
+  })
+}
+
+// Invalidate both schedule queries (range + upcoming) after a mutation.
+export function useInvalidateSchedule() {
+  const client = useQueryClient()
+  return () => {
+    client.invalidateQueries({ queryKey: ['schedule'] })
+    client.invalidateQueries({ queryKey: ['scheduleUpcoming'] })
+  }
+}
+
+// Optimistically drop a deleted event from every cached schedule query
+// (range + upcoming) so it vanishes immediately, before the server
+// round-trip — replaces the old setEvents/setUpcoming filters.
+export function useDropScheduleEvent() {
+  const client = useQueryClient()
+  return (evtId: string) => {
+    const drop = (rows: ScheduleEvent[] | undefined) =>
+      (rows ?? []).filter((e) => e.id !== evtId)
+    client.setQueriesData({ queryKey: ['schedule'] }, drop)
+    client.setQueriesData({ queryKey: ['scheduleUpcoming'] }, drop)
+  }
 }

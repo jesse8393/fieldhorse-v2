@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
@@ -9,6 +9,12 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { FloatingActionButton, ScreenCloser } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import {
+  useScheduleEvents,
+  useUpcomingEvents,
+  useInvalidateSchedule,
+  useDropScheduleEvent
+} from '../lib/queries.ts'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { getWeather, workWindow } from '../lib/weather.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
@@ -56,14 +62,40 @@ export default function Schedule() {
     try { window.localStorage.setItem('fh:schedule:view', view) } catch {}
   }, [view])
   const [cursor, setCursor] = useState(initialCursor)
-  // null = haven't fetched yet, [] = fetched but empty. Distinguishes
-  // "first paint, please show skeleton" from "view switched, keep
-  // grid visible while we re-fetch in background." Audit was seeing
-  // the SkeletonList horizontal bars during a view switch and reading
-  // them as a broken Month grid.
-  const [events, setEvents] = useState(null)
-  const [upcoming, setUpcoming] = useState([])
-  const [loading, setLoading] = useState(true)
+
+  // Range bounds for the current day/week/month grid. Only depends on
+  // view + cursor; feeds the scheduled-events query below.
+  const range = useMemo(() => {
+    if (view === 'day') return { start: cursor, end: addDays(cursor, 1) }
+    if (view === 'week') {
+      const s = addDays(cursor, -cursor.getDay())
+      return { start: s, end: addDays(s, 7) }
+    }
+    const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+    const gridStart = addDays(monthStart, -monthStart.getDay())
+    const gridEnd = addDays(gridStart, 42)
+    return { start: gridStart, end: gridEnd, monthStart, monthEnd }
+  }, [view, cursor])
+
+  // TanStack Query replaces the manual events/upcoming/loading useState
+  // + load()/loadUpcoming() callbacks. keepPreviousData inside the hook
+  // preserves the "keep the grid rendered during a view switch" behavior
+  // the old setLoading guard provided. events defaults to null on first
+  // load so the skeleton-vs-empty distinction below still holds.
+  const { data: events = null, isPending: eventsPending } = useScheduleEvents(
+    user?.id,
+    range.start.toISOString(),
+    range.end.toISOString()
+  )
+  const { data: upcoming = [] } = useUpcomingEvents(user?.id)
+  const invalidateSchedule = useInvalidateSchedule()
+  const dropScheduleEvent = useDropScheduleEvent()
+  const loading = eventsPending
+  // Aliases so the existing delete/undo + FAB-save call sites keep working.
+  const load = invalidateSchedule
+  const loadUpcoming = invalidateSchedule
+
   const [weather, setWeather] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
   // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
@@ -104,9 +136,9 @@ export default function Schedule() {
       toastError("Couldn't delete", error.message)
       return
     }
-    // Optimistic local-state removal so the row vanishes immediately
-    setEvents((prev) => prev.filter((e) => e.id !== evtId))
-    setUpcoming((prev) => prev.filter((e) => e.id !== evtId))
+    // Optimistic cache removal so the row vanishes immediately, before
+    // the Undo toast resolves. Drops from both schedule queries.
+    dropScheduleEvent(evtId)
     toastUndo('Event deleted', {
       description: snapshot?.title || 'Tap Undo to restore',
       onUndo: async () => {
@@ -123,58 +155,6 @@ export default function Schedule() {
   }
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
-
-  const range = useMemo(() => {
-    if (view === 'day') return { start: cursor, end: addDays(cursor, 1) }
-    if (view === 'week') {
-      const s = addDays(cursor, -cursor.getDay())
-      return { start: s, end: addDays(s, 7) }
-    }
-    // Month view: query a 6-week window so the leading + trailing
-    // calendar cells (which fall in adjacent months) get badges, not
-    // just the days strictly inside the month.
-    const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
-    const gridStart = addDays(monthStart, -monthStart.getDay())
-    const gridEnd = addDays(gridStart, 42)
-    return { start: gridStart, end: gridEnd, monthStart, monthEnd }
-  }, [view, cursor])
-
-  const load = useCallback(async () => {
-    if (!user) return
-    // Only blank the grid for the very first fetch — subsequent fetches
-    // (after a view switch, after an event delete, after FAB save) keep
-    // the existing events rendered until the new payload lands.
-    setLoading((prev) => events == null ? true : prev)
-    const { data } = await supabase
-      .from('fh_schedule')
-      .select('*, fh_contacts(name, stage)')
-      .eq('user_id', user.id)
-      .gte('start_at', range.start.toISOString())
-      .lt('start_at', range.end.toISOString())
-      .order('start_at', { ascending: true })
-    setEvents(data || [])
-    setLoading(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, range.start, range.end])
-
-  const loadUpcoming = useCallback(async () => {
-    if (!user) return
-    const now = new Date()
-    const in7 = addDays(startOfDay(now), 7)
-    const { data } = await supabase
-      .from('fh_schedule')
-      .select('*, fh_contacts(name, stage)')
-      .eq('user_id', user.id)
-      .gte('start_at', now.toISOString())
-      .lt('start_at', in7.toISOString())
-      .order('start_at', { ascending: true })
-      .limit(8)
-    setUpcoming(data || [])
-  }, [user])
-
-  useEffect(() => { load() }, [load])
-  useEffect(() => { loadUpcoming() }, [loadUpcoming, addOpen])
 
   useEffect(() => {
     if (!hasCoords) return
