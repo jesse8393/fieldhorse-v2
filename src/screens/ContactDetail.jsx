@@ -5,4 +5,4 @@
 // during the transition so subsequent drops (3.1 Details, 3.2 Financials,
 // 3.3 Files) can copy section logic out of it. Once all 10 sections are
 // rebuilt in v3, ContactDetail.legacy.jsx will be deleted.
-export { default } from './ContactDetail/index.jsx'
+export { default } from './ContactDetail/index.tsx'

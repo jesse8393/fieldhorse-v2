@@ -12,7 +12,9 @@ import { stageColor } from '../../lib/stages.ts'
 import { toastSuccess, toastInfo, toastError } from '../../lib/toast.ts'
 import { hapticTap, hapticError } from '../../lib/haptics.ts'
 import { dueStatus } from '../../lib/dueDate.ts'
-import { SkeletonBlock, SkeletonList } from '../../components/Skeleton.jsx'
+import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.jsx'
+const SkeletonBlock = SkeletonBlock_ as any
+const SkeletonList = SkeletonList_ as any
 import ActionSheet from '../../components/ActionSheet.jsx'
 import AddEventSheet from '../../components/AddEventSheet.jsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.jsx'
@@ -43,7 +45,7 @@ const TOP_TABS = [
 ]
 const VALID_TABS = new Set(TOP_TABS.map((t) => t.id))
 
-function money(n) {
+function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -90,7 +92,7 @@ export default function ContactDetail() {
     }
   }, [nextAction])
 
-  async function markTodoDone(todoId) {
+  async function markTodoDone(todoId: any) {
     if (!todoId || !user) return
     hapticTap()
     const { error } = await supabase
@@ -108,8 +110,8 @@ export default function ContactDetail() {
 
   // URL-synced tab state. Default to overview if the param is absent or invalid.
   const tabParam = searchParams.get('tab')
-  const tab = VALID_TABS.has(tabParam) ? tabParam : 'overview'
-  function setTab(next) {
+  const tab = (tabParam && VALID_TABS.has(tabParam)) ? tabParam : 'overview'
+  function setTab(next: any) {
     if (next === tab) return
     const sp = new URLSearchParams(searchParams)
     if (next === 'overview') sp.delete('tab')
@@ -139,11 +141,11 @@ export default function ContactDetail() {
     setDeleteErr('')
     try {
       const deletedName = contact?.name || 'this job'
-      const { error } = await supabase.from('fh_contacts').delete().eq('id', id).eq('user_id', user.id)
+      const { error } = await supabase.from('fh_contacts').delete().eq('id', id as string).eq('user_id', user?.id as string)
       if (error) throw error
       toastSuccess('Deleted', `${deletedName} and cascading rows removed`)
       navigate('/jobs')
-    } catch (e) {
+    } catch (e: any) {
       console.error('Delete contact failed:', e)
       setDeleting(false)
       setDeleteErr("Couldn't delete this job. Check your connection and try again.")
@@ -238,7 +240,7 @@ export default function ContactDetail() {
             fetchAll()
           }}
           onDelete={() => setDeleteOpen(true)}
-          onClientNav={(cid) => navigate(`/clients/${cid}`)}
+          onClientNav={(cid: any) => navigate(`/clients/${cid}`)}
           onTodoDone={markTodoDone}
           onOpenLogPayment={() => setPayModalOpen(true)}
           onOpenAddEvent={() => setEventOpen(true)}
@@ -266,11 +268,11 @@ export default function ContactDetail() {
           fetchAll()
         }}
         onDelete={() => setDeleteOpen(true)}
-        onClientNav={(cid) => navigate(`/clients/${cid}`)}
+        onClientNav={(cid: any) => navigate(`/clients/${cid}`)}
         onTodoDone={markTodoDone}
       />
 
-      <StageTimeline currentStage={contact.stage} />
+      <StageTimeline currentStage={contact.stage ?? undefined} />
 
       {/* TOP-LEVEL TABS (underline variant) */}
       <SegmentedTabs
@@ -452,7 +454,7 @@ function Header({
   contact, clientSummary, viewerUserId, isEditing,
   paid, balance, nextTodo,
   onBack, onEdit, onMarkLost, onDelete, onClientNav, onTodoDone
-}) {
+}: any) {
   const isOwnerView = !!viewerUserId && contact.user_id === viewerUserId
   const phoneHref = contact.phone ? `tel:${contact.phone}` : null
   const smsHref = contact.phone ? `sms:${contact.phone}` : null
@@ -672,14 +674,14 @@ function Header({
 
 /* Compact money formatter — $46K / $1.2M for cockpit metrics. Falls back to
    full dollars under 1k. */
-function kMoney(n) {
+function kMoney(n: any) {
   const v = Number(n || 0)
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
   if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function CockpitMetric({ label, tone = 'default', size = 'lg', children }) {
+function CockpitMetric({ label, tone = 'default', size = 'lg', children }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
@@ -696,7 +698,7 @@ function CockpitMetric({ label, tone = 'default', size = 'lg', children }) {
  *   warn    → today (gold)
  *   muted   → future (date label)
  */
-function NextTodoDueChip({ iso }) {
+function NextTodoDueChip({ iso }: any) {
   const status = dueStatus(iso)
   if (!status) return null
   const palette = status.tone === 'danger'
@@ -743,7 +745,7 @@ function NextTodoDueChip({ iso }) {
    ICON BUTTONS — header chrome
    ============================================================ */
 
-function iconButtonStyle({ disabled = false, tone } = {}) {
+function iconButtonStyle({ disabled = false, tone }: any = {}) {
   return {
     width: 40,
     height: 40,
@@ -761,7 +763,7 @@ function iconButtonStyle({ disabled = false, tone } = {}) {
   }
 }
 
-function IconButton({ children, onClick, disabled, ariaLabel, ariaPressed, tone }) {
+function IconButton({ children, onClick, disabled, ariaLabel, ariaPressed, tone }: any) {
   return (
     <motion.button
       type="button"
@@ -782,7 +784,7 @@ function IconButton({ children, onClick, disabled, ariaLabel, ariaPressed, tone 
  * framer-motion + Vaul drawer was eating clicks on iOS Safari for tel:/sms:.
  * Plain anchor + manual location.href fallback ensures the OS handler fires.
  */
-function PhoneAction({ href, ariaLabel, children }) {
+function PhoneAction({ href, ariaLabel, children }: any) {
   return (
     <a
       href={href}
@@ -805,7 +807,7 @@ function PhoneAction({ href, ariaLabel, children }) {
    DELETE CASCADE ROW (used inside the delete ActionSheet)
    ============================================================ */
 
-function DeleteCascadeRow({ label, count, detail = 'deleted' }) {
+function DeleteCascadeRow({ label, count, detail = 'deleted' }: any) {
   return (
     <li style={{
       display: 'flex',
