@@ -10,7 +10,7 @@ import ActionSheet from '../../../components/ActionSheet.jsx'
 const BUCKET = 'job-files'
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB per file
 
-function fmtSize(n) {
+function fmtSize(n: any) {
   if (!n) return ''
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
@@ -21,14 +21,14 @@ function fmtSize(n) {
  * Files section — fh_job_files where kind='file'. Same upload flow as Photos
  * but list rendering instead of grid + opens via signed URL in new tab.
  */
-export default function FilesSection({ jobId, userId }) {
-  const [rows, setRows] = useState([])
+export default function FilesSection({ jobId, userId }: any) {
+  const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   // Destructive-confirm sheet state for delete file.
-  const [pendingDelete, setPendingDelete] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
-  const inputRef = useRef(null)
+  const inputRef = useRef<any>(null)
 
   const fetchRows = useCallback(async () => {
     if (!jobId || !userId) return
@@ -48,8 +48,8 @@ export default function FilesSection({ jobId, userId }) {
 
   function pick() { inputRef.current?.click() }
 
-  async function handleFile(e) {
-    const files = Array.from(e.target.files || [])
+  async function handleFile(e: any) {
+    const files: any[] = Array.from(e.target.files || [])
     if (files.length === 0) return
     setUploading(true)
     try {
@@ -79,7 +79,7 @@ export default function FilesSection({ jobId, userId }) {
       }
       toastSuccess('Files uploaded', `Added ${files.length}`)
       await fetchRows()
-    } catch (ex) {
+    } catch (ex: any) {
       toastError('Upload failed', ex?.message || 'Try again')
     } finally {
       setUploading(false)
@@ -87,7 +87,7 @@ export default function FilesSection({ jobId, userId }) {
     }
   }
 
-  async function open(row) {
+  async function open(row: any) {
     hapticTap()
     const { data, error } = await supabase.storage
       .from(BUCKET)
@@ -101,7 +101,7 @@ export default function FilesSection({ jobId, userId }) {
 
   // Open the destructive-confirm sheet for this file. Storage + db
   // delete happens in confirmRemove on commit.
-  function remove(row) {
+  function remove(row: any) {
     if (!row) return
     setPendingDelete(row)
   }
@@ -115,7 +115,7 @@ export default function FilesSection({ jobId, userId }) {
       await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
       toastSuccess('Deleted', row.filename)
       await fetchRows()
-    } catch (ex) {
+    } catch (ex: any) {
       toastError('Delete failed', ex?.message || 'Try again')
     } finally {
       setDeleting(false)

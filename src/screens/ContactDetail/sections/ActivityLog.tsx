@@ -1,4 +1,4 @@
-// src/screens/ContactDetail/sections/ActivityLog.jsx
+// src/screens/ContactDetail/sections/ActivityLog.tsx
 //
 // Per-job activity timeline. Composes events from existing data
 // (notes, payments, schedule, change orders, contact metadata) — no
@@ -18,7 +18,7 @@ import { useMemo, useState } from 'react'
 import { Activity, FileText, DollarSign, Calendar, FileEdit, Check, Sparkles } from 'lucide-react'
 import { composeActivityEvents } from './composeActivityEvents.ts'
 
-const ICONS = {
+const ICONS: Record<string, any> = {
   created: Sparkles,
   stage: Activity,
   note: FileText,
@@ -28,17 +28,17 @@ const ICONS = {
   change_order_approved: Check
 }
 
-const TONE_COLORS = {
+const TONE_COLORS: Record<string, any> = {
   neutral: { fg: 'var(--v3-text-muted)', bg: 'rgba(255,255,255,0.06)', dot: 'var(--v3-text-muted)' },
   gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', dot: 'var(--v3-primary)' },
   green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74, 222, 128, 0.10)', dot: 'var(--v3-success-bright, #4ade80)' },
   red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232, 90, 87, 0.10)', dot: 'var(--v3-danger-bright, #f5a294)' }
 }
 
-function relTime(d) {
+function relTime(d: any) {
   if (!d) return ''
   const now = new Date()
-  const diffMs = now - d
+  const diffMs = now.getTime() - new Date(d).getTime()
   const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
   if (diffDays < 0) {
     // Future event (scheduled)
@@ -66,7 +66,7 @@ export default function ActivityLog({
   scheduleItems = [],
   changeOrders = [],
   stageTransitions = []
-}) {
+}: any) {
   const events = useMemo(
     () => composeActivityEvents({ contact, notes, payments, scheduleItems, changeOrders, stageTransitions }),
     [contact, notes, payments, scheduleItems, changeOrders, stageTransitions]

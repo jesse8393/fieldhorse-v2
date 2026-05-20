@@ -3,9 +3,9 @@ import { SegmentedTabs } from '../../../components/v3'
 import MilestonesSection from '../sections/Milestones.jsx'
 import TodosSection from '../sections/Todos.jsx'
 import ScheduledSection from '../sections/Scheduled.jsx'
-import InspectionsSection from '../sections/Inspections.jsx'
-import InvitePartnerSection from '../sections/InvitePartner.jsx'
-import InsuranceSection from '../sections/InsuranceSection.jsx'
+import InspectionsSection from '../sections/Inspections.tsx'
+import InvitePartnerSection from '../sections/InvitePartner.tsx'
+import InsuranceSection from '../sections/InsuranceSection.tsx'
 
 /**
  * DETAILS tab — sub-tab router for the work-plan side of a job.

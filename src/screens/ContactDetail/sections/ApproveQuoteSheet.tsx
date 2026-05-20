@@ -49,7 +49,7 @@ const METHODS = [
   { value: 'esign_link',       label: 'Customer link', disabled: true, hint: 'Customers can sign themselves via Quote → Share link. Those approvals are recorded automatically.' }
 ]
 
-function money(n) {
+function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -58,7 +58,7 @@ function money(n) {
 // Compute a deterministic-ish quote number for the snapshot.
 // Mirrors the helper in pdf.js so the approval record carries the
 // same identifier the PDF will stamp later in 4C-3.
-function makeQuoteNumber(contactId) {
+function makeQuoteNumber(contactId: any) {
   const d = new Date()
   const y = d.getFullYear().toString().slice(-2)
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -68,7 +68,7 @@ function makeQuoteNumber(contactId) {
   return `FH-Q-${y}${m}-${tail}`
 }
 
-export default function ApproveQuoteSheet({ open, contact, userId, onClose, onApproved }) {
+export default function ApproveQuoteSheet({ open, contact, userId, onClose, onApproved }: any) {
   const { profile } = useProfile()
 
   const [method, setMethod] = useState('verbal')
@@ -79,10 +79,10 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   // Signature state (4C-4b). signatureKind mirrors the schema enum
   // ('drawn' | 'typed' | null). signatureData is either a PNG data URL
   // (drawn) or plain text (typed). Both null when method is non-signature.
-  const [signatureKind, setSignatureKind] = useState(null)
-  const [signatureData, setSignatureData] = useState(null)
+  const [signatureKind, setSignatureKind] = useState<any>(null)
+  const [signatureData, setSignatureData] = useState<any>(null)
 
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState<any[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
@@ -154,7 +154,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   // signature data never leaks across kinds. Typed mode seeds signatureData
   // with the current name field ONCE on transition (per spec); subsequent
   // edits in either field don't override each other.
-  function handleMethodChange(next) {
+  function handleMethodChange(next: any) {
     if (next === method) return
     hapticTap()
     setMethod(next)
@@ -193,7 +193,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         name: profile?.company_name || profile?.full_name || 'My Company',
         address: profile?.company_address || '',
         phone: profile?.company_phone || '',
-        email: profile?.company_email || profile?.email || '',
+        email: profile?.company_email || (profile as any)?.email || '',
         website: profile?.company_website || '',
         logo_url: profile?.logo_url || null,
         brand_accent_hex: profile?.brand_accent_hex || null,
@@ -255,8 +255,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         p_excluded_count: totals.excludedCount,
         p_approval_method: method,
         p_approved_by_name: name.trim(),
-        p_approved_by_email: email.trim() || null,
-        p_approval_note: note.trim() || null,
+        p_approved_by_email: (email.trim() || null) as any,
+        p_approval_note: (note.trim() || null) as any,
         p_signature_kind: sigKindOut,
         p_signature_data: sigDataOut
       })
@@ -353,7 +353,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
       toastSuccess(
         `Quote approved${archiveNote}${stageNote}`,
-        `Approved version ${confirmed.version_number} · ${money(totals.base)}`
+        `Approved version ${(confirmed as any).version_number} · ${money(totals.base)}`
       )
 
       // Write a contractor inbox notification (migration 008). Tap-
@@ -371,7 +371,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
       onApproved?.()
       onClose?.()
-    } catch (e) {
+    } catch (e: any) {
       console.error('[approve-quote] failed:', e)
       // Use the message we threw when it's one of ours; otherwise
       // fall back to a generic human message. Technical/Postgres
@@ -384,7 +384,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   }
 
   const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
-  const fieldStyle = {
+  const fieldStyle: import('react').CSSProperties = {
     padding: '11px 14px',
     borderRadius: 12,
     background: 'var(--surface-2)',
@@ -400,7 +400,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   }
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { if (!v && !submitting) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !submitting) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
         style={drawerStyle}
@@ -579,7 +579,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                 fontFamily: 'var(--font-body)', fontSize: 11,
                 color: 'var(--ink-faint, var(--ink-muted))', lineHeight: 1.45
               }}>
-                {METHODS.find((m) => m.value === 'esign_link').hint}
+                {METHODS.find((m: any) => m.value === 'esign_link')?.hint}
               </span>
             )}
           </div>
@@ -758,7 +758,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
  * on any failure. Caller treats failure as a non-blocking warning;
  * the snapshot stays approved either way.
  */
-async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userId }) {
+async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userId }: any) {
   try {
     // Approval shape — keys match what the v3 ApprovalBlock /
     // drawApprovalSection consume (Phase 4b). The new draw helper
@@ -822,7 +822,7 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
       status: 'approved',
       quoteId: contact.id,
       approval
-    })
+    } as any)
     if (!result?.doc) return { ok: false, error: new Error('Generator returned no doc') }
 
     const blob = result.doc.output('blob')
@@ -888,24 +888,24 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
       })
     }
     return { ok: true, linked, fileId: rowId }
-  } catch (e) {
+  } catch (e: any) {
     return { ok: false, error: e }
   }
 }
 
-function shortDate(iso) {
+function shortDate(iso: any) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function relativeAgo(iso) {
+function relativeAgo(iso: any) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   const dayMs = 86400000
-  const sameDay = (a, b) =>
+  const sameDay = (a: any, b: any) =>
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()

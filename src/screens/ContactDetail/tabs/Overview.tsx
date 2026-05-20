@@ -18,7 +18,7 @@ import {
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.jsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
-import ActivityLog from '../sections/ActivityLog.jsx'
+import ActivityLog from '../sections/ActivityLog.tsx'
 import { resolveNextAction } from '../lib/jobNextAction.ts'
 import ClientPicker from '../../../components/ClientPicker.jsx'
 import { money } from '../lib/format.ts'
