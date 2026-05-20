@@ -19,6 +19,13 @@
  *   - The active state is intentionally bold (gold gradient + halo
  *     ring) — this is THE primary affordance for "you are filtering".
  */
+type FilterPillProps = import('react').ButtonHTMLAttributes<HTMLButtonElement> & {
+  active?: boolean
+  count?: number | null
+  ariaLabel?: string
+  size?: 'sm' | 'md'
+}
+
 export default function FilterPill({
   active = false,
   count,
@@ -29,7 +36,7 @@ export default function FilterPill({
   className,
   style,
   ...rest
-}) {
+}: FilterPillProps) {
   const padY = size === 'sm' ? 7 : 9
   const padX = size === 'sm' ? 12 : 16
   const fontSize = size === 'sm' ? 11 : 12

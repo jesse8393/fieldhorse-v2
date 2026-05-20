@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Users as UsersIcon, ArrowUpRight } from 'lucide-react'
 import { STAGE_MAP, margin, marginTier } from '../../lib/stages.ts'
 import { hapticTap } from '../../lib/haptics.ts'
-import StatusPill from './StatusPill.jsx'
+import StatusPill from './StatusPill.tsx'
 
 // Cold threshold (V3-JOBS-1) — a contact in lead or quote stage with no
 // updated_at activity for at least 7 days reads as cold. Mirrors the
@@ -74,7 +74,7 @@ function MarginBadge({ pct, hasCost }) {
 }
 
 // V3-JOBS-1: local StagePill removed — replaced app-wide by the
-// shared StatusPill primitive (src/components/v3/StatusPill.jsx)
+// shared StatusPill primitive (src/components/v3/StatusPill.tsx)
 // so all status badges (stage / Top Deal / Approved / Cold) share
 // one chip family.
 
