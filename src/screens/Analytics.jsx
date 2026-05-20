@@ -12,7 +12,7 @@ import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn,
 import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import SectionHeader from '../components/v3/SectionHeader.jsx'
+import SectionHeader from '../components/v3/SectionHeader.tsx'
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 // Compact currency — matches Home hero pattern. Skips compaction under $1k

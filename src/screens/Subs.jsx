@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.jsx'
-import SectionHeader from '../components/v3/SectionHeader.jsx'
+import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import {

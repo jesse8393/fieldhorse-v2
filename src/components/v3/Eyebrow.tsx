@@ -1,3 +1,5 @@
+import type { HTMLAttributes, ElementType } from 'react'
+
 /**
  * Eyebrow — canonical small uppercase label.
  *
@@ -17,11 +19,18 @@
  *   <Eyebrow tone="alert">Needs attention today</Eyebrow>
  *   <Eyebrow as="div" tone="gold">Account</Eyebrow>
  */
-const TONE_COLOR = {
+type EyebrowTone = 'default' | 'gold' | 'alert' | 'success'
+
+const TONE_COLOR: Record<EyebrowTone, string> = {
   default: 'var(--v3-text-muted)',
   gold:    'var(--v3-primary)',
   alert:   'var(--v3-danger-bright)',
   success: 'var(--v3-success-bright)'
+}
+
+type EyebrowProps = HTMLAttributes<HTMLElement> & {
+  tone?: EyebrowTone
+  as?: ElementType
 }
 
 export default function Eyebrow({
@@ -31,7 +40,7 @@ export default function Eyebrow({
   className,
   style,
   ...rest
-}) {
+}: EyebrowProps) {
   return (
     <Component
       className={className}
