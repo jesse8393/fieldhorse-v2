@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, Phone, Mail, Pencil, Trash2 } from 'lucide-react-native'
 import { useClientDetail, useUpdateClient, useDeleteClient } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, GoldButton, StagePill, theme } from '../../components/ui'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E',
@@ -102,79 +103,78 @@ export default function ClientDetailScreen() {
   }
 
   return (
-    <View className="flex-1 bg-bg">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
-        <View className="flex-row items-center justify-between mb-4">
-          <Pressable onPress={() => router.back()} className="flex-row items-center" style={{ gap: 4 }}>
-            <ChevronLeft color="#E8B865" size={20} />
-            <Text className="text-gold-bright font-bold">Clients</Text>
+    <View style={{ flex: 1 }}>
+      <ScreenBackground />
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <Pressable onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} hitSlop={10}>
+            <ChevronLeft color={theme.goldBright} size={20} />
+            <Text style={{ color: theme.goldBright, fontWeight: '700' }}>Clients</Text>
           </Pressable>
-          <Pressable onPress={openEdit} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Pencil color="#E8B865" size={16} />
-            <Text className="text-gold-bright font-bold">Edit</Text>
+          <Pressable onPress={openEdit} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} hitSlop={8}>
+            <Pencil color={theme.goldBright} size={16} />
+            <Text style={{ color: theme.goldBright, fontWeight: '700' }}>Edit</Text>
           </Pressable>
         </View>
 
-        <Text className="text-ink text-3xl font-bold" numberOfLines={2}>{client.name || 'Unnamed'}</Text>
-        {client.company_name ? <Text className="text-ink-muted text-sm mt-1">{client.company_name}</Text> : null}
+        <Text style={{ color: theme.ink, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 }} numberOfLines={2}>{client.name || 'Unnamed'}</Text>
+        {client.company_name ? <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 2 }}>{client.company_name}</Text> : null}
 
         {/* Rollups */}
-        <View className="flex-row mt-5" style={{ gap: 10 }}>
-          <Stat label="Lifetime" value={money(totals.lifetime)} tone="#E8B865" />
+        <View style={{ flexDirection: 'row', marginTop: 18, gap: 10 }}>
+          <Stat label="Lifetime" value={money(totals.lifetime)} tone={theme.goldBright} glow />
           <Stat label="Active jobs" value={String(totals.active)} />
           <Stat label="Total jobs" value={String(jobs.length)} />
         </View>
 
         {/* Contact actions */}
         {(client.phone || client.email) && (
-          <View className="flex-row mt-4" style={{ gap: 10 }}>
+          <View style={{ flexDirection: 'row', marginTop: 14, gap: 10 }}>
             {client.phone ? (
-              <Action icon={<Phone color="#E8B865" size={16} />} label="Call" onPress={() => Linking.openURL(`tel:${client.phone}`)} />
+              <Action icon={<Phone color={theme.goldBright} size={16} />} label="Call" onPress={() => Linking.openURL(`tel:${client.phone}`)} />
             ) : null}
             {client.email ? (
-              <Action icon={<Mail color="#E8B865" size={16} />} label="Email" onPress={() => Linking.openURL(`mailto:${client.email}`)} />
+              <Action icon={<Mail color={theme.goldBright} size={16} />} label="Email" onPress={() => Linking.openURL(`mailto:${client.email}`)} />
             ) : null}
           </View>
         )}
 
         {client.address ? (
           <>
-            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Address</Text>
-            <Text className="text-ink text-sm">{client.address}</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 28, marginBottom: 8 }}>Address</Text>
+            <Text style={{ color: theme.ink, fontSize: 14 }}>{client.address}</Text>
           </>
         ) : null}
 
         {client.notes ? (
           <>
-            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Notes</Text>
-            <Text className="text-ink text-sm">{client.notes}</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 28, marginBottom: 8 }}>Notes</Text>
+            <Text style={{ color: theme.ink, fontSize: 14 }}>{client.notes}</Text>
           </>
         ) : null}
 
         {/* Jobs */}
-        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">Jobs</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 28, marginBottom: 12 }}>Jobs</Text>
         {jobs.length === 0 ? (
-          <Text className="text-ink-muted text-sm">No jobs linked to this client.</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 14 }}>No jobs linked to this client.</Text>
         ) : (
-          <View style={{ gap: 8 }}>
+          <View style={{ gap: 10 }}>
             {jobs.map((j) => {
-              const tint = STAGE_TINT[j.stage ?? ''] ?? '#5C5C5C'
+              const tint = STAGE_TINT[j.stage ?? ''] ?? '#3a352e'
               return (
-                <Pressable
-                  key={j.id}
-                  onPress={() => router.push(`/jobs/${j.id}`)}
-                  className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center"
-                  style={{ gap: 12 }}
-                >
-                  <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 3, backgroundColor: tint }} />
-                  <View className="flex-1">
-                    <Text className="text-ink text-base font-bold" numberOfLines={1}>{j.name || 'Untitled'}</Text>
-                    <Text className="text-ink-muted text-xs mt-1" numberOfLines={1}>{j.job_title || j.job_type || '—'}</Text>
-                  </View>
-                  <View className="items-end">
-                    <Text className="text-gold-bright text-base font-bold">{money(Number(j.amount || 0))}</Text>
-                    <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>{j.stage}</Text>
-                  </View>
+                <Pressable key={j.id} onPress={() => router.push(`/jobs/${j.id}`)}>
+                  <Card accent={tint}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 18 }}>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
+                        <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>{j.job_title || j.job_type || '—'}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: theme.goldBright, fontSize: 16, fontWeight: '800' }}>{money(Number(j.amount || 0))}</Text>
+                        {j.stage ? <View style={{ marginTop: 5 }}><StagePill stage={j.stage} /></View> : null}
+                      </View>
+                    </View>
+                  </Card>
                 </Pressable>
               )
             })}
@@ -233,21 +233,13 @@ export default function ClientDetailScreen() {
               className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
               style={{ minHeight: 72, textAlignVertical: 'top' }}
             />
-            <Pressable
-              onPress={submitEdit}
-              disabled={eSaving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: eSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
-            >
-              {eSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save changes</Text>}
-            </Pressable>
+            <GoldButton label="Save changes" onPress={submitEdit} loading={eSaving} />
             <Pressable
               onPress={confirmDelete}
-              className="flex-row items-center justify-center rounded-xl py-3.5 mt-3 border border-[rgba(232,90,87,0.3)]"
-              style={{ gap: 6, backgroundColor: 'rgba(232,90,87,0.10)' }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 14, paddingVertical: 14, marginTop: 12, borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}
             >
-              <Trash2 color="#f5a294" size={16} />
-              <Text className="text-[#f5a294] font-bold">Delete client</Text>
+              <Trash2 color={theme.danger} size={16} />
+              <Text style={{ color: theme.danger, fontWeight: '700' }}>Delete client</Text>
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -256,12 +248,14 @@ export default function ClientDetailScreen() {
   )
 }
 
-function Stat({ label, value, tone = '#F2EDE4' }: { label: string; value: string; tone?: string }) {
+function Stat({ label, value, tone = '#F2EDE4', glow }: { label: string; value: string; tone?: string; glow?: boolean }) {
   return (
-    <View className="flex-1 bg-surface rounded-2xl p-3 border border-[rgba(255,240,210,0.06)]">
-      <Text className="text-lg font-bold" style={{ color: tone }} numberOfLines={1}>{value}</Text>
-      <Text className="text-ink-muted text-[10px] font-semibold mt-1">{label}</Text>
-    </View>
+    <Card glow={glow} style={{ flex: 1 }}>
+      <View style={{ padding: 14 }}>
+        <Text style={{ fontSize: 18, fontWeight: '800', color: tone }} numberOfLines={1}>{value}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '600', marginTop: 4 }}>{label}</Text>
+      </View>
+    </Card>
   )
 }
 
@@ -269,11 +263,10 @@ function Action({ icon, label, onPress }: { icon: import('react').ReactNode; lab
   return (
     <Pressable
       onPress={onPress}
-      className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
-      style={{ gap: 6, backgroundColor: 'rgba(232,184,101,0.10)' }}
+      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 14, paddingVertical: 13, borderWidth: 1, borderColor: 'rgba(232,184,101,0.3)', backgroundColor: 'rgba(232,184,101,0.10)' }}
     >
       {icon}
-      <Text className="text-gold-bright font-bold">{label}</Text>
+      <Text style={{ color: theme.goldBright, fontWeight: '700' }}>{label}</Text>
     </Pressable>
   )
 }
