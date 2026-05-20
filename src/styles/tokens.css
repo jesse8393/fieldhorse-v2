@@ -190,12 +190,20 @@
   --v3-s-6: 48px;
   --v3-s-7: 64px;
 
-  /* ---------- Shadows — restrained, warm-inset (prototype 2-layer) ---------- */
-  --v3-shadow:    0 1px 0 rgba(255, 240, 210, 0.04) inset,
-                  0 4px 14px rgba(0, 0, 0, 0.45);
-  --v3-shadow-lg: 0 1px 0 rgba(255, 240, 210, 0.06) inset,
+  /* ---------- Shadows — layered depth (3-plane: contact / mid / ambient)
+     plus a warm inner top-edge highlight so cards read as lifted
+     glass panels instead of flat rectangles. Billion-dollar polish:
+     a single soft shadow looks cheap; stacking a tight contact
+     shadow + a mid-spread + a wide ambient gives real dimensionality
+     on a dark canvas. ---------- */
+  --v3-shadow:    0 1px 0 rgba(255, 240, 210, 0.05) inset,
+                  0 1px 2px rgba(0, 0, 0, 0.40),
+                  0 6px 16px rgba(0, 0, 0, 0.42),
+                  0 18px 40px rgba(0, 0, 0, 0.30);
+  --v3-shadow-lg: 0 1px 0 rgba(255, 240, 210, 0.07) inset,
+                  0 2px 4px rgba(0, 0, 0, 0.45),
                   0 14px 36px rgba(0, 0, 0, 0.55),
-                  0 4px 10px rgba(0, 0, 0, 0.35);
+                  0 28px 64px rgba(0, 0, 0, 0.40);
   /* Hero shadow — Phase 1A-3: black depth carries the lift, gold is
      barely there. Gold ambient 0.10 → 0.05; black depth 56/0.60 →
      64/0.66. Hero now reads as a smoked-glass panel with a hint of
