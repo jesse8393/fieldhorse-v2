@@ -17,7 +17,7 @@ const SUB_TABS = [
   { id: 'messages', label: 'Messages' }
 ]
 
-export default function FilesTab({ contact, notes = [], userId, fetchAll }) {
+export default function FilesTab({ contact, notes = [], userId, fetchAll }: any) {
   const [sub, setSub] = useState('photos')
 
   return (

@@ -32,7 +32,7 @@ export default function FinancialsTab({
   onOpenLogPayment,
   insurance,
   changeOrders
-}) {
+}: any) {
   // Default sub = invoice when there's money owed; otherwise subs.
   const defaultSub = balance > 0.5 ? 'invoice' : 'subs'
   const [sub, setSub] = useState(defaultSub)

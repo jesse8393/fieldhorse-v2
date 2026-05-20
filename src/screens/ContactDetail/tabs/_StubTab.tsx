@@ -12,7 +12,7 @@ import { Construction } from 'lucide-react'
  *
  * Each call site overrides `name` + `upcoming` so the message is specific.
  */
-export default function StubTab({ name, upcoming = [] }) {
+export default function StubTab({ name, upcoming = [] }: any) {
   return (
     <div style={{
       margin: '24px 20px',

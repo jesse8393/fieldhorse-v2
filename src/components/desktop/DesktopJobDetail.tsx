@@ -6,11 +6,11 @@ import {
 } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
 import { stageColor } from '../../lib/stages.ts'
-import OverviewTab_ from '../../screens/ContactDetail/tabs/Overview.jsx'
-import QuoteTab_ from '../../screens/ContactDetail/tabs/Quote.jsx'
-import DetailsTab_ from '../../screens/ContactDetail/tabs/Details.jsx'
-import FinancialsTab_ from '../../screens/ContactDetail/tabs/Financials.jsx'
-import FilesTab_ from '../../screens/ContactDetail/tabs/Files.jsx'
+import OverviewTab_ from '../../screens/ContactDetail/tabs/Overview.tsx'
+import QuoteTab_ from '../../screens/ContactDetail/tabs/Quote.tsx'
+import DetailsTab_ from '../../screens/ContactDetail/tabs/Details.tsx'
+import FinancialsTab_ from '../../screens/ContactDetail/tabs/Financials.tsx'
+import FilesTab_ from '../../screens/ContactDetail/tabs/Files.tsx'
 // Aliased as any-prop until the ContactDetail tabs are converted to .tsx
 // with optional props; these desktop usages pass a subset by design.
 const OverviewTab = OverviewTab_ as any

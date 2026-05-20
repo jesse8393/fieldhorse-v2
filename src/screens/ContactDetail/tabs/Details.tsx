@@ -38,7 +38,7 @@ export default function DetailsTab({
   onOpenAddEvent,
   onOpenInvitePartner,
   insurance
-}) {
+}: any) {
   const [sub, setSub] = useState('milestones')
 
   // Sub-tabs with counts where they make the screen more useful
@@ -46,7 +46,7 @@ export default function DetailsTab({
     const milestones = Array.isArray(contact?.milestones) ? contact.milestones : []
     return SUB_TABS.map((t) => {
       if (t.id === 'milestones') {
-        const undone = milestones.filter((m) => !m.done).length
+        const undone = milestones.filter((m: any) => !m.done).length
         return undone > 0 ? { ...t, count: undone } : t
       }
       if (t.id === 'scheduled') {
