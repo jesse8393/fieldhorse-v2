@@ -1,4 +1,4 @@
-// src/components/InvitePartnerSheet.jsx
+// src/components/InvitePartnerSheet.tsx
 //
 // v3 rebuild — same partner-invite flow, but rebuilt around the
 // cockpit / serif-headline / commit-button pattern shared with
@@ -27,7 +27,7 @@ import { hapticTap } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { loadPastPartners, PARTNER_ROLES } from '../lib/partners.ts'
 
-function friendlyInviteError(code) {
+function friendlyInviteError(code: any) {
   if (code === 'server_misconfigured') return "Server isn't set up — missing Supabase keys in Netlify env."
   if (code === 'forbidden_or_not_found') return "Can't invite on a job that isn't yours."
   if (code === 'db_insert_failed') return 'Database rejected the invite.'
@@ -37,7 +37,7 @@ function friendlyInviteError(code) {
   return `Invite failed (${code}).`
 }
 
-export default function InvitePartnerSheet({ open, onOpenChange, contactId, contactName, invitedByUserId }) {
+export default function InvitePartnerSheet({ open, onOpenChange, contactId, contactName, invitedByUserId }: any) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('')
@@ -46,9 +46,9 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
   const [sendFallbackReason, setSendFallbackReason] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
   const [copied, setCopied] = useState(false)
-  const [pastPartners, setPastPartners] = useState([])
+  const [pastPartners, setPastPartners] = useState<any[]>([])
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
-  const copyTimer = useRef(null)
+  const copyTimer = useRef<any>(null)
 
   // Reset state every time the sheet closes so reopening starts clean.
   useEffect(() => {
@@ -77,14 +77,14 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     return () => { alive = false }
   }, [open, readyUrl, contactId])
 
-  function pickPast(p) {
+  function pickPast(p: any) {
     hapticTap()
     setName(p.name || '')
     setEmail(p.email || '')
     setRole(p.role || '')
   }
 
-  async function submit(e) {
+  async function submit(e: any) {
     e?.preventDefault?.()
     const trimmed = email.trim().toLowerCase()
     if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
@@ -129,7 +129,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         toastSuccess('Invite sent', `${trimmed} will get the link shortly.`)
         onOpenChange(false)
       }
-    } catch (err) {
+    } catch (err: any) {
       toastError("Couldn't send invite", err?.message || 'Check your connection and try again.')
     } finally {
       setSending(false)
@@ -144,7 +144,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         await navigator.clipboard.writeText(readyUrl)
         wrote = true
       }
-    } catch (ex) {
+    } catch (ex: any) {
       console.error('[partner-invite] clipboard.writeText failed', ex)
     }
     if (!wrote) {
@@ -160,7 +160,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         ta.setSelectionRange(0, readyUrl.length)
         wrote = document.execCommand('copy')
         document.body.removeChild(ta)
-      } catch (ex) {
+      } catch (ex: any) {
         console.error('[partner-invite] execCommand copy fallback failed', ex)
       }
     }
@@ -185,15 +185,15 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         text: body,
         url: readyUrl
       })
-    } catch (ex) {
+    } catch (ex: any) {
       if (ex?.name !== 'AbortError') {
         console.error('[partner-invite] navigator.share failed', ex)
       }
     }
   }
 
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
-  const fieldStyle = {
+  const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const fieldStyle: import('react').CSSProperties = {
     padding: '11px 14px',
     borderRadius: 12,
     background: 'var(--surface-2)',
@@ -375,7 +375,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
   )
 }
 
-const iconStyle = {
+const iconStyle: import('react').CSSProperties = {
   position: 'absolute',
   left: 14, top: '50%',
   transform: 'translateY(-50%)',
@@ -383,7 +383,7 @@ const iconStyle = {
   pointerEvents: 'none'
 }
 
-function RecentPartnersStrip({ partners, onPick }) {
+function RecentPartnersStrip({ partners, onPick }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{
@@ -397,7 +397,7 @@ function RecentPartnersStrip({ partners, onPick }) {
         overflowX: 'auto', WebkitOverflowScrolling: 'touch',
         paddingBottom: 2
       }}>
-        {partners.map((p) => (
+        {partners.map((p: any) => (
           <button
             key={p.email}
             type="button"
@@ -456,7 +456,7 @@ function RecentPartnersStrip({ partners, onPick }) {
   )
 }
 
-function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onCopy, onShare, onClose }) {
+function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onCopy, onShare, onClose }: any) {
   return (
     <div style={{
       padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',

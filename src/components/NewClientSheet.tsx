@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 
-export default function NewClientSheet({ open, userId, onClose, onSaved }) {
+export default function NewClientSheet({ open, userId, onClose, onSaved }: any) {
   const [name, setName] = useState('')
   const [company, setCompany] = useState('')
   const [phone, setPhone] = useState('')
@@ -27,7 +27,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
     }
   }, [open])
 
-  async function submit(e) {
+  async function submit(e: any) {
     e?.preventDefault?.()
     if (!name.trim() || !userId) return
     setSaving(true)
@@ -48,14 +48,14 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
       if (error) throw error
       toastSuccess('Client saved', data?.name || '')
       onSaved?.(data)
-    } catch (ex) {
+    } catch (ex: any) {
       toastError("Couldn't save client", ex?.message || 'Try again in a moment.')
     } finally {
       setSaving(false)
     }
   }
 
-  const fieldStyle = {
+  const fieldStyle: import('react').CSSProperties = {
     width: '100%',
     boxSizing: 'border-box',
     padding: '11px 14px',
@@ -72,10 +72,10 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }) {
     scrollMarginTop: 96,
     scrollMarginBottom: 120
   }
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { if (!v) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
         style={drawerStyle}

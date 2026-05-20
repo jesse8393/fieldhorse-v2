@@ -28,7 +28,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 const MOBILE_BREAKPOINT = 900
 const DEBOUNCE_MS = 200
 
-const KIND_META = {
+const KIND_META: Record<string, any> = {
   job:    { Icon: Briefcase,  heading: 'Jobs' },
   client: { Icon: Users,      heading: 'Clients' },
   note:   { Icon: FileText,   heading: 'Notes' },
@@ -37,16 +37,16 @@ const KIND_META = {
 }
 
 const GROUP_ORDER = ['jobs', 'clients', 'notes', 'events', 'files']
-const GROUP_TO_KIND = {
+const GROUP_TO_KIND: Record<string, any> = {
   jobs: 'job', clients: 'client', notes: 'note', events: 'event', files: 'file'
 }
 
 export default function MobileSearchOverlay() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState(null) // null = idle, {} = empty results
+  const [results, setResults] = useState<any>(null) // null = idle, {} = empty results
   const [searching, setSearching] = useState(false)
-  const inputRef = useRef(null)
+  const inputRef = useRef<any>(null)
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -87,7 +87,7 @@ export default function MobileSearchOverlay() {
   // Escape closes.
   useEffect(() => {
     if (!open) return
-    function onKey(e) {
+    function onKey(e: any) {
       if (e.key === 'Escape') { e.preventDefault(); setOpen(false) }
     }
     window.addEventListener('keydown', onKey)
@@ -114,7 +114,7 @@ export default function MobileSearchOverlay() {
     return () => { cancelled = true; clearTimeout(t) }
   }, [query, open, user?.id])
 
-  const handleGo = useCallback((to) => {
+  const handleGo = useCallback((to: any) => {
     setOpen(false)
     // Allow the close animation to settle before navigating so the
     // screen swap doesn't unmount the overlay mid-exit.
@@ -266,7 +266,7 @@ function IdleHint() {
   )
 }
 
-function EmptyState({ text }) {
+function EmptyState({ text }: any) {
   return (
     <div style={{
       padding: '32px 18px',
@@ -279,7 +279,7 @@ function EmptyState({ text }) {
   )
 }
 
-function ResultsList({ results, onGo }) {
+function ResultsList({ results, onGo }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
       {GROUP_ORDER.map((groupKey) => {
@@ -308,7 +308,7 @@ function ResultsList({ results, onGo }) {
                 display: 'flex', flexDirection: 'column', gap: 6
               }}
             >
-              {items.map((it) => (
+              {items.map((it: any) => (
                 <ResultRow key={it.id} item={it} onGo={onGo} />
               ))}
             </ul>
@@ -319,7 +319,7 @@ function ResultsList({ results, onGo }) {
   )
 }
 
-function ResultRow({ item, onGo }) {
+function ResultRow({ item, onGo }: any) {
   const meta = KIND_META[item.kind] || KIND_META.note
   const Icon = meta.Icon
   return (

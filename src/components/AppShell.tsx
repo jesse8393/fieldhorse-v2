@@ -5,7 +5,7 @@ import AppHeader from './AppHeader.tsx'
 import BottomNav from './BottomNav.tsx'
 import DesktopSidebar from './DesktopSidebar.tsx'
 import CommandPalette from './CommandPalette.tsx'
-import MobileSearchOverlay from './MobileSearchOverlay.jsx'
+import MobileSearchOverlay from './MobileSearchOverlay.tsx'
 import Toaster from './Toaster.jsx'
 import RouteErrorBoundary from './RouteErrorBoundary.jsx'
 

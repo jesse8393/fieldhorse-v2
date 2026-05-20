@@ -22,7 +22,7 @@ const COLUMNS = [
   { id: 'closed',  label: 'Closed' }
 ]
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
@@ -30,12 +30,12 @@ function money(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function initials(name) {
+function initials(name: any) {
   if (!name) return '—'
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w: any) => w[0].toUpperCase()).join('')
 }
 
-function KanbanCard({ contact, dragging, onOpen }) {
+function KanbanCard({ contact, dragging, onOpen }: any) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: contact.id, data: { contact } })
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
@@ -44,7 +44,7 @@ function KanbanCard({ contact, dragging, onOpen }) {
   // releases under 6 px of movement never start a drag. Use the
   // pointerup event (not click — dnd-kit absorbs click) and only
   // navigate if no drag actually occurred.
-  function handlePointerUp(e) {
+  function handlePointerUp(e: any) {
     if (isDragging) return
     if (e.button !== undefined && e.button !== 0) return
     onOpen?.(contact)
@@ -98,9 +98,9 @@ function KanbanCard({ contact, dragging, onOpen }) {
   )
 }
 
-function KanbanColumn({ id, label, contacts, isOver, onOpen }) {
+function KanbanColumn({ id, label, contacts, isOver, onOpen }: any) {
   const { setNodeRef } = useDroppable({ id })
-  const total = contacts.reduce((s, c) => s + Number(c.amount || 0), 0)
+  const total = contacts.reduce((s: any, c: any) => s + Number(c.amount || 0), 0)
   return (
     <div
       ref={setNodeRef}
@@ -125,7 +125,7 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }) {
         </span>
       </header>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {contacts.map((c) => (
+        {contacts.map((c: any) => (
           <KanbanCard key={c.id} contact={c} onOpen={onOpen} />
         ))}
         {contacts.length === 0 && (
@@ -138,9 +138,9 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }) {
   )
 }
 
-export default function KanbanBoard({ contacts, onStageChange, onOpen }) {
-  const [activeId, setActiveId] = useState(null)
-  const [overColumn, setOverColumn] = useState(null)
+export default function KanbanBoard({ contacts, onStageChange, onOpen }: any) {
+  const [activeId, setActiveId] = useState<any>(null)
+  const [overColumn, setOverColumn] = useState<any>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -148,31 +148,31 @@ export default function KanbanBoard({ contacts, onStageChange, onOpen }) {
   )
 
   const byStage = useMemo(() => {
-    const out = Object.fromEntries(COLUMNS.map((c) => [c.id, []]))
+    const out: Record<string, any[]> = Object.fromEntries(COLUMNS.map((c: any) => [c.id, []]))
     for (const c of contacts || []) {
       if (out[c.stage]) out[c.stage].push(c)
     }
     return out
   }, [contacts])
 
-  const activeContact = activeId ? (contacts || []).find((c) => c.id === activeId) : null
+  const activeContact = activeId ? (contacts || []).find((c: any) => c.id === activeId) : null
 
-  function handleDragStart(e) {
+  function handleDragStart(e: any) {
     setActiveId(e.active.id)
     hapticTap()
   }
 
-  function handleDragOver(e) {
+  function handleDragOver(e: any) {
     setOverColumn(e.over?.id || null)
   }
 
-  function handleDragEnd(e) {
+  function handleDragEnd(e: any) {
     const id = e.active.id
     const targetStage = e.over?.id
     setActiveId(null)
     setOverColumn(null)
     if (!targetStage || !COLUMNS.some((c) => c.id === targetStage)) return
-    const moved = (contacts || []).find((c) => c.id === id)
+    const moved = (contacts || []).find((c: any) => c.id === id)
     if (!moved || moved.stage === targetStage) return
     hapticStageChange()
     onStageChange?.(id, targetStage)

@@ -24,7 +24,7 @@ import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import CountUp from '../components/fx/CountUp.tsx'
 import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
-import HomeActivityCard from '../components/HomeActivityCard.jsx'
+import HomeActivityCard from '../components/HomeActivityCard.tsx'
 import { hapticTap } from '../lib/haptics.ts'
 // V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
 // same batch helper Jobs already uses (one query + one signed-URL
