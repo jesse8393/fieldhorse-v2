@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, MessageSquare, Mail, Phone, ExternalLink,
@@ -10,14 +11,13 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import SwipeableRow from '../components/SwipeableRow.jsx'
 import { JobCard, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
 import DesktopJobsBoard from '../components/desktop/DesktopJobsBoard.jsx'
-import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { ACTIVE_STAGES } from '../lib/stages.js'
 import { hapticTap, hapticMedium } from '../lib/haptics.js'
 import { toastSuccess } from '../lib/toast.js'
 import { useFhMotion } from '../lib/motion.js'
 import { useIsDesktop } from '../lib/useMediaQuery.js'
-import { fetchCoverPhotosByJob } from '../lib/photos.js'
+import { useJobs, useJobPhotos, useJobsRealtime, queryKeys } from '../lib/queries.ts'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
 // Tabs collapse 6 raw stages to 5 honest groupings.
@@ -53,9 +53,14 @@ function kFormat(n) {
 
 export default function Jobs() {
   const { user } = useAuth()
-  const [contacts, setContacts] = useState([])
-  const [refreshTick, setRefreshTick] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  // TanStack Query replaces the old useState + load() + refreshTick
+  // pattern. useJobs caches the contacts list; useJobPhotos signs cover
+  // photos separately; useJobsRealtime invalidates on any fh_contacts
+  // change so the list stays live without a manual counter.
+  const { data: contacts = [], isLoading: loading } = useJobs()
+  const { data: photoUrlByJob = {} } = useJobPhotos(user?.id)
+  useJobsRealtime(user?.id, queryClient)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
@@ -65,54 +70,8 @@ export default function Jobs() {
   const [addInitialStage, setAddInitialStage] = useState('lead')
   const [justAddedId, setJustAddedId] = useState(null)
   const [drawerContact, setDrawerContact] = useState(null)
-  // Cover photos by job_id. Populated alongside contacts; ONE batch query
-  // + ONE batch signed-URL call (see lib/photos.js). Empty map = fall back
-  // to JobCard's stage-tinted initial tile.
-  const [photoUrlByJob, setPhotoUrlByJob] = useState({})
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-
-  const load = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    // Run contacts + cover-photos in parallel. Photos failure is non-fatal
-    // (we just keep the existing photo map / fall back to initials).
-    // V3-PARTNERS: dropped the .eq('user_id', user.id) JS-layer filter so
-    // partner-shared jobs surface in this list. RLS (fh_contacts owner +
-    // fh_contacts_partner_read) is the enforcement layer; the JS filter
-    // was excluding shared rows entirely. Owner sees the same set they
-    // always did; partner now sees jobs owned by other contractors that
-    // were shared with them via accepted fh_job_partners invites.
-    const [contactsRes, photoMap] = await Promise.all([
-      supabase
-        .from('fh_contacts')
-        // Embed client phone + email so the tile-peek action sheet's
-        // Call / Text / Email tiles can fall back to the client's
-        // contact info when the job row itself has none.
-        .select('*, fh_clients(name, phone, email)')
-        .order('updated_at', { ascending: false }),
-      fetchCoverPhotosByJob(user.id).catch(() => ({}))
-    ])
-    if (!contactsRes.error) setContacts(contactsRes.data || [])
-    setPhotoUrlByJob(photoMap || {})
-    setLoading(false)
-  }, [user, refreshTick])
-
-  // Supabase Realtime — re-fetch Jobs on any fh_contacts change for this user.
-  useEffect(() => {
-    if (!user) return
-    const channel = supabase
-      .channel(`fh_contacts:jobs:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${user.id}` },
-        () => setRefreshTick((t) => t + 1)
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [user])
-
-  useEffect(() => { load() }, [load])
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
@@ -304,7 +263,7 @@ export default function Jobs() {
           onCreated={async (created) => {
             setAddOpen(false)
             if (created?.id) setJustAddedId(created.id)
-            await load()
+            await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
             setTimeout(() => setJustAddedId(null), 1200)
             const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
             toastSuccess(
@@ -532,7 +491,7 @@ export default function Jobs() {
         onCreated={async (created) => {
           setAddOpen(false)
           if (created?.id) setJustAddedId(created.id)
-          await load()
+          await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
           setTimeout(() => setJustAddedId(null), 1200)
           const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
           toastSuccess(

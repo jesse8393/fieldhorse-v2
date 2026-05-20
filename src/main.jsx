@@ -1,12 +1,14 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
 import App from './App.jsx'
 import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { ConfirmProvider } from './components/ConfirmSheet.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { ProfileProvider } from './contexts/ProfileContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
+import { queryClient } from './lib/queryClient.js'
 import './styles/tokens.css'
 import './styles/global.css'
 import './styles/v3.css'
@@ -61,15 +63,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           v7_relativeSplatPath: true
         }}
       >
-        <ThemeProvider>
-          <AuthProvider>
-            <ProfileProvider>
-              <ConfirmProvider>
-                <App />
-              </ConfirmProvider>
-            </ProfileProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <AuthProvider>
+              <ProfileProvider>
+                <ConfirmProvider>
+                  <App />
+                </ConfirmProvider>
+              </ProfileProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
       </BrowserRouter>
     </AppErrorBoundary>
   </React.StrictMode>
