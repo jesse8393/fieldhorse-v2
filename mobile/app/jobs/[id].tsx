@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import {
   ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera, Calendar, Users, User,
-  CheckSquare, Square, FileText
+  CheckSquare, Square, FileText, ClipboardCheck, Car
 } from 'lucide-react-native'
 import {
   useJobDetail, useLogPayment, useUpdateStage, useUpdateJob,
@@ -22,12 +22,23 @@ import {
   useAddSub, useDeleteSub, useClientsBundle,
   useAddTodo, useToggleTodo, useDeleteTodo,
   useAddNote, useDeleteNote,
-  useCreateInvoice, useUpdateInvoiceStatus, useDeleteInvoice
+  useCreateInvoice, useUpdateInvoiceStatus, useDeleteInvoice,
+  useAddChangeOrder, useUpdateChangeOrderStatus, useDeleteChangeOrder,
+  useAddMileage, useDeleteMileage,
+  useAddInspection, useUpdateInspectionResult, useDeleteInspection
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#6B7CA8', paid: '#4F8C5E', overdue: '#7d2a1f', void: '#5C5C5C'
+}
+
+const CO_TINT: Record<string, string> = {
+  pending: '#C9963A', approved: '#4F8C5E', declined: '#7d2a1f'
+}
+
+const INSP_TINT: Record<string, string> = {
+  pending: '#C9963A', pass: '#4F8C5E', fail: '#7d2a1f'
 }
 
 const STAGE_TINT: Record<string, string> = {
@@ -66,6 +77,14 @@ export default function JobDetailScreen() {
   const createInvoice = useCreateInvoice()
   const updateInvoiceStatus = useUpdateInvoiceStatus()
   const deleteInvoice = useDeleteInvoice()
+  const addChangeOrder = useAddChangeOrder()
+  const updateChangeOrderStatus = useUpdateChangeOrderStatus()
+  const deleteChangeOrder = useDeleteChangeOrder()
+  const addMileage = useAddMileage()
+  const deleteMileage = useDeleteMileage()
+  const addInspection = useAddInspection()
+  const updateInspectionResult = useUpdateInspectionResult()
+  const deleteInspection = useDeleteInspection()
   const { data: photos = [] } = useJobPhotos(id)
   const { data: clientsBundle } = useClientsBundle(user?.id)
 
@@ -78,6 +97,19 @@ export default function JobDetailScreen() {
   const [invTitle, setInvTitle] = useState('')
   const [invAmount, setInvAmount] = useState('')
   const [invSaving, setInvSaving] = useState(false)
+  const [coOpen, setCoOpen] = useState(false)
+  const [coTitle, setCoTitle] = useState('')
+  const [coAmount, setCoAmount] = useState('')
+  const [coDesc, setCoDesc] = useState('')
+  const [coSaving, setCoSaving] = useState(false)
+  const [milesOpen, setMilesOpen] = useState(false)
+  const [milesVal, setMilesVal] = useState('')
+  const [milesPurpose, setMilesPurpose] = useState('')
+  const [milesSaving, setMilesSaving] = useState(false)
+  const [inspOpen, setInspOpen] = useState(false)
+  const [inspTrade, setInspTrade] = useState('')
+  const [inspInspector, setInspInspector] = useState('')
+  const [inspSaving, setInspSaving] = useState(false)
 
   const [subOpen, setSubOpen] = useState(false)
   const [subName, setSubName] = useState('')
@@ -147,6 +179,9 @@ export default function JobDetailScreen() {
   const todos = data?.todos ?? []
   const notes = data?.notes ?? []
   const invoices = data?.invoices ?? []
+  const changeOrders = data?.changeOrders ?? []
+  const mileage = data?.mileage ?? []
+  const inspections = data?.inspections ?? []
   const clients = clientsBundle?.clients ?? []
   const linkedClient = contact?.client_id ? clients.find((c) => c.id === contact.client_id) ?? null : null
 
@@ -196,6 +231,73 @@ export default function JobDetailScreen() {
       { text: 'Delete', style: 'destructive', onPress: () => deleteInvoice({ id: iid, contactId: contact.id }) }
     ])
   }
+
+  async function submitChangeOrder() {
+    const amt = Number(coAmount.replace(/[^0-9.]/g, ''))
+    if (!coTitle.trim() || !contact || !user || coSaving) return
+    setCoSaving(true)
+    const { error } = await addChangeOrder({ userId: user.id, contactId: contact.id, title: coTitle.trim(), amount: amt, description: coDesc.trim() || undefined })
+    setCoSaving(false)
+    if (!error) { setCoOpen(false); setCoTitle(''); setCoAmount(''); setCoDesc('') }
+  }
+
+  function cycleChangeOrder(co: { id: string; status: string }) {
+    if (!contact) return
+    const order = ['pending', 'approved', 'declined']
+    const next = order[(order.indexOf(co.status) + 1) % order.length]
+    updateChangeOrderStatus({ id: co.id, contactId: contact.id, status: next })
+  }
+
+  function confirmDeleteChangeOrder(cid: string) {
+    if (!contact) return
+    Alert.alert('Delete change order?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteChangeOrder({ id: cid, contactId: contact.id }) }
+    ])
+  }
+
+  async function submitMileage() {
+    const m = Number(milesVal.replace(/[^0-9.]/g, ''))
+    if (!m || !contact || !user || milesSaving) return
+    setMilesSaving(true)
+    const { error } = await addMileage({ userId: user.id, contactId: contact.id, miles: m, purpose: milesPurpose.trim() || undefined })
+    setMilesSaving(false)
+    if (!error) { setMilesOpen(false); setMilesVal(''); setMilesPurpose('') }
+  }
+
+  function confirmDeleteMileage(mid: string) {
+    if (!contact) return
+    Alert.alert('Delete trip?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMileage({ id: mid, contactId: contact.id }) }
+    ])
+  }
+
+  async function submitInspection() {
+    if (!inspTrade.trim() || !contact || !user || inspSaving) return
+    setInspSaving(true)
+    const { error } = await addInspection({ userId: user.id, contactId: contact.id, trade: inspTrade.trim(), inspector: inspInspector.trim() || undefined })
+    setInspSaving(false)
+    if (!error) { setInspOpen(false); setInspTrade(''); setInspInspector('') }
+  }
+
+  function cycleInspection(insp: { id: string; result: string | null }) {
+    if (!contact) return
+    const order = ['pending', 'pass', 'fail']
+    const cur = insp.result || 'pending'
+    const next = order[(order.indexOf(cur) + 1) % order.length]
+    updateInspectionResult({ id: insp.id, contactId: contact.id, result: next })
+  }
+
+  function confirmDeleteInspection(iid: string) {
+    if (!contact) return
+    Alert.alert('Delete inspection?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteInspection({ id: iid, contactId: contact.id }) }
+    ])
+  }
+
+  const mileageTotal = mileage.reduce((s, m) => s + Number(m.miles || 0), 0)
 
   async function submitSub() {
     if (!subName.trim() || !contact || !user || subSaving) return
@@ -615,6 +717,108 @@ export default function JobDetailScreen() {
           </View>
         )}
 
+        {/* Change orders */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Change orders</Text>
+          <Pressable onPress={() => setCoOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Plus color="#E8B865" size={14} />
+            <Text className="text-gold-bright text-xs font-bold">New</Text>
+          </Pressable>
+        </View>
+        {changeOrders.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No change orders.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {changeOrders.map((co) => {
+              const tint = CO_TINT[co.status] ?? '#5C5C5C'
+              return (
+                <Pressable
+                  key={co.id}
+                  onPress={() => cycleChangeOrder(co)}
+                  onLongPress={() => confirmDeleteChangeOrder(co.id)}
+                  delayLongPress={350}
+                  className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+                >
+                  <View className="flex-1 pr-3">
+                    <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{co.title}</Text>
+                    <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>{co.status}</Text>
+                  </View>
+                  <Text className="text-ink font-bold">{money(Number(co.amount || 0))}</Text>
+                </Pressable>
+              )
+            })}
+            <Text className="text-ink-muted text-[10px] mt-1">Tap to advance status · long-press to delete.</Text>
+          </View>
+        )}
+
+        {/* Inspections */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Inspections</Text>
+          <Pressable onPress={() => setInspOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <ClipboardCheck color="#E8B865" size={14} />
+            <Text className="text-gold-bright text-xs font-bold">Add</Text>
+          </Pressable>
+        </View>
+        {inspections.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No inspections.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {inspections.map((insp) => {
+              const result = insp.result || 'pending'
+              const tint = INSP_TINT[result] ?? '#5C5C5C'
+              return (
+                <Pressable
+                  key={insp.id}
+                  onPress={() => cycleInspection(insp)}
+                  onLongPress={() => confirmDeleteInspection(insp.id)}
+                  delayLongPress={350}
+                  className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+                >
+                  <View className="flex-1 pr-3">
+                    <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{insp.trade || 'Inspection'}</Text>
+                    <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>{insp.inspector || '—'}</Text>
+                  </View>
+                  <Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color: tint }}>{result}</Text>
+                </Pressable>
+              )
+            })}
+            <Text className="text-ink-muted text-[10px] mt-1">Tap to cycle result · long-press to delete.</Text>
+          </View>
+        )}
+
+        {/* Mileage */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">
+            Mileage{mileageTotal ? ` · ${mileageTotal} mi` : ''}
+          </Text>
+          <Pressable onPress={() => setMilesOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Car color="#E8B865" size={14} />
+            <Text className="text-gold-bright text-xs font-bold">Log</Text>
+          </Pressable>
+        </View>
+        {mileage.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No trips logged.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {mileage.map((m) => (
+              <Pressable
+                key={m.id}
+                onLongPress={() => confirmDeleteMileage(m.id)}
+                delayLongPress={350}
+                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+              >
+                <View className="flex-1 pr-3">
+                  <Text className="text-ink text-sm font-semibold">{m.miles} mi</Text>
+                  <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>
+                    {m.drove_on ? new Date(m.drove_on).toLocaleDateString() : '—'}{m.purpose ? ` · ${m.purpose}` : ''}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+            <Text className="text-ink-muted text-[10px] mt-1">Long-press a trip to delete.</Text>
+          </View>
+        )}
+
         {/* Schedule */}
         <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">Schedule</Text>
         {schedule.length === 0 ? (
@@ -945,6 +1149,88 @@ export default function JobDetailScreen() {
               style={{ backgroundColor: invSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
             >
               {invSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create invoice</Text>}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* New change order modal */}
+      <Modal visible={coOpen} transparent animationType="slide" onRequestClose={() => setCoOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setCoOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">New change order</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Title</Text>
+            <TextInput
+              value={coTitle} onChangeText={setCoTitle} autoFocus
+              placeholder="Added scope, upgrade…" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Amount</Text>
+            <TextInput
+              value={coAmount} onChangeText={setCoAmount} keyboardType="decimal-pad"
+              placeholder="$0" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Description (optional)</Text>
+            <TextInput
+              value={coDesc} onChangeText={setCoDesc} multiline
+              placeholder="What changed and why" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              style={{ minHeight: 72, textAlignVertical: 'top' }}
+            />
+            <Pressable onPress={submitChangeOrder} disabled={coSaving} className="rounded-xl py-4 items-center" style={{ backgroundColor: coSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}>
+              {coSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create change order</Text>}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Log mileage modal */}
+      <Modal visible={milesOpen} transparent animationType="slide" onRequestClose={() => setMilesOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setMilesOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">Log mileage</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Miles</Text>
+            <TextInput
+              value={milesVal} onChangeText={setMilesVal} keyboardType="decimal-pad" autoFocus
+              placeholder="0" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Purpose (optional)</Text>
+            <TextInput
+              value={milesPurpose} onChangeText={setMilesPurpose}
+              placeholder="Supply run, site visit…" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+            />
+            <Pressable onPress={submitMileage} disabled={milesSaving} className="rounded-xl py-4 items-center" style={{ backgroundColor: milesSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}>
+              {milesSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Log trip</Text>}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add inspection modal */}
+      <Modal visible={inspOpen} transparent animationType="slide" onRequestClose={() => setInspOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setInspOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">Add inspection</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Trade / type</Text>
+            <TextInput
+              value={inspTrade} onChangeText={setInspTrade} autoFocus
+              placeholder="Framing, electrical, final…" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Inspector (optional)</Text>
+            <TextInput
+              value={inspInspector} onChangeText={setInspInspector}
+              placeholder="Name or agency" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+            />
+            <Pressable onPress={submitInspection} disabled={inspSaving} className="rounded-xl py-4 items-center" style={{ backgroundColor: inspSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}>
+              {inspSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Add inspection</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>

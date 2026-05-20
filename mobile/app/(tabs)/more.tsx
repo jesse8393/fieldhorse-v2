@@ -4,7 +4,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { LogOut, Plug, ChevronRight, Building2 } from 'lucide-react-native'
+import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell } from 'lucide-react-native'
 import { useAuth } from '../../contexts/AuthContext'
 
 export default function MoreScreen() {
@@ -26,6 +26,42 @@ export default function MoreScreen() {
       </View>
 
       <Text className="text-ink-muted text-[10px] font-bold tracking-wider uppercase mb-2">Tools</Text>
+      <Pressable
+        onPress={() => router.push('/analytics')}
+        className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-3 flex-row items-center"
+        style={{ gap: 12 }}
+      >
+        <View
+          className="rounded-xl items-center justify-center"
+          style={{ width: 40, height: 40, backgroundColor: '#1B1816', borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}
+        >
+          <BarChart3 color="#E8B865" size={18} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-ink text-base font-bold">Analytics</Text>
+          <Text className="text-ink-muted text-xs mt-0.5">Pipeline, revenue & stage breakdown</Text>
+        </View>
+        <ChevronRight color="#9b948a" size={18} />
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push('/notifications')}
+        className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-3 flex-row items-center"
+        style={{ gap: 12 }}
+      >
+        <View
+          className="rounded-xl items-center justify-center"
+          style={{ width: 40, height: 40, backgroundColor: '#1B1816', borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}
+        >
+          <Bell color="#E8B865" size={18} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-ink text-base font-bold">Notifications</Text>
+          <Text className="text-ink-muted text-xs mt-0.5">Activity & alerts</Text>
+        </View>
+        <ChevronRight color="#9b948a" size={18} />
+      </Pressable>
+
       <Pressable
         onPress={() => router.push('/settings')}
         className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-3 flex-row items-center"

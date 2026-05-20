@@ -210,6 +210,9 @@ export function useUpcomingEvents(userId: string | undefined, days = 7) {
 export type Todo = Database['public']['Tables']['fh_job_todos']['Row']
 export type Note = Database['public']['Tables']['fh_notes']['Row']
 export type Invoice = Database['public']['Tables']['fh_invoices']['Row']
+export type ChangeOrder = Database['public']['Tables']['fh_change_orders']['Row']
+export type Mileage = Database['public']['Tables']['fh_mileage']['Row']
+export type Inspection = Database['public']['Tables']['fh_inspections']['Row']
 
 export type JobDetail = {
   contact: Contact | null
@@ -220,10 +223,13 @@ export type JobDetail = {
   todos: Todo[]
   notes: Note[]
   invoices: Invoice[]
+  changeOrders: ChangeOrder[]
+  mileage: Mileage[]
+  inspections: Inspection[]
 }
 
 async function fetchJobDetail(id: string): Promise<JobDetail> {
-  const [c, p, sch, s, e, t, n, inv] = await Promise.all([
+  const [c, p, sch, s, e, t, n, inv, co, mi, insp] = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
     supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
     supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
@@ -231,7 +237,10 @@ async function fetchJobDetail(id: string): Promise<JobDetail> {
     supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
     supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: true }),
     supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-    supabase.from('fh_invoices').select('*').eq('contact_id', id).order('created_at', { ascending: false })
+    supabase.from('fh_invoices').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+    supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+    supabase.from('fh_mileage').select('*').eq('contact_id', id).order('drove_on', { ascending: false }),
+    supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false })
   ])
   return {
     contact: (c.data ?? null) as Contact | null,
@@ -241,7 +250,10 @@ async function fetchJobDetail(id: string): Promise<JobDetail> {
     expenses: (e.data ?? []) as JobDetail['expenses'],
     todos: (t.data ?? []) as Todo[],
     notes: (n.data ?? []) as Note[],
-    invoices: (inv.data ?? []) as Invoice[]
+    invoices: (inv.data ?? []) as Invoice[],
+    changeOrders: (co.data ?? []) as ChangeOrder[],
+    mileage: (mi.data ?? []) as Mileage[],
+    inspections: (insp.data ?? []) as Inspection[]
   }
 }
 
@@ -804,6 +816,144 @@ export function useUpdateProfile() {
       .update(patch as any)
       .eq('user_id', input.userId)
     if (!error) client.invalidateQueries({ queryKey: ['profile', input.userId] })
+    return { error }
+  }
+}
+
+// ---- Change orders ----
+export function useAddChangeOrder() {
+  const client = useQueryClient()
+  return async (input: { userId: string; contactId: string; title: string; amount: number; description?: string }) => {
+    const { error } = await supabase.from('fh_change_orders').insert({
+      user_id: input.userId,
+      contact_id: input.contactId,
+      title: input.title,
+      amount: input.amount,
+      description: input.description || null,
+      status: 'pending'
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useUpdateChangeOrderStatus() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string; status: string }) => {
+    const { error } = await supabase.from('fh_change_orders')
+      .update({ status: input.status, approved_at: input.status === 'approved' ? new Date().toISOString() : null } as any)
+      .eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useDeleteChangeOrder() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string }) => {
+    const { error } = await supabase.from('fh_change_orders').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+// ---- Mileage ----
+export function useAddMileage() {
+  const client = useQueryClient()
+  return async (input: { userId: string; contactId: string; miles: number; purpose?: string; droveOn?: string }) => {
+    const { error } = await supabase.from('fh_mileage').insert({
+      user_id: input.userId,
+      contact_id: input.contactId,
+      miles: input.miles,
+      purpose: input.purpose || null,
+      drove_on: input.droveOn || new Date().toISOString().slice(0, 10)
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useDeleteMileage() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string }) => {
+    const { error } = await supabase.from('fh_mileage').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+// ---- Inspections ----
+export function useAddInspection() {
+  const client = useQueryClient()
+  return async (input: { userId: string; contactId: string; trade: string; inspector?: string; result?: string }) => {
+    const { error } = await supabase.from('fh_inspections').insert({
+      user_id: input.userId,
+      contact_id: input.contactId,
+      trade: input.trade,
+      inspector: input.inspector || null,
+      result: input.result || 'pending'
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useUpdateInspectionResult() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string; result: string }) => {
+    const { error } = await supabase.from('fh_inspections')
+      .update({ result: input.result } as any)
+      .eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useDeleteInspection() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string }) => {
+    const { error } = await supabase.from('fh_inspections').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+// ---- Notifications ----
+export type Notification = Database['public']['Tables']['fh_notifications']['Row']
+
+export function useNotifications(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['notifications', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('fh_notifications').select('*')
+        .eq('user_id', userId as string)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      return (data ?? []) as Notification[]
+    },
+    enabled: !!userId
+  })
+}
+
+export function useMarkNotificationRead() {
+  const client = useQueryClient()
+  return async (input: { id: string; userId: string }) => {
+    const { error } = await supabase.from('fh_notifications')
+      .update({ read_at: new Date().toISOString() } as any)
+      .eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['notifications', input.userId] })
+    return { error }
+  }
+}
+
+export function useMarkAllNotificationsRead() {
+  const client = useQueryClient()
+  return async (userId: string) => {
+    const { error } = await supabase.from('fh_notifications')
+      .update({ read_at: new Date().toISOString() } as any)
+      .eq('user_id', userId)
+      .is('read_at', null)
+    if (!error) client.invalidateQueries({ queryKey: ['notifications', userId] })
     return { error }
   }
 }
