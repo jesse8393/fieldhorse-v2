@@ -34,12 +34,12 @@ import { hapticTap } from '../../lib/haptics.ts'
  *   └─────────────────────────────────────────────────────────────┘
  */
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
-function shortMoney(n) {
+function shortMoney(n: any) {
   const v = Number(n || 0)
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
   if (v >= 10_000) return `$${Math.round(v / 1_000)}K`
@@ -54,14 +54,14 @@ function greetingPrefix() {
   return 'Good evening'
 }
 
-function relTime(ms) {
+function relTime(ms: any) {
   const t = ms instanceof Date ? ms.getTime() : Number(ms)
   if (!Number.isFinite(t)) return ''
   const d = new Date(t)
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-function stageColorVar(stage) {
+function stageColorVar(stage: any) {
   const k = String(stage || 'lead').toLowerCase()
   if (k === 'lead') return '#6B7CA8'
   if (k === 'quote') return '#B07A4A'
@@ -105,7 +105,7 @@ export default function DesktopHomeCommandCenter({
   onOpenJob,
   onOpenJobAtTab,
   onNewLead
-}) {
+}: any) {
   const greeting = useMemo(() => `${greetingPrefix()}, ${firstName || 'there'}.`, [firstName])
   const dateLabel = useMemo(() => (now || new Date()).toLocaleDateString(undefined, {
     weekday: 'long', month: 'long', day: 'numeric'
@@ -266,7 +266,7 @@ export default function DesktopHomeCommandCenter({
             <p className="dt-home__empty">No site visits scheduled today.</p>
           ) : (
             <ul className="dt-home__site-list">
-              {todayOnSite.slice(0, 6).map((row) => (
+              {todayOnSite.slice(0, 6).map((row: any) => (
                 <li
                   key={row.id}
                   className="dt-home__site-row"
@@ -312,7 +312,7 @@ export default function DesktopHomeCommandCenter({
             <p className="dt-home__empty">No active deals.</p>
           ) : (
             <ul className="dt-home__pipe-list">
-              {topPipeline.map((deal) => {
+              {topPipeline.map((deal: any) => {
                 const sc = stageColorVar(deal.stage)
                 const stage = String(deal.stage || 'lead').toLowerCase()
                 return (
@@ -395,7 +395,7 @@ export default function DesktopHomeCommandCenter({
   )
 }
 
-function PipelineStat({ label, count, color }) {
+function PipelineStat({ label, count, color }: any) {
   return (
     <div className="dt-home__pipeline-stat">
       <span className="dt-home__pipeline-stat-dot" style={{ background: color, boxShadow: `0 0 8px ${color}66` }} />
@@ -407,7 +407,7 @@ function PipelineStat({ label, count, color }) {
   )
 }
 
-function PrioRow({ icon: Icon, count, valueLabel, label, sub, tone, onClick }) {
+function PrioRow({ icon: Icon, count, valueLabel, label, sub, tone, onClick }: any) {
   return (
     <button
       type="button"

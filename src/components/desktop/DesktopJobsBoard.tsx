@@ -33,7 +33,7 @@ import { ACTIVE_STAGES } from '../../lib/stages.ts'
  * NOT subscribe, fetch, or write.
  */
 
-const STAGE_COLOR = {
+const STAGE_COLOR: Record<string, string> = {
   lead: '#6B7CA8',
   quote: '#B07A4A',
   job: '#4F8C5E',
@@ -44,10 +44,10 @@ const STAGE_COLOR = {
   lost: '#5C5C5C'
 }
 
-const STAGE_STEP = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
+const STAGE_STEP: Record<string, number> = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
 const TOTAL_STAGES = 5
 
-const NEXT_ACTION_HINT = {
+const NEXT_ACTION_HINT: Record<string, string | null> = {
   lead:    'Send a quote',
   quote:   'Get approval',
   job:     'Job in progress',
@@ -64,25 +64,25 @@ const TABS = [
   { id: 'won',    label: 'Complete' }
 ]
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
-function kFormat(n) {
+function kFormat(n: any) {
   const v = Number(n || 0)
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
   if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
   return money(v)
 }
-function initials(name) {
+function initials(name: any) {
   if (!name) return '—'
   return String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
 }
-function stageColor(stage) {
+function stageColor(stage: any) {
   return STAGE_COLOR[String(stage || 'lead').toLowerCase()] || STAGE_COLOR.lead
 }
-function stageStep(stage) {
+function stageStep(stage: any) {
   return STAGE_STEP[String(stage || 'lead').toLowerCase()] ?? 0
 }
 
@@ -99,14 +99,14 @@ export default function DesktopJobsBoard({
   tabCounts,
   onOpenJob,
   onNewLead
-}) {
+}: any) {
   const summary = useMemo(() => {
     const pipeline = (contacts || [])
-      .filter((c) => ACTIVE_STAGES.includes(c.stage))
-      .reduce((s, c) => s + Number(c.amount || 0), 0)
-    const activeCount = (contacts || []).filter((c) => ACTIVE_STAGES.includes(c.stage)).length
+      .filter((c: any) => ACTIVE_STAGES.includes(c.stage))
+      .reduce((s: any, c: any) => s + Number(c.amount || 0), 0)
+    const activeCount = (contacts || []).filter((c: any) => ACTIVE_STAGES.includes(c.stage)).length
     const needAttention = (contacts || []).filter(
-      (c) => c.stage === 'quote' || c.stage === 'lead'
+      (c: any) => c.stage === 'quote' || c.stage === 'lead'
     ).length
     return { pipeline, activeCount, needAttention }
   }, [contacts])
@@ -195,7 +195,7 @@ export default function DesktopJobsBoard({
             </button>
           </div>
         )}
-        {!loading && filtered.map((c) => {
+        {!loading && filtered.map((c: any) => {
           const isFeatured = c.id === featuredId
           const photo = photoUrlByJob?.[c.id]
           const stage = String(c.stage || 'lead').toLowerCase()

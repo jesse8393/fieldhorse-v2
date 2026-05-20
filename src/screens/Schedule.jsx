@@ -20,7 +20,7 @@ import { getWeather, workWindow } from '../lib/weather.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import DesktopScheduleWorkspace from '../components/desktop/DesktopScheduleWorkspace.jsx'
+import DesktopScheduleWorkspace from '../components/desktop/DesktopScheduleWorkspace.tsx'
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
