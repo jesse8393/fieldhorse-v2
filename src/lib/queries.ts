@@ -224,3 +224,51 @@ export function useDropScheduleEvent() {
     client.setQueriesData({ queryKey: ['scheduleUpcoming'] }, drop)
   }
 }
+
+// ---- Activity feed ----
+// Global cross-job event feed. The hook fetches the 5 raw datasets;
+// the screen maps them into display events (with icon components) in a
+// useMemo so React component refs stay out of the query cache.
+
+export type ActivityBundle = {
+  transitions: Database['public']['Tables']['fh_stage_transitions']['Row'][]
+  payments: Database['public']['Tables']['fh_payments']['Row'][]
+  changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
+  invoices: Database['public']['Tables']['fh_invoices']['Row'][]
+  contacts: Pick<Contact, 'id' | 'name' | 'job_title' | 'stage'>[]
+}
+
+async function fetchActivity(userId: string, pageSize: number): Promise<ActivityBundle> {
+  const [transitions, payments, changeOrders, invoices, contacts] = await Promise.all([
+    supabase.from('fh_stage_transitions')
+      .select('id, contact_id, from_stage, to_stage, transitioned_at, user_id')
+      .eq('user_id', userId).order('transitioned_at', { ascending: false }).limit(pageSize),
+    supabase.from('fh_payments')
+      .select('id, contact_id, amount, method, kind, paid_on, created_at, user_id')
+      .eq('user_id', userId).order('paid_on', { ascending: false }).limit(pageSize),
+    supabase.from('fh_change_orders')
+      .select('id, contact_id, sequence_number, title, amount, status, approved_at, created_at, user_id')
+      .eq('user_id', userId).order('created_at', { ascending: false }).limit(pageSize),
+    supabase.from('fh_invoices')
+      .select('id, contact_id, sequence_number, title, amount, status, issued_at, created_at, user_id')
+      .eq('user_id', userId).order('created_at', { ascending: false }).limit(pageSize),
+    supabase.from('fh_contacts')
+      .select('id, name, job_title, stage')
+      .eq('user_id', userId).order('updated_at', { ascending: false }).limit(pageSize * 2)
+  ])
+  return {
+    transitions: (transitions.data ?? []) as ActivityBundle['transitions'],
+    payments: (payments.data ?? []) as ActivityBundle['payments'],
+    changeOrders: (changeOrders.data ?? []) as ActivityBundle['changeOrders'],
+    invoices: (invoices.data ?? []) as ActivityBundle['invoices'],
+    contacts: (contacts.data ?? []) as ActivityBundle['contacts']
+  }
+}
+
+export function useActivityFeed(userId: string | undefined, pageSize = 60) {
+  return useQuery({
+    queryKey: ['activity', userId, pageSize],
+    queryFn: () => fetchActivity(userId as string, pageSize),
+    enabled: !!userId
+  })
+}
