@@ -673,6 +673,97 @@ export function useDeleteInvoice() {
   }
 }
 
+// ---- Quote / estimate line items ----
+export type QuoteItem = Database['public']['Tables']['fh_quote_items']['Row']
+
+export function useQuoteItems(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ['quoteItems', jobId],
+    queryFn: async () => {
+      const { data } = await supabase.from('fh_quote_items').select('*')
+        .eq('contact_id', jobId as string)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+      return (data ?? []) as QuoteItem[]
+    },
+    enabled: !!jobId
+  })
+}
+
+export type QuoteItemInput = {
+  description: string
+  qty: number
+  rate: number
+  unit?: string
+  section?: string
+  isOptional?: boolean
+  isExcluded?: boolean
+}
+
+export function useAddQuoteItem() {
+  const client = useQueryClient()
+  return async (input: { userId: string; jobId: string; item: QuoteItemInput }) => {
+    const { item } = input
+    const { error } = await supabase.from('fh_quote_items').insert({
+      user_id: input.userId,
+      contact_id: input.jobId,
+      description: item.description,
+      qty: item.qty,
+      rate: item.rate,
+      amount: item.qty * item.rate,
+      unit: item.unit || null,
+      section: item.section || null,
+      is_optional: item.isOptional ?? false,
+      is_excluded: item.isExcluded ?? false
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['quoteItems', input.jobId] })
+    return { error }
+  }
+}
+
+export function useUpdateQuoteItem() {
+  const client = useQueryClient()
+  return async (input: { id: string; jobId: string; item: QuoteItemInput }) => {
+    const { item } = input
+    const { error } = await supabase.from('fh_quote_items').update({
+      description: item.description,
+      qty: item.qty,
+      rate: item.rate,
+      amount: item.qty * item.rate,
+      unit: item.unit || null,
+      section: item.section || null,
+      is_optional: item.isOptional ?? false,
+      is_excluded: item.isExcluded ?? false
+    } as any).eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['quoteItems', input.jobId] })
+    return { error }
+  }
+}
+
+export function useDeleteQuoteItem() {
+  const client = useQueryClient()
+  return async (input: { id: string; jobId: string }) => {
+    const { error } = await supabase.from('fh_quote_items').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['quoteItems', input.jobId] })
+    return { error }
+  }
+}
+
+// Push the quote's base total onto the job's contract amount.
+export function useApplyQuoteTotal() {
+  const client = useQueryClient()
+  return async (input: { jobId: string; amount: number }) => {
+    const { error } = await supabase.from('fh_contacts')
+      .update({ amount: input.amount } as any)
+      .eq('id', input.jobId)
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['jobDetail', input.jobId] })
+      client.invalidateQueries({ queryKey: queryKeys.jobs })
+    }
+    return { error }
+  }
+}
+
 // ---- Business profile ----
 export type Profile = Database['public']['Tables']['profiles']['Row']
 

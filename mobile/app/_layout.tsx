@@ -55,6 +55,7 @@ function RootNavigator() {
       <Stack.Screen name="clients/[id]" />
       <Stack.Screen name="integrations" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="quote/[id]" />
     </Stack>
   )
 }

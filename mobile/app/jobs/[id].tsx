@@ -378,6 +378,16 @@ export default function JobDetailScreen() {
           <Stat label="Balance" value={money(totals.balance)} tone="#E8B865" />
         </View>
 
+        {/* Quote builder */}
+        <Pressable
+          onPress={() => router.push(`/quote/${contact.id}`)}
+          className="flex-row items-center justify-center rounded-2xl py-3 mt-3 border border-[rgba(232,184,101,0.3)]"
+          style={{ gap: 6, backgroundColor: 'rgba(232,184,101,0.10)' }}
+        >
+          <FileText color="#E8B865" size={16} />
+          <Text className="text-gold-bright font-bold">Build estimate</Text>
+        </Pressable>
+
         {/* Stage progression */}
         <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-6 mb-2">Stage</Text>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
