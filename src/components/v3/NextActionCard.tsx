@@ -20,16 +20,25 @@ import { dueStatus } from '../../lib/dueDate.ts'
  * Empty-state (no next action): renders an "Add next action" CTA so the
  * card never reads as dead. Aligns with the ruleset rule "no dead screens".
  */
+type NextActionCardProps = {
+  title?: import('react').ReactNode
+  date?: string | Date | null
+  dueIso?: string | null
+  cta?: import('react').ReactNode
+  onComplete?: () => void
+  onSchedule?: () => void
+  loading?: boolean
+}
+
 export default function NextActionCard({
   title,
-  date, // optional: ISO string or Date or formatted string (schedule entries)
-  dueIso, // optional: ISO timestamptz from a todo's due_at — renders a
-          // tone-aware chip via dueStatus(). Null/undefined hides it.
+  date,
+  dueIso,
   cta = 'Mark Complete',
   onComplete,
   onSchedule,
   loading
-}) {
+}: NextActionCardProps) {
   const hasAction = !!title
   const due = dueStatus(dueIso)
 
@@ -151,7 +160,7 @@ export default function NextActionCard({
  * and the per-row DueChipButton. Keeps the chip vocabulary consistent
  * everywhere a due_at surfaces.
  */
-function DueStatusChip({ status }) {
+function DueStatusChip({ status }: { status: { tone: string; label: string } }) {
   const palette = status.tone === 'danger'
     ? {
         bg: 'var(--v3-danger-soft)',
@@ -192,7 +201,7 @@ function DueStatusChip({ status }) {
   )
 }
 
-function formatDate(d) {
+function formatDate(d: string | Date) {
   try {
     const date = d instanceof Date ? d : new Date(d)
     if (isNaN(date.getTime())) return String(d)

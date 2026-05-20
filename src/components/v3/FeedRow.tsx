@@ -3,14 +3,14 @@ import { Hammer, FileText, Receipt, Camera, Activity, Trash2 } from 'lucide-reac
 import Pill from './Pill.tsx'
 import { hapticTap } from '../../lib/haptics.ts'
 
-const ICONS = {
+const ICONS: Record<string, import('react').ComponentType<any>> = {
   'crew-on-site': Hammer,
   'photos': Camera,
   'invoice': Receipt,
   'note': FileText,
   default: Activity
 }
-const TONE = {
+const TONE: Record<string, { color: string; bg: string }> = {
   'crew-on-site': { color: 'var(--v3-stage-active)', bg: 'rgba(79, 140, 94, 0.14)' },
   'photos':       { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
   'invoice':      { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
@@ -18,7 +18,7 @@ const TONE = {
   default:        { color: 'var(--v3-text-muted)',   bg: 'var(--v3-glass-tint)' }
 }
 
-function formatTime(iso) {
+function formatTime(iso: string | null | undefined) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
@@ -27,6 +27,18 @@ function formatTime(iso) {
   const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   if (sameDay) return time
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • ${time}`
+}
+
+type FeedRowProps = {
+  type?: string
+  title?: import('react').ReactNode
+  detail?: import('react').ReactNode
+  timestamp?: string | null
+  pillTone?: any
+  pillLabel?: import('react').ReactNode
+  onTap?: () => void
+  onDelete?: () => void
+  deleteLabel?: string
 }
 
 export default function FeedRow({
@@ -39,7 +51,7 @@ export default function FeedRow({
   onTap,
   onDelete,
   deleteLabel = 'Delete'
-}) {
+}: FeedRowProps) {
   const Icon = ICONS[type] || ICONS.default
   const tone = TONE[type] || TONE.default
   // Tap only fires when there's an onTap AND no nested delete control was
@@ -47,9 +59,9 @@ export default function FeedRow({
   // the delete handler so the row's onTap doesn't also fire.
   const interactive = !!onTap
 
-  const Tag = interactive ? motion.button : motion.div
-  const tagProps = interactive
-    ? { type: 'button', whileTap: { scale: 0.99 }, onClick: () => { hapticTap(); onTap() } }
+  const Tag: any = interactive ? motion.button : motion.div
+  const tagProps: any = interactive
+    ? { type: 'button', whileTap: { scale: 0.99 }, onClick: () => { hapticTap(); onTap!() } }
     : {}
 
   return (
@@ -123,7 +135,7 @@ export default function FeedRow({
             e.stopPropagation()
             e.preventDefault()
             hapticTap()
-            onDelete()
+            onDelete?.()
           }}
           style={{
             flexShrink: 0,
