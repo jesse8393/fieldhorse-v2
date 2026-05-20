@@ -16,7 +16,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { Users, Check, AlertTriangle, X } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.js'
 import { toastSuccess, toastError } from '../lib/toast.js'
-import { mergeClients } from '../lib/clientMerge.js'
+import { mergeClients } from '../lib/clientMerge.ts'
 
 function fmtPhone(n) {
   if (!n) return ''

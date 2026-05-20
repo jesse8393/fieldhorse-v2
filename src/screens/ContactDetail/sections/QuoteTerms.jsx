@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FileText } from 'lucide-react'
-import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate.js'
+import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate.ts'
 
 /**
  * Quote terms section — customer-facing prose blocks + expiration.

@@ -1,4 +1,4 @@
-import { dueStatus } from '../../../lib/dueDate.js'
+import { dueStatus } from '../../../lib/dueDate.ts'
 
 /**
  * Job Next Action — resolve "what should the operator do next?" via priority

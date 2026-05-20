@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase.js'
 import { toastSuccess, toastError, toastUndo } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
 import { SkeletonList } from '../../../components/Skeleton.jsx'
-import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.js'
+import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.ts'
 
 /**
  * To-dos section — backed by fh_job_todos. Owns its own fetch (independent of

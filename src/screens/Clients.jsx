@@ -8,7 +8,7 @@ import { useFhMotion } from '../lib/motion.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
-import { findDuplicateClusters } from '../lib/clientMerge.js'
+import { findDuplicateClusters } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.jsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
@@ -50,7 +50,7 @@ export default function Clients() {
   const rollupMap = useMemo(() => rollupByClient(jobs, payments), [jobs, payments])
 
   // Duplicate detection — runs every time the client roster changes.
-  // Match policy lives in lib/clientMerge.js (phone or email normalized).
+  // Match policy lives in lib/clientMerge.ts (phone or email normalized).
   const duplicateClusters = useMemo(() => findDuplicateClusters(rows), [rows])
   const duplicateCount = useMemo(
     () => duplicateClusters.reduce((s, c) => s + c.members.length, 0),
