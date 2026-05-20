@@ -1,10 +1,17 @@
 import { useMemo } from 'react'
 import { ResponsiveContainer, AreaChart, Area } from 'recharts'
 
-export default function Sparkline({ data, color = '#D4AF37', height = 56, gradientId = 'v3spark' }) {
+type SparklineProps = {
+  data?: Array<number | { v: number }> | null
+  color?: string
+  height?: number
+  gradientId?: string
+}
+
+export default function Sparkline({ data, color = '#D4AF37', height = 56, gradientId = 'v3spark' }: SparklineProps) {
   const safe = useMemo(() => {
     if (!Array.isArray(data) || data.length === 0) return [{ v: 0 }, { v: 0 }]
-    return data.map((d, i) => (typeof d === 'number' ? { v: d } : d))
+    return data.map((d) => (typeof d === 'number' ? { v: d } : d))
   }, [data])
 
   return (

@@ -37,6 +37,15 @@ import { hapticMedium } from '../../lib/haptics.ts'
  *   width/height 56;
  * Single source of truth — change there to retune across the app.
  */
+type FloatingActionButtonProps = {
+  onClick?: (e: import('react').MouseEvent<HTMLButtonElement>) => void
+  ariaLabel?: string
+  icon?: import('react').ReactNode
+  iconSize?: number
+  iconStrokeWidth?: number
+  hideOnDesktop?: boolean
+}
+
 export default function FloatingActionButton({
   onClick,
   ariaLabel,
@@ -44,10 +53,10 @@ export default function FloatingActionButton({
   iconSize = 26,
   iconStrokeWidth = 2.6,
   hideOnDesktop = false
-}) {
+}: FloatingActionButtonProps) {
   if (typeof document === 'undefined') return null
 
-  function handleClick(e) {
+  function handleClick(e: import('react').MouseEvent<HTMLButtonElement>) {
     hapticMedium()
     onClick?.(e)
   }

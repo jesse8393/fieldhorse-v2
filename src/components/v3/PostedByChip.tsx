@@ -21,7 +21,14 @@ import { useAccountLabels, formatAttribution } from '../../lib/accountAttributio
  *   showRole  — boolean; append "· Partner" / "· Owner" when known
  *   style     — additional styles to merge
  */
-export default function PostedByChip({ userId, verb = 'posted', showRole = false, style }) {
+type PostedByChipProps = {
+  userId?: string | null
+  verb?: 'posted' | 'added' | 'created'
+  showRole?: boolean
+  style?: import('react').CSSProperties
+}
+
+export default function PostedByChip({ userId, verb = 'posted', showRole = false, style }: PostedByChipProps) {
   // Stable single-element array reference per render isn't required —
   // the hook keys off a deduped/sorted CSV of ids, so passing [userId]
   // here is fine even if it's a new array each render.
