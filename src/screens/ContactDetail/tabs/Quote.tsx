@@ -31,7 +31,7 @@ import { mintPublicLink } from '../../../lib/publicLink.ts'
  *
  * Customer portal / e-sign / email send live in later phases.
  */
-export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenApprove, insurance = null, changeOrders = [] }) {
+export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenApprove, insurance = null, changeOrders = [] }: any) {
   const { profile } = useProfile()
 
   // "Past quote" = pipeline stage already advanced beyond the quoting
@@ -53,7 +53,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     phone: profile?.company_phone || '',
     // Prefer the customer-facing company_email (migration 015) over the
     // operator's auth email so proposals show the public address.
-    email: profile?.company_email || profile?.email || '',
+    email: profile?.company_email || (profile as any)?.email || '',
     website: profile?.company_website || '',
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
@@ -91,8 +91,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // the draft and reviewing the customer-facing render without losing
   // their seat.
   const [docMode, setDocMode] = useState('builder')
-  const [docItems, setDocItems] = useState([])
-  const [docPhotos, setDocPhotos] = useState([])
+  const [docItems, setDocItems] = useState<any[]>([])
+  const [docPhotos, setDocPhotos] = useState<any[]>([])
   const [docItemsLoading, setDocItemsLoading] = useState(false)
   useEffect(() => {
     if (docMode !== 'document' || !contact?.id || !userId) return
@@ -119,7 +119,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     // 011_quote_items so the preview re-fetches without an extra sub.
   }, [docMode, contact?.id, contact?.updated_at, userId])
 
-  const [busy, setBusy] = useState(null) // 'preview' | 'download' | 'send' | null
+  const [busy, setBusy] = useState<any>(null) // 'preview' | 'download' | 'send' | null
   const disabled = baseCount === 0 || busy !== null
   // Phase 1 send requires a recipient — the proposal email is attached to
   // the client's email address. Preview and Download don't require this.
@@ -161,11 +161,11 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     // snapshot also reflects them. Diff vs persisted values; null
     // out blanks. patch is optimistic — local state matches contact
     // immediately; the awaited server-write also queues.
-    const norm = (s) => {
+    const norm = (s: any) => {
       const t = String(s || '').trim()
       return t.length === 0 ? null : t
     }
-    const updates = {}
+    const updates: Record<string, any> = {}
     const persistedScope = contact.scope_text || ''
     const persistedExclusions = contact.exclusions_text || ''
     const persistedTerms = contact.terms_text || ''
@@ -182,7 +182,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       updates.quote_expires_at = pendingExpiresIso
     }
     if (Object.keys(updates).length > 0 && patch) {
-      try { await patch(updates) } catch (e) { console.warn('[buildPdf] terms patch failed:', e) }
+      try { await patch(updates) } catch (e: any) { console.warn('[buildPdf] terms patch failed:', e) }
     }
 
     const { data, error } = await supabase
@@ -193,7 +193,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     if (error) throw new Error(error.message)
-    const items = data || []
+    const items: any[] = data || []
     const base = items.filter((i) => !i.is_optional && !i.is_excluded)
     if (base.length === 0) {
       throw new Error('Add at least one base line item before generating a quote')
@@ -203,7 +203,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     // proposal can use a hero image + per-scope photos. Quietly tolerates
     // failure: the renderer falls back to graceful placeholders when no
     // photos are loaded.
-    const photos = await loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
+    const photos: any[] = await loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
 
     // generateQuote() became async in 4D-2C — it pre-fetches the
     // contractor's logo + project photos before rendering the cover.
@@ -217,17 +217,17 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         email: contact.email,
         job_title: contact.job_title
       },
-      items,
+      items: items as any,
       scope: pendingScope || '',
       terms: pendingTerms || '',
       exclusions: pendingExclusions || '',
       expiresAt: pendingExpiresIso,
       status: contact.proposal_status || 'draft',
       quoteId: contact.id,
-      photos,
+      photos: photos as any,
       insurance,
       changeOrders
-    })
+    } as any)
     if (!result?.doc) throw new Error('PDF generator returned no document')
     return result
   }
@@ -240,7 +240,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       const result = await buildPdf()
       const url = result.doc.output('bloburl')
       window.open(url, '_blank', 'noopener')
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't preview", e?.message || 'Try again')
     } finally {
       setBusy(null)
@@ -255,7 +255,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       const result = await buildPdf()
       downloadPdf(result)
       toastSuccess('Quote downloaded', result.filename)
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't download", e?.message || 'Try again')
     } finally {
       setBusy(null)
@@ -269,7 +269,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // customer agreed to; we don't want a "clear draft" gesture to
   // appear to wipe an approved quote.
   const [clearing, setClearing] = useState(false)
-  const confirm = useConfirm()
+  const confirm = useConfirm() as any
   async function handleClearDraft() {
     if (!contact?.id || !userId) return
     if ((contact?.proposal_status || 'draft').toLowerCase() === 'approved') return
@@ -308,7 +308,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       }
       if (fetchAll) await fetchAll()
       toastSuccess('Draft quote cleared', 'Line items and draft terms removed.')
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't clear draft", e?.message || 'Try again in a moment.')
     } finally {
       setClearing(false)
@@ -334,7 +334,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       } catch {
         toastSuccess('Share link ready', link.url)
       }
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't mint share link", e?.message || 'Try again.')
     } finally {
       setBusy(null)
@@ -423,7 +423,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         `Proposal sent to ${contact.email}`,
         result.filename
       )
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't send proposal", e?.message || 'Try again')
     } finally {
       setBusy(null)
@@ -457,7 +457,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           filename: result.filename, storage_path: path,
           mime_type: 'application/pdf', size_bytes: blob.size || 0, kind: 'file'
         })
-      } catch (e) { console.warn('[quote] esign fh_job_files insert failed', e) }
+      } catch (e: any) { console.warn('[quote] esign fh_job_files insert failed', e) }
 
       const res = await fetch('/api/docusign-send', {
         method: 'POST',
@@ -480,7 +480,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       }
       if (fetchAll) await fetchAll()
       toastSuccess(`Sent to ${contact.email} for signature`, 'DocuSign will email the signing request.')
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't send for e-signature", e?.message || 'Try again')
     } finally {
       setBusy(null)
@@ -613,7 +613,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
    replaces the builder pane with the customer-facing render so the
    contractor can see exactly what's about to ship.
    ============================================================ */
-function QuoteViewToggle({ value, onChange }) {
+function QuoteViewToggle({ value, onChange }: any) {
   const opts = [
     { v: 'builder',  label: 'Builder' },
     { v: 'document', label: 'Document' }
@@ -664,7 +664,7 @@ function QuoteViewToggle({ value, onChange }) {
   )
 }
 
-function DocumentPreviewPane({ company, contact, items, photos = [], loading, insurance = null, changeOrders = [] }) {
+function DocumentPreviewPane({ company, contact, items, photos = [], loading, insurance = null, changeOrders = [] }: any) {
   // Group line items by their `section` field so each trade renders
   // as its own ScopeSectionCard. Order is preserved (groupByOrdered).
   // Optional items (is_optional=true) split into the upgrades array;
@@ -680,7 +680,7 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
   // so the preview can stamp the captured signature + date onto the
   // ApprovalBlock. Stays null for draft / sent / expired quotes — the
   // block then renders blank signature lines.
-  const [approval, setApproval] = useState(null)
+  const [approval, setApproval] = useState<any>(null)
   useEffect(() => {
     let cancelled = false
     if (status !== 'approved' || !contact?.id) {
@@ -782,7 +782,7 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
    to be wiped by a "clear draft" gesture. Renders nothing when
    the line-item count is 0 AND status is draft (nothing to clear).
    ============================================================ */
-function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }) {
+function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
   const status = (contact?.proposal_status || 'draft').toLowerCase()
   const isApproved = status === 'approved'
   const isEmptyDraft = status === 'draft' && baseCount === 0
@@ -876,7 +876,7 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }) {
    proposal_status is the closest equivalent. saved-ago hint omitted
    (we'd need to track a separate dirty timestamp).
    ============================================================ */
-function WorkspaceHead({ contact, status, baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onSend }) {
+function WorkspaceHead({ contact, status, baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onSend }: any) {
   const idShort = contact?.id ? `EST · ${String(contact.id).slice(0, 8).toUpperCase()}` : 'ESTIMATE'
   const statusLabel = (status?.label || 'Draft').toUpperCase()
   const titleText = contact?.job_title || contact?.name || 'Estimate'
@@ -931,9 +931,9 @@ function WorkspaceHead({ contact, status, baseCount, busy, disabled, sendDisable
    no fetches, no writes. CSS-hidden on mobile because
    ContactDetail Header already surfaces this info above the tabs.
    ============================================================ */
-function ContextCard({ contact, status }) {
+function ContextCard({ contact, status }: any) {
   const total = Number(contact?.amount || 0)
-  const moneyFmt = (n) => Number(n || 0).toLocaleString(undefined, {
+  const moneyFmt = (n: any) => Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
 
@@ -986,7 +986,7 @@ function ContextCard({ contact, status }) {
    small "Approve a new version" link so re-approval requires an
    intentional tap (no accidental double-approval). Phase 4C-2.
    ============================================================ */
-function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprove }) {
+function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprove }: any) {
   const status = (contact?.proposal_status || 'draft').toLowerCase()
   const explicitlyApproved = status === 'approved'
   // Either the operator pressed Approve, or the pipeline has already
@@ -1105,7 +1105,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
 /* ============================================================
    Action bar — Preview / Download / Send Quote
    ============================================================ */
-function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend, onShare, onEsign }) {
+function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend, onShare, onEsign }: any) {
   const helperLine = sendDisabledReason
     ? sendDisabledReason
     : 'Generates the proposal PDF and emails it directly to the client. Marks the quote as sent on success. This is not the same as Approve — use Approve when the customer says yes.'
@@ -1169,7 +1169,7 @@ function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason
   )
 }
 
-function SecondaryButton({ icon, label, onClick, disabled }) {
+function SecondaryButton({ icon, label, onClick, disabled }: any) {
   return (
     <motion.button
       type="button"
@@ -1199,7 +1199,7 @@ function SecondaryButton({ icon, label, onClick, disabled }) {
   )
 }
 
-function PrimaryButton({ icon, label, onClick, disabled }) {
+function PrimaryButton({ icon, label, onClick, disabled }: any) {
   return (
     <motion.button
       type="button"
@@ -1239,7 +1239,7 @@ function PrimaryButton({ icon, label, onClick, disabled }) {
    takes precedence over status when expired so the operator
    sees the urgent state regardless of how the row was last saved.
    ============================================================ */
-function deriveStatus(contact, pastQuote = false) {
+function deriveStatus(contact: any, pastQuote = false) {
   const raw = (contact?.proposal_status || 'draft').toLowerCase()
   const sentIso = contact?.quote_sent_at || null
   const expIso = contact?.quote_expires_at || null
@@ -1281,7 +1281,7 @@ function deriveStatus(contact, pastQuote = false) {
   return { label, tone, sub }
 }
 
-function StatusPill({ status }) {
+function StatusPill({ status }: any) {
   const palette = (() => {
     switch (status.tone) {
       case 'gold':
@@ -1340,17 +1340,17 @@ function StatusPill({ status }) {
   )
 }
 
-function capitalize(s) {
+function capitalize(s: any) {
   if (!s) return ''
   return s[0].toUpperCase() + s.slice(1)
 }
 
-function relativeAgo(iso, prefix) {
+function relativeAgo(iso: any, prefix: any) {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
   const dayMs = 24 * 60 * 60 * 1000
-  const sameDay = (a, b) =>
+  const sameDay = (a: any, b: any) =>
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
@@ -1363,7 +1363,7 @@ function relativeAgo(iso, prefix) {
   return `${prefix} ${shortDate(iso)}`
 }
 
-function shortDate(iso) {
+function shortDate(iso: any) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -1383,7 +1383,7 @@ function shortDate(iso) {
  * "Roofing" tags the photo for the Roofing scope) — a lightweight
  * convention that doesn't require a schema change.
  */
-async function loadProjectPhotosForPdf(jobId, userId) {
+async function loadProjectPhotosForPdf(jobId: any, userId: any) {
   if (!jobId || !userId) return []
   const { data, error } = await supabase
     .from('fh_job_files')

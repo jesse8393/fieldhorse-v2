@@ -61,15 +61,15 @@ export default function OverviewTab({
   onOpenInvitePartner,
   onOpenApproveQuote,
   onOpenMarkComplete
-}) {
+}: any) {
   const [actionLoading, setActionLoading] = useState(false)
-  const confirm = useConfirm()
+  const confirm = useConfirm() as any
 
   // Delete a logged payment row. Used by the trash icon on payment
   // rows in the Recent Activity list. We confirm because payments are
   // financial records and an accidental delete here would silently
   // change the job's paid/balance numbers.
-  async function deletePayment(paymentId, amount) {
+  async function deletePayment(paymentId: any, amount: any) {
     if (!paymentId || !userId) return
     const ok = await confirm({
       title: 'Delete this payment?',
@@ -106,7 +106,7 @@ export default function OverviewTab({
     [contact?.milestones]
   )
   const milestonePct = milestones.length
-    ? Math.round((milestones.filter((m) => m.done).length / milestones.length) * 100)
+    ? Math.round((milestones.filter((m: any) => m.done).length / milestones.length) * 100)
     : 0
 
   const activityRows = useMemo(
@@ -120,7 +120,7 @@ export default function OverviewTab({
     try {
       switch (nextAction.kind) {
         case 'milestone': {
-          const next = milestones.map((m, i) =>
+          const next = milestones.map((m: any, i: any) =>
             i === nextAction.sourceId ? { ...m, done: true } : m
           )
           await patch({ milestones: next })
@@ -167,7 +167,7 @@ export default function OverviewTab({
             onOpenApproveQuote()
             break
           }
-          const fn = STAGE_FN_MAP[nextAction.pipelineFn]
+          const fn = STAGE_FN_MAP[nextAction.pipelineFn || ""]
           if (fn) {
             // Heavier haptic on stage boundary — matches haptics.ts convention
             // that lead→quote→job→invoice transitions get hapticStageChange.
@@ -187,7 +187,7 @@ export default function OverviewTab({
         default:
           onOpenAddEvent?.()
       }
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't complete action", e?.message || 'Unknown error')
     } finally {
       setActionLoading(false)
@@ -273,14 +273,14 @@ export default function OverviewTab({
         label="Job Progress"
         value={milestonePct}
         caption={milestones.length
-          ? `${milestones.filter((m) => m.done).length} of ${milestones.length} milestones complete`
+          ? `${milestones.filter((m: any) => m.done).length} of ${milestones.length} milestones complete`
           : 'No milestones added yet'
         }
       />
 
       {/* RECENT ACTIVITY */}
       <div className="v3-section">
-        <SectionHeader title="Recent Activity" />
+        <SectionHeader {...({ title: "Recent Activity" } as any)} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
           {activityRows.length === 0 ? (
             <div className="v3-empty">
@@ -302,7 +302,7 @@ export default function OverviewTab({
                 {row.userId && (
                   <PostedByChip
                     userId={row.userId}
-                    verb={row.verb || 'posted'}
+                    verb={(row.verb || 'posted') as any}
                     style={{ paddingLeft: 14 }}
                   />
                 )}
@@ -385,14 +385,14 @@ export default function OverviewTab({
 
 /* ----------- helpers ----------- */
 
-const STAGE_FN_MAP = {
+const STAGE_FN_MAP: Record<string, any> = {
   startQuote,
   approveQuote,
   markComplete,
   reopen
 }
 
-function fmtMoney(n) {
+function fmtMoney(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -407,7 +407,7 @@ function fmtMoney(n) {
  *   note     → 'note'     (muted)
  *   schedule → 'crew-on-site' (green) — schedule entries are crew work
  */
-function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
+function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }: any) {
   const rows = []
 
   for (const p of payments) {
@@ -480,7 +480,7 @@ function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
   })
 }
 
-function SecondaryAction({ icon: Icon, label, onClick }) {
+function SecondaryAction({ icon: Icon, label, onClick }: any) {
   return (
     <motion.button
       type="button"
@@ -530,18 +530,18 @@ const EDITABLE_FIELDS = [
   { key: 'notes',       label: 'Notes',       kind: 'textarea', placeholder: 'Anything else…',    col: 1 }
 ]
 
-function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
+function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
   const [form, setForm] = useState(() => buildForm(contact))
   const [saving, setSaving] = useState(false)
   // Linked fh_clients row used for the "Pull from client" button. Loaded
   // only when contact has a client_id + caller is the owner (RLS on
   // fh_clients denies partner reads — owner-only by design).
-  const [linkedClient, setLinkedClient] = useState(null)
+  const [linkedClient, setLinkedClient] = useState<any>(null)
   const [hydrating, setHydrating] = useState(false)
   // Pending client_id change tracked separately so the diff at commit()
   // time can include it without polluting the EDITABLE_FIELDS form
   // shape. null = no change, '' = explicit unlink, uuid = new link.
-  const [pendingClientId, setPendingClientId] = useState(null)
+  const [pendingClientId, setPendingClientId] = useState<any>(null)
 
   // Reset form whenever the underlying contact changes (e.g. a partner edit
   // streams in via realtime mid-edit). Keeps the form authoritative for
@@ -564,7 +564,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
     return () => { cancelled = true }
   }, [contact?.client_id, userId])
 
-  function set(key, value) {
+  function set(key: any, value: any) {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
@@ -612,7 +612,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
   async function commit() {
     if (saving) return
     // Diff: only patch keys whose value differs from the contact row.
-    const diff = {}
+    const diff: Record<string, any> = {}
     for (const f of EDITABLE_FIELDS) {
       const next = f.kind === 'number' ? (form[f.key] === '' ? null : Number(form[f.key])) : form[f.key]
       const cur = contact[f.key]
@@ -639,7 +639,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
   // ClientPicker below. Auto-hydrates empty form fields with the
   // picked client's values — same merge policy as NewLeadSheet's
   // handleClientChange. User-typed values are never clobbered.
-  function handleClientLink(picked) {
+  function handleClientLink(picked: any) {
     if (!picked) {
       setPendingClientId('') // sentinel for explicit unlink
       setLinkedClient(null)
@@ -741,7 +741,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
             key={f.key}
             label={f.label}
             value={form[f.key]}
-            onChange={(v) => set(f.key, v)}
+            onChange={(v: any) => set(f.key, v)}
             kind={f.kind}
             placeholder={f.placeholder}
             spanFull={f.kind === 'textarea' || f.key === 'address'}
@@ -801,8 +801,8 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }) {
   )
 }
 
-function buildForm(contact) {
-  const out = {}
+function buildForm(contact: any) {
+  const out: Record<string, any> = {}
   for (const f of EDITABLE_FIELDS) {
     const v = contact?.[f.key]
     out[f.key] = v == null ? '' : String(v)
@@ -810,9 +810,9 @@ function buildForm(contact) {
   return out
 }
 
-function EditField({ label, value, onChange, kind, placeholder, spanFull }) {
+function EditField({ label, value, onChange, kind, placeholder, spanFull }: any) {
   const className = spanFull ? 'v3-edit-field--full' : ''
-  const sharedInputStyle = {
+  const sharedInputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
     padding: '11px 13px', borderRadius: 10,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
