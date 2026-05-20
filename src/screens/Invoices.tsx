@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase.ts'
 import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { generateInvoice, downloadPdf } from '../lib/pdf.js'
+import { generateInvoice as generateInvoice_, downloadPdf } from '../lib/pdf.js'
+const generateInvoice = generateInvoice_ as any
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -31,7 +32,7 @@ const AGING_BUCKETS = [
   { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-bright)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
 
-function bucketFor(days) {
+function bucketFor(days: any) {
   if (days <= 30) return '0-30'
   if (days <= 60) return '31-60'
   return '60+'
@@ -41,7 +42,7 @@ function bucketFor(days) {
 // the job, fall back to the joined fh_clients row. Edits to the client
 // card don't propagate back to the job row, so the linked client is
 // the source of truth when the job row is stale or empty.
-function resolveClient(job) {
+function resolveClient(job: any) {
   const cli = job?.fh_clients || {}
   return {
     name:    job?.name    || cli.name    || '',
@@ -51,7 +52,7 @@ function resolveClient(job) {
   }
 }
 
-function fmtMoney(n) {
+function fmtMoney(n: any) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
 
@@ -65,11 +66,11 @@ export default function Invoices() {
   const [filter, setFilter] = useState('outstanding') // 'outstanding' | 'all'
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
-  const [payingRow, setPayingRow] = useState(null)
+  const [payingRow, setPayingRow] = useState<any>(null)
   // Which row is mid-send (job.id) and which just succeeded — drives
   // the per-row Email button's loading + green Sent morph.
-  const [sendingId, setSendingId] = useState(null)
-  const [sentId, setSentId] = useState(null)
+  const [sendingId, setSendingId] = useState<any>(null)
+  const [sentId, setSentId] = useState<any>(null)
   const confirm = useConfirm()
 
   // Roll up payment totals per contact for fast lookup.
@@ -92,7 +93,7 @@ export default function Invoices() {
       const amount = Number(j.amount || 0)
       const paid = paidByJob.get(j.id) || 0
       const balance = amount - paid
-      const ageDays = Math.floor((now - new Date(j.created_at).getTime()) / 86400000)
+      const ageDays = Math.floor((now - new Date(j.created_at as any).getTime()) / 86400000)
       const bucket = bucketFor(ageDays)
       const isOutstanding = balance > 0.5 && j.stage !== 'lost'
       out.push({ job: j, amount, paid, balance, ageDays, bucket, isOutstanding })
@@ -103,7 +104,7 @@ export default function Invoices() {
   const filtered = filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows
 
   const totals = useMemo(() => {
-    const out = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
+    const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
     for (const r of rows) {
       if (!r.isOutstanding) continue
       out[r.bucket] += r.balance
@@ -124,7 +125,7 @@ export default function Invoices() {
     let monthCollected = 0
     let priorTotal = 0
     for (const p of payments) {
-      const t = p.paid_on ? new Date(p.paid_on).getTime() : new Date(p.created_at).getTime()
+      const t = p.paid_on ? new Date(p.paid_on as any).getTime() : new Date(p.created_at as any).getTime()
       const amt = Number(p.amount || 0)
       if (t >= startOfMonth) monthCollected += amt
       else if (t >= threeMonthsAgo) priorTotal += amt
@@ -143,7 +144,7 @@ export default function Invoices() {
     phone: profile?.company_phone || '',
     // Prefer customer-facing company_email (migration 015) over the
     // operator's auth email so invoices show the public address.
-    email: profile?.company_email || profile?.email || '',
+    email: profile?.company_email || (profile as any)?.email || '',
     website: profile?.company_website || '',
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
@@ -151,7 +152,7 @@ export default function Invoices() {
     insured_text: profile?.insured_text || ''
   }), [profile])
 
-  async function handleGeneratePDF(row) {
+  async function handleGeneratePDF(row: any) {
     // Audit caught this as a no-op. Wrap in try/catch so a jsPDF
     // failure surfaces a real error instead of silently swallowing,
     // and so the user sees a toast immediately on click instead of
@@ -197,7 +198,7 @@ export default function Invoices() {
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
       toastSuccess('Invoice PDF downloaded', result.filename)
-    } catch (e) {
+    } catch (e: any) {
       console.error('[invoices] PDF generation failed:', e)
       toastError("Couldn't generate PDF", e?.message || 'Try again')
     }
@@ -206,7 +207,7 @@ export default function Invoices() {
   // Mark Paid now opens the shared V3PaymentSheet. The sheet handles
   // method / reference / paid_on / partial amount and calls logPayment
   // through the existing pipeline (auto-close cascade preserved).
-  function openPaymentSheet(row) {
+  function openPaymentSheet(row: any) {
     setPayingRow(row)
   }
 
@@ -216,7 +217,7 @@ export default function Invoices() {
   // "Invoice PDF" expecting it to send; only the inner detail page
   // had a real Send button. This wires it into the list so the
   // operator never has to dive into the detail page just to email.
-  async function handleSendEmail(row) {
+  async function handleSendEmail(row: any) {
     const job = row?.job
     if (!user || !job) return
     const c = resolveClient(job)
@@ -291,7 +292,7 @@ export default function Invoices() {
       setSentId(job.id)
       setTimeout(() => setSentId(null), 2400)
       refresh()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't send invoice", e?.message || 'Try again')
     } finally {
       setSendingId(null)
@@ -533,7 +534,7 @@ export default function Invoices() {
      - collect: gold-tinted "Collect · N" (outstanding, no overdue)
      - overdue: danger-tinted "Overdue · N" (60+ exists)
    ============================================================ */
-function BalanceStateChip({ totals }) {
+function BalanceStateChip({ totals }: any) {
   const overdueCount = totals['60+'] > 0 ? totals.count : 0
   // Variant selection — overdue beats collect beats none.
   let variant
@@ -541,7 +542,7 @@ function BalanceStateChip({ totals }) {
   else if (totals['60+'] > 0) variant = 'overdue'
   else variant = 'collect'
 
-  const styles = {
+  const styles = ({
     none: {
       bg: 'var(--v3-surface-2)',
       border: 'var(--v3-border-strong)',
@@ -557,7 +558,7 @@ function BalanceStateChip({ totals }) {
       border: 'color-mix(in srgb, var(--v3-danger) 38%, transparent)',
       color: 'var(--v3-danger-bright)'
     }
-  }[variant]
+  } as Record<string, any>)[variant]
 
   const label = variant === 'none'
     ? 'All caught up'
@@ -597,10 +598,10 @@ function BalanceStateChip({ totals }) {
    owed-aging__bar pattern; segments collapse to zero-width when
    their bucket is empty.
    ============================================================ */
-function AgingBar({ totals }) {
+function AgingBar({ totals }: any) {
   const total = totals.total || 0
   if (total <= 0) return null
-  const pct = (n) => (Number(n) / total) * 100
+  const pct = (n: any) => (Number(n) / total) * 100
   return (
     <div
       role="img"
@@ -643,7 +644,7 @@ function AgingBar({ totals }) {
      └──────────────────────────────────────────────────┘
    Functions preserved: PDF generation + mark paid via parent props.
    ============================================================ */
-function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }) {
+function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
   const { job, amount, paid, balance, ageDays, bucket, isOutstanding } = row
   const bucketMeta = AGING_BUCKETS.find((b) => b.id === bucket) || AGING_BUCKETS[0]
   const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0

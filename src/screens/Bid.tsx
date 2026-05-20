@@ -25,9 +25,9 @@ const SYSTEM = `You are an estimating assistant for a contractor's business. Giv
 // pre-checks because they're user-specific.
 const TRADES = Object.keys(RATE_CARD)
 
-function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
-function formatThousands(n) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }
-function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
+function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
+function formatThousands(n: any) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }
+function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
 
 export default function Bid() {
   const { user } = useAuth()
@@ -35,9 +35,9 @@ export default function Bid() {
   const [scope, setScope] = useState('')
   const [marginPct, setMarginPct] = useState(25)
   const [generating, setGenerating] = useState(false)
-  const [bid, setBid] = useState(null)
+  const [bid, setBid] = useState<any>(null)
   const [err, setErr] = useState('')
-  const [picks, setPicks] = useState([])
+  const [picks, setPicks] = useState<any[]>([])
   const [jobType, setJobType] = useState('')
   const [copied, setCopied] = useState(false)
   const [pushing, setPushing] = useState(false)
@@ -52,7 +52,7 @@ export default function Bid() {
   // Falls back to RATE_CARD before load resolves so the screen is
   // usable instantly on first paint.
   const [userRates, setUserRates] = useState(() => {
-    const m = {}
+    const m: Record<string, any> = {}
     for (const [k, v] of Object.entries(RATE_CARD)) m[k] = { ...v, label: TRADE_LABELS[k] || k }
     return m
   })
@@ -71,8 +71,8 @@ export default function Bid() {
 
   const total = useMemo(() => {
     if (!bid) return null
-    const low = bid.total_low || bid.line_items?.reduce((s, li) => s + (li.rate_low * (li.qty || 1)), 0) || 0
-    const high = bid.total_high || bid.line_items?.reduce((s, li) => s + (li.rate_high * (li.qty || 1)), 0) || 0
+    const low = bid.total_low || bid.line_items?.reduce((s: any, li: any) => s + (li.rate_low * (li.qty || 1)), 0) || 0
+    const high = bid.total_high || bid.line_items?.reduce((s: any, li: any) => s + (li.rate_high * (li.qty || 1)), 0) || 0
     const midpoint = (low + high) / 2
     const withMargin = midpoint / (1 - marginPct / 100)
     return { low, high, midpoint, withMargin }
@@ -100,14 +100,14 @@ export default function Bid() {
       if (match) {
         const parsedBid = JSON.parse(match[0])
         hapticSuccess(); setBid(parsedBid)
-        const low = parsedBid.total_low || parsedBid.line_items?.reduce((s, li) => s + (li.rate_low * (li.qty || 1)), 0) || 0
-        const high = parsedBid.total_high || parsedBid.line_items?.reduce((s, li) => s + (li.rate_high * (li.qty || 1)), 0) || 0
+        const low = parsedBid.total_low || parsedBid.line_items?.reduce((s: any, li: any) => s + (li.rate_low * (li.qty || 1)), 0) || 0
+        const high = parsedBid.total_high || parsedBid.line_items?.reduce((s: any, li: any) => s + (li.rate_high * (li.qty || 1)), 0) || 0
         const withMargin = ((low + high) / 2) / (1 - marginPct / 100)
         hapticSuccess(); toastSuccess('Estimate ready', money(Math.round(withMargin)))
       } else {
         setErr('AI returned no structured estimate')
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('[bid] generate failed:', e)
       setErr(e.message || 'Estimate generation failed')
     } finally {
@@ -115,7 +115,7 @@ export default function Bid() {
     }
   }
 
-  function togglePick(t) {
+  function togglePick(t: any) {
     setPicks((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
   }
 
@@ -150,8 +150,8 @@ export default function Bid() {
           stage: 'quote',
           scope_text: scope || null,
           notes: [
-            bid.assumptions?.length ? `Assumptions:\n${bid.assumptions.map((a) => `• ${a}`).join('\n')}` : '',
-            bid.risks?.length ? `Risks:\n${bid.risks.map((r) => `• ${r}`).join('\n')}` : ''
+            bid.assumptions?.length ? `Assumptions:\n${bid.assumptions.map((a: any) => `• ${a}`).join('\n')}` : '',
+            bid.risks?.length ? `Risks:\n${bid.risks.map((r: any) => `• ${r}`).join('\n')}` : ''
           ].filter(Boolean).join('\n\n') || null
         })
         .select('*')
@@ -162,7 +162,7 @@ export default function Bid() {
       //    high end of the rate range as the rate — gives the
       //    contractor room to negotiate down rather than scrambling
       //    to add charges later.
-      const items = (bid.line_items || []).map((li, idx) => ({
+      const items = (bid.line_items || []).map((li: any, idx: any) => ({
         user_id: user.id,
         contact_id: contact.id,
         section: TRADE_LABELS[picks[0]] || 'Scope',
@@ -174,7 +174,7 @@ export default function Bid() {
         is_optional: false,
         is_excluded: false,
         sort_order: idx
-      })).filter((row) => row.rate > 0 || row.amount > 0)
+      })).filter((row: any) => row.rate > 0 || row.amount > 0)
 
       if (items.length > 0) {
         const { error: iErr } = await supabase.from('fh_quote_items').insert(items)
@@ -188,7 +188,7 @@ export default function Bid() {
       )
       // Land on the Quote tab so the contractor can refine + send.
       navigate(`/jobs/${contact.id}?tab=quote`)
-    } catch (e) {
+    } catch (e: any) {
       console.error('[bid] pushToJob failed:', e)
       toastError("Couldn't create job from bid", e?.message || 'Try again.')
     } finally {
@@ -220,7 +220,7 @@ export default function Bid() {
       toastSuccess('Saved to templates', name)
       setTemplateNamePrompt('')
       await fetchTemplates()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't save template", e?.message || 'Try again.')
     } finally {
       setSavingTemplate(false)
@@ -230,7 +230,7 @@ export default function Bid() {
   // Load a saved template into the current bid state — skips the AI
   // round trip entirely. The operator can refine + push to a job
   // from there as if they'd just generated it.
-  function loadTemplate(t) {
+  function loadTemplate(t: any) {
     setBid({
       summary: t.description || t.name,
       line_items: t.line_items || [],
@@ -246,7 +246,7 @@ export default function Bid() {
     toastSuccess('Template loaded', t.name)
   }
 
-  async function deleteTemplate(t) {
+  async function deleteTemplate(t: any) {
     if (!t?.id) return
     if (!window.confirm(`Delete "${t.name}" from your templates?`)) return
     try {
@@ -254,7 +254,7 @@ export default function Bid() {
       if (error) throw error
       toastSuccess('Template deleted', t.name)
       await fetchTemplates()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't delete", e?.message || 'Try again.')
     }
   }
@@ -268,9 +268,9 @@ export default function Bid() {
       `Raw range: ${money(total.low)} – ${money(total.high)}`,
       '',
       'Line items:',
-      ...(bid.line_items || []).map((li) => `  • ${li.name}${li.notes ? ` — ${li.notes}` : ''} (${li.qty || 1} ${li.unit}: ${money((li.rate_low || 0) * (li.qty || 1))} – ${money((li.rate_high || 0) * (li.qty || 1))})`),
-      ...(bid.assumptions?.length ? ['', 'Assumptions:', ...bid.assumptions.map((a) => `  • ${a}`)] : []),
-      ...(bid.risks?.length ? ['', 'Risks:', ...bid.risks.map((r) => `  • ${r}`)] : [])
+      ...(bid.line_items || []).map((li: any) => `  • ${li.name}${li.notes ? ` — ${li.notes}` : ''} (${li.qty || 1} ${li.unit}: ${money((li.rate_low || 0) * (li.qty || 1))} – ${money((li.rate_high || 0) * (li.qty || 1))})`),
+      ...(bid.assumptions?.length ? ['', 'Assumptions:', ...bid.assumptions.map((a: any) => `  • ${a}`)] : []),
+      ...(bid.risks?.length ? ['', 'Risks:', ...bid.risks.map((r: any) => `  • ${r}`)] : [])
     ]
     await navigator.clipboard.writeText(lines.join('\n'))
     setCopied(true)
@@ -386,7 +386,7 @@ export default function Bid() {
                       {t.name}
                     </span>
                     <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)' }}>
-                      {(t.line_items || []).length} item{(t.line_items || []).length === 1 ? '' : 's'}
+                      {((t.line_items || []) as any[]).length} item{((t.line_items || []) as any[]).length === 1 ? '' : 's'}
                       {t.total_high ? ` · ${money(t.total_high)}` : ''}
                       {t.job_type ? ` · ${capitalize(t.job_type)}` : ''}
                     </span>
@@ -796,7 +796,7 @@ export default function Bid() {
             }}>
               <SectionHeader label="Line Items" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                {bid.line_items?.map((li, i) => (
+                {bid.line_items?.map((li: any, i: any) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, x: -8 }}
@@ -856,7 +856,7 @@ export default function Bid() {
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--v3-border)' }}>
                 <SectionHeader label="Assumptions" />
                 <ul style={{ margin: '4px 0 0', paddingLeft: 18, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.55 }}>
-                  {bid.assumptions.map((a, i) => <li key={i} style={{ marginBottom: 4 }}>{a}</li>)}
+                  {bid.assumptions.map((a: any, i: any) => <li key={i} style={{ marginBottom: 4 }}>{a}</li>)}
                 </ul>
               </div>
             )}
@@ -872,7 +872,7 @@ export default function Bid() {
               }}>
                 <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>Risks</span>
                 <ul style={{ margin: '6px 0 0', paddingLeft: 18, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.55 }}>
-                  {bid.risks.map((r, i) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
+                  {bid.risks.map((r: any, i: any) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
                 </ul>
               </div>
             )}

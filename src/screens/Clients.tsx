@@ -15,7 +15,7 @@ import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } 
 import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
@@ -57,7 +57,7 @@ export default function Clients() {
     [duplicateClusters]
   )
 
-  function rollupFor(clientId) {
+  function rollupFor(clientId: any) {
     return rollupMap.get(clientId) || { lifetime: 0, outstanding: 0, activeCount: 0, wonCount: 0, paidTotal: 0 }
   }
 
@@ -156,7 +156,7 @@ export default function Clients() {
           totalLifetime={totalLifetime}
           duplicateClusters={duplicateClusters}
           duplicateCount={duplicateCount}
-          onOpenClient={(id) => navigate(`/clients/${id}`)}
+          onOpenClient={(id: any) => navigate(`/clients/${id}`)}
           onNewClient={() => setAddOpen(true)}
           onReviewDuplicates={() => setMergeOpen(true)}
         />
@@ -164,7 +164,7 @@ export default function Clients() {
           open={addOpen}
           userId={user?.id}
           onClose={() => setAddOpen(false)}
-          onSaved={(client) => {
+          onSaved={(client: any) => {
             setAddOpen(false)
             if (client?.id) navigate(`/clients/${client.id}`)
             else load()
@@ -488,7 +488,7 @@ export default function Clients() {
         open={addOpen}
         userId={user?.id}
         onClose={() => setAddOpen(false)}
-        onSaved={(client) => {
+        onSaved={(client: any) => {
           setAddOpen(false)
           if (client?.id) navigate(`/clients/${client.id}`)
           else load()
@@ -534,7 +534,7 @@ export default function Clients() {
    user wouldn't read before tapping anyway.
    ============================================================ */
 
-function formatRelative(date) {
+function formatRelative(date: any) {
   const ms = Date.now() - date.getTime()
   const days = Math.floor(ms / 86400000)
   if (days === 0) return 'Today'
@@ -545,7 +545,7 @@ function formatRelative(date) {
   return `${Math.floor(days / 365)}y ago`
 }
 
-function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast, onOpen }) {
+function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast, onOpen }: any) {
   const subline = useMemo(() => {
     if (r.outstanding > 0) {
       return { text: `Owes ${money(r.outstanding)}`, tone: 'danger' }
@@ -682,7 +682,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
      active  → gold-tinted   "N active" (active jobs, no overdue)
      idle    → muted         "N accounts" (nothing in motion)
    ============================================================ */
-function ClientsStateChip({ stats, totalAccounts }) {
+function ClientsStateChip({ stats, totalAccounts }: any) {
   const { owesAccounts, activeAccounts } = stats
   let bg, border, color, label
   if (owesAccounts > 0) {

@@ -14,17 +14,17 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 
-function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
+function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 // Compact currency — matches Home hero pattern. Skips compaction under $1k
 // so small numbers don't render as "$900" / "$0K" weirdness.
-function fmtMoneyCompact(n) {
+function fmtMoneyCompact(n: any) {
   const v = Number(n || 0)
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
   if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
   return `$${Math.round(v).toLocaleString()}`
 }
-function fmtPct(n) { return `${Math.round(n)}%` }
-function fmtInt(n) { return String(Math.round(n)) }
+function fmtPct(n: any) { return `${Math.round(n)}%` }
+function fmtInt(n: any) { return String(Math.round(n)) }
 
 export default function Analytics() {
   const { user } = useAuth()
@@ -58,7 +58,7 @@ export default function Analytics() {
         .filter((c) => {
           const created = c.created_at ? new Date(c.created_at) : null
           if (!created) return false
-          return created >= wkStart && created < wkEnd && ACTIVE_STAGES.includes(c.stage)
+          return created >= wkStart && created < wkEnd && ACTIVE_STAGES.includes(c.stage as string)
         })
         .reduce((s, c) => s + Number(c.amount || 0), 0)
       buckets.push({
@@ -71,7 +71,7 @@ export default function Analytics() {
 
   const stats = useMemo(() => {
     // Pipeline = sum of all jobs in active stages.
-    const pipeline = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage)).reduce((s, c) => s + Number(c.amount || 0), 0)
+    const pipeline = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage as string)).reduce((s, c) => s + Number(c.amount || 0), 0)
     // Won YTD + Profit YTD now share the rollups.ts definition with
     // Jobs/Clients (won = stage in (invoice, closed)). Was previously
     // 'closed' only, so any job sitting in 'invoice' read as $0 won.
@@ -159,7 +159,7 @@ export default function Analytics() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const next = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
       const total = payments.reduce((s, p) => {
-        const when = new Date(p.paid_on || p.created_at)
+        const when = new Date((p.paid_on || p.created_at) as any)
         if (Number.isNaN(when.getTime())) return s
         if (when >= d && when < next) return s + Number(p.amount || 0)
         return s
@@ -208,9 +208,9 @@ export default function Analytics() {
     const clientById = new Map(clients.map((c) => [c.id, c]))
     const totals = new Map()
     for (const p of payments) {
-      const when = new Date(p.paid_on || p.created_at)
+      const when = new Date((p.paid_on || p.created_at) as any)
       if (Number.isNaN(when.getTime()) || when < cutoff) continue
-      const c = contactById.get(p.contact_id)
+      const c = contactById.get(p.contact_id as string)
       const clientName = c?.client_id ? clientById.get(c.client_id)?.name : null
       const key = clientName || c?.name || 'Unknown'
       totals.set(key, (totals.get(key) || 0) + Number(p.amount || 0))
@@ -238,7 +238,7 @@ export default function Analytics() {
   const avgDepositLagDays = useMemo(() => {
     const firstPaymentByContact = new Map()
     for (const p of payments) {
-      const when = new Date(p.paid_on || p.created_at)
+      const when = new Date((p.paid_on || p.created_at) as any)
       if (Number.isNaN(when.getTime())) continue
       const prev = firstPaymentByContact.get(p.contact_id)
       if (!prev || when < prev) firstPaymentByContact.set(p.contact_id, when)
@@ -249,7 +249,7 @@ export default function Analytics() {
       const first = firstPaymentByContact.get(c.id)
       if (!first) continue
       const sent = new Date(c.quote_sent_at)
-      const days = Math.max(0, (first - sent) / (24 * 60 * 60 * 1000))
+      const days = Math.max(0, ((first as any) - (sent as any)) / (24 * 60 * 60 * 1000))
       if (Number.isFinite(days)) lags.push(days)
     }
     if (lags.length === 0) return null
@@ -503,7 +503,7 @@ export default function Analytics() {
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--v3-text)' }}>{m.purpose || 'Drive'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>{new Date(m.drove_on).toLocaleDateString()}</div>
+                      <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>{new Date(m.drove_on as any).toLocaleDateString()}</div>
                     </div>
                     <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>{m.miles} mi</div>
                   </div>
@@ -631,7 +631,7 @@ export default function Analytics() {
   )
 }
 
-function InsightCard({ title, children }) {
+function InsightCard({ title, children }: any) {
   return (
     <div style={{
       padding: '16px 18px',
@@ -652,10 +652,10 @@ function InsightCard({ title, children }) {
   )
 }
 
-function RevenueBars({ data, maxValue }) {
+function RevenueBars({ data, maxValue }: any) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.length}, 1fr)`, gap: 6, alignItems: 'flex-end', height: 80 }}>
-      {data.map((b) => {
+      {data.map((b: any) => {
         const heightPct = (b.total / maxValue) * 100
         return (
           <div key={b.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -682,7 +682,7 @@ function RevenueBars({ data, maxValue }) {
   )
 }
 
-function KPI({ label, to, format, Icon, gold, note }) {
+function KPI({ label, to, format, Icon, gold, note }: any) {
   return (
     <div
       style={{

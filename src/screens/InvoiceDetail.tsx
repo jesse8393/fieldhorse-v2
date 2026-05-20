@@ -16,7 +16,8 @@ import { supabase } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { generateInvoice, downloadPdf } from '../lib/pdf.js'
+import { generateInvoice as generateInvoice_, downloadPdf } from '../lib/pdf.js'
+const generateInvoice = generateInvoice_ as any
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
@@ -46,26 +47,26 @@ const AGING_BUCKETS = [
   { id: '60+',   label: 'Overdue',  max: Infinity,  color: 'var(--v3-danger-bright)',  accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
 
-function bucketFor(days) {
+function bucketFor(days: any) {
   if (days <= 30) return '0-30'
   if (days <= 60) return '31-60'
   return '60+'
 }
 
-function fmtMoney(n) {
+function fmtMoney(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
 }
 
-function fmtDate(iso) {
+function fmtDate(iso: any) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function methodLabel(m) {
+function methodLabel(m: any) {
   if (!m) return 'Payment'
   const lower = String(m).toLowerCase()
   if (lower === 'cash') return 'Cash'
@@ -115,7 +116,7 @@ export default function InvoiceDetail() {
   // back to fh_clients (the source of truth when edits happen on the
   // client card and the job row stayed empty).
   const resolved = useMemo(() => {
-    const cli = contact?.fh_clients || {}
+    const cli: any = contact?.fh_clients || {}
     return {
       name:    contact?.name    || cli.name    || '',
       email:   contact?.email   || cli.email   || '',
@@ -151,7 +152,7 @@ export default function InvoiceDetail() {
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
     phone: profile?.company_phone || '',
-    email: profile?.company_email || profile?.email || '',
+    email: profile?.company_email || (profile as any)?.email || '',
     website: profile?.company_website || '',
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
@@ -197,7 +198,7 @@ export default function InvoiceDetail() {
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
       toastSuccess('Invoice PDF downloaded', result.filename)
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't generate PDF", e?.message || 'Try again')
     } finally {
       setGenerating(false)
@@ -221,7 +222,7 @@ export default function InvoiceDetail() {
     try {
       const link = await mintPublicLink({
         contactId: contact.id,
-        userId: user.id,
+        userId: user!.id,
         kind: 'invoice'
       })
       try {
@@ -232,7 +233,7 @@ export default function InvoiceDetail() {
         // the link so the operator can long-press to copy.
         toastSuccess('Share link ready', link.url)
       }
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't mint share link", e?.message || 'Try again.')
     } finally {
       setSharing(false)
@@ -280,7 +281,7 @@ export default function InvoiceDetail() {
       // Upload to job-files so the server can pull it with service role.
       const blob = result.doc.output('blob')
       const rowId = crypto.randomUUID()
-      const path = `${user.id}/${contact.id}/${rowId}.pdf`
+      const path = `${user!.id}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage
         .from('job-files')
         .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
@@ -289,7 +290,7 @@ export default function InvoiceDetail() {
       try {
         await supabase.from('fh_job_files').insert({
           id: rowId,
-          user_id: user.id,
+          user_id: user!.id,
           job_id: contact.id,
           filename: result.filename,
           storage_path: path,
@@ -297,7 +298,7 @@ export default function InvoiceDetail() {
           size_bytes: blob.size || 0,
           kind: 'file'
         })
-      } catch (e) {
+      } catch (e: any) {
         console.warn('[invoice] fh_job_files row insert failed', e)
       }
 
@@ -306,7 +307,7 @@ export default function InvoiceDetail() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contact_id: contact.id,
-          sender_user_id: user.id,
+          sender_user_id: user!.id,
           recipient_email: resolved.email,
           recipient_name: resolved.name || null,
           storage_path: path,
@@ -338,7 +339,7 @@ export default function InvoiceDetail() {
       setSent(true)
       setTimeout(() => setSent(false), 2400)
       refresh()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't send invoice", e?.message || 'Try again')
     } finally {
       setSending(false)
@@ -843,7 +844,7 @@ export default function InvoiceDetail() {
    out of state and shapes them into the template's prop contract.
    No new queries; no schema changes.
    ───────────────────────────────────────────────────────── */
-function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item }) {
+function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item, insurance, changeOrders }: any) {
   const docStatus = (() => {
     const tone = status?.tone
     if (tone === 'good')   return 'paid'
@@ -893,7 +894,7 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
   )
 }
 
-function ViewModeToggle({ value, onChange }) {
+function ViewModeToggle({ value, onChange }: any) {
   const opts = [
     { v: 'detail',   label: 'Detail' },
     { v: 'document', label: 'Document' }
@@ -944,7 +945,7 @@ function ViewModeToggle({ value, onChange }) {
   )
 }
 
-function SectionTitle({ children }) {
+function SectionTitle({ children }: any) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -961,7 +962,7 @@ function SectionTitle({ children }) {
   )
 }
 
-function StatusPill({ status }) {
+function StatusPill({ status }: any) {
   const palette = (() => {
     switch (status.tone) {
       case 'gold':
