@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { UserPlus, Save as SaveIcon, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { supabase } from '../lib/supabase.js'
-import { toastSuccess, toastError } from '../lib/toast.js'
+import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
 
 export default function NewClientSheet({ open, userId, onClose, onSaved }) {

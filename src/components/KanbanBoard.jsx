@@ -11,7 +11,7 @@ import {
 import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { motion } from 'framer-motion'
 import { GripVertical } from 'lucide-react'
-import { hapticStageChange, hapticTap } from '../lib/haptics.js'
+import { hapticStageChange, hapticTap } from '../lib/haptics.ts'
 
 // Stage columns shown left-to-right. "lost" lives off-board (URL-only).
 const COLUMNS = [

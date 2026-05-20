@@ -14,8 +14,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Users, Check, AlertTriangle, X } from 'lucide-react'
-import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.js'
-import { toastSuccess, toastError } from '../lib/toast.js'
+import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
+import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mergeClients } from '../lib/clientMerge.ts'
 
 function fmtPhone(n) {

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
-import { hapticTap, hapticMedium } from '../../lib/haptics.js'
+import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
 
 /**
  * DesktopScheduleWorkspace — desktop-first composition for /schedule

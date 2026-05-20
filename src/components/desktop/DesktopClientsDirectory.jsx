@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Plus, Search, Phone, Mail, MessageSquare, Map } from 'lucide-react'
-import { hapticTap, hapticMedium } from '../../lib/haptics.js'
+import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
 
 /**
  * DesktopClientsDirectory — desktop-first composition for /clients at >=900px.

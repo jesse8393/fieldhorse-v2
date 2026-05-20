@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Calendar } from 'lucide-react'
-import { hapticTap } from '../../lib/haptics.js'
+import { hapticTap } from '../../lib/haptics.ts'
 import { dueStatus } from '../../lib/dueDate.ts'
 
 /**

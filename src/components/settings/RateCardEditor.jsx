@@ -13,8 +13,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Save as SaveIcon, RotateCcw, Trash2, Check } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
-import { hapticTap, hapticSuccess, hapticError } from '../../lib/haptics.js'
-import { toastSuccess, toastError } from '../../lib/toast.js'
+import { hapticTap, hapticSuccess, hapticError } from '../../lib/haptics.ts'
+import { toastSuccess, toastError } from '../../lib/toast.ts'
 import {
   RATE_CARD, TRADE_LABELS, RATE_UNITS,
   loadUserRateCard, upsertRate, resetRate

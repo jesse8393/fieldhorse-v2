@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, ArrowRight, Plus } from 'lucide-react'
-import { hapticTap } from '../../../lib/haptics.js'
+import { hapticTap } from '../../../lib/haptics.ts'
 
 /**
  * Scheduled section — read-only display of fh_schedule entries for this job.

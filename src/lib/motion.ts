@@ -13,9 +13,9 @@
 //   variant (their own opacity 0 → 1 with a fixed-duration tween), so
 //   the entry feel is preserved without the failure mode.
 
-import { useReducedMotion } from 'framer-motion'
+import { useReducedMotion, type Variants } from 'framer-motion'
 
-export function useFhMotion() {
+export function useFhMotion(): { stagger: Variants; item: Variants; reduced: boolean | null } {
   const reduced = useReducedMotion()
 
   // Parent never fades. `staggerChildren` still cascades the children.

@@ -4,7 +4,7 @@ import {
   ArrowRight, ChevronRight, AlertTriangle, Zap, Receipt,
   CalendarClock, Plus, Sparkles
 } from 'lucide-react'
-import { hapticTap } from '../../lib/haptics.js'
+import { hapticTap } from '../../lib/haptics.ts'
 
 /**
  * DesktopHomeCommandCenter — Phase 10 desktop composition for / at >=900px.

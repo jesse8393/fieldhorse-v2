@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { Users as UsersIcon, ArrowUpRight } from 'lucide-react'
 import { STAGE_MAP, margin, marginTier } from '../../lib/stages.ts'
-import { hapticTap } from '../../lib/haptics.js'
+import { hapticTap } from '../../lib/haptics.ts'
 import StatusPill from './StatusPill.jsx'
 
 // Cold threshold (V3-JOBS-1) — a contact in lead or quote stage with no

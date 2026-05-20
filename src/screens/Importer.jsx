@@ -6,9 +6,9 @@ import { Progress } from '@/components/ui/progress'
 import { supabase } from '../lib/supabase.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { toastSuccess, toastError } from '../lib/toast.js'
-import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
-import { useFhMotion } from '../lib/motion.js'
+import { toastSuccess, toastError } from '../lib/toast.ts'
+import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
+import { useFhMotion } from '../lib/motion.ts'
 
 // Importable target fields, in display order. Used by the mapping
 // review UI + the AI mapper prompt.

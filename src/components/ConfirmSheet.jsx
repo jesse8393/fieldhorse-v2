@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { hapticTap } from '../lib/haptics.js'
+import { hapticTap } from '../lib/haptics.ts'
 
 /**
  * ConfirmSheet — premium black-glass replacement for window.confirm().

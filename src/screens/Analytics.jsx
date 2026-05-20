@@ -9,9 +9,9 @@ import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
 import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn } from '../lib/rollups.ts'
-import { toastSuccess } from '../lib/toast.js'
-import { hapticTap, hapticMedium } from '../lib/haptics.js'
-import { useFhMotion } from '../lib/motion.js'
+import { toastSuccess } from '../lib/toast.ts'
+import { hapticTap, hapticMedium } from '../lib/haptics.ts'
+import { useFhMotion } from '../lib/motion.ts'
 import SectionHeader from '../components/v3/SectionHeader.jsx'
 
 function money(n) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { DollarSign, Plus } from 'lucide-react'
-import { hapticTap } from '../../../lib/haptics.js'
+import { hapticTap } from '../../../lib/haptics.ts'
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {

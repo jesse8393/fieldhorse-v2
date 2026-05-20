@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { hapticTap } from '../../lib/haptics.js'
+import { hapticTap } from '../../lib/haptics.ts'
 
 // QuickAction — single Home tile in the 5-up launcher row.
 //

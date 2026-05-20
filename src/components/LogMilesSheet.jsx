@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Car, Save as SaveIcon, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { supabase } from '../lib/supabase.js'
-import { toastError } from '../lib/toast.js'
+import { toastError } from '../lib/toast.ts'
 
 const IRS_RATE = 0.67
 

@@ -9,7 +9,7 @@ import DocIntakeButton from './DocIntakeButton.jsx'
 import { supabase } from '../lib/supabase.js'
 import { claudeMessage } from '../lib/anthropic.js'
 import { parseLeadFromImage } from '../lib/docIntelligence.js'
-import { toastSuccess } from '../lib/toast.js'
+import { toastSuccess } from '../lib/toast.ts'
 import { JOB_TYPES } from '../lib/jobTypes.ts'
 import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.js'
 

@@ -7,7 +7,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription
 } from '@/components/ui/drawer'
 import { notifySelf } from '../../../lib/notifications.js'
-import { hapticTap } from '../../../lib/haptics.js'
+import { hapticTap } from '../../../lib/haptics.ts'
 
 const TRADES = [
   'Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing',

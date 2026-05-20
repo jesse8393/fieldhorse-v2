@@ -4,7 +4,7 @@
 // hapticMedium for primary commits, hapticSuccess/Error for outcomes,
 // hapticSwipe for swipe reveals.
 
-function vibrate(pattern) {
+function vibrate(pattern: number | number[]) {
   if (typeof navigator === 'undefined') return
   if (typeof navigator.vibrate !== 'function') return
   // Respect user's reduce-motion preference — vibration counts as motion.

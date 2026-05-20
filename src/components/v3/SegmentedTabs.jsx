@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { hapticTap } from '../../lib/haptics.js'
+import { hapticTap } from '../../lib/haptics.ts'
 
 /**
  * v3 segmented tab bar.

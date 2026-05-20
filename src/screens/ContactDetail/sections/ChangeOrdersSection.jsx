@@ -15,7 +15,7 @@
 import { useState } from 'react'
 import { Plus, FileEdit, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
-import { toastSuccess, toastError } from '../../../lib/toast.js'
+import { toastSuccess, toastError } from '../../../lib/toast.ts'
 
 function money(n) {
   const v = Number(n || 0)

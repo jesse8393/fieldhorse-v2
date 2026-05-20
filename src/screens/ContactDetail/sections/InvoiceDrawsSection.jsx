@@ -24,7 +24,7 @@ import { supabase } from '../../../lib/supabase.js'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { useAuth } from '../../../contexts/AuthContext.jsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
-import { toastSuccess, toastError } from '../../../lib/toast.js'
+import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 
 function money(n) {

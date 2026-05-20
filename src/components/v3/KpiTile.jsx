@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import CountUp from '../fx/CountUp.jsx'
-import { hapticTap } from '../../lib/haptics.js'
+import { hapticTap } from '../../lib/haptics.ts'
 
 const TONE = {
   primary: {

@@ -6,8 +6,8 @@ import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import {
   startQuote, approveQuote, markComplete, reopen
 } from '../../../lib/pipeline.ts'
-import { toastSuccess, toastError } from '../../../lib/toast.js'
-import { hapticTap, hapticStageChange } from '../../../lib/haptics.js'
+import { toastSuccess, toastError } from '../../../lib/toast.ts'
+import { hapticTap, hapticStageChange } from '../../../lib/haptics.ts'
 import {
   NextActionCard,
   HealthDonut,
@@ -169,7 +169,7 @@ export default function OverviewTab({
           }
           const fn = STAGE_FN_MAP[nextAction.pipelineFn]
           if (fn) {
-            // Heavier haptic on stage boundary — matches haptics.js convention
+            // Heavier haptic on stage boundary — matches haptics.ts convention
             // that lead→quote→job→invoice transitions get hapticStageChange.
             // pipeline.ts fires its own commit haptic; this one announces the
             // boundary BEFORE the network call.
