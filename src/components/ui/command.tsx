@@ -16,7 +16,7 @@ import {
 function Command({
   className,
   ...props
-}) {
+}: any) {
   return (
     <CommandPrimitive
       data-slot="command"
@@ -35,7 +35,7 @@ function CommandDialog({
   className,
   showCloseButton = true,
   ...props
-}) {
+}: any) {
   return (
     <Dialog {...props}>
       <DialogHeader className="ui:sr-only">
@@ -57,7 +57,7 @@ function CommandDialog({
 function CommandInput({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="command-input-wrapper"
@@ -77,7 +77,7 @@ function CommandInput({
 function CommandList({
   className,
   ...props
-}) {
+}: any) {
   return (
     <CommandPrimitive.List
       data-slot="command-list"
@@ -91,7 +91,7 @@ function CommandList({
 
 function CommandEmpty({
   ...props
-}) {
+}: any) {
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
@@ -103,7 +103,7 @@ function CommandEmpty({
 function CommandGroup({
   className,
   ...props
-}) {
+}: any) {
   return (
     <CommandPrimitive.Group
       data-slot="command-group"
@@ -118,7 +118,7 @@ function CommandGroup({
 function CommandSeparator({
   className,
   ...props
-}) {
+}: any) {
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
@@ -130,7 +130,7 @@ function CommandSeparator({
 function CommandItem({
   className,
   ...props
-}) {
+}: any) {
   return (
     <CommandPrimitive.Item
       data-slot="command-item"
@@ -145,7 +145,7 @@ function CommandItem({
 function CommandShortcut({
   className,
   ...props
-}) {
+}: any) {
   return (
     <span
       data-slot="command-shortcut"

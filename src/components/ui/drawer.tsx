@@ -11,7 +11,7 @@ const DrawerTrigger = VaulDrawer.Trigger
 const DrawerPortal = VaulDrawer.Portal
 const DrawerClose = VaulDrawer.Close
 
-const DrawerOverlay = React.forwardRef(({ className, ...props }, ref) => (
+const DrawerOverlay = React.forwardRef<any, any>(({ className, ...props }, ref) => (
   <VaulDrawer.Overlay
     ref={ref}
     className={cn('ui:fixed ui:inset-0 ui:z-50 ui:bg-black/70 ui:backdrop-blur-sm', className)}
@@ -20,7 +20,7 @@ const DrawerOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DrawerOverlay.displayName = 'DrawerOverlay'
 
-const DrawerContent = React.forwardRef(({ className, children, ...props }, ref) => (
+const DrawerContent = React.forwardRef<any, any>(({ className, children, ...props }, ref) => (
   <DrawerPortal>
     <DrawerOverlay />
     <VaulDrawer.Content
@@ -38,17 +38,17 @@ const DrawerContent = React.forwardRef(({ className, children, ...props }, ref) 
 ))
 DrawerContent.displayName = 'DrawerContent'
 
-const DrawerHeader = ({ className, ...props }) => (
+const DrawerHeader = ({ className, ...props }: any) => (
   <div className={cn('ui:grid ui:gap-1.5 ui:p-4 ui:text-center ui:sm:text-left', className)} {...props} />
 )
-const DrawerFooter = ({ className, ...props }) => (
+const DrawerFooter = ({ className, ...props }: any) => (
   <div className={cn('ui:mt-auto ui:flex ui:flex-col ui:gap-2 ui:p-4', className)} {...props} />
 )
-const DrawerTitle = React.forwardRef(({ className, ...props }, ref) => (
+const DrawerTitle = React.forwardRef<any, any>(({ className, ...props }, ref) => (
   <VaulDrawer.Title ref={ref} className={cn('ui:text-lg ui:font-semibold ui:leading-none ui:tracking-tight ui:text-foreground', className)} {...props} />
 ))
 DrawerTitle.displayName = 'DrawerTitle'
-const DrawerDescription = React.forwardRef(({ className, ...props }, ref) => (
+const DrawerDescription = React.forwardRef<any, any>(({ className, ...props }, ref) => (
   <VaulDrawer.Description ref={ref} className={cn('ui:text-sm ui:text-muted-foreground', className)} {...props} />
 ))
 DrawerDescription.displayName = 'DrawerDescription'

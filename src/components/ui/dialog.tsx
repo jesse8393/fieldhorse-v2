@@ -7,32 +7,32 @@ import { Button } from "@/components/ui/button"
 
 function Dialog({
   ...props
-}) {
+}: any) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
 function DialogTrigger({
   ...props
-}) {
+}: any) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
 function DialogPortal({
   ...props
-}) {
+}: any) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
 function DialogClose({
   ...props
-}) {
+}: any) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
 // forwardRef so consumers (and Radix internals) can attach a ref —
 // without it React fires "Function components cannot be given refs"
 // every time a sheet/drawer is wrapped around a Dialog primitive.
-const DialogOverlay = React.forwardRef(function DialogOverlay({
+const DialogOverlay = React.forwardRef<any, any>(function DialogOverlay({
   className,
   ...props
 }, ref) {
@@ -48,7 +48,7 @@ const DialogOverlay = React.forwardRef(function DialogOverlay({
   );
 })
 
-const DialogContent = React.forwardRef(function DialogContent({
+const DialogContent = React.forwardRef<any, any>(function DialogContent({
   className,
   children,
   showCloseButton = true,
@@ -82,7 +82,7 @@ const DialogContent = React.forwardRef(function DialogContent({
 function DialogHeader({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="dialog-header"
@@ -99,7 +99,7 @@ function DialogFooter({
   showCloseButton = false,
   children,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="dialog-footer"
@@ -118,7 +118,7 @@ function DialogFooter({
   );
 }
 
-const DialogTitle = React.forwardRef(function DialogTitle({
+const DialogTitle = React.forwardRef<any, any>(function DialogTitle({
   className,
   ...props
 }, ref) {
@@ -131,7 +131,7 @@ const DialogTitle = React.forwardRef(function DialogTitle({
   );
 })
 
-const DialogDescription = React.forwardRef(function DialogDescription({
+const DialogDescription = React.forwardRef<any, any>(function DialogDescription({
   className,
   ...props
 }, ref) {
