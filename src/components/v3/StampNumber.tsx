@@ -27,7 +27,12 @@
  *   <StampNumber size="lg" tone="gold">11</StampNumber>
  *   <StampNumber size="sm" tone="muted">$24K</StampNumber>
  */
-const SIZE_PX = {
+import type { HTMLAttributes, ElementType } from 'react'
+
+type StampSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl'
+type StampTone = 'default' | 'muted' | 'gold' | 'success' | 'danger'
+
+const SIZE_PX: Record<StampSize, number> = {
   xs:  14,
   sm:  18,
   md:  22,
@@ -37,12 +42,18 @@ const SIZE_PX = {
   '3xl': 72
 }
 
-const TONE_COLOR = {
+const TONE_COLOR: Record<StampTone, string> = {
   default: 'var(--v3-text)',
   muted:   'var(--v3-text-muted)',
   gold:    'var(--v3-primary)',
   success: 'var(--v3-success-bright)',
   danger:  'var(--v3-danger-bright)'
+}
+
+type StampNumberProps = HTMLAttributes<HTMLElement> & {
+  size?: StampSize
+  tone?: StampTone
+  as?: ElementType
 }
 
 export default function StampNumber({
@@ -53,7 +64,7 @@ export default function StampNumber({
   className,
   style,
   ...rest
-}) {
+}: StampNumberProps) {
   const px = SIZE_PX[size] ?? SIZE_PX.md
 
   return (

@@ -10,7 +10,14 @@ import { hapticTap } from '../../lib/haptics.ts'
 // "yellow and stuck" per user feedback. Now `primary` only adds a
 // subtle gold accent to the icon tile; the surrounding tile, border,
 // and label are identical to non-primary tiles.
-export default function QuickAction({ icon: Icon, label, primary = false, onTap }) {
+type QuickActionProps = {
+  icon: import('react').ComponentType<any>
+  label?: import('react').ReactNode
+  primary?: boolean
+  onTap?: () => void
+}
+
+export default function QuickAction({ icon: Icon, label, primary = false, onTap }: QuickActionProps) {
   return (
     <motion.button
       type="button"
