@@ -152,7 +152,13 @@ const JobCard = memo(function JobCard({
         // top padding. Spine moves to the left edge of the card body.
         padding: hasPhotoBanner ? '0 18px 18px' : '18px 18px 18px 22px',
         borderRadius: 'var(--v3-radius-card)',
-        background: 'var(--v3-surface)',
+        // Subtle vertical gradient — top edge a touch lighter than the
+        // base so the card reads as a lifted glass panel catching light
+        // from above, not a flat black rectangle. Featured cards get a
+        // faint warm wash.
+        background: featured
+          ? 'linear-gradient(180deg, #1f1a12 0%, #141110 60%)'
+          : 'linear-gradient(180deg, #1a1715 0%, #121010 70%)',
         // V3-JOBS-1: card border demoted to matte hairline (matches
         // V3-HOME-1 pass). Featured cards keep a functional gold border
         // to telegraph Top Deal status without halo decoration.
@@ -164,7 +170,9 @@ const JobCard = memo(function JobCard({
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
         overflow: 'hidden',
-        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.34), 0 8px 24px rgba(0, 0, 0, 0.30)'
+        // Layered depth: warm inner top-edge highlight + tight contact
+        // shadow + mid spread + wide ambient. Reads as dimensional.
+        boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 6px 16px rgba(0, 0, 0, 0.40), 0 18px 40px rgba(0, 0, 0, 0.28)'
       }}
     >
       {/* Photo cover banner (only when photo present). Renders flush
