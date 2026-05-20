@@ -957,3 +957,34 @@ export function useMarkAllNotificationsRead() {
     return { error }
   }
 }
+
+// ---- Home: recent activity (recent payments with the job/contact name) ----
+export type ActivityItem = {
+  id: string
+  amount: number
+  name: string | null
+  date: string | null
+  kind: string | null
+}
+
+export function useRecentActivity(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['recentActivity', userId],
+    queryFn: async (): Promise<ActivityItem[]> => {
+      const { data } = await supabase
+        .from('fh_payments')
+        .select('id, amount, paid_on, created_at, kind, fh_contacts(name)')
+        .eq('user_id', userId as string)
+        .order('created_at', { ascending: false })
+        .limit(6)
+      return ((data ?? []) as any[]).map((p) => ({
+        id: p.id,
+        amount: Number(p.amount || 0),
+        name: p.fh_contacts?.name ?? null,
+        date: p.paid_on || p.created_at || null,
+        kind: p.kind ?? null
+      }))
+    },
+    enabled: !!userId
+  })
+}

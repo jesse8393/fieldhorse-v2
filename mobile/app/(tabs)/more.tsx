@@ -1,11 +1,10 @@
-// mobile/app/(tabs)/more.tsx — account + tools.
-// Shows the signed-in account and a sign-out action. Sign-out clears the
-// Supabase session; the root redirect gate then bounces back to /login.
+// mobile/app/(tabs)/more.tsx — account + tools, on the premium primitives.
 import { View, Text, Pressable, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell } from 'lucide-react-native'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, Eyebrow, SectionLabel, theme } from '../../components/ui'
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets()
@@ -13,101 +12,56 @@ export default function MoreScreen() {
   const { user, signOut } = useAuth()
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}
-    >
-      <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">More</Text>
-      <Text className="text-ink text-3xl font-bold mb-6">Account</Text>
+    <View style={{ flex: 1 }}>
+      <ScreenBackground />
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+        <Eyebrow>More</Eyebrow>
+        <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', letterSpacing: -0.5, marginBottom: 20 }}>Account</Text>
 
-      <View className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-6">
-        <Text className="text-ink-muted text-[10px] font-bold tracking-wider uppercase mb-1">Signed in as</Text>
-        <Text className="text-ink text-base font-bold" numberOfLines={1}>{user?.email || '—'}</Text>
-      </View>
+        <Card style={{ marginBottom: 24 }}>
+          <View style={{ padding: 16 }}>
+            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Signed in as</Text>
+            <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{user?.email || '—'}</Text>
+          </View>
+        </Card>
 
-      <Text className="text-ink-muted text-[10px] font-bold tracking-wider uppercase mb-2">Tools</Text>
-      <Pressable
-        onPress={() => router.push('/analytics')}
-        className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-3 flex-row items-center"
-        style={{ gap: 12 }}
-      >
-        <View
-          className="rounded-xl items-center justify-center"
-          style={{ width: 40, height: 40, backgroundColor: '#1B1816', borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}
+        <SectionLabel style={{ marginBottom: 10 }}>Tools</SectionLabel>
+        <View style={{ gap: 10, marginBottom: 24 }}>
+          <MenuRow icon={<BarChart3 color={theme.goldBright} size={18} />} title="Analytics" sub="Pipeline, revenue & stage breakdown" onPress={() => router.push('/analytics')} />
+          <MenuRow icon={<Bell color={theme.goldBright} size={18} />} title="Notifications" sub="Activity & alerts" onPress={() => router.push('/notifications')} />
+          <MenuRow icon={<Building2 color={theme.goldBright} size={18} />} title="Business profile" sub="Company info for quotes & invoices" onPress={() => router.push('/settings')} />
+          <MenuRow icon={<Plug color={theme.goldBright} size={18} />} title="Integrations" sub="QuickBooks, Stripe, Google, GHL, Jobber" onPress={() => router.push('/integrations')} />
+        </View>
+
+        <Pressable
+          onPress={signOut}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 16, borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}
         >
-          <BarChart3 color="#E8B865" size={18} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-ink text-base font-bold">Analytics</Text>
-          <Text className="text-ink-muted text-xs mt-0.5">Pipeline, revenue & stage breakdown</Text>
-        </View>
-        <ChevronRight color="#9b948a" size={18} />
-      </Pressable>
+          <LogOut color={theme.danger} size={16} />
+          <Text style={{ color: theme.danger, fontSize: 16, fontWeight: '700' }}>Sign out</Text>
+        </Pressable>
 
-      <Pressable
-        onPress={() => router.push('/notifications')}
-        className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-3 flex-row items-center"
-        style={{ gap: 12 }}
-      >
-        <View
-          className="rounded-xl items-center justify-center"
-          style={{ width: 40, height: 40, backgroundColor: '#1B1816', borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}
-        >
-          <Bell color="#E8B865" size={18} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-ink text-base font-bold">Notifications</Text>
-          <Text className="text-ink-muted text-xs mt-0.5">Activity & alerts</Text>
-        </View>
-        <ChevronRight color="#9b948a" size={18} />
-      </Pressable>
+        <Text style={{ color: theme.inkMuted, fontSize: 12, textAlign: 'center', marginTop: 28 }}>FieldHorse · Built for the jobsite.</Text>
+      </ScrollView>
+    </View>
+  )
+}
 
-      <Pressable
-        onPress={() => router.push('/settings')}
-        className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-3 flex-row items-center"
-        style={{ gap: 12 }}
-      >
-        <View
-          className="rounded-xl items-center justify-center"
-          style={{ width: 40, height: 40, backgroundColor: '#1B1816', borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}
-        >
-          <Building2 color="#E8B865" size={18} />
+function MenuRow({ icon, title, sub, onPress }: { icon: React.ReactNode; title: string; sub: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress}>
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
+          <View style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}>
+            {icon}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }}>{title}</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{sub}</Text>
+          </View>
+          <ChevronRight color="#9b948a" size={18} />
         </View>
-        <View className="flex-1">
-          <Text className="text-ink text-base font-bold">Business profile</Text>
-          <Text className="text-ink-muted text-xs mt-0.5">Company info for quotes & invoices</Text>
-        </View>
-        <ChevronRight color="#9b948a" size={18} />
-      </Pressable>
-
-      <Pressable
-        onPress={() => router.push('/integrations')}
-        className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-6 flex-row items-center"
-        style={{ gap: 12 }}
-      >
-        <View
-          className="rounded-xl items-center justify-center"
-          style={{ width: 40, height: 40, backgroundColor: '#1B1816', borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}
-        >
-          <Plug color="#E8B865" size={18} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-ink text-base font-bold">Integrations</Text>
-          <Text className="text-ink-muted text-xs mt-0.5">QuickBooks, Stripe, Google, GHL, Jobber</Text>
-        </View>
-        <ChevronRight color="#9b948a" size={18} />
-      </Pressable>
-
-      <Pressable
-        onPress={signOut}
-        className="flex-row items-center justify-center rounded-2xl py-4 border border-[rgba(232,90,87,0.3)]"
-        style={{ gap: 8, backgroundColor: 'rgba(232,90,87,0.10)' }}
-      >
-        <LogOut color="#f5a294" size={16} />
-        <Text className="text-[#f5a294] text-base font-bold">Sign out</Text>
-      </Pressable>
-
-      <Text className="text-ink-muted text-xs text-center mt-8">FieldHorse · Built for the jobsite.</Text>
-    </ScrollView>
+      </Card>
+    </Pressable>
   )
 }

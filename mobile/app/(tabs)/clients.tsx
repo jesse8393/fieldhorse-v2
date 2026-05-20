@@ -9,9 +9,11 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Plus } from 'lucide-react-native'
 import { useClientsBundle, useCreateClient, type Client } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, Eyebrow, GoldButton, theme } from '../../components/ui'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 
@@ -80,93 +82,87 @@ export default function ClientsScreen() {
   }, [clients, search])
 
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top + 8 }}>
-      <View className="px-5 pb-3">
-        <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Clients</Text>
-        <Text className="text-ink text-3xl font-bold">Roster</Text>
+    <View style={{ flex: 1, paddingTop: insets.top + 10 }}>
+      <ScreenBackground />
+      <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+        <Eyebrow>Clients</Eyebrow>
+        <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', letterSpacing: -0.5 }}>Roster</Text>
       </View>
 
-      <View className="px-5 pb-3">
+      <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Search clients…"
-          placeholderTextColor="rgba(242,237,228,0.45)"
-          className="bg-surface border border-[rgba(255,240,210,0.10)] rounded-xl px-4 py-3 text-ink"
+          placeholderTextColor={theme.inkFaint}
+          style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, fontSize: 15 }}
         />
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center"><ActivityIndicator color="#E8B865" /></View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.goldBright} /></View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 8 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100, gap: 10 }}
           renderItem={({ item }) => (
             <ClientCard client={item} roll={rollups.get(item.id)} onPress={() => router.push(`/clients/${item.id}`)} />
           )}
-          ListEmptyComponent={<Text className="text-ink-muted text-center mt-12">No clients yet.</Text>}
+          ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>No clients yet.</Text>}
         />
       )}
 
       {/* Floating add button */}
       <Pressable
         onPress={() => setAddOpen(true)}
-        className="absolute items-center justify-center rounded-full"
         style={{
-          right: 20, bottom: insets.bottom + 20, width: 56, height: 56,
-          backgroundColor: '#E8B865', shadowColor: '#000', shadowOpacity: 0.4,
-          shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8
+          position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 999,
+          shadowColor: '#E8B865', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12
         }}
       >
-        <Plus color="#1A120A" size={26} strokeWidth={2.6} />
+        <LinearGradient colors={['#F0CE86', '#E4BE6F', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>
+          <Plus color={theme.onGold} size={26} strokeWidth={2.8} />
+        </LinearGradient>
       </Pressable>
 
       {/* New client modal */}
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setAddOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
-            <Text className="text-ink text-xl font-bold mb-5">New client</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+          <View style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderTopWidth: 1, borderColor: theme.borderMid, paddingBottom: insets.bottom + 24 }}>
+            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 20 }}>New client</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Name</Text>
             <TextInput
               value={cName} onChangeText={setCName} autoFocus
-              placeholder="Client name" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              placeholder="Client name" placeholderTextColor={theme.inkFaint}
+              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16 }}
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Company (optional)</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Company (optional)</Text>
             <TextInput
               value={cCompany} onChangeText={setCCompany}
-              placeholder="Company" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              placeholder="Company" placeholderTextColor={theme.inkFaint}
+              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16 }}
             />
-            <View className="flex-row mb-5" style={{ gap: 12 }}>
-              <View className="flex-1">
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Phone</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Phone</Text>
                 <TextInput
                   value={cPhone} onChangeText={setCPhone} keyboardType="phone-pad"
-                  placeholder="(555) 555-5555" placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                  placeholder="(555) 555-5555" placeholderTextColor={theme.inkFaint}
+                  style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink }}
                 />
               </View>
-              <View className="flex-1">
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Email</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Email</Text>
                 <TextInput
                   value={cEmail} onChangeText={setCEmail} keyboardType="email-address" autoCapitalize="none"
-                  placeholder="name@email.com" placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                  placeholder="name@email.com" placeholderTextColor={theme.inkFaint}
+                  style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink }}
                 />
               </View>
             </View>
-            <Pressable
-              onPress={submitClient}
-              disabled={saving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: saving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
-            >
-              {saving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create client</Text>}
-            </Pressable>
+            <GoldButton label="Create client" onPress={submitClient} loading={saving} />
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -177,27 +173,27 @@ export default function ClientsScreen() {
 function ClientCard({ client, roll, onPress }: { client: Client; roll?: Roll; onPress: () => void }) {
   const initial = (client.name || '·').trim().charAt(0).toUpperCase()
   return (
-    <Pressable
-      onPress={onPress}
-      className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center"
-      style={{ gap: 12 }}
-    >
-      <View
-        className="rounded-xl items-center justify-center"
-        style={{ width: 44, height: 44, backgroundColor: '#1B1816', borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}
-      >
-        <Text className="text-gold-bright text-lg font-bold">{initial}</Text>
-      </View>
-      <View className="flex-1">
-        <Text className="text-ink text-base font-bold" numberOfLines={1}>{client.name || 'Unnamed'}</Text>
-        <Text className="text-ink-muted text-xs mt-1" numberOfLines={1}>
-          {client.company_name || client.email || client.phone || '—'}
-        </Text>
-      </View>
-      <View className="items-end">
-        <Text className="text-gold-bright text-base font-bold">{money(roll?.lifetime || 0)}</Text>
-        <Text className="text-ink-muted text-[10px] mt-1">{roll?.active || 0} active</Text>
-      </View>
+    <Pressable onPress={onPress}>
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
+          <LinearGradient
+            colors={['#2A2118', '#1B1612']}
+            style={{ width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(232,184,101,0.28)' }}
+          >
+            <Text style={{ color: theme.goldBright, fontSize: 18, fontWeight: '800' }}>{initial}</Text>
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{client.name || 'Unnamed'}</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>
+              {client.company_name || client.email || client.phone || '—'}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ color: theme.goldBright, fontSize: 16, fontWeight: '800' }}>{money(roll?.lifetime || 0)}</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 10, marginTop: 2 }}>{roll?.active || 0} active</Text>
+          </View>
+        </View>
+      </Card>
     </Pressable>
   )
 }
