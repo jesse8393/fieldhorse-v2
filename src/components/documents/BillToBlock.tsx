@@ -1,4 +1,4 @@
-// src/components/documents/BillToBlock.jsx
+// src/components/documents/BillToBlock.tsx
 //
 // "Bill to" panel for invoices + the "Prepared for" panel for
 // proposals. Same visual treatment — one side renders the client
@@ -23,7 +23,7 @@ export default function BillToBlock({
   client = {},
   projectLabel = 'PROJECT',
   project = null
-}) {
+}: { clientLabel?: string; client?: any; projectLabel?: string; project?: any }) {
   return (
     <section
       style={{
@@ -67,7 +67,7 @@ export default function BillToBlock({
   )
 }
 
-function Panel({ label, children }) {
+function Panel({ label, children }: { label?: import('react').ReactNode; children?: import('react').ReactNode }) {
   return (
     <div>
       <div
@@ -84,7 +84,7 @@ function Panel({ label, children }) {
   )
 }
 
-function ContactLines({ client }) {
+function ContactLines({ client }: { client?: any }) {
   const lines = [client?.phone, client?.email].map((s) => (s && String(s).trim()) || '').filter(Boolean)
   if (!lines.length) return null
   return (

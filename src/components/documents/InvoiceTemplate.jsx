@@ -14,11 +14,11 @@
 //   9. Disclaimer footer
 
 import DocumentShell from './DocumentShell.jsx'
-import LineItemsTable from './LineItemsTable.jsx'
-import PaymentHistoryBlock from './PaymentHistoryBlock.jsx'
+import LineItemsTable from './LineItemsTable.tsx'
+import PaymentHistoryBlock from './PaymentHistoryBlock.tsx'
 import InvoiceBalanceBlock from './InvoiceBalanceBlock.jsx'
-import InsuranceModeBlock from './InsuranceModeBlock.jsx'
-import ChangeOrdersBlock from './ChangeOrdersBlock.jsx'
+import InsuranceModeBlock from './InsuranceModeBlock.tsx'
+import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { DOC_COLORS, DOC_FONTS } from './tokens.ts'
 import { money } from './format.ts'
 import { invoiceNumber } from './numbers.ts'
