@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -7,6 +8,7 @@ import {
   ChevronRight, Activity
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { useNotesBundle, notesKey } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { claudeMessage } from '../lib/anthropic.js'
 import { toastSuccess, toastUndo, toastError } from '../lib/toast.js'
@@ -37,11 +39,12 @@ const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive ro
 export default function Notes() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [notes, setNotes] = useState([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data: bundle, isLoading: loading } = useNotesBundle(user?.id)
+  const notes = bundle?.notes ?? []
+  const contacts = bundle?.contacts ?? []
   const [draft, setDraft] = useState('')
   const [contactId, setContactId] = useState('')
-  const [contacts, setContacts] = useState([])
   const [saving, setSaving] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parsed, setParsed] = useState(null)
@@ -51,19 +54,11 @@ export default function Notes() {
   const recognitionRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const load = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    const [{ data: n }, { data: c }] = await Promise.all([
-      supabase.from('fh_notes').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(80),
-      supabase.from('fh_contacts').select('id, name').eq('user_id', user.id).order('updated_at', { ascending: false })
-    ])
-    setNotes(n || [])
-    setContacts(c || [])
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => { load() }, [load])
+  // Optimistic local edits write straight to the cached notes array so
+  // the feed updates without a refetch; the cache is the source of truth.
+  const patchNotes = (fn) =>
+    queryClient.setQueryData(notesKey(user?.id), (prev) =>
+      prev ? { ...prev, notes: fn(prev.notes) } : prev)
 
   useEffect(() => {
     if (searchParams.get('voice') === '1') {
@@ -150,7 +145,7 @@ export default function Notes() {
       setDraft('')
       setParsed(null)
       setContactId('')
-      setNotes((n) => [data, ...n])
+      patchNotes((n) => [data, ...n])
       toastSuccess('Note saved', 'Synced across devices')
     }
   }
@@ -158,7 +153,7 @@ export default function Notes() {
   async function markDone(id) {
     if (!user) return
     await supabase.from('fh_notes').update({ done: true }).eq('id', id).eq('user_id', user.id)
-    setNotes((n) => n.filter((x) => x.id !== id))
+    patchNotes((n) => n.filter((x) => x.id !== id))
   }
 
   async function remove(id) {
@@ -166,14 +161,14 @@ export default function Notes() {
     const snapshot = notes.find((n) => n.id === id)
     const { error } = await supabase.from('fh_notes').delete().eq('id', id).eq('user_id', user.id)
     if (error) { toastError("Couldn't delete", error.message); return }
-    setNotes((n) => n.filter((x) => x.id !== id))
+    patchNotes((n) => n.filter((x) => x.id !== id))
     toastUndo('Note deleted', {
       description: snapshot?.parsed?.summary || (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_notes').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
-        setNotes((n) => [snapshot, ...n])
+        patchNotes((n) => [snapshot, ...n])
         toastSuccess('Restored', '')
       }
     })
