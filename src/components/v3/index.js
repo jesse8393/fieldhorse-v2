@@ -2,22 +2,22 @@ export { default as Button } from './Button.tsx'
 export { default as Card } from './Card.tsx'
 export { default as Pill } from './Pill.tsx'
 export { default as SectionHeader } from './SectionHeader.tsx'
-export { default as KpiTile } from './KpiTile.jsx'
+export { default as KpiTile } from './KpiTile.tsx'
 export { default as QuickAction } from './QuickAction.tsx'
 export { default as Sparkline } from './Sparkline.tsx'
 export { default as FeedRow } from './FeedRow.jsx'
 export { default as JobCard } from './JobCard.jsx'
 export { default as StageTimeline } from './StageTimeline.jsx'
-export { default as SegmentedTabs } from './SegmentedTabs.jsx'
+export { default as SegmentedTabs } from './SegmentedTabs.tsx'
 export { default as NextActionCard } from './NextActionCard.jsx'
-export { default as HealthDonut } from './HealthDonut.jsx'
+export { default as HealthDonut } from './HealthDonut.tsx'
 export { default as ProgressMeter } from './ProgressMeter.tsx'
 
 /* Phase 1B canonical primitives — added but not yet migrated to. */
 export { default as Eyebrow } from './Eyebrow.tsx'
 export { default as StampNumber } from './StampNumber.tsx'
 export { default as FilterPill } from './FilterPill.tsx'
-export { default as IconButton } from './IconButton.jsx'
+export { default as IconButton } from './IconButton.tsx'
 
 /* Phase 3D — canonical floating action button (portal-rendered to
    escape framer-motion containing-block traps). */

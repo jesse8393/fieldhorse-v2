@@ -6,7 +6,15 @@ import { useEffect } from 'react'
 // to feel "premium" without overshooting wildly enough to ship wrong values
 // mid-animation. The `duration` prop (legacy from the tween-based version)
 // is accepted and ignored — spring physics use stiffness/damping instead.
-export default function CountUp({ to = 0, duration, prefix = '', suffix = '', formatter }) {
+type CountUpProps = {
+  to?: number
+  duration?: number
+  prefix?: string
+  suffix?: string
+  formatter?: (n: number) => string
+}
+
+export default function CountUp({ to = 0, duration, prefix = '', suffix = '', formatter }: CountUpProps) {
   const count = useSpring(0, { stiffness: 120, damping: 20 })
   const rounded = useTransform(count, (v) => {
     const n = Math.round(v)
