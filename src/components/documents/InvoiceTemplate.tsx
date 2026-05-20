@@ -1,4 +1,4 @@
-// src/components/documents/InvoiceTemplate.jsx
+// src/components/documents/InvoiceTemplate.tsx
 //
 // Customer-facing HTML preview of a contractor invoice — same
 // restrained editorial layout as the proposal. Composes:
@@ -13,10 +13,10 @@
 //   8. Insurance (optional)
 //   9. Disclaimer footer
 
-import DocumentShell from './DocumentShell.jsx'
+import DocumentShell from './DocumentShell.tsx'
 import LineItemsTable from './LineItemsTable.tsx'
 import PaymentHistoryBlock from './PaymentHistoryBlock.tsx'
-import InvoiceBalanceBlock from './InvoiceBalanceBlock.jsx'
+import InvoiceBalanceBlock from './InvoiceBalanceBlock.tsx'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { DOC_COLORS, DOC_FONTS } from './tokens.ts'
@@ -43,20 +43,20 @@ export default function InvoiceTemplate({
   insurance = null,
   changeOrders = [],
   photos = []   // [{ url, section_tag, caption }] — quiet strip at end
-}) {
+}: any) {
   const number = meta.number || invoiceNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
   const dueDate = meta.dueDate || null
 
   const approvedCOAdjustment = (changeOrders || [])
-    .filter((co) => co?.status === 'approved')
-    .reduce((s, co) => s + Number(co.amount || 0), 0)
+    .filter((co: any) => co?.status === 'approved')
+    .reduce((s: any, co: any) => s + Number(co.amount || 0), 0)
   const adjustedContractTotal = Number(contractTotal || 0) + approvedCOAdjustment
 
   // Single canonical row when no granular items — matches the existing
   // synth pattern the screens were already using.
   const rows = (lineItems && lineItems.length > 0)
-    ? lineItems.map((li) => ({
+    ? lineItems.map((li: any) => ({
         id: li.id,
         title: li.description || 'Item',
         descriptionLines: li.notes ? [li.notes] : [],
@@ -74,7 +74,7 @@ export default function InvoiceTemplate({
         amount: contractTotal
       }]
 
-  const subtotal = rows.reduce((s, r) => {
+  const subtotal = rows.reduce((s: any, r: any) => {
     const q = Number(r.qty || 1)
     const rt = Number(r.rate || 0)
     return s + Number(r.amount != null ? r.amount : q * rt)
@@ -84,7 +84,7 @@ export default function InvoiceTemplate({
 
   const pp = previouslyPaid != null
     ? Number(previouslyPaid)
-    : (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+    : (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
 
   const statusChip = statusToChip(status, dueDate)
 
@@ -111,7 +111,7 @@ export default function InvoiceTemplate({
       />
 
       {/* Change orders */}
-      {(changeOrders || []).filter((co) => co?.status !== 'void').length > 0 && (
+      {(changeOrders || []).filter((co: any) => co?.status !== 'void').length > 0 && (
         <section>
           <SectionLabel>Contract amendments</SectionLabel>
           <ChangeOrdersBlock changeOrders={changeOrders} company={company} />
@@ -164,7 +164,7 @@ export default function InvoiceTemplate({
             gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
             gap: 8
           }}>
-            {photos.slice(0, 4).map((p, i) => p?.url && (
+            {photos.slice(0, 4).map((p: any, i: any) => p?.url && (
               <figure key={i} style={{ margin: 0 }}>
                 <div style={{
                   width: '100%',
@@ -202,7 +202,7 @@ export default function InvoiceTemplate({
 
 /* ─── Internal blocks ─── */
 
-function SectionLabel({ children }) {
+function SectionLabel({ children }: any) {
   return (
     <div
       style={{
@@ -220,7 +220,7 @@ function SectionLabel({ children }) {
   )
 }
 
-function Detail({ label, children }) {
+function Detail({ label, children }: any) {
   return (
     <div>
       <div
@@ -249,7 +249,7 @@ function Detail({ label, children }) {
   )
 }
 
-function TotalsBlock({ subtotal, tax, taxRate, total, dueDate }) {
+function TotalsBlock({ subtotal, tax, taxRate, total, dueDate }: any) {
   return (
     <section style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -8 }}>
       <div style={{ minWidth: 320 }}>
@@ -301,7 +301,7 @@ function TotalsBlock({ subtotal, tax, taxRate, total, dueDate }) {
   )
 }
 
-function Row({ label, value, muted }) {
+function Row({ label, value, muted }: any) {
   return (
     <tr>
       <td style={{ padding: '6px 0', fontFamily: DOC_FONTS.body, fontSize: 13, color: DOC_COLORS.inkMuted, textAlign: 'left' }}>
@@ -314,20 +314,20 @@ function Row({ label, value, muted }) {
   )
 }
 
-function formatDateShort(d) {
+function formatDateShort(d: any) {
   if (!d) return ''
   const dt = d instanceof Date ? d : new Date(d)
   if (Number.isNaN(dt.getTime())) return ''
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function shortNumber(num) {
+function shortNumber(num: any) {
   if (!num) return ''
   const parts = String(num).split('-')
   return parts[parts.length - 1] || String(num)
 }
 
-function statusToChip(status, dueDate) {
+function statusToChip(status: any, dueDate: any) {
   switch (String(status || 'outstanding').toLowerCase()) {
     case 'paid':    return { label: 'PAID',    tone: 'green' }
     case 'overdue': return { label: 'OVERDUE', tone: 'red' }

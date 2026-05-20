@@ -1,4 +1,4 @@
-// src/components/documents/ApprovalBlock.jsx
+// src/components/documents/ApprovalBlock.tsx
 //
 // "Approval / Signature" block at the bottom of every proposal. Renders
 // the authorization paragraph + four signature fields (client sig +
@@ -31,7 +31,7 @@ export default function ApprovalBlock({
   clientApprovedAt,
   contractorSignatureDataUrl,
   contractorApprovedAt
-}) {
+}: any) {
   const gold = resolveBrandGold(company)
   const stamped = mode === 'approved'
 
@@ -76,7 +76,7 @@ export default function ApprovalBlock({
   )
 }
 
-function SignatureField({ label, name, dataUrl, dateLabel, date, gold }) {
+function SignatureField({ label, name, dataUrl, dateLabel, date, gold }: any) {
   return (
     <div>
       <div

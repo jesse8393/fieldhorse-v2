@@ -1,4 +1,4 @@
-// src/components/documents/DocumentShell.jsx
+// src/components/documents/DocumentShell.tsx
 //
 // Letter-paper wrapper — restrained editorial layout matching the
 // "Estimate #62" reference the contractor approved. Premium feel via
@@ -49,7 +49,7 @@ export default function DocumentShell({
   status = null,
   children,
   footer
-}) {
+}: any) {
   const brand = resolveBrandGold(company)
 
   return (
@@ -125,12 +125,12 @@ export default function DocumentShell({
    Internal blocks
    ───────────────────────────────────────────────────────── */
 
-function LogoBlock({ company, brand }) {
+function LogoBlock({ company, brand }: any) {
   const hasLogo = !!company?.logo_url
   const monogram = (company?.name || 'MC')
     .split(/\s+/)
     .filter(Boolean)
-    .map((w) => w[0])
+    .map((w: any) => w[0])
     .join('')
     .toUpperCase()
     .replace(/[^A-Z]/g, '')
@@ -162,7 +162,7 @@ function LogoBlock({ company, brand }) {
             display: 'block'
           }}
           onError={(e) => {
-            const parent = e.currentTarget.parentNode
+            const parent = e.currentTarget.parentNode as HTMLElement | null
             if (parent && parent.dataset.monogramFallback !== 'on') {
               parent.dataset.monogramFallback = 'on'
               e.currentTarget.style.display = 'none'
@@ -199,7 +199,7 @@ function LogoBlock({ company, brand }) {
   )
 }
 
-function DocMetaBlock({ docType, number, issuedAt, status }) {
+function DocMetaBlock({ docType, number, issuedAt, status }: any) {
   return (
     <div style={{ textAlign: 'right' }}>
       <div
@@ -246,7 +246,7 @@ function DocMetaBlock({ docType, number, issuedAt, status }) {
   )
 }
 
-function PartiesBlock({ recipient, company }) {
+function PartiesBlock({ recipient, company }: any) {
   return (
     <section
       style={{
@@ -269,7 +269,7 @@ function PartiesBlock({ recipient, company }) {
   )
 }
 
-function Party({ label, name, lines }) {
+function Party({ label, name, lines }: any) {
   return (
     <div>
       <div style={{ height: 1, background: DOC_COLORS.ink, opacity: 0.85, marginBottom: 14 }} />
@@ -298,7 +298,7 @@ function Party({ label, name, lines }) {
       >
         {name || '—'}
       </div>
-      {lines.map((line, i) => (
+      {lines.map((line: any, i: any) => (
         <div
           key={i}
           style={{
@@ -316,14 +316,14 @@ function Party({ label, name, lines }) {
   )
 }
 
-function StatusChip({ label, tone = 'neutral' }) {
-  const palette = {
+function StatusChip({ label, tone = 'neutral' }: any) {
+  const palette = ({
     neutral: { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' },
     gold:    { bg: '#F4ECD8', fg: '#8A6F2A', br: '#C8A154' },
     green:   { bg: '#E8F2EC', fg: '#2E6346', br: '#48825F' },
     red:     { bg: '#F4E0DE', fg: '#8A2A2A', br: '#B33A3A' },
     slate:   { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' }
-  }[tone] || { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' }
+  } as Record<string, { bg: string; fg: string; br: string }>)[tone] || { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' }
   return (
     <span
       style={{
@@ -345,7 +345,7 @@ function StatusChip({ label, tone = 'neutral' }) {
   )
 }
 
-function formatLongDate(iso) {
+function formatLongDate(iso: any) {
   if (!iso) return ''
   const d = iso instanceof Date ? iso : new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
