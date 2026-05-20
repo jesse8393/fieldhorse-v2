@@ -5,9 +5,10 @@
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { ChevronLeft, Bell } from 'lucide-react-native'
+import { Bell } from 'lucide-react-native'
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, type Notification } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
+import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -38,55 +39,40 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <View className="flex-1 bg-bg">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
-        <Pressable onPress={() => router.back()} className="flex-row items-center mb-4" style={{ gap: 4 }}>
-          <ChevronLeft color="#E8B865" size={20} />
-          <Text className="text-gold-bright font-bold">More</Text>
-        </Pressable>
-
-        <View className="flex-row items-end justify-between mb-5">
-          <View>
-            <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Notifications</Text>
-            <Text className="text-ink text-3xl font-bold">Activity</Text>
-          </View>
-          {unread > 0 ? (
+    <View style={{ flex: 1 }}>
+      <ScreenBackground />
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+        <ScreenHeader
+          backLabel="More" onBack={() => router.back()} eyebrow="Notifications" title="Activity"
+          right={unread > 0 ? (
             <Pressable onPress={() => user && markAll(user.id)} hitSlop={8}>
-              <Text className="text-gold-bright text-sm font-bold">Mark all read</Text>
+              <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '700' }}>Mark all read</Text>
             </Pressable>
-          ) : null}
-        </View>
+          ) : undefined}
+        />
 
         {isLoading ? (
-          <ActivityIndicator color="#E8B865" />
+          <ActivityIndicator color={theme.goldBright} style={{ marginTop: 24 }} />
         ) : items.length === 0 ? (
-          <View className="items-center mt-16">
+          <View style={{ alignItems: 'center', marginTop: 64 }}>
             <Bell color="#5C5C5C" size={28} />
-            <Text className="text-ink-muted text-center mt-3">You're all caught up.</Text>
+            <Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 12 }}>You're all caught up.</Text>
           </View>
         ) : (
-          <View style={{ gap: 8 }}>
+          <View style={{ gap: 10, marginTop: 20 }}>
             {items.map((n) => {
               const isUnread = !n.read_at
               return (
-                <Pressable
-                  key={n.id}
-                  onPress={() => onPress(n)}
-                  className="rounded-2xl p-4 border flex-row"
-                  style={{
-                    gap: 12,
-                    backgroundColor: isUnread ? 'rgba(232,184,101,0.08)' : '#161311',
-                    borderColor: isUnread ? 'rgba(232,184,101,0.25)' : 'rgba(255,240,210,0.06)'
-                  }}
-                >
-                  <View style={{ width: 8 }}>
-                    {isUnread ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#E8B865', marginTop: 6 }} /> : null}
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-ink text-sm font-bold" numberOfLines={1}>{n.title}</Text>
-                    {n.body ? <Text className="text-ink-muted text-xs mt-1" numberOfLines={2}>{n.body}</Text> : null}
-                    <Text className="text-ink-muted text-[10px] mt-1">{timeAgo(n.created_at)}</Text>
-                  </View>
+                <Pressable key={n.id} onPress={() => onPress(n)}>
+                  <Card glow={isUnread} accent={isUnread ? theme.goldBright : undefined}>
+                    <View style={{ flexDirection: 'row', gap: 10, padding: 16, paddingLeft: 18 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{n.title}</Text>
+                        {n.body ? <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={2}>{n.body}</Text> : null}
+                        <Text style={{ color: theme.inkFaint, fontSize: 10, marginTop: 4 }}>{timeAgo(n.created_at)}</Text>
+                      </View>
+                    </View>
+                  </Card>
                 </Pressable>
               )
             })}

@@ -3,12 +3,12 @@
 // (which carries payments), with no extra queries: pipeline value, won
 // value, collected revenue, and a per-stage pipeline breakdown.
 import { useMemo } from 'react'
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { ChevronLeft } from 'lucide-react-native'
 import { useJobs, useClientsBundle } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
+import { ScreenBackground, Card, ScreenHeader, SectionLabel, theme } from '../components/ui'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E', invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f'
@@ -48,48 +48,45 @@ export default function AnalyticsScreen() {
   const maxStageValue = Math.max(1, ...STAGES.map((s) => stats.byStage.get(s)?.value ?? 0))
 
   return (
-    <View className="flex-1 bg-bg">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
-        <Pressable onPress={() => router.back()} className="flex-row items-center mb-4" style={{ gap: 4 }}>
-          <ChevronLeft color="#E8B865" size={20} />
-          <Text className="text-gold-bright font-bold">More</Text>
-        </Pressable>
-
-        <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Analytics</Text>
-        <Text className="text-ink text-3xl font-bold mb-5">Business snapshot</Text>
+    <View style={{ flex: 1 }}>
+      <ScreenBackground />
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Analytics" title="Business snapshot" />
 
         {isLoading ? (
-          <ActivityIndicator color="#E8B865" />
+          <ActivityIndicator color={theme.goldBright} style={{ marginTop: 24 }} />
         ) : (
           <>
-            <View className="flex-row flex-wrap" style={{ gap: 10 }}>
-              <Kpi label="Pipeline" value={money(stats.pipeline)} tone="#E8B865" />
-              <Kpi label="Collected" value={money(stats.collected)} tone="#4ade80" />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
+              <Kpi label="Pipeline" value={money(stats.pipeline)} tone={theme.goldBright} glow />
+              <Kpi label="Collected" value={money(stats.collected)} tone={theme.success} />
               <Kpi label="Won (closed)" value={money(stats.won)} />
               <Kpi label="Active jobs" value={String(stats.active)} />
             </View>
 
-            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-8 mb-3">Pipeline by stage</Text>
-            <View style={{ gap: 10 }}>
-              {STAGES.map((s) => {
-                const row = stats.byStage.get(s) || { count: 0, value: 0 }
-                const tint = STAGE_TINT[s]
-                const pct = Math.round((row.value / maxStageValue) * 100)
-                return (
-                  <View key={s}>
-                    <View className="flex-row items-center justify-between mb-1">
-                      <Text className="text-ink text-sm font-semibold capitalize">{s} <Text className="text-ink-muted">· {row.count}</Text></Text>
-                      <Text className="text-ink-muted text-sm">{money(row.value)}</Text>
+            <SectionLabel style={{ marginTop: 28, marginBottom: 12 }}>Pipeline by stage</SectionLabel>
+            <Card>
+              <View style={{ padding: 16, gap: 14 }}>
+                {STAGES.map((s) => {
+                  const row = stats.byStage.get(s) || { count: 0, value: 0 }
+                  const tint = STAGE_TINT[s]
+                  const pct = Math.round((row.value / maxStageValue) * 100)
+                  return (
+                    <View key={s}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '700', textTransform: 'capitalize' }}>{s} <Text style={{ color: theme.inkMuted }}>· {row.count}</Text></Text>
+                        <Text style={{ color: theme.inkMuted, fontSize: 13 }}>{money(row.value)}</Text>
+                      </View>
+                      <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,240,210,0.06)', overflow: 'hidden' }}>
+                        <View style={{ width: `${pct}%`, height: 8, borderRadius: 4, backgroundColor: tint }} />
+                      </View>
                     </View>
-                    <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,240,210,0.06)', overflow: 'hidden' }}>
-                      <View style={{ width: `${pct}%`, height: 8, borderRadius: 4, backgroundColor: tint }} />
-                    </View>
-                  </View>
-                )
-              })}
-            </View>
+                  )
+                })}
+              </View>
+            </Card>
 
-            <Text className="text-ink-muted text-xs text-center mt-8">{stats.total} jobs in the pipeline.</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, textAlign: 'center', marginTop: 24 }}>{stats.total} jobs in the pipeline.</Text>
           </>
         )}
       </ScrollView>
@@ -97,11 +94,13 @@ export default function AnalyticsScreen() {
   )
 }
 
-function Kpi({ label, value, tone = '#F2EDE4' }: { label: string; value: string; tone?: string }) {
+function Kpi({ label, value, tone = '#F2EDE4', glow }: { label: string; value: string; tone?: string; glow?: boolean }) {
   return (
-    <View className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)]" style={{ width: '47.5%' }}>
-      <Text className="text-2xl font-bold" style={{ color: tone }} numberOfLines={1}>{value}</Text>
-      <Text className="text-ink-muted text-[11px] font-semibold mt-1">{label}</Text>
-    </View>
+    <Card glow={glow} style={{ width: '47.5%' }}>
+      <View style={{ padding: 16 }}>
+        <Text style={{ color: tone, fontSize: 24, fontWeight: '800' }} numberOfLines={1}>{value}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '600', marginTop: 4 }}>{label}</Text>
+      </View>
+    </Card>
   )
 }

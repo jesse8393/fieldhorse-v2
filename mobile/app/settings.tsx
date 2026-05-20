@@ -3,24 +3,24 @@
 // address/website/license) that brands documents and invoices. Saves
 // straight to profiles via useUpdateProfile.
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { ChevronLeft } from 'lucide-react-native'
 import { useProfile, useUpdateProfile } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
+import { ScreenBackground, ScreenHeader, GoldButton, theme } from '../components/ui'
 
 function Field({ label, value, onChange, ...rest }: {
   label: string; value: string; onChange: (v: string) => void
 } & Record<string, unknown>) {
   return (
     <>
-      <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">{label}</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
-        placeholderTextColor="rgba(242,237,228,0.4)"
-        className="bg-surface border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+        placeholderTextColor={theme.inkFaint}
+        style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16, fontSize: 15 }}
         {...(rest as object)}
       />
     </>
@@ -73,19 +73,14 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View className="flex-1 bg-bg">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }}>
-        <Pressable onPress={() => router.back()} className="flex-row items-center mb-4" style={{ gap: 4 }}>
-          <ChevronLeft color="#E8B865" size={20} />
-          <Text className="text-gold-bright font-bold">More</Text>
-        </Pressable>
-
-        <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Settings</Text>
-        <Text className="text-ink text-3xl font-bold mb-2">Business profile</Text>
-        <Text className="text-ink-muted text-sm mb-6">This brands your quotes, invoices, and customer-facing documents.</Text>
+    <View style={{ flex: 1 }}>
+      <ScreenBackground />
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }}>
+        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Settings" title="Business profile" />
+        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6, marginBottom: 22 }}>This brands your quotes, invoices, and customer-facing documents.</Text>
 
         {isLoading ? (
-          <ActivityIndicator color="#E8B865" />
+          <ActivityIndicator color={theme.goldBright} />
         ) : (
           <>
             <Field label="Company name" value={name} onChange={setName} placeholder="Parker Construction" />
@@ -96,14 +91,9 @@ export default function SettingsScreen() {
             <Field label="Address" value={address} onChange={setAddress} placeholder="Business address" />
             <Field label="License #" value={license} onChange={setLicense} placeholder="Contractor license number" />
 
-            <Pressable
-              onPress={save}
-              disabled={saving}
-              className="rounded-xl py-4 items-center mt-2"
-              style={{ backgroundColor: saving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
-            >
-              {saving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">{saved ? 'Saved ✓' : 'Save profile'}</Text>}
-            </Pressable>
+            <View style={{ marginTop: 8 }}>
+              <GoldButton label={saved ? 'Saved ✓' : 'Save profile'} onPress={save} loading={saving} />
+            </View>
           </>
         )}
       </ScrollView>

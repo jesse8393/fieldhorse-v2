@@ -8,6 +8,7 @@
 import { ReactNode } from 'react'
 import { View, Text, Pressable, StyleSheet, type ViewStyle, type StyleProp } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { ChevronLeft } from 'lucide-react-native'
 
 export const theme = {
   bg: '#0B0907',
@@ -110,6 +111,25 @@ export function GoldButton({
         <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 15, letterSpacing: 0.2 }}>{label}</Text>
       </LinearGradient>
     </Pressable>
+  )
+}
+
+// Back link + eyebrow + big title, used across the detail screens.
+export function ScreenHeader({ backLabel, onBack, eyebrow, title, right }: {
+  backLabel: string; onBack: () => void; eyebrow: string; title: string; right?: ReactNode
+}) {
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <Pressable onPress={onBack} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} hitSlop={10}>
+          <ChevronLeft color={theme.goldBright} size={20} />
+          <Text style={{ color: theme.goldBright, fontWeight: '700' }}>{backLabel}</Text>
+        </Pressable>
+        {right ?? null}
+      </View>
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <Text style={{ color: theme.ink, fontSize: 30, fontWeight: '800', letterSpacing: -0.5, marginTop: 2 }} numberOfLines={2}>{title}</Text>
+    </>
   )
 }
 
