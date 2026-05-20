@@ -12,7 +12,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail } from '../lib/queries.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
 

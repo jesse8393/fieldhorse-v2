@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { useNotesBundle, notesKey } from '../lib/queries.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'

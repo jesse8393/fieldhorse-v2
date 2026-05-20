@@ -5,7 +5,7 @@ import {
   ChevronLeft, Phone, MessageSquare, Pencil, MoreHorizontal,
   XCircle, Trash2, Users
 } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext.jsx'
+import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { markLost } from '../../lib/pipeline.ts'
 import { stageColor } from '../../lib/stages.ts'

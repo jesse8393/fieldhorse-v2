@@ -15,7 +15,7 @@ import {
   Paperclip
 } from 'lucide-react'
 import { universalSearch } from '../lib/universalSearch.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 
 // Static nav — shown as the "empty state" when the input is blank.
 // When the user starts typing, the data search results take over.

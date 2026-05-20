@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml'

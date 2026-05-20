@@ -8,14 +8,14 @@ import AddEventSheet from '../components/AddEventSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { FloatingActionButton, ScreenCloser } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import {
   useScheduleEvents,
   useUpcomingEvents,
   useInvalidateSchedule,
   useDropScheduleEvent
 } from '../lib/queries.ts'
-import { useProfile } from '../contexts/ProfileContext.jsx'
+import { useProfile } from '../contexts/ProfileContext.tsx'
 import { getWeather, workWindow } from '../lib/weather.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'

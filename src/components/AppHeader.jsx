@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { NotebookPen, Search } from 'lucide-react'
-import { useProfile } from '../contexts/ProfileContext.jsx'
+import { useProfile } from '../contexts/ProfileContext.tsx'
 import FieldhorseBadge from './FieldhorseBadge.jsx'
 import NotificationsBell from './NotificationsBell.jsx'
 

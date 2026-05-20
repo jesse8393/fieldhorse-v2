@@ -21,7 +21,7 @@ import {
   Briefcase, Sparkles, Receipt, ArrowRight
 } from 'lucide-react'
 import { useActivityFeed } from '../lib/queries.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.jsx'
 

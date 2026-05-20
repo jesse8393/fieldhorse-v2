@@ -16,8 +16,8 @@ import {
   Zap,
   Mic
 } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext.jsx'
-import { useProfile } from '../contexts/ProfileContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
+import { useProfile } from '../contexts/ProfileContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { getWeather, MURFREESBORO } from '../lib/weather.ts'
 import { ACTIVE_STAGES } from '../lib/stages.ts'

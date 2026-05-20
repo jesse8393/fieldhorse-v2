@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Users, ArrowRight } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import Aurora from '../components/fx/Aurora.jsx'
 import GridPattern from '../components/fx/GridPattern.jsx'
 

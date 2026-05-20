@@ -5,7 +5,7 @@ import { Upload, Check, Zap, Copy, FileSpreadsheet, ChevronDown, Eye, EyeOff, Sp
 import { Progress } from '@/components/ui/progress'
 import { supabase } from '../lib/supabase.ts'
 import { claudeMessage } from '../lib/anthropic.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'

@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth } from './contexts/AuthContext.jsx'
-import { useProfile } from './contexts/ProfileContext.jsx'
+import { useAuth } from './contexts/AuthContext.tsx'
+import { useProfile } from './contexts/ProfileContext.tsx'
 import AppShell from './components/AppShell.jsx'
 
 // Eager — must be in main bundle
