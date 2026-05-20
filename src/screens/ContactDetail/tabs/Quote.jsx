@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon } from 'lucide-react'
+import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon, PenLine } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
@@ -430,6 +430,63 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     }
   }
 
+  // Send the proposal PDF for DocuSign e-signature. Same upload path as
+  // handleSend (PDF → job-files), then POSTs to /api/docusign-send. The
+  // function degrades gracefully (503 esign_not_configured) until the
+  // DOCUSIGN_* env vars are set in Netlify.
+  async function handleEsign() {
+    if (disabled) return
+    if (!hasClientEmail) {
+      toastError('Add a client email first', 'DocuSign sends the signing request to the client email.')
+      return
+    }
+    hapticTap()
+    setBusy('esign')
+    try {
+      const result = await buildPdf()
+      const blob = result.doc.output('blob')
+      const rowId = crypto.randomUUID()
+      const path = `${userId}/${contact.id}/${rowId}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from('job-files')
+        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+      if (upErr) throw new Error(`Couldn't save the proposal PDF: ${upErr.message}`)
+      try {
+        await supabase.from('fh_job_files').insert({
+          id: rowId, user_id: userId, job_id: contact.id,
+          filename: result.filename, storage_path: path,
+          mime_type: 'application/pdf', size_bytes: blob.size || 0, kind: 'file'
+        })
+      } catch (e) { console.warn('[quote] esign fh_job_files insert failed', e) }
+
+      const res = await fetch('/api/docusign-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          sender_user_id: userId,
+          recipient_email: contact.email,
+          recipient_name: contact.name || null,
+          storage_path: path
+        })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 503 && data?.error === 'esign_not_configured') {
+        toastError('DocuSign not connected yet', 'Add the DOCUSIGN_* keys in Netlify, then try again.')
+        return
+      }
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.detail || data?.error || 'DocuSign send failed.')
+      }
+      if (fetchAll) await fetchAll()
+      toastSuccess(`Sent to ${contact.email} for signature`, 'DocuSign will email the signing request.')
+    } catch (e) {
+      toastError("Couldn't send for e-signature", e?.message || 'Try again')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     /* Phase 4 — Estimate workspace.
        Mobile (<900px): stacks vertically as before. Each section
@@ -528,6 +585,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           onDownload={handleDownload}
           onSend={handleSend}
           onShare={handleShare}
+          onEsign={handleEsign}
         />
 
         <ApproveBand
@@ -1047,7 +1105,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
 /* ============================================================
    Action bar — Preview / Download / Send Quote
    ============================================================ */
-function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend, onShare }) {
+function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend, onShare, onEsign }) {
   const helperLine = sendDisabledReason
     ? sendDisabledReason
     : 'Generates the proposal PDF and emails it directly to the client. Marks the quote as sent on success. This is not the same as Approve — use Approve when the customer says yes.'
@@ -1092,6 +1150,14 @@ function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason
           onClick={onShare}
           disabled={disabled}
         />
+        {onEsign && (
+          <SecondaryButton
+            icon={<PenLine size={14} aria-hidden="true" />}
+            label={busy === 'esign' ? 'Sending…' : 'E-signature'}
+            onClick={onEsign}
+            disabled={sendDisabled}
+          />
+        )}
         <PrimaryButton
           icon={<Send size={14} aria-hidden="true" />}
           label={busy === 'send' ? 'Sending…' : 'Send Proposal'}
