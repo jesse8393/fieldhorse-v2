@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'react'
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, Check, Zap, Copy, FileSpreadsheet, ChevronDown, Eye, EyeOff } from 'lucide-react'
+import { Upload, Check, Zap, Copy, FileSpreadsheet, ChevronDown, Eye, EyeOff, Sparkles } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { supabase } from '../lib/supabase.js'
+import { claudeMessage } from '../lib/anthropic.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { toastSuccess } from '../lib/toast.js'
+import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'
+
+// Importable target fields, in display order. Used by the mapping
+// review UI + the AI mapper prompt.
+const TARGET_FIELDS = [
+  { key: 'name',      label: 'Name',      required: true },
+  { key: 'phone',     label: 'Phone' },
+  { key: 'email',     label: 'Email' },
+  { key: 'address',   label: 'Address' },
+  { key: 'job_title', label: 'Job title' },
+  { key: 'job_type',  label: 'Job type' },
+  { key: 'amount',    label: 'Amount' }
+]
 
 // Normalize a column header so "First Name" / "first_name" / "firstname" all match.
 function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '') }
@@ -63,6 +76,11 @@ export default function Importer() {
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState(0)
   const [done, setDone] = useState(null)
+  // Raw CSV headers + AI mapping state. headerMap holds the active
+  // field→column resolution; the AI mapper and the manual dropdowns
+  // both write into it via applyHeaderMap so the preview re-derives.
+  const [csvHeaders, setCsvHeaders] = useState([])
+  const [aiMapping, setAiMapping] = useState(false)
   const [webhookKey, setWebhookKey] = useState('')
   const [copiedWebhook, setCopiedWebhook] = useState(false)
   // Audit caught the full webhook key rendered in plain text. Default
@@ -100,7 +118,14 @@ export default function Importer() {
   function remap(data, p) {
     // Build a header map based on what's actually in the CSV (first row's keys).
     const headers = data[0] ? Object.keys(data[0]) : []
+    setCsvHeaders(headers)
     const hm = buildHeaderMap(headers)
+    applyHeaderMap(hm, data)
+  }
+
+  // Re-derive the mapped preview rows from a given field→column map.
+  // Shared by remap (static), the AI mapper, and the manual dropdowns.
+  function applyHeaderMap(hm, data = rows) {
     setHeaderMap(hm)
     const out = data.map((r) => ({
       name: pick(r, hm.name),
@@ -113,6 +138,53 @@ export default function Importer() {
       stage: 'lead'
     })).filter((r) => r.name)
     setMapped(out)
+  }
+
+  // Manual override from the mapping review dropdowns.
+  function setFieldColumn(field, column) {
+    const next = { ...headerMap }
+    if (column) next[field] = column
+    else delete next[field]
+    applyHeaderMap(next)
+  }
+
+  // AI column mapping — for CSVs whose headers the static synonym
+  // matcher can't resolve (QuickBooks, ServiceTitan, custom exports).
+  // Sends the headers + 3 sample rows to Claude and asks for a
+  // field→header JSON map. Merges over the existing map so already-
+  // resolved columns are preserved.
+  async function aiMap() {
+    if (!csvHeaders.length || aiMapping) return
+    setAiMapping(true)
+    hapticMedium()
+    try {
+      const sample = rows.slice(0, 3)
+      const system = `You map spreadsheet columns to a fixed set of CRM fields for a contractor's job/lead import. The target fields are: ${TARGET_FIELDS.map((f) => f.key).join(', ')}. Given the CSV headers and a few sample rows, return ONLY a JSON object whose keys are the target field names and whose values are the EXACT matching CSV header string (or null if no column fits). Map "name" to whichever column best identifies the customer or company. Map "amount" to the column holding the dollar value of the job/deal. Never invent headers — values must be exact strings from the provided header list or null. Return ONLY the JSON object, no prose.`
+      const userContent = `CSV headers: ${JSON.stringify(csvHeaders)}\n\nSample rows:\n${JSON.stringify(sample, null, 2)}`
+      const res = await claudeMessage({
+        system,
+        messages: [{ role: 'user', content: userContent }],
+        maxTokens: 500
+      })
+      const text = res?.content?.[0]?.text || ''
+      const match = text.match(/\{[\s\S]*\}/)
+      if (!match) throw new Error('AI returned no mapping')
+      const parsed = JSON.parse(match[0])
+      // Keep only values that are real headers; merge over current map.
+      const next = { ...headerMap }
+      for (const f of TARGET_FIELDS) {
+        const col = parsed[f.key]
+        if (col && csvHeaders.includes(col)) next[f.key] = col
+      }
+      applyHeaderMap(next)
+      hapticSuccess()
+      const mappedCount = TARGET_FIELDS.filter((f) => next[f.key]).length
+      toastSuccess('AI mapped your columns', `${mappedCount} of ${TARGET_FIELDS.length} fields matched`)
+    } catch (e) {
+      toastError("Couldn't auto-map", e?.message || 'Try the manual mapping below.')
+    } finally {
+      setAiMapping(false)
+    }
   }
 
   function changePreset(p) {
@@ -138,6 +210,8 @@ export default function Importer() {
     if (!error) {
       setRows([])
       setMapped([])
+      setCsvHeaders([])
+      setHeaderMap({})
       toastSuccess(`Imported ${finalCount} contacts`, 'Now in your Pipeline')
     }
   }
@@ -241,6 +315,71 @@ export default function Importer() {
           )}
           <input type="file" accept=".csv" onChange={onFile} hidden />
         </label>
+
+        {/* Column mapping review — only once a file is loaded. Shows the
+            resolved field→column map with manual override dropdowns, plus
+            an AI auto-map button for headers the static matcher missed. */}
+        {csvHeaders.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+                Column mapping
+              </span>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                onClick={aiMap}
+                disabled={aiMapping}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 12px', borderRadius: 999,
+                  border: '1px solid rgba(201,150,58,0.4)',
+                  background: 'rgba(201,150,58,0.14)',
+                  color: 'var(--field-gold-bright)',
+                  fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+                  letterSpacing: '0.06em', textTransform: 'uppercase',
+                  cursor: aiMapping ? 'wait' : 'pointer',
+                  opacity: aiMapping ? 0.7 : 1
+                }}
+              >
+                <Sparkles size={12} />
+                {aiMapping ? 'Mapping…' : 'Smart map with AI'}
+              </motion.button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {TARGET_FIELDS.map((f) => {
+                const col = headerMap[f.key] || ''
+                const unmapped = !col
+                return (
+                  <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 8, alignItems: 'center' }}>
+                    <span style={{
+                      fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
+                      color: unmapped && f.required ? 'var(--alert-red)' : 'var(--ink-strong)'
+                    }}>
+                      {f.label}{f.required ? ' *' : ''}
+                    </span>
+                    <select
+                      value={col}
+                      onChange={(e) => setFieldColumn(f.key, e.target.value)}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '8px 10px', borderRadius: 10,
+                        background: 'var(--surface-2)',
+                        border: `1px solid ${unmapped && f.required ? 'rgba(192,57,43,0.4)' : 'var(--rule)'}`,
+                        color: unmapped ? 'var(--ink-muted)' : 'var(--ink-strong)',
+                        fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">— not mapped —</option>
+                      {csvHeaders.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Preview + import */}
         {mapped.length > 0 && (
