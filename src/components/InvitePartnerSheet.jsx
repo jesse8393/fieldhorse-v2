@@ -24,7 +24,7 @@ import { Mail, Send, Users, X, Copy, Check, Share2, UserPlus } from 'lucide-reac
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
-import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { loadPastPartners, PARTNER_ROLES } from '../lib/partners.ts'
 
 function friendlyInviteError(code) {

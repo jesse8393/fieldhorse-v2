@@ -1,4 +1,4 @@
-// src/lib/useDrawerKeyboard.js
+// src/lib/useDrawerKeyboard.ts
 //
 // Shared iOS keyboard handler for Vaul drawer-based sheets. Solves
 // two real bugs we kept hitting:
@@ -29,11 +29,11 @@
 // (enough for the iOS keyboard slide + visualViewport resize to
 // settle).
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 
-export function useDrawerKeyboard(open) {
+export function useDrawerKeyboard(open: boolean) {
   const [kbd, setKbd] = useState(0)
-  const formRef = useRef(null)
+  const formRef = useRef<HTMLFormElement | null>(null)
 
   // Track keyboard height via visualViewport. Floor at 40px so iOS
   // soft-button bars (notched phones) don't trip the offset.
@@ -42,7 +42,7 @@ export function useDrawerKeyboard(open) {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null
     if (!vv) return
     function update() {
-      const next = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+      const next = Math.max(0, window.innerHeight - vv!.height - (vv!.offsetTop || 0))
       setKbd(next > 40 ? next : 0)
     }
     update()
@@ -60,8 +60,8 @@ export function useDrawerKeyboard(open) {
     if (!open) return
     const form = formRef.current
     if (!form) return
-    function onFocusIn(e) {
-      const t = e.target
+    function onFocusIn(e: FocusEvent) {
+      const t = e.target as HTMLElement | null
       if (!t || !t.matches?.('input, textarea, select')) return
       const inputType = (t.getAttribute?.('type') || '').toLowerCase()
       if (['checkbox', 'radio', 'button', 'submit'].includes(inputType)) return
@@ -73,7 +73,7 @@ export function useDrawerKeyboard(open) {
     return () => form.removeEventListener('focusin', onFocusIn)
   }, [open])
 
-  const drawerStyle = {
+  const drawerStyle: CSSProperties = {
     maxWidth: '100%',
     overflowX: 'hidden',
     // Cap height so the drawer always fits between the iOS status
@@ -93,7 +93,7 @@ export function useDrawerKeyboard(open) {
     flexDirection: 'column'
   }
 
-  function formStyle(extra = {}) {
+  function formStyle(extra: CSSProperties = {}): CSSProperties {
     return {
       paddingTop: 6,
       paddingLeft: 20,

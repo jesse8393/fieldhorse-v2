@@ -10,7 +10,7 @@ import {
 import { supabase } from '../lib/supabase.js'
 import { useNotesBundle, notesKey } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { claudeMessage } from '../lib/anthropic.js'
+import { claudeMessage } from '../lib/anthropic.ts'
 import { toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'

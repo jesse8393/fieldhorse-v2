@@ -15,10 +15,12 @@ import { supabase } from './supabase.js'
  * overlapping user_ids; sharing the cache means at most one RPC call
  * per unique user_id per session.
  */
-const labelCache = new Map() // user_id -> { label, role }
-const inflight = new Map()   // user_id -> Promise<{ label, role } | null>
+export type AccountLabel = { label: string; role: string }
 
-async function resolveBatch(missing) {
+const labelCache = new Map<string, AccountLabel>() // user_id -> { label, role }
+const inflight = new Map<string, Promise<void>>()   // user_id -> in-flight resolve
+
+async function resolveBatch(missing: string[]) {
   if (missing.length === 0) return
   const { data, error } = await supabase.rpc('fh_resolve_account_labels', {
     p_user_ids: missing
@@ -29,8 +31,8 @@ async function resolveBatch(missing) {
     // Don't poison the cache on error — just leave the user_ids unresolved.
     return
   }
-  const got = new Set()
-  for (const row of data || []) {
+  const got = new Set<string>()
+  for (const row of (data || []) as Array<{ user_id: string; label: string; role: string }>) {
     labelCache.set(row.user_id, { label: row.label, role: row.role })
     got.add(row.user_id)
   }
@@ -49,7 +51,7 @@ async function resolveBatch(missing) {
  * fills in the rest async. Stable Map reference between renders when
  * nothing has changed.
  */
-export function useAccountLabels(userIds) {
+export function useAccountLabels(userIds: Iterable<string | null | undefined> | null | undefined) {
   // Stable, deduped, sorted key for the dependency array.
   const idsKey = useMemo(() => {
     const set = new Set()
@@ -82,7 +84,7 @@ export function useAccountLabels(userIds) {
   // Return a Map of currently-known labels. Unresolved ids will simply be
   // missing from the Map; the consumer renders a fallback for those.
   return useMemo(() => {
-    const out = new Map()
+    const out = new Map<string, AccountLabel>()
     if (!idsKey) return out
     for (const id of idsKey.split(',').filter(Boolean)) {
       const hit = labelCache.get(id)
@@ -99,7 +101,7 @@ export function useAccountLabels(userIds) {
  * verb: 'posted' | 'added' | 'created'  (default 'posted')
  * showRole: boolean — append " · Partner" or " · Owner" when not self
  */
-export function formatAttribution(entry, verb = 'posted', showRole = false) {
+export function formatAttribution(entry: AccountLabel | null | undefined, verb = 'posted', showRole = false) {
   const v = verb === 'added' ? 'Added by' : verb === 'created' ? 'Created by' : 'Posted by'
   // Friendlier fallback when the label RPC can't resolve a name. The
   // prior "someone on this job" read as alarming/stub-y in the 5/13

@@ -13,7 +13,7 @@ import NewClientSheet from '../components/NewClientSheet.jsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.jsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
 import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.jsx'
-import { useIsDesktop } from '../lib/useMediaQuery.js'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
 function money(n) {
   const v = Number(n || 0)

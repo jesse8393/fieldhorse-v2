@@ -32,7 +32,7 @@ import FinancialsTab from './tabs/Financials.jsx'
 import FilesTab from './tabs/Files.jsx'
 import ApproveQuoteSheet from './sections/ApproveQuoteSheet.jsx'
 import DesktopJobDetail from '../../components/desktop/DesktopJobDetail.jsx'
-import { useIsDesktop } from '../../lib/useMediaQuery.js'
+import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
 const TOP_TABS = [
   { id: 'overview',   label: 'Overview' },

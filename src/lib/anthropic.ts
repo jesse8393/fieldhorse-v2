@@ -1,7 +1,7 @@
 // Claude API client. Calls route through serverless function in production
 // so the key never ships to the browser. Local dev can hit the edge route too.
 
-const MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
+const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
 
 // Hard ceiling so a stuck /api/claude call never leaves the UI in an
 // indefinite "parsing…" or "drafting…" state. 15s is comfortably above
@@ -9,7 +9,9 @@ const MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
 // payload sizes; tune via this constant if real usage exceeds it.
 const REQUEST_TIMEOUT_MS = 15000
 
-export async function claudeMessage({ system, messages, maxTokens = 1024 }) {
+type ClaudeMessage = { role: string; content: unknown }
+
+export async function claudeMessage({ system, messages, maxTokens = 1024 }: { system?: string; messages: ClaudeMessage[]; maxTokens?: number }) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
@@ -22,7 +24,7 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }) {
     if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)
     return await res.json()
   } catch (err) {
-    if (err?.name === 'AbortError') {
+    if ((err as Error)?.name === 'AbortError') {
       throw new Error('Claude request timed out (15s)')
     }
     throw err
@@ -41,7 +43,7 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }) {
  *
  * Returns the same shape as claudeMessage — { content: [{ text }, ...], ... }
  */
-export async function claudeVision({ system, prompt, imageData, mediaType, maxTokens = 1024 }) {
+export async function claudeVision({ system, prompt, imageData, mediaType, maxTokens = 1024 }: { system?: string; prompt: string; imageData: string; mediaType?: string; maxTokens?: number }) {
   // Accept data-URL or raw base64. Strip the data-URL header if present
   // and pull the media type from it when not provided explicitly.
   let base64 = imageData
@@ -76,7 +78,7 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
     if (!res.ok) throw new Error(`Claude vision request failed: ${res.status}`)
     return await res.json()
   } catch (err) {
-    if (err?.name === 'AbortError') {
+    if ((err as Error)?.name === 'AbortError') {
       throw new Error('Claude vision request timed out (15s)')
     }
     throw err
@@ -87,7 +89,7 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
 
 // Pull the first JSON object out of a Claude response body. Vision responses
 // often include preamble; this finds the first {...} balanced block.
-export function extractJson(text) {
+export function extractJson(text: string | null | undefined) {
   if (!text) return null
   const match = text.match(/\{[\s\S]*\}/)
   if (!match) return null

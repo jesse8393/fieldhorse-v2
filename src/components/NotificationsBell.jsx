@@ -4,7 +4,7 @@ import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, Messag
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.js'
+import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.ts'
 import { hapticTap } from '../lib/haptics.ts'
 
 // Map notification kind → icon + accent color. Add cases as new kinds

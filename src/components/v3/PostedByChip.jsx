@@ -1,4 +1,4 @@
-import { useAccountLabels, formatAttribution } from '../../lib/accountAttribution.js'
+import { useAccountLabels, formatAttribution } from '../../lib/accountAttribution.ts'
 
 /**
  * PostedByChip — compact byline for shared-job content.

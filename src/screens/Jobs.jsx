@@ -16,7 +16,7 @@ import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import { useIsDesktop } from '../lib/useMediaQuery.js'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobPhotos, useJobsRealtime, queryKeys } from '../lib/queries.ts'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 

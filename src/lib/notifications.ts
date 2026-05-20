@@ -6,7 +6,7 @@
 
 import { supabase } from './supabase.js'
 
-export async function fetchInbox(limit = 30, userId) {
+export async function fetchInbox(limit = 30, userId?: string) {
   if (!userId) return []
   const { data, error } = await supabase
     .from('fh_notifications')
@@ -18,7 +18,7 @@ export async function fetchInbox(limit = 30, userId) {
   return data || []
 }
 
-export async function unreadCount(userId) {
+export async function unreadCount(userId?: string) {
   if (!userId) return 0
   const { count, error } = await supabase
     .from('fh_notifications')
@@ -29,12 +29,12 @@ export async function unreadCount(userId) {
   return count || 0
 }
 
-export async function markRead(id, userId) {
+export async function markRead(id: string | undefined, userId: string | undefined) {
   if (!id || !userId) return
   await supabase.from('fh_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId)
 }
 
-export async function markAllRead(userId) {
+export async function markAllRead(userId: string | undefined) {
   if (!userId) return
   await supabase
     .from('fh_notifications')
@@ -47,7 +47,7 @@ export async function markAllRead(userId) {
 // like "You logged a failed inspection". For cross-user notifications
 // (partner accepted, sub responded), use the server-side notify() in
 // Netlify functions where the service role can write to any inbox.
-export async function notifySelf(userId, { kind, title, body, link, actor_user_id = null }) {
+export async function notifySelf(userId: string | undefined, { kind, title, body, link, actor_user_id = null }: { kind?: string; title?: string; body?: string | null; link?: string | null; actor_user_id?: string | null }) {
   if (!userId || !kind || !title) return
   await supabase.from('fh_notifications').insert({
     user_id: userId,
@@ -59,7 +59,7 @@ export async function notifySelf(userId, { kind, title, body, link, actor_user_i
   })
 }
 
-export function fmtAge(iso) {
+export function fmtAge(iso: string | null | undefined) {
   if (!iso) return ''
   const ms = Date.now() - new Date(iso).getTime()
   const min = Math.floor(ms / 60000)

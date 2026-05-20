@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription
 } from '@/components/ui/drawer'
-import { notifySelf } from '../../../lib/notifications.js'
+import { notifySelf } from '../../../lib/notifications.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 
 const TRADES = [

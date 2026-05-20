@@ -18,7 +18,7 @@ import { DollarSign, Check, X } from 'lucide-react'
 import { logPayment } from '../lib/pipeline.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
-import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
+import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
