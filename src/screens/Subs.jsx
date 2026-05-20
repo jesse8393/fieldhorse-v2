@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Phone, Plus, Search, Hammer, ChevronRight, MessageSquare, IdCard } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { useSubsBundle, useInvalidateSubs } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.js'
@@ -50,28 +51,18 @@ function fmtRelativeDate(d) {
 
 export default function Subs() {
   const { user } = useAuth()
-  const [rows, setRows] = useState([])
-  const [contacts, setContacts] = useState({})
-  const [loading, setLoading] = useState(true)
+  const { data: bundle, isLoading: loading } = useSubsBundle(user?.id)
+  const load = useInvalidateSubs()
+  const rows = bundle?.subs ?? []
   const [q, setQ] = useState('')
   const [tradeFilter, setTradeFilter] = useState('')
   const [addOpen, setAddOpen] = useState(false)
 
-  const load = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    const [{ data: subs }, { data: cs }] = await Promise.all([
-      supabase.from('fh_subs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('fh_contacts').select('id, name, job_title, stage').eq('user_id', user.id)
-    ])
-    setRows(subs || [])
+  const contacts = useMemo(() => {
     const map = {}
-    for (const c of cs || []) map[c.id] = c
-    setContacts(map)
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => { load() }, [load])
+    for (const c of bundle?.contacts ?? []) map[c.id] = c
+    return map
+  }, [bundle?.contacts])
 
   // Roll up by sub identity. Phone wins (unique) when present; falls
   // back to lowercased name. Subs with neither name nor phone get
