@@ -86,6 +86,33 @@ export function useClientsBundle(userId: string | undefined) {
   })
 }
 
+// ---- Client detail ----
+// One client plus the jobs linked to them, for the client detail screen.
+export type ClientDetail = {
+  client: Client | null
+  jobs: Pick<Contact, 'id' | 'name' | 'job_title' | 'job_type' | 'amount' | 'stage'>[]
+}
+
+async function fetchClientDetail(id: string): Promise<ClientDetail> {
+  const [c, j] = await Promise.all([
+    supabase.from('fh_clients').select('*').eq('id', id).maybeSingle(),
+    supabase.from('fh_contacts').select('id, name, job_title, job_type, amount, stage')
+      .eq('client_id', id).order('updated_at', { ascending: false })
+  ])
+  return {
+    client: (c.data ?? null) as Client | null,
+    jobs: (j.data ?? []) as ClientDetail['jobs']
+  }
+}
+
+export function useClientDetail(id: string | undefined) {
+  return useQuery({
+    queryKey: ['clientDetail', id],
+    queryFn: () => fetchClientDetail(id as string),
+    enabled: !!id
+  })
+}
+
 // ---- Schedule (next 7 days) ----
 export type ScheduleEvent =
   Database['public']['Tables']['fh_schedule']['Row'] & {

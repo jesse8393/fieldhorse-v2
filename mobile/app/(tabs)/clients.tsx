@@ -3,8 +3,9 @@
 // and computes per-client lifetime / active-count rollups natively —
 // the same rollup math the web Clients screen uses.
 import { useMemo, useState } from 'react'
-import { View, Text, FlatList, TextInput, ActivityIndicator } from 'react-native'
+import { View, Text, FlatList, TextInput, ActivityIndicator, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
 import { useClientsBundle, type Client } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -20,6 +21,7 @@ type Roll = { lifetime: number; active: number }
 
 export default function ClientsScreen() {
   const insets = useSafeAreaInsets()
+  const router = useRouter()
   const { user } = useAuth()
   const { data: bundle, isLoading } = useClientsBundle(user?.id)
   const [search, setSearch] = useState('')
@@ -73,7 +75,9 @@ export default function ClientsScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 8 }}
-          renderItem={({ item }) => <ClientCard client={item} roll={rollups.get(item.id)} />}
+          renderItem={({ item }) => (
+            <ClientCard client={item} roll={rollups.get(item.id)} onPress={() => router.push(`/clients/${item.id}`)} />
+          )}
           ListEmptyComponent={<Text className="text-ink-muted text-center mt-12">No clients yet.</Text>}
         />
       )}
@@ -81,10 +85,11 @@ export default function ClientsScreen() {
   )
 }
 
-function ClientCard({ client, roll }: { client: Client; roll?: Roll }) {
+function ClientCard({ client, roll, onPress }: { client: Client; roll?: Roll; onPress: () => void }) {
   const initial = (client.name || '·').trim().charAt(0).toUpperCase()
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center"
       style={{ gap: 12 }}
     >
@@ -104,6 +109,6 @@ function ClientCard({ client, roll }: { client: Client; roll?: Roll }) {
         <Text className="text-gold-bright text-base font-bold">{money(roll?.lifetime || 0)}</Text>
         <Text className="text-ink-muted text-[10px] mt-1">{roll?.active || 0} active</Text>
       </View>
-    </View>
+    </Pressable>
   )
 }
