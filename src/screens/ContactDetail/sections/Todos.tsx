@@ -18,8 +18,8 @@ import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../
  *
  * Delete uses toastUndo so a stray tap can be reversed within 6s.
  */
-export default function TodosSection({ jobId, userId }) {
-  const [rows, setRows] = useState([])
+export default function TodosSection({ jobId, userId }: any) {
+  const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState('')
   // Optional due date for the new todo being composed. YYYY-MM-DD or ''.
@@ -46,9 +46,9 @@ export default function TodosSection({ jobId, userId }) {
     const txt = draft.trim()
     if (!txt) return
     hapticTap()
-    const payload = { user_id: userId, job_id: jobId, text: txt }
+    const payload: Record<string, any> = { user_id: userId, job_id: jobId, text: txt }
     if (dueDraft) payload.due_at = dateInputToTimestamp(dueDraft)
-    const { error } = await supabase.from('fh_job_todos').insert(payload)
+    const { error } = await supabase.from('fh_job_todos').insert(payload as any)
     if (error) {
       toastError("Couldn't add to-do", error.message)
       return
@@ -60,7 +60,7 @@ export default function TodosSection({ jobId, userId }) {
 
   // Inline edit: tap a row's due chip → native date picker → onChange
   // fires here. Optimistic update with rollback on Supabase error.
-  async function updateDueAt(rowId, nextDueAt) {
+  async function updateDueAt(rowId: any, nextDueAt: any) {
     setRows((rs) => rs.map((r) => r.id === rowId ? { ...r, due_at: nextDueAt } : r))
     const { error } = await supabase
       .from('fh_job_todos')
@@ -73,7 +73,7 @@ export default function TodosSection({ jobId, userId }) {
     }
   }
 
-  async function toggle(row) {
+  async function toggle(row: any) {
     hapticTap()
     const next = !row.done
     // Optimistic
@@ -92,7 +92,7 @@ export default function TodosSection({ jobId, userId }) {
     }
   }
 
-  async function remove(rowId) {
+  async function remove(rowId: any) {
     hapticTap()
     const snapshot = rows.find((r) => r.id === rowId)
     setRows((rs) => rs.filter((r) => r.id !== rowId)) // optimistic
@@ -252,7 +252,7 @@ export default function TodosSection({ jobId, userId }) {
                 <DueChipButton
                   iso={r.due_at}
                   done={r.done}
-                  onChange={(nextIso) => updateDueAt(r.id, nextIso)}
+                  onChange={(nextIso: any) => updateDueAt(r.id, nextIso)}
                 />
                 <button
                   type="button"
@@ -283,7 +283,7 @@ export default function TodosSection({ jobId, userId }) {
  * iso is null: a quiet calendar icon serves as the "set due date"
  * affordance — no labeled chip is shown, but the tap target stays.
  */
-function DueChipButton({ iso, done, onChange }) {
+function DueChipButton({ iso, done, onChange }: any) {
   const status = dueStatus(iso)
   const dateStr = timestampToDateInput(iso)
 

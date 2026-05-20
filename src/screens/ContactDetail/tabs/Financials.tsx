@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
-import SubsSection from '../sections/Subs.jsx'
+import SubsSection from '../sections/Subs.tsx'
 import ExpensesSection from '../sections/Expenses.tsx'
 import InvoiceSection from '../sections/Invoice.tsx'
-import InvoiceDrawsSection from '../sections/InvoiceDrawsSection.jsx'
+import InvoiceDrawsSection from '../sections/InvoiceDrawsSection.tsx'
 
 /**
  * FINANCIALS tab — sub-tab router for cost + revenue surfaces.

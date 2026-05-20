@@ -17,7 +17,7 @@ import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate
  * the operator typing and blurring because the effect keys on
  * `id` + `updated_at`, not on every render.
  */
-export default function QuoteTermsSection({ contact, patch, valuesRef }) {
+export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
   const [scope, setScope] = useState(contact?.scope_text || '')
   const [exclusions, setExclusions] = useState(contact?.exclusions_text || '')
   const [terms, setTerms] = useState(contact?.terms_text || '')
@@ -41,19 +41,19 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }) {
 
   // Normalize blank → null so the column stores absence consistently
   // (downstream PDF + status-pill logic checks `is null` not `=== ''`).
-  function normText(s) {
+  function normText(s: any) {
     const t = String(s || '').trim()
     return t.length === 0 ? null : t
   }
 
-  async function saveText(field, current, prior) {
+  async function saveText(field: any, current: any, prior: any) {
     const next = normText(current)
     const before = normText(prior)
     if (next === before) return
     await patch?.({ [field]: next })
   }
 
-  async function saveExpires(current, priorIso) {
+  async function saveExpires(current: any, priorIso: any) {
     const nextIso = dateInputToTimestamp(current) // null on empty
     if (nextIso === priorIso) return
     if (!nextIso && !priorIso) return
@@ -137,7 +137,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }) {
   )
 }
 
-function FieldLabel({ label, hint, children }) {
+function FieldLabel({ label, hint, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{
@@ -161,7 +161,7 @@ function FieldLabel({ label, hint, children }) {
   )
 }
 
-const textareaStyle = {
+const textareaStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
   padding: '11px 13px',
   borderRadius: 10,

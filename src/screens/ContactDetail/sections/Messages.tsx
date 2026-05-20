@@ -15,10 +15,10 @@ import { useConfirm } from '../../../components/ConfirmSheet.jsx'
  * Other categories (call/text/email logs) come in via the bottom-sheet
  * Text/Email/Call quick actions on Jobs.jsx — same fh_notes table.
  */
-export default function MessagesSection({ contactId, userId, notes = [], fetchAll }) {
+export default function MessagesSection({ contactId, userId, notes = [], fetchAll }: any) {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
-  const confirm = useConfirm()
+  const confirm = useConfirm() as any
 
   async function add() {
     const txt = draft.trim()
@@ -44,7 +44,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
   // deletion so the Undo can re-insert it. RLS scopes the delete to the
   // owner; partner-shared jobs let the original poster delete their own
   // posts via fh_notes_partner policy.
-  async function remove(note) {
+  async function remove(note: any) {
     if (!note?.id) return
     const ok = await confirm({
       title: 'Delete this note?',
@@ -148,7 +148,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <AnimatePresence>
-            {notes.map((n, i) => (
+            {notes.map((n: any, i: any) => (
               <motion.li
                 key={n.id}
                 layout

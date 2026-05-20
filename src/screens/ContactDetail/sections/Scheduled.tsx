@@ -12,10 +12,10 @@ import { hapticTap } from '../../../lib/haptics.ts'
  * event, the parent's onOpenAddEvent prop opens AddEventSheet pre-filled
  * with this contact_id.
  */
-export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }) {
+export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }: any) {
   const navigate = useNavigate()
 
-  function openOnSchedule(row) {
+  function openOnSchedule(row: any) {
     hapticTap()
     const d = new Date(row.start_at)
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -64,7 +64,7 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent })
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {scheduleItems.map((e) => {
+          {scheduleItems.map((e: any) => {
             const d = new Date(e.start_at)
             const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
             const timeStr = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })

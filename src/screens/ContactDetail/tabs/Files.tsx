@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
-import PhotosSection from '../sections/Photos.jsx'
+import PhotosSection from '../sections/Photos.tsx'
 import FilesSection from '../sections/Files.tsx'
-import MessagesSection from '../sections/Messages.jsx'
+import MessagesSection from '../sections/Messages.tsx'
 
 /**
  * FILES tab — sub-tab router for media + comms.
