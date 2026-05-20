@@ -12,7 +12,7 @@
 // 'revoked' on every fh_job_partners row for the partner; we use the
 // client-side update because RLS already scopes by inviter.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -24,7 +24,8 @@ import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.js'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.js'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
-import { loadPartnerDirectory, revokePartnerRow } from '../lib/partners.js'
+import { usePartnerDirectory, useInvalidatePartners } from '../lib/queries.ts'
+import { revokePartnerRow } from '../lib/partners.js'
 import { stageColor } from '../lib/stages.js'
 
 const STATUS_FILTERS = [
@@ -49,20 +50,10 @@ function relTime(input) {
 export default function Partners() {
   const { user } = useAuth()
   const confirm = useConfirm()
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { data: rows = [], isLoading: loading } = usePartnerDirectory(user?.id)
+  const load = useInvalidatePartners()
   const [filter, setFilter] = useState('all')
   const [busyKey, setBusyKey] = useState(null)
-
-  const load = useCallback(async () => {
-    if (!user?.id) return
-    setLoading(true)
-    const partners = await loadPartnerDirectory({ includeRevoked: true })
-    setRows(partners)
-    setLoading(false)
-  }, [user?.id])
-
-  useEffect(() => { load() }, [load])
 
   const counts = useMemo(() => ({
     all: rows.length,
