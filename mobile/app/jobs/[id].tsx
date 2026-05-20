@@ -221,7 +221,7 @@ export default function JobDetailScreen() {
     )
   }
 
-  const tint = STAGE_TINT[contact.stage] ?? '#5C5C5C'
+  const tint = STAGE_TINT[contact.stage ?? ''] ?? '#5C5C5C'
 
   return (
     <View className="flex-1 bg-bg">

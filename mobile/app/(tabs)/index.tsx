@@ -37,8 +37,8 @@ export default function HomeScreen() {
     let active = 0
     for (const j of jobs) {
       const amt = Number(j.amount || 0)
-      if (ACTIVE.has(j.stage)) { pipeline += amt; active += 1 }
-      if (WON.has(j.stage)) won += amt
+      if (ACTIVE.has(j.stage ?? '')) { pipeline += amt; active += 1 }
+      if (WON.has(j.stage ?? '')) won += amt
     }
     return { pipeline, won, active }
   }, [jobs])

@@ -157,7 +157,7 @@ export default function JobsScreen() {
 }
 
 function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {
-  const tint = STAGE_TINT[job.stage] ?? '#5C5C5C'
+  const tint = STAGE_TINT[job.stage ?? ''] ?? '#5C5C5C'
   return (
     <Pressable
       onPress={onPress}
