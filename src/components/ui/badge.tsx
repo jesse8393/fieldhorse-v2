@@ -31,7 +31,7 @@ function Badge({
   variant = "default",
   asChild = false,
   ...props
-}) {
+}: any) {
   const Comp = asChild ? Slot.Root : "span"
 
   return (

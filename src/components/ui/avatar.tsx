@@ -7,7 +7,7 @@ function Avatar({
   className,
   size = "default",
   ...props
-}) {
+}: any) {
   return (
     <AvatarPrimitive.Root
       data-slot="avatar"
@@ -23,7 +23,7 @@ function Avatar({
 function AvatarImage({
   className,
   ...props
-}) {
+}: any) {
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
@@ -35,7 +35,7 @@ function AvatarImage({
 function AvatarFallback({
   className,
   ...props
-}) {
+}: any) {
   return (
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
@@ -50,7 +50,7 @@ function AvatarFallback({
 function AvatarBadge({
   className,
   ...props
-}) {
+}: any) {
   return (
     <span
       data-slot="avatar-badge"
@@ -68,7 +68,7 @@ function AvatarBadge({
 function AvatarGroup({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="avatar-group"
@@ -83,7 +83,7 @@ function AvatarGroup({
 function AvatarGroupCount({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="avatar-group-count"

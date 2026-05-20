@@ -6,19 +6,19 @@ import { cn } from "@/lib/utils"
 function TooltipProvider({
   delayDuration = 0,
   ...props
-}) {
+}: any) {
   return (<TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} {...props} />);
 }
 
 function Tooltip({
   ...props
-}) {
+}: any) {
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
 function TooltipTrigger({
   ...props
-}) {
+}: any) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
@@ -27,7 +27,7 @@ function TooltipContent({
   sideOffset = 0,
   children,
   ...props
-}) {
+}: any) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content

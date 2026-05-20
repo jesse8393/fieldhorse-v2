@@ -8,7 +8,7 @@ function Tabs({
   className,
   orientation = "horizontal",
   ...props
-}) {
+}: any) {
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
@@ -41,7 +41,7 @@ function TabsList({
   className,
   variant = "default",
   ...props
-}) {
+}: any) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
@@ -54,7 +54,7 @@ function TabsList({
 function TabsTrigger({
   className,
   ...props
-}) {
+}: any) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
@@ -72,7 +72,7 @@ function TabsTrigger({
 function TabsContent({
   className,
   ...props
-}) {
+}: any) {
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"

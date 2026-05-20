@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 function Card({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="card"
@@ -20,7 +20,7 @@ function Card({
 function CardHeader({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="card-header"
@@ -35,7 +35,7 @@ function CardHeader({
 function CardTitle({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="card-title"
@@ -47,7 +47,7 @@ function CardTitle({
 function CardDescription({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="card-description"
@@ -59,7 +59,7 @@ function CardDescription({
 function CardAction({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="card-action"
@@ -74,14 +74,14 @@ function CardAction({
 function CardContent({
   className,
   ...props
-}) {
+}: any) {
   return (<div data-slot="card-content" className={cn("ui:px-6", className)} {...props} />);
 }
 
 function CardFooter({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="card-footer"

@@ -6,19 +6,19 @@ import { cn } from "@/lib/utils"
 
 function Select({
   ...props
-}) {
+}: any) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
 
 function SelectGroup({
   ...props
-}) {
+}: any) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />;
 }
 
 function SelectValue({
   ...props
-}) {
+}: any) {
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
@@ -27,7 +27,7 @@ function SelectTrigger({
   size = "default",
   children,
   ...props
-}) {
+}: any) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
@@ -51,7 +51,7 @@ function SelectContent({
   position = "item-aligned",
   align = "center",
   ...props
-}) {
+}: any) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -80,7 +80,7 @@ function SelectContent({
 function SelectLabel({
   className,
   ...props
-}) {
+}: any) {
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
@@ -93,7 +93,7 @@ function SelectItem({
   className,
   children,
   ...props
-}) {
+}: any) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -117,7 +117,7 @@ function SelectItem({
 function SelectSeparator({
   className,
   ...props
-}) {
+}: any) {
   return (
     <SelectPrimitive.Separator
       data-slot="select-separator"
@@ -132,7 +132,7 @@ function SelectSeparator({
 function SelectScrollUpButton({
   className,
   ...props
-}) {
+}: any) {
   return (
     <SelectPrimitive.ScrollUpButton
       data-slot="select-scroll-up-button"
@@ -149,7 +149,7 @@ function SelectScrollUpButton({
 function SelectScrollDownButton({
   className,
   ...props
-}) {
+}: any) {
   return (
     <SelectPrimitive.ScrollDownButton
       data-slot="select-scroll-down-button"

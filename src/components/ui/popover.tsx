@@ -5,13 +5,13 @@ import { cn } from "@/lib/utils"
 
 function Popover({
   ...props
-}) {
+}: any) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
 function PopoverTrigger({
   ...props
-}) {
+}: any) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
@@ -20,7 +20,7 @@ function PopoverContent({
   align = "center",
   sideOffset = 4,
   ...props
-}) {
+}: any) {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
@@ -38,14 +38,14 @@ function PopoverContent({
 
 function PopoverAnchor({
   ...props
-}) {
+}: any) {
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />;
 }
 
 function PopoverHeader({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="popover-header"
@@ -57,7 +57,7 @@ function PopoverHeader({
 function PopoverTitle({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div
       data-slot="popover-title"
@@ -69,7 +69,7 @@ function PopoverTitle({
 function PopoverDescription({
   className,
   ...props
-}) {
+}: any) {
   return (
     <p
       data-slot="popover-description"

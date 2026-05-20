@@ -6,7 +6,7 @@ function Input({
   className,
   type,
   ...props
-}) {
+}: any) {
   return (
     <input
       type={type}

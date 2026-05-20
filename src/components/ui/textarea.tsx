@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 function Textarea({
   className,
   ...props
-}) {
+}: any) {
   return (
     <textarea
       data-slot="textarea"

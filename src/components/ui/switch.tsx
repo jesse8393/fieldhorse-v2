@@ -7,7 +7,7 @@ function Switch({
   className,
   size = "default",
   ...props
-}) {
+}: any) {
   return (
     <SwitchPrimitive.Root
       data-slot="switch"
