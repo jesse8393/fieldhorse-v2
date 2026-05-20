@@ -9,7 +9,7 @@
 // Both sides are optional; the block collapses cleanly when only one
 // is provided.
 
-import { DOC_COLORS, typeStyle } from './tokens.js'
+import { DOC_COLORS, typeStyle } from './tokens.ts'
 
 /**
  * @param {object} props

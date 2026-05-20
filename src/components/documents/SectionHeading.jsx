@@ -8,7 +8,7 @@
 // from "Scope of Work" → "Pricing Summary" → "Payment Terms" stays
 // consistent across both proposal + invoice templates.
 
-import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
+import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
 
 export default function SectionHeading({ eyebrow, title, meta, company }) {
   const gold = resolveBrandGold(company)

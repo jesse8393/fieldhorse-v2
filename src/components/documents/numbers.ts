@@ -1,4 +1,4 @@
-// src/components/documents/numbers.js
+// src/components/documents/numbers.ts
 //
 // Proposal / invoice number generators. Shared between the HTML
 // preview and the jsPDF export so the customer-facing document number
@@ -21,7 +21,7 @@
 
 const SKIP_WORDS = new Set(['the', 'of', 'and', '&', 'a', 'an'])
 
-function initials(name) {
+function initials(name: string | null | undefined) {
   if (!name || !String(name).trim()) return ''
   return String(name)
     .trim()
@@ -38,23 +38,23 @@ function initials(name) {
  * Returns '' when the name is missing or has fewer than `minChars`
  * usable initials so the caller can fall back to a doctype word.
  */
-export function companyPrefix(companyName, { minChars = 2, maxChars = 3 } = {}) {
+export function companyPrefix(companyName: string | null | undefined, { minChars = 2, maxChars = 3 }: { minChars?: number; maxChars?: number } = {}) {
   const init = initials(companyName)
   if (init.length < minChars) return ''
   return init.slice(0, maxChars)
 }
 
-function seedTail(seed, n = 4) {
+function seedTail(seed: string | null | undefined, n = 4) {
   if (!seed) return Math.random().toString(36).slice(2, 2 + n).toUpperCase()
   return String(seed).slice(-n).toUpperCase()
 }
 
-export function proposalNumber(companyName, seed) {
+export function proposalNumber(companyName: string | null | undefined, seed: string | null | undefined) {
   const pfx = companyPrefix(companyName) || 'PROPOSAL'
   return `${pfx}-${new Date().getFullYear()}-${seedTail(seed)}`
 }
 
-export function invoiceNumber(companyName, seed) {
+export function invoiceNumber(companyName: string | null | undefined, seed: string | null | undefined) {
   const pfx = companyPrefix(companyName)
   const y = new Date().getFullYear()
   const tail = seedTail(seed)

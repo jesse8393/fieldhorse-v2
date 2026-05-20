@@ -11,8 +11,8 @@
 // stack short specs ("12x14.5 concrete\n5x4 concrete") cleanly. Falls
 // back to `description` (single line) when not provided.
 
-import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.js'
-import { money } from './format.js'
+import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
+import { money } from './format.ts'
 
 export default function LineItemsTable({ rows = [], company, showQty = true }) {
   const brand = resolveBrandGold(company)

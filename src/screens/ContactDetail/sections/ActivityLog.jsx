@@ -16,7 +16,7 @@
 
 import { useMemo, useState } from 'react'
 import { Activity, FileText, DollarSign, Calendar, FileEdit, Check, Sparkles } from 'lucide-react'
-import { composeActivityEvents } from './composeActivityEvents.js'
+import { composeActivityEvents } from './composeActivityEvents.ts'
 
 const ICONS = {
   created: Sparkles,

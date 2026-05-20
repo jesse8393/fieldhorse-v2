@@ -1,4 +1,4 @@
-// src/components/documents/mapItems.js
+// src/components/documents/mapItems.ts
 //
 // Shared mapper that turns a flat array of fh_quote_items rows into the
 // section-grouped shape both ProposalTemplate (HTML preview) and the
@@ -20,11 +20,24 @@
 // "Concrete", etc.); the contractor's choice from the curated picker
 // on the Quote tab. Empty → "General".
 
-export function mapItemsToScope(items = []) {
-  const groups = []
-  const groupIndex = new Map()
-  const upgradeBuckets = []
-  const exclusions = []
+type QuoteItem = {
+  id?: string
+  section?: string | null
+  description?: string | null
+  qty?: number | null
+  rate?: number | null
+  amount?: number | null
+  is_optional?: boolean | null
+  is_excluded?: boolean | null
+  [k: string]: unknown
+}
+type ScopeGroup = { id: string; title: string; items: QuoteItem[] }
+
+export function mapItemsToScope(items: QuoteItem[] = []) {
+  const groups: ScopeGroup[] = []
+  const groupIndex = new Map<string, number>()
+  const upgradeBuckets: ScopeGroup[] = []
+  const exclusions: string[] = []
   let baseTotal = 0
   let upgradeTotal = 0
 

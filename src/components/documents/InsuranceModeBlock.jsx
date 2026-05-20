@@ -19,8 +19,8 @@
 //   Until that migration lands, parents can pass an `insurance` object
 //   from any source (form state, ad-hoc jsonb column, etc.).
 
-import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
-import { money } from './format.js'
+import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
+import { money } from './format.ts'
 
 export default function InsuranceModeBlock({ insurance = null, company }) {
   if (!insurance) return null

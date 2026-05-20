@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess } from '../../../lib/toast.ts'
+import type { Database } from '../../../lib/database.types.ts'
+
+type Contact = Database['public']['Tables']['fh_contacts']['Row']
+type ContactUpdate = Database['public']['Tables']['fh_contacts']['Update']
 
 /**
  * Single source of truth for the Job Detail screen's data layer.
@@ -35,7 +39,7 @@ const EMPTY = {
   stageTransitions: []
 }
 
-async function fetchJobDetail(id, userId) {
+async function fetchJobDetail(id: string, userId: string | undefined) {
   const [c, s, e, p, i, n, sch, td, ins, co, st] = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
     supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
@@ -81,12 +85,12 @@ async function fetchJobDetail(id, userId) {
   }
 }
 
-export function useJobData(id, userId) {
+export function useJobData(id: string | undefined, userId: string | undefined) {
   const queryClient = useQueryClient()
 
   const { data, isPending } = useQuery({
     queryKey: ['jobDetail', id],
-    queryFn: () => fetchJobDetail(id, userId),
+    queryFn: () => fetchJobDetail(id as string, userId),
     enabled: !!id && !!userId
   })
 
@@ -114,11 +118,11 @@ export function useJobData(id, userId) {
 
   // Optimistic patch — flip the cached contact locally, sync, toast on
   // success; invalidate to resync on failure.
-  const patch = useCallback(async (update) => {
-    queryClient.setQueryData(['jobDetail', id], (prev) =>
+  const patch = useCallback(async (update: ContactUpdate) => {
+    queryClient.setQueryData(['jobDetail', id], (prev: any) =>
       prev ? { ...prev, contact: { ...prev.contact, ...update } } : prev
     )
-    const { error } = await supabase.from('fh_contacts').update(update).eq('id', id)
+    const { error } = await supabase.from('fh_contacts').update(update).eq('id', id as string)
     if (!error) toastSuccess('Saved', 'Changes synced')
     else queryClient.invalidateQueries({ queryKey: ['jobDetail', id] })
   }, [id, queryClient])

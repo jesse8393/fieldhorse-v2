@@ -20,8 +20,8 @@
 // progress-billing (e.g. "draw 2 of 4"), the parent screen can pass
 // the four values explicitly and this block renders without changes.
 
-import { DOC_COLORS, DOC_FONTS, typeStyle, resolveBrandGold } from './tokens.js'
-import { money } from './format.js'
+import { DOC_COLORS, DOC_FONTS, typeStyle, resolveBrandGold } from './tokens.ts'
+import { money } from './format.ts'
 
 export default function InvoiceBalanceBlock({
   contractTotal = 0,

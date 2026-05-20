@@ -1,4 +1,4 @@
-// src/components/documents/tokens.js
+// src/components/documents/tokens.ts
 //
 // Shared design tokens for FieldHorse document templates (HTML preview
 // + jsPDF export). One palette + one type scale that both the in-app
@@ -42,15 +42,25 @@ export const DOC_COLORS = {
   slate:        '#5C6168'   // neutral status pill
 }
 
-export const DOC_FONTS = {
+export const DOC_FONTS: Record<string, string> = {
   display:  "'Bebas Neue', 'Helvetica Neue', sans-serif",
   serif:    "'Instrument Serif', Georgia, 'Times New Roman', serif",
   body:     "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 }
 
+type DocTypeScale = {
+  size: number | string
+  weight: number
+  family?: string
+  letterSpacing?: string
+  textTransform?: string
+  lineHeight?: number
+  color?: string
+}
+
 // Type scale — sizes in px so they map cleanly to HTML preview AND
 // jsPDF (which works in pt; convert via 1pt ≈ 1.333px when rendering).
-export const DOC_TYPE = {
+export const DOC_TYPE: Record<string, DocTypeScale> = {
   eyebrow:  { size: 10, weight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', family: 'body' },
   label:    { size: 9,  weight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', family: 'body' },
   stamp:    { size: 11, weight: 600, letterSpacing: '0.04em', family: 'body' },
@@ -103,7 +113,7 @@ export const DOC_PDF = {
  * default gold when the value is missing or malformed. Returns a hex
  * string suitable for CSS; pdf.js has its own RGB parser.
  */
-export function resolveBrandGold(company) {
+export function resolveBrandGold(company: { brand_accent_hex?: string | null } | null | undefined) {
   const raw = (company?.brand_accent_hex || '').trim()
   if (/^#[0-9a-f]{6}$/i.test(raw)) return raw
   return DOC_COLORS.gold
@@ -114,7 +124,7 @@ export function resolveBrandGold(company) {
  * backgrounds and totals card surfaces. 16% of the brand color over
  * the cream paper.
  */
-export function resolveBrandGoldSoft(company) {
+export function resolveBrandGoldSoft(company: { brand_accent_hex?: string | null } | null | undefined) {
   return `color-mix(in srgb, ${resolveBrandGold(company)} 16%, ${DOC_COLORS.paperSoft})`
 }
 
@@ -123,7 +133,7 @@ export function resolveBrandGoldSoft(company) {
  * object. Lets templates write `style={{ ...typeStyle('h2'), color: ... }}`
  * instead of repeating the same six properties every block.
  */
-export function typeStyle(scaleKey) {
+export function typeStyle(scaleKey: string) {
   const t = DOC_TYPE[scaleKey] || DOC_TYPE.body
   return {
     fontFamily: DOC_FONTS[t.family || 'body'],
