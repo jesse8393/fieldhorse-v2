@@ -5,11 +5,11 @@
 import { useMemo, useState } from 'react'
 import {
   View, Text, SectionList, ActivityIndicator, Pressable, Modal,
-  TextInput, KeyboardAvoidingView, Platform
+  TextInput, KeyboardAvoidingView, Platform, Alert
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Plus } from 'lucide-react-native'
-import { useUpcomingEvents, useCreateEvent, type ScheduleEvent } from '../../lib/queries'
+import { useUpcomingEvents, useCreateEvent, useDeleteEvent, type ScheduleEvent } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
 function dayLabel(iso: string) {
@@ -48,6 +48,15 @@ export default function ScheduleScreen() {
   const { user } = useAuth()
   const { data: events = [], isLoading } = useUpcomingEvents(user?.id)
   const createEvent = useCreateEvent()
+  const deleteEvent = useDeleteEvent()
+
+  function confirmDelete(eventId: string) {
+    if (!user) return
+    Alert.alert('Delete event?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteEvent({ id: eventId, userId: user.id }) }
+    ])
+  }
 
   const [addOpen, setAddOpen] = useState(false)
   const [title, setTitle] = useState('')
@@ -105,7 +114,9 @@ export default function ScheduleScreen() {
             </Text>
           )}
           renderItem={({ item }) => (
-            <View
+            <Pressable
+              onLongPress={() => confirmDelete(item.id)}
+              delayLongPress={350}
               className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-2 flex-row items-center"
               style={{ gap: 12 }}
             >
@@ -119,10 +130,13 @@ export default function ScheduleScreen() {
               <Text className="text-gold-bright text-sm font-bold">
                 {item.start_at ? timeLabel(item.start_at) : ''}
               </Text>
-            </View>
+            </Pressable>
           )}
           ListEmptyComponent={
             <Text className="text-ink-muted text-center mt-12">A clear week — nothing scheduled.</Text>
+          }
+          ListFooterComponent={
+            events.length ? <Text className="text-ink-muted text-[10px] text-center mt-4">Long-press an event to delete.</Text> : null
           }
         />
       )}

@@ -6,12 +6,17 @@
 import { useMemo, useState } from 'react'
 import {
   View, Text, ScrollView, Pressable, TextInput, ActivityIndicator,
-  Modal, KeyboardAvoidingView, Platform, Linking
+  Modal, KeyboardAvoidingView, Platform, Linking, Alert, Image
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ChevronLeft, Phone, Mail, Plus, Pencil } from 'lucide-react-native'
-import { useJobDetail, useLogPayment, useUpdateStage, useUpdateJob } from '../../lib/queries'
+import * as ImagePicker from 'expo-image-picker'
+import { ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera } from 'lucide-react-native'
+import {
+  useJobDetail, useLogPayment, useUpdateStage, useUpdateJob,
+  useAddExpense, useDeletePayment, useDeleteExpense, useDeleteJob,
+  useJobPhotos, useUploadPhoto, useDeletePhoto
+} from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
 const STAGE_TINT: Record<string, string> = {
@@ -34,11 +39,26 @@ export default function JobDetailScreen() {
   const logPayment = useLogPayment()
   const updateStage = useUpdateStage()
   const updateJob = useUpdateJob()
+  const addExpense = useAddExpense()
+  const deletePayment = useDeletePayment()
+  const deleteExpense = useDeleteExpense()
+  const deleteJob = useDeleteJob()
+  const uploadPhoto = useUploadPhoto()
+  const deletePhoto = useDeletePhoto()
+  const { data: photos = [] } = useJobPhotos(id)
+
+  const [photoBusy, setPhotoBusy] = useState(false)
 
   const [payOpen, setPayOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [paySaving, setPaySaving] = useState(false)
   const [stageSaving, setStageSaving] = useState<string | null>(null)
+
+  const [expOpen, setExpOpen] = useState(false)
+  const [expAmount, setExpAmount] = useState('')
+  const [expCategory, setExpCategory] = useState('')
+  const [expDesc, setExpDesc] = useState('')
+  const [expSaving, setExpSaving] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [editName, setEditName] = useState('')
@@ -76,12 +96,97 @@ export default function JobDetailScreen() {
 
   const contact = data?.contact ?? null
   const payments = data?.payments ?? []
+  const expenses = data?.expenses ?? []
 
   const totals = useMemo(() => {
     const amount = Number(contact?.amount || 0)
     const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
-    return { amount, paid, balance: Math.max(0, amount - paid) }
-  }, [contact, payments])
+    const spent = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+    return { amount, paid, balance: Math.max(0, amount - paid), spent }
+  }, [contact, payments, expenses])
+
+  async function submitExpense() {
+    const amt = Number(expAmount.replace(/[^0-9.]/g, ''))
+    if (!amt || !contact || !user || expSaving) return
+    setExpSaving(true)
+    const { error } = await addExpense({
+      userId: user.id, contactId: contact.id, amount: amt,
+      category: expCategory.trim() || undefined, description: expDesc.trim() || undefined
+    })
+    setExpSaving(false)
+    if (!error) {
+      setExpOpen(false)
+      setExpAmount(''); setExpCategory(''); setExpDesc('')
+    }
+  }
+
+  async function runPhotoUpload(uri: string) {
+    if (!contact || !user) return
+    setPhotoBusy(true)
+    const { error } = await uploadPhoto({ userId: user.id, jobId: contact.id, uri })
+    setPhotoBusy(false)
+    if (error) Alert.alert("Couldn't upload photo", error.message)
+  }
+
+  async function pickFromLibrary() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access in Settings to attach photos.'); return }
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 })
+    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri)
+  }
+
+  async function takePhoto() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync()
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access in Settings to capture photos.'); return }
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.7 })
+    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri)
+  }
+
+  function addPhoto() {
+    Alert.alert('Add photo', undefined, [
+      { text: 'Take photo', onPress: takePhoto },
+      { text: 'Choose from library', onPress: pickFromLibrary },
+      { text: 'Cancel', style: 'cancel' }
+    ])
+  }
+
+  function confirmDeletePhoto(photoId: string, path: string) {
+    if (!contact) return
+    Alert.alert('Delete photo?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deletePhoto({ id: photoId, path, jobId: contact.id }) }
+    ])
+  }
+
+  function confirmDeletePayment(pid: string) {
+    if (!contact) return
+    Alert.alert('Delete payment?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deletePayment({ id: pid, contactId: contact.id }) }
+    ])
+  }
+
+  function confirmDeleteExpense(eid: string) {
+    if (!contact) return
+    Alert.alert('Delete expense?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteExpense({ id: eid, contactId: contact.id }) }
+    ])
+  }
+
+  function confirmDeleteJob() {
+    if (!contact) return
+    Alert.alert('Delete job?', 'This permanently removes the job and its payments. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          const { error } = await deleteJob(contact.id)
+          if (!error) { setEditOpen(false); router.back() }
+        }
+      }
+    ])
+  }
 
   async function changeStage(next: string) {
     if (!contact || next === contact.stage || stageSaving) return
@@ -175,6 +280,29 @@ export default function JobDetailScreen() {
           })}
         </View>
 
+        {/* Photos */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Photos</Text>
+          <Pressable onPress={addPhoto} disabled={photoBusy} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            {photoBusy ? <ActivityIndicator size="small" color="#E8B865" /> : <Camera color="#E8B865" size={14} />}
+            <Text className="text-gold-bright text-xs font-bold">Add</Text>
+          </Pressable>
+        </View>
+        {photos.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No photos yet.</Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {photos.map((ph) => (
+              <Pressable key={ph.id} onLongPress={() => confirmDeletePhoto(ph.id, ph.path)} delayLongPress={350}>
+                <Image
+                  source={{ uri: ph.url }}
+                  style={{ width: 120, height: 120, borderRadius: 14, backgroundColor: '#1B1816' }}
+                />
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
         {/* Contact actions */}
         {(contact.phone || contact.email) && (
           <View className="flex-row mt-4" style={{ gap: 10 }}>
@@ -204,13 +332,55 @@ export default function JobDetailScreen() {
         ) : (
           <View style={{ gap: 8 }}>
             {payments.map((p) => (
-              <View key={p.id} className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row justify-between">
+              <Pressable
+                key={p.id}
+                onLongPress={() => confirmDeletePayment(p.id)}
+                delayLongPress={350}
+                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row justify-between items-center"
+              >
                 <Text className="text-ink-muted text-sm">
                   {p.paid_on ? new Date(p.paid_on).toLocaleDateString() : '—'} · {p.method || 'payment'}
                 </Text>
                 <Text className="text-ink font-bold">{money(Number(p.amount || 0))}</Text>
-              </View>
+              </Pressable>
             ))}
+            <Text className="text-ink-muted text-[10px] mt-1">Long-press a payment to delete.</Text>
+          </View>
+        )}
+
+        {/* Expenses */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">
+            Expenses{totals.spent ? ` · ${money(totals.spent)}` : ''}
+          </Text>
+          <Pressable onPress={() => setExpOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Plus color="#E8B865" size={14} />
+            <Text className="text-gold-bright text-xs font-bold">Add</Text>
+          </Pressable>
+        </View>
+        {expenses.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No expenses logged.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {expenses.map((e) => (
+              <Pressable
+                key={e.id}
+                onLongPress={() => confirmDeleteExpense(e.id)}
+                delayLongPress={350}
+                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row justify-between items-center"
+              >
+                <View className="flex-1 pr-3">
+                  <Text className="text-ink text-sm font-semibold" numberOfLines={1}>
+                    {e.category || e.description || 'Expense'}
+                  </Text>
+                  <Text className="text-ink-muted text-xs mt-0.5">
+                    {e.expense_date ? new Date(e.expense_date).toLocaleDateString() : '—'}
+                  </Text>
+                </View>
+                <Text className="text-ink font-bold">{money(Number(e.amount || 0))}</Text>
+              </Pressable>
+            ))}
+            <Text className="text-ink-muted text-[10px] mt-1">Long-press an expense to delete.</Text>
           </View>
         )}
       </ScrollView>
@@ -278,6 +448,58 @@ export default function JobDetailScreen() {
               style={{ backgroundColor: editSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
             >
               {editSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save changes</Text>}
+            </Pressable>
+            <Pressable
+              onPress={confirmDeleteJob}
+              className="flex-row items-center justify-center rounded-xl py-3.5 mt-3 border border-[rgba(232,90,87,0.3)]"
+              style={{ gap: 6, backgroundColor: 'rgba(232,90,87,0.10)' }}
+            >
+              <Trash2 color="#f5a294" size={16} />
+              <Text className="text-[#f5a294] font-bold">Delete job</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add expense modal */}
+      <Modal visible={expOpen} transparent animationType="slide" onRequestClose={() => setExpOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setExpOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">Log an expense</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Amount</Text>
+            <TextInput
+              value={expAmount}
+              onChangeText={setExpAmount}
+              keyboardType="decimal-pad"
+              placeholder="$0"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              autoFocus
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Category</Text>
+            <TextInput
+              value={expCategory}
+              onChangeText={setExpCategory}
+              placeholder="Materials, fuel, permit…"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Note (optional)</Text>
+            <TextInput
+              value={expDesc}
+              onChangeText={setExpDesc}
+              placeholder="What was it for?"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+            />
+            <Pressable
+              onPress={submitExpense}
+              disabled={expSaving}
+              className="rounded-xl py-4 items-center"
+              style={{ backgroundColor: expSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+            >
+              {expSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save expense</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>

@@ -35,6 +35,13 @@
           "resizeMode": "contain",
           "imageWidth": 200
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FieldHorse uses your photo library to attach jobsite photos to a job.",
+          "cameraPermission": "FieldHorse uses your camera to capture jobsite photos for a job."
+        }
       ]
     ],
     "experiments": {

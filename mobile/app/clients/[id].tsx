@@ -3,12 +3,16 @@
 // (lifetime value / active jobs), contact actions (call / email), and
 // the list of jobs linked to this client — each tappable through to the
 // job detail. Reuses the shared useClientDetail() hook.
-import { useMemo } from 'react'
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native'
+import { useMemo, useState } from 'react'
+import {
+  View, Text, ScrollView, Pressable, ActivityIndicator, Linking,
+  Modal, KeyboardAvoidingView, Platform, TextInput, Alert
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ChevronLeft, Phone, Mail } from 'lucide-react-native'
-import { useClientDetail } from '../../lib/queries'
+import { ChevronLeft, Phone, Mail, Pencil, Trash2 } from 'lucide-react-native'
+import { useClientDetail, useUpdateClient, useDeleteClient } from '../../lib/queries'
+import { useAuth } from '../../contexts/AuthContext'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E',
@@ -23,11 +27,61 @@ function money(n: number) {
 export default function ClientDetailScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
+  const { user } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending } = useClientDetail(id)
+  const updateClient = useUpdateClient()
+  const deleteClient = useDeleteClient()
 
   const client = data?.client ?? null
   const jobs = data?.jobs ?? []
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [eName, setEName] = useState('')
+  const [eCompany, setECompany] = useState('')
+  const [ePhone, setEPhone] = useState('')
+  const [eEmail, setEEmail] = useState('')
+  const [eAddress, setEAddress] = useState('')
+  const [eNotes, setENotes] = useState('')
+  const [eSaving, setESaving] = useState(false)
+
+  function openEdit() {
+    if (!client) return
+    setEName(client.name || '')
+    setECompany(client.company_name || '')
+    setEPhone(client.phone || '')
+    setEEmail(client.email || '')
+    setEAddress(client.address || '')
+    setENotes(client.notes || '')
+    setEditOpen(true)
+  }
+
+  async function submitEdit() {
+    if (!client || !user || eSaving) return
+    setESaving(true)
+    const { error } = await updateClient({
+      clientId: client.id, userId: user.id,
+      name: eName.trim(), companyName: eCompany.trim() || null,
+      phone: ePhone.trim() || null, email: eEmail.trim() || null,
+      address: eAddress.trim() || null, notes: eNotes.trim() || null
+    })
+    setESaving(false)
+    if (!error) setEditOpen(false)
+  }
+
+  function confirmDelete() {
+    if (!client || !user) return
+    Alert.alert('Delete client?', 'This removes the client record. Their jobs are kept but unlinked. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          const { error } = await deleteClient({ id: client.id, userId: user.id })
+          if (!error) { setEditOpen(false); router.back() }
+        }
+      }
+    ])
+  }
 
   const totals = useMemo(() => {
     const lifetime = jobs.reduce((s, j) => s + Number(j.amount || 0), 0)
@@ -50,10 +104,16 @@ export default function ClientDetailScreen() {
   return (
     <View className="flex-1 bg-bg">
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
-        <Pressable onPress={() => router.back()} className="flex-row items-center mb-4" style={{ gap: 4 }}>
-          <ChevronLeft color="#E8B865" size={20} />
-          <Text className="text-gold-bright font-bold">Clients</Text>
-        </Pressable>
+        <View className="flex-row items-center justify-between mb-4">
+          <Pressable onPress={() => router.back()} className="flex-row items-center" style={{ gap: 4 }}>
+            <ChevronLeft color="#E8B865" size={20} />
+            <Text className="text-gold-bright font-bold">Clients</Text>
+          </Pressable>
+          <Pressable onPress={openEdit} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Pencil color="#E8B865" size={16} />
+            <Text className="text-gold-bright font-bold">Edit</Text>
+          </Pressable>
+        </View>
 
         <Text className="text-ink text-3xl font-bold" numberOfLines={2}>{client.name || 'Unnamed'}</Text>
         {client.company_name ? <Text className="text-ink-muted text-sm mt-1">{client.company_name}</Text> : null}
@@ -121,6 +181,77 @@ export default function ClientDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Edit client modal */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setEditOpen(false)} />
+          <ScrollView
+            className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]"
+            contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }}
+            style={{ maxHeight: '85%' }}
+          >
+            <Text className="text-ink text-xl font-bold mb-5">Edit client</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+            <TextInput
+              value={eName} onChangeText={setEName}
+              placeholder="Client name" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Company</Text>
+            <TextInput
+              value={eCompany} onChangeText={setECompany}
+              placeholder="Company (optional)" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <View className="flex-row mb-4" style={{ gap: 12 }}>
+              <View className="flex-1">
+                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Phone</Text>
+                <TextInput
+                  value={ePhone} onChangeText={setEPhone} keyboardType="phone-pad"
+                  placeholder="(555) 555-5555" placeholderTextColor="rgba(242,237,228,0.4)"
+                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                />
+              </View>
+            </View>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Email</Text>
+            <TextInput
+              value={eEmail} onChangeText={setEEmail} keyboardType="email-address" autoCapitalize="none"
+              placeholder="name@email.com" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Address</Text>
+            <TextInput
+              value={eAddress} onChangeText={setEAddress}
+              placeholder="Job site or billing address" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Notes</Text>
+            <TextInput
+              value={eNotes} onChangeText={setENotes} multiline
+              placeholder="Anything worth remembering" placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              style={{ minHeight: 72, textAlignVertical: 'top' }}
+            />
+            <Pressable
+              onPress={submitEdit}
+              disabled={eSaving}
+              className="rounded-xl py-4 items-center"
+              style={{ backgroundColor: eSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+            >
+              {eSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save changes</Text>}
+            </Pressable>
+            <Pressable
+              onPress={confirmDelete}
+              className="flex-row items-center justify-center rounded-xl py-3.5 mt-3 border border-[rgba(232,90,87,0.3)]"
+              style={{ gap: 6, backgroundColor: 'rgba(232,90,87,0.10)' }}
+            >
+              <Trash2 color="#f5a294" size={16} />
+              <Text className="text-[#f5a294] font-bold">Delete client</Text>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   )
 }
