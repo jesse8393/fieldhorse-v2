@@ -4,11 +4,15 @@
 // just rendered with React Native primitives + NativeWind classes
 // instead of divs + inline styles.
 import { useMemo, useState } from 'react'
-import { View, Text, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native'
+import {
+  View, Text, FlatList, Pressable, TextInput, ActivityIndicator,
+  Modal, KeyboardAvoidingView, Platform
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
+import { Plus } from 'lucide-react-native'
 import { useQueryClient } from '@tanstack/react-query'
-import { useJobs, useJobsRealtime, type JobRow } from '../../lib/queries'
+import { useJobs, useJobsRealtime, useCreateLead, type JobRow } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 
 const STAGE_TINT: Record<string, string> = {
@@ -36,7 +40,26 @@ export default function JobsScreen() {
   const { user } = useAuth()
   const { data: jobs = [], isLoading } = useJobs()
   useJobsRealtime(user?.id, queryClient)
+  const createLead = useCreateLead()
   const [search, setSearch] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
+  const [leadName, setLeadName] = useState('')
+  const [leadAmount, setLeadAmount] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function submitLead() {
+    if (!leadName.trim() || !user || saving) return
+    setSaving(true)
+    const amt = Number(leadAmount.replace(/[^0-9.]/g, '')) || undefined
+    const { id, error } = await createLead({ userId: user.id, name: leadName.trim(), amount: amt })
+    setSaving(false)
+    if (!error) {
+      setAddOpen(false)
+      setLeadName('')
+      setLeadAmount('')
+      if (id) router.push(`/jobs/${id}`)
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -80,6 +103,55 @@ export default function JobsScreen() {
           }
         />
       )}
+
+      {/* Floating add button */}
+      <Pressable
+        onPress={() => setAddOpen(true)}
+        className="absolute items-center justify-center rounded-full"
+        style={{
+          right: 20, bottom: insets.bottom + 20, width: 56, height: 56,
+          backgroundColor: '#E8B865', shadowColor: '#000', shadowOpacity: 0.4,
+          shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8
+        }}
+      >
+        <Plus color="#1A120A" size={26} strokeWidth={2.6} />
+      </Pressable>
+
+      {/* New lead modal */}
+      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setAddOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">New lead</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+            <TextInput
+              value={leadName}
+              onChangeText={setLeadName}
+              placeholder="Homeowner or company"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              autoFocus
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Estimated value (optional)</Text>
+            <TextInput
+              value={leadAmount}
+              onChangeText={setLeadAmount}
+              keyboardType="decimal-pad"
+              placeholder="$0"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+            />
+            <Pressable
+              onPress={submitLead}
+              disabled={saving}
+              className="rounded-xl py-4 items-center"
+              style={{ backgroundColor: saving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+            >
+              {saving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create lead</Text>}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   )
 }

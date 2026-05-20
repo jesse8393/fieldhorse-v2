@@ -173,3 +173,33 @@ export function useLogPayment() {
     return { error }
   }
 }
+
+// ---- Create lead ----
+// Insert a new fh_contacts row at a chosen stage, then invalidate the
+// jobs list. Mirrors the web NewLeadSheet's minimal create path.
+export type NewLeadInput = {
+  userId: string
+  name: string
+  phone?: string
+  email?: string
+  jobType?: string
+  amount?: number
+  stage?: string
+}
+
+export function useCreateLead() {
+  const client = useQueryClient()
+  return async (input: NewLeadInput) => {
+    const { data, error } = await supabase.from('fh_contacts').insert({
+      user_id: input.userId,
+      name: input.name,
+      phone: input.phone || null,
+      email: input.email || null,
+      job_type: input.jobType || null,
+      amount: input.amount ?? null,
+      stage: input.stage || 'lead'
+    } as any).select('id').single()
+    if (!error) client.invalidateQueries({ queryKey: queryKeys.jobs })
+    return { id: (data as any)?.id as string | undefined, error }
+  }
+}
