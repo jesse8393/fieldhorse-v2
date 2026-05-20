@@ -1,7 +1,9 @@
 // Fieldhorse icon system — 24px viewBox, 1.5px stroke, currentColor
 // Unified export. <Icon name="home" size={22} />
 
-const ICONS = {
+import type { ReactNode, SVGProps } from 'react'
+
+const ICONS: Record<string, ReactNode> = {
   // Nav
   home: (
     <>
@@ -290,7 +292,13 @@ const ICONS = {
   )
 }
 
-export default function Icon({ name, size = 22, strokeWidth = 1.5, className = '', style, ...rest }) {
+type IconProps = SVGProps<SVGSVGElement> & {
+  name: string
+  size?: number
+  strokeWidth?: number
+}
+
+export default function Icon({ name, size = 22, strokeWidth = 1.5, className = '', style, ...rest }: IconProps) {
   const content = ICONS[name]
   if (!content) return null
   return (

@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
-import App from './App.jsx'
+import App from './App.tsx'
 import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { ConfirmProvider } from './components/ConfirmSheet.jsx'
 import { AuthProvider } from './contexts/AuthContext.tsx'
@@ -52,7 +52,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <BrowserRouter

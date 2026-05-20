@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import type { ReactNode } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext.tsx'
 import { useProfile } from './contexts/ProfileContext.tsx'
@@ -37,21 +38,21 @@ const SubDetail      = lazy(() => import('./screens/SubDetail.jsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.jsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.jsx'))
 
-function RequireAuth({ children }) {
+function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   if (loading) return null
   if (!session) return <Navigate to="/login" replace />
   return children
 }
 
-function RequireOnboarded({ children }) {
+function RequireOnboarded({ children }: { children: ReactNode }) {
   const { loading, isOnboarded } = useProfile()
   if (loading) return null
   if (!isOnboarded) return <Navigate to="/onboarding" replace />
   return children
 }
 
-function Gated({ children }) {
+function Gated({ children }: { children: ReactNode }) {
   return (
     <RequireAuth>
       <RequireOnboarded>{children}</RequireOnboarded>
