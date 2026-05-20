@@ -23,31 +23,26 @@
 // cached for the session — a transient failure won't retry on every
 // Preview / Download / Send. Operators can refresh to retry.
 
-const cache = new Map()
+export type LogoDescriptor = { dataUrl: string; format: 'PNG'; width: number; height: number }
+
+const cache = new Map<string, Promise<LogoDescriptor | null>>()
 
 /**
  * Load a logo and return a jsPDF-compatible image descriptor.
- *
- * @param {string} logoUrl                       signed URL from profiles.logo_url
- * @param {object} [opts]
- * @param {number} [opts.maxDimension=720]       max width or height (px) of the
- *                                               rasterized output. Keeps PDF
- *                                               size sane for large uploads.
- * @param {number} [opts.timeoutMs=8000]         abort fetch after this many ms.
- * @returns {Promise<{ dataUrl: string, format: 'PNG', width: number, height: number } | null>}
  */
-export function loadLogoForPdf(logoUrl, { maxDimension = 720, timeoutMs = 8000 } = {}) {
+export function loadLogoForPdf(logoUrl: string | null | undefined, { maxDimension = 720, timeoutMs = 8000 }: { maxDimension?: number; timeoutMs?: number } = {}): Promise<LogoDescriptor | null> {
   if (!logoUrl || typeof logoUrl !== 'string') return Promise.resolve(null)
 
   const key = `${maxDimension}:${logoUrl}`
-  if (cache.has(key)) return cache.get(key)
+  const cached = cache.get(key)
+  if (cached) return cached
 
   const p = doLoad(logoUrl, maxDimension, timeoutMs).catch(() => null)
   cache.set(key, p)
   return p
 }
 
-async function doLoad(url, maxDimension, timeoutMs) {
+async function doLoad(url: string, maxDimension: number, timeoutMs: number): Promise<LogoDescriptor | null> {
   const blob = await fetchWithTimeout(url, timeoutMs)
   if (!blob) return null
 
@@ -79,7 +74,7 @@ async function doLoad(url, maxDimension, timeoutMs) {
       return null
     }
 
-    let dataUrl
+    let dataUrl: string
     try {
       dataUrl = canvas.toDataURL('image/png')
     } catch (e) {
@@ -90,13 +85,13 @@ async function doLoad(url, maxDimension, timeoutMs) {
     }
     if (!dataUrl || dataUrl === 'data:,') return null
 
-    return { dataUrl, format: 'PNG', width: targetW, height: targetH }
+    return { dataUrl, format: 'PNG' as const, width: targetW, height: targetH }
   } finally {
     URL.revokeObjectURL(objectUrl)
   }
 }
 
-function fetchWithTimeout(url, timeoutMs) {
+function fetchWithTimeout(url: string, timeoutMs: number): Promise<Blob | null> {
   return new Promise((resolve) => {
     const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null
     const timer = setTimeout(() => {
@@ -127,7 +122,7 @@ function fetchWithTimeout(url, timeoutMs) {
   })
 }
 
-function loadImage(src) {
+function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'

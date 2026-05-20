@@ -13,7 +13,7 @@
 // render the same code path the browser uses.
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.js'
+import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
 import {
   invoiceNumber as docInvoiceNumber,
   proposalNumber as docProposalNumber

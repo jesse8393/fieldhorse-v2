@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { supabase } from '../lib/supabase.js'
-import { getWeather, MURFREESBORO } from '../lib/weather.js'
+import { getWeather, MURFREESBORO } from '../lib/weather.ts'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import CountUp from '../components/fx/CountUp.jsx'

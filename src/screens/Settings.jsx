@@ -7,7 +7,7 @@ import RateCardEditor from '../components/settings/RateCardEditor.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
-import { reverseGeocode } from '../lib/weather.js'
+import { reverseGeocode } from '../lib/weather.ts'
 // useTheme import removed 5/17 with APPEARANCE section — restore alongside
 // the toggle when full light-theme parity ships.
 // import { useTheme } from '../contexts/ThemeContext.jsx'
@@ -196,7 +196,7 @@ export default function Settings() {
 
   // Reverse-geocode the saved coords so the Settings location card
   // surfaces "Murfreesboro, TN" instead of the raw 35.838 / -86.470
-  // figures the 5/13 audit flagged. Helper lives in lib/weather.js
+  // figures the 5/13 audit flagged. Helper lives in lib/weather.ts
   // (used by Forecast page already) with a per-coord cache so the
   // fetch only fires once per coord pair per session.
   const [locationLabel, setLocationLabel] = useState('')
