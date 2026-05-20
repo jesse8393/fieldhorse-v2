@@ -1024,3 +1024,34 @@ export function useAgenda(userId: string | undefined) {
     enabled: !!userId
   })
 }
+
+// ---- Cover photos (latest photo per job, batch-signed) ----
+// Mirrors the web fetchCoverPhotosByJob: one query for all the user's
+// photos + ONE batch signed-URL call. Returns jobId -> signed URL.
+export function useCoverPhotos(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['coverPhotos', userId],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data: photos } = await supabase
+        .from('fh_job_files')
+        .select('job_id, storage_path, uploaded_at')
+        .eq('user_id', userId as string)
+        .eq('kind', 'photo')
+        .order('uploaded_at', { ascending: false })
+      if (!photos || photos.length === 0) return {}
+      const pathByJob = new Map<string, string>()
+      for (const p of photos as any[]) {
+        if (p.job_id && p.storage_path && !pathByJob.has(p.job_id)) pathByJob.set(p.job_id, p.storage_path)
+      }
+      const uniquePaths = Array.from(new Set(pathByJob.values()))
+      if (uniquePaths.length === 0) return {}
+      const { data: signed } = await supabase.storage.from('job-photos').createSignedUrls(uniquePaths, 3600)
+      const urlByPath = new Map<string, string>()
+      for (const s of signed ?? []) { if (s?.path && s.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl) }
+      const out: Record<string, string> = {}
+      for (const [jobId, path] of pathByJob.entries()) { const u = urlByPath.get(path); if (u) out[jobId] = u }
+      return out
+    },
+    enabled: !!userId
+  })
+}
