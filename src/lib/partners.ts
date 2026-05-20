@@ -1,4 +1,4 @@
-// src/lib/partners.js
+// src/lib/partners.ts
 //
 // Partner-roster helpers for the InvitePartnerSheet "past partners"
 // suggestion strip. RLS already scopes fh_job_partners to the inviter,
@@ -8,6 +8,48 @@
 import { supabase } from './supabase.js'
 
 export const PARTNER_ROLES = ['Foreman', 'Sub', 'Estimator', 'Other']
+
+export type PartnerJob = {
+  partnerId: string
+  id: string | null
+  name: string | null
+  jobTitle: string | null
+  stage: string | null
+  status: string
+  role: string | null
+}
+
+export type PartnerEntry = {
+  email: string
+  name: string
+  role: string
+  status: string
+  lastInvitedAt: string | null
+  jobs: PartnerJob[]
+}
+
+export type PastPartner = {
+  email: string
+  name: string
+  role: string
+  status: string
+  lastInvitedAt: string | null
+  jobCount: number
+}
+
+// Row shape from the embedded-join select below. The joined fh_contacts
+// is a single related row (or null) under the FK alias.
+type PartnerDirectoryRow = {
+  id: string
+  partner_email: string | null
+  partner_name: string | null
+  partner_role: string | null
+  status: string | null
+  invited_at: string | null
+  accepted_at: string | null
+  job_id: string | null
+  fh_contacts: { id: string; name: string | null; job_title: string | null; stage: string | null } | null
+}
 
 // Full partner roster across every job the operator owns. Groups by
 // normalized email so a single person who's on three jobs shows as
@@ -24,7 +66,7 @@ export const PARTNER_ROLES = ['Foreman', 'Sub', 'Estimator', 'Other']
 //
 // Pulls every row tied to invited_by_user_id (RLS enforces tenant
 // isolation). Joins fh_contacts inline for job name + stage.
-export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 500 } = {}) {
+export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 500 }: { includeRevoked?: boolean; limitRows?: number } = {}): Promise<PartnerEntry[]> {
   const sel = [
     'id', 'partner_email', 'partner_name', 'partner_role',
     'status', 'invited_at', 'accepted_at', 'job_id',
@@ -39,8 +81,9 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
 
   if (error || !Array.isArray(data)) return []
 
-  const byEmail = new Map()
-  for (const row of data) {
+  const rows = data as unknown as PartnerDirectoryRow[]
+  const byEmail = new Map<string, PartnerEntry>()
+  for (const row of rows) {
     if (!row?.partner_email) continue
     if (!includeRevoked && row.status === 'revoked') continue
     const email = String(row.partner_email).toLowerCase()
@@ -63,7 +106,7 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
         jobs: [jobEntry]
       })
     } else {
-      const e = byEmail.get(email)
+      const e = byEmail.get(email)!
       e.jobs.push(jobEntry)
       if (!e.name && row.partner_name) e.name = row.partner_name
       if (!e.role && row.partner_role) e.role = row.partner_role
@@ -75,18 +118,18 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
     }
   }
   return Array.from(byEmail.values())
-    .sort((a, b) => new Date(b.lastInvitedAt || 0) - new Date(a.lastInvitedAt || 0))
+    .sort((a, b) => new Date(b.lastInvitedAt || 0).getTime() - new Date(a.lastInvitedAt || 0).getTime())
 }
 
-function rollupStatus(a, b) {
-  const rank = { accepted: 4, pending: 3, revoked: 2, declined: 1 }
-  return (rank[b] || 0) > (rank[a] || 0) ? b : a
+function rollupStatus(a: string, b: string | null | undefined) {
+  const rank: Record<string, number> = { accepted: 4, pending: 3, revoked: 2, declined: 1 }
+  return (rank[b || ''] || 0) > (rank[a] || 0) ? (b as string) : a
 }
 
 // Flip a single partner row to status='revoked'. RLS keeps cross-tenant
 // updates from succeeding; we still scope by partnerId only because the
 // caller already proved ownership by being signed in.
-export async function revokePartnerRow(partnerId) {
+export async function revokePartnerRow(partnerId: string | undefined) {
   if (!partnerId) throw new Error('revokePartnerRow: partnerId required')
   const { error } = await supabase
     .from('fh_job_partners')
@@ -97,7 +140,7 @@ export async function revokePartnerRow(partnerId) {
 
 // Returns at most `limit` distinct past partners (by email), newest-first.
 // Each entry: { email, name, role, lastInvitedAt, status, jobCount }.
-export async function loadPastPartners({ excludeJobId = null, limit = 8 } = {}) {
+export async function loadPastPartners({ excludeJobId = null, limit = 8 }: { excludeJobId?: string | null; limit?: number } = {}): Promise<PastPartner[]> {
   const { data, error } = await supabase
     .from('fh_job_partners')
     .select('partner_email, partner_name, partner_role, status, invited_at, accepted_at, job_id')
@@ -107,7 +150,7 @@ export async function loadPastPartners({ excludeJobId = null, limit = 8 } = {}) 
 
   if (error || !Array.isArray(data)) return []
 
-  const byEmail = new Map()
+  const byEmail = new Map<string, PastPartner>()
   for (const row of data) {
     if (!row?.partner_email) continue
     if (excludeJobId && row.job_id === excludeJobId) continue

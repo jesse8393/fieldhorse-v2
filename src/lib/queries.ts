@@ -20,8 +20,8 @@ import {
   type QueryClient
 } from '@tanstack/react-query'
 import { supabase } from './supabase.js'
-import { fetchCoverPhotosByJob } from './photos.js'
-import { loadPartnerDirectory } from './partners.js'
+import { fetchCoverPhotosByJob } from './photos.ts'
+import { loadPartnerDirectory } from './partners.ts'
 import type { Database } from './database.types.ts'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -419,7 +419,7 @@ export function useNotesBundle(userId: string | undefined) {
 
 // ---- Partners ----
 // The partner directory (one row per partner, with their jobs nested)
-// is assembled by loadPartnerDirectory from lib/partners.js. Wrapped in
+// is assembled by loadPartnerDirectory from lib/partners.ts. Wrapped in
 // a query so the screen drops its useState/load/useEffect plumbing;
 // includeRevoked is fixed so revoked rows can be filtered client-side.
 

@@ -25,7 +25,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticTap } from '../lib/haptics.js'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'
-import { loadPastPartners, PARTNER_ROLES } from '../lib/partners.js'
+import { loadPastPartners, PARTNER_ROLES } from '../lib/partners.ts'
 
 function friendlyInviteError(code) {
   if (code === 'server_misconfigured') return "Server isn't set up — missing Supabase keys in Netlify env."

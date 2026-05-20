@@ -1,4 +1,4 @@
-// src/lib/publicLink.js
+// src/lib/publicLink.ts
 //
 // Mint, fetch, and revoke fh_public_links rows from any in-app
 // surface (Quote tab, InvoiceDetail, future surfaces). Tokens are
@@ -21,17 +21,18 @@ function randomToken() {
   return out
 }
 
+export type PublicLinkKind = 'proposal' | 'invoice'
+
 /**
  * Create a new public link for the given contact. Returns the full
  * row including the token + the public URL ready to share.
- *
- * @param {object} opts
- * @param {string} opts.contactId
- * @param {string} opts.userId
- * @param {'proposal'|'invoice'} opts.kind
- * @param {Date|null} [opts.expiresAt]  optional expiry
  */
-export async function mintPublicLink({ contactId, userId, kind, expiresAt = null }) {
+export async function mintPublicLink({ contactId, userId, kind, expiresAt = null }: {
+  contactId: string | undefined
+  userId: string | undefined
+  kind: PublicLinkKind
+  expiresAt?: Date | null
+}) {
   if (!contactId || !userId || !kind) throw new Error('contactId, userId, kind required')
   if (kind !== 'proposal' && kind !== 'invoice') throw new Error(`unknown kind: ${kind}`)
   const token = randomToken()
@@ -58,7 +59,7 @@ export async function mintPublicLink({ contactId, userId, kind, expiresAt = null
  * the link works regardless of the deploy environment (Netlify
  * preview, production, localhost).
  */
-export function buildPublicUrl(token) {
+export function buildPublicUrl(token: string) {
   if (typeof window === 'undefined') return `/p/${token}`
   return `${window.location.origin}/p/${token}`
 }
@@ -68,7 +69,7 @@ export function buildPublicUrl(token) {
  * Caller uses this to surface "X active share link(s)" + a revoke
  * action on detail surfaces.
  */
-export async function listPublicLinks(contactId) {
+export async function listPublicLinks(contactId: string | undefined) {
   if (!contactId) return []
   const { data } = await supabase
     .from('fh_public_links')
@@ -79,7 +80,7 @@ export async function listPublicLinks(contactId) {
   return data || []
 }
 
-export async function revokePublicLink(linkId) {
+export async function revokePublicLink(linkId: string | undefined) {
   if (!linkId) return false
   const { error } = await supabase
     .from('fh_public_links')
