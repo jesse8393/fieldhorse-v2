@@ -49,24 +49,24 @@ const SCOPE_SECTIONS = [
  *   - Lightbox with swipe-between + caption editor.
  *   - Compare mode: select 2 photos, drag the before/after slider.
  */
-export default function PhotosSection({ jobId, userId }) {
-  const [rows, setRows] = useState([])
-  const [thumbUrls, setThumbUrls] = useState({}) // { [rowId]: signedUrl }
+export default function PhotosSection({ jobId, userId }: any) {
+  const [rows, setRows] = useState<any[]>([])
+  const [thumbUrls, setThumbUrls] = useState<any>({}) // { [rowId]: signedUrl }
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [captioningIds, setCaptioningIds] = useState(() => new Set())
   // Destructive-confirm sheet state for delete photo.
-  const [pendingDelete, setPendingDelete] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
 
   const [lightboxIdx, setLightboxIdx] = useState(-1)
   const [lightboxUrl, setLightboxUrl] = useState('')
 
   const [compareMode, setCompareMode] = useState(false)
-  const [compareBefore, setCompareBefore] = useState(null)
-  const [compareAfter, setCompareAfter] = useState(null)
+  const [compareBefore, setCompareBefore] = useState<any>(null)
+  const [compareAfter, setCompareAfter] = useState<any>(null)
 
-  const inputRef = useRef(null)
+  const inputRef = useRef<any>(null)
 
   const fetchRows = useCallback(async () => {
     if (!jobId || !userId) return
@@ -88,7 +88,7 @@ export default function PhotosSection({ jobId, userId }) {
       const { data: signed } = await supabase.storage
         .from(BUCKET)
         .createSignedUrls(paths, 3600)
-      const next = {}
+      const next: Record<string, any> = {}
       const byPath = new Map()
       for (const s of signed || []) {
         if (s?.signedUrl && !s.error) byPath.set(s.path, s.signedUrl)
@@ -107,11 +107,11 @@ export default function PhotosSection({ jobId, userId }) {
 
   function pick() { inputRef.current?.click() }
 
-  async function handleFile(e) {
-    const files = Array.from(e.target.files || [])
+  async function handleFile(e: any) {
+    const files: any[] = Array.from(e.target.files || [])
     if (files.length === 0) return
     setUploading(true)
-    const newPhotoIds = []
+    const newPhotoIds: any[] = []
     try {
       for (const file of files) {
         if (file.size > MAX_BYTES) {
@@ -123,10 +123,10 @@ export default function PhotosSection({ jobId, userId }) {
         // jobsite photos. Orientation is preserved because the browser
         // auto-rotates pixels at <img> decode time. Storage gets a
         // ~1.5MB JPEG instead of the original 3-8MB raw file.
-        let uploadBlob
+        let uploadBlob: any
         try {
           uploadBlob = await compressImageToBlob(file, 1_500_000, 1800)
-        } catch (ex) {
+        } catch (ex: any) {
           toastError("Couldn't process photo", ex?.message || `${file.name} skipped`)
           continue
         }
@@ -163,7 +163,7 @@ export default function PhotosSection({ jobId, userId }) {
           captionAndPersist(id, file)
         }
       }
-    } catch (ex) {
+    } catch (ex: any) {
       toastError('Upload failed', ex?.message || 'Try again')
     } finally {
       setUploading(false)
@@ -171,7 +171,7 @@ export default function PhotosSection({ jobId, userId }) {
     }
   }
 
-  async function captionAndPersist(rowId, file) {
+  async function captionAndPersist(rowId: any, file: any) {
     try {
       const dataUrl = await compressImageToDataUrl(file, 900_000, 1280)
       const cap = await captionPhoto(dataUrl)
@@ -195,7 +195,7 @@ export default function PhotosSection({ jobId, userId }) {
     }
   }
 
-  async function saveCaption(rowId, nextCaption) {
+  async function saveCaption(rowId: any, nextCaption: any) {
     const trimmed = (nextCaption || '').trim()
     setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, caption: trimmed || null } : r))
     const { error } = await supabase
@@ -211,7 +211,7 @@ export default function PhotosSection({ jobId, userId }) {
   // to the matching ScopeSectionCard so the customer sees evidence per
   // trade. Column added by migration 020; the PDF loader falls back to
   // the photo caption for older rows.
-  async function saveSectionTag(rowId, nextTag) {
+  async function saveSectionTag(rowId: any, nextTag: any) {
     const trimmed = (nextTag || '').trim()
     setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, section_tag: trimmed || null } : r))
     const { error } = await supabase
@@ -224,7 +224,7 @@ export default function PhotosSection({ jobId, userId }) {
 
   // Open the destructive-confirm sheet for this photo. The actual
   // storage + db delete happens in confirmRemove on commit.
-  function remove(row) {
+  function remove(row: any) {
     if (!row) return
     setPendingDelete(row)
   }
@@ -238,7 +238,7 @@ export default function PhotosSection({ jobId, userId }) {
       await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
       toastSuccess('Deleted', row.filename)
       await fetchRows()
-    } catch (ex) {
+    } catch (ex: any) {
       toastError('Delete failed', ex?.message || 'Try again')
     } finally {
       setDeleting(false)
@@ -246,13 +246,13 @@ export default function PhotosSection({ jobId, userId }) {
     }
   }
 
-  async function urlFor(row) {
+  async function urlFor(row: any) {
     if (thumbUrls[row.id]) return thumbUrls[row.id]
     const { data } = await supabase.storage.from(BUCKET).createSignedUrl(row.storage_path, 3600)
     return data?.signedUrl || ''
   }
 
-  async function openLightbox(idx) {
+  async function openLightbox(idx: any) {
     const row = rows[idx]
     if (!row) return
     setLightboxIdx(idx)
@@ -265,7 +265,7 @@ export default function PhotosSection({ jobId, userId }) {
     setLightboxUrl('')
   }
 
-  async function goLightbox(delta) {
+  async function goLightbox(delta: any) {
     const next = lightboxIdx + delta
     if (next < 0 || next >= rows.length) return
     setLightboxUrl('')
@@ -274,7 +274,7 @@ export default function PhotosSection({ jobId, userId }) {
     setLightboxUrl(url)
   }
 
-  async function handleThumbTap(row) {
+  async function handleThumbTap(row: any) {
     hapticTap()
     if (!compareMode) {
       const idx = rows.findIndex((r) => r.id === row.id)
@@ -504,8 +504,8 @@ export default function PhotosSection({ jobId, userId }) {
             onPrev={() => goLightbox(-1)}
             onNext={() => goLightbox(1)}
             onClose={closeLightbox}
-            onSaveCaption={(c) => saveCaption(lightboxRow.id, c)}
-            onSaveSectionTag={(t) => saveSectionTag(lightboxRow.id, t)}
+            onSaveCaption={(c: any) => saveCaption(lightboxRow.id, c)}
+            onSaveSectionTag={(t: any) => saveSectionTag(lightboxRow.id, t)}
             onDelete={() => { closeLightbox(); remove(lightboxRow) }}
           />
         )}
@@ -539,7 +539,7 @@ export default function PhotosSection({ jobId, userId }) {
    PhotoLightbox — full-screen image with caption editor + nav
    ============================================================ */
 
-function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete }) {
+function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete }: any) {
   const [caption, setCaption] = useState(row.caption || '')
   const [sectionTag, setSectionTag] = useState(row.section_tag || '')
   const [customTag, setCustomTag] = useState('')
@@ -553,7 +553,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
     setCustomTag(tag && !SCOPE_SECTIONS.includes(tag) ? tag : '')
   }, [row.id, row.caption, row.section_tag])
 
-  function pickSection(value) {
+  function pickSection(value: any) {
     if (value === '__custom__') {
       setShowCustom(true)
       return
@@ -812,11 +812,11 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
    BeforeAfterSlider — drag a vertical divider to wipe between two photos
    ============================================================ */
 
-function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }) {
-  const containerRef = useRef(null)
+function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any) {
+  const containerRef = useRef<any>(null)
   const [pct, setPct] = useState(50)
 
-  function onMove(clientX) {
+  function onMove(clientX: any) {
     const el = containerRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()

@@ -1,4 +1,4 @@
-// src/screens/ContactDetail/sections/InvoiceDrawsSection.jsx
+// src/screens/ContactDetail/sections/InvoiceDrawsSection.tsx
 //
 // Progress-billing surface. Lists every fh_invoices row (draw) issued
 // against the contract and lets the contractor add, edit, download
@@ -27,7 +27,7 @@ import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, {
     style: 'currency', currency: 'USD',
@@ -35,43 +35,43 @@ function money(n) {
   })
 }
 
-function shortDate(iso) {
+function shortDate(iso: any) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function isoFromDateInput(s) {
+function isoFromDateInput(s: any) {
   if (!s) return null
   return new Date(s + 'T00:00:00').toISOString()
 }
 
-function dateInputFromIso(iso) {
+function dateInputFromIso(iso: any) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toISOString().slice(0, 10)
 }
 
-export default function InvoiceDrawsSection({ contact, payments = [], changeOrders = [], insurance = null, userId }) {
+export default function InvoiceDrawsSection({ contact, payments = [], changeOrders = [], insurance = null, userId }: any) {
   const { profile } = useProfile()
   const { user } = useAuth()
-  const [draws, setDraws] = useState([])
+  const [draws, setDraws] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [editingId, setEditingId] = useState(null)
+  const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
-  const [busyId, setBusyId] = useState(null)
+  const [busyId, setBusyId] = useState<any>(null)
   const isOwner = contact && contact.user_id === userId
 
   // Resolved contract total = contact.amount + approved change-order
   // adjustments. Mirrors the math in InvoiceTemplate so on-screen +
   // PDF balance summaries match.
   const approvedCOAdjustment = (changeOrders || [])
-    .filter((co) => co?.status === 'approved')
-    .reduce((s, co) => s + Number(co.amount || 0), 0)
+    .filter((co: any) => co?.status === 'approved')
+    .reduce((s: any, co: any) => s + Number(co.amount || 0), 0)
   const contractTotal = Number(contact?.amount || 0) + approvedCOAdjustment
-  const previouslyPaid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+  const previouslyPaid = (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
   const drawsIssued = draws
     .filter((d) => d.status !== 'void')
     .reduce((s, d) => s + Number(d.amount || 0), 0)
@@ -91,7 +91,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
   useEffect(() => { fetchDraws() }, [contact?.id])
 
-  async function handleSave(payload) {
+  async function handleSave(payload: any) {
     if (!contact?.id || !userId) return false
     try {
       const row = {
@@ -123,7 +123,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       toastSuccess(payload.id ? 'Draw updated' : 'Draw added', `Draw #${res.data?.sequence_number || ''}`.trim())
       await fetchDraws()
       return true
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't save draw", e?.message || 'Try again.')
       return false
     }
@@ -181,14 +181,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         `Pre-filled from ${schedule.map((s) => `${s.pct}%`).join(' / ')} payment terms`
       )
       await fetchDraws()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't generate draws", e?.message || 'Try again.')
     } finally {
       setBusyId(null)
     }
   }
 
-  async function handleMarkPaid(draw) {
+  async function handleMarkPaid(draw: any) {
     if (!draw?.id) return
     setBusyId(draw.id)
     try {
@@ -199,14 +199,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       if (error) throw error
       toastSuccess('Marked paid', `Draw #${draw.sequence_number}`)
       await fetchDraws()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't update", e?.message || 'Try again.')
     } finally {
       setBusyId(null)
     }
   }
 
-  async function handleVoid(draw) {
+  async function handleVoid(draw: any) {
     if (!window.confirm(`Void Draw #${draw.sequence_number}? It will stop counting toward the unbilled total.`)) return
     setBusyId(draw.id)
     try {
@@ -217,14 +217,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       if (error) throw error
       toastSuccess('Draw voided', `Draw #${draw.sequence_number}`)
       await fetchDraws()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't void", e?.message || 'Try again.')
     } finally {
       setBusyId(null)
     }
   }
 
-  async function handleDelete(draw) {
+  async function handleDelete(draw: any) {
     if (!window.confirm(`Delete Draw #${draw.sequence_number}? This cannot be undone.`)) return
     try {
       const { error } = await supabase
@@ -234,7 +234,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       if (error) throw error
       toastSuccess('Draw deleted', '')
       await fetchDraws()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't delete", e?.message || 'Try again.')
     }
   }
@@ -243,7 +243,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
     phone: profile?.company_phone || '',
-    email: profile?.company_email || profile?.email || '',
+    email: profile?.company_email || (profile as any)?.email || '',
     website: profile?.company_website || '',
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
@@ -255,7 +255,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   // and Send (upload to job-files + POST to /api/send-invoice). The
   // job_title slot carries "Draw N of M — {label}" so the invoice
   // letterhead title reflects which draw the customer is receiving.
-  async function buildDrawPdf(draw) {
+  async function buildDrawPdf(draw: any) {
     const allActiveDraws = draws.filter((d) => d.status !== 'void')
     const drawCount = allActiveDraws.length
     const drawTitle = draw.title?.trim()
@@ -287,14 +287,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       previouslyPaid,
       insurance,
       changeOrders
-    })
+    } as any)
   }
 
   // Build a single-draw PDF — reuses generateInvoice with this draw's
   // amount routed to thisInvoice + balanceRemaining computed from the
   // current paid total. Lets each draw print its own letterhead with
   // "Draw N of M" stamped in the title.
-  async function handleDownload(draw) {
+  async function handleDownload(draw: any) {
     if (busyId) return
     setBusyId(draw.id)
     try {
@@ -302,7 +302,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
       toastSuccess('Draw PDF downloaded', result.filename)
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't generate PDF", e?.message || 'Try again.')
     } finally {
       setBusyId(null)
@@ -318,7 +318,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   // resolution lives at this surface (uses the linked client's email
   // as fallback when the contact row's email is empty, matching the
   // pattern in Invoices.jsx).
-  async function handleSend(draw) {
+  async function handleSend(draw: any) {
     if (busyId) return
     if (!user?.id) return
     // Use contact.email directly. The fh_clients-join fallback the
@@ -360,7 +360,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           size_bytes: blob.size || 0,
           kind: 'file'
         })
-      } catch (e) {
+      } catch (e: any) {
         console.warn('[draw] fh_job_files row insert failed', e)
       }
 
@@ -406,7 +406,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       }
       toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
       await fetchDraws()
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't send draw", e?.message || 'Try again.')
     } finally {
       setBusyId(null)
@@ -453,7 +453,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
             due_at: null,
             notes: ''
           }}
-          onSave={async (payload) => { const ok = await handleSave(payload); if (ok) setCreating(false) }}
+          onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setCreating(false) }}
           onCancel={() => setCreating(false)}
         />
       )}
@@ -466,9 +466,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           draws={draws}
           editingId={editingId}
           busyId={busyId}
-          onEdit={(id) => setEditingId(id)}
+          onEdit={(id: any) => setEditingId(id)}
           onCancelEdit={() => setEditingId(null)}
-          onSave={async (payload) => { const ok = await handleSave(payload); if (ok) setEditingId(null) }}
+          onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setEditingId(null) }}
           onMarkPaid={handleMarkPaid}
           onVoid={handleVoid}
           onDelete={handleDelete}
@@ -482,7 +482,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
 /* ─── presentational components ─── */
 
-function Shell({ children }) {
+function Shell({ children }: any) {
   return (
     <div
       className="fh-draws"
@@ -498,7 +498,7 @@ function Shell({ children }) {
   )
 }
 
-function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }) {
+function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: any) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8,
@@ -563,7 +563,7 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }) {
   )
 }
 
-function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }) {
+function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) {
   // Four KPIs in a row at the top of the section so the contractor
   // sees what they're working with at a glance. Numbers wrap on
   // narrow widths via responsive flex; desktop CSS forces a single
@@ -603,7 +603,7 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }) {
   )
 }
 
-function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }) {
+function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
   if (draws.length === 0) {
     return (
       <div style={{
@@ -617,7 +617,7 @@ function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave
   }
   return (
     <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-      {draws.map((d, i) => (
+      {draws.map((d: any, i: any) => (
         <li key={d.id} style={{ borderTop: i > 0 ? '1px solid var(--v3-border)' : 'none' }}>
           {editingId === d.id ? (
             <Editor initial={d} onSave={onSave} onCancel={onCancelEdit} />
@@ -640,7 +640,7 @@ function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave
   )
 }
 
-function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete }) {
+function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete }: any) {
   const isPaid = draw.status === 'paid'
   const isVoid = draw.status === 'void'
   const isOverdue = draw.status === 'overdue'
@@ -722,7 +722,7 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
   )
 }
 
-function Editor({ initial, isNew, unbilled, onSave, onCancel }) {
+function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
   const [form, setForm] = useState({
     id: initial.id || null,
     title: initial.title || '',
@@ -734,7 +734,7 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }) {
   })
   const [saving, setSaving] = useState(false)
 
-  function set(k, v) { setForm((prev) => ({ ...prev, [k]: v })) }
+  function set(k: any, v: any) { setForm((prev) => ({ ...prev, [k]: v })) }
 
   async function submit() {
     if (Number(form.amount) <= 0) {
@@ -831,13 +831,13 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }) {
   )
 }
 
-function Tag({ tone, children }) {
-  const palette = {
+function Tag({ tone, children }: any) {
+  const palette = ({
     muted: { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' },
     green: { bg: 'rgba(74, 222, 128, 0.12)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74, 222, 128, 0.30)' },
     gold:  { bg: 'rgba(228, 190, 111, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(228, 190, 111, 0.30)' },
     red:   { bg: 'rgba(232, 90, 87, 0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232, 90, 87, 0.30)' }
-  }[tone] || { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' }
+  } as Record<string, any>)[tone] || { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
@@ -851,7 +851,7 @@ function Tag({ tone, children }) {
   )
 }
 
-function IconBtn({ children, onClick, disabled, tone, title, ...rest }) {
+function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
   const danger = tone === 'danger'
   return (
     <button
@@ -879,7 +879,7 @@ const labelStyle = {
   fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
   letterSpacing: '0.14em', color: 'var(--v3-text-muted)', textTransform: 'uppercase'
 }
-const inputStyle = {
+const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
   padding: '9px 12px', borderRadius: 8,
   background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)',

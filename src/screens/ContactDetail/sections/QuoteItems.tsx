@@ -30,14 +30,14 @@ const SECTION_SUGGESTIONS = ['Labor', 'Materials', 'Subs', 'Equipment', 'Other']
 // the keyboard has had a moment to appear, then center the input in
 // the visible viewport. No-op on desktop (already-visible inputs ignore
 // scrollIntoView). Used on every DraftCard input + textarea.
-function scrollIntoCenterOnFocus(e) {
+function scrollIntoCenterOnFocus(e: any) {
   const el = e.currentTarget
   setTimeout(() => {
     try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
   }, 250)
 }
 
-function money(n) {
+function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 2
   })
@@ -58,7 +58,7 @@ function emptyDraft() {
   }
 }
 
-function draftFromRow(row) {
+function draftFromRow(row: any) {
   // amountOverridden seeds true on edit so changing qty/rate does not
   // silently overwrite an intentionally-set amount on an existing row.
   // Operators can still edit the amount field directly. Add-mode keeps
@@ -83,7 +83,7 @@ function draftFromRow(row) {
 // fields are guarded against negatives and NaN — HTML `min="0"` is not
 // reliably enforced on submit, so we re-check at the JS boundary.
 // Credit lines (negative amounts) are deferred to a later phase.
-function validateDraft(d) {
+function validateDraft(d: any) {
   if (!d.description || !d.description.trim()) return 'Description is required'
   const qty = Number(d.qty)
   const rate = Number(d.rate)
@@ -94,7 +94,7 @@ function validateDraft(d) {
   return null
 }
 
-function normalizeForDB(d) {
+function normalizeForDB(d: any) {
   // Derive flags from a single canonical kind so an inconsistent draft
   // (e.g. both flags somehow true) can never reach the DB. Mutually
   // exclusive by construction.
@@ -116,14 +116,14 @@ function normalizeForDB(d) {
   }
 }
 
-export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
-  const [rows, setRows] = useState([])
+export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: any) {
+  const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [draft, setDraft] = useState(emptyDraft)
   const [adding, setAdding] = useState(false)
 
-  const [editingId, setEditingId] = useState(null)
+  const [editingId, setEditingId] = useState<any>(null)
   const [editDraft, setEditDraft] = useState(emptyDraft)
   const [editing, setEditing] = useState(false)
 
@@ -148,7 +148,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
   // trigger fires on each write and keeps fh_contacts.amount synced.
   // ============================================================
 
-  async function addItem(input) {
+  async function addItem(input: any) {
     if (!jobId || !userId) return null
     if (!input.description) {
       toastError("Couldn't add item", 'Description is required')
@@ -174,7 +174,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
     return data
   }
 
-  async function updateItem(id, patch) {
+  async function updateItem(id: any, patch: any) {
     if (!id || !userId) return false
     const { error } = await supabase
       .from('fh_quote_items')
@@ -190,7 +190,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
     return true
   }
 
-  async function removeItem(id) {
+  async function removeItem(id: any) {
     if (!id || !userId) return false
     hapticTap()
     const snapshot = rows.find((r) => r.id === id)
@@ -220,7 +220,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
     return true
   }
 
-  async function reorderItem(id, direction) {
+  async function reorderItem(id: any, direction: any) {
     const idx = rows.findIndex((r) => r.id === id)
     if (idx === -1) return false
     const targetIdx = idx + direction
@@ -241,7 +241,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
       supabase.from('fh_quote_items').update({ sort_order: aOrder }).eq('id', b.id).eq('user_id', userId)
     ])
     if (r1.error || r2.error) {
-      toastError("Couldn't reorder", (r1.error || r2.error).message)
+      toastError("Couldn't reorder", (r1.error || r2.error)?.message)
       fetchRows()
       return false
     }
@@ -255,8 +255,8 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
   // is_optional and is_excluded are mutually exclusive.
   // ============================================================
 
-  function patchDraft(setter, key, value) {
-    setter((d) => {
+  function patchDraft(setter: any, key: any, value: any) {
+    setter((d: any) => {
       // Synthetic 'kind' key — drives the 3-way mode picker and writes
       // both is_optional + is_excluded atomically. Mutually exclusive
       // by design; eliminates the ambiguity of two parallel checkboxes.
@@ -292,7 +292,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
 
   // Derive the 3-way mode label from the current flags. Used by the
   // segment control to show the active selection.
-  function kindFromDraft(d) {
+  function kindFromDraft(d: any) {
     if (d?.is_excluded) return 'excluded'
     if (d?.is_optional) return 'optional'
     return 'base'
@@ -311,7 +311,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
     if (inserted) setDraft(emptyDraft())
   }
 
-  function beginEdit(row) {
+  function beginEdit(row: any) {
     setEditingId(row.id)
     setEditDraft(draftFromRow(row))
   }
@@ -414,7 +414,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
       <DraftCard
         eyebrow="Add line item"
         draft={draft}
-        onChange={(k, v) => patchDraft(setDraft, k, v)}
+        onChange={(k: any, v: any) => patchDraft(setDraft, k, v)}
         primaryLabel={adding ? 'Adding…' : 'Add line item'}
         onPrimary={handleAdd}
         primaryDisabled={!draft.description.trim() || adding}
@@ -453,7 +453,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
                 <DraftCard
                   eyebrow="Edit line item"
                   draft={editDraft}
-                  onChange={(k, v) => patchDraft(setEditDraft, k, v)}
+                  onChange={(k: any, v: any) => patchDraft(setEditDraft, k, v)}
                   primaryLabel={editing ? 'Saving…' : 'Save changes'}
                   onPrimary={saveEdit}
                   primaryDisabled={!editDraft.description.trim() || editing}
@@ -483,7 +483,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }) {
 /* ============================================================
    ItemRow — collapsed view of a single quote item.
    ============================================================ */
-function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown }) {
+function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown }: any) {
   const isOptional = !!row.is_optional && !row.is_excluded
   const isExcluded = !!row.is_excluded
   const dim = isExcluded ? 0.55 : isOptional ? 0.85 : 1
@@ -590,7 +590,7 @@ function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown 
   )
 }
 
-function RowActionButton({ children, ariaLabel, onClick, disabled, tone }) {
+function RowActionButton({ children, ariaLabel, onClick, disabled, tone }: any) {
   const color = disabled
     ? 'var(--v3-text-faint)'
     : tone === 'danger'
@@ -627,7 +627,7 @@ function RowActionButton({ children, ariaLabel, onClick, disabled, tone }) {
   )
 }
 
-function StatusChip({ label, tone }) {
+function StatusChip({ label, tone }: any) {
   const palette = tone === 'gold'
     ? {
         bg: 'var(--v3-primary-soft)',
@@ -656,7 +656,7 @@ function StatusChip({ label, tone }) {
 /* ============================================================
    DraftCard — shared form layout for both Add and Edit.
    ============================================================ */
-function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel }) {
+function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel }: any) {
   return (
     <div style={{
       padding: '14px 16px',
@@ -777,7 +777,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
         </span>
         <KindPicker
           value={draft.is_excluded ? 'excluded' : draft.is_optional ? 'optional' : 'base'}
-          onChange={(kind) => onChange('kind', kind)}
+          onChange={(kind: any) => onChange('kind', kind)}
         />
         <span style={{
           fontFamily: 'var(--font-body)',
@@ -846,7 +846,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
   )
 }
 
-function FormField({ label, required, hint, children }) {
+function FormField({ label, required, hint, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <span style={{
@@ -876,7 +876,7 @@ function FormField({ label, required, hint, children }) {
  * or Excluded. Replaces the prior parallel checkboxes that allowed
  * an ambiguous "neither flag set" state to slip through silently.
  */
-function KindPicker({ value, onChange }) {
+function KindPicker({ value, onChange }: any) {
   const options = [
     { value: 'base',     label: 'Base',     hint: 'Counts toward quoted price' },
     { value: 'optional', label: 'Optional', hint: 'Add-on, shown for reference' },
@@ -933,7 +933,7 @@ function KindPicker({ value, onChange }) {
   )
 }
 
-const inputStyle = {
+const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
   padding: '11px 13px',
   borderRadius: 10,
@@ -950,7 +950,7 @@ const inputStyle = {
   scrollMarginBottom: 320
 }
 
-function Stat({ label, value, tone = 'default' }) {
+function Stat({ label, value, tone = 'default' }: any) {
   const valueColor = tone === 'gold'
     ? 'var(--v3-primary)'
     : tone === 'muted'

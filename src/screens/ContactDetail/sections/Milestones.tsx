@@ -11,13 +11,13 @@ import { hapticTap } from '../../../lib/haptics.ts'
  * sync via the parent's useJobData hook). Order is operator-meaningful;
  * we never sort.
  */
-export default function MilestonesSection({ contact, patch }) {
+export default function MilestonesSection({ contact, patch }: any) {
   const list = useMemo(
     () => Array.isArray(contact?.milestones) ? contact.milestones : [],
     [contact?.milestones]
   )
   const [draft, setDraft] = useState('')
-  const doneCount = list.filter((m) => m.done).length
+  const doneCount = list.filter((m: any) => m.done).length
 
   async function add() {
     const txt = draft.trim()
@@ -28,15 +28,15 @@ export default function MilestonesSection({ contact, patch }) {
     await patch({ milestones: next })
   }
 
-  async function toggle(i) {
+  async function toggle(i: any) {
     hapticTap()
-    const next = list.map((m, idx) => idx === i ? { ...m, done: !m.done } : m)
+    const next = list.map((m: any, idx: any) => idx === i ? { ...m, done: !m.done } : m)
     await patch({ milestones: next })
   }
 
-  async function remove(i) {
+  async function remove(i: any) {
     hapticTap()
-    const next = list.filter((_, idx) => idx !== i)
+    const next = list.filter((_: any, idx: any) => idx !== i)
     await patch({ milestones: next })
   }
 
@@ -130,7 +130,7 @@ export default function MilestonesSection({ contact, patch }) {
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <AnimatePresence>
-            {list.map((m, i) => (
+            {list.map((m: any, i: any) => (
               <motion.li
                 key={`${m.created_at || ''}-${i}-${m.label}`}
                 layout
@@ -209,7 +209,7 @@ export default function MilestonesSection({ contact, patch }) {
   )
 }
 
-function EmptyMini({ label }) {
+function EmptyMini({ label }: any) {
   return (
     <div style={{
       padding: '20px 18px',

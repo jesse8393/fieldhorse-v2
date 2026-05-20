@@ -6,7 +6,9 @@ import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { formatPhone } from '../../../lib/utils.ts'
-import ActionSheet, { SheetField, SheetChipRow } from '../../../components/ActionSheet.jsx'
+import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_ } from '../../../components/ActionSheet.jsx'
+const SheetField = SheetField_ as any
+const SheetChipRow = SheetChipRow_ as any
 
 const SUB_STATUSES = [
   { value: 'scheduled', label: 'Scheduled' },
@@ -15,14 +17,14 @@ const SUB_STATUSES = [
   { value: 'paid',      label: 'Paid' }
 ]
 
-const STATUS_COLOR = {
+const STATUS_COLOR: Record<string, string> = {
   scheduled: 'var(--v3-text-muted)',
   onsite:    'var(--v3-success-bright)',
   complete:  'var(--v3-primary)',
   paid:      'var(--v3-success-bright)'
 }
 
-function money(n) {
+function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
@@ -35,7 +37,7 @@ function money(n) {
  *
  * Form lives inside ActionSheet (preserves the staged-step UX from legacy).
  */
-export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
+export default function SubsSection({ contact, subs = [], userId, fetchAll }: any) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ name: '', trade: '', phone: '', rate: '', status: 'scheduled' })
   const [saving, setSaving] = useState(false)
@@ -44,7 +46,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
     if (!open) setForm({ name: '', trade: '', phone: '', rate: '', status: 'scheduled' })
   }, [open])
 
-  const totalRate = subs.reduce((s, x) => s + Number(x.rate || 0), 0)
+  const totalRate = subs.reduce((s: any, x: any) => s + Number(x.rate || 0), 0)
   const step = form.name ? (form.trade || form.rate ? 3 : 2) : 1
 
   async function save() {
@@ -70,9 +72,9 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
     fetchAll?.()
   }
 
-  async function remove(id) {
+  async function remove(id: any) {
     hapticTap()
-    const snapshot = subs.find((s) => s.id === id)
+    const snapshot = subs.find((s: any) => s.id === id)
     const { error } = await supabase.from('fh_subs').delete().eq('id', id).eq('user_id', userId)
     if (error) { toastError("Couldn't delete", error.message); return }
     await recalcCost(contact.id, userId)
@@ -141,7 +143,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <AnimatePresence>
-            {subs.map((s) => (
+            {subs.map((s: any) => (
               <motion.li
                 key={s.id}
                 layout
@@ -248,7 +250,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }) {
           label="Status"
           value={form.status}
           options={SUB_STATUSES}
-          onChange={(v) => setForm({ ...form, status: v })}
+          onChange={(v: any) => setForm({ ...form, status: v })}
         />
       </ActionSheet>
     </div>
