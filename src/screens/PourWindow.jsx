@@ -6,7 +6,7 @@ import { useProfile } from '../contexts/ProfileContext.tsx'
 import { getWeather, workWindow, hourlyStrip, weatherLabel, tradeStatus, reverseGeocode, MURFREESBORO } from '../lib/weather.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import Spotlight from '../components/fx/Spotlight.jsx'
+import Spotlight from '../components/fx/Spotlight.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
 
 // Status token → brand palette mapping used across the whole screen.

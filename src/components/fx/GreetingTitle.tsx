@@ -1,4 +1,4 @@
-export default function GreetingTitle({ prefix = 'Morning,', name = 'there' }) {
+export default function GreetingTitle({ prefix = 'Morning,', name = 'there' }: { prefix?: string; name?: string }) {
   return (
     <h1
       className="fh-font-serif"
