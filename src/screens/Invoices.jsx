@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Receipt, FileDown, DollarSign, ChevronRight, Check, Send, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase.js'
+import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { generateInvoice, downloadPdf } from '../lib/pdf.js'
@@ -57,9 +58,10 @@ function fmtMoney(n) {
 export default function Invoices() {
   const { user } = useAuth()
   const { profile } = useProfile()
-  const [jobs, setJobs] = useState([])
-  const [payments, setPayments] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { data: bundle, isLoading: loading } = useInvoicesBundle(user?.id)
+  const refresh = useInvalidateInvoices()
+  const jobs = bundle?.jobs ?? []
+  const payments = bundle?.payments ?? []
   const [filter, setFilter] = useState('outstanding') // 'outstanding' | 'all'
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
@@ -69,24 +71,6 @@ export default function Invoices() {
   const [sendingId, setSendingId] = useState(null)
   const [sentId, setSentId] = useState(null)
   const confirm = useConfirm()
-
-  const refresh = async () => {
-    if (!user) return
-    setLoading(true)
-    // Join fh_clients so each job row can fall back to the linked
-    // client's email/name/phone/address when the denormalized fields
-    // on the job row are empty (typical when the client is added or
-    // edited later from the Client card, not the job).
-    const [{ data: js }, { data: ps }] = await Promise.all([
-      supabase.from('fh_contacts').select('*, fh_clients(name, email, phone, address)').eq('user_id', user.id).in('stage', ['job', 'invoice', 'closed']).order('created_at', { ascending: false }),
-      supabase.from('fh_payments').select('*').eq('user_id', user.id)
-    ])
-    setJobs(js || [])
-    setPayments(ps || [])
-    setLoading(false)
-  }
-
-  useEffect(() => { refresh() }, [user])
 
   // Roll up payment totals per contact for fast lookup.
   const paidByJob = useMemo(() => {
