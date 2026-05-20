@@ -12,7 +12,7 @@ import QuoteTermsSection from '../sections/QuoteTerms.jsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.jsx'
 import { useConfirm } from '../../../components/ConfirmSheet.jsx'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
-import { mintPublicLink } from '../../../lib/publicLink.js'
+import { mintPublicLink } from '../../../lib/publicLink.ts'
 
 /**
  * QUOTE tab — the formal sellable scope. Lead → Quote → Approved Job

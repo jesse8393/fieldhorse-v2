@@ -29,7 +29,7 @@ import { hapticTap } from '../lib/haptics.js'
 // V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
 // same batch helper Jobs already uses (one query + one signed-URL
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
-import { fetchCoverPhotosByJob } from '../lib/photos.js'
+import { fetchCoverPhotosByJob } from '../lib/photos.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.js'
 import DesktopHomeCommandCenter from '../components/desktop/DesktopHomeCommandCenter.jsx'
 

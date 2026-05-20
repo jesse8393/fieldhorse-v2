@@ -14,11 +14,8 @@ const SIGN_TTL_SECONDS = 3600 // 1 hour — long enough for a session, short eno
 /**
  * Fetch the latest cover photo per job for the given user, returning a map
  * keyed by contact (job) id → signed URL.
- *
- * @param {string} userId - auth.users.id
- * @returns {Promise<Record<string, string>>} { [jobId]: signedUrl }
  */
-export async function fetchCoverPhotosByJob(userId) {
+export async function fetchCoverPhotosByJob(userId: string | undefined): Promise<Record<string, string>> {
   if (!userId) return {}
 
   // Latest-first so the reduce naturally keeps the newest per job.
@@ -32,9 +29,11 @@ export async function fetchCoverPhotosByJob(userId) {
   if (qErr || !photos || photos.length === 0) return {}
 
   // Reduce to latest path per job.
-  const pathByJob = new Map()
+  const pathByJob = new Map<string, string>()
   for (const p of photos) {
-    if (!pathByJob.has(p.job_id)) pathByJob.set(p.job_id, p.storage_path)
+    if (p.job_id && p.storage_path && !pathByJob.has(p.job_id)) {
+      pathByJob.set(p.job_id, p.storage_path)
+    }
   }
 
   const uniquePaths = Array.from(new Set(pathByJob.values()))
@@ -47,12 +46,12 @@ export async function fetchCoverPhotosByJob(userId) {
 
   if (signErr || !signed) return {}
 
-  const urlByPath = new Map()
+  const urlByPath = new Map<string, string>()
   for (const s of signed) {
-    if (s?.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl)
+    if (s?.path && s.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl)
   }
 
-  const out = {}
+  const out: Record<string, string> = {}
   for (const [jobId, path] of pathByJob.entries()) {
     const url = urlByPath.get(path)
     if (url) out[jobId] = url
