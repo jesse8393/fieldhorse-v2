@@ -1,8 +1,6 @@
-// mobile/app/(tabs)/jobs.tsx — the Jobs list, ported from the web
-// Jobs screen. Demonstrates the shared-logic thesis: this screen uses
-// the SAME query hook shape (useJobs / useJobsRealtime) as the web app,
-// just rendered with React Native primitives + NativeWind classes
-// instead of divs + inline styles.
+// mobile/app/(tabs)/jobs.tsx — the Jobs pipeline list.
+// Same shared query hooks (useJobs / useJobsRealtime / useCreateLead),
+// rebuilt on the premium v3 design primitives.
 import { useMemo, useState } from 'react'
 import {
   View, Text, FlatList, Pressable, TextInput, ActivityIndicator,
@@ -10,19 +8,12 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Plus } from 'lucide-react-native'
 import { useQueryClient } from '@tanstack/react-query'
 import { useJobs, useJobsRealtime, useCreateLead, type JobRow } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
-
-const STAGE_TINT: Record<string, string> = {
-  lead: '#6B7CA8',
-  quote: '#B07A4A',
-  job: '#4F8C5E',
-  invoice: '#C9963A',
-  closed: '#5C5C5C',
-  lost: '#7d2a1f'
-}
+import { ScreenBackground, Card, Eyebrow, GoldButton, StagePill, STAGE_TINT, theme } from '../../components/ui'
 
 const STAGE_FILTERS = ['all', 'lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
 
@@ -37,8 +28,6 @@ export default function JobsScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const queryClient = useQueryClient()
-  // userId would come from an auth context (Supabase session) in the
-  // full build; realtime is wired the moment it's available.
   const { user } = useAuth()
   const { data: jobs = [], isLoading } = useJobs()
   useJobsRealtime(user?.id, queryClient)
@@ -76,23 +65,24 @@ export default function JobsScreen() {
   }, [jobs, search, stageFilter])
 
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top + 8 }}>
-      <View className="px-5 pb-3">
-        <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Jobs</Text>
-        <Text className="text-ink text-3xl font-bold">Pipeline</Text>
+    <View style={{ flex: 1, paddingTop: insets.top + 10 }}>
+      <ScreenBackground />
+      <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+        <Eyebrow>Jobs</Eyebrow>
+        <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', letterSpacing: -0.5 }}>Pipeline</Text>
       </View>
 
-      <View className="px-5 pb-3">
+      <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Search jobs, contacts…"
-          placeholderTextColor="rgba(242,237,228,0.45)"
-          className="bg-surface border border-[rgba(255,240,210,0.10)] rounded-xl px-4 py-3 text-ink"
+          placeholderTextColor={theme.inkFaint}
+          style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, fontSize: 15 }}
         />
       </View>
 
-      <View className="pb-3">
+      <View style={{ paddingBottom: 14 }}>
         <FlatList
           data={STAGE_FILTERS as unknown as string[]}
           horizontal
@@ -101,20 +91,17 @@ export default function JobsScreen() {
           contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
           renderItem={({ item: s }) => {
             const active = stageFilter === s
-            const chipTint = s === 'all' ? '#E8B865' : (STAGE_TINT[s] ?? '#5C5C5C')
+            const chipTint = s === 'all' ? theme.goldBright : (STAGE_TINT[s] ?? '#5C5C5C')
             return (
               <Pressable
                 onPress={() => setStageFilter(s)}
-                className="rounded-full px-3.5 py-1.5 border"
                 style={{
-                  borderColor: active ? chipTint : 'rgba(255,240,210,0.12)',
-                  backgroundColor: active ? chipTint : 'transparent'
+                  borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1,
+                  borderColor: active ? chipTint : theme.borderMid,
+                  backgroundColor: active ? `${chipTint}26` : 'transparent'
                 }}
               >
-                <Text
-                  className="text-xs font-bold uppercase tracking-wider"
-                  style={{ color: active ? '#1A120A' : '#9b948a' }}
-                >
+                <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', color: active ? chipTint : theme.inkMuted }}>
                   {s}
                 </Text>
               </Pressable>
@@ -124,66 +111,49 @@ export default function JobsScreen() {
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#E8B865" />
-        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.goldBright} /></View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 8 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100, gap: 10 }}
           renderItem={({ item }) => <JobCard job={item} onPress={() => router.push(`/jobs/${item.id}`)} />}
-          ListEmptyComponent={
-            <Text className="text-ink-muted text-center mt-12">No jobs in this view.</Text>
-          }
+          ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>No jobs in this view.</Text>}
         />
       )}
 
       {/* Floating add button */}
       <Pressable
         onPress={() => setAddOpen(true)}
-        className="absolute items-center justify-center rounded-full"
         style={{
-          right: 20, bottom: insets.bottom + 20, width: 56, height: 56,
-          backgroundColor: '#E8B865', shadowColor: '#000', shadowOpacity: 0.4,
-          shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8
+          position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 999,
+          shadowColor: '#E8B865', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12
         }}
       >
-        <Plus color="#1A120A" size={26} strokeWidth={2.6} />
+        <LinearGradient colors={['#F0CE86', '#E4BE6F', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>
+          <Plus color={theme.onGold} size={26} strokeWidth={2.8} />
+        </LinearGradient>
       </Pressable>
 
       {/* New lead modal */}
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setAddOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
-            <Text className="text-ink text-xl font-bold mb-5">New lead</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+          <Pressable style={{ flex: 1 }} onPress={() => setAddOpen(false)} />
+          <View style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderTopWidth: 1, borderColor: theme.borderMid, paddingBottom: insets.bottom + 24 }}>
+            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 20 }}>New lead</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Name</Text>
             <TextInput
-              value={leadName}
-              onChangeText={setLeadName}
-              placeholder="Homeowner or company"
-              placeholderTextColor="rgba(242,237,228,0.4)"
-              autoFocus
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              value={leadName} onChangeText={setLeadName} autoFocus
+              placeholder="Homeowner or company" placeholderTextColor={theme.inkFaint}
+              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16 }}
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Estimated value (optional)</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Estimated value (optional)</Text>
             <TextInput
-              value={leadAmount}
-              onChangeText={setLeadAmount}
-              keyboardType="decimal-pad"
-              placeholder="$0"
-              placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              value={leadAmount} onChangeText={setLeadAmount} keyboardType="decimal-pad"
+              placeholder="$0" placeholderTextColor={theme.inkFaint}
+              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 20 }}
             />
-            <Pressable
-              onPress={submitLead}
-              disabled={saving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: saving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
-            >
-              {saving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create lead</Text>}
-            </Pressable>
+            <GoldButton label="Create lead" onPress={submitLead} loading={saving} />
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -192,28 +162,21 @@ export default function JobsScreen() {
 }
 
 function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {
-  const tint = STAGE_TINT[job.stage ?? ''] ?? '#5C5C5C'
+  const tint = STAGE_TINT[job.stage ?? ''] ?? '#3a352e'
   return (
-    <Pressable
-      onPress={onPress}
-      className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center"
-      style={{ gap: 12 }}
-    >
-      <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 3, backgroundColor: tint }} />
-      <View className="flex-1">
-        <Text className="text-ink text-base font-bold" numberOfLines={1}>
-          {job.name || 'Untitled'}
-        </Text>
-        <Text className="text-ink-muted text-xs mt-1" numberOfLines={1}>
-          {job.job_title || job.job_type || '—'}
-        </Text>
-      </View>
-      <View className="items-end">
-        <Text className="text-gold-bright text-base font-bold">{money(job.amount)}</Text>
-        <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>
-          {job.stage}
-        </Text>
-      </View>
+    <Pressable onPress={onPress}>
+      <Card accent={tint}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 18 }}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{job.name || 'Untitled'}</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>{job.job_title || job.job_type || '—'}</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ color: theme.goldBright, fontSize: 17, fontWeight: '800' }}>{money(job.amount)}</Text>
+            {job.stage ? <View style={{ marginTop: 5 }}><StagePill stage={job.stage} /></View> : null}
+          </View>
+        </View>
+      </Card>
     </Pressable>
   )
 }

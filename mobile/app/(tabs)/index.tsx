@@ -1,13 +1,13 @@
 // mobile/app/(tabs)/index.tsx — Home dashboard.
 // Reuses the shared useJobs() hook (same as web) and derives the
-// headline KPIs natively. No new query — the cross-screen cache means
-// Jobs and Home share one fetch.
+// headline KPIs natively. Styled on the premium v3 design primitives.
 import { useMemo } from 'react'
 import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useJobs } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, Eyebrow, SectionLabel, StagePill, theme } from '../../components/ui'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 const WON = new Set(['invoice', 'closed'])
@@ -32,9 +32,7 @@ export default function HomeScreen() {
   const { data: jobs = [], isLoading } = useJobs()
 
   const stats = useMemo(() => {
-    let pipeline = 0
-    let won = 0
-    let active = 0
+    let pipeline = 0, won = 0, active = 0
     for (const j of jobs) {
       const amt = Number(j.amount || 0)
       if (ACTIVE.has(j.stage ?? '')) { pipeline += amt; active += 1 }
@@ -43,65 +41,70 @@ export default function HomeScreen() {
     return { pipeline, won, active }
   }, [jobs])
 
-  const recent = jobs.slice(0, 5)
+  const recent = jobs.slice(0, 6)
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}
-    >
-      <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">{greeting()}</Text>
-      <Text className="text-ink text-3xl font-bold mb-1" numberOfLines={1}>
-        {user?.email?.split('@')[0] || 'there'}.
-      </Text>
-      <Text className="text-ink-muted text-sm mb-6">Here's the state of your pipeline.</Text>
+    <View style={{ flex: 1 }}>
+      <ScreenBackground />
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+        <Eyebrow>{greeting()}</Eyebrow>
+        <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', marginTop: 2, letterSpacing: -0.5 }} numberOfLines={1}>
+          {user?.email?.split('@')[0] || 'there'}.
+        </Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 4, marginBottom: 22 }}>Here's the state of your pipeline.</Text>
 
-      {isLoading ? (
-        <View className="items-center justify-center py-16">
-          <ActivityIndicator color="#E8B865" />
-        </View>
-      ) : (
-        <>
-          <View className="flex-row" style={{ gap: 10, marginBottom: 24 }}>
-            <Kpi label="In pipeline" value={money(stats.pipeline)} tone="#E8B865" />
-            <Kpi label="Won" value={money(stats.won)} tone="#4ade80" />
-            <Kpi label="Active" value={String(stats.active)} tone="#F2EDE4" />
-          </View>
-
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mb-3">Recent jobs</Text>
-          {recent.length === 0 ? (
-            <Text className="text-ink-muted text-sm">No jobs yet.</Text>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {recent.map((j) => (
-                <Pressable
-                  key={j.id}
-                  onPress={() => router.push(`/jobs/${j.id}`)}
-                  className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
-                >
-                  <View className="flex-1 pr-3">
-                    <Text className="text-ink text-base font-bold" numberOfLines={1}>{j.name || 'Untitled'}</Text>
-                    <Text className="text-ink-muted text-xs mt-1" numberOfLines={1}>{j.job_title || j.job_type || '—'}</Text>
-                  </View>
-                  <Text className="text-gold-bright text-base font-bold">{money(Number(j.amount || 0))}</Text>
-                </Pressable>
-              ))}
+        {isLoading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 64 }}><ActivityIndicator color={theme.goldBright} /></View>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 26 }}>
+              <Kpi label="In pipeline" value={money(stats.pipeline)} tone={theme.goldBright} glow />
+              <Kpi label="Won" value={money(stats.won)} tone={theme.success} />
+              <Kpi label="Active" value={String(stats.active)} tone={theme.ink} />
             </View>
-          )}
-        </>
-      )}
-    </ScrollView>
+
+            <SectionLabel style={{ marginBottom: 12 }}>Recent jobs</SectionLabel>
+            {recent.length === 0 ? (
+              <Text style={{ color: theme.inkMuted, fontSize: 14 }}>No jobs yet.</Text>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {recent.map((j) => (
+                  <Pressable key={j.id} onPress={() => router.push(`/jobs/${j.id}`)}>
+                    <Card accent={STAGE_ACCENT(j.stage)}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 18 }}>
+                        <View style={{ flex: 1, paddingRight: 12 }}>
+                          <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
+                          <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>{j.job_title || j.job_type || '—'}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ color: theme.goldBright, fontSize: 17, fontWeight: '800' }}>{money(Number(j.amount || 0))}</Text>
+                          {j.stage ? <View style={{ marginTop: 5 }}><StagePill stage={j.stage} /></View> : null}
+                        </View>
+                      </View>
+                    </Card>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
+        )}
+      </ScrollView>
+    </View>
   )
 }
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone: string }) {
+function STAGE_ACCENT(stage: string | null) {
+  const tints: Record<string, string> = { lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E', invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f' }
+  return tints[stage ?? ''] ?? '#3a352e'
+}
+
+function Kpi({ label, value, tone, glow }: { label: string; value: string; tone: string; glow?: boolean }) {
   return (
-    <View
-      className="flex-1 bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)]"
-      style={{ minHeight: 88 }}
-    >
-      <Text className="text-2xl font-bold" style={{ color: tone }}>{value}</Text>
-      <Text className="text-ink-muted text-[11px] font-semibold mt-1">{label}</Text>
-    </View>
+    <Card glow={glow} style={{ flex: 1 }}>
+      <View style={{ padding: 14, minHeight: 92, justifyContent: 'center' }}>
+        <Text style={{ color: tone, fontSize: 24, fontWeight: '800' }} numberOfLines={1}>{value}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '600', marginTop: 4 }}>{label}</Text>
+      </View>
+    </Card>
   )
 }
