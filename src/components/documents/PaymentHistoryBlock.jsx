@@ -7,8 +7,8 @@
 // Empty state suppressed by the parent — render the block only when
 // payments.length > 0.
 
-import { DOC_COLORS, typeStyle } from './tokens.js'
-import { money, shortDate } from './format.js'
+import { DOC_COLORS, typeStyle } from './tokens.ts'
+import { money, shortDate } from './format.ts'
 
 function methodLabel(m) {
   if (!m) return 'Payment'

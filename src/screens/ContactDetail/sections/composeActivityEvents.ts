@@ -1,4 +1,4 @@
-// src/screens/ContactDetail/sections/composeActivityEvents.js
+// src/screens/ContactDetail/sections/composeActivityEvents.ts
 //
 // Synthesizes a unified, chronological activity feed for one job from
 // the raw arrays that useJobData already loads. NO new schema — the
@@ -13,20 +13,29 @@
 // Sorted most-recent first; events at the exact same timestamp keep
 // insertion order (kind precedence).
 
-function methodLabel(m) {
+type ActivityEvent = {
+  id: string
+  when: Date
+  kind: string
+  title: string
+  sub?: string | null
+  tone?: string
+}
+
+function methodLabel(m: string | null | undefined) {
   if (!m) return 'Payment'
   const lower = String(m).toLowerCase()
   if (lower === 'ach') return 'ACH'
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
-function kindLabel(k) {
+function kindLabel(k: string | null | undefined) {
   if (!k || k === 'other') return ''
-  const map = { deposit: 'deposit', progress: 'progress', final: 'final', retainage: 'retainage' }
+  const map: Record<string, string> = { deposit: 'deposit', progress: 'progress', final: 'final', retainage: 'retainage' }
   return map[k] || ''
 }
 
-function money(n) {
+function money(n: number | string | null | undefined) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, {
     style: 'currency', currency: 'USD',
@@ -36,7 +45,7 @@ function money(n) {
 
 // Tone matrix for stage transitions. Closed = good (collected),
 // lost = bad, everything else = gold-toned progress.
-const STAGE_TONE = {
+const STAGE_TONE: Record<string, string> = {
   closed: 'green',
   lost:   'red',
   invoice: 'gold',
@@ -52,8 +61,15 @@ export function composeActivityEvents({
   scheduleItems = [],
   changeOrders = [],
   stageTransitions = []
-}) {
-  const out = []
+}: {
+  contact?: any
+  notes?: any[]
+  payments?: any[]
+  scheduleItems?: any[]
+  changeOrders?: any[]
+  stageTransitions?: any[]
+}): ActivityEvent[] {
+  const out: ActivityEvent[] = []
 
   // 1. Job created — anchors the bottom of the feed
   if (contact?.created_at) {
@@ -168,7 +184,7 @@ export function composeActivityEvents({
   //    a chatty job. Older notes live on the Notes screen.
   const sortedNotes = (notes || [])
     .slice()
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5)
   for (const n of sortedNotes) {
     const preview = (n.text || '').trim().split('\n')[0].slice(0, 80)
@@ -185,10 +201,10 @@ export function composeActivityEvents({
   // Most recent first; drop events with an invalid date
   return out
     .filter((e) => e.when instanceof Date && !Number.isNaN(e.when.getTime()))
-    .sort((a, b) => b.when - a.when)
+    .sort((a, b) => b.when.getTime() - a.when.getTime())
 }
 
-function capitalize(s) {
+function capitalize(s: string | null | undefined) {
   if (!s) return ''
   return s[0].toUpperCase() + s.slice(1)
 }

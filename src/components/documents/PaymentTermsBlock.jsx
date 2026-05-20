@@ -13,8 +13,8 @@
 // so the customer sees real money next to each milestone rather than
 // having to math it out themselves.
 
-import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
-import { money } from './format.js'
+import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
+import { money } from './format.ts'
 
 export const DEFAULT_PAYMENT_SCHEDULE = [
   { pct: 50, label: 'Deposit due upon approval',         sub: 'Before crew mobilizes' },

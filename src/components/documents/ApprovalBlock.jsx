@@ -17,8 +17,8 @@
 // The signing surface itself lives elsewhere (approval flow in
 // ContactDetail/Quote tab); this block is presentation only.
 
-import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
-import { longDate } from './format.js'
+import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
+import { longDate } from './format.ts'
 
 const AUTHORIZATION_COPY = `By signing below, the customer authorizes the company to perform the work outlined in this proposal and agrees to the terms and conditions contained herein.`
 

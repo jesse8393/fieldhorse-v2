@@ -17,8 +17,8 @@ import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
 import {
   invoiceNumber as docInvoiceNumber,
   proposalNumber as docProposalNumber
-} from '../components/documents/numbers.js'
-import { mapItemsToScope } from '../components/documents/mapItems.js'
+} from '../components/documents/numbers.ts'
+import { mapItemsToScope } from '../components/documents/mapItems.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.jsx'
 
 const FIELD_GOLD = [200, 161, 84]      // #C8A154

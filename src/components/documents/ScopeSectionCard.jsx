@@ -22,8 +22,8 @@
 // overbuild now"); section ordering comes from the array passed by
 // the template's parent.
 
-import { DOC_COLORS, typeStyle } from './tokens.js'
-import { money } from './format.js'
+import { DOC_COLORS, typeStyle } from './tokens.ts'
+import { money } from './format.ts'
 
 export default function ScopeSectionCard({
   title,

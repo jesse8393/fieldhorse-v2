@@ -11,8 +11,8 @@
 // contract total used by InvoiceBalanceBlock; the parent template
 // composes that math.
 
-import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.js'
-import { money, shortDate } from './format.js'
+import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
+import { money, shortDate } from './format.ts'
 
 export default function ChangeOrdersBlock({ changeOrders = [], company }) {
   const gold = resolveBrandGold(company)

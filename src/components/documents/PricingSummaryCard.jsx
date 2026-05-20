@@ -10,8 +10,8 @@
 // "Project Investment" is the headline; the other rows are subordinated
 // stamps under a hairline. The contractor sees ONE number that matters.
 
-import { DOC_COLORS, DOC_FONTS, typeStyle, resolveBrandGold } from './tokens.js'
-import { money } from './format.js'
+import { DOC_COLORS, DOC_FONTS, typeStyle, resolveBrandGold } from './tokens.ts'
+import { money } from './format.ts'
 
 /**
  * @param {object} props

@@ -27,7 +27,7 @@
 // frame, so each contractor's brand color still surfaces without
 // overwhelming the doc.
 
-import { DOC_COLORS, DOC_FONTS, DOC_SPACE, resolveBrandGold } from './tokens.js'
+import { DOC_COLORS, DOC_FONTS, DOC_SPACE, resolveBrandGold } from './tokens.ts'
 
 /**
  * @param {object}    props
