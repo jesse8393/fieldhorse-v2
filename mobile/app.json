@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "FieldHorse",
+    "slug": "fieldhorse",
+    "version": "0.1.0",
+    "scheme": "fieldhorse",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.fieldhorse.app"
+    },
+    "android": {
+      "package": "io.fieldhorse.app",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B0907",
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
