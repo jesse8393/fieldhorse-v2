@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import { supabase } from '../../lib/supabase.js'
-import { markLost } from '../../lib/pipeline.js'
+import { markLost } from '../../lib/pipeline.ts'
 import { stageColor } from '../../lib/stages.ts'
 import { toastSuccess, toastInfo, toastError } from '../../lib/toast.js'
 import { hapticTap, hapticError } from '../../lib/haptics.js'

@@ -82,7 +82,7 @@ export async function markLost(contact: Contact) {
 }
 
 type LogPaymentOpts = {
-  amount: number | string
+  amount?: number | string | null
   method?: string | null
   kind?: string | null
   reference?: string | null

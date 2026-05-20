@@ -2,7 +2,7 @@
 //
 // Payment recorder — NOT a card processor. Records what the contractor
 // already collected (cash / check / ACH / card receipt / other) against
-// the job. Wires logPayment() from pipeline.js which:
+// the job. Wires logPayment() from pipeline.ts which:
 //   - inserts to fh_payments with the contact's user_id
 //   - re-aggregates and auto-closes the contact when overpaid
 //   - fires the paid-in-full haptic + toast cascade
@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { DollarSign, Check, X } from 'lucide-react'
-import { logPayment } from '../lib/pipeline.js'
+import { logPayment } from '../lib/pipeline.ts'
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticTap } from '../lib/haptics.js'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.js'

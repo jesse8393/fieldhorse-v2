@@ -7,7 +7,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { useFhMotion } from '../lib/motion.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
-import { rollupByClient } from '../lib/rollups.js'
+import { rollupByClient } from '../lib/rollups.ts'
 import { findDuplicateClusters } from '../lib/clientMerge.js'
 import NewClientSheet from '../components/NewClientSheet.jsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.jsx'
@@ -36,7 +36,7 @@ export default function Clients() {
 
   // Rollups computed live from jobs + payments instead of trusting the
   // stale fh_clients.total_lifetime_value / active_jobs_count columns.
-  // Single source of truth shared with Client detail (rollups.js).
+  // Single source of truth shared with Client detail (rollups.ts).
   // Both come from the same Query bundle as the client roster.
   const jobs = bundle?.jobs ?? []
   const payments = bundle?.payments ?? []

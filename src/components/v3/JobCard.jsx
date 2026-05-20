@@ -27,7 +27,7 @@ const STAGE_STEP = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
 const TOTAL_STAGES = 5
 
 // Stage-driven "next action" hint shown beneath the stage pill. Mirrors the
-// pipeline.js stage default suggestions so the operator sees the same
+// pipeline.ts stage default suggestions so the operator sees the same
 // primary action they'd see in the Job Detail NextActionCard.
 const NEXT_ACTION_HINT = {
   lead:    'Send a quote',

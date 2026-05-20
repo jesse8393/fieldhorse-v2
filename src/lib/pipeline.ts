@@ -8,24 +8,28 @@ import {
   completeJob as baseCompleteJob,
   markLost as baseMarkLost,
   logPayment as baseLogPayment,
-  STAGE_MAP
+  STAGE_MAP,
+  type StageId
 } from './stages.ts'
 import { toast, hapticMedium, hapticSuccess } from './toast.js'
+import type { Database } from './database.types.ts'
 
-function notify(stageId, verb = 'Moved to') {
+type Contact = Database['public']['Tables']['fh_contacts']['Row']
+
+function notify(stageId: string, verb = 'Moved to') {
   const s = STAGE_MAP[stageId]
   if (!s) return
   hapticMedium()
   toast(`${verb} ${s.label}`, { accent: stageId })
 }
 
-export async function startQuote(contact) {
+export async function startQuote(contact: Contact) {
   const res = await baseStartQuote(contact)
   if (!res.error) notify('quote')
   return res
 }
 
-export async function approveQuote(contact) {
+export async function approveQuote(contact: Contact) {
   const res = await baseApproveQuote(contact)
   if (!res.error) {
     hapticMedium()
@@ -34,31 +38,32 @@ export async function approveQuote(contact) {
   return res
 }
 
-export async function markComplete(contact) {
+export async function markComplete(contact: Contact) {
   const res = await baseCompleteJob(contact)
   if (!res.error) notify('invoice')
   return res
 }
 
-export async function markLost(contact) {
+export async function markLost(contact: Contact) {
   const res = await baseMarkLost(contact)
   if (!res.error) notify('lost', 'Marked as')
   return res
 }
 
-export async function reopen(contact) {
+export async function reopen(contact: Contact) {
   // Closed/lost → back to invoice (if amount owed) else job
-  const next = contact.stage === 'closed' ? 'invoice' : 'lead'
+  const next: StageId = contact.stage === 'closed' ? 'invoice' : 'lead'
   const res = await transitionStage(contact, next)
   if (!res.error) notify(next, 'Reopened to')
   return res
 }
 
-export async function logPayment(contact, input) {
+export async function logPayment(contact: Contact, input: { amount?: number | string | null; method?: string | null; kind?: string | null; reference?: string | null; paid_on?: string | null }) {
   const res = await baseLogPayment(contact, input)
   hapticSuccess()
   const paid = Number(input.amount || 0)
-  if (res && res.total !== undefined && res.total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
+  const total = res && 'total' in res ? res.total : undefined
+  if (total !== undefined && total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
     toast(`Paid in full · moved to Closed`, { accent: 'closed', heavy: true })
   } else {
     toast(`Payment logged · $${paid.toLocaleString()}`, { accent: 'gold' })
