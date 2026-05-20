@@ -203,3 +203,29 @@ export function useCreateLead() {
     return { id: (data as any)?.id as string | undefined, error }
   }
 }
+
+// ---- Create schedule event ----
+// Insert a new fh_schedule row, then invalidate the upcoming list so the
+// Schedule screen reflects it. Mirrors the web schedule create path.
+export type NewEventInput = {
+  userId: string
+  title: string
+  startAt: string
+  endAt?: string
+  contactId?: string
+}
+
+export function useCreateEvent() {
+  const client = useQueryClient()
+  return async (input: NewEventInput) => {
+    const { data, error } = await supabase.from('fh_schedule').insert({
+      user_id: input.userId,
+      title: input.title,
+      start_at: input.startAt,
+      end_at: input.endAt ?? null,
+      contact_id: input.contactId ?? null
+    } as any).select('id').single()
+    if (!error) client.invalidateQueries({ queryKey: ['scheduleUpcoming', input.userId] })
+    return { id: (data as any)?.id as string | undefined, error }
+  }
+}
