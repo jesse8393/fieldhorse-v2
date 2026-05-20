@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -11,6 +11,7 @@ import ActionSheet from '../components/ActionSheet.jsx'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.js'
+import { useClientDetail, useInvalidateClientDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
 import { stageColor } from '../lib/stages.js'
@@ -43,14 +44,16 @@ export default function ClientDetail() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const [client, setClient] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { data: bundle, isPending: loading } = useClientDetail(id, user?.id)
+  const invalidateClientDetail = useInvalidateClientDetail()
+  const fetchClient = () => invalidateClientDetail(id)
+  const client = bundle?.client ?? null
+  const jobs = bundle?.jobs ?? []
+  const notes = bundle?.notes ?? []
+  const files = bundle?.files ?? []
+  const payments = bundle?.payments ?? []
   const [tab, setTab] = useState('overview')
   const [isEditing, setIsEditing] = useState(false)
-  const [jobs, setJobs] = useState([])
-  const [notes, setNotes] = useState([])
-  const [files, setFiles] = useState([])
-  const [payments, setPayments] = useState([])
   // Destructive-confirm sheet state for delete client.
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -80,70 +83,6 @@ export default function ClientDetail() {
     () => (jobs || []).filter((j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage)).length,
     [jobs]
   )
-
-  const fetchClient = useCallback(async () => {
-    if (!user || !id) return
-    setLoading(true)
-    const { data } = await supabase
-      .from('fh_clients')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    setClient(data || null)
-    setLoading(false)
-  }, [user, id])
-
-  useEffect(() => { fetchClient() }, [fetchClient])
-
-  useEffect(() => {
-    if (!client?.id) return
-    let cancelled = false
-    async function loadTabData() {
-      const { data: j } = await supabase
-        .from('fh_contacts')
-        .select('id, name, stage, job_title, job_type, amount, updated_at')
-        .eq('user_id', user.id)
-        .eq('client_id', client.id)
-        .order('updated_at', { ascending: false })
-      if (cancelled) return
-      setJobs(j || [])
-      const jobIds = (j || []).map((r) => r.id)
-      if (jobIds.length === 0) {
-        setNotes([])
-        setFiles([])
-        setPayments([])
-        return
-      }
-      const [{ data: n }, { data: f }, { data: p }] = await Promise.all([
-        supabase
-          .from('fh_notes')
-          .select('*, fh_contacts(name)')
-          .eq('user_id', user.id)
-          .in('contact_id', jobIds)
-          .order('created_at', { ascending: false })
-          .limit(40),
-        supabase
-          .from('fh_job_files')
-          .select('*, fh_contacts(name)')
-          .eq('user_id', user.id)
-          .in('job_id', jobIds)
-          .order('uploaded_at', { ascending: false })
-          .limit(60),
-        supabase
-          .from('fh_payments')
-          .select('contact_id, amount')
-          .eq('user_id', user.id)
-          .in('contact_id', jobIds)
-      ])
-      if (cancelled) return
-      setNotes(n || [])
-      setFiles(f || [])
-      setPayments(p || [])
-    }
-    loadTabData()
-    return () => { cancelled = true }
-  }, [client?.id, user?.id])
 
   // Open the destructive-confirm sheet. The header trash button hits this.
   function requestDelete() {

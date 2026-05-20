@@ -435,3 +435,98 @@ export function useInvalidatePartners() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: ['partners'] })
 }
+
+// ---- Client detail ----
+// A dependent fetch: the client row, then every job under that client,
+// then the notes/files/payments scoped to those job ids. Folded into a
+// single keyed query so the screen drops its two chained effects; the
+// metrics (lifetime / outstanding / active) are derived in the screen.
+
+export type ClientJob = Pick<
+  Contact,
+  'id' | 'name' | 'stage' | 'job_title' | 'job_type' | 'amount' | 'updated_at'
+>
+
+export type ClientDetailBundle = {
+  client: Client | null
+  jobs: ClientJob[]
+  notes: (Database['public']['Tables']['fh_notes']['Row'] & {
+    fh_contacts: Pick<Contact, 'name'> | null
+  })[]
+  files: (Database['public']['Tables']['fh_job_files']['Row'] & {
+    fh_contacts: Pick<Contact, 'name'> | null
+  })[]
+  payments: Pick<Payment, 'contact_id' | 'amount'>[]
+}
+
+const EMPTY_CLIENT_DETAIL: Omit<ClientDetailBundle, 'client'> = {
+  jobs: [], notes: [], files: [], payments: []
+}
+
+async function fetchClientDetail(id: string, userId: string): Promise<ClientDetailBundle> {
+  const { data: client } = await supabase
+    .from('fh_clients')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (!client) return { client: null, ...EMPTY_CLIENT_DETAIL }
+
+  const { data: jobsData } = await supabase
+    .from('fh_contacts')
+    .select('id, name, stage, job_title, job_type, amount, updated_at')
+    .eq('user_id', userId)
+    .eq('client_id', client.id)
+    .order('updated_at', { ascending: false })
+
+  const jobs = (jobsData ?? []) as ClientJob[]
+  const jobIds = jobs.map((r) => r.id)
+  if (jobIds.length === 0) {
+    return { client: client as Client, ...EMPTY_CLIENT_DETAIL }
+  }
+
+  const [notesRes, filesRes, paymentsRes] = await Promise.all([
+    supabase
+      .from('fh_notes')
+      .select('*, fh_contacts(name)')
+      .eq('user_id', userId)
+      .in('contact_id', jobIds)
+      .order('created_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('fh_job_files')
+      .select('*, fh_contacts(name)')
+      .eq('user_id', userId)
+      .in('job_id', jobIds)
+      .order('uploaded_at', { ascending: false })
+      .limit(60),
+    supabase
+      .from('fh_payments')
+      .select('contact_id, amount')
+      .eq('user_id', userId)
+      .in('contact_id', jobIds)
+  ])
+
+  return {
+    client: client as Client,
+    jobs,
+    notes: (notesRes.data ?? []) as ClientDetailBundle['notes'],
+    files: (filesRes.data ?? []) as ClientDetailBundle['files'],
+    payments: (paymentsRes.data ?? []) as ClientDetailBundle['payments']
+  }
+}
+
+export function useClientDetail(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: ['clientDetail', id],
+    queryFn: () => fetchClientDetail(id as string, userId as string),
+    enabled: !!id && !!userId
+  })
+}
+
+export function useInvalidateClientDetail() {
+  const client = useQueryClient()
+  return (id: string | undefined) =>
+    client.invalidateQueries({ queryKey: ['clientDetail', id] })
+}
