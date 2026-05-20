@@ -459,7 +459,7 @@ function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }) {
   // 5/17 — collapse duplicate activity rows that come from the same
   // logical event written multiple times. The 5/13 audit flagged
   // "Roof-Deck-Chimney · Approved quote for Jeff Roy" appearing 4×
-  // on the feed; root cause is upstream (approveQuote() in lib/stages.js
+  // on the feed; root cause is upstream (approveQuote() in lib/stages.ts
   // and possibly fn_approve_quote_version trigger both insert into
   // fh_schedule on the same approval, doubling per re-approval). Fixing
   // the write path is invasive — a content-key dedupe at display time

@@ -13,7 +13,7 @@
 // Both run vision on Claude Sonnet via the existing /api/claude proxy
 // so the API key never ships to the browser.
 
-import { JOB_TYPES } from './jobTypes.js'
+import { JOB_TYPES } from './jobTypes.ts'
 import { claudeVision, extractJson } from './anthropic.js'
 
 const EXPENSE_CATEGORIES = ['Materials', 'Fuel', 'Permits', 'Equipment', 'Other']

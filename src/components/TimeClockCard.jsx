@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Clock, Play, Square, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
-import { recalcCost } from '../lib/stages.js'
+import { recalcCost } from '../lib/stages.ts'
 import { toastSuccess, toastError } from '../lib/toast.js'
 import { hapticTap, hapticSuccess } from '../lib/haptics.js'
 

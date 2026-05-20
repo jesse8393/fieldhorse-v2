@@ -1,7 +1,7 @@
-import { clsx } from 'clsx'
+import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
-export function cn(...inputs) {
+export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))
 }
 
@@ -11,7 +11,7 @@ export function cn(...inputs) {
 //   "+15551234567"    -> "+1 (555) 123-4567"
 //   "555 1234567"     -> "(555) 123-4567"
 //   anything else     -> returned unchanged
-export function formatPhone(raw) {
+export function formatPhone(raw: string | null | undefined): string {
   if (!raw) return ''
   const s = String(raw).trim()
   const digits = s.replace(/\D/g, '')

@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { Users as UsersIcon, ArrowUpRight } from 'lucide-react'
-import { STAGE_MAP, margin, marginTier } from '../../lib/stages.js'
+import { STAGE_MAP, margin, marginTier } from '../../lib/stages.ts'
 import { hapticTap } from '../../lib/haptics.js'
 import StatusPill from './StatusPill.jsx'
 

@@ -9,7 +9,7 @@
 // list in sync with the SQL or upserts will reject.
 
 import { supabase } from './supabase.js'
-import { transitionStage } from './stages.js'
+import { transitionStage } from './stages.ts'
 
 export const SIGNOFF_METHODS = [
   { id: 'verbal',           label: 'Verbal' },

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, Wrench } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.js'
-import { recalcCost } from '../../../lib/stages.js'
+import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.js'
 import { hapticTap } from '../../../lib/haptics.js'
-import { formatPhone } from '../../../lib/utils.js'
+import { formatPhone } from '../../../lib/utils.ts'
 import ActionSheet, { SheetField, SheetChipRow } from '../../../components/ActionSheet.jsx'
 
 const SUB_STATUSES = [

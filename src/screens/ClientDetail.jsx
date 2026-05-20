@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase.js'
 import { useClientDetail, useInvalidateClientDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.js'
-import { stageColor } from '../lib/stages.js'
+import { stageColor } from '../lib/stages.ts'
 
 function money(n) {
   const v = Number(n || 0)

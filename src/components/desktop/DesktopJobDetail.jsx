@@ -5,7 +5,7 @@ import {
   ArrowRight, Receipt
 } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../../lib/haptics.js'
-import { stageColor } from '../../lib/stages.js'
+import { stageColor } from '../../lib/stages.ts'
 import OverviewTab from '../../screens/ContactDetail/tabs/Overview.jsx'
 import QuoteTab from '../../screens/ContactDetail/tabs/Quote.jsx'
 import DetailsTab from '../../screens/ContactDetail/tabs/Details.jsx'
