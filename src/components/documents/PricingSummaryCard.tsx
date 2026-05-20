@@ -1,4 +1,4 @@
-// src/components/documents/PricingSummaryCard.jsx
+// src/components/documents/PricingSummaryCard.tsx
 //
 // "Pricing Summary" card used on proposal preview. Spec-driven layout:
 //   - Base scope total
@@ -29,7 +29,7 @@ export default function PricingSummaryCard({
   taxRate = 0,
   company,
   heroLabel = 'Project investment'
-}) {
+}: any) {
   const gold = resolveBrandGold(company)
   const base = Number(baseTotal || 0)
   const upgrade = Number(upgradeTotal || 0)
@@ -43,7 +43,7 @@ export default function PricingSummaryCard({
     upgrade > 0 ? { label: 'Selected upgrades', value: money(upgrade) } : null,
     disc > 0    ? { label: 'Discount', value: `−${money(disc)}`, muted: true } : null,
     taxRate > 0 ? { label: `Tax · ${(taxRate * 100).toFixed(2)}%`, value: money(tax) } : null
-  ].filter(Boolean)
+  ].filter(Boolean) as Array<{ label: string; value: string; muted?: boolean }>
 
   return (
     <section

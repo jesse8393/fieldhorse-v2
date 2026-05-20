@@ -1,4 +1,4 @@
-// src/components/documents/ScopeSectionCard.jsx
+// src/components/documents/ScopeSectionCard.tsx
 //
 // Reusable card for a proposal scope section. Sits on the proposal
 // "Scope of Work" page. One card per trade — e.g. Demolition, Roofing,
@@ -34,8 +34,8 @@ export default function ScopeSectionCard({
   internalNote,
   showPricing = false,
   showInternalNotes = false
-}) {
-  const visibleItems = items.filter((it) => !it?.is_excluded)
+}: any) {
+  const visibleItems = items.filter((it: any) => !it?.is_excluded)
   const hasBody = description || bullets.length > 0 || visibleItems.length > 0 || photos.length > 0
 
   return (
@@ -83,7 +83,7 @@ export default function ScopeSectionCard({
             gap: 6
           }}
         >
-          {bullets.map((b, i) => (
+          {bullets.map((b: any, i: any) => (
             <li
               key={i}
               style={{
@@ -122,7 +122,7 @@ export default function ScopeSectionCard({
             flexDirection: 'column'
           }}
         >
-          {visibleItems.map((it, i) => {
+          {visibleItems.map((it: any, i: any) => {
             const qty = Number(it.qty || 1)
             const rate = Number(it.rate || 0)
             const amount = Number(it.amount != null ? it.amount : qty * rate)
@@ -190,7 +190,7 @@ export default function ScopeSectionCard({
             gap: 8
           }}
         >
-          {photos.slice(0, 6).map((p, i) => (
+          {photos.slice(0, 6).map((p: any, i: any) => (
             <figure key={p.id || i} style={{ margin: 0 }}>
               <div
                 style={{

@@ -1,4 +1,4 @@
-// src/components/documents/ProposalTemplate.jsx
+// src/components/documents/ProposalTemplate.tsx
 //
 // Customer-facing HTML preview of a contractor proposal — restrained
 // editorial layout matching the reference estimate. Composes:
@@ -18,7 +18,7 @@
 // dark items table as the visual anchor. The brand_accent_hex drives
 // the table header bar so each contractor's identity still shows.
 
-import DocumentShell from './DocumentShell.jsx'
+import DocumentShell from './DocumentShell.tsx'
 import LineItemsTable from './LineItemsTable.tsx'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
@@ -47,7 +47,7 @@ export default function ProposalTemplate({
   showInternalNotes = false,
   photos = []             // [{ url, section_tag, caption }] — tagged
                           // photos surface grouped under Project photos.
-}) {
+}: any) {
   const number = meta.number || proposalNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
   const expiresAt = meta.expiresAt || null
@@ -56,10 +56,10 @@ export default function ProposalTemplate({
   // rows. Section title becomes the row's title; items collapse into
   // descriptionLines so the customer sees one clean "Concrete add on /
   // 12x14.5 concrete / 5x4 concrete" row per trade.
-  const baseRows = scopeSections.map((sec) => ({
+  const baseRows = scopeSections.map((sec: any) => ({
     id: sec.id,
     title: sec.title,
-    descriptionLines: (sec.items || []).map((it) => {
+    descriptionLines: (sec.items || []).map((it: any) => {
       const qty = Number(it.qty || 1)
       const unit = it.unit ? ` ${it.unit}` : ''
       return qty !== 1
@@ -67,25 +67,25 @@ export default function ProposalTemplate({
         : (it.description || '—')
     }),
     qty: 1,
-    rate: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
-    amount: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+    rate: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
+    amount: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
   }))
 
-  const upgradeRows = upgrades.map((sec) => ({
+  const upgradeRows = upgrades.map((sec: any) => ({
     id: sec.id,
     title: sec.title,
-    descriptionLines: (sec.items || []).map((it) => it.description || '—'),
+    descriptionLines: (sec.items || []).map((it: any) => it.description || '—'),
     qty: 1,
-    rate: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
-    amount: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+    rate: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
+    amount: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
   }))
 
   // Approved change orders bump the contract total in the on-screen
   // grand total. They render as their own table row too so the
   // customer sees what got added.
   const coAdjustment = (changeOrders || [])
-    .filter((co) => co?.status === 'approved')
-    .reduce((s, co) => s + Number(co.amount || 0), 0)
+    .filter((co: any) => co?.status === 'approved')
+    .reduce((s: any, co: any) => s + Number(co.amount || 0), 0)
 
   const subtotal = Math.max(0, Number(pricing.baseTotal || 0))
   const upgradeSubtotal = Math.max(0, Number(pricing.upgradeTotal || 0))
@@ -130,7 +130,7 @@ export default function ProposalTemplate({
       )}
 
       {/* Change orders */}
-      {(changeOrders || []).filter((co) => co?.status !== 'void').length > 0 && (
+      {(changeOrders || []).filter((co: any) => co?.status !== 'void').length > 0 && (
         <section>
           <SectionLabel>Contract amendments</SectionLabel>
           <ChangeOrdersBlock changeOrders={changeOrders} company={company} />
@@ -178,7 +178,7 @@ export default function ProposalTemplate({
 
 /* ─── Internal blocks ─── */
 
-function ProjectPhotosBlock({ photos, company }) {
+function ProjectPhotosBlock({ photos, company }: any) {
   // Group by section_tag. Untagged photos collect into a single
   // 'Other' bucket so they still render but stay visually separate.
   const groups = new Map()
@@ -215,7 +215,7 @@ function ProjectPhotosBlock({ photos, company }) {
               gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
               gap: 8
             }}>
-              {arr.slice(0, 6).map((p, i) => (
+              {arr.slice(0, 6).map((p: any, i: any) => (
                 <figure key={`${tag}-${i}`} style={{ margin: 0 }}>
                   <div style={{
                     width: '100%',
@@ -261,7 +261,7 @@ function ProjectPhotosBlock({ photos, company }) {
   )
 }
 
-function SectionLabel({ children }) {
+function SectionLabel({ children }: any) {
   return (
     <div
       style={{
@@ -279,7 +279,7 @@ function SectionLabel({ children }) {
   )
 }
 
-function Detail({ label, children }) {
+function Detail({ label, children }: any) {
   return (
     <div>
       <div
@@ -308,7 +308,7 @@ function Detail({ label, children }) {
   )
 }
 
-function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTotal }) {
+function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTotal }: any) {
   return (
     <section
       style={{
@@ -369,7 +369,7 @@ function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTota
   )
 }
 
-function Row({ label, value, muted }) {
+function Row({ label, value, muted }: any) {
   return (
     <tr>
       <td
@@ -400,7 +400,7 @@ function Row({ label, value, muted }) {
   )
 }
 
-function ApprovalLines({ company, contact, approval }) {
+function ApprovalLines({ company, contact, approval }: any) {
   const stamped = approval?.mode === 'approved'
   return (
     <section style={{ marginTop: 12 }}>
@@ -433,7 +433,7 @@ function ApprovalLines({ company, contact, approval }) {
   )
 }
 
-function SigLine({ label, name, dataUrl, date }) {
+function SigLine({ label, name, dataUrl, date }: any) {
   return (
     <div>
       <div
@@ -486,14 +486,14 @@ function SigLine({ label, name, dataUrl, date }) {
   )
 }
 
-function shortDateOnly(d) {
+function shortDateOnly(d: any) {
   if (!d) return ''
   const dt = d instanceof Date ? d : new Date(d)
   if (Number.isNaN(dt.getTime())) return ''
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function shortNumber(num) {
+function shortNumber(num: any) {
   // Reference layout shows "#62" — drop the prefix + year. Keep only
   // the trailing seed segment so the # reads short on the doc.
   if (!num) return ''
@@ -501,7 +501,7 @@ function shortNumber(num) {
   return parts[parts.length - 1] || String(num)
 }
 
-function statusToChip(status) {
+function statusToChip(status: any) {
   switch (String(status || 'draft').toLowerCase()) {
     case 'approved': return { label: 'APPROVED', tone: 'green' }
     case 'sent':     return { label: 'SENT',     tone: 'gold' }

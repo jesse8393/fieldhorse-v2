@@ -229,7 +229,7 @@ function drawFooter(doc, tagline = '') {
 /**
  * Generate a branded invoice PDF — v3 letterhead (Phase 4 parity).
  *
- * Mirrors src/components/documents/InvoiceTemplate.jsx section-for-
+ * Mirrors src/components/documents/InvoiceTemplate.tsx section-for-
  * section so the customer sees the same render whether the contractor
  * previewed it on-screen or received it as an email attachment.
  *
@@ -1033,7 +1033,7 @@ function parseBrandAccentRgb(hex) {
 /**
  * Generate a branded proposal PDF — v3 letterhead (Phase 4b parity).
  *
- * Mirrors src/components/documents/ProposalTemplate.jsx section-for-
+ * Mirrors src/components/documents/ProposalTemplate.tsx section-for-
  * section so the customer sees the same render whether the contractor
  * previewed it on-screen or received it as an email attachment.
  *
@@ -1448,7 +1448,7 @@ function drawUpgradesSection(ctx, cursor) {
   return cursor
 }
 
-// Per-trade scope card. Mirrors ScopeSectionCard.jsx visually:
+// Per-trade scope card. Mirrors ScopeSectionCard.tsx visually:
 //   - title row
 //   - line items list (with optional pricing column)
 function drawScopeCard(ctx, cursor, { title, items, photos = [], showPricing }) {

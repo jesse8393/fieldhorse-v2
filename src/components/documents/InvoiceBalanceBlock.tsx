@@ -1,4 +1,4 @@
-// src/components/documents/InvoiceBalanceBlock.jsx
+// src/components/documents/InvoiceBalanceBlock.tsx
 //
 // "Where the project stands" panel for an invoice. Four KPIs in a grid:
 //
@@ -35,7 +35,7 @@ export default function InvoiceBalanceBlock({
                           //   the contractor is holding back vs already
                           //   collected.
   company
-}) {
+}: any) {
   const gold = resolveBrandGold(company)
   const ct = Number(contractTotal || 0)
   const pp = Math.max(0, Number(previouslyPaid || 0))
@@ -46,8 +46,8 @@ export default function InvoiceBalanceBlock({
   // subordinate row + the "Previously paid" row label flips to
   // "Progress paid" so the meaning is unambiguous.
   const retainage = (payments || [])
-    .filter((p) => p?.kind === 'retainage')
-    .reduce((s, p) => s + Number(p.amount || 0), 0)
+    .filter((p: any) => p?.kind === 'retainage')
+    .reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
   const hasRetainage = retainage > 0
 
   const subordinate = [
@@ -63,7 +63,7 @@ export default function InvoiceBalanceBlock({
       muted: true
     },
     { label: 'This invoice', value: money(ti) }
-  ].filter(Boolean)
+  ].filter(Boolean) as Array<{ label: string; value: string; muted?: boolean }>
 
   return (
     <section
