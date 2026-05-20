@@ -17,7 +17,14 @@ import { useMemo } from 'react'
  *
  * @param {number} value 0..100
  */
-export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }) {
+type HealthDonutProps = {
+  value?: number
+  size?: number
+  stroke?: number
+  label?: import('react').ReactNode
+}
+
+export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }: HealthDonutProps) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0))
   const tier = useMemo(() => {
     if (safe >= 80) return { name: 'Good',    color: 'var(--v3-success-bright)', soft: 'var(--v3-success-soft)' }

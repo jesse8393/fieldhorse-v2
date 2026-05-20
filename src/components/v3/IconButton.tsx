@@ -34,10 +34,14 @@
  *   </IconButton>
  */
 import { useState } from 'react'
+import type { ButtonHTMLAttributes } from 'react'
 
-const SIZE_PX = { sm: 32, md: 36, lg: 44 }
+type IconBtnVariant = 'default' | 'primary' | 'ghost' | 'danger'
+type IconBtnSize = 'sm' | 'md' | 'lg'
 
-const VARIANT_BASE = {
+const SIZE_PX: Record<IconBtnSize, number> = { sm: 32, md: 36, lg: 44 }
+
+const VARIANT_BASE: Record<IconBtnVariant, { background: string; border: string; color: string }> = {
   default: {
     background: 'var(--v3-surface)',
     border: '1px solid var(--v3-border-strong)',
@@ -60,6 +64,13 @@ const VARIANT_BASE = {
   }
 }
 
+type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  ariaLabel?: string
+  variant?: IconBtnVariant
+  size?: IconBtnSize
+  dot?: boolean
+}
+
 export default function IconButton({
   children,
   onClick,
@@ -73,7 +84,7 @@ export default function IconButton({
   className,
   style,
   ...rest
-}) {
+}: IconButtonProps) {
   const [hover, setHover] = useState(false)
   const px = SIZE_PX[size] ?? SIZE_PX.md
   const base = VARIANT_BASE[variant] || VARIANT_BASE.default

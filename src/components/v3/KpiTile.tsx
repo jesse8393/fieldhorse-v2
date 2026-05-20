@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion'
-import CountUp from '../fx/CountUp.jsx'
+import CountUp from '../fx/CountUp.tsx'
 import { hapticTap } from '../../lib/haptics.ts'
 
-const TONE = {
+type KpiTone = 'primary' | 'success' | 'danger'
+
+const TONE: Record<KpiTone, { bg: string; border: string; accent: string; glow: string }> = {
   primary: {
     bg: 'linear-gradient(180deg, rgba(212,175,55,0.10), rgba(212,175,55,0.02))',
     border: 'rgba(212,175,55,0.30)',
@@ -23,10 +25,20 @@ const TONE = {
   }
 }
 
-function formatMoney(n) {
+function formatMoney(n: number | null | undefined) {
   if (n == null) return '—'
   if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`
   return n.toLocaleString()
+}
+
+type KpiTileProps = {
+  tone?: KpiTone
+  value?: number | string | null
+  label?: import('react').ReactNode
+  subline?: import('react').ReactNode
+  isMoney?: boolean
+  to?: string
+  onTap?: () => void
 }
 
 export default function KpiTile({
@@ -37,7 +49,7 @@ export default function KpiTile({
   isMoney = false,
   to,
   onTap
-}) {
+}: KpiTileProps) {
   const t = TONE[tone] || TONE.primary
   const interactive = !!(to || onTap)
   const handleTap = () => {
@@ -45,8 +57,8 @@ export default function KpiTile({
     hapticTap()
     onTap && onTap()
   }
-  const Tag = interactive ? motion.button : motion.div
-  const tagProps = interactive
+  const Tag: any = interactive ? motion.button : motion.div
+  const tagProps: any = interactive
     ? { type: 'button', whileTap: { scale: 0.97 }, onClick: handleTap }
     : {}
 

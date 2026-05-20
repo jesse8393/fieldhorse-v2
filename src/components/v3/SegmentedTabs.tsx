@@ -15,7 +15,17 @@ import { hapticTap } from '../../lib/haptics.ts'
  * @param {Array<{id: string, label: string, count?: number}>} props.tabs
  * @param {'underline' | 'pill'} [props.variant='underline']
  */
-export default function SegmentedTabs({ value, onChange, tabs, variant = 'underline', ariaLabel = 'Tabs' }) {
+type Tab = { id: string; label: import('react').ReactNode; count?: number }
+
+type SegmentedTabsProps = {
+  value: string
+  onChange: (next: string) => void
+  tabs: Tab[]
+  variant?: 'underline' | 'pill'
+  ariaLabel?: string
+}
+
+export default function SegmentedTabs({ value, onChange, tabs, variant = 'underline', ariaLabel = 'Tabs' }: SegmentedTabsProps) {
   if (variant === 'pill') {
     return (
       <div role="tablist" aria-label={ariaLabel} style={{
