@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ClipboardCheck, CheckCircle2, XCircle, MinusCircle } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { Switch } from '@/components/ui/switch'
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription

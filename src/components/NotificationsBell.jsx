@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare, Eye, ShieldCheck, FileEdit } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.ts'
 import { hapticTap } from '../lib/haptics.ts'
 

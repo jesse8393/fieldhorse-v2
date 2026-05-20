@@ -17,7 +17,7 @@
 // Single user_id check protects against cross-tenant merges. Caller
 // must pass the authed user_id; we trust no client-supplied ids.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 import type { Database } from './database.types.ts'
 
 type Client = Database['public']['Tables']['fh_clients']['Row']

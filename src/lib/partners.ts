@@ -5,7 +5,7 @@
 // so the query needs no extra owner filter — we just dedupe by email
 // and prefer the most recent name/role for each partner.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 
 export const PARTNER_ROLES = ['Foreman', 'Sub', 'Estimator', 'Other']
 

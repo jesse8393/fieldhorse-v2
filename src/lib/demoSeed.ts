@@ -9,7 +9,7 @@
 // everything" wipes them.
 //
 // Usage:
-//   import { seedDemoData } from '../lib/demoSeed.js'
+//   import { seedDemoData } from '../lib/demoSeed.ts'
 //   const counts = await seedDemoData(supabase, user.id)
 //   // counts: { clients, jobs, events, notes, todos, expenses }
 //
@@ -17,24 +17,24 @@
 
 import { hapticSuccess } from './haptics.ts'
 
-function todayAt(hour, minute = 0) {
+function todayAt(hour: number, minute = 0) {
   const d = new Date()
   d.setHours(hour, minute, 0, 0)
   return d.toISOString()
 }
-function dayAt(daysOffset, hour, minute = 0) {
+function dayAt(daysOffset: number, hour: number, minute = 0) {
   const d = new Date()
   d.setDate(d.getDate() + daysOffset)
   d.setHours(hour, minute, 0, 0)
   return d.toISOString()
 }
-function daysAgo(n) {
+function daysAgo(n: number) {
   const d = new Date()
   d.setDate(d.getDate() - n)
   return d.toISOString()
 }
 
-export async function seedDemoData(supabase, userId) {
+export async function seedDemoData(supabase: any, userId: string | undefined) {
   if (!userId) throw new Error('seedDemoData: userId required')
 
   const counts = { clients: 0, jobs: 0, events: 0, notes: 0, todos: 0, expenses: 0 }
@@ -76,9 +76,9 @@ export async function seedDemoData(supabase, userId) {
     .select('id, name')
   if (clientsErr) throw clientsErr
   counts.clients = clients.length
-  const henderson = clients.find((c) => c.name === 'Henderson Family')
-  const mccarthy = clients.find((c) => c.name === 'McCarthy Construction LLC')
-  const patel = clients.find((c) => c.name === 'Jane Patel')
+  const henderson = clients.find((c: any) => c.name === 'Henderson Family')
+  const mccarthy = clients.find((c: any) => c.name === 'McCarthy Construction LLC')
+  const patel = clients.find((c: any) => c.name === 'Jane Patel')
 
   // ============================================================
   // 2. JOBS (fh_contacts) — 6 across every stage
@@ -174,11 +174,11 @@ export async function seedDemoData(supabase, userId) {
     .select('id, name, job_title, stage, client_id')
   if (jobsErr) throw jobsErr
   counts.jobs = jobs.length
-  const henKitchen = jobs.find((j) => j.job_title === 'Kitchen remodel — full gut')
-  const henBath = jobs.find((j) => j.job_title === 'Primary bath refresh')
-  const mccOffice = jobs.find((j) => j.job_title === 'Office tenant build-out')
-  const patelYard = jobs.find((j) => j.job_title === 'Front yard redesign')
-  const murray = jobs.find((j) => j.job_title === 'Detached 2-car garage')
+  const henKitchen = jobs.find((j: any) => j.job_title === 'Kitchen remodel — full gut')
+  const henBath = jobs.find((j: any) => j.job_title === 'Primary bath refresh')
+  const mccOffice = jobs.find((j: any) => j.job_title === 'Office tenant build-out')
+  const patelYard = jobs.find((j: any) => j.job_title === 'Front yard redesign')
+  const murray = jobs.find((j: any) => j.job_title === 'Detached 2-car garage')
 
   // ============================================================
   // 3. SCHEDULE — 4 events in the next 7 days

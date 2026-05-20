@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+const env = (import.meta as any).env
+const url = env.VITE_SUPABASE_URL as string
+const key = env.VITE_SUPABASE_ANON_KEY as string
 
 if (!url || !key) {
   console.warn('[fieldhorse] Missing Supabase env vars. Copy .env.example to .env.local.')

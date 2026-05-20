@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, UserPlus, Check, X } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 
 /**
  * ClientPicker — inline autocomplete + inline-create, built on the

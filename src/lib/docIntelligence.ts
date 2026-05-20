@@ -62,7 +62,7 @@ Rules:
 // Most phone photos land at 3-8 MB; Claude Vision pricing is per
 // (resolution + tokens), so we want to ship the smallest image that
 // still has readable text. ~1.2 MB at 90% quality is a safe ceiling.
-export async function compressImageToDataUrl(file, maxBytes = 1_200_000, maxDim = 1600) {
+export async function compressImageToDataUrl(file: File | null | undefined, maxBytes = 1_200_000, maxDim = 1600): Promise<string> {
   if (!file) throw new Error('compressImageToDataUrl: file required')
 
   const objUrl = URL.createObjectURL(file)
@@ -83,7 +83,7 @@ export async function compressImageToDataUrl(file, maxBytes = 1_200_000, maxDim 
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  ctx.drawImage(img, 0, 0, width, height)
+  ctx!.drawImage(img, 0, 0, width, height)
   URL.revokeObjectURL(objUrl)
 
   // Walk down quality until the result fits maxBytes
@@ -108,7 +108,7 @@ export async function compressImageToDataUrl(file, maxBytes = 1_200_000, maxDim 
 // device fingerprints into Supabase storage. Larger ceiling than the
 // caption path (which targets Vision payload size) — storage is okay
 // to keep more detail.
-export async function compressImageToBlob(file, maxBytes = 1_500_000, maxDim = 1800) {
+export async function compressImageToBlob(file: File | null | undefined, maxBytes = 1_500_000, maxDim = 1800): Promise<Blob | null> {
   if (!file) throw new Error('compressImageToBlob: file required')
 
   const objUrl = URL.createObjectURL(file)
@@ -128,19 +128,19 @@ export async function compressImageToBlob(file, maxBytes = 1_500_000, maxDim = 1
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  ctx.drawImage(img, 0, 0, width, height)
+  ctx!.drawImage(img, 0, 0, width, height)
   URL.revokeObjectURL(objUrl)
 
   // Walk down quality until we fit maxBytes. canvas.toBlob is callback-
   // based; wrap in Promise. Quality floor is 0.5 so we never end up with
   // a near-unreadable photo even on a comically large input.
   for (const quality of [0.92, 0.85, 0.78, 0.7, 0.6, 0.5]) {
-    const blob = await new Promise((resolve) => {
+    const blob = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
     })
     if (blob && (blob.size <= maxBytes || quality <= 0.5)) return blob
   }
-  return await new Promise((resolve) => {
+  return await new Promise<Blob | null>((resolve) => {
     canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.5)
   })
 }
@@ -148,7 +148,7 @@ export async function compressImageToBlob(file, maxBytes = 1_500_000, maxDim = 1
 // Read a clipboard event for an image and return a File. Returns null
 // if the paste didn't contain an image. Used by NewLeadSheet's paste
 // handler so the user can screenshot an email and Cmd-V into the form.
-export function imageFromClipboardEvent(e) {
+export function imageFromClipboardEvent(e: ClipboardEvent): File | null {
   const items = e.clipboardData?.items || []
   for (const item of items) {
     if (item.type?.startsWith('image/')) {
@@ -158,7 +158,7 @@ export function imageFromClipboardEvent(e) {
   return null
 }
 
-export async function parseLeadFromImage(dataUrl) {
+export async function parseLeadFromImage(dataUrl: string) {
   const res = await claudeVision({
     system: LEAD_SYSTEM,
     prompt: 'Extract this lead. Return only the JSON object specified in your system prompt.',
@@ -171,7 +171,7 @@ export async function parseLeadFromImage(dataUrl) {
   return normalizeLead(parsed)
 }
 
-export async function parseExpenseFromImage(dataUrl) {
+export async function parseExpenseFromImage(dataUrl: string) {
   const res = await claudeVision({
     system: EXPENSE_SYSTEM,
     prompt: 'Extract this expense. Return only the JSON object specified in your system prompt.',
@@ -195,7 +195,7 @@ Rules:
 - If the photo isn't a jobsite photo (selfie, screenshot, blank, blurred), say so plainly: "Not a jobsite photo." or "Image too blurred to caption." — do not invent.
 - No prefacing ("This image shows…"), no markdown, no JSON.`
 
-export async function captionPhoto(dataUrl) {
+export async function captionPhoto(dataUrl: string): Promise<string | null> {
   const res = await claudeVision({
     system: CAPTION_SYSTEM,
     prompt: 'Caption this jobsite photo. One sentence, under 18 words.',
@@ -209,7 +209,7 @@ export async function captionPhoto(dataUrl) {
   return cleaned.length > 220 ? cleaned.slice(0, 217) + '…' : cleaned
 }
 
-function normalizeLead(p) {
+function normalizeLead(p: any) {
   // Coerce types + strip junk so the parsed object slots cleanly into
   // the form state. Anything questionable becomes null so the field
   // stays empty rather than getting a hallucinated value.
@@ -219,7 +219,7 @@ function normalizeLead(p) {
     email: nullableString(p.email),
     address: nullableString(p.address),
     job_title: nullableString(p.job_title),
-    job_type: null,
+    job_type: null as string | null,
     amount: typeof p.amount === 'number' && p.amount > 0 ? Math.round(p.amount) : null,
     notes: nullableString(p.notes)
   }
@@ -230,7 +230,7 @@ function normalizeLead(p) {
   return out
 }
 
-function normalizeExpense(p) {
+function normalizeExpense(p: any) {
   const cat = typeof p.category === 'string'
     ? EXPENSE_CATEGORIES.find((c) => c.toLowerCase() === p.category.toLowerCase())
     : null
@@ -246,7 +246,7 @@ function normalizeExpense(p) {
   }
 }
 
-function nullableString(v) {
+function nullableString(v: unknown): string | null {
   if (typeof v !== 'string') return null
   const t = v.trim()
   return t.length > 0 ? t : null

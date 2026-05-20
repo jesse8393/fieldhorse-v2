@@ -4,8 +4,8 @@ import {
   Upload, GitCompareArrows, ChevronLeft, ChevronRight,
   X, Trash2, Sparkles, Image as ImageIcon
 } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
-import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.js'
+import { supabase } from '../../../lib/supabase.ts'
+import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.jsx'

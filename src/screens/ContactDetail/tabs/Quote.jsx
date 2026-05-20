@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon, PenLine } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { useProfile } from '../../../contexts/ProfileContext.jsx'
 import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'

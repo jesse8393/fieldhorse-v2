@@ -7,7 +7,7 @@
 // Strategy for list views (Jobs, Home Live Feed): one query for all the
 // user's photos + ONE batch signed-URL call. No N+1.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 
 const SIGN_TTL_SECONDS = 3600 // 1 hour — long enough for a session, short enough that leaked URLs expire
 

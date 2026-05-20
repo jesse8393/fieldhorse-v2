@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 
 /**
  * Account attribution — resolve a set of user_ids into display labels

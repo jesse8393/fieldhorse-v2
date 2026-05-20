@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../../lib/supabase.js'
+import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess } from '../../../lib/toast.ts'
 
 /**

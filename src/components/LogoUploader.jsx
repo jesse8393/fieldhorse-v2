@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.ts'
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml'
 const MAX_BYTES = 2 * 1024 * 1024 // 2 MB

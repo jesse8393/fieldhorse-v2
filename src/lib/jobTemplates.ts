@@ -15,7 +15,15 @@
 // template whose jobType matches the lead's chosen job_type appears.
 // Set jobType to '*' to always show.
 
-export const JOB_TEMPLATES = [
+export type JobTemplate = {
+  slug: string
+  label: string
+  jobType: string
+  description: string
+  todos: string[]
+}
+
+export const JOB_TEMPLATES: JobTemplate[] = [
   {
     slug: 'roofing-tearoff',
     label: 'Roof tear-off + reshingle',
@@ -199,12 +207,12 @@ export const JOB_TEMPLATES = [
   }
 ]
 
-export function getTemplatesForJobType(jobType) {
+export function getTemplatesForJobType(jobType: string | null | undefined): JobTemplate[] {
   if (!jobType) return []
   return JOB_TEMPLATES.filter((t) => t.jobType === jobType || t.jobType === '*')
 }
 
-export function getTemplate(slug) {
+export function getTemplate(slug: string | null | undefined): JobTemplate | null {
   if (!slug) return null
   return JOB_TEMPLATES.find((t) => t.slug === slug) || null
 }
@@ -212,7 +220,7 @@ export function getTemplate(slug) {
 // Apply a template to a freshly-created job. Inserts every milestone as
 // a row in fh_job_todos with done=false. Failure is non-fatal — the lead
 // still exists, the user just gets an empty checklist.
-export async function applyTemplate(supabase, { template, jobId, userId }) {
+export async function applyTemplate(supabase: any, { template, jobId, userId }: { template: JobTemplate | null | undefined; jobId: string | undefined; userId: string | undefined }) {
   if (!template?.todos?.length || !jobId || !userId) return { inserted: 0 }
   const rows = template.todos.map((text) => ({
     user_id: userId,

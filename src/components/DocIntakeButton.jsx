@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Upload, Sparkles, X, Loader2 } from 'lucide-react'
-import { compressImageToDataUrl, imageFromClipboardEvent } from '../lib/docIntelligence.js'
+import { compressImageToDataUrl, imageFromClipboardEvent } from '../lib/docIntelligence.ts'
 import { hapticTap, hapticSuccess } from './../lib/haptics.ts'
 import { toastError } from '../lib/toast.ts'
 

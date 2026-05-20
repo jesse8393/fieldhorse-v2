@@ -10,7 +10,7 @@
 // or pre-load surfaces, but anything customer-facing should use the
 // merged version so the contractor's edits actually flow through.
 
-import { supabase } from './supabase.js'
+import { supabase } from './supabase.ts'
 
 export type RateSeed = { unit: string; low: number; high: number }
 export type RateEntry = RateSeed & { label?: string; custom?: boolean }

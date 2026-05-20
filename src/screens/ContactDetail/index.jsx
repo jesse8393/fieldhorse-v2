@@ -6,7 +6,7 @@ import {
   XCircle, Trash2, Users
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
-import { supabase } from '../../lib/supabase.js'
+import { supabase } from '../../lib/supabase.ts'
 import { markLost } from '../../lib/pipeline.ts'
 import { stageColor } from '../../lib/stages.ts'
 import { toastSuccess, toastInfo, toastError } from '../../lib/toast.ts'
