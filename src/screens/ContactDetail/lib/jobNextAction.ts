@@ -32,7 +32,7 @@ import { dueStatus } from '../../../lib/dueDate.ts'
  *   - stage     → call pipelineFn(contact)
  *   - idle      → open AddEventSheet
  */
-const STAGE_DEFAULTS = {
+const STAGE_DEFAULTS: Record<string, { title: string; ctaLabel: string; pipelineFn: string }> = {
   lead:    { title: 'Send a quote.',                   ctaLabel: 'Start quote',     pipelineFn: 'startQuote' },
   quote:   { title: 'Approve the quote and kick off.', ctaLabel: 'Approve quote',   pipelineFn: 'approveQuote' },
   job:     { title: 'Wrap up and invoice.',            ctaLabel: 'Mark complete',   pipelineFn: 'markComplete' },
@@ -41,7 +41,7 @@ const STAGE_DEFAULTS = {
   lost:    { title: 'Reopen if back in play.',         ctaLabel: 'Reopen',          pipelineFn: 'reopen' }
 }
 
-export function resolveNextAction({ contact, scheduleItems = [], todos = [] } = {}) {
+export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: { contact?: any; scheduleItems?: any[]; todos?: any[] } = {}) {
   if (!contact) {
     return { kind: 'idle', title: 'No next action.', ctaLabel: '+ Schedule next step' }
   }
@@ -51,7 +51,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] } = 
   // 1. SCHEDULE — soonest upcoming entry wins
   const upcoming = scheduleItems
     .filter((s) => s?.start_at && new Date(s.start_at).getTime() >= now)
-    .sort((a, b) => new Date(a.start_at) - new Date(b.start_at))[0]
+    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())[0]
 
   if (upcoming) {
     return {
@@ -65,7 +65,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] } = 
 
   // 2. MILESTONES — first undone (operator-defined order matters; don't sort)
   const milestones = Array.isArray(contact.milestones) ? contact.milestones : []
-  const milestoneIdx = milestones.findIndex((m) => m && !m.done)
+  const milestoneIdx = milestones.findIndex((m: any) => m && !m.done)
   if (milestoneIdx !== -1) {
     return {
       kind: 'milestone',
@@ -105,12 +105,12 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] } = 
 // Bucket undone todos by dueStatus tone, then sort by due_at ascending
 // within each bucket. danger (overdue, oldest first) > warn (today)
 // > muted (soonest future) > undated (preserves upstream order).
-const TODO_BUCKET_RANK = { danger: 0, warn: 1, muted: 2 }
+const TODO_BUCKET_RANK: Record<string, number> = { danger: 0, warn: 1, muted: 2 }
 
-function pickPriorityTodo(todos) {
+function pickPriorityTodo(todos: any[]) {
   if (!Array.isArray(todos) || todos.length === 0) return null
-  let firstUndated = null
-  const dated = []
+  let firstUndated: any = null
+  const dated: any[] = []
   for (const t of todos) {
     if (!t || t.done) continue
     if (t.due_at) {
@@ -121,8 +121,8 @@ function pickPriorityTodo(todos) {
   }
   if (dated.length === 0) return firstUndated
   dated.sort((a, b) => {
-    const ra = TODO_BUCKET_RANK[dueStatus(a.due_at)?.tone] ?? 3
-    const rb = TODO_BUCKET_RANK[dueStatus(b.due_at)?.tone] ?? 3
+    const ra = TODO_BUCKET_RANK[dueStatus(a.due_at)?.tone ?? ''] ?? 3
+    const rb = TODO_BUCKET_RANK[dueStatus(b.due_at)?.tone ?? ''] ?? 3
     if (ra !== rb) return ra - rb
     return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
   })

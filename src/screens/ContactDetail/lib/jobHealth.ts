@@ -22,14 +22,14 @@
  *
  * Pure function. No side effects. No imports beyond what's typed in args.
  */
-export function computeJobHealth({ contact, payments = [], scheduleItems = [] } = {}) {
+export function computeJobHealth({ contact, payments = [], scheduleItems = [] }: { contact?: any; payments?: any[]; scheduleItems?: any[] } = {}) {
   if (!contact) {
     return { score: 0, tier: 'unknown', label: '—', breakdown: null }
   }
 
   // Execution: milestones complete / total
   const milestones = Array.isArray(contact.milestones) ? contact.milestones : []
-  const milestonesDone = milestones.filter((m) => m && m.done).length
+  const milestonesDone = milestones.filter((m: any) => m && m.done).length
   const milestoneRatio = milestones.length > 0 ? milestonesDone / milestones.length : 0
 
   // Financial: paid / contracted (cap at 1 — overpayment doesn't keep adding)
