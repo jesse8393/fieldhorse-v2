@@ -26,7 +26,7 @@ import { SkeletonList } from '../components/Skeleton.jsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import { usePartnerDirectory, useInvalidatePartners } from '../lib/queries.ts'
 import { revokePartnerRow } from '../lib/partners.js'
-import { stageColor } from '../lib/stages.js'
+import { stageColor } from '../lib/stages.ts'
 
 const STATUS_FILTERS = [
   { id: 'all',      label: 'All',      match: () => true },

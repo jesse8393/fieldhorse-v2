@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Plus, Search, Star } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../../lib/haptics.js'
-import { ACTIVE_STAGES } from '../../lib/stages.js'
+import { ACTIVE_STAGES } from '../../lib/stages.ts'
 
 /**
  * DesktopJobsBoard — desktop-first composition for /jobs at >=900px.

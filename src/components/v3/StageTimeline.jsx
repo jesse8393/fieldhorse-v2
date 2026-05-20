@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import { STAGES, STAGE_MAP } from '../../lib/stages.js'
+import { STAGES, STAGE_MAP } from '../../lib/stages.ts'
 
 // Visual stage progression — collapses 6 raw stages to a 5-step linear
 // timeline that matches the mockup. `lost` is rendered as a small inline

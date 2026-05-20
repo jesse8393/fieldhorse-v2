@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useSubDetail, subDetailKey } from '../lib/queries.ts'
-import { formatPhone } from '../lib/utils.js'
+import { formatPhone } from '../lib/utils.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.js'
 import { useFhMotion } from '../lib/motion.js'

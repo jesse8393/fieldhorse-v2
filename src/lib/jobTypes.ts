@@ -1,7 +1,9 @@
 // Single source of truth for job type options. Used by NewLeadSheet and Bid
 // so the app speaks the same language end-to-end.
 
-export const JOB_TYPES = [
+export type JobType = { value: string; label: string }
+
+export const JOB_TYPES: JobType[] = [
   { value: 'New Build', label: 'New build' },
   { value: 'Renovation', label: 'Renovation' },
   { value: 'Addition', label: 'Addition' },

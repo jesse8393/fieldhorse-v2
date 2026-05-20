@@ -1,5 +1,5 @@
 // Pipeline transitions with haptic + toast. Wraps the stage helpers from
-// stages.js so ContactDetail fires consistent feedback on every move.
+// stages.ts so ContactDetail fires consistent feedback on every move.
 
 import {
   transitionStage,
@@ -9,7 +9,7 @@ import {
   markLost as baseMarkLost,
   logPayment as baseLogPayment,
   STAGE_MAP
-} from './stages.js'
+} from './stages.ts'
 import { toast, hapticMedium, hapticSuccess } from './toast.js'
 
 function notify(stageId, verb = 'Moved to') {

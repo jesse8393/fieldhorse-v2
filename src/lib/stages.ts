@@ -1,7 +1,14 @@
 // Fieldhorse pipeline stages + auto-transitions
 import { supabase } from './supabase.js'
+import type { Database } from './database.types.ts'
 
-export const STAGES = [
+type Contact = Database['public']['Tables']['fh_contacts']['Row']
+
+export type StageId = 'lead' | 'quote' | 'job' | 'invoice' | 'closed' | 'lost'
+
+export type Stage = { id: StageId; label: string; color: string; icon: string }
+
+export const STAGES: Stage[] = [
   { id: 'lead',    label: 'Lead',    color: 'var(--stage-lead)',    icon: 'lead' },
   { id: 'quote',   label: 'Quote',   color: 'var(--stage-quote)',   icon: 'quote' },
   { id: 'job',     label: 'Job',     color: 'var(--stage-job)',     icon: 'job' },
@@ -10,20 +17,20 @@ export const STAGES = [
   { id: 'lost',    label: 'Lost',    color: 'var(--stage-lost)',    icon: 'lost' }
 ]
 
-export const STAGE_MAP = Object.fromEntries(STAGES.map((s) => [s.id, s]))
+export const STAGE_MAP: Record<string, Stage> = Object.fromEntries(STAGES.map((s) => [s.id, s]))
 
 export const ACTIVE_STAGES = ['lead', 'quote', 'job', 'invoice']
 
-export function stageColor(id) {
+export function stageColor(id: string): string {
   return STAGE_MAP[id]?.color || 'var(--steel)'
 }
 
-export function stageLabel(id) {
+export function stageLabel(id: string): string {
   return STAGE_MAP[id]?.label || id
 }
 
 // Transitions
-export async function transitionStage(contact, nextStage) {
+export async function transitionStage(contact: Contact, nextStage: StageId) {
   const patch = { stage: nextStage }
   const { data, error } = await supabase
     .from('fh_contacts')
@@ -35,11 +42,11 @@ export async function transitionStage(contact, nextStage) {
   return { data, error }
 }
 
-export async function startQuote(contact) {
+export async function startQuote(contact: Contact) {
   return transitionStage(contact, 'quote')
 }
 
-export async function approveQuote(contact) {
+export async function approveQuote(contact: Contact) {
   const { data, error } = await transitionStage(contact, 'job')
   if (error) return { data, error }
 
@@ -66,17 +73,25 @@ export async function approveQuote(contact) {
   return { data, error: null }
 }
 
-export async function completeJob(contact) {
+export async function completeJob(contact: Contact) {
   return transitionStage(contact, 'invoice')
 }
 
-export async function markLost(contact) {
+export async function markLost(contact: Contact) {
   return transitionStage(contact, 'lost')
 }
 
-export async function logPayment(contact, { amount, method, kind, reference, paid_on }) {
+type LogPaymentOpts = {
+  amount: number | string
+  method?: string | null
+  kind?: string | null
+  reference?: string | null
+  paid_on?: string | null
+}
+
+export async function logPayment(contact: Contact, { amount, method, kind, reference, paid_on }: LogPaymentOpts) {
   const normalizedAmount = Number(amount) || 0
-  const normalizedKind = ['deposit','progress','final','retainage','other'].includes(kind) ? kind : 'other'
+  const normalizedKind = ['deposit','progress','final','retainage','other'].includes(kind ?? '') ? (kind as string) : 'other'
   const payload = {
     user_id: contact.user_id,
     contact_id: contact.id,
@@ -126,7 +141,7 @@ export async function logPayment(contact, { amount, method, kind, reference, pai
   return { total }
 }
 
-export async function recalcCost(contactId, userId) {
+export async function recalcCost(contactId: string | undefined, userId: string | undefined) {
   if (!contactId || !userId) return 0
   const { data: subs } = await supabase
     .from('fh_subs')
@@ -145,14 +160,14 @@ export async function recalcCost(contactId, userId) {
   return cost
 }
 
-export function margin(contact) {
+export function margin(contact: Pick<Contact, 'amount' | 'cost'> | null | undefined) {
   const amt = Number(contact?.amount || 0)
   const cost = Number(contact?.cost || 0)
   if (!amt) return 0
   return ((amt - cost) / amt) * 100
 }
 
-export function marginTier(pct) {
+export function marginTier(pct: number) {
   if (pct >= 30) return 'good'
   if (pct >= 15) return 'warn'
   return 'thin'
