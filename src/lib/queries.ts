@@ -530,3 +530,50 @@ export function useInvalidateClientDetail() {
   return (id: string | undefined) =>
     client.invalidateQueries({ queryKey: ['clientDetail', id] })
 }
+
+// ---- Analytics ----
+// Six datasets feeding the KPI tiles + Reports & Insights section:
+// every contact, mileage log, payments, invoices, change orders, and a
+// slim client list (id/name, for the top-revenue list without N+1
+// lookups). Bundled so the screen keeps one loading flag.
+
+export type AnalyticsBundle = {
+  contacts: Contact[]
+  mileage: Database['public']['Tables']['fh_mileage']['Row'][]
+  payments: Payment[]
+  invoices: Database['public']['Tables']['fh_invoices']['Row'][]
+  changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
+  clients: Pick<Client, 'id' | 'name'>[]
+}
+
+async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
+  const [c, m, p, inv, co, cli] = await Promise.all([
+    supabase.from('fh_contacts').select('*').eq('user_id', userId),
+    supabase.from('fh_mileage').select('*').eq('user_id', userId).order('drove_on', { ascending: false }),
+    supabase.from('fh_payments').select('*').eq('user_id', userId),
+    supabase.from('fh_invoices').select('*').eq('user_id', userId),
+    supabase.from('fh_change_orders').select('*').eq('user_id', userId),
+    supabase.from('fh_clients').select('id, name').eq('user_id', userId)
+  ])
+  return {
+    contacts: (c.data ?? []) as Contact[],
+    mileage: (m.data ?? []) as AnalyticsBundle['mileage'],
+    payments: (p.data ?? []) as Payment[],
+    invoices: (inv.data ?? []) as AnalyticsBundle['invoices'],
+    changeOrders: (co.data ?? []) as AnalyticsBundle['changeOrders'],
+    clients: (cli.data ?? []) as AnalyticsBundle['clients']
+  }
+}
+
+export function useAnalyticsBundle(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['analytics', userId],
+    queryFn: () => fetchAnalyticsBundle(userId as string),
+    enabled: !!userId
+  })
+}
+
+export function useInvalidateAnalytics() {
+  const client = useQueryClient()
+  return () => client.invalidateQueries({ queryKey: ['analytics'] })
+}

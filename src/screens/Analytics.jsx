@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.jsx'
 import CountUp from '../components/fx/CountUp.jsx'
 import LogMilesSheet from '../components/LogMilesSheet.jsx'
-import { supabase } from '../lib/supabase.js'
+import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.js'
 import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn } from '../lib/rollups.js'
@@ -28,39 +28,18 @@ function fmtInt(n) { return String(Math.round(n)) }
 
 export default function Analytics() {
   const { user } = useAuth()
-  const [contacts, setContacts] = useState([])
-  const [mileage, setMileage] = useState([])
-  // Financial detail tables — unlocked the deeper "Reports & Insights"
-  // section below the original 8 KPI tiles. fh_clients fetched so the
-  // top-revenue list can show client names without N+1 lookups.
-  const [payments, setPayments] = useState([])
-  const [invoices, setInvoices] = useState([])
-  const [changeOrders, setChangeOrders] = useState([])
-  const [clients, setClients] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Financial detail tables feed the "Reports & Insights" section below
+  // the KPI tiles. fh_clients (id/name) lets the top-revenue list show
+  // client names without N+1 lookups.
+  const { data: bundle, isLoading: loading } = useAnalyticsBundle(user?.id)
+  const load = useInvalidateAnalytics()
+  const contacts = bundle?.contacts ?? []
+  const mileage = bundle?.mileage ?? []
+  const payments = bundle?.payments ?? []
+  const invoices = bundle?.invoices ?? []
+  const changeOrders = bundle?.changeOrders ?? []
+  const clients = bundle?.clients ?? []
   const [logOpen, setLogOpen] = useState(false)
-
-  const load = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    const [{ data: c }, { data: m }, { data: p }, { data: inv }, { data: co }, { data: cli }] = await Promise.all([
-      supabase.from('fh_contacts').select('*').eq('user_id', user.id),
-      supabase.from('fh_mileage').select('*').eq('user_id', user.id).order('drove_on', { ascending: false }),
-      supabase.from('fh_payments').select('*').eq('user_id', user.id),
-      supabase.from('fh_invoices').select('*').eq('user_id', user.id),
-      supabase.from('fh_change_orders').select('*').eq('user_id', user.id),
-      supabase.from('fh_clients').select('id, name').eq('user_id', user.id)
-    ])
-    setContacts(c || [])
-    setMileage(m || [])
-    setPayments(p || [])
-    setInvoices(inv || [])
-    setChangeOrders(co || [])
-    setClients(cli || [])
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => { load() }, [load])
 
   // 12-week pipeline trend — bucket contacts by created_at week,
   // sum amount of rows still in active stages. Each bucket is Sunday-anchored.
