@@ -27,7 +27,7 @@ import { SkeletonList } from '../components/Skeleton.tsx'
 
 const PAGE_SIZE = 60
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, {
     style: 'currency', currency: 'USD',
@@ -35,9 +35,9 @@ function money(n) {
   })
 }
 
-function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
+function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
 
-const STAGE_TONE = {
+const STAGE_TONE: Record<string, any> = {
   closed: 'green',
   lost:   'red',
   invoice:'gold',
@@ -48,7 +48,7 @@ const STAGE_TONE = {
 
 // Group events by relative date bucket so the feed reads as a
 // timeline of "today / yesterday / this week / older" sections.
-function bucketLabel(d) {
+function bucketLabel(d: any) {
   if (!d) return 'Earlier'
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
@@ -61,7 +61,7 @@ function bucketLabel(d) {
   return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 }
 
-function timeAt(d) {
+function timeAt(d: any) {
   if (!d) return ''
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
@@ -99,8 +99,8 @@ export default function Activity() {
         const kindStr = p.kind && p.kind !== 'other' ? ` · ${p.kind}` : ''
         out.push({
           id: `p:${p.id}`,
-          when: new Date(p.paid_on || p.created_at),
-          contact: contactById.get(p.contact_id),
+          when: new Date((p.paid_on || p.created_at) as any),
+          contact: contactById.get(p.contact_id as string),
           contactId: p.contact_id,
           kind: 'payment',
           icon: DollarSign,
@@ -145,7 +145,7 @@ export default function Activity() {
 
     return out
       .filter((e) => e.when instanceof Date && !Number.isNaN(e.when.getTime()))
-      .sort((a, b) => b.when - a.when)
+      .sort((a: any, b: any) => b.when.getTime() - a.when.getTime())
   }, [bundle])
 
   // Group by date bucket for the section headers.
@@ -235,7 +235,7 @@ export default function Activity() {
               </span>
             </div>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {items.map((e) => <EventRow key={e.id} event={e} />)}
+              {items.map((e: any) => <EventRow key={e.id} event={e} />)}
             </ul>
           </section>
         ))}
@@ -244,14 +244,14 @@ export default function Activity() {
   )
 }
 
-function EventRow({ event }) {
+function EventRow({ event }: any) {
   const Icon = event.icon || ActivityIcon
   const tone = ({
     neutral: { fg: 'var(--v3-text-muted)', bg: 'rgba(255,255,255,0.06)', br: 'rgba(255,255,255,0.10)' },
     gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
     green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74,222,128,0.10)', br: 'rgba(74,222,128,0.30)' },
     red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232,90,87,0.10)', br: 'rgba(232,90,87,0.30)' }
-  })[event.tone || 'neutral']
+  } as Record<string, any>)[event.tone || 'neutral']
 
   const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
 

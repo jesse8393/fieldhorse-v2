@@ -32,8 +32,8 @@ export default function Compose() {
   const [channel, setChannel] = useState('sms')
   const [intent, setIntent] = useState(INTENTS[0])
   const [contactId, setContactId] = useState('')
-  const [contact, setContact] = useState(null)
-  const [contacts, setContacts] = useState([])
+  const [contact, setContact] = useState<any>(null)
+  const [contacts, setContacts] = useState<any[]>([])
   const [context, setContext] = useState('')
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
@@ -51,7 +51,7 @@ export default function Compose() {
       .select('id, name, phone, email, job_title, job_type, stage, amount')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
-      .then(({ data }) => setContacts(data || []))
+      .then(({ data }: any) => setContacts(data || []))
   }, [user])
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function Compose() {
         // phrasing in the system prompt — the recipient never knows a
         // platform exists. Sender identity comes from the contractor's
         // profile.company_name with a neutral fallback.
-        system: `You are a messaging assistant for a contractor's business. Write a ${ch.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
+        system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
         messages: [{ role: 'user', content: `Intent: ${intent}\n${contactLine}\nExtra context: ${context || 'none'}\n\nReturn only the message text, no preamble.` }],
         maxTokens: 500
       })
@@ -82,7 +82,7 @@ export default function Compose() {
       if (!text) throw new Error('Empty response from AI')
       hapticSuccess(); setDraft(text)
       toastSuccess('Draft ready', 'Copy, send, or edit')
-    } catch (e) {
+    } catch (e: any) {
       console.error('[compose] generate failed:', e)
       const msg = String(e?.message || '').toLowerCase()
       if (msg.includes('missing_api_key') || msg.includes('500')) {
@@ -132,7 +132,7 @@ export default function Compose() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contact_id: contact.id,
-          sender_user_id: user.id,
+          sender_user_id: user!.id,
           recipient_email: contact.email,
           recipient_name: contact.name || null,
           subject: subjectGuess,
@@ -155,7 +155,7 @@ export default function Compose() {
       setSent(true)
       toastSuccess(`Email sent to ${contact.email}`, `${draft.length} chars · ${countWords(draft)} words`)
       setTimeout(() => setSent(false), 2400)
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message || 'Could not send the message. Try again.')
     } finally {
       setSending(false)
@@ -259,7 +259,7 @@ export default function Compose() {
                       size="sm"
                       active={isOn}
                       onClick={() => setChannel(ch.id)}
-                      ariaLabel={`${ch.label} channel`}
+                      ariaLabel={`${ch?.label} channel`}
                       style={{ justifyContent: 'center' }}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -665,7 +665,7 @@ export default function Compose() {
    Field — labelled input wrapper. Uses v3-eyebrow label style
    for consistency with the rest of the app's form fields.
    ============================================================ */
-function Field({ label, children }) {
+function Field({ label, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span className="v3-eyebrow">{label}</span>
@@ -680,7 +680,7 @@ function Field({ label, children }) {
    prototype's "USED 4 FACTS" chips were hand-typed mocks; ours
    reflect the actual contact fields fed into claudeMessage.
    ============================================================ */
-function ContextChip({ children, tone = 'default' }) {
+function ContextChip({ children, tone = 'default' }: any) {
   const isGold = tone === 'gold'
   return (
     <span style={{
@@ -704,7 +704,7 @@ function ContextChip({ children, tone = 'default' }) {
   )
 }
 
-function countWords(s) {
+function countWords(s: any) {
   if (!s) return 0
   return s.trim().split(/\s+/).filter(Boolean).length
 }
@@ -715,7 +715,7 @@ function countWords(s) {
    nav.jsx) so the operator sees what the client will receive,
    not just plain text on a panel.
    ============================================================ */
-function DraftHero({ channel, draft, contact, profile, intent }) {
+function DraftHero({ channel, draft, contact, profile, intent }: any) {
   if (channel === 'sms') {
     return <SmsHero draft={draft} contact={contact} />
   }
@@ -725,8 +725,8 @@ function DraftHero({ channel, draft, contact, profile, intent }) {
   return <VoiceHero draft={draft} />
 }
 
-function SmsHero({ draft, contact }) {
-  const initials = (contact?.name || '·').trim().split(/\s+/).slice(0, 2).map((s) => s.charAt(0).toUpperCase()).join('') || '·'
+function SmsHero({ draft, contact }: any) {
+  const initials = (contact?.name || '·').trim().split(/\s+/).slice(0, 2).map((s: any) => s.charAt(0).toUpperCase()).join('') || '·'
   const now = new Date()
   const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   const dayStr = now.toLocaleDateString([], { weekday: 'short' }).toUpperCase()
@@ -813,7 +813,7 @@ function SmsHero({ draft, contact }) {
 // fenced code blocks, headings) that Claude sometimes emits so the
 // recipient doesn't see literal asterisks in the email body. Audit flagged
 // "**Subject: ...**" rendering with raw asterisks visible.
-function stripMarkdown(text) {
+function stripMarkdown(text: any) {
   if (!text) return ''
   return text
     .replace(/\*\*(.+?)\*\*/g, '$1')
@@ -824,7 +824,7 @@ function stripMarkdown(text) {
     .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
 }
 
-function EmailHero({ draft, contact, profile, intent }) {
+function EmailHero({ draft, contact, profile, intent }: any) {
   const fromName = profile?.company_name || profile?.full_name || 'Sender'
   const fromAddr = profile?.company_email || profile?.email || ''
   const cleaned = stripMarkdown(draft)
@@ -878,7 +878,7 @@ function EmailHero({ draft, contact, profile, intent }) {
   )
 }
 
-function VoiceHero({ draft }) {
+function VoiceHero({ draft }: any) {
   return (
     <div style={{
       borderRadius: 14,
@@ -906,7 +906,7 @@ function VoiceHero({ draft }) {
   )
 }
 
-const selectStyle = {
+const selectStyle: import('react').CSSProperties = {
   padding: '11px 14px',
   borderRadius: 12,
   background: 'var(--v3-surface-2)',

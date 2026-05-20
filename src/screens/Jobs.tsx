@@ -33,19 +33,19 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 // Phase 11 ?stage=active deep-link from Home still routes here.
 const TABS = [
   { id: 'all',    label: 'All',    match: () => true },
-  { id: 'lead',   label: 'Lead',   match: (c) => c.stage === 'lead' },
-  { id: 'quote',  label: 'Quote',  match: (c) => c.stage === 'quote' },
-  { id: 'active', label: 'Doing',  match: (c) => c.stage === 'job' },
-  { id: 'won',    label: 'Complete', match: (c) => c.stage === 'invoice' || c.stage === 'closed' }
+  { id: 'lead',   label: 'Lead',   match: (c: any) => c.stage === 'lead' },
+  { id: 'quote',  label: 'Quote',  match: (c: any) => c.stage === 'quote' },
+  { id: 'active', label: 'Doing',  match: (c: any) => c.stage === 'job' },
+  { id: 'won',    label: 'Complete', match: (c: any) => c.stage === 'invoice' || c.stage === 'closed' }
 ]
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   return v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 }
 
-function kFormat(n) {
+function kFormat(n: any) {
   const v = Number(n || 0)
   if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`
   return money(v)
@@ -68,8 +68,8 @@ export default function Jobs() {
   // 'job' when the entry point was the Home "New Job" quick action
   // (which passes ?asStage=job). Keeps the title + default chip honest.
   const [addInitialStage, setAddInitialStage] = useState('lead')
-  const [justAddedId, setJustAddedId] = useState(null)
-  const [drawerContact, setDrawerContact] = useState(null)
+  const [justAddedId, setJustAddedId] = useState<any>(null)
+  const [drawerContact, setDrawerContact] = useState<any>(null)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -122,9 +122,9 @@ export default function Jobs() {
 
   const summary = useMemo(() => {
     const pipeline = contacts
-      .filter((c) => ACTIVE_STAGES.includes(c.stage))
+      .filter((c) => ACTIVE_STAGES.includes(c.stage as string))
       .reduce((s, c) => s + Number(c.amount || 0), 0)
-    const activeCount = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage)).length
+    const activeCount = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage as string)).length
     const totalCount = contacts.length
     // "Need eyes" — active-stage jobs with no update in 7+ days. Matches
     // the design's stats line ("X total · $Y in motion · Z need eyes") and
@@ -132,7 +132,7 @@ export default function Jobs() {
     // attention. Excludes closed/lost since they're terminal.
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
     const needEyesCount = contacts.filter((c) => {
-      if (!ACTIVE_STAGES.includes(c.stage)) return false
+      if (!ACTIVE_STAGES.includes(c.stage as string)) return false
       const last = new Date(c.updated_at || c.created_at || 0).getTime()
       return Number.isFinite(last) && last < sevenDaysAgo
     }).length
@@ -144,8 +144,8 @@ export default function Jobs() {
     // empty map so each FilterPill receives `count={undefined}` and
     // skips its count chip entirely — avoids the misleading
     // "0 lead 0 quote 0 active 0 won" first-paint state.
-    if (loading) return {}
-    const out = {}
+    if (loading) return {} as Record<string, any>
+    const out: Record<string, any> = {}
     for (const t of TABS) out[t.id] = contacts.filter(t.match).length
     return out
   }, [contacts, loading])
@@ -167,7 +167,7 @@ export default function Jobs() {
     return topAmount > 0 ? topId : null
   }, [filtered])
 
-  function openDrawer(contact) {
+  function openDrawer(contact: any) {
     setDrawerContact(contact)
   }
 
@@ -175,7 +175,7 @@ export default function Jobs() {
     setDrawerContact(null)
   }
 
-  function onDrawerOpenChange(next) {
+  function onDrawerOpenChange(next: any) {
     if (!next) closeDrawer()
   }
 
@@ -260,7 +260,7 @@ export default function Jobs() {
           userId={user?.id}
           initialStage={addInitialStage}
           onClose={() => setAddOpen(false)}
-          onCreated={async (created) => {
+          onCreated={async (created: any) => {
             setAddOpen(false)
             if (created?.id) setJustAddedId(created.id)
             await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -488,7 +488,7 @@ export default function Jobs() {
         userId={user?.id}
         initialStage={addInitialStage}
         onClose={() => setAddOpen(false)}
-        onCreated={async (created) => {
+        onCreated={async (created: any) => {
           setAddOpen(false)
           if (created?.id) setJustAddedId(created.id)
           await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -522,7 +522,7 @@ export default function Jobs() {
 
 /* ----------- helpers (small enough to live inline) ----------- */
 
-function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
+function ActionTile({ icon: I, label, onClick, href, disabled, primary }: any) {
   const bg = primary
     ? 'var(--v3-primary)'
     : 'var(--v3-surface-2)'
@@ -583,7 +583,7 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }) {
   )
 }
 
-function EmptyView({ hasFilter, onAdd }) {
+function EmptyView({ hasFilter, onAdd }: any) {
   if (hasFilter) {
     return (
       <div className="v3-empty" style={{ gridColumn: '1 / -1' }}>

@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
 
-function money(n) {
+function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
@@ -24,7 +24,7 @@ function money(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function fmtPhone(n) {
+function fmtPhone(n: any) {
   if (!n) return ''
   const digits = String(n).replace(/\D/g, '')
   if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
@@ -80,7 +80,7 @@ export default function ClientDetail() {
       }, 0)
   }, [jobs, payments])
   const activeCount = useMemo(
-    () => (jobs || []).filter((j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage)).length,
+    () => (jobs || []).filter((j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage as string)).length,
     [jobs]
   )
 
@@ -93,11 +93,11 @@ export default function ClientDetail() {
   async function confirmDelete() {
     if (!client?.id || deleting) return
     setDeleting(true)
-    const { error } = await supabase.from('fh_clients').delete().eq('id', client.id).eq('user_id', user.id)
+    const { error } = await supabase.from('fh_clients').delete().eq('id', client.id).eq('user_id', user!.id)
     if (error) {
       setDeleting(false)
       setDeleteOpen(false)
-      toast({ kind: 'error', title: "Couldn't delete", body: error.message })
+      toast({ kind: 'error', title: "Couldn't delete", body: error.message } as any)
       return
     }
     toastInfo('Client deleted', 'Linked jobs unlinked')
@@ -300,11 +300,11 @@ export default function ClientDetail() {
       <div style={{ padding: '0 20px' }}>
         {tab === 'overview' && (
           isEditing
-            ? <OverviewEdit client={client} onCommit={async (patch) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
+            ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
             : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId) => navigate(`/jobs/${jobId}`)} />
+          <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
@@ -339,12 +339,12 @@ export default function ClientDetail() {
    IconBtn — chrome icon button (back / edit / more / delete)
    ============================================================ */
 
-function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }) {
+function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }: any) {
   const palette = {
     primary: { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 45%, transparent)', color: 'var(--v3-primary)' },
     danger:  { bg: 'rgba(192, 57, 43, 0.10)', border: 'color-mix(in srgb, var(--v3-danger) 35%, transparent)', color: 'var(--v3-danger-bright)' }
   }
-  const p = (tone && palette[tone]) || { bg: 'var(--v3-surface)', border: 'var(--v3-border-strong)', color: 'var(--v3-text)' }
+  const p = (tone && (palette as any)[tone]) || { bg: 'var(--v3-surface)', border: 'var(--v3-border-strong)', color: 'var(--v3-text)' }
   return (
     <motion.button
       type="button"
@@ -374,9 +374,9 @@ function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }) 
    Plain <a> + setTimeout fallback for iOS Safari (audit-batch-6 pattern).
    ============================================================ */
 
-function ActionTile({ icon: Icon, label, href, external }) {
+function ActionTile({ icon: Icon, label, href, external }: any) {
   const enabled = !!href
-  const baseStyle = {
+  const baseStyle: import('react').CSSProperties = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     gap: 4,
     padding: '10px 4px',
@@ -428,7 +428,7 @@ function ActionTile({ icon: Icon, label, href, external }) {
    Job Detail cockpit helper so both detail screens share scale.
    ============================================================ */
 
-function CockpitMetric({ label, tone = 'default', size = 'md', children }) {
+function CockpitMetric({ label, tone = 'default', size = 'md', children }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
@@ -442,7 +442,7 @@ function CockpitMetric({ label, tone = 'default', size = 'md', children }) {
    live in the cockpit header above)
    ============================================================ */
 
-function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], payments = [], onJump }) {
+function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], payments = [], onJump }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 0 24px' }}>
 
@@ -589,7 +589,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
   )
 }
 
-function ContactRow({ icon: Icon, label, value, href, multiline, isLast }) {
+function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) {
   const hasValue = !!value
   const inner = (
     <div style={{
@@ -669,18 +669,18 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }) {
    OverviewEdit — controlled form, v3 surface
    ============================================================ */
 
-function OverviewEdit({ client, onCommit, onCancel }) {
+function OverviewEdit({ client, onCommit, onCancel }: any) {
   const [form, setForm] = useState({ ...client })
   const [saving, setSaving] = useState(false)
-  function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
-  const fieldStyle = {
+  function set(k: any, v: any) { setForm((f: any) => ({ ...f, [k]: v })) }
+  const fieldStyle: import('react').CSSProperties = {
     width: '100%', boxSizing: 'border-box',
     padding: '11px 14px', borderRadius: 12,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
     fontSize: 14, outline: 'none'
   }
-  const labelStyle = {
+  const labelStyle: import('react').CSSProperties = {
     fontFamily: 'var(--font-body)',
     fontSize: 10, fontWeight: 700,
     letterSpacing: '0.16em', textTransform: 'uppercase',
@@ -688,7 +688,7 @@ function OverviewEdit({ client, onCommit, onCancel }) {
   }
   async function commit() {
     const EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
-    const patch = {}
+    const patch: Record<string, any> = {}
     for (const k of EDITABLE) {
       const next = form[k]
       const prev = client[k]
@@ -774,7 +774,7 @@ const PIPELINE_ROWS = [
   { id: 'lost',    label: 'Lost' }
 ]
 
-function PipelineDistribution({ jobs, payments = [], onJump }) {
+function PipelineDistribution({ jobs, payments = [], onJump }: any) {
   const buckets = useMemo(() => {
     const out = Object.fromEntries(PIPELINE_ROWS.map((r) => [r.id, { count: 0, value: 0 }]))
     for (const j of jobs) {
@@ -786,7 +786,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }) {
     return out
   }, [jobs])
   const totalRevenue = useMemo(
-    () => (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0),
+    () => (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0),
     [payments]
   )
   const visible = PIPELINE_ROWS.filter((r) => buckets[r.id].count > 0)
@@ -910,12 +910,12 @@ function PipelineDistribution({ jobs, payments = [], onJump }) {
 
 const PROJECT_FILTERS = [
   { id: 'all',    label: 'All' },
-  { id: 'active', label: 'Active', match: (j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage) },
-  { id: 'won',    label: 'Complete', match: (j) => j.stage === 'closed' },
-  { id: 'lost',   label: 'Lost',   match: (j) => j.stage === 'lost' }
+  { id: 'active', label: 'Active', match: (j: any) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage as string) },
+  { id: 'won',    label: 'Complete', match: (j: any) => j.stage === 'closed' },
+  { id: 'lost',   label: 'Lost',   match: (j: any) => j.stage === 'lost' }
 ]
 
-function relTime(input) {
+function relTime(input: any) {
   if (!input) return ''
   const d = input instanceof Date ? input : new Date(input)
   if (Number.isNaN(d.getTime())) return ''
@@ -931,7 +931,7 @@ function relTime(input) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function ProjectsList({ jobs, payments = [], onOpen }) {
+function ProjectsList({ jobs, payments = [], onOpen }: any) {
   const [filter, setFilter] = useState('all')
 
   const paidByJob = useMemo(() => {
@@ -1000,7 +1000,7 @@ function ProjectsList({ jobs, payments = [], onOpen }) {
         <EmptyCard label="No projects in this filter." />
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((j) => {
+          {filtered.map((j: any) => {
             const c = stageColor(j.stage)
             const amount = Number(j.amount || 0)
             const paid = paidByJob.get(j.id) || 0
@@ -1148,14 +1148,14 @@ function ProjectsList({ jobs, payments = [], onOpen }) {
    NotesList — communication log across all the client's jobs
    ============================================================ */
 
-function NotesList({ notes }) {
+function NotesList({ notes }: any) {
   if (notes.length === 0) return <EmptyCard label="No notes on this client's jobs yet." />
   return (
     <div style={{ padding: '12px 0 24px' }}>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {notes.map((n) => {
+        {notes.map((n: any) => {
           const body = n.text || n.body || ''
-          const title = n.parsed?.summary || (body.split('\n').find((l) => l.trim()) || '').slice(0, 80) || 'Untitled'
+          const title = n.parsed?.summary || (body.split('\n').find((l: any) => l.trim()) || '').slice(0, 80) || 'Untitled'
           return (
             <li key={n.id} style={{
               position: 'relative',
@@ -1233,19 +1233,19 @@ function NotesList({ notes }) {
    FilesList — files + photos across the client's jobs
    ============================================================ */
 
-function FilesList({ rows }) {
+function FilesList({ rows }: any) {
   if (rows.length === 0) return <EmptyCard label="No files or photos across this client's jobs." />
-  function fmtSize(n) {
+  function fmtSize(n: any) {
     if (!n) return ''
     if (n < 1024) return `${n} B`
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
     return `${(n / (1024 * 1024)).toFixed(1)} MB`
   }
-  async function open(row) {
+  async function open(row: any) {
     const bucket = row.kind === 'photo' ? 'job-photos' : 'job-files'
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(row.storage_path, 60 * 60)
     if (error || !data?.signedUrl) {
-      toast({ kind: 'error', title: 'Could not open', body: error?.message || 'Try again' })
+      toast({ kind: 'error', title: 'Could not open', body: error?.message || 'Try again' } as any)
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener')
@@ -1253,7 +1253,7 @@ function FilesList({ rows }) {
   return (
     <div style={{ padding: '12px 0 24px' }}>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {rows.map((r) => (
+        {rows.map((r: any) => (
           <li key={r.id} style={{
             display: 'flex', alignItems: 'center', gap: 12,
             padding: '12px 14px',
@@ -1313,7 +1313,7 @@ function FilesList({ rows }) {
   )
 }
 
-function EmptyCard({ label }) {
+function EmptyCard({ label }: any) {
   return (
     <div className="v3-empty" style={{ margin: '12px 0 24px' }}>
       {label}

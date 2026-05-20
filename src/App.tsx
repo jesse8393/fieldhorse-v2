@@ -9,7 +9,7 @@ import AppShell from './components/AppShell.tsx'
 //   Login: gates everything; can't lazy-load the login screen
 //   Home: the post-auth landing screen; lazy here would flash a spinner
 //         on every cold app open, defeats premium feel
-import Home from './screens/Home.jsx'
+import Home from './screens/Home.tsx'
 import Login from './screens/Login.jsx'
 
 // Lazy — every other route. Each becomes its own chunk.
@@ -18,25 +18,25 @@ import Login from './screens/Login.jsx'
 const ResetPassword  = lazy(() => import('./screens/ResetPassword.jsx'))
 const Onboarding     = lazy(() => import('./screens/Onboarding.jsx'))
 const PartnerInvite  = lazy(() => import('./screens/PartnerInvite.jsx'))
-const Jobs           = lazy(() => import('./screens/Jobs.jsx'))
-const ContactDetail  = lazy(() => import('./screens/ContactDetail.jsx'))
-const Clients        = lazy(() => import('./screens/Clients.jsx'))
-const ClientDetail   = lazy(() => import('./screens/ClientDetail.jsx'))
+const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
+const ContactDetail  = lazy(() => import('./screens/ContactDetail.tsx'))
+const Clients        = lazy(() => import('./screens/Clients.tsx'))
+const ClientDetail   = lazy(() => import('./screens/ClientDetail.tsx'))
 const Notes          = lazy(() => import('./screens/Notes.jsx'))
 const Schedule       = lazy(() => import('./screens/Schedule.jsx'))
-const Activity       = lazy(() => import('./screens/Activity.jsx'))
+const Activity       = lazy(() => import('./screens/Activity.tsx'))
 const PublicDoc      = lazy(() => import('./screens/PublicDoc.jsx'))
-const Bid            = lazy(() => import('./screens/Bid.jsx'))
-const Compose        = lazy(() => import('./screens/Compose.jsx'))
-const Analytics      = lazy(() => import('./screens/Analytics.jsx'))
-const Importer       = lazy(() => import('./screens/Importer.jsx'))
+const Bid            = lazy(() => import('./screens/Bid.tsx'))
+const Compose        = lazy(() => import('./screens/Compose.tsx'))
+const Analytics      = lazy(() => import('./screens/Analytics.tsx'))
+const Importer       = lazy(() => import('./screens/Importer.tsx'))
 const Settings       = lazy(() => import('./screens/Settings.jsx'))
 const PourWindow     = lazy(() => import('./screens/PourWindow.jsx'))
 const Subs           = lazy(() => import('./screens/Subs.jsx'))
 const Partners       = lazy(() => import('./screens/Partners.jsx'))
 const SubDetail      = lazy(() => import('./screens/SubDetail.jsx'))
-const Invoices       = lazy(() => import('./screens/Invoices.jsx'))
-const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.jsx'))
+const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
+const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()

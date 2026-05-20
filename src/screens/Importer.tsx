@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+// @ts-ignore -- papaparse ships no types
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, Check, Zap, Copy, FileSpreadsheet, ChevronDown, Eye, EyeOff, Sparkles } from 'lucide-react'
@@ -23,10 +24,10 @@ const TARGET_FIELDS = [
 ]
 
 // Normalize a column header so "First Name" / "first_name" / "firstname" all match.
-function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '') }
+function norm(s: any) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '') }
 
 // Each field has a list of common synonyms. Matching is normalized (case + punct + whitespace agnostic).
-const FIELD_SYNONYMS = {
+const FIELD_SYNONYMS: Record<string, any> = {
   name:      ['name', 'fullname', 'clientname', 'contact', 'contactname', 'customername', 'firstname', 'company', 'companyname', 'businessname', 'first', 'lead'],
   phone:     ['phone', 'phonenumber', 'mobile', 'mobilephone', 'primaryphone', 'cell', 'cellphone', 'workphone', 'telephone', 'tel'],
   email:     ['email', 'emailaddress', 'primaryemail', 'workemail', 'contactemail', 'mail'],
@@ -36,15 +37,15 @@ const FIELD_SYNONYMS = {
   amount:    ['total', 'amount', 'quotetotal', 'dealamount', 'value', 'price', 'revenue', 'estimate', 'bidamount']
 }
 
-const PRESETS = {
+const PRESETS: Record<string, any> = {
   jobber:  { label: 'Jobber'      },
   hubspot: { label: 'HubSpot'     },
   generic: { label: 'Generic CSV' }
 }
 
 // Build a lookup once per parse: for each CSV header we see, resolve which field it maps to (if any).
-function buildHeaderMap(headers) {
-  const out = {}
+function buildHeaderMap(headers: any) {
+  const out: Record<string, any> = {}
   for (const h of headers) {
     const n = norm(h)
     for (const [field, syns] of Object.entries(FIELD_SYNONYMS)) {
@@ -54,14 +55,14 @@ function buildHeaderMap(headers) {
     if (!Object.values(out).includes(h)) {
       for (const [field, syns] of Object.entries(FIELD_SYNONYMS)) {
         if (out[field]) continue
-        if (syns.some((s) => n.startsWith(s) || n.includes(s))) { out[field] = h; break }
+        if (syns.some((s: any) => n.startsWith(s) || n.includes(s))) { out[field] = h; break }
       }
     }
   }
   return out
 }
 
-function pick(row, header) {
+function pick(row: any, header: any) {
   if (!header) return null
   const v = row[header]
   return v != null && v !== '' ? v : null
@@ -70,16 +71,16 @@ function pick(row, header) {
 export default function Importer() {
   const { user } = useAuth()
   const [preset, setPreset] = useState('jobber')
-  const [rows, setRows] = useState([])
-  const [mapped, setMapped] = useState([])
-  const [headerMap, setHeaderMap] = useState({})
+  const [rows, setRows] = useState<any[]>([])
+  const [mapped, setMapped] = useState<any[]>([])
+  const [headerMap, setHeaderMap] = useState<any>({})
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [done, setDone] = useState(null)
+  const [done, setDone] = useState<any>(null)
   // Raw CSV headers + AI mapping state. headerMap holds the active
   // field→column resolution; the AI mapper and the manual dropdowns
   // both write into it via applyHeaderMap so the preview re-derives.
-  const [csvHeaders, setCsvHeaders] = useState([])
+  const [csvHeaders, setCsvHeaders] = useState<any[]>([])
   const [aiMapping, setAiMapping] = useState(false)
   const [webhookKey, setWebhookKey] = useState('')
   const [copiedWebhook, setCopiedWebhook] = useState(false)
@@ -89,7 +90,7 @@ export default function Importer() {
 
   useEffect(() => {
     if (!user) return
-    supabase.from('profiles').select('webhook_key').eq('user_id', user.id).single().then(({ data }) => {
+    supabase.from('profiles').select('webhook_key').eq('user_id', user!.id).single().then(({ data }: any) => {
       setWebhookKey(data?.webhook_key || '')
     })
   }, [user])
@@ -97,25 +98,25 @@ export default function Importer() {
   async function ensureWebhookKey() {
     if (webhookKey) return webhookKey
     const k = crypto.randomUUID().replace(/-/g, '').slice(0, 24)
-    await supabase.from('profiles').update({ webhook_key: k }).eq('user_id', user.id)
+    await supabase.from('profiles').update({ webhook_key: k }).eq('user_id', user!.id)
     setWebhookKey(k)
     return k
   }
 
-  function onFile(e) {
+  function onFile(e: any) {
     const f = e.target.files?.[0]
     if (!f) return
     Papa.parse(f, {
       header: true,
       skipEmptyLines: true,
-      complete: (r) => {
+      complete: (r: any) => {
         setRows(r.data)
         remap(r.data, preset)
       }
     })
   }
 
-  function remap(data, p) {
+  function remap(data: any, p: any) {
     // Build a header map based on what's actually in the CSV (first row's keys).
     const headers = data[0] ? Object.keys(data[0]) : []
     setCsvHeaders(headers)
@@ -125,7 +126,7 @@ export default function Importer() {
 
   // Re-derive the mapped preview rows from a given field→column map.
   // Shared by remap (static), the AI mapper, and the manual dropdowns.
-  function applyHeaderMap(hm, data = rows) {
+  function applyHeaderMap(hm: any, data = rows) {
     setHeaderMap(hm)
     const out = data.map((r) => ({
       name: pick(r, hm.name),
@@ -141,7 +142,7 @@ export default function Importer() {
   }
 
   // Manual override from the mapping review dropdowns.
-  function setFieldColumn(field, column) {
+  function setFieldColumn(field: any, column: any) {
     const next = { ...headerMap }
     if (column) next[field] = column
     else delete next[field]
@@ -180,14 +181,14 @@ export default function Importer() {
       hapticSuccess()
       const mappedCount = TARGET_FIELDS.filter((f) => next[f.key]).length
       toastSuccess('AI mapped your columns', `${mappedCount} of ${TARGET_FIELDS.length} fields matched`)
-    } catch (e) {
+    } catch (e: any) {
       toastError("Couldn't auto-map", e?.message || 'Try the manual mapping below.')
     } finally {
       setAiMapping(false)
     }
   }
 
-  function changePreset(p) {
+  function changePreset(p: any) {
     setPreset(p)
     if (rows.length) remap(rows, p)
   }

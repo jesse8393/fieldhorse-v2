@@ -42,17 +42,17 @@ function greetingPrefix() {
   return 'Good evening,'
 }
 
-function emailFirstToken(email) {
+function emailFirstToken(email: any) {
   if (!email) return ''
   const raw = email.split('@')[0].split(/[._-]/).filter(Boolean)[0] || ''
   return raw ? raw[0].toUpperCase() + raw.slice(1) : ''
 }
 
-function displayNameFrom(profile, user) {
+function displayNameFrom(profile: any, user: any) {
   // Multi-tenant guard: profile must belong to the current auth user.
   // Without this, a stale profile row left in context during a sign-out
   // → sign-in transition can leak the prior user's name onto the greeting.
-  const profileMatchesUser = profile && user && profile.user_id === user.id
+  const profileMatchesUser = profile && user && profile.user_id === user!.id
   const full = profileMatchesUser ? profile.full_name?.trim() : ''
   if (full) return full
   return emailFirstToken(user?.email)
@@ -60,7 +60,7 @@ function displayNameFrom(profile, user) {
 
 // Map Open-Meteo weather_code to a short label. Covers the common buckets;
 // rare codes fall through to "—" so we don't lie about the conditions.
-function weatherLabel(code) {
+function weatherLabel(code: any) {
   if (code == null) return ''
   if (code === 0) return 'Clear'
   if (code <= 2) return 'Partly cloudy'
@@ -73,7 +73,7 @@ function weatherLabel(code) {
   return ''
 }
 
-function startOfWeek(now) {
+function startOfWeek(now: any) {
   const d = new Date(now)
   d.setHours(0, 0, 0, 0)
   d.setDate(d.getDate() - d.getDay())
@@ -94,36 +94,36 @@ export default function Home() {
   }, [])
 
   // Weather
-  const [weather, setWeather] = useState(null)
+  const [weather, setWeather] = useState<any>(null)
   const [weatherErr, setWeatherErr] = useState('')
 
   // KPIs default to null (loading) so we never flash "0" before the
   // query lands — the perception bug fix carried over from v2.
-  const [pipeline, setPipeline] = useState(null)
-  const [pipelinePrev, setPipelinePrev] = useState(null)
-  const [dealsAtRisk, setDealsAtRisk] = useState(null) // { count, value }
-  const [jobsBehind, setJobsBehind] = useState(null)
-  const [invoicingWeek, setInvoicingWeek] = useState(null)
+  const [pipeline, setPipeline] = useState<any>(null)
+  const [pipelinePrev, setPipelinePrev] = useState<any>(null)
+  const [dealsAtRisk, setDealsAtRisk] = useState<any>(null) // { count, value }
+  const [jobsBehind, setJobsBehind] = useState<any>(null)
+  const [invoicingWeek, setInvoicingWeek] = useState<any>(null)
   // Pipeline Preview = top 3 active deals by value (lead/quote/job/invoice).
   // Renders as a glanceable list at the bottom of Home so the operator sees
   // their highest-value open work without leaving the screen.
-  const [topPipeline, setTopPipeline] = useState(null)
+  const [topPipeline, setTopPipeline] = useState<any>(null)
   // Stage breakdown for Pipeline card footer (mockup: Won / Active / Lead)
-  const [stageBreakdown, setStageBreakdown] = useState(null)
+  const [stageBreakdown, setStageBreakdown] = useState<any>(null)
   // Today on Site = schedule entries that start today (or are happening
   // now). Read-only fetch, no schema change. Joined with fh_contacts so
   // each row shows the job name + stage at a glance.
-  const [todayOnSite, setTodayOnSite] = useState(null)
+  const [todayOnSite, setTodayOnSite] = useState<any>(null)
   // Next Actions = up to 5 actionable items (stale leads, overdue jobs,
   // unsent invoices) computed from the same contacts/schedule/payments data.
   // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
-  const [nextActions, setNextActions] = useState(null)
+  const [nextActions, setNextActions] = useState<any>(null)
   // V3-SYSTEM-1B-3: signed cover-photo URLs keyed by contact id. Populated
   // alongside the rest of the Home data via fetchCoverPhotosByJob (same
   // pattern Jobs uses). Empty map = every row falls back to a neutral
   // initial tile. Doesn't gate render — lists paint immediately, photos
   // pop in when the URL map arrives.
-  const [photoUrlByJob, setPhotoUrlByJob] = useState({})
+  const [photoUrlByJob, setPhotoUrlByJob] = useState<any>({})
   const [refreshTick, setRefreshTick] = useState(0)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -161,7 +161,7 @@ export default function Home() {
       const [contactsRes, overdueSchedRes, paysRes, todaySchedRes, photoMap] = await Promise.all([
         // Contacts: stages + amounts + last update for at-risk calc.
         // updated_at falls back to created_at if missing.
-        // V3-PARTNERS: dropped the .eq('user_id', user.id) JS-layer filter
+        // V3-PARTNERS: dropped the .eq('user_id', user!.id) JS-layer filter
         // so partner-shared jobs flow into Pipeline / Next Actions / Today
         // on Site / Pipeline Preview. RLS enforces owner+partner access.
         supabase
@@ -172,27 +172,27 @@ export default function Home() {
         supabase
           .from('fh_schedule')
           .select('contact_id, end_at, start_at')
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .lt('end_at', nowD.toISOString())
           .gte('end_at', fourteenDaysAgo.toISOString()),
         // Payments collected this week (Sun → today).
         supabase
           .from('fh_payments')
           .select('amount, created_at')
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .gte('created_at', wkStart.toISOString()),
         // Today on Site — schedule entries that start today, joined with
         // contacts for name+stage. Read-only query, no schema change.
         supabase
           .from('fh_schedule')
           .select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)')
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .gte('start_at', todayStart.toISOString())
           .lt('start_at', todayEnd.toISOString())
           .order('start_at', { ascending: true })
           .limit(6),
         // Cover photos keyed by contact id — same helper Jobs uses.
-        fetchCoverPhotosByJob(user.id).catch(() => ({}))
+        fetchCoverPhotosByJob(user!.id).catch(() => ({}))
       ])
 
       if (cancelled) return
@@ -201,14 +201,14 @@ export default function Home() {
 
       // Pipeline = sum of $ across active stages.
       const totalPipeline = contacts
-        .filter((c) => ACTIVE_STAGES.includes(c.stage))
+        .filter((c) => ACTIVE_STAGES.includes(c.stage as string))
         .reduce((s, c) => s + Number(c.amount || 0), 0)
 
       // Pipeline 7 days ago = active stages whose record predates the window
       // (i.e. existed back then). Best-effort proxy until snapshot table.
       const prevPipeline = contacts
         .filter((c) => {
-          if (!ACTIVE_STAGES.includes(c.stage)) return false
+          if (!ACTIVE_STAGES.includes(c.stage as string)) return false
           const created = new Date(c.created_at || nowD)
           return created < sevenDaysAgo
         })
@@ -236,7 +236,7 @@ export default function Home() {
       // last-touch wins). Capped at 5 so the section stays scannable.
       const fiveDaysAgo = new Date(nowD); fiveDaysAgo.setDate(nowD.getDate() - 5)
       const paidContactIds = new Set(
-        (paysRes.data || []).map((p) => p.contact_id).filter(Boolean)
+        (paysRes.data || []).map((p: any) => p.contact_id).filter(Boolean)
       )
       const actions = []
       // 1. Stale leads/quotes — needs a follow-up call/text. Urgency
@@ -245,7 +245,7 @@ export default function Home() {
       // Operator-facing copy (no CRM shorthand): subline names the
       // stage + days waiting in plain English.
       for (const c of risky) {
-        const daysWaiting = Math.max(1, Math.floor((nowD - new Date(c.updated_at || c.created_at || 0)) / 86400000))
+        const daysWaiting = Math.max(1, Math.floor((nowD.getTime() - new Date(c.updated_at || c.created_at || 0).getTime()) / 86400000))
         const dayWord = daysWaiting === 1 ? 'day' : 'days'
         actions.push({
           id: `followup-${c.id}`,
@@ -284,7 +284,7 @@ export default function Home() {
           kind: 'invoice',
           contactId: c.id,
           title: `Chase invoice for ${c.name || 'job'}`,
-          detail: c.amount > 0 ? `$${Number(c.amount).toLocaleString()} owed` : 'Awaiting payment',
+          detail: Number(c.amount) > 0 ? `$${Number(c.amount).toLocaleString()} owed` : 'Awaiting payment',
           urgencyLabel: 'Invoice pending',
           urgencyTone: 'success',
           urgency: updated.getTime()
@@ -347,7 +347,7 @@ export default function Home() {
       // Preview section. Capped at 3 to keep the home screen scannable —
       // operators tap "View all" to drill into the full board.
       const topActiveDeals = contacts
-        .filter((c) => ACTIVE_STAGES.includes(c.stage))
+        .filter((c) => ACTIVE_STAGES.includes(c.stage as string))
         .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
         .slice(0, 3)
         .map((c) => ({
@@ -376,10 +376,10 @@ export default function Home() {
   useEffect(() => {
     if (!user) return
     const channel = supabase
-      .channel(`fh_contacts:home:${user.id}`)
+      .channel(`fh_contacts:home:${user!.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${user!.id}` },
         () => setRefreshTick((t) => t + 1)
       )
       .subscribe()
@@ -439,14 +439,14 @@ export default function Home() {
         todayOnSite={todayOnSite}
         topPipeline={topPipeline}
         nextActions={nextActions}
-        onGoToJobs={(filter) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
+        onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
         onGoToSchedule={() => navigate('/schedule')}
         onGoToInvoices={() => navigate('/invoices')}
         onGoToBid={() => navigate('/bid')}
         onGoToCompose={() => navigate('/compose')}
         onGoToPourWindow={() => navigate('/pour-window')}
-        onOpenJob={(id) => navigate(`/jobs/${id}`)}
-        onOpenJobAtTab={(id, tab) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
+        onOpenJob={(id: any) => navigate(`/jobs/${id}`)}
+        onOpenJobAtTab={(id: any, tab: any) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
         onNewLead={() => navigate('/jobs?new=1')}
       />
     )
@@ -780,21 +780,21 @@ export default function Home() {
               label="Won"
               count={stageBreakdown.won}
               tone="success"
-              onClick={(e) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=won') }}
+              onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=won') }}
             />
             <PipelineBreakdownCell
               dotColor="var(--v3-primary)"
               label="Active"
               count={stageBreakdown.active}
               tone="gold"
-              onClick={(e) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=active') }}
+              onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=active') }}
             />
             <PipelineBreakdownCell
               dotColor="#6B7CA8"
               label="Lead"
               count={stageBreakdown.lead}
               tone="muted"
-              onClick={(e) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=lead') }}
+              onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=lead') }}
             />
           </div>
         )}
@@ -888,7 +888,7 @@ export default function Home() {
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
-            {nextActions.map((action) => (
+            {nextActions.map((action: any) => (
               <NextActionRow
                 key={action.id}
                 action={action}
@@ -986,7 +986,7 @@ export default function Home() {
               <div style={{ fontSize: 12 }}>Open Schedule to plan crew visits.</div>
             </div>
           ) : (
-            todayOnSite.map((row) => (
+            todayOnSite.map((row: any) => (
               <TodayOnSiteRow
                 key={row.id}
                 row={row}
@@ -1029,7 +1029,7 @@ export default function Home() {
               <div style={{ fontSize: 12 }}>Add your first lead to start the pipeline.</div>
             </div>
           ) : (
-            topPipeline.map((deal) => (
+            topPipeline.map((deal: any) => (
               <PipelineDealRow
                 key={deal.id}
                 deal={deal}
@@ -1051,7 +1051,7 @@ export default function Home() {
    TodayOnSiteRow — single schedule row in Today on Site.
    Time + job/title + stage chip + chevron. Tap → linked job.
    ============================================================ */
-function TodayOnSiteRow({ row, photoUrl, onTap }) {
+function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
   const stage = row.stage ? STAGE_DISPLAY[row.stage] : null
   const startTime = row.startAt
     ? new Date(row.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
@@ -1148,14 +1148,14 @@ function TodayOnSiteRow({ row, photoUrl, onTap }) {
    Stage chip on the left + name + amount in Bebas. Hover lifts
    border/background, tap navigates to the contact.
    ============================================================ */
-const STAGE_DISPLAY = {
+const STAGE_DISPLAY: Record<string, any> = {
   lead:    { label: 'Lead',    color: 'var(--v3-stage-lead)' },
   quote:   { label: 'Quote',   color: 'var(--v3-stage-quote)' },
   job:     { label: 'Job',     color: 'var(--v3-stage-active)' },
   invoice: { label: 'Invoice', color: 'var(--v3-stage-won)' }
 }
 
-function PipelineDealRow({ deal, photoUrl, onTap }) {
+function PipelineDealRow({ deal, photoUrl, onTap }: any) {
   const stage = STAGE_DISPLAY[deal.stage] || { label: deal.stage, color: 'var(--v3-text-muted)' }
   return (
     <motion.button
@@ -1262,7 +1262,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }) {
    the size + skeleton state.
    ============================================================ */
 
-const COMPACT_TONE = {
+const COMPACT_TONE: Record<string, any> = {
   primary: { color: 'var(--v3-primary)' },
   success: { color: 'var(--v3-success-bright)' },
   danger:  { color: 'var(--v3-danger-bright)' },
@@ -1274,7 +1274,7 @@ const COMPACT_TONE = {
   lead:    { color: 'var(--v3-stage-lead)' }
 }
 
-function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }) {
+function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }: any) {
   const t = COMPACT_TONE[tone] || COMPACT_TONE.primary
   // V3-SYSTEM-1B-1: subline mutes when the metric is zero. Three tiles
   // at zero used to read as three colored shouts; now they read as
@@ -1396,7 +1396,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 // Per-kind icon. The urgency tone (danger/warn/success) drives the row's
 // accent color via URGENCY_TONE below — kind alone no longer picks color
 // (an old lead can be warn OR danger depending on how cold it's gone).
-const NEXT_ACTION_KIND = {
+const NEXT_ACTION_KIND: Record<string, any> = {
   followup:   { Icon: PhoneCall },
   reschedule: { Icon: CalendarClock },
   invoice:    { Icon: Receipt }
@@ -1406,13 +1406,13 @@ const NEXT_ACTION_KIND = {
 // leads <14d cold now wear the dedicated --v3-warn amber (#D4A042) so
 // gold can stay scarce on Home — reserved for the Pipeline money digits
 // and the small hairline sweep. Red urgency stays red, green stays green.
-const URGENCY_TONE = {
+const URGENCY_TONE: Record<string, any> = {
   danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
   warn:    { color: 'var(--v3-warn)',           glow: 'rgba(212, 160, 66, 0.40)' },
   success: { color: 'var(--v3-success-bright)', glow: 'rgba(46, 204, 113, 0.40)' }
 }
 
-function NextActionRow({ action, photoUrl, onTap }) {
+function NextActionRow({ action, photoUrl, onTap }: any) {
   const kindMeta = NEXT_ACTION_KIND[action.kind] || { Icon: Zap }
   const { Icon } = kindMeta
   const tone = URGENCY_TONE[action.urgencyTone] || URGENCY_TONE.warn
@@ -1584,7 +1584,7 @@ function NextActionRow({ action, photoUrl, onTap }) {
    placeholder image — restraint is intentional so the row's
    spine + stage label + amount stay the carriers of meaning.
    ============================================================ */
-function RowThumb({ photoUrl, name, size = 32 }) {
+function RowThumb({ photoUrl, name, size = 32 }: any) {
   const radius = 8
   if (photoUrl) {
     return (
@@ -1636,7 +1636,7 @@ function RowThumb({ photoUrl, name, size = 32 }) {
   )
 }
 
-function nameInitials(name) {
+function nameInitials(name: any) {
   if (!name) return '—'
   const parts = String(name).trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '—'
@@ -1657,7 +1657,7 @@ function nameInitials(name) {
      $stamp value
      N segments
    ============================================================ */
-function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }) {
+function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
   const valueColor = tone === 'success'
     ? 'var(--v3-success-bright, #7BB58E)'
     : tone === 'gold'
@@ -1721,7 +1721,7 @@ function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }) {
   )
 }
 
-function StageChip({ count, label, stage, navigate }) {
+function StageChip({ count, label, stage, navigate }: any) {
   return (
     <button
       type="button"
