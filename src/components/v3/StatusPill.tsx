@@ -23,8 +23,11 @@
  * @param {object} [props.style]   merged onto the pill's wrapper
  */
 import { Check, Snowflake, Star } from 'lucide-react'
+import type { HTMLAttributes, ComponentType } from 'react'
 
-const TONE = {
+type StatusTone = 'lead' | 'quote' | 'job' | 'invoice' | 'closed' | 'lost' | 'topDeal' | 'approved' | 'cold'
+
+const TONE: Record<StatusTone, { color: string; label: string; Icon?: ComponentType<any> }> = {
   lead:     { color: 'var(--v3-stage-lead)',       label: 'Lead' },
   quote:    { color: 'var(--v3-stage-quote)',      label: 'Quote' },
   job:      { color: 'var(--v3-stage-active)',     label: 'Job' },
@@ -36,6 +39,12 @@ const TONE = {
   cold:     { color: 'var(--v3-danger-bright)',    label: 'Cold',      Icon: Snowflake }
 }
 
+type StatusPillProps = HTMLAttributes<HTMLSpanElement> & {
+  tone?: StatusTone
+  label?: import('react').ReactNode
+  icon?: ComponentType<any>
+}
+
 export default function StatusPill({
   tone = 'lead',
   label,
@@ -43,7 +52,7 @@ export default function StatusPill({
   className,
   style,
   ...rest
-}) {
+}: StatusPillProps) {
   const cfg = TONE[tone] || TONE.lead
   const text = label || cfg.label
   const IconCmp = IconOverride || cfg.Icon

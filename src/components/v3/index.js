@@ -11,12 +11,12 @@ export { default as StageTimeline } from './StageTimeline.jsx'
 export { default as SegmentedTabs } from './SegmentedTabs.jsx'
 export { default as NextActionCard } from './NextActionCard.jsx'
 export { default as HealthDonut } from './HealthDonut.jsx'
-export { default as ProgressMeter } from './ProgressMeter.jsx'
+export { default as ProgressMeter } from './ProgressMeter.tsx'
 
 /* Phase 1B canonical primitives — added but not yet migrated to. */
 export { default as Eyebrow } from './Eyebrow.tsx'
 export { default as StampNumber } from './StampNumber.tsx'
-export { default as FilterPill } from './FilterPill.jsx'
+export { default as FilterPill } from './FilterPill.tsx'
 export { default as IconButton } from './IconButton.jsx'
 
 /* Phase 3D — canonical floating action button (portal-rendered to
@@ -31,10 +31,10 @@ export { default as PostedByChip } from './PostedByChip.tsx'
 /* Phase V3-JOBS-1 — unified status badge primitive. One pill family
    for stage (lead/quote/job/invoice/closed/lost), Top Deal, Approved,
    Cold. Replaces the prior mix of inline StagePill + ad-hoc chips. */
-export { default as StatusPill } from './StatusPill.jsx'
+export { default as StatusPill } from './StatusPill.tsx'
 
 /* "You've reached the bottom" footer affordance that closes off
    scrollable screens so empty space doesn't read as a gap before the
    bottom nav. marginTop:auto inside a flex column pushes it to the
    bottom on under-filled screens. */
-export { default as ScreenCloser } from './ScreenCloser.jsx'
+export { default as ScreenCloser } from './ScreenCloser.tsx'

@@ -1,4 +1,4 @@
-// src/components/v3/ScreenCloser.jsx
+// src/components/v3/ScreenCloser.tsx
 //
 // A premium "you've reached the bottom" footer that closes off
 // scrollable screens. Without this, every dashboard ends in a
@@ -14,12 +14,19 @@
 import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 
+type ScreenCloserProps = {
+  variant?: 'muted' | 'cta'
+  caption?: import('react').ReactNode
+  ctaLabel?: import('react').ReactNode
+  onCta?: () => void
+}
+
 export default function ScreenCloser({
   variant = 'muted',
   caption,
   ctaLabel,
   onCta
-}) {
+}: ScreenCloserProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}

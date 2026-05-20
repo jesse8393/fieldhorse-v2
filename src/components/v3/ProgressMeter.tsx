@@ -7,13 +7,21 @@
  *
  * Color follows tier: 0–49 danger, 50–79 gold, 80–100 success.
  */
+type ProgressMeterProps = {
+  label?: import('react').ReactNode
+  value?: number          // 0..100
+  caption?: import('react').ReactNode  // e.g. "8 of 12 tasks completed"
+  trailing?: import('react').ReactNode // optional right-side element
+  height?: number
+}
+
 export default function ProgressMeter({
   label,
-  value = 0,            // 0..100
-  caption,              // e.g. "8 of 12 tasks completed"
-  trailing,             // optional right-side element (button/link/text)
+  value = 0,
+  caption,
+  trailing,
   height = 8
-}) {
+}: ProgressMeterProps) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0))
   const color = safe >= 80
     ? 'var(--v3-success-bright)'
