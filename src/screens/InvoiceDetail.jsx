@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -13,6 +13,7 @@ import {
   Link as LinkIcon
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useProfile } from '../contexts/ProfileContext.jsx'
 import { generateInvoice, downloadPdf } from '../lib/pdf.js'
@@ -80,19 +81,18 @@ export default function InvoiceDetail() {
   const { user } = useAuth()
   const { profile } = useProfile()
 
-  const [contact, setContact] = useState(null)
-  const [payments, setPayments] = useState([])
-  // Insurance claim payload (migration 018). One-to-one with the
-  // contact. Owner-only RLS, so this is null for partner viewers.
-  // Flows into both the InvoiceTemplate preview's InsuranceModeBlock
-  // and the generateInvoice PDF call below.
-  const [insurance, setInsurance] = useState(null)
-  // Change orders against the contract (migration 019). Approved COs
-  // bump the contract total on the balance summary; non-approved
-  // entries still surface as a section so the customer sees them.
-  const [changeOrders, setChangeOrders] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  // Insurance claim payload (migration 018) is one-to-one with the
+  // contact (owner-only RLS, null for partner viewers); change orders
+  // (migration 019) bump the contract total when approved. Both come
+  // back in the bundle below.
+  const { data: bundle, isPending: loading, isError, error: queryError } = useInvoiceDetail(id, user?.id)
+  const invalidateInvoiceDetail = useInvalidateInvoiceDetail()
+  const refresh = () => invalidateInvoiceDetail(id)
+  const contact = bundle?.contact ?? null
+  const payments = bundle?.payments ?? []
+  const insurance = bundle?.insurance ?? null
+  const changeOrders = bundle?.changeOrders ?? []
+  const error = isError ? (queryError?.message || 'Could not load invoice') : ''
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
   // 'detail' = existing list-style breakdown (default — original UX).
@@ -111,38 +111,6 @@ export default function InvoiceDetail() {
   const [sent, setSent] = useState(false)
   const [sharing, setSharing] = useState(false)
 
-  const refresh = async () => {
-    if (!user?.id || !id) return
-    setLoading(true)
-    setError('')
-    try {
-      // Join fh_clients via client_id so the invoice can fall back to
-      // the client's email/phone/address when the denormalized fields
-      // on the job row are empty. Migration 007 stamped client_id on
-      // every contact, so the link should always exist.
-      const [{ data: c, error: cErr }, { data: ps }, { data: ins }, { data: co }] = await Promise.all([
-        supabase
-          .from('fh_contacts')
-          .select('*, fh_clients(name, email, phone, address)')
-          .eq('id', id)
-          .maybeSingle(),
-        supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
-        supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle(),
-        supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
-      ])
-      if (cErr) throw cErr
-      if (!c) throw new Error('Invoice not found')
-      setContact(c)
-      setPayments(ps || [])
-      setInsurance(ins || null)
-      setChangeOrders(co || [])
-    } catch (e) {
-      setError(e?.message || 'Could not load invoice')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // Resolved client info — prefer the denormalized job-row fields, fall
   // back to fh_clients (the source of truth when edits happen on the
   // client card and the job row stayed empty).
@@ -155,8 +123,6 @@ export default function InvoiceDetail() {
       address: contact?.address || cli.address || ''
     }
   }, [contact])
-
-  useEffect(() => { refresh() }, [user?.id, id])
 
   const totals = useMemo(() => {
     const amount = Number(contact?.amount || 0)
