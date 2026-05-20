@@ -11,14 +11,24 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera, Calendar, Users, User } from 'lucide-react-native'
+import {
+  ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera, Calendar, Users, User,
+  CheckSquare, Square, FileText
+} from 'lucide-react-native'
 import {
   useJobDetail, useLogPayment, useUpdateStage, useUpdateJob,
   useAddExpense, useDeletePayment, useDeleteExpense, useDeleteJob,
   useJobPhotos, useUploadPhoto, useDeletePhoto,
-  useAddSub, useDeleteSub, useClientsBundle
+  useAddSub, useDeleteSub, useClientsBundle,
+  useAddTodo, useToggleTodo, useDeleteTodo,
+  useAddNote, useDeleteNote,
+  useCreateInvoice, useUpdateInvoiceStatus, useDeleteInvoice
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+
+const INVOICE_TINT: Record<string, string> = {
+  draft: '#5C5C5C', sent: '#6B7CA8', paid: '#4F8C5E', overdue: '#7d2a1f', void: '#5C5C5C'
+}
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E',
@@ -48,10 +58,26 @@ export default function JobDetailScreen() {
   const deletePhoto = useDeletePhoto()
   const addSub = useAddSub()
   const deleteSub = useDeleteSub()
+  const addTodo = useAddTodo()
+  const toggleTodo = useToggleTodo()
+  const deleteTodo = useDeleteTodo()
+  const addNote = useAddNote()
+  const deleteNote = useDeleteNote()
+  const createInvoice = useCreateInvoice()
+  const updateInvoiceStatus = useUpdateInvoiceStatus()
+  const deleteInvoice = useDeleteInvoice()
   const { data: photos = [] } = useJobPhotos(id)
   const { data: clientsBundle } = useClientsBundle(user?.id)
 
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [todoText, setTodoText] = useState('')
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+  const [invOpen, setInvOpen] = useState(false)
+  const [invTitle, setInvTitle] = useState('')
+  const [invAmount, setInvAmount] = useState('')
+  const [invSaving, setInvSaving] = useState(false)
 
   const [subOpen, setSubOpen] = useState(false)
   const [subName, setSubName] = useState('')
@@ -118,8 +144,58 @@ export default function JobDetailScreen() {
   const expenses = data?.expenses ?? []
   const schedule = data?.schedule ?? []
   const subs = data?.subs ?? []
+  const todos = data?.todos ?? []
+  const notes = data?.notes ?? []
+  const invoices = data?.invoices ?? []
   const clients = clientsBundle?.clients ?? []
   const linkedClient = contact?.client_id ? clients.find((c) => c.id === contact.client_id) ?? null : null
+
+  async function submitTodo() {
+    const text = todoText.trim()
+    if (!text || !contact || !user) return
+    setTodoText('')
+    await addTodo({ userId: user.id, jobId: contact.id, text })
+  }
+
+  async function submitNote() {
+    if (!noteText.trim() || !contact || !user || noteSaving) return
+    setNoteSaving(true)
+    const { error } = await addNote({ userId: user.id, contactId: contact.id, text: noteText.trim() })
+    setNoteSaving(false)
+    if (!error) { setNoteOpen(false); setNoteText('') }
+  }
+
+  function confirmDeleteNote(nid: string) {
+    if (!contact) return
+    Alert.alert('Delete note?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteNote({ id: nid, contactId: contact.id }) }
+    ])
+  }
+
+  async function submitInvoice() {
+    const amt = Number(invAmount.replace(/[^0-9.]/g, ''))
+    if (!amt || !contact || !user || invSaving) return
+    setInvSaving(true)
+    const { error } = await createInvoice({ userId: user.id, contactId: contact.id, amount: amt, title: invTitle.trim() || undefined })
+    setInvSaving(false)
+    if (!error) { setInvOpen(false); setInvTitle(''); setInvAmount('') }
+  }
+
+  function cycleInvoiceStatus(inv: { id: string; status: string }) {
+    if (!contact) return
+    const order = ['draft', 'sent', 'paid']
+    const next = order[(order.indexOf(inv.status) + 1) % order.length]
+    updateInvoiceStatus({ id: inv.id, contactId: contact.id, status: next })
+  }
+
+  function confirmDeleteInvoice(iid: string) {
+    if (!contact) return
+    Alert.alert('Delete invoice?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteInvoice({ id: iid, contactId: contact.id }) }
+    ])
+  }
 
   async function submitSub() {
     if (!subName.trim() || !contact || !user || subSaving) return
@@ -347,6 +423,48 @@ export default function JobDetailScreen() {
           <Text className="text-gold-bright text-xs font-bold">{linkedClient ? 'Change' : 'Link'}</Text>
         </Pressable>
 
+        {/* Todos */}
+        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">
+          Punch list{todos.length ? ` · ${todos.filter((t) => t.done).length}/${todos.length}` : ''}
+        </Text>
+        <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
+          <TextInput
+            value={todoText}
+            onChangeText={setTodoText}
+            onSubmitEditing={submitTodo}
+            returnKeyType="done"
+            placeholder="Add a task…"
+            placeholderTextColor="rgba(242,237,228,0.4)"
+            className="flex-1 bg-surface border border-[rgba(255,240,210,0.10)] rounded-xl px-4 py-3 text-ink"
+          />
+          <Pressable onPress={submitTodo} className="rounded-xl items-center justify-center" style={{ width: 46, height: 46, backgroundColor: '#E8B865' }}>
+            <Plus color="#1A120A" size={20} strokeWidth={2.6} />
+          </Pressable>
+        </View>
+        {todos.length > 0 ? (
+          <View style={{ gap: 6 }}>
+            {todos.map((t) => (
+              <Pressable
+                key={t.id}
+                onPress={() => contact && toggleTodo({ id: t.id, jobId: contact.id, done: !t.done })}
+                onLongPress={() => contact && deleteTodo({ id: t.id, jobId: contact.id })}
+                delayLongPress={350}
+                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center"
+                style={{ gap: 10 }}
+              >
+                {t.done ? <CheckSquare color="#4F8C5E" size={18} /> : <Square color="#9b948a" size={18} />}
+                <Text
+                  className="flex-1 text-sm"
+                  style={{ color: t.done ? '#9b948a' : '#F2EDE4', textDecorationLine: t.done ? 'line-through' : 'none' }}
+                  numberOfLines={2}
+                >
+                  {t.text}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
         {/* Photos */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
           <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Photos</Text>
@@ -451,6 +569,42 @@ export default function JobDetailScreen() {
           </View>
         )}
 
+        {/* Invoices */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Invoices</Text>
+          <Pressable onPress={() => setInvOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <FileText color="#E8B865" size={14} />
+            <Text className="text-gold-bright text-xs font-bold">New</Text>
+          </Pressable>
+        </View>
+        {invoices.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No invoices yet.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {invoices.map((inv) => {
+              const tint = INVOICE_TINT[inv.status] ?? '#5C5C5C'
+              return (
+                <Pressable
+                  key={inv.id}
+                  onPress={() => cycleInvoiceStatus(inv)}
+                  onLongPress={() => confirmDeleteInvoice(inv.id)}
+                  delayLongPress={350}
+                  className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+                >
+                  <View className="flex-1 pr-3">
+                    <Text className="text-ink text-sm font-semibold" numberOfLines={1}>
+                      {inv.title || `Invoice #${inv.sequence_number ?? ''}`}
+                    </Text>
+                    <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>{inv.status}</Text>
+                  </View>
+                  <Text className="text-ink font-bold">{money(Number(inv.amount || 0))}</Text>
+                </Pressable>
+              )
+            })}
+            <Text className="text-ink-muted text-[10px] mt-1">Tap to advance status · long-press to delete.</Text>
+          </View>
+        )}
+
         {/* Schedule */}
         <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">Schedule</Text>
         {schedule.length === 0 ? (
@@ -503,13 +657,42 @@ export default function JobDetailScreen() {
           </View>
         )}
 
-        {/* Notes */}
+        {/* Job notes (single field) */}
         {contact.notes ? (
           <>
-            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Notes</Text>
+            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Job notes</Text>
             <Text className="text-ink text-sm">{contact.notes}</Text>
           </>
         ) : null}
+
+        {/* Activity / notes timeline */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Activity</Text>
+          <Pressable onPress={() => setNoteOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Plus color="#E8B865" size={14} />
+            <Text className="text-gold-bright text-xs font-bold">Add note</Text>
+          </Pressable>
+        </View>
+        {notes.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No activity logged.</Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {notes.map((n) => (
+              <Pressable
+                key={n.id}
+                onLongPress={() => confirmDeleteNote(n.id)}
+                delayLongPress={350}
+                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)]"
+              >
+                <Text className="text-ink text-sm">{n.text || '—'}</Text>
+                <Text className="text-ink-muted text-[10px] mt-1">
+                  {n.created_at ? new Date(n.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
+                </Text>
+              </Pressable>
+            ))}
+            <Text className="text-ink-muted text-[10px] mt-1">Long-press a note to delete.</Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Edit job modal */}
@@ -691,6 +874,70 @@ export default function JobDetailScreen() {
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* Add note modal */}
+      <Modal visible={noteOpen} transparent animationType="slide" onRequestClose={() => setNoteOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setNoteOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-5">Add note</Text>
+            <TextInput
+              value={noteText}
+              onChangeText={setNoteText}
+              multiline
+              autoFocus
+              placeholder="What happened on the job?"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              style={{ minHeight: 96, textAlignVertical: 'top' }}
+            />
+            <Pressable
+              onPress={submitNote}
+              disabled={noteSaving}
+              className="rounded-xl py-4 items-center"
+              style={{ backgroundColor: noteSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+            >
+              {noteSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save note</Text>}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* New invoice modal */}
+      <Modal visible={invOpen} transparent animationType="slide" onRequestClose={() => setInvOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setInvOpen(false)} />
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-ink text-xl font-bold mb-1">New invoice</Text>
+            <Text className="text-ink-muted text-sm mb-5">Balance on this job: {money(totals.balance)}</Text>
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Title (optional)</Text>
+            <TextInput
+              value={invTitle}
+              onChangeText={setInvTitle}
+              placeholder="Deposit, progress draw, final…"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+            />
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Amount</Text>
+            <TextInput
+              value={invAmount}
+              onChangeText={setInvAmount}
+              keyboardType="decimal-pad"
+              placeholder="$0"
+              placeholderTextColor="rgba(242,237,228,0.4)"
+              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-5"
+            />
+            <Pressable
+              onPress={submitInvoice}
+              disabled={invSaving}
+              className="rounded-xl py-4 items-center"
+              style={{ backgroundColor: invSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+            >
+              {invSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create invoice</Text>}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Add expense modal */}

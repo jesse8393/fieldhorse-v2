@@ -207,28 +207,41 @@ export function useUpcomingEvents(userId: string | undefined, days = 7) {
 // One job's worth of data for the detail screen: the contact row plus
 // its payments, schedule, subs, and expenses. Mirrors the web
 // useJobData fetch (lighter — no client lookup / change orders yet).
+export type Todo = Database['public']['Tables']['fh_job_todos']['Row']
+export type Note = Database['public']['Tables']['fh_notes']['Row']
+export type Invoice = Database['public']['Tables']['fh_invoices']['Row']
+
 export type JobDetail = {
   contact: Contact | null
   payments: Payment[]
   schedule: Database['public']['Tables']['fh_schedule']['Row'][]
   subs: Database['public']['Tables']['fh_subs']['Row'][]
   expenses: Database['public']['Tables']['fh_expenses']['Row'][]
+  todos: Todo[]
+  notes: Note[]
+  invoices: Invoice[]
 }
 
 async function fetchJobDetail(id: string): Promise<JobDetail> {
-  const [c, p, sch, s, e] = await Promise.all([
+  const [c, p, sch, s, e, t, n, inv] = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
     supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
     supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
     supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-    supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false })
+    supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
+    supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: true }),
+    supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+    supabase.from('fh_invoices').select('*').eq('contact_id', id).order('created_at', { ascending: false })
   ])
   return {
     contact: (c.data ?? null) as Contact | null,
     payments: (p.data ?? []) as Payment[],
     schedule: (sch.data ?? []) as JobDetail['schedule'],
     subs: (s.data ?? []) as JobDetail['subs'],
-    expenses: (e.data ?? []) as JobDetail['expenses']
+    expenses: (e.data ?? []) as JobDetail['expenses'],
+    todos: (t.data ?? []) as Todo[],
+    notes: (n.data ?? []) as Note[],
+    invoices: (inv.data ?? []) as Invoice[]
   }
 }
 
@@ -565,6 +578,141 @@ export function useDeleteClient() {
       client.invalidateQueries({ queryKey: ['clients', input.userId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
     }
+    return { error }
+  }
+}
+
+// ---- Todos ----
+export function useAddTodo() {
+  const client = useQueryClient()
+  return async (input: { userId: string; jobId: string; text: string }) => {
+    const { error } = await supabase.from('fh_job_todos').insert({
+      user_id: input.userId, job_id: input.jobId, text: input.text, done: false
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.jobId] })
+    return { error }
+  }
+}
+
+export function useToggleTodo() {
+  const client = useQueryClient()
+  return async (input: { id: string; jobId: string; done: boolean }) => {
+    const { error } = await supabase.from('fh_job_todos')
+      .update({ done: input.done, completed_at: input.done ? new Date().toISOString() : null } as any)
+      .eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.jobId] })
+    return { error }
+  }
+}
+
+export function useDeleteTodo() {
+  const client = useQueryClient()
+  return async (input: { id: string; jobId: string }) => {
+    const { error } = await supabase.from('fh_job_todos').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.jobId] })
+    return { error }
+  }
+}
+
+// ---- Notes ----
+export function useAddNote() {
+  const client = useQueryClient()
+  return async (input: { userId: string; contactId: string; text: string; category?: string }) => {
+    const { error } = await supabase.from('fh_notes').insert({
+      user_id: input.userId, contact_id: input.contactId, text: input.text, category: input.category || 'note'
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useDeleteNote() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string }) => {
+    const { error } = await supabase.from('fh_notes').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+// ---- Invoices ----
+export function useCreateInvoice() {
+  const client = useQueryClient()
+  return async (input: { userId: string; contactId: string; amount: number; title?: string; dueAt?: string }) => {
+    const { error } = await supabase.from('fh_invoices').insert({
+      user_id: input.userId,
+      contact_id: input.contactId,
+      amount: input.amount,
+      title: input.title || null,
+      due_at: input.dueAt || null,
+      status: 'draft',
+      issued_at: new Date().toISOString()
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useUpdateInvoiceStatus() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string; status: string }) => {
+    const { error } = await supabase.from('fh_invoices')
+      .update({ status: input.status } as any)
+      .eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useDeleteInvoice() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string }) => {
+    const { error } = await supabase.from('fh_invoices').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+// ---- Business profile ----
+export type Profile = Database['public']['Tables']['profiles']['Row']
+
+export function useProfile(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['profile', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('*').eq('user_id', userId as string).maybeSingle()
+      return (data ?? null) as Profile | null
+    },
+    enabled: !!userId
+  })
+}
+
+export type UpdateProfileInput = {
+  userId: string
+  companyName?: string | null
+  companyPhone?: string | null
+  companyEmail?: string | null
+  companyAddress?: string | null
+  companyWebsite?: string | null
+  licenseNumber?: string | null
+  fullName?: string | null
+}
+
+export function useUpdateProfile() {
+  const client = useQueryClient()
+  return async (input: UpdateProfileInput) => {
+    const patch: Record<string, unknown> = {}
+    if (input.companyName !== undefined) patch.company_name = input.companyName
+    if (input.companyPhone !== undefined) patch.company_phone = input.companyPhone
+    if (input.companyEmail !== undefined) patch.company_email = input.companyEmail
+    if (input.companyAddress !== undefined) patch.company_address = input.companyAddress
+    if (input.companyWebsite !== undefined) patch.company_website = input.companyWebsite
+    if (input.licenseNumber !== undefined) patch.license_number = input.licenseNumber
+    if (input.fullName !== undefined) patch.full_name = input.fullName
+    const { error } = await supabase.from('profiles')
+      .update(patch as any)
+      .eq('user_id', input.userId)
+    if (!error) client.invalidateQueries({ queryKey: ['profile', input.userId] })
     return { error }
   }
 }
