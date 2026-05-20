@@ -321,3 +321,49 @@ export function useInvalidateInvoices() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: ['invoices'] })
 }
+
+// ---- Subs ----
+// The subs roster plus a lightweight contacts list (id/name/job/stage)
+// used to label which jobs each sub worked. Bundled into one hook so
+// the screen keeps a single loading flag.
+
+export type Sub = Database['public']['Tables']['fh_subs']['Row']
+export type SubContact = Pick<Contact, 'id' | 'name' | 'job_title' | 'stage'>
+
+export type SubsBundle = {
+  subs: Sub[]
+  contacts: SubContact[]
+}
+
+async function fetchSubsBundle(userId: string): Promise<SubsBundle> {
+  const [subsRes, contactsRes] = await Promise.all([
+    supabase
+      .from('fh_subs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('fh_contacts')
+      .select('id, name, job_title, stage')
+      .eq('user_id', userId)
+  ])
+  if (subsRes.error) throw subsRes.error
+  if (contactsRes.error) throw contactsRes.error
+  return {
+    subs: (subsRes.data ?? []) as Sub[],
+    contacts: (contactsRes.data ?? []) as SubContact[]
+  }
+}
+
+export function useSubsBundle(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['subs', userId],
+    queryFn: () => fetchSubsBundle(userId as string),
+    enabled: !!userId
+  })
+}
+
+export function useInvalidateSubs() {
+  const client = useQueryClient()
+  return () => client.invalidateQueries({ queryKey: ['subs'] })
+}
