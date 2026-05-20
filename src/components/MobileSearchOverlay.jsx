@@ -7,7 +7,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { universalSearch } from '../lib/universalSearch.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 
 // Mobile-native search overlay — replaces CommandPalette on phone widths
 // (the cmdk popover renders clipped on iOS Safari + Chrome behind the

@@ -5,7 +5,7 @@ import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-rea
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.jsx'
 import { useFhMotion } from '../lib/motion.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
 import { findDuplicateClusters } from '../lib/clientMerge.ts'

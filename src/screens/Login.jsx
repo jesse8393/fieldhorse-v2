@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, Lock, ArrowRight } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext.jsx'
-import { useProfile } from '../contexts/ProfileContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
+import { useProfile } from '../contexts/ProfileContext.tsx'
 
 export default function Login() {
   const { signIn, signUp, sendPasswordReset, session, loading } = useAuth()

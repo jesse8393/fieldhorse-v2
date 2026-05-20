@@ -5,7 +5,7 @@ import { Phone, Plus, Search, Hammer, ChevronRight, MessageSquare, IdCard } from
 import { supabase } from '../lib/supabase.ts'
 import { useSubsBundle, useInvalidateSubs } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.ts'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.jsx'

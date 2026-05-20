@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Save as SaveIcon, RotateCcw, Trash2, Check } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext.jsx'
+import { useAuth } from '../../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess, hapticError } from '../../lib/haptics.ts'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import {

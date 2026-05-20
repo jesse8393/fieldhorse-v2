@@ -1,12 +1,24 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase.ts'
-import { useAuth } from './AuthContext.jsx'
+import { useAuth } from './AuthContext.tsx'
+import type { Database } from '../lib/database.types.ts'
 
-const ProfileContext = createContext(null)
+type Profile = Database['public']['Tables']['profiles']['Row']
 
-export function ProfileProvider({ children }) {
+type ProfileContextValue = {
+  profile: Profile | null
+  loading: boolean
+  isOnboarded: boolean
+  refresh: () => Promise<void>
+  upsertProfile: (patch: Record<string, unknown>) => Promise<{ data?: Profile; error: any }>
+}
+
+const ProfileContext = createContext<ProfileContextValue | null>(null)
+
+export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user, session } = useAuth()
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async () => {
@@ -40,16 +52,16 @@ export function ProfileProvider({ children }) {
   }, [fetchProfile, session?.access_token])
 
   const upsertProfile = useCallback(
-    async (patch) => {
+    async (patch: Record<string, unknown>) => {
       if (!user) return { error: new Error('Not signed in') }
       const payload = { user_id: user.id, ...patch }
       const { data, error } = await supabase
         .from('profiles')
-        .upsert(payload, { onConflict: 'user_id' })
+        .upsert(payload as Database['public']['Tables']['profiles']['Insert'], { onConflict: 'user_id' })
         .select()
         .single()
       if (!error) setProfile(data)
-      return { data, error }
+      return { data: data ?? undefined, error }
     },
     [user]
   )

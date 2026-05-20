@@ -15,8 +15,8 @@ import {
   LogOut,
   Activity as ActivityIcon
 } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext.jsx'
-import { useProfile } from '../contexts/ProfileContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
+import { useProfile } from '../contexts/ProfileContext.tsx'
 
 /**
  * DesktopSidebar — Phase 1 of the Responsive Desktop Command Center.

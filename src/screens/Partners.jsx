@@ -18,7 +18,7 @@ import { motion } from 'framer-motion'
 import {
   Users, Send, ShieldOff, Briefcase, Check, ChevronRight, Clock
 } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { useConfirm } from '../components/ConfirmSheet.jsx'
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'

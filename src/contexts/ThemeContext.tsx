@@ -1,9 +1,18 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 
-const ThemeContext = createContext(null)
+type Theme = 'dark' | 'light'
+
+type ThemeContextValue = {
+  theme: Theme
+  setTheme: (t: Theme) => void
+  toggleTheme: () => void
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null)
 const STORAGE_KEY = 'fh:theme'
 
-function initial() {
+function initial(): Theme {
   if (typeof window === 'undefined') return 'dark'
   // Safari Private Mode on older iOS throws SecurityError on localStorage.
   // Default to dark on any failure.
@@ -14,8 +23,8 @@ function initial() {
   return 'dark' // Fieldhorse ships dark-first
 }
 
-export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(initial)
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(initial)
 
   useEffect(() => {
     const root = document.documentElement
