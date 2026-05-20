@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
-import { resolveNextAction } from './lib/jobNextAction.js'
+import { resolveNextAction } from './lib/jobNextAction.ts'
 import OverviewTab from './tabs/Overview.jsx'
 import QuoteTab from './tabs/Quote.jsx'
 import DetailsTab from './tabs/Details.jsx'

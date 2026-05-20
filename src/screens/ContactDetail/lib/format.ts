@@ -6,7 +6,7 @@
  * redeclaring.
  */
 
-export function money(n) {
+export function money(n: number | string | null | undefined) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency',
     currency: 'USD',
@@ -14,7 +14,7 @@ export function money(n) {
   })
 }
 
-export function fmtSize(n) {
+export function fmtSize(n: number | null | undefined) {
   if (!n) return ''
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`

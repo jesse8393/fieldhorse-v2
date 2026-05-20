@@ -17,11 +17,11 @@ import {
   PostedByChip
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.jsx'
-import { computeJobHealth } from '../lib/jobHealth.js'
+import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.jsx'
-import { resolveNextAction } from '../lib/jobNextAction.js'
+import { resolveNextAction } from '../lib/jobNextAction.ts'
 import ClientPicker from '../../../components/ClientPicker.jsx'
-import { money } from '../lib/format.js'
+import { money } from '../lib/format.ts'
 
 /**
  * v3 OVERVIEW tab — the "money screen" of the Job Detail.
@@ -34,7 +34,7 @@ import { money } from '../lib/format.js'
  *   TimeClockCard (only when stage in {job, invoice} — preserved from legacy)
  *
  * NextActionCard owns the primary action per ruleset ("Max 1 primary action
- * per screen"). Its CTA dispatches by `kind` resolved from jobNextAction.js:
+ * per screen"). Its CTA dispatches by `kind` resolved from jobNextAction.ts:
  *   - milestone → patch contact.milestones[i].done = true
  *   - todo      → fh_job_todos UPDATE done=true
  *   - schedule  → open AddEventSheet via onOpenAddEvent (parent owns sheet)
