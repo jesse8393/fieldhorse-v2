@@ -51,6 +51,7 @@ function RootNavigator() {
     >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="jobs/[id]" />
     </Stack>
   )
 }
