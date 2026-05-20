@@ -1,4 +1,4 @@
-// src/lib/closeout.js
+// src/lib/closeout.ts
 //
 // Closeout actions for the Mark Complete sheet. Reads/writes fh_closeouts
 // (migration 028), advances stage to 'closed' when needed, and snapshots
@@ -10,6 +10,19 @@
 
 import { supabase } from './supabase.js'
 import { transitionStage } from './stages.ts'
+import type { Database } from './database.types.ts'
+
+type Contact = Database['public']['Tables']['fh_contacts']['Row']
+
+type CloseoutPayload = {
+  closed_at?: string | null
+  warranty_start_date?: string | null
+  warranty_months?: number | string | null
+  signoff_name?: string | null
+  signoff_method?: string | null
+  signoff_at?: string | null
+  notes?: string | null
+}
 
 export const SIGNOFF_METHODS = [
   { id: 'verbal',           label: 'Verbal' },
@@ -29,7 +42,7 @@ export const WARRANTY_PRESETS = [
 ]
 
 // Load any existing closeout for a job. Returns null when none.
-export async function loadCloseout({ userId, contactId }) {
+export async function loadCloseout({ userId, contactId }: { userId: string | undefined; contactId: string | undefined }) {
   if (!userId || !contactId) return null
   const { data } = await supabase
     .from('fh_closeouts')
@@ -42,7 +55,7 @@ export async function loadCloseout({ userId, contactId }) {
 
 // Snapshot helpers — called by the sheet before save so the modal can
 // show the operator what's about to be locked in.
-export async function snapshotJobTotals({ userId, contactId }) {
+export async function snapshotJobTotals({ userId, contactId }: { userId: string | undefined; contactId: string | undefined }) {
   if (!userId || !contactId) return { paid: 0, photoCount: 0 }
   const [{ data: payments }, { count: photoCount }] = await Promise.all([
     supabase
@@ -64,7 +77,7 @@ export async function snapshotJobTotals({ userId, contactId }) {
 // already-closed job updates the existing record instead of erroring.
 // When advanceStage=true and the job isn't already closed, also flips
 // stage to 'closed' so the pipeline reflects the closeout.
-export async function saveCloseout({ userId, contact, payload, advanceStage = true }) {
+export async function saveCloseout({ userId, contact, payload, advanceStage = true }: { userId: string | undefined; contact: Contact; payload: CloseoutPayload; advanceStage?: boolean }) {
   if (!userId || !contact?.id) throw new Error('saveCloseout: userId + contact required')
 
   const totals = await snapshotJobTotals({ userId, contactId: contact.id })
@@ -77,7 +90,7 @@ export async function saveCloseout({ userId, contact, payload, advanceStage = tr
     warranty_months: Number.isFinite(Number(payload.warranty_months)) ? Number(payload.warranty_months) : null,
     signoff_name: payload.signoff_name?.trim() || null,
     signoff_method: SIGNOFF_METHODS.some((m) => m.id === payload.signoff_method)
-      ? payload.signoff_method
+      ? (payload.signoff_method as string)
       : 'verbal',
     signoff_at: payload.signoff_at || new Date().toISOString(),
     notes: payload.notes?.trim() || null,
@@ -114,7 +127,7 @@ export async function saveCloseout({ userId, contact, payload, advanceStage = tr
 }
 
 // Delete an existing closeout (and optionally reopen the stage).
-export async function clearCloseout({ userId, contact, reopenTo = 'invoice' }) {
+export async function clearCloseout({ userId, contact, reopenTo = 'invoice' }: { userId: string | undefined; contact: Contact; reopenTo?: 'invoice' | 'job' | 'lead' | 'quote' | 'closed' | 'lost' }) {
   if (!userId || !contact?.id) throw new Error('clearCloseout: userId + contact required')
   const { error } = await supabase
     .from('fh_closeouts')

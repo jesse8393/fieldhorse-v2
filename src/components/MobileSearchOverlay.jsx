@@ -6,7 +6,7 @@ import {
   X, Search as SearchIcon, Briefcase, Users, FileText, Calendar, Paperclip,
   ChevronRight
 } from 'lucide-react'
-import { universalSearch } from '../lib/universalSearch.js'
+import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 // Mobile-native search overlay — replaces CommandPalette on phone widths

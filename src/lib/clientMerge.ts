@@ -1,4 +1,4 @@
-// src/lib/clientMerge.js
+// src/lib/clientMerge.ts
 //
 // Duplicate detection + merge transaction for fh_clients. Clients are
 // considered a possible duplicate when their normalized phone matches
@@ -18,15 +18,24 @@
 // must pass the authed user_id; we trust no client-supplied ids.
 
 import { supabase } from './supabase.js'
+import type { Database } from './database.types.ts'
 
-function normPhone(v) {
+type Client = Database['public']['Tables']['fh_clients']['Row']
+
+export type DuplicateCluster = {
+  key: string
+  members: Client[]
+  matchedOn: string[]
+}
+
+function normPhone(v: string | null | undefined) {
   if (!v) return ''
   const digits = String(v).replace(/\D/g, '')
   if (!digits) return ''
   return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
 }
 
-function normEmail(v) {
+function normEmail(v: string | null | undefined) {
   if (!v) return ''
   return String(v).trim().toLowerCase()
 }
@@ -36,35 +45,35 @@ function normEmail(v) {
 // (normalized phone, normalized email). Each row may belong to at most
 // one cluster — first match wins. Output is sorted with the largest
 // clusters first so the UI lists the biggest cleanups at the top.
-export function findDuplicateClusters(clients) {
+export function findDuplicateClusters(clients: Client[]): DuplicateCluster[] {
   if (!Array.isArray(clients) || clients.length < 2) return []
 
-  const phoneIndex = new Map()
-  const emailIndex = new Map()
+  const phoneIndex = new Map<string, Client[]>()
+  const emailIndex = new Map<string, Client[]>()
   for (const c of clients) {
     const p = normPhone(c.phone)
     if (p) {
       if (!phoneIndex.has(p)) phoneIndex.set(p, [])
-      phoneIndex.get(p).push(c)
+      phoneIndex.get(p)!.push(c)
     }
     const e = normEmail(c.email)
     if (e) {
       if (!emailIndex.has(e)) emailIndex.set(e, [])
-      emailIndex.get(e).push(c)
+      emailIndex.get(e)!.push(c)
     }
   }
 
   // Union-find over client ids so a phone match + email match that span
   // three rows collapse into a single cluster.
-  const parent = new Map(clients.map((c) => [c.id, c.id]))
-  function find(x) {
+  const parent = new Map<string, string>(clients.map((c) => [c.id, c.id]))
+  function find(x: string): string {
     while (parent.get(x) !== x) {
-      parent.set(x, parent.get(parent.get(x)))
-      x = parent.get(x)
+      parent.set(x, parent.get(parent.get(x)!)!)
+      x = parent.get(x)!
     }
     return x
   }
-  function union(a, b) {
+  function union(a: string, b: string) {
     const ra = find(a)
     const rb = find(b)
     if (ra !== rb) parent.set(ra, rb)
@@ -76,17 +85,17 @@ export function findDuplicateClusters(clients) {
     if (arr.length > 1) for (let i = 1; i < arr.length; i++) union(arr[0].id, arr[i].id)
   }
 
-  const groups = new Map()
+  const groups = new Map<string, Client[]>()
   for (const c of clients) {
     const root = find(c.id)
     if (!groups.has(root)) groups.set(root, [])
-    groups.get(root).push(c)
+    groups.get(root)!.push(c)
   }
 
-  const out = []
+  const out: DuplicateCluster[] = []
   for (const arr of groups.values()) {
     if (arr.length < 2) continue
-    const matchedOn = []
+    const matchedOn: string[] = []
     const phones = new Set(arr.map((c) => normPhone(c.phone)).filter(Boolean))
     const emails = new Set(arr.map((c) => normEmail(c.email)).filter(Boolean))
     if (phones.size > 0 && [...phoneIndex.values()].some((g) => g.length > 1 && g.every((c) => arr.includes(c)))) {
@@ -111,9 +120,9 @@ export function findDuplicateClusters(clients) {
 // Field-merge policy. Survivor wins on every field except where it is
 // null/empty AND the loser has a value, in which case the loser's value
 // fills it in. We never overwrite a non-empty survivor field.
-const MERGEABLE_FIELDS = ['company_name', 'phone', 'email', 'address', 'notes']
+const MERGEABLE_FIELDS = ['company_name', 'phone', 'email', 'address', 'notes'] as const
 
-function pickMergedValue(survivorVal, loserVal) {
+function pickMergedValue(survivorVal: unknown, loserVal: unknown) {
   const sHas = survivorVal !== null && survivorVal !== undefined && String(survivorVal).trim() !== ''
   const lHas = loserVal !== null && loserVal !== undefined && String(loserVal).trim() !== ''
   if (sHas) return survivorVal
@@ -124,7 +133,7 @@ function pickMergedValue(survivorVal, loserVal) {
 // Run a merge. `survivor` is the client row that stays; `losers` is the
 // array of client rows that will be absorbed and deleted. Returns
 // { reassigned, deletedCount, patch } on success or throws on failure.
-export async function mergeClients({ userId, survivor, losers }) {
+export async function mergeClients({ userId, survivor, losers }: { userId: string | undefined; survivor: Client; losers: Client[] }) {
   if (!userId) throw new Error('mergeClients: userId required')
   if (!survivor?.id) throw new Error('mergeClients: survivor required')
   if (!Array.isArray(losers) || losers.length === 0) throw new Error('mergeClients: at least one loser required')
@@ -150,16 +159,16 @@ export async function mergeClients({ userId, survivor, losers }) {
     const db = b.created_at ? new Date(b.created_at).getTime() : 0
     return da - db
   })
-  const patch = {}
+  const patch: Record<string, unknown> = {}
   for (const f of MERGEABLE_FIELDS) {
-    let val = survivor[f]
+    let val: unknown = survivor[f]
     for (const l of ordered) val = pickMergedValue(val, l[f])
     if (val !== survivor[f] && val !== null) patch[f] = val
   }
   if (Object.keys(patch).length > 0) {
     const { error: upErr } = await supabase
       .from('fh_clients')
-      .update(patch)
+      .update(patch as Database['public']['Tables']['fh_clients']['Update'])
       .eq('id', survivor.id)
       .eq('user_id', userId)
     if (upErr) throw upErr

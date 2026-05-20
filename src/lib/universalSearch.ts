@@ -21,20 +21,39 @@ import { supabase } from './supabase.js'
 
 const PER_KIND = 6
 
-function pat(q) { return `%${q.replace(/[%_]/g, (m) => '\\' + m)}%` }
+export type SearchKind = 'job' | 'client' | 'note' | 'event' | 'file'
 
-function fmtDateShort(iso) {
+export type SearchResult = {
+  id: string
+  kind: SearchKind
+  title: string
+  sub: string
+  to: string
+}
+
+export type SearchResults = {
+  jobs: SearchResult[]
+  clients: SearchResult[]
+  notes: SearchResult[]
+  events: SearchResult[]
+  files: SearchResult[]
+  total: number
+}
+
+function pat(q: string) { return `%${q.replace(/[%_]/g, (m) => '\\' + m)}%` }
+
+function fmtDateShort(iso: string | null | undefined) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function fmtDateTime(iso) {
+function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return ''
   const d = new Date(iso)
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
 }
 
-export async function universalSearch(query, userId) {
+export async function universalSearch(query: string | null | undefined, userId: string | undefined): Promise<SearchResults> {
   const q = String(query || '').trim()
   if (!q || !userId) return { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
 
@@ -86,35 +105,39 @@ export async function universalSearch(query, userId) {
       .limit(PER_KIND)
   ])
 
-  const jobs = (jobsRes.data || []).map((j) => ({
+  // The embedded fh_contacts join makes the row types awkward to infer;
+  // these are display mappers, so we read the rows loosely.
+  const asRows = (d: unknown): any[] => (Array.isArray(d) ? d : [])
+
+  const jobs: SearchResult[] = asRows(jobsRes.data).map((j) => ({
     id: `job:${j.id}`,
     kind: 'job',
     title: j.name || 'Untitled',
     sub: [j.job_title || j.job_type, j.stage?.toUpperCase(), j.amount ? `$${Math.round(j.amount).toLocaleString()}` : null].filter(Boolean).join(' · '),
     to: `/jobs/${j.id}`
   }))
-  const clients = (clientsRes.data || []).map((c) => ({
+  const clients: SearchResult[] = asRows(clientsRes.data).map((c) => ({
     id: `client:${c.id}`,
     kind: 'client',
     title: c.name || 'Unnamed',
     sub: [c.company_name, c.email || c.phone, c.active_jobs_count ? `${c.active_jobs_count} active` : null].filter(Boolean).join(' · '),
     to: `/clients/${c.id}`
   }))
-  const notes = (notesRes.data || []).map((n) => ({
+  const notes: SearchResult[] = asRows(notesRes.data).map((n) => ({
     id: `note:${n.id}`,
     kind: 'note',
     title: (n.text || '').slice(0, 80) || 'Untitled note',
     sub: [n.fh_contacts?.name, fmtDateShort(n.created_at)].filter(Boolean).join(' · '),
     to: '/notes'
   }))
-  const events = (eventsRes.data || []).map((e) => ({
+  const events: SearchResult[] = asRows(eventsRes.data).map((e) => ({
     id: `event:${e.id}`,
     kind: 'event',
     title: e.title || 'Untitled event',
     sub: [fmtDateTime(e.start_at), e.fh_contacts?.name].filter(Boolean).join(' · '),
     to: e.contact_id ? `/jobs/${e.contact_id}` : '/schedule'
   }))
-  const files = (filesRes.data || []).map((f) => ({
+  const files: SearchResult[] = asRows(filesRes.data).map((f) => ({
     id: `file:${f.id}`,
     kind: 'file',
     title: f.filename,

@@ -14,7 +14,7 @@ import {
   BarChart3, Upload, Settings, Plus, Mic, Users, Image as ImageIcon,
   Paperclip
 } from 'lucide-react'
-import { universalSearch } from '../lib/universalSearch.js'
+import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 // Static nav — shown as the "empty state" when the input is blank.

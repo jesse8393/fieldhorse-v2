@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Calendar } from 'lucide-react'
 import { hapticTap } from '../../lib/haptics.js'
-import { dueStatus } from '../../lib/dueDate.js'
+import { dueStatus } from '../../lib/dueDate.ts'
 
 /**
  * Next Action card — the most important thing on the Job Detail Overview.

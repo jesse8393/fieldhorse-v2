@@ -22,7 +22,7 @@ import { generateCertificate, downloadPdf } from '../lib/pdf.js'
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals
-} from '../lib/closeout.js'
+} from '../lib/closeout.ts'
 
 function moneyFmt(n) {
   return Number(n || 0).toLocaleString(undefined, {

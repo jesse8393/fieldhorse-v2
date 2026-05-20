@@ -13,7 +13,7 @@
  * Convert a YYYY-MM-DD input value to an ISO timestamptz at the
  * operator's local end-of-day. Returns null for empty input.
  */
-export function dateInputToTimestamp(dateStr) {
+export function dateInputToTimestamp(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null
   const parts = String(dateStr).split('-').map(Number)
   if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null
@@ -28,7 +28,7 @@ export function dateInputToTimestamp(dateStr) {
  * <input type="date"> value. Returns '' when iso is null/undefined
  * so the input renders empty.
  */
-export function timestampToDateInput(iso) {
+export function timestampToDateInput(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
@@ -49,7 +49,7 @@ export function timestampToDateInput(iso) {
  * "Day" comparisons strip time-of-day so a 23:59:59 end-of-day
  * timestamp doesn't get misclassified as overdue at 11:59pm.
  */
-export function dueStatus(iso) {
+export function dueStatus(iso: string | null | undefined): { label: string; tone: string } | null {
   if (!iso) return null
   const due = new Date(iso)
   if (Number.isNaN(due.getTime())) return null
