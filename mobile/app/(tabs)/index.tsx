@@ -19,10 +19,12 @@ import {
   useJobs, useClientsBundle, useRecentActivity, useProfile, useAgenda,
   useWeather, useInvoicesOverview, useNotifications, useSaveLocation
 } from '../../lib/queries'
+import { weatherLabel } from '../../lib/weather'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, SectionLabel, theme } from '../../components/ui'
 import { NewLeadSheet } from '../../components/NewLeadSheet'
 import { SearchOverlay } from '../../components/SearchOverlay'
+import { DailyBriefCard } from '../../components/DailyBriefCard'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 const STAGE_TINT: Record<string, string> = { lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E', invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f' }
@@ -141,6 +143,19 @@ export default function HomeScreen() {
     return out.slice(0, 5)
   }, [overdue, jobs, invoices?.invoices, router])
 
+  const briefContext = useMemo(() => {
+    const parts = [
+      `Pipeline $${Math.round(stats.pipeline).toLocaleString()} across ${stats.active} active deals (7-day trend ${stats.trend >= 0 ? '+' : ''}${stats.trend}%).`,
+      `${stats.lead} leads, ${todayEvents.length} jobs on site today.`,
+      `${priorities.followUps} cold follow-ups, ${priorities.quotes} open quotes.`,
+      invoices ? `$${Math.round(invoices.totalOutstanding).toLocaleString()} outstanding across ${invoices.outstandingCount} invoices; $${Math.round(priorities.collectedWeek).toLocaleString()} collected this week.` : '',
+      overdue.length ? `${overdue.length} jobs behind schedule.` : '',
+      weather?.current ? `Weather: ${Math.round(weather.current.temperature_2m)}°F, ${weatherLabel(weather.current.weather_code)}.` : '',
+      nextActions.length ? `Top actions: ${nextActions.map((a) => a.title).slice(0, 5).join('; ')}.` : ''
+    ]
+    return parts.filter(Boolean).join(' ')
+  }, [stats, todayEvents.length, priorities, invoices, overdue.length, weather, nextActions])
+
   const name = (user?.email?.split('@')[0] || 'there')
   const display = name.charAt(0).toUpperCase() + name.slice(1)
   const eyebrow = `${now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · ${now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`.toUpperCase()
@@ -252,6 +267,9 @@ export default function HomeScreen() {
                 </View>
               </View>
             </Card>
+
+            {/* AI daily brief */}
+            <DailyBriefCard context={briefContext} />
 
             {/* Quick actions */}
             <SectionLabel style={{ marginBottom: 10 }}>Quick actions</SectionLabel>
