@@ -68,6 +68,47 @@ function normalizeLead(p: any): ParsedLead {
   return out
 }
 
+const EXPENSE_SYSTEM = `You are an OCR + extraction engine for a contractor's expense tracking. You will be shown a single image — usually a receipt, an invoice, a credit-card slip, or a screenshot of a vendor email. Extract one expense line.
+
+Return ONLY one JSON object, using null for anything you can't read with high confidence:
+
+{
+  "description": string or null,
+  "amount": number or null,
+  "category": one of ["Materials", "Fuel", "Permits", "Equipment", "Other"] or null,
+  "expense_date": string or null
+}
+
+Rules:
+- Pick the GRAND TOTAL (or "Total Due" / "Amount Charged"). Skip line items, subtotals, tax-only.
+- Category: lumber/concrete/paint -> Materials; gas/diesel -> Fuel; city/county fees -> Permits; tool rental -> Equipment; else Other.
+- expense_date: ISO YYYY-MM-DD if visible (assume current year if only month/day); null if unreadable.
+- No prose, JSON only.`
+
+export type ParsedExpense = {
+  description: string | null; amount: number | null
+  category: string | null; expense_date: string | null
+}
+
+export async function parseExpenseFromImage(dataUrl: string): Promise<ParsedExpense> {
+  const res = await claudeVision({
+    system: EXPENSE_SYSTEM,
+    prompt: 'Extract this expense. Return only the JSON object specified in your system prompt.',
+    imageData: dataUrl,
+    maxTokens: 500
+  })
+  const text = res?.content?.[0]?.text || ''
+  const parsed = extractJson(text)
+  if (!parsed) throw new Error("Couldn't read that receipt. Try a clearer photo.")
+  const CATS = ['Materials', 'Fuel', 'Permits', 'Equipment', 'Other']
+  return {
+    description: nullableString(parsed.description),
+    amount: typeof parsed.amount === 'number' && parsed.amount > 0 ? Math.round(parsed.amount * 100) / 100 : null,
+    category: typeof parsed.category === 'string' && CATS.includes(parsed.category) ? parsed.category : null,
+    expense_date: nullableString(parsed.expense_date)
+  }
+}
+
 export async function parseLeadFromImage(dataUrl: string): Promise<ParsedLead> {
   const res = await claudeVision({
     system: LEAD_SYSTEM,

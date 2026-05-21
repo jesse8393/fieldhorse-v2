@@ -34,6 +34,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground } from '../../components/ui'
 import { MarkCompleteSheet } from '../../components/MarkCompleteSheet'
 import { PaymentSheet } from '../../components/PaymentSheet'
+import { parseExpenseFromImage } from '../../lib/docIntelligence'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#6B7CA8', paid: '#4F8C5E', overdue: '#7d2a1f', void: '#5C5C5C'
@@ -147,7 +148,9 @@ export default function JobDetailScreen() {
   const [expAmount, setExpAmount] = useState('')
   const [expCategory, setExpCategory] = useState('')
   const [expDesc, setExpDesc] = useState('')
+  const [expDate, setExpDate] = useState<string | null>(null)
   const [expSaving, setExpSaving] = useState(false)
+  const [expScanning, setExpScanning] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [editName, setEditName] = useState('')
@@ -421,13 +424,46 @@ export default function JobDetailScreen() {
     setExpSaving(true)
     const { error } = await addExpense({
       userId: user.id, contactId: contact.id, amount: amt,
-      category: expCategory.trim() || undefined, description: expDesc.trim() || undefined
+      category: expCategory.trim() || undefined, description: expDesc.trim() || undefined,
+      expenseDate: expDate || undefined
     })
     setExpSaving(false)
     if (!error) {
       setExpOpen(false)
-      setExpAmount(''); setExpCategory(''); setExpDesc('')
+      setExpAmount(''); setExpCategory(''); setExpDesc(''); setExpDate(null)
     }
+  }
+
+  async function scanReceipt(fromCamera: boolean) {
+    try {
+      const perm = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!perm.granted) { Alert.alert('Permission needed', `Allow ${fromCamera ? 'camera' : 'photo'} access to scan a receipt.`); return }
+      const res = fromCamera
+        ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.5 })
+      if (res.canceled || !res.assets?.[0]?.base64) return
+      const a = res.assets[0]
+      setExpScanning(true)
+      const parsed = await parseExpenseFromImage(`data:${a.mimeType || 'image/jpeg'};base64,${a.base64}`)
+      if (parsed.amount) setExpAmount(String(parsed.amount))
+      if (parsed.category) setExpCategory(parsed.category)
+      if (parsed.description) setExpDesc(parsed.description)
+      if (parsed.expense_date) setExpDate(parsed.expense_date)
+    } catch (e) {
+      Alert.alert('Scan failed', (e as Error).message || 'Could not read that receipt.')
+    } finally {
+      setExpScanning(false)
+    }
+  }
+
+  function promptScanReceipt() {
+    Alert.alert('Scan a receipt', 'Photograph a receipt and AI will fill the expense.', [
+      { text: 'Take photo', onPress: () => scanReceipt(true) },
+      { text: 'Choose from library', onPress: () => scanReceipt(false) },
+      { text: 'Cancel', style: 'cancel' }
+    ])
   }
 
   async function runPhotoUpload(uri: string) {
@@ -1486,7 +1522,21 @@ export default function JobDetailScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setExpOpen(false)} />
           <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
-            <Text className="text-ink text-xl font-bold mb-5">Log an expense</Text>
+            <Text className="text-ink text-xl font-bold mb-4">Log an expense</Text>
+            <Pressable
+              onPress={promptScanReceipt}
+              disabled={expScanning}
+              className="flex-row items-center rounded-xl p-3.5 mb-4 border"
+              style={{ gap: 12, borderColor: 'rgba(201,150,58,0.3)', backgroundColor: 'rgba(232,184,101,0.08)', opacity: expScanning ? 0.6 : 1 }}
+            >
+              <View className="items-center justify-center rounded-xl border" style={{ width: 38, height: 38, borderColor: 'rgba(201,150,58,0.3)', backgroundColor: 'rgba(232,184,101,0.12)' }}>
+                {expScanning ? <ActivityIndicator color="#E8B865" size="small" /> : <Camera color="#E8B865" size={17} />}
+              </View>
+              <View className="flex-1">
+                <Text className="text-ink font-bold text-sm">{expScanning ? 'Reading receipt…' : 'Scan a receipt'}</Text>
+                <Text className="text-ink-muted text-xs mt-0.5">AI fills amount, category & date</Text>
+              </View>
+            </Pressable>
             <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Amount</Text>
             <TextInput
               value={expAmount}
