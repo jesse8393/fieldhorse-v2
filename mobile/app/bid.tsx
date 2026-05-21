@@ -11,7 +11,8 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Sparkles, Check } from 'lucide-react-native'
+import * as Clipboard from 'expo-clipboard'
+import { Sparkles, Check, Copy } from 'lucide-react-native'
 import { ScreenBackground, ScreenHeader, GoldButton, theme } from '../components/ui'
 import { claudeMessage, claudeText } from '../lib/anthropic'
 import { useCreateJobFromBid, type BidResult } from '../lib/queries'
@@ -52,6 +53,7 @@ export default function BidScreen() {
   const [bid, setBid] = useState<BidResult | null>(null)
   const [err, setErr] = useState('')
   const [pushing, setPushing] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const total = useMemo(() => {
     if (!bid) return null
@@ -87,6 +89,21 @@ export default function BidScreen() {
     } finally {
       setGenerating(false)
     }
+  }
+
+  async function copyEstimate() {
+    if (!bid || !total) return
+    const lines: string[] = []
+    if (bid.summary) lines.push(bid.summary, '')
+    for (const li of bid.line_items || []) {
+      const qty = Number(li.qty || 1)
+      lines.push(`• ${li.name} — ${qty} ${li.unit || ''} @ ${money(li.rate_low || 0)}–${money(li.rate_high || 0)}`)
+    }
+    lines.push('', `Recommended price: ${money(total.withMargin)}`, `Range: ${money(total.low)}–${money(total.high)} (${marginPct}% margin)`)
+    if (bid.assumptions?.length) lines.push('', 'Assumptions:', ...bid.assumptions.map((a) => `- ${a}`))
+    if (bid.risks?.length) lines.push('', 'Risks:', ...bid.risks.map((r) => `- ${r}`))
+    await Clipboard.setStringAsync(lines.join('\n'))
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
   async function pushToJob() {
@@ -191,8 +208,14 @@ export default function BidScreen() {
             {bid.assumptions?.length ? <Bullets title="Assumptions" items={bid.assumptions} /> : null}
             {bid.risks?.length ? <Bullets title="Risks" items={bid.risks} /> : null}
 
-            <View style={{ marginTop: 18 }}>
-              <GoldButton label="Create job from estimate" onPress={pushToJob} loading={pushing} />
+            <View style={{ marginTop: 18, flexDirection: 'row', gap: 12 }}>
+              <Pressable onPress={copyEstimate} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, borderWidth: 1, borderColor: theme.borderMid }}>
+                {copied ? <Check color={theme.success} size={16} /> : <Copy color={theme.ink} size={16} />}
+                <Text style={{ color: copied ? theme.success : theme.ink, fontWeight: '700' }}>{copied ? 'Copied' : 'Copy'}</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <GoldButton label="Create job from estimate" onPress={pushToJob} loading={pushing} />
+              </View>
             </View>
           </View>
         ) : null}
