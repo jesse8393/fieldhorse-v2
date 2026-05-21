@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, SectionLabel, theme } from '../../components/ui'
 import { NewLeadSheet } from '../../components/NewLeadSheet'
+import { SearchOverlay } from '../../components/SearchOverlay'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 const STAGE_TINT: Record<string, string> = { lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E', invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f' }
@@ -61,6 +62,7 @@ export default function HomeScreen() {
   const [now, setNow] = useState(() => new Date())
   const [pinning, setPinning] = useState(false)
   const [leadOpen, setLeadOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30000)
     return () => clearInterval(t)
@@ -180,7 +182,7 @@ export default function HomeScreen() {
               </Text>
             )}
           </View>
-          <IconBtn onPress={() => router.push('/jobs')}><Search color={theme.goldBright} size={17} /></IconBtn>
+          <IconBtn onPress={() => setSearchOpen(true)}><Search color={theme.goldBright} size={17} /></IconBtn>
           <IconBtn onPress={() => router.push('/notifications')} badge={unread}><Bell color={theme.goldBright} size={17} /></IconBtn>
           <IconBtn onPress={() => router.push('/notes')}><NotebookPen color={theme.goldBright} size={17} /></IconBtn>
         </View>
@@ -393,6 +395,7 @@ export default function HomeScreen() {
       {user ? (
         <NewLeadSheet open={leadOpen} onClose={() => setLeadOpen(false)} userId={user.id} onCreated={(id) => router.push(`/jobs/${id}`)} />
       ) : null}
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} userId={user?.id} />
     </View>
   )
 }
