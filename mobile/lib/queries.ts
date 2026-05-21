@@ -1419,3 +1419,102 @@ export function useInvoiceDetail(id: string | undefined) {
     enabled: !!id
   })
 }
+
+// ---- Sub detail (vendor profile keyed by phone||name lowercased) ----
+export type SubProfile = {
+  id: string
+  name: string | null
+  company: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  trades: string[] | null
+  ein: string | null
+  license_number: string | null
+  insurance_carrier: string | null
+  insurance_policy: string | null
+  insurance_expires_on: string | null
+  payment_method: string | null
+  payment_handle: string | null
+  notes: string | null
+  coi_path: string | null
+  w9_path: string | null
+  license_path: string | null
+}
+export type SubDetailData = {
+  key: string
+  displayName: string
+  displayPhone: string
+  profile: SubProfile | null
+  jobs: { id: string; rate: number; status: string; contactId: string | null; contactName: string | null; jobTitle: string | null }[]
+  billed: number
+  trades: string[]
+  lastWorked: number | null
+}
+
+export function useSubDetail(key: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: ['subDetail', key],
+    queryFn: async (): Promise<SubDetailData | null> => {
+      const uid = userId as string
+      const norm = (key as string).trim().toLowerCase()
+      const [sRes, pRes] = await Promise.all([
+        supabase.from('fh_subs').select('id, name, phone, trade, rate, status, contact_id, created_at').eq('user_id', uid),
+        supabase.from('fh_sub_profiles').select('*').eq('user_id', uid)
+      ])
+      const allSubs = (sRes.data ?? []) as any[]
+      const subRows = allSubs.filter((r) => ((r.phone || r.name || '').trim().toLowerCase()) === norm)
+      const profile = ((pRes.data ?? []) as any[]).find((p) => ((p.phone || p.name || '').trim().toLowerCase()) === norm) ?? null
+      const contactIds = Array.from(new Set(subRows.map((r) => r.contact_id).filter(Boolean)))
+      let contacts: Record<string, { name: string | null; jobTitle: string | null }> = {}
+      if (contactIds.length) {
+        const cRes = await supabase.from('fh_contacts').select('id, name, job_title').in('id', contactIds as string[])
+        for (const c of (cRes.data ?? []) as any[]) contacts[c.id] = { name: c.name, jobTitle: c.job_title }
+      }
+      const first = subRows[0]
+      const tradesSet = new Set<string>()
+      let billed = 0, lastWorked: number | null = null
+      for (const r of subRows) {
+        if (r.trade) tradesSet.add(r.trade)
+        billed += Number(r.rate || 0)
+        const t = r.created_at ? new Date(r.created_at).getTime() : null
+        if (t && (!lastWorked || t > lastWorked)) lastWorked = t
+      }
+      return {
+        key: key as string,
+        displayName: profile?.name?.trim() || first?.name?.trim() || '(Unnamed sub)',
+        displayPhone: profile?.phone || first?.phone || '',
+        profile: profile as SubProfile | null,
+        jobs: subRows.map((r) => ({ id: r.id, rate: Number(r.rate || 0), status: r.status || 'scheduled', contactId: r.contact_id, contactName: r.contact_id ? contacts[r.contact_id]?.name ?? null : null, jobTitle: r.contact_id ? contacts[r.contact_id]?.jobTitle ?? null : null })),
+        billed, trades: Array.from(tradesSet), lastWorked
+      }
+    },
+    enabled: !!key && !!userId
+  })
+}
+
+export function useCreateSubProfile() {
+  const client = useQueryClient()
+  return async (input: { userId: string; key: string; name: string; phone: string | null; trades: string[] }) => {
+    const { error } = await supabase.from('fh_sub_profiles').insert({
+      user_id: input.userId, name: input.name, phone: input.phone, trades: input.trades.length ? input.trades : null
+    } as any)
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['subDetail', input.key] })
+      client.invalidateQueries({ queryKey: ['subsRoster', input.userId] })
+    }
+    return { error }
+  }
+}
+
+export function useUpdateSubProfile() {
+  const client = useQueryClient()
+  return async (input: { id: string; userId: string; key: string; patch: Partial<Omit<SubProfile, 'id'>> }) => {
+    const { error } = await supabase.from('fh_sub_profiles').update(input.patch as any).eq('id', input.id)
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['subDetail', input.key] })
+      client.invalidateQueries({ queryKey: ['subsRoster', input.userId] })
+    }
+    return { error }
+  }
+}

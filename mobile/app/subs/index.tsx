@@ -4,10 +4,10 @@ import { useMemo, useState } from 'react'
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Modal, Alert, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Hammer, Search, Plus, Phone, ChevronRight, Check } from 'lucide-react-native'
-import { useSubsRoster, useAddSubGlobal, type SubsRoster } from '../lib/queries'
-import { useAuth } from '../contexts/AuthContext'
-import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
+import { Hammer, Search, Plus, Phone, ChevronRight, IdCard } from 'lucide-react-native'
+import { useSubsRoster, useAddSubGlobal, type SubsRoster } from '../../lib/queries'
+import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui'
 
 type Group = {
   key: string; name: string; phone: string; trades: string[]
@@ -117,7 +117,7 @@ export default function SubsScreen() {
           <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 8 }}>No subs match that filter.</Text>
         ) : (
           <View style={{ gap: 10 }}>
-            {filtered.map((g) => <SubCard key={g.key} g={g} contacts={data?.contacts ?? {}} isTop={g.key === topKey} onJob={(id) => router.push(`/jobs/${id}`)} />)}
+            {filtered.map((g) => <SubCard key={g.key} g={g} contacts={data?.contacts ?? {}} isTop={g.key === topKey} onJob={(id) => router.push(`/jobs/${id}`)} onProfile={() => router.push(`/subs/${encodeURIComponent(g.key)}`)} />)}
           </View>
         )}
       </ScrollView>
@@ -135,7 +135,7 @@ function TradePill({ label, active, onPress }: { label: string; active: boolean;
   )
 }
 
-function SubCard({ g, contacts, isTop, onJob }: { g: Group; contacts: SubsRoster['contacts']; isTop: boolean; onJob: (id: string) => void }) {
+function SubCard({ g, contacts, isTop, onJob, onProfile }: { g: Group; contacts: SubsRoster['contacts']; isTop: boolean; onJob: (id: string) => void; onProfile: () => void }) {
   const [open, setOpen] = useState(false)
   const initials = g.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'SB'
   return (
@@ -163,6 +163,11 @@ function SubCard({ g, contacts, isTop, onJob }: { g: Group; contacts: SubsRoster
 
       {open ? (
         <View style={{ borderTopWidth: 1, borderTopColor: theme.border, paddingHorizontal: 16 }}>
+          <Pressable onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 12 }}>
+            <IdCard color={theme.goldBright} size={15} />
+            <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '700', flex: 1 }}>View vendor profile</Text>
+            <ChevronRight color={theme.goldBright} size={14} />
+          </Pressable>
           {g.phone ? (
             <Pressable onPress={() => Linking.openURL(`tel:${g.phone}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 }}>
               <Phone color={theme.goldBright} size={14} />
