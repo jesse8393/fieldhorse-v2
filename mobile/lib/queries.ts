@@ -279,6 +279,9 @@ export function useLogPayment() {
     } as any)
     if (!error) {
       client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+      client.invalidateQueries({ queryKey: ['invoiceDetail', input.contactId] })
+      client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
+      client.invalidateQueries({ queryKey: ['activityFeed', input.userId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
     }
     return { error }
@@ -1377,4 +1380,42 @@ export function useAddSubGlobal() {
     if (!error) client.invalidateQueries({ queryKey: ['subsRoster', input.userId] })
     return { error }
   }
+}
+
+// ---- Invoice detail (per-job billing summary) ----
+export type InvoiceDetailData = {
+  contact: { id: string; name: string | null; jobTitle: string | null; stage: string | null; amount: number; email: string | null; phone: string | null; createdAt: string | null }
+  payments: { id: string; amount: number; method: string | null; reference: string | null; paidOn: string | null }[]
+  amount: number
+  paid: number
+  balance: number
+  pctPaid: number
+  ageDays: number
+}
+
+export function useInvoiceDetail(id: string | undefined) {
+  return useQuery({
+    queryKey: ['invoiceDetail', id],
+    queryFn: async (): Promise<InvoiceDetailData | null> => {
+      const cid = id as string
+      const [cRes, pRes] = await Promise.all([
+        supabase.from('fh_contacts').select('id, name, job_title, stage, amount, email, phone, created_at').eq('id', cid).single(),
+        supabase.from('fh_payments').select('id, amount, method, reference, paid_on').eq('contact_id', cid).order('paid_on', { ascending: false })
+      ])
+      if (!cRes.data) return null
+      const c = cRes.data as any
+      const payments = ((pRes.data ?? []) as any[]).map((p) => ({ id: p.id, amount: Number(p.amount || 0), method: p.method, reference: p.reference, paidOn: p.paid_on }))
+      const amount = Number(c.amount || 0)
+      const paid = payments.reduce((s, p) => s + p.amount, 0)
+      const balance = Math.max(0, amount - paid)
+      const ageDays = c.created_at ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0
+      return {
+        contact: { id: c.id, name: c.name, jobTitle: c.job_title, stage: c.stage, amount, email: c.email, phone: c.phone, createdAt: c.created_at },
+        payments, amount, paid, balance,
+        pctPaid: amount > 0 ? Math.max(0, Math.min(100, (paid / amount) * 100)) : 0,
+        ageDays
+      }
+    },
+    enabled: !!id
+  })
 }

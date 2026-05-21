@@ -58,7 +58,8 @@ function RootNavigator() {
       <Stack.Screen name="quote/[id]" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="analytics" />
-      <Stack.Screen name="invoices" />
+      <Stack.Screen name="invoices/index" />
+      <Stack.Screen name="invoices/[id]" />
       <Stack.Screen name="activity" />
       <Stack.Screen name="partners" />
       <Stack.Screen name="estimates" />

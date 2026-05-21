@@ -6,9 +6,9 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Send, DollarSign } from 'lucide-react-native'
-import { useInvoicesOverview, useMarkInvoicePaid, type InvoiceRow } from '../lib/queries'
-import { useAuth } from '../contexts/AuthContext'
-import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
+import { useInvoicesOverview, useMarkInvoicePaid, type InvoiceRow } from '../../lib/queries'
+import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui'
 
 function full(n: number) { return `$${Math.round(n).toLocaleString()}` }
 function ageLabel(inv: InvoiceRow) {
@@ -99,7 +99,7 @@ export default function InvoicesScreen() {
                   return (
                     <Card key={inv.id} accent={paid ? theme.success : '#C9963A'}>
                       <View style={{ padding: 16, paddingLeft: 18 }}>
-                        <Pressable onPress={() => inv.contactId && router.push(`/jobs/${inv.contactId}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Pressable onPress={() => inv.contactId && router.push(`/invoices/${inv.contactId}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Text style={{ color: theme.ink, fontSize: 17, fontWeight: '700', flex: 1 }} numberOfLines={1}>{inv.name || `Invoice #${inv.sequence ?? ''}`}</Text>
                           <Text style={{ color: theme.ink, fontSize: 18, fontWeight: '800' }}>{full(inv.amount)}</Text>
                         </Pressable>
