@@ -409,8 +409,11 @@ export default function JobDetailScreen() {
     const amount = Number(contact?.amount || 0)
     const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
     const spent = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
-    return { amount, paid, balance: Math.max(0, amount - paid), spent }
-  }, [contact, payments, expenses])
+    const approvedCO = changeOrders.reduce((s, co) => s + (co.status === 'approved' ? Number(co.amount || 0) : 0), 0)
+    const contractTotal = amount + approvedCO
+    const invoiced = invoices.reduce((s, inv) => s + (inv.status === 'void' ? 0 : Number(inv.amount || 0)), 0)
+    return { amount, paid, balance: Math.max(0, amount - paid), spent, contractTotal, approvedCO, invoiced }
+  }, [contact, payments, expenses, changeOrders, invoices])
 
   async function submitExpense() {
     const amt = Number(expAmount.replace(/[^0-9.]/g, ''))
@@ -825,6 +828,17 @@ export default function JobDetailScreen() {
             <Text className="text-gold-bright text-xs font-bold">New</Text>
           </Pressable>
         </View>
+        {totals.contractTotal > 0 ? (
+          <View className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)] mb-3">
+            <View className="flex-row flex-wrap" style={{ gap: 18 }}>
+              <InsStat label="Contract" value={money(totals.contractTotal)} />
+              <InsStat label="Invoiced" value={money(totals.invoiced)} />
+              <InsStat label="Paid" value={money(totals.paid)} />
+              <InsStat label="Balance" value={money(Math.max(0, totals.contractTotal - totals.paid))} />
+            </View>
+            {totals.approvedCO > 0 ? <Text className="text-ink-muted text-[10px] mt-3">Includes {money(totals.approvedCO)} in approved change orders.</Text> : null}
+          </View>
+        ) : null}
         {invoices.length === 0 ? (
           <Text className="text-ink-muted text-sm">No invoices yet.</Text>
         ) : (
