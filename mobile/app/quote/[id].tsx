@@ -15,6 +15,7 @@ import {
   useApplyQuoteTotal, type QuoteItem
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground } from '../../components/ui'
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -112,7 +113,8 @@ export default function QuoteScreen() {
   }
 
   return (
-    <View className="flex-1 bg-bg">
+    <View className="flex-1">
+      <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 120, paddingHorizontal: 20 }}>
         <Pressable onPress={() => router.back()} className="flex-row items-center mb-4" style={{ gap: 4 }}>
           <ChevronLeft color="#E8B865" size={20} />
@@ -137,7 +139,7 @@ export default function QuoteScreen() {
                     onPress={() => openEdit(it)}
                     onLongPress={() => confirmDelete(it.id)}
                     delayLongPress={350}
-                    className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center"
+                    className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
                     style={{ gap: 10, opacity: it.is_excluded ? 0.5 : 1 }}
                   >
                     <View className="flex-1">

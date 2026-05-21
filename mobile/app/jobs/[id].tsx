@@ -28,6 +28,7 @@ import {
   useAddInspection, useUpdateInspectionResult, useDeleteInspection
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground } from '../../components/ui'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#6B7CA8', paid: '#4F8C5E', overdue: '#7d2a1f', void: '#5C5C5C'
@@ -454,7 +455,8 @@ export default function JobDetailScreen() {
   const tint = STAGE_TINT[contact.stage ?? ''] ?? '#5C5C5C'
 
   return (
-    <View className="flex-1 bg-bg">
+    <View className="flex-1">
+      <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
         <View className="flex-row items-center justify-between mb-4">
           <Pressable onPress={() => router.back()} className="flex-row items-center" style={{ gap: 4 }}>
@@ -524,7 +526,7 @@ export default function JobDetailScreen() {
         <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Client</Text>
         <Pressable
           onPress={() => setClientPickOpen(true)}
-          className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+          className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
         >
           <View className="flex-row items-center flex-1" style={{ gap: 10 }}>
             <User color="#E8B865" size={16} />
@@ -561,7 +563,7 @@ export default function JobDetailScreen() {
                 onPress={() => contact && toggleTodo({ id: t.id, jobId: contact.id, done: !t.done })}
                 onLongPress={() => contact && deleteTodo({ id: t.id, jobId: contact.id })}
                 delayLongPress={350}
-                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center"
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
                 style={{ gap: 10 }}
               >
                 {t.done ? <CheckSquare color="#4F8C5E" size={18} /> : <Square color="#9b948a" size={18} />}
@@ -633,7 +635,7 @@ export default function JobDetailScreen() {
                 key={p.id}
                 onLongPress={() => confirmDeletePayment(p.id)}
                 delayLongPress={350}
-                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row justify-between items-center"
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row justify-between items-center"
               >
                 <Text className="text-ink-muted text-sm">
                   {p.paid_on ? new Date(p.paid_on).toLocaleDateString() : '—'} · {p.method || 'payment'}
@@ -664,7 +666,7 @@ export default function JobDetailScreen() {
                 key={e.id}
                 onLongPress={() => confirmDeleteExpense(e.id)}
                 delayLongPress={350}
-                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row justify-between items-center"
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row justify-between items-center"
               >
                 <View className="flex-1 pr-3">
                   <Text className="text-ink text-sm font-semibold" numberOfLines={1}>
@@ -701,7 +703,7 @@ export default function JobDetailScreen() {
                   onPress={() => cycleInvoiceStatus(inv)}
                   onLongPress={() => confirmDeleteInvoice(inv.id)}
                   delayLongPress={350}
-                  className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+                  className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
                 >
                   <View className="flex-1 pr-3">
                     <Text className="text-ink text-sm font-semibold" numberOfLines={1}>
@@ -737,7 +739,7 @@ export default function JobDetailScreen() {
                   onPress={() => cycleChangeOrder(co)}
                   onLongPress={() => confirmDeleteChangeOrder(co.id)}
                   delayLongPress={350}
-                  className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+                  className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
                 >
                   <View className="flex-1 pr-3">
                     <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{co.title}</Text>
@@ -772,7 +774,7 @@ export default function JobDetailScreen() {
                   onPress={() => cycleInspection(insp)}
                   onLongPress={() => confirmDeleteInspection(insp.id)}
                   delayLongPress={350}
-                  className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+                  className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
                 >
                   <View className="flex-1 pr-3">
                     <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{insp.trade || 'Inspection'}</Text>
@@ -805,7 +807,7 @@ export default function JobDetailScreen() {
                 key={m.id}
                 onLongPress={() => confirmDeleteMileage(m.id)}
                 delayLongPress={350}
-                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center justify-between"
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
               >
                 <View className="flex-1 pr-3">
                   <Text className="text-ink text-sm font-semibold">{m.miles} mi</Text>
@@ -826,7 +828,7 @@ export default function JobDetailScreen() {
         ) : (
           <View style={{ gap: 8 }}>
             {schedule.map((ev) => (
-              <View key={ev.id} className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center" style={{ gap: 10 }}>
+              <View key={ev.id} className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center" style={{ gap: 10 }}>
                 <Calendar color="#E8B865" size={16} />
                 <View className="flex-1">
                   <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{ev.title || 'Scheduled event'}</Text>
@@ -856,7 +858,7 @@ export default function JobDetailScreen() {
                 key={s.id}
                 onLongPress={() => confirmDeleteSub(s.id)}
                 delayLongPress={350}
-                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)] flex-row items-center"
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
                 style={{ gap: 10 }}
               >
                 <Users color="#E8B865" size={16} />
@@ -896,7 +898,7 @@ export default function JobDetailScreen() {
                 key={n.id}
                 onLongPress={() => confirmDeleteNote(n.id)}
                 delayLongPress={350}
-                className="bg-surface rounded-xl p-3 border border-[rgba(255,240,210,0.06)]"
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)]"
               >
                 <Text className="text-ink text-sm">{n.text || '—'}</Text>
                 <Text className="text-ink-muted text-[10px] mt-1">
@@ -1313,9 +1315,9 @@ export default function JobDetailScreen() {
 
 function Stat({ label, value, tone = '#F2EDE4' }: { label: string; value: string; tone?: string }) {
   return (
-    <View className="flex-1 bg-surface rounded-2xl p-3 border border-[rgba(255,240,210,0.06)]">
-      <Text className="text-lg font-bold" style={{ color: tone }} numberOfLines={1}>{value}</Text>
-      <Text className="text-ink-muted text-[10px] font-semibold mt-1">{label}</Text>
+    <View className="flex-1 rounded-2xl p-3.5 border border-[rgba(232,184,101,0.14)]" style={{ backgroundColor: 'rgba(24,20,17,0.6)' }}>
+      <Text className="text-xl font-bold" style={{ color: tone, letterSpacing: -0.3 }} numberOfLines={1}>{value}</Text>
+      <Text className="text-ink-muted text-[10px] font-bold uppercase tracking-wider mt-1">{label}</Text>
     </View>
   )
 }
