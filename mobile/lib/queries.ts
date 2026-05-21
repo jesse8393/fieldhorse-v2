@@ -884,6 +884,10 @@ export type UpdateProfileInput = {
   companyWebsite?: string | null
   licenseNumber?: string | null
   fullName?: string | null
+  services?: string[] | null
+  brandAccentHex?: string | null
+  insuredText?: string | null
+  warrantyDefault?: string | null
 }
 
 export function useUpdateProfile() {
@@ -897,6 +901,10 @@ export function useUpdateProfile() {
     if (input.companyWebsite !== undefined) patch.company_website = input.companyWebsite
     if (input.licenseNumber !== undefined) patch.license_number = input.licenseNumber
     if (input.fullName !== undefined) patch.full_name = input.fullName
+    if (input.services !== undefined) patch.services = input.services
+    if (input.brandAccentHex !== undefined) patch.brand_accent_hex = input.brandAccentHex
+    if (input.insuredText !== undefined) patch.insured_text = input.insuredText
+    if (input.warrantyDefault !== undefined) patch.warranty_default = input.warrantyDefault
     const { error } = await supabase.from('profiles')
       .update(patch as any)
       .eq('user_id', input.userId)
