@@ -1,11 +1,13 @@
 // mobile/app/partners.tsx — roster of partners you've shared jobs with.
+import { useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Mail, Briefcase } from 'lucide-react-native'
-import { usePartners, type PartnerEntry } from '../lib/queries'
+import { Mail, Briefcase, UserPlus } from 'lucide-react-native'
+import { usePartners, useJobs, type PartnerEntry } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
+import { InvitePartnerSheet } from '../components/InvitePartnerSheet'
 
 function initials(name: string | null, email: string) {
   const s = (name || email).trim()
@@ -18,6 +20,8 @@ export default function PartnersScreen() {
   const router = useRouter()
   const { user } = useAuth()
   const { data, isLoading } = usePartners(user?.id)
+  const { data: jobs = [] } = useJobs()
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const partners = data ?? []
   const totalJobs = partners.reduce((s, p) => s + p.jobs.length, 0)
@@ -27,7 +31,15 @@ export default function PartnersScreen() {
     <View style={{ flex: 1 }}>
       <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
-        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Partners" title="Your network" />
+        <ScreenHeader
+          backLabel="More" onBack={() => router.back()} eyebrow="Partners" title="Your network"
+          right={
+            <Pressable onPress={() => setInviteOpen(true)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}1f` }}>
+              <UserPlus color={theme.goldBright} size={15} />
+              <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '800' }}>Invite</Text>
+            </Pressable>
+          }
+        />
 
         {isLoading ? (
           <ActivityIndicator color={theme.goldBright} style={{ marginTop: 24 }} />
@@ -49,6 +61,9 @@ export default function PartnersScreen() {
           </>
         )}
       </ScrollView>
+      {user ? (
+        <InvitePartnerSheet open={inviteOpen} onClose={() => setInviteOpen(false)} userId={user.id} jobs={jobs} />
+      ) : null}
     </View>
   )
 }
