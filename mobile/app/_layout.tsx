@@ -62,6 +62,7 @@ function RootNavigator() {
       <Stack.Screen name="activity" />
       <Stack.Screen name="partners" />
       <Stack.Screen name="estimates" />
+      <Stack.Screen name="notes" />
     </Stack>
   )
 }
