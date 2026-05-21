@@ -18,6 +18,8 @@ import Login from './screens/Login.tsx'
 const ResetPassword  = lazy(() => import('./screens/ResetPassword.tsx'))
 const Onboarding     = lazy(() => import('./screens/Onboarding.tsx'))
 const PartnerInvite  = lazy(() => import('./screens/PartnerInvite.tsx'))
+const Privacy        = lazy(() => import('./screens/Privacy.tsx'))
+const Terms          = lazy(() => import('./screens/Terms.tsx'))
 const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
 const ContactDetail  = lazy(() => import('./screens/ContactDetail.tsx'))
 const Clients        = lazy(() => import('./screens/Clients.tsx'))
@@ -77,6 +79,8 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/partner-invite/:token" element={<PartnerInvite />} />
         <Route path="/p/:token" element={<PublicDoc />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route
           path="/onboarding"
           element={
