@@ -318,6 +318,10 @@ export type UpdateJobInput = {
   notes?: string | null
   address?: string | null
   clientId?: string | null
+  scopeText?: string | null
+  exclusionsText?: string | null
+  termsText?: string | null
+  quoteExpiresAt?: string | null
 }
 
 export function useUpdateJob() {
@@ -332,6 +336,10 @@ export function useUpdateJob() {
     if (input.notes !== undefined) patch.notes = input.notes
     if (input.address !== undefined) patch.address = input.address
     if (input.clientId !== undefined) patch.client_id = input.clientId
+    if (input.scopeText !== undefined) patch.scope_text = input.scopeText
+    if (input.exclusionsText !== undefined) patch.exclusions_text = input.exclusionsText
+    if (input.termsText !== undefined) patch.terms_text = input.termsText
+    if (input.quoteExpiresAt !== undefined) patch.quote_expires_at = input.quoteExpiresAt
     const { error } = await supabase.from('fh_contacts')
       .update(patch as any)
       .eq('id', input.contactId)
@@ -445,6 +453,76 @@ export function useDeletePhoto() {
     await supabase.storage.from(PHOTO_BUCKET).remove([input.path])
     const { error } = await supabase.from('fh_job_files').delete().eq('id', input.id)
     if (!error) client.invalidateQueries({ queryKey: ['jobPhotos', input.jobId] })
+    return { error }
+  }
+}
+
+// ---- Job files (documents) ----
+// Non-photo attachments live in the PRIVATE `job-files` bucket, indexed in
+// fh_job_files (kind='file'), same as the web Files section. Rows are listed
+// then signed on demand when the user opens one.
+const FILE_BUCKET = 'job-files'
+
+export type JobFile = {
+  id: string; filename: string | null; storage_path: string
+  mime_type: string | null; size_bytes: number | null; uploaded_at: string | null
+}
+
+async function fetchJobFiles(jobId: string): Promise<JobFile[]> {
+  const { data, error } = await supabase
+    .from('fh_job_files')
+    .select('id, filename, storage_path, mime_type, size_bytes, uploaded_at')
+    .eq('job_id', jobId)
+    .eq('kind', 'file')
+    .order('uploaded_at', { ascending: false })
+  if (error) return []
+  return (data ?? []) as JobFile[]
+}
+
+export function useJobFiles(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ['jobFiles', jobId],
+    queryFn: () => fetchJobFiles(jobId as string),
+    enabled: !!jobId
+  })
+}
+
+export async function signJobFileUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from(FILE_BUCKET).createSignedUrl(path, 3600)
+  if (error || !data?.signedUrl) return null
+  return data.signedUrl
+}
+
+export function useUploadFile() {
+  const client = useQueryClient()
+  return async (input: { userId: string; jobId: string; uri: string; name: string; mimeType?: string | null; size?: number | null }) => {
+    const safe = input.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${input.userId}/${input.jobId}/${Date.now()}-${safe}`
+    const arrayBuffer = await fetch(input.uri).then((r) => r.arrayBuffer())
+    const { error: upErr } = await supabase.storage
+      .from(FILE_BUCKET)
+      .upload(path, arrayBuffer, { contentType: input.mimeType || 'application/octet-stream', upsert: false })
+    if (upErr) return { error: upErr }
+    const { error: insErr } = await supabase.from('fh_job_files').insert({
+      user_id: input.userId,
+      job_id: input.jobId,
+      filename: input.name,
+      storage_path: path,
+      mime_type: input.mimeType || null,
+      size_bytes: input.size ?? (arrayBuffer as ArrayBuffer).byteLength,
+      kind: 'file'
+    } as any)
+    if (!insErr) client.invalidateQueries({ queryKey: ['jobFiles', input.jobId] })
+    return { error: insErr }
+  }
+}
+
+export function useDeleteFile() {
+  const client = useQueryClient()
+  return async (input: { id: string; path: string; jobId: string }) => {
+    await supabase.storage.from(FILE_BUCKET).remove([input.path])
+    const { error } = await supabase.from('fh_job_files').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobFiles', input.jobId] })
     return { error }
   }
 }

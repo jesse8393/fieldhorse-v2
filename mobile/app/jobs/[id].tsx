@@ -11,9 +11,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
+import * as DocumentPicker from 'expo-document-picker'
 import {
   ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera, Calendar, Users, User,
-  CheckSquare, Square, FileText, ClipboardCheck, Car, ShieldCheck, Flag
+  CheckSquare, Square, FileText, ClipboardCheck, Car, ShieldCheck, Flag, Paperclip, Download
 } from 'lucide-react-native'
 import {
   useJobDetail, useLogPayment, useUpdateStage, useUpdateJob,
@@ -26,7 +27,8 @@ import {
   useAddChangeOrder, useUpdateChangeOrderStatus, useDeleteChangeOrder,
   useAddMileage, useDeleteMileage,
   useAddInspection, useUpdateInspectionResult, useDeleteInspection,
-  useUpsertInsurance, useDeleteInsurance, useSaveMilestones, type Milestone
+  useUpsertInsurance, useDeleteInsurance, useSaveMilestones, type Milestone,
+  useJobFiles, useUploadFile, useDeleteFile, signJobFileUrl, type JobFile
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground } from '../../components/ui'
@@ -91,6 +93,9 @@ export default function JobDetailScreen() {
   const deleteInsurance = useDeleteInsurance()
   const saveMilestones = useSaveMilestones()
   const { data: photos = [] } = useJobPhotos(id)
+  const { data: files = [] } = useJobFiles(id)
+  const uploadFile = useUploadFile()
+  const deleteFile = useDeleteFile()
   const { data: clientsBundle } = useClientsBundle(user?.id)
 
   const [photoBusy, setPhotoBusy] = useState(false)
@@ -127,6 +132,9 @@ export default function JobDetailScreen() {
   const [insOpen, setInsOpen] = useState(false)
   const [insForm, setInsForm] = useState({ claim_number: '', carrier: '', adjuster: '', deductible: '', rcv: '', acv: '', depreciation: '', supplement_amount: '', mortgage_company: '' })
   const [insSaving, setInsSaving] = useState(false)
+  const [qtOpen, setQtOpen] = useState(false)
+  const [qtForm, setQtForm] = useState({ scope: '', exclusions: '', terms: '' })
+  const [qtSaving, setQtSaving] = useState(false)
 
   const [clientPickOpen, setClientPickOpen] = useState(false)
 
@@ -233,6 +241,23 @@ export default function JobDetailScreen() {
     setInsSaving(false)
     if (error) { Alert.alert("Couldn't save insurance", error.message); return }
     setInsOpen(false)
+  }
+  function openQuoteTerms() {
+    setQtForm({ scope: (contact as any)?.scope_text || '', exclusions: (contact as any)?.exclusions_text || '', terms: (contact as any)?.terms_text || '' })
+    setQtOpen(true)
+  }
+  async function saveQuoteTerms() {
+    if (!contact) return
+    setQtSaving(true)
+    const { error } = await updateJob({
+      contactId: contact.id,
+      scopeText: qtForm.scope.trim() || null,
+      exclusionsText: qtForm.exclusions.trim() || null,
+      termsText: qtForm.terms.trim() || null
+    })
+    setQtSaving(false)
+    if (error) { Alert.alert("Couldn't save quote terms", error.message); return }
+    setQtOpen(false)
   }
   const clients = clientsBundle?.clients ?? []
   const linkedClient = contact?.client_id ? clients.find((c) => c.id === contact.client_id) ?? null : null
@@ -429,6 +454,30 @@ export default function JobDetailScreen() {
       { text: 'Take photo', onPress: takePhoto },
       { text: 'Choose from library', onPress: pickFromLibrary },
       { text: 'Cancel', style: 'cancel' }
+    ])
+  }
+
+  const [fileBusy, setFileBusy] = useState(false)
+  async function pickFile() {
+    if (!contact || !user) return
+    const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false })
+    if (res.canceled || !res.assets?.[0]) return
+    const a = res.assets[0]
+    setFileBusy(true)
+    const { error } = await uploadFile({ userId: user.id, jobId: contact.id, uri: a.uri, name: a.name, mimeType: a.mimeType, size: a.size })
+    setFileBusy(false)
+    if (error) Alert.alert("Couldn't upload file", error.message)
+  }
+  async function openFile(f: JobFile) {
+    const url = await signJobFileUrl(f.storage_path)
+    if (!url) { Alert.alert("Couldn't open file", 'The signed link could not be created.'); return }
+    Linking.openURL(url)
+  }
+  function confirmDeleteFile(f: JobFile) {
+    if (!contact) return
+    Alert.alert('Delete file?', `Removing ${f.filename || 'this file'} from storage. This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteFile({ id: f.id, path: f.storage_path, jobId: contact.id }) }
     ])
   }
 
@@ -653,6 +702,40 @@ export default function JobDetailScreen() {
           </ScrollView>
         )}
 
+        {/* Files */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Files</Text>
+          <Pressable onPress={pickFile} disabled={fileBusy} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            {fileBusy ? <ActivityIndicator size="small" color="#E8B865" /> : <Paperclip color="#E8B865" size={14} />}
+            <Text className="text-gold-bright text-xs font-bold">Upload</Text>
+          </Pressable>
+        </View>
+        {files.length === 0 ? (
+          <Text className="text-ink-muted text-sm">No files yet. Attach contracts, permits, or PDFs.</Text>
+        ) : (
+          <View style={{ gap: 6 }}>
+            {files.map((f) => (
+              <Pressable
+                key={f.id}
+                onPress={() => openFile(f)}
+                onLongPress={() => confirmDeleteFile(f)}
+                delayLongPress={350}
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
+                style={{ gap: 10 }}
+              >
+                <FileText color="#E8B865" size={16} />
+                <View className="flex-1">
+                  <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{f.filename || 'Document'}</Text>
+                  <Text className="text-ink-muted text-xs mt-0.5">
+                    {fmtSize(f.size_bytes)}{f.uploaded_at ? ` · ${new Date(f.uploaded_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
+                  </Text>
+                </View>
+                <Download color="#9b948a" size={16} />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         {/* Contact actions */}
         {(contact.phone || contact.email) && (
           <View className="flex-row mt-4" style={{ gap: 10 }}>
@@ -871,6 +954,34 @@ export default function JobDetailScreen() {
             <Text className="text-ink-muted text-[10px] mt-1">Long-press a trip to delete.</Text>
           </View>
         )}
+
+        {/* Quote terms */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Quote terms</Text>
+          <Pressable onPress={openQuoteTerms} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Pencil color="#E8B865" size={13} />
+            <Text className="text-gold-bright text-xs font-bold">Edit</Text>
+          </Pressable>
+        </View>
+        {(() => {
+          const c = contact as any
+          const hasTerms = c?.scope_text || c?.exclusions_text || c?.terms_text
+          if (!hasTerms) {
+            return (
+              <Pressable onPress={openQuoteTerms} className="bg-[rgba(24,20,17,0.6)] rounded-xl p-4 border border-[rgba(232,184,101,0.12)] flex-row items-center" style={{ gap: 10 }}>
+                <FileText color="#E8B865" size={16} />
+                <Text className="text-ink-muted text-sm flex-1">Add scope, exclusions & payment terms — they flow onto every proposal.</Text>
+              </Pressable>
+            )
+          }
+          return (
+            <View className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)]" style={{ gap: 12 }}>
+              {c?.scope_text ? <QuoteTermBlock label="Scope of work" text={c.scope_text} /> : null}
+              {c?.exclusions_text ? <QuoteTermBlock label="Exclusions" text={c.exclusions_text} /> : null}
+              {c?.terms_text ? <QuoteTermBlock label="Payment terms" text={c.terms_text} /> : null}
+            </View>
+          )
+        })()}
 
         {/* Milestones */}
         <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">
@@ -1478,6 +1589,60 @@ export default function JobDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Quote terms modal */}
+      <Modal visible={qtOpen} transparent animationType="slide" onRequestClose={() => setQtOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setQtOpen(false)} />
+          <View className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
+            <Text className="text-ink text-xl font-bold px-6 pt-6 pb-3">Quote terms</Text>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+              {([
+                ['scope', 'Scope of work', "What you'll do, in plain English."],
+                ['exclusions', 'Exclusions', "What's NOT included — prevents change-order surprises."],
+                ['terms', 'Payment terms', 'Deposit, progress payments, warranty, change-order policy.']
+              ] as const).map(([key, label, hint]) => (
+                <View key={key}>
+                  <Text className="text-ink-muted text-[10px] font-bold tracking-[1.5px] uppercase mb-1">{label}</Text>
+                  <Text className="text-ink-muted text-xs mb-2">{hint}</Text>
+                  <TextInput
+                    value={(qtForm as any)[key]}
+                    onChangeText={(v) => setQtForm((f) => ({ ...f, [key]: v }))}
+                    multiline
+                    placeholderTextColor="rgba(242,237,228,0.4)"
+                    className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                    style={{ minHeight: 90, textAlignVertical: 'top' }}
+                  />
+                </View>
+              ))}
+              <Pressable
+                onPress={saveQuoteTerms}
+                disabled={qtSaving}
+                className="rounded-xl py-4 items-center mt-2"
+                style={{ backgroundColor: qtSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              >
+                {qtSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save quote terms</Text>}
+              </Pressable>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  )
+}
+
+function fmtSize(bytes: number | null): string {
+  if (!bytes || bytes <= 0) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function QuoteTermBlock({ label, text }: { label: string; text: string }) {
+  return (
+    <View>
+      <Text className="text-gold-bright text-[10px] font-bold tracking-[1.5px] uppercase mb-1">{label}</Text>
+      <Text className="text-ink text-sm leading-5">{text}</Text>
     </View>
   )
 }
