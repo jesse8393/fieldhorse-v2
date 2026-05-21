@@ -3,12 +3,12 @@
 // trades, brand accent, service area, session) that brands quotes/invoices
 // and powers the Home weather pill + Pour Window. Saves via useUpdateProfile.
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, TextInput, ActivityIndicator, Pressable, Alert } from 'react-native'
+import { View, Text, ScrollView, TextInput, ActivityIndicator, Pressable, Alert, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as Location from 'expo-location'
-import { MapPin, LogOut } from 'lucide-react-native'
-import { useProfile, useUpdateProfile, useSaveLocation } from '../lib/queries'
+import { MapPin, LogOut, Trash2 } from 'lucide-react-native'
+import { useProfile, useUpdateProfile, useSaveLocation, useDeleteAccount } from '../lib/queries'
 import { reverseGeocode } from '../lib/weather'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, ScreenHeader, GoldButton, theme } from '../components/ui'
@@ -53,6 +53,8 @@ export default function SettingsScreen() {
   const { data: profile, isLoading } = useProfile(user?.id)
   const updateProfile = useUpdateProfile()
   const saveLocation = useSaveLocation()
+  const deleteAccount = useDeleteAccount()
+  const [deleting, setDeleting] = useState(false)
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -140,6 +142,26 @@ export default function SettingsScreen() {
     ])
   }
 
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account and all your jobs, clients, payments, notes, and other data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete everything', style: 'destructive',
+          onPress: async () => {
+            setDeleting(true)
+            const { error } = await deleteAccount()
+            setDeleting(false)
+            if (error) { Alert.alert("Couldn't delete account", error.message); return }
+            await signOut()
+          }
+        }
+      ]
+    )
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
@@ -222,6 +244,26 @@ export default function SettingsScreen() {
               <LogOut color={theme.danger} size={16} />
               <Text style={{ color: theme.danger, fontWeight: '700' }}>Sign out</Text>
             </Pressable>
+
+            <SectionTitle>Legal</SectionTitle>
+            <View style={{ flexDirection: 'row', gap: 18 }}>
+              <Pressable onPress={() => Linking.openURL('https://fieldhorse.io/privacy')} hitSlop={8}>
+                <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Privacy Policy</Text>
+              </Pressable>
+              <Pressable onPress={() => Linking.openURL('https://fieldhorse.io/terms')} hitSlop={8}>
+                <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Terms of Service</Text>
+              </Pressable>
+            </View>
+
+            <Pressable
+              onPress={confirmDeleteAccount}
+              disabled={deleting}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, marginTop: 24, opacity: deleting ? 0.6 : 1 }}
+            >
+              {deleting ? <ActivityIndicator color={theme.danger} size="small" /> : <Trash2 color={theme.danger} size={15} />}
+              <Text style={{ color: theme.danger, fontWeight: '700', fontSize: 13 }}>{deleting ? 'Deleting…' : 'Delete account'}</Text>
+            </Pressable>
+            <Text style={{ color: theme.inkFaint, fontSize: 11, textAlign: 'center', marginTop: 4 }}>Permanently deletes your account and all data.</Text>
           </>
         )}
       </ScrollView>

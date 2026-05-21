@@ -1699,6 +1699,29 @@ export function useWeather(lat?: number | null, lon?: number | null) {
   })
 }
 
+// ---- Account deletion (App Store requirement) ----
+// Sends the signed-in user's access token to the delete-account function,
+// which purges their data and removes the auth account server-side.
+export function useDeleteAccount() {
+  return async (): Promise<{ error: { message: string } | null }> => {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return { error: { message: 'You are not signed in.' } }
+    const base = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
+    try {
+      const res = await fetch(`${base}/api/delete-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) return { error: { message: body?.detail || body?.error || `Request failed (${res.status})` } }
+      return { error: null }
+    } catch (e) {
+      return { error: { message: (e as Error).message || 'Network error.' } }
+    }
+  }
+}
+
 // ---- Save the contractor's pinned location (Pour Window weather) ----
 export function useSaveLocation() {
   const client = useQueryClient()
