@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import {
   ChevronLeft, Phone, Mail, Plus, Pencil, Trash2, Camera, Calendar, Users, User,
-  CheckSquare, Square, FileText, ClipboardCheck, Car
+  CheckSquare, Square, FileText, ClipboardCheck, Car, ShieldCheck, Flag
 } from 'lucide-react-native'
 import {
   useJobDetail, useLogPayment, useUpdateStage, useUpdateJob,
@@ -25,7 +25,8 @@ import {
   useCreateInvoice, useUpdateInvoiceStatus, useDeleteInvoice,
   useAddChangeOrder, useUpdateChangeOrderStatus, useDeleteChangeOrder,
   useAddMileage, useDeleteMileage,
-  useAddInspection, useUpdateInspectionResult, useDeleteInspection
+  useAddInspection, useUpdateInspectionResult, useDeleteInspection,
+  useUpsertInsurance, useDeleteInsurance, useSaveMilestones, type Milestone
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground } from '../../components/ui'
@@ -86,6 +87,9 @@ export default function JobDetailScreen() {
   const addInspection = useAddInspection()
   const updateInspectionResult = useUpdateInspectionResult()
   const deleteInspection = useDeleteInspection()
+  const upsertInsurance = useUpsertInsurance()
+  const deleteInsurance = useDeleteInsurance()
+  const saveMilestones = useSaveMilestones()
   const { data: photos = [] } = useJobPhotos(id)
   const { data: clientsBundle } = useClientsBundle(user?.id)
 
@@ -118,6 +122,11 @@ export default function JobDetailScreen() {
   const [subPhone, setSubPhone] = useState('')
   const [subRate, setSubRate] = useState('')
   const [subSaving, setSubSaving] = useState(false)
+
+  const [milestoneText, setMilestoneText] = useState('')
+  const [insOpen, setInsOpen] = useState(false)
+  const [insForm, setInsForm] = useState({ claim_number: '', carrier: '', adjuster: '', deductible: '', rcv: '', acv: '', depreciation: '', supplement_amount: '', mortgage_company: '' })
+  const [insSaving, setInsSaving] = useState(false)
 
   const [clientPickOpen, setClientPickOpen] = useState(false)
 
@@ -183,6 +192,48 @@ export default function JobDetailScreen() {
   const changeOrders = data?.changeOrders ?? []
   const mileage = data?.mileage ?? []
   const inspections = data?.inspections ?? []
+  const insurance = data?.insurance ?? null
+  const milestones: Milestone[] = Array.isArray((contact as any)?.milestones) ? (contact as any).milestones : []
+
+  async function addMilestone() {
+    const txt = milestoneText.trim()
+    if (!txt || !contact) return
+    setMilestoneText('')
+    await saveMilestones({ contactId: contact.id, milestones: [...milestones, { label: txt, done: false, created_at: new Date().toISOString() }] })
+  }
+  async function toggleMilestone(i: number) {
+    if (!contact) return
+    await saveMilestones({ contactId: contact.id, milestones: milestones.map((m, idx) => (idx === i ? { ...m, done: !m.done } : m)) })
+  }
+  async function removeMilestone(i: number) {
+    if (!contact) return
+    await saveMilestones({ contactId: contact.id, milestones: milestones.filter((_, idx) => idx !== i) })
+  }
+  function openInsurance() {
+    setInsForm({
+      claim_number: insurance?.claim_number || '', carrier: insurance?.carrier || '', adjuster: insurance?.adjuster || '',
+      deductible: insurance?.deductible != null ? String(insurance.deductible) : '', rcv: insurance?.rcv != null ? String(insurance.rcv) : '',
+      acv: insurance?.acv != null ? String(insurance.acv) : '', depreciation: insurance?.depreciation != null ? String(insurance.depreciation) : '',
+      supplement_amount: insurance?.supplement_amount != null ? String(insurance.supplement_amount) : '', mortgage_company: insurance?.mortgage_company || ''
+    })
+    setInsOpen(true)
+  }
+  async function saveInsurance() {
+    if (!contact || !user) return
+    setInsSaving(true)
+    const num = (v: string) => { const n = parseFloat(v.replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n }
+    const { error } = await upsertInsurance({
+      contactId: contact.id, userId: user.id, existingId: insurance?.id,
+      patch: {
+        claim_number: insForm.claim_number.trim() || null, carrier: insForm.carrier.trim() || null, adjuster: insForm.adjuster.trim() || null,
+        deductible: num(insForm.deductible), rcv: num(insForm.rcv), acv: num(insForm.acv), depreciation: num(insForm.depreciation),
+        supplement_amount: num(insForm.supplement_amount), mortgage_company: insForm.mortgage_company.trim() || null
+      }
+    })
+    setInsSaving(false)
+    if (error) { Alert.alert("Couldn't save insurance", error.message); return }
+    setInsOpen(false)
+  }
   const clients = clientsBundle?.clients ?? []
   const linkedClient = contact?.client_id ? clients.find((c) => c.id === contact.client_id) ?? null : null
 
@@ -821,6 +872,74 @@ export default function JobDetailScreen() {
           </View>
         )}
 
+        {/* Milestones */}
+        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">
+          Milestones{milestones.length ? ` · ${milestones.filter((m) => m.done).length}/${milestones.length}` : ''}
+        </Text>
+        <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
+          <TextInput
+            value={milestoneText}
+            onChangeText={setMilestoneText}
+            onSubmitEditing={addMilestone}
+            returnKeyType="done"
+            placeholder="Add a checkpoint…"
+            placeholderTextColor="rgba(242,237,228,0.4)"
+            className="flex-1 bg-surface border border-[rgba(255,240,210,0.10)] rounded-xl px-4 py-3 text-ink"
+          />
+          <Pressable onPress={addMilestone} className="rounded-xl items-center justify-center" style={{ width: 46, height: 46, backgroundColor: '#E8B865' }}>
+            <Plus color="#1A120A" size={20} strokeWidth={2.6} />
+          </Pressable>
+        </View>
+        {milestones.length > 0 ? (
+          <View style={{ gap: 6 }}>
+            {milestones.map((m, i) => (
+              <Pressable
+                key={`${m.created_at}-${i}`}
+                onPress={() => toggleMilestone(i)}
+                onLongPress={() => removeMilestone(i)}
+                delayLongPress={350}
+                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
+                style={{ gap: 10 }}
+              >
+                {m.done ? <CheckSquare color="#4F8C5E" size={18} /> : <Square color="#9b948a" size={18} />}
+                <Flag color={m.done ? '#4F8C5E' : '#E8B865'} size={13} />
+                <Text className="flex-1 text-sm" style={{ color: m.done ? '#9b948a' : '#F2EDE4', textDecorationLine: m.done ? 'line-through' : 'none' }} numberOfLines={2}>{m.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Insurance claim */}
+        <View className="flex-row items-center justify-between mt-7 mb-3">
+          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Insurance claim</Text>
+          <Pressable onPress={openInsurance} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
+            <Pencil color="#E8B865" size={13} />
+            <Text className="text-gold-bright text-xs font-bold">{insurance ? 'Edit' : 'Add'}</Text>
+          </Pressable>
+        </View>
+        {!insurance ? (
+          <Pressable onPress={openInsurance} className="bg-[rgba(24,20,17,0.6)] rounded-xl p-4 border border-[rgba(232,184,101,0.12)] flex-row items-center" style={{ gap: 10 }}>
+            <ShieldCheck color="#E8B865" size={16} />
+            <Text className="text-ink-muted text-sm flex-1">Track a carrier claim — surfaces RCV / ACV, deductible & supplement.</Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={openInsurance} className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)]">
+            <View className="flex-row items-center" style={{ gap: 8 }}>
+              <ShieldCheck color="#E8B865" size={16} />
+              <Text className="text-ink text-base font-semibold flex-1" numberOfLines={1}>{insurance.carrier || 'Carrier'}{insurance.claim_number ? ` · ${insurance.claim_number}` : ''}</Text>
+            </View>
+            {insurance.adjuster ? <Text className="text-ink-muted text-xs mt-1">{insurance.adjuster}</Text> : null}
+            <View className="flex-row flex-wrap mt-3" style={{ gap: 14 }}>
+              {insurance.rcv != null ? <InsStat label="RCV" value={money(insurance.rcv)} /> : null}
+              {insurance.acv != null ? <InsStat label="ACV" value={money(insurance.acv)} /> : null}
+              {insurance.deductible != null ? <InsStat label="Deductible" value={money(insurance.deductible)} /> : null}
+              {insurance.depreciation != null ? <InsStat label="Depreciation" value={money(insurance.depreciation)} /> : null}
+              {insurance.supplement_amount != null && Number(insurance.supplement_amount) > 0 ? <InsStat label="Supplement" value={money(insurance.supplement_amount)} /> : null}
+            </View>
+            {insurance.mortgage_company ? <Text className="text-ink-muted text-xs mt-3">Mortgage: {insurance.mortgage_company}</Text> : null}
+          </Pressable>
+        )}
+
         {/* Schedule */}
         <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">Schedule</Text>
         {schedule.length === 0 ? (
@@ -1309,6 +1428,65 @@ export default function JobDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Insurance modal */}
+      <Modal visible={insOpen} transparent animationType="slide" onRequestClose={() => setInsOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setInsOpen(false)} />
+          <View className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
+            <View className="flex-row items-center justify-between px-6 pt-6 pb-3">
+              <Text className="text-ink text-xl font-bold">Insurance claim</Text>
+              {insurance ? (
+                <Pressable onPress={() => { Alert.alert('Remove claim?', 'This deletes the insurance details for this job.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { if (contact) { await deleteInsurance({ id: insurance.id, contactId: contact.id }); setInsOpen(false) } } }]) }} hitSlop={8}>
+                  <Trash2 color="#f5a294" size={18} />
+                </Pressable>
+              ) : null}
+            </View>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
+              {([
+                ['claim_number', 'Claim number', 'CL-2026-04812', 'default'],
+                ['carrier', 'Carrier', 'State Farm', 'default'],
+                ['adjuster', 'Adjuster', 'Karen Whitfield · (615) 555-0184', 'default'],
+                ['deductible', 'Deductible', '1000', 'decimal-pad'],
+                ['rcv', 'RCV', '24800', 'decimal-pad'],
+                ['acv', 'ACV', '18200', 'decimal-pad'],
+                ['depreciation', 'Depreciation', '6600', 'decimal-pad'],
+                ['supplement_amount', 'Supplement', '0', 'decimal-pad'],
+                ['mortgage_company', 'Mortgage company', 'Wells Fargo (when applicable)', 'default']
+              ] as const).map(([key, label, ph, kb]) => (
+                <View key={key}>
+                  <Text className="text-ink-muted text-[10px] font-bold tracking-[1.5px] uppercase mb-1.5">{label}</Text>
+                  <TextInput
+                    value={(insForm as any)[key]}
+                    onChangeText={(v) => setInsForm((f) => ({ ...f, [key]: v }))}
+                    keyboardType={kb as any}
+                    placeholder={ph}
+                    placeholderTextColor="rgba(242,237,228,0.4)"
+                    className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                  />
+                </View>
+              ))}
+              <Pressable
+                onPress={saveInsurance}
+                disabled={insSaving}
+                className="rounded-xl py-4 items-center mt-2"
+                style={{ backgroundColor: insSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              >
+                {insSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save insurance</Text>}
+              </Pressable>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  )
+}
+
+function InsStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text className="text-ink text-base font-bold">{value}</Text>
+      <Text className="text-ink-muted text-[10px] font-bold uppercase tracking-wider mt-0.5">{label}</Text>
     </View>
   )
 }

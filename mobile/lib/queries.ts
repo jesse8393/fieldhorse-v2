@@ -226,10 +226,11 @@ export type JobDetail = {
   changeOrders: ChangeOrder[]
   mileage: Mileage[]
   inspections: Inspection[]
+  insurance: Database['public']['Tables']['fh_insurance_claims']['Row'] | null
 }
 
 async function fetchJobDetail(id: string): Promise<JobDetail> {
-  const [c, p, sch, s, e, t, n, inv, co, mi, insp] = await Promise.all([
+  const [c, p, sch, s, e, t, n, inv, co, mi, insp, ins] = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
     supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
     supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
@@ -240,7 +241,8 @@ async function fetchJobDetail(id: string): Promise<JobDetail> {
     supabase.from('fh_invoices').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
     supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
     supabase.from('fh_mileage').select('*').eq('contact_id', id).order('drove_on', { ascending: false }),
-    supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false })
+    supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+    supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle()
   ])
   return {
     contact: (c.data ?? null) as Contact | null,
@@ -253,7 +255,8 @@ async function fetchJobDetail(id: string): Promise<JobDetail> {
     invoices: (inv.data ?? []) as Invoice[],
     changeOrders: (co.data ?? []) as ChangeOrder[],
     mileage: (mi.data ?? []) as Mileage[],
-    inspections: (insp.data ?? []) as Inspection[]
+    inspections: (insp.data ?? []) as Inspection[],
+    insurance: (ins.data ?? null) as JobDetail['insurance']
   }
 }
 
@@ -1527,6 +1530,47 @@ export function useSaveLocation() {
       .update({ location_lat: input.lat, location_lon: input.lon } as any)
       .eq('user_id', input.userId)
     if (!error) client.invalidateQueries({ queryKey: ['profile', input.userId] })
+    return { error }
+  }
+}
+
+// ---- Job detail: insurance claim + milestones ----
+export type InsurancePatch = {
+  claim_number?: string | null; carrier?: string | null; adjuster?: string | null
+  deductible?: number | null; rcv?: number | null; acv?: number | null
+  depreciation?: number | null; supplement_amount?: number | null; mortgage_company?: string | null
+}
+
+export function useUpsertInsurance() {
+  const client = useQueryClient()
+  return async (input: { contactId: string; userId: string; existingId?: string | null; patch: InsurancePatch }) => {
+    let error
+    if (input.existingId) {
+      ({ error } = await supabase.from('fh_insurance_claims').update(input.patch as any).eq('id', input.existingId))
+    } else {
+      ({ error } = await supabase.from('fh_insurance_claims').insert({ contact_id: input.contactId, user_id: input.userId, ...input.patch } as any))
+    }
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export function useDeleteInsurance() {
+  const client = useQueryClient()
+  return async (input: { id: string; contactId: string }) => {
+    const { error } = await supabase.from('fh_insurance_claims').delete().eq('id', input.id)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error }
+  }
+}
+
+export type Milestone = { label: string; done: boolean; created_at: string }
+
+export function useSaveMilestones() {
+  const client = useQueryClient()
+  return async (input: { contactId: string; milestones: Milestone[] }) => {
+    const { error } = await supabase.from('fh_contacts').update({ milestones: input.milestones } as any).eq('id', input.contactId)
+    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
 }
