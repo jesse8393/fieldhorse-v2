@@ -4,8 +4,9 @@ import { useMemo, useState } from 'react'
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Briefcase, Clock, Trash2, ChevronRight, Archive, Check } from 'lucide-react-native'
+import { Briefcase, Clock, Trash2, ChevronRight, Archive, Check, Sparkles, Flag } from 'lucide-react-native'
 import { useNotesScreen, useSaveNote, useArchiveNote, useDeleteNoteGlobal, type NoteRow } from '../lib/queries'
+import { claudeMessage, claudeText } from '../lib/anthropic'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
 
@@ -36,6 +37,8 @@ export default function NotesScreen() {
   const [contactId, setContactId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [pickOpen, setPickOpen] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const [parsed, setParsed] = useState<{ category: string | null; action: string | null; whenText: string | null } | null>(null)
 
   const notes = data?.notes ?? []
   const contacts = data?.contacts ?? []
@@ -55,13 +58,37 @@ export default function NotesScreen() {
     return Array.from(map.values())
   }, [notes, contacts])
 
+  async function parseDraft() {
+    if (!draft.trim() || parsing) return
+    setParsing(true)
+    try {
+      const res = await claudeMessage({
+        system: `You extract structured fields from a contractor's field note. Return ONLY one JSON object: {"category": one of ["note","follow-up","material","risk","measurement"] or null, "action": the single most important action item as a short string or null, "when_text": any date or timeframe mentioned (e.g. "Friday", "next week") or null}. No prose, JSON only.`,
+        messages: [{ role: 'user', content: draft.trim() }],
+        maxTokens: 300
+      })
+      const m = claudeText(res).match(/\{[\s\S]*\}/)
+      if (m) {
+        const p = JSON.parse(m[0])
+        setParsed({ category: p.category || null, action: p.action || null, whenText: p.when_text || null })
+      }
+    } catch {
+      Alert.alert('AI parse failed', 'Could not read that note. Check your connection or save it as-is.')
+    } finally {
+      setParsing(false)
+    }
+  }
+
   async function onSave() {
     if (!draft.trim() || !user) return
     setSaving(true)
-    const { error } = await saveNote({ userId: user.id, text: draft.trim(), contactId })
+    const { error } = await saveNote({
+      userId: user.id, text: draft.trim(), contactId,
+      category: parsed?.category, action: parsed?.action, whenText: parsed?.whenText
+    })
     setSaving(false)
     if (error) { Alert.alert("Couldn't save", error.message); return }
-    setDraft(''); setContactId(null)
+    setDraft(''); setContactId(null); setParsed(null)
   }
 
   function confirmDelete(id: string) {
@@ -88,10 +115,21 @@ export default function NotesScreen() {
               multiline
               style={{ color: theme.ink, fontSize: 15, lineHeight: 22, minHeight: 84, textAlignVertical: 'top' }}
             />
+            {parsed ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+                {parsed.category ? <Chip icon={<Sparkles color={theme.goldBright} size={11} />} text={parsed.category} /> : null}
+                {parsed.action ? <Chip icon={<Flag color={theme.success} size={11} />} text={parsed.action} tint={theme.success} /> : null}
+                {parsed.whenText ? <Chip icon={<Clock color="#6B7CA8" size={11} />} text={parsed.whenText} tint="#6B7CA8" /> : null}
+              </View>
+            ) : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
               <Pressable onPress={() => setPickOpen(true)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid }}>
                 <Briefcase color={contactId ? theme.goldBright : theme.inkMuted} size={14} />
                 <Text style={{ color: contactId ? theme.ink : theme.inkMuted, fontSize: 13, fontWeight: '600', flex: 1 }} numberOfLines={1}>{linkedName || 'No job link'}</Text>
+              </Pressable>
+              <Pressable onPress={parseDraft} disabled={!draft.trim() || parsing} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}14`, opacity: !draft.trim() || parsing ? 0.5 : 1 }}>
+                {parsing ? <ActivityIndicator color={theme.goldBright} size="small" /> : <Sparkles color={theme.goldBright} size={14} />}
+                <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '800' }}>AI</Text>
               </Pressable>
               <Pressable onPress={onSave} disabled={!draft.trim() || saving} style={{ borderRadius: 10, overflow: 'hidden', opacity: !draft.trim() || saving ? 0.5 : 1 }}>
                 <View style={{ paddingHorizontal: 18, paddingVertical: 11, backgroundColor: theme.goldBright }}>
@@ -193,6 +231,15 @@ function Stat({ label, value, tone = theme.ink }: { label: string; value: number
   )
 }
 
+function Chip({ icon, text, tint = theme.goldBright }: { icon: React.ReactNode; text: string; tint?: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: `${tint}55`, backgroundColor: `${tint}14` }}>
+      {icon}
+      <Text style={{ color: theme.ink, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{text}</Text>
+    </View>
+  )
+}
+
 function NoteCard({ note, contactName, hideJobChip, onTap, onArchive, onDelete }: {
   note: NoteRow; contactName: string | null; hideJobChip?: boolean; onTap: () => void; onArchive: () => void; onDelete: () => void
 }) {
@@ -211,6 +258,12 @@ function NoteCard({ note, contactName, hideJobChip, onTap, onArchive, onDelete }
           </View>
         </View>
         {showBody ? <Text style={{ color: theme.inkMuted, fontSize: 13, marginTop: 6, lineHeight: 19 }} numberOfLines={3}>{body}</Text> : null}
+        {note.action ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: 'rgba(91,185,122,0.10)', borderWidth: 1, borderColor: 'rgba(91,185,122,0.3)' }}>
+            <Flag color={theme.success} size={12} />
+            <Text style={{ color: theme.ink, fontSize: 12, fontWeight: '600', flex: 1 }} numberOfLines={2}>{note.action}{note.whenText ? ` · ${note.whenText}` : ''}</Text>
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
           {!hideJobChip && contactName ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: theme.borderMid }}>

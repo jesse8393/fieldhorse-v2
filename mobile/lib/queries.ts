@@ -1440,6 +1440,8 @@ export type NoteRow = {
   contactId: string | null
   createdAt: string | null
   category: string | null
+  action: string | null
+  whenText: string | null
 }
 export type NotesScreenData = {
   notes: NoteRow[]
@@ -1452,12 +1454,12 @@ export function useNotesScreen(userId: string | undefined) {
     queryFn: async (): Promise<NotesScreenData> => {
       const uid = userId as string
       const [nRes, cRes] = await Promise.all([
-        supabase.from('fh_notes').select('id, text, contact_id, created_at, category, done').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
+        supabase.from('fh_notes').select('id, text, contact_id, created_at, category, action, when_text, done').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
         supabase.from('fh_contacts').select('id, name').eq('user_id', uid).order('name', { ascending: true })
       ])
       const notes: NoteRow[] = ((nRes.data ?? []) as any[])
         .filter((n) => !n.done)
-        .map((n) => ({ id: n.id, text: n.text, contactId: n.contact_id, createdAt: n.created_at, category: n.category }))
+        .map((n) => ({ id: n.id, text: n.text, contactId: n.contact_id, createdAt: n.created_at, category: n.category, action: n.action, whenText: n.when_text }))
       const contacts = ((cRes.data ?? []) as any[]).map((c) => ({ id: c.id, name: c.name }))
       return { notes, contacts }
     },
@@ -1467,9 +1469,12 @@ export function useNotesScreen(userId: string | undefined) {
 
 export function useSaveNote() {
   const client = useQueryClient()
-  return async (input: { userId: string; text: string; contactId: string | null }) => {
+  return async (input: { userId: string; text: string; contactId: string | null; category?: string | null; action?: string | null; whenText?: string | null }) => {
     const { error } = await supabase.from('fh_notes').insert({
-      user_id: input.userId, text: input.text, contact_id: input.contactId, category: 'note'
+      user_id: input.userId, text: input.text, contact_id: input.contactId,
+      category: input.category || 'note',
+      action: input.action || null,
+      when_text: input.whenText || null
     } as any)
     if (!error) {
       client.invalidateQueries({ queryKey: ['notesScreen', input.userId] })
