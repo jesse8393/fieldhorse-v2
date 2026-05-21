@@ -42,6 +42,12 @@
           "photosPermission": "FieldHorse uses your photo library to attach jobsite photos to a job.",
           "cameraPermission": "FieldHorse uses your camera to capture jobsite photos for a job."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FieldHorse uses your location to pin the jobsite for an accurate weather work-window."
+        }
       ]
     ],
     "experiments": {

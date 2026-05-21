@@ -1518,3 +1518,15 @@ export function useUpdateSubProfile() {
     return { error }
   }
 }
+
+// ---- Save the contractor's pinned location (Pour Window weather) ----
+export function useSaveLocation() {
+  const client = useQueryClient()
+  return async (input: { userId: string; lat: number; lon: number }) => {
+    const { error } = await supabase.from('profiles')
+      .update({ location_lat: input.lat, location_lon: input.lon } as any)
+      .eq('user_id', input.userId)
+    if (!error) client.invalidateQueries({ queryKey: ['profile', input.userId] })
+    return { error }
+  }
+}

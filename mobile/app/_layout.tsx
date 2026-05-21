@@ -66,6 +66,7 @@ function RootNavigator() {
       <Stack.Screen name="notes" />
       <Stack.Screen name="subs/index" />
       <Stack.Screen name="subs/[key]" />
+      <Stack.Screen name="pour-window" />
     </Stack>
   )
 }

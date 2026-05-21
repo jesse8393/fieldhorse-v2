@@ -2,7 +2,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell, Receipt, Activity, Users, FileSignature, StickyNote, Hammer } from 'lucide-react-native'
+import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell, Receipt, Activity, Users, FileSignature, StickyNote, Hammer, CloudSun } from 'lucide-react-native'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, Eyebrow, SectionLabel, theme } from '../../components/ui'
 
@@ -33,6 +33,7 @@ export default function MoreScreen() {
           <MenuRow icon={<FileSignature color={theme.goldBright} size={18} />} title="Estimates" sub="Proposals, win rate & open value" onPress={() => router.push('/estimates')} />
           <MenuRow icon={<Users color={theme.goldBright} size={18} />} title="Partners" sub="People you've shared jobs with" onPress={() => router.push('/partners')} />
           <MenuRow icon={<Hammer color={theme.goldBright} size={18} />} title="Subs" sub="Trade directory, rates & job history" onPress={() => router.push('/subs')} />
+          <MenuRow icon={<CloudSun color={theme.goldBright} size={18} />} title="Pour Window" sub="Weather work-window by trade" onPress={() => router.push('/pour-window')} />
           <MenuRow icon={<BarChart3 color={theme.goldBright} size={18} />} title="Analytics" sub="Pipeline, revenue & stage breakdown" onPress={() => router.push('/analytics')} />
           <MenuRow icon={<Bell color={theme.goldBright} size={18} />} title="Notifications" sub="Activity & alerts" onPress={() => router.push('/notifications')} />
           <MenuRow icon={<Building2 color={theme.goldBright} size={18} />} title="Business profile" sub="Company info for quotes & invoices" onPress={() => router.push('/settings')} />
