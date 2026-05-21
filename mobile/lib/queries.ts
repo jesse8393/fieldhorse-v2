@@ -904,6 +904,22 @@ export function useUpdateProfile() {
   }
 }
 
+export function useCompleteOnboarding() {
+  const client = useQueryClient()
+  return async (input: { userId: string; companyName: string; services: string[]; lat?: number | null; lon?: number | null }) => {
+    const { error } = await supabase.from('profiles').upsert({
+      user_id: input.userId,
+      company_name: input.companyName.trim(),
+      services: input.services,
+      location_lat: input.lat ?? null,
+      location_lon: input.lon ?? null,
+      onboarded_at: new Date().toISOString()
+    } as any, { onConflict: 'user_id' })
+    if (!error) client.invalidateQueries({ queryKey: ['profile', input.userId] })
+    return { error }
+  }
+}
+
 // ---- Change orders ----
 export function useAddChangeOrder() {
   const client = useQueryClient()

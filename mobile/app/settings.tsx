@@ -3,7 +3,7 @@
 // address/website/license) that brands documents and invoices. Saves
 // straight to profiles via useUpdateProfile.
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, TextInput, ActivityIndicator, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useProfile, useUpdateProfile } from '../lib/queries'
@@ -94,6 +94,10 @@ export default function SettingsScreen() {
             <View style={{ marginTop: 8 }}>
               <GoldButton label={saved ? 'Saved ✓' : 'Save profile'} onPress={save} loading={saving} />
             </View>
+
+            <Pressable onPress={() => router.push('/reset-password')} style={{ marginTop: 22, alignItems: 'center' }} hitSlop={8}>
+              <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Change password</Text>
+            </Pressable>
           </>
         )}
       </ScrollView>

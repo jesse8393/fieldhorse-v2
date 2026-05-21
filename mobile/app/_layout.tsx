@@ -14,20 +14,34 @@ import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { queryClient } from '../lib/queryClient'
 import { AuthProvider, useAuth } from '../contexts/AuthContext'
+import { useProfile } from '../lib/queries'
 
-// Redirect gate: keeps the user on /login until there's a session, and
-// out of /login once signed in. Runs whenever session or route changes.
+// Redirect gate: keeps the user on /login until there's a session, routes
+// signed-in-but-unonboarded users to /onboarding, and otherwise lands them
+// in the tabs. Runs whenever session, profile, or route changes.
 function useAuthGate() {
-  const { session, loading } = useAuth()
+  const { session, user, loading } = useAuth()
+  const { data: profile, isPending: profilePending } = useProfile(user?.id)
   const segments = useSegments()
   const router = useRouter()
 
   useEffect(() => {
     if (loading) return
     const onLogin = segments[0] === 'login'
-    if (!session && !onLogin) router.replace('/login')
-    else if (session && onLogin) router.replace('/')
-  }, [session, loading, segments])
+    const onOnboarding = segments[0] === 'onboarding'
+    if (!session) {
+      if (!onLogin) router.replace('/login')
+      return
+    }
+    // Signed in — wait for the profile before deciding onboarding state.
+    if (profilePending) return
+    const onboarded = !!profile?.onboarded_at
+    if (!onboarded) {
+      if (!onOnboarding) router.replace('/onboarding')
+    } else if (onLogin || onOnboarding) {
+      router.replace('/')
+    }
+  }, [session, user?.id, profile?.onboarded_at, profilePending, loading, segments])
 }
 
 function RootNavigator() {
@@ -51,6 +65,8 @@ function RootNavigator() {
     >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="reset-password" />
       <Stack.Screen name="jobs/[id]" />
       <Stack.Screen name="clients/[id]" />
       <Stack.Screen name="integrations" />
