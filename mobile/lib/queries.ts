@@ -904,6 +904,52 @@ export function useUpdateProfile() {
   }
 }
 
+// ---- Bid → job ----
+// Creates a stage='quote' contact from an AI estimate and inserts one
+// fh_quote_items row per line item (high end of the rate range so the
+// operator negotiates down). Mirrors the web Bid pushToJob.
+export type BidLineItem = { name: string; qty?: number; unit?: string; rate_low?: number; rate_high?: number; notes?: string }
+export type BidResult = { line_items?: BidLineItem[]; summary?: string; assumptions?: string[]; risks?: string[]; total_low?: number; total_high?: number }
+
+export function useCreateJobFromBid() {
+  const client = useQueryClient()
+  return async (input: { userId: string; bid: BidResult; jobType: string; scope: string; recommendedPrice: number; section?: string }) => {
+    const notes = [
+      input.bid.assumptions?.length ? `Assumptions:\n${input.bid.assumptions.map((a) => `• ${a}`).join('\n')}` : '',
+      input.bid.risks?.length ? `Risks:\n${input.bid.risks.map((r) => `• ${r}`).join('\n')}` : ''
+    ].filter(Boolean).join('\n\n') || null
+    const { data: contact, error: cErr } = await supabase.from('fh_contacts').insert({
+      user_id: input.userId,
+      name: 'New estimate',
+      job_title: input.bid.summary || (input.jobType ? `${input.jobType} project` : 'New estimate'),
+      job_type: input.jobType || null,
+      amount: input.recommendedPrice,
+      stage: 'quote',
+      scope_text: input.scope || null,
+      notes
+    } as any).select('id').single()
+    if (cErr || !contact) return { error: cErr, id: undefined }
+    const items = (input.bid.line_items || []).map((li, idx) => {
+      const qty = Number(li.qty || 1)
+      const rate = Number(li.rate_high ?? li.rate_low ?? 0)
+      return {
+        user_id: input.userId,
+        contact_id: (contact as any).id,
+        section: input.section || 'Scope',
+        description: li.name + (li.notes ? ` — ${li.notes}` : ''),
+        qty, unit: li.unit || null, rate, amount: qty * rate,
+        is_optional: false, is_excluded: false, sort_order: idx
+      }
+    }).filter((row) => row.rate > 0 || row.amount > 0)
+    if (items.length > 0) {
+      const { error: iErr } = await supabase.from('fh_quote_items').insert(items as any)
+      if (iErr) return { error: iErr, id: (contact as any).id as string }
+    }
+    client.invalidateQueries({ queryKey: queryKeys.jobs })
+    return { error: null, id: (contact as any).id as string }
+  }
+}
+
 export function useCompleteOnboarding() {
   const client = useQueryClient()
   return async (input: { userId: string; companyName: string; services: string[]; lat?: number | null; lon?: number | null }) => {

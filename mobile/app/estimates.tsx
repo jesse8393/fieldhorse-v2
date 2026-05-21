@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { FileSignature } from 'lucide-react-native'
+import { FileSignature, Sparkles } from 'lucide-react-native'
 import { useEstimates, type EstimateRow } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
@@ -42,7 +42,18 @@ export default function EstimatesScreen() {
     <View style={{ flex: 1 }}>
       <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
-        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Estimates" title="Proposals" />
+        <ScreenHeader
+          backLabel="More"
+          onBack={() => router.back()}
+          eyebrow="Estimates"
+          title="Proposals"
+          right={(
+            <Pressable onPress={() => router.push('/bid')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }} hitSlop={8}>
+              <Sparkles color={theme.goldBright} size={15} />
+              <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '700' }}>AI estimate</Text>
+            </Pressable>
+          )}
+        />
 
         {isLoading ? (
           <ActivityIndicator color={theme.goldBright} style={{ marginTop: 24 }} />

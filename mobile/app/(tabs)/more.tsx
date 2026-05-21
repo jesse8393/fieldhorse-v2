@@ -2,7 +2,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell, Receipt, Activity, Users, FileSignature, StickyNote, Hammer, CloudSun } from 'lucide-react-native'
+import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell, Receipt, Activity, Users, FileSignature, StickyNote, Hammer, CloudSun, Sparkles, MessageSquare } from 'lucide-react-native'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, Eyebrow, SectionLabel, theme } from '../../components/ui'
 
@@ -27,6 +27,8 @@ export default function MoreScreen() {
 
         <SectionLabel style={{ marginBottom: 10 }}>Tools</SectionLabel>
         <View style={{ gap: 10, marginBottom: 24 }}>
+          <MenuRow icon={<Sparkles color={theme.goldBright} size={18} />} title="AI estimate" sub="Scope to line-item bid in seconds" onPress={() => router.push('/bid')} />
+          <MenuRow icon={<MessageSquare color={theme.goldBright} size={18} />} title="Compose" sub="Draft on-brand texts & emails" onPress={() => router.push('/compose')} />
           <MenuRow icon={<Receipt color={theme.goldBright} size={18} />} title="Invoices & Payments" sub="Money owed, aging & mark paid" onPress={() => router.push('/invoices')} />
           <MenuRow icon={<StickyNote color={theme.goldBright} size={18} />} title="Notes" sub="Capture, link to jobs & review" onPress={() => router.push('/notes')} />
           <MenuRow icon={<Activity color={theme.goldBright} size={18} />} title="Activity" sub="Payments, leads, invoices & notes" onPress={() => router.push('/activity')} />

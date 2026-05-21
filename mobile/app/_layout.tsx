@@ -67,6 +67,8 @@ function RootNavigator() {
       <Stack.Screen name="login" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="reset-password" />
+      <Stack.Screen name="bid" />
+      <Stack.Screen name="compose" />
       <Stack.Screen name="jobs/[id]" />
       <Stack.Screen name="clients/[id]" />
       <Stack.Screen name="integrations" />
