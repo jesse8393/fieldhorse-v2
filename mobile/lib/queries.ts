@@ -11,6 +11,7 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
+import { getWeather } from './weather'
 import type { Database } from './database.types'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -1660,6 +1661,16 @@ export function useUpdateSubProfile() {
     }
     return { error }
   }
+}
+
+// ---- Live weather for the contractor's pinned location (Home pill + Pour Window) ----
+export function useWeather(lat?: number | null, lon?: number | null) {
+  return useQuery({
+    queryKey: ['weather', lat ?? 'default', lon ?? 'default'],
+    queryFn: () => getWeather(lat ?? undefined, lon ?? undefined),
+    staleTime: 1000 * 60 * 30,
+    refetchInterval: 1000 * 60 * 30
+  })
 }
 
 // ---- Save the contractor's pinned location (Pour Window weather) ----

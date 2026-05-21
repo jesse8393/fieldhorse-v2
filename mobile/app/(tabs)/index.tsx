@@ -8,8 +8,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle } from 'react-native-svg'
-import { Plus, Calendar, Users, BarChart3, DollarSign, ChevronRight, Bell, Phone, FileText, CalendarClock } from 'lucide-react-native'
-import { useJobs, useClientsBundle, useRecentActivity, useProfile, useAgenda } from '../../lib/queries'
+import { Plus, Calendar, Users, BarChart3, DollarSign, ChevronRight, Bell, Phone, FileText, CalendarClock, Search, PenSquare, Sun } from 'lucide-react-native'
+import { useJobs, useClientsBundle, useRecentActivity, useProfile, useAgenda, useWeather } from '../../lib/queries'
+import { weatherLabel } from '../../lib/weather'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, SectionLabel, theme } from '../../components/ui'
 
@@ -43,6 +44,7 @@ export default function HomeScreen() {
   const { data: activity = [] } = useRecentActivity(user?.id)
   const { data: profile } = useProfile(user?.id)
   const { data: agenda } = useAgenda(user?.id)
+  const { data: weather } = useWeather(profile?.location_lat, profile?.location_lon)
 
   const stats = useMemo(() => {
     let pipeline = 0, won = 0, active = 0, lead = 0
@@ -76,23 +78,37 @@ export default function HomeScreen() {
       <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
         {/* Branded header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <LinearGradient colors={['#F0CE86', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: theme.onGold, fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>FH</Text>
           </LinearGradient>
-          <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', flex: 1, textAlign: 'center' }} numberOfLines={1}>
+          <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', flex: 1 }} numberOfLines={1}>
             {profile?.company_name || 'FieldHorse'}
           </Text>
-          <Pressable onPress={() => router.push('/notifications')} hitSlop={8} style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}>
-            <Bell color={theme.goldBright} size={17} />
-          </Pressable>
+          <IconBtn onPress={() => router.push('/jobs')}><Search color={theme.goldBright} size={17} /></IconBtn>
+          <IconBtn onPress={() => router.push('/compose')}><PenSquare color={theme.goldBright} size={17} /></IconBtn>
+          <IconBtn onPress={() => router.push('/notifications')}><Bell color={theme.goldBright} size={17} /></IconBtn>
         </View>
 
-        <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }}>{dateLine()}</Text>
-        <Text style={{ fontSize: 28, fontWeight: '800', marginTop: 4, marginBottom: 18, letterSpacing: -0.5 }}>
-          <Text style={{ color: theme.ink }}>{greeting()}, </Text>
-          <Text style={{ color: theme.goldBright }}>{display}.</Text>
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }}>{dateLine()}</Text>
+            <Text style={{ fontSize: 28, fontWeight: '800', marginTop: 4, letterSpacing: -0.5 }}>
+              <Text style={{ color: theme.ink }}>{greeting()}, </Text>
+              <Text style={{ color: theme.goldBright }}>{display}.</Text>
+            </Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 13, marginTop: 4 }}>
+              {todayEvents.length} on site today · {money(stats.pipeline)} pipeline
+            </Text>
+          </View>
+          {weather?.current ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, marginTop: 2 }}>
+              <Sun color={theme.goldBright} size={15} />
+              <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '800' }}>{Math.round(weather.current.temperature_2m)}°</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }} numberOfLines={1}>{weatherLabel(weather.current.weather_code)}</Text>
+            </View>
+          ) : null}
+        </View>
 
         {isLoading ? (
           <View style={{ alignItems: 'center', paddingVertical: 64 }}><ActivityIndicator color={theme.goldBright} /></View>
@@ -271,6 +287,14 @@ export default function HomeScreen() {
         )}
       </ScrollView>
     </View>
+  )
+}
+
+function IconBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={8} style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}>
+      {children}
+    </Pressable>
   )
 }
 

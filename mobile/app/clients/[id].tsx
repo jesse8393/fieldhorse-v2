@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ChevronLeft, Phone, Mail, Pencil, Trash2 } from 'lucide-react-native'
+import { ChevronLeft, Phone, Mail, Pencil, Trash2, MessageSquare, MapPin } from 'lucide-react-native'
 import { useClientDetail, useUpdateClient, useDeleteClient } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, GoldButton, StagePill, theme } from '../../components/ui'
@@ -128,13 +128,19 @@ export default function ClientDetailScreen() {
         </View>
 
         {/* Contact actions */}
-        {(client.phone || client.email) && (
+        {(client.phone || client.email || client.address) && (
           <View style={{ flexDirection: 'row', marginTop: 14, gap: 10 }}>
             {client.phone ? (
               <Action icon={<Phone color={theme.goldBright} size={16} />} label="Call" onPress={() => Linking.openURL(`tel:${client.phone}`)} />
             ) : null}
+            {client.phone ? (
+              <Action icon={<MessageSquare color={theme.goldBright} size={16} />} label="Text" onPress={() => Linking.openURL(`sms:${client.phone}`)} />
+            ) : null}
             {client.email ? (
               <Action icon={<Mail color={theme.goldBright} size={16} />} label="Email" onPress={() => Linking.openURL(`mailto:${client.email}`)} />
+            ) : null}
+            {client.address ? (
+              <Action icon={<MapPin color={theme.goldBright} size={16} />} label="Map" onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(client.address as string)}`)} />
             ) : null}
           </View>
         )}

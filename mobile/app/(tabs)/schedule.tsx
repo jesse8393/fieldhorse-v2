@@ -4,7 +4,7 @@
 // sheet to create an event (title + date + time + optional linked job);
 // tapping an event opens the same sheet to edit it. A 7/30-day range
 // toggle widens the window.
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   View, Text, SectionList, ActivityIndicator, Pressable, Modal,
   TextInput, KeyboardAvoidingView, Platform, Alert, ScrollView
@@ -117,6 +117,28 @@ export default function ScheduleScreen() {
     ])
   }
 
+  const listRef = useRef<SectionList<ScheduleEvent>>(null)
+
+  const countByDay = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const e of events) {
+      if (!e.start_at) continue
+      const key = new Date(e.start_at).toDateString()
+      m.set(key, (m.get(key) || 0) + 1)
+    }
+    return m
+  }, [events])
+
+  const weekDays = useMemo(() => {
+    const out: Date[] = []
+    const base = new Date(); base.setHours(0, 0, 0, 0)
+    for (let i = 0; i < Math.min(range, 14); i++) {
+      const d = new Date(base); d.setDate(base.getDate() + i)
+      out.push(d)
+    }
+    return out
+  }, [range])
+
   const sections = useMemo(() => {
     const byDay = new Map<string, ScheduleEvent[]>()
     for (const e of events) {
@@ -130,6 +152,14 @@ export default function ScheduleScreen() {
       data: list
     }))
   }, [events])
+
+  function jumpToDay(d: Date) {
+    const key = d.toDateString()
+    const idx = sections.findIndex((s) => s.data[0]?.start_at && new Date(s.data[0].start_at).toDateString() === key)
+    if (idx >= 0) {
+      try { listRef.current?.scrollToLocation({ sectionIndex: idx, itemIndex: 0, viewPosition: 0, animated: true }) } catch {}
+    }
+  }
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top + 10 }}>
@@ -155,14 +185,47 @@ export default function ScheduleScreen() {
         </View>
       </View>
 
+      {/* Week strip */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingBottom: 6 }}
+        style={{ maxHeight: 78, flexGrow: 0 }}
+      >
+        {weekDays.map((d) => {
+          const isToday = d.toDateString() === new Date().toDateString()
+          const count = countByDay.get(d.toDateString()) || 0
+          return (
+            <Pressable
+              key={d.toISOString()}
+              onPress={() => jumpToDay(d)}
+              style={{
+                width: 46, borderRadius: 14, paddingVertical: 8, alignItems: 'center',
+                borderWidth: 1,
+                borderColor: isToday ? theme.goldBright : count > 0 ? theme.borderGold : theme.border,
+                backgroundColor: isToday ? `${theme.goldBright}1f` : theme.surface
+              }}
+            >
+              <Text style={{ color: isToday ? theme.goldBright : theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                {d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3)}
+              </Text>
+              <Text style={{ color: isToday ? theme.goldBright : theme.ink, fontSize: 17, fontWeight: '800', marginTop: 2 }}>{d.getDate()}</Text>
+              <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 4, backgroundColor: count > 0 ? theme.goldBright : 'transparent' }} />
+            </Pressable>
+          )
+        })}
+      </ScrollView>
+
       {isLoading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.goldBright} /></View>
       ) : (
         <SectionList
+          ref={listRef}
           sections={sections}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100 }}
           stickySectionHeadersEnabled={false}
+          onScrollToIndexFailed={() => {}}
           renderSectionHeader={({ section }) => (
             <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 18, marginBottom: 10 }}>
               {section.title}

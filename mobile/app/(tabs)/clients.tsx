@@ -58,6 +58,26 @@ export default function ClientsScreen() {
 
   const clients = bundle?.clients ?? []
   const jobs = bundle?.jobs ?? []
+  const payments = bundle?.payments ?? []
+
+  const kpis = useMemo(() => {
+    const paidByJob = new Map<string, number>()
+    for (const p of payments) {
+      if (!p.contact_id) continue
+      paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
+    }
+    let lifetime = 0, activeJobs = 0, outstanding = 0, jobCount = 0
+    for (const j of jobs) {
+      const amt = Number(j.amount || 0)
+      lifetime += amt
+      jobCount += 1
+      if (j.stage && ACTIVE.has(j.stage)) {
+        activeJobs += 1
+        outstanding += Math.max(0, amt - (paidByJob.get(j.id) || 0))
+      }
+    }
+    return { lifetime, activeJobs, outstanding, avg: jobCount ? lifetime / jobCount : 0 }
+  }, [jobs, payments])
 
   const rollups = useMemo(() => {
     const map = new Map<string, Roll>()
@@ -106,6 +126,20 @@ export default function ClientsScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100, gap: 10 }}
+          ListHeaderComponent={
+            clients.length > 0 ? (
+              <View style={{ marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                  <Kpi label="Lifetime billed" value={money(kpis.lifetime)} sub={`${clients.length} client${clients.length === 1 ? '' : 's'}`} />
+                  <Kpi label="Active jobs" value={String(kpis.activeJobs)} sub="in motion" />
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Kpi label="Outstanding" value={money(kpis.outstanding)} sub="owed to you" danger={kpis.outstanding > 0} />
+                  <Kpi label="Avg job size" value={money(kpis.avg)} sub="per job" />
+                </View>
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => (
             <ClientCard client={item} roll={rollups.get(item.id)} onPress={() => router.push(`/clients/${item.id}`)} />
           )}
@@ -167,6 +201,18 @@ export default function ClientsScreen() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+  )
+}
+
+function Kpi({ label, value, sub, danger }: { label: string; value: string; sub: string; danger?: boolean }) {
+  return (
+    <Card style={{ flex: 1 }}>
+      <View style={{ padding: 14 }}>
+        <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' }} numberOfLines={1}>{label}</Text>
+        <Text style={{ color: danger ? theme.danger : theme.goldBright, fontSize: 22, fontWeight: '800', marginTop: 6 }} numberOfLines={1}>{value}</Text>
+        <Text style={{ color: theme.inkFaint, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{sub}</Text>
+      </View>
+    </Card>
   )
 }
 
