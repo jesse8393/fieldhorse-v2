@@ -5,19 +5,14 @@
 // tapping an event opens the same sheet to edit it. A 7/30-day range
 // toggle widens the window.
 import { useMemo, useRef, useState } from 'react'
-import {
-  View, Text, SectionList, ActivityIndicator, Pressable, Modal,
-  TextInput, KeyboardAvoidingView, Platform, Alert, ScrollView
-} from 'react-native'
+import { View, Text, SectionList, ActivityIndicator, Pressable, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Plus } from 'lucide-react-native'
-import {
-  useUpcomingEvents, useCreateEvent, useDeleteEvent, useUpdateEvent,
-  useJobs, type ScheduleEvent
-} from '../../lib/queries'
+import { useUpcomingEvents, useJobs, type ScheduleEvent } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
-import { ScreenBackground, Card, Eyebrow, GoldButton, theme } from '../../components/ui'
+import { ScreenBackground, Card, Eyebrow, theme } from '../../components/ui'
+import { AddEventSheet } from '../../components/AddEventSheet'
 
 function dayLabel(iso: string) {
   const d = new Date(iso)
@@ -32,90 +27,18 @@ function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
-function dateField(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-// Combine a YYYY-MM-DD date and HH:MM (24h) time into a local Date,
-// returning its ISO string — or null if either field doesn't parse.
-function toIso(dateStr: string, timeStr: string): string | null {
-  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim())
-  const tm = /^(\d{1,2}):(\d{2})$/.exec(timeStr.trim())
-  if (!dm || !tm) return null
-  const [, y, mo, d] = dm
-  const hh = Number(tm[1]); const mm = Number(tm[2])
-  if (hh > 23 || mm > 59) return null
-  const dt = new Date(Number(y), Number(mo) - 1, Number(d), hh, mm, 0, 0)
-  if (isNaN(dt.getTime())) return null
-  return dt.toISOString()
-}
-
 export default function ScheduleScreen() {
   const insets = useSafeAreaInsets()
   const { user } = useAuth()
   const [range, setRange] = useState<7 | 30>(7)
   const { data: events = [], isLoading } = useUpcomingEvents(user?.id, range)
   const { data: jobs = [] } = useJobs()
-  const createEvent = useCreateEvent()
-  const updateEvent = useUpdateEvent()
-  const deleteEvent = useDeleteEvent()
 
   const [addOpen, setAddOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [title, setTitle] = useState('')
-  const [date, setDate] = useState(dateField(new Date()))
-  const [time, setTime] = useState('09:00')
-  const [jobId, setJobId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+  const [editEvent, setEditEvent] = useState<ScheduleEvent | null>(null)
 
-  function openCreate() {
-    setEditingId(null)
-    setTitle(''); setDate(dateField(new Date())); setTime('09:00'); setJobId(null)
-    setErr(null); setAddOpen(true)
-  }
-
-  function openEdit(e: ScheduleEvent) {
-    setEditingId(e.id)
-    setTitle(e.title || '')
-    const d = e.start_at ? new Date(e.start_at) : new Date()
-    setDate(dateField(d))
-    setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`)
-    setJobId(e.contact_id ?? null)
-    setErr(null); setAddOpen(true)
-  }
-
-  async function submitEvent() {
-    if (!title.trim() || !user || saving) return
-    const startAt = toIso(date, time)
-    if (!startAt) { setErr('Use date YYYY-MM-DD and time HH:MM.'); return }
-    setErr(null)
-    setSaving(true)
-    const { error } = editingId
-      ? await updateEvent({ id: editingId, userId: user.id, title: title.trim(), startAt, contactId: jobId })
-      : await createEvent({ userId: user.id, title: title.trim(), startAt, contactId: jobId ?? undefined })
-    setSaving(false)
-    if (error) { setErr(error.message); return }
-    setAddOpen(false)
-  }
-
-  function confirmDelete() {
-    if (!user || !editingId) return
-    Alert.alert('Delete event?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          await deleteEvent({ id: editingId, userId: user.id })
-          setAddOpen(false)
-        }
-      }
-    ])
-  }
+  function openCreate() { setEditEvent(null); setAddOpen(true) }
+  function openEdit(e: ScheduleEvent) { setEditEvent(e); setAddOpen(true) }
 
   const listRef = useRef<SectionList<ScheduleEvent>>(null)
 
@@ -259,82 +182,9 @@ export default function ScheduleScreen() {
         </LinearGradient>
       </Pressable>
 
-      {/* Create/edit event modal */}
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setAddOpen(false)} />
-          <View style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderTopWidth: 1, borderColor: theme.borderMid, paddingBottom: insets.bottom + 24 }}>
-            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 20 }}>{editingId ? 'Edit event' : 'New event'}</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Title</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Site visit, install, inspection…"
-              placeholderTextColor="rgba(242,237,228,0.4)"
-              autoFocus={!editingId}
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
-            />
-            <View className="flex-row mb-4" style={{ gap: 12 }}>
-              <View className="flex-1">
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Date</Text>
-                <TextInput
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
-                />
-              </View>
-              <View style={{ width: 110 }}>
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Time</Text>
-                <TextInput
-                  value={time}
-                  onChangeText={setTime}
-                  placeholder="09:00"
-                  placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
-                />
-              </View>
-            </View>
-
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Link to job (optional)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginBottom: 4 }}>
-              <Pressable
-                onPress={() => setJobId(null)}
-                className="rounded-full px-3.5 py-2 border"
-                style={{ borderColor: jobId === null ? '#E8B865' : 'rgba(255,240,210,0.12)', backgroundColor: jobId === null ? '#E8B865' : 'transparent' }}
-              >
-                <Text className="text-xs font-bold" style={{ color: jobId === null ? '#1A120A' : '#9b948a' }}>None</Text>
-              </Pressable>
-              {jobs.slice(0, 30).map((j) => {
-                const active = jobId === j.id
-                return (
-                  <Pressable
-                    key={j.id}
-                    onPress={() => setJobId(j.id)}
-                    className="rounded-full px-3.5 py-2 border"
-                    style={{ borderColor: active ? '#E8B865' : 'rgba(255,240,210,0.12)', backgroundColor: active ? '#E8B865' : 'transparent' }}
-                  >
-                    <Text className="text-xs font-bold" style={{ color: active ? '#1A120A' : '#9b948a' }} numberOfLines={1}>
-                      {j.name || 'Untitled'}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-
-            {err ? <Text style={{ color: theme.danger, fontSize: 12, marginTop: 12 }}>{err}</Text> : null}
-            <View style={{ marginTop: 20 }}>
-              <GoldButton label={editingId ? 'Save event' : 'Create event'} onPress={submitEvent} loading={saving} />
-            </View>
-            {editingId ? (
-              <Pressable onPress={confirmDelete} style={{ borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}>
-                <Text style={{ color: theme.danger, fontWeight: '700' }}>Delete event</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {user ? (
+        <AddEventSheet open={addOpen} onClose={() => setAddOpen(false)} userId={user.id} jobs={jobs} editEvent={editEvent} />
+      ) : null}
     </View>
   )
 }

@@ -3,17 +3,15 @@
 // and computes per-client lifetime / active-count rollups natively —
 // the same rollup math the web Clients screen uses.
 import { useMemo, useState } from 'react'
-import {
-  View, Text, FlatList, TextInput, ActivityIndicator, Pressable,
-  Modal, KeyboardAvoidingView, Platform
-} from 'react-native'
+import { View, Text, FlatList, TextInput, ActivityIndicator, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Plus } from 'lucide-react-native'
-import { useClientsBundle, useCreateClient, type Client } from '../../lib/queries'
+import { useClientsBundle, type Client } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
-import { ScreenBackground, Card, Eyebrow, GoldButton, theme } from '../../components/ui'
+import { ScreenBackground, Card, Eyebrow, theme } from '../../components/ui'
+import { NewClientSheet } from '../../components/NewClientSheet'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 
@@ -30,31 +28,8 @@ export default function ClientsScreen() {
   const router = useRouter()
   const { user } = useAuth()
   const { data: bundle, isLoading } = useClientsBundle(user?.id)
-  const createClient = useCreateClient()
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
-  const [cName, setCName] = useState('')
-  const [cCompany, setCCompany] = useState('')
-  const [cPhone, setCPhone] = useState('')
-  const [cEmail, setCEmail] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  async function submitClient() {
-    if (!cName.trim() || !user || saving) return
-    setSaving(true)
-    const { id, error } = await createClient({
-      userId: user.id, name: cName.trim(),
-      companyName: cCompany.trim() || undefined,
-      phone: cPhone.trim() || undefined,
-      email: cEmail.trim() || undefined
-    })
-    setSaving(false)
-    if (!error) {
-      setAddOpen(false)
-      setCName(''); setCCompany(''); setCPhone(''); setCEmail('')
-      if (id) router.push(`/clients/${id}`)
-    }
-  }
 
   const clients = bundle?.clients ?? []
   const jobs = bundle?.jobs ?? []
@@ -160,46 +135,9 @@ export default function ClientsScreen() {
         </LinearGradient>
       </Pressable>
 
-      {/* New client modal */}
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setAddOpen(false)} />
-          <View style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderTopWidth: 1, borderColor: theme.borderMid, paddingBottom: insets.bottom + 24 }}>
-            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 20 }}>New client</Text>
-            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Name</Text>
-            <TextInput
-              value={cName} onChangeText={setCName} autoFocus
-              placeholder="Client name" placeholderTextColor={theme.inkFaint}
-              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16 }}
-            />
-            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Company (optional)</Text>
-            <TextInput
-              value={cCompany} onChangeText={setCCompany}
-              placeholder="Company" placeholderTextColor={theme.inkFaint}
-              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16 }}
-            />
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Phone</Text>
-                <TextInput
-                  value={cPhone} onChangeText={setCPhone} keyboardType="phone-pad"
-                  placeholder="(555) 555-5555" placeholderTextColor={theme.inkFaint}
-                  style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink }}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Email</Text>
-                <TextInput
-                  value={cEmail} onChangeText={setCEmail} keyboardType="email-address" autoCapitalize="none"
-                  placeholder="name@email.com" placeholderTextColor={theme.inkFaint}
-                  style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink }}
-                />
-              </View>
-            </View>
-            <GoldButton label="Create client" onPress={submitClient} loading={saving} />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {user ? (
+        <NewClientSheet open={addOpen} onClose={() => setAddOpen(false)} userId={user.id} onCreated={(id) => router.push(`/clients/${id}`)} />
+      ) : null}
     </View>
   )
 }

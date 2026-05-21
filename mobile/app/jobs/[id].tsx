@@ -32,6 +32,7 @@ import {
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground } from '../../components/ui'
+import { MarkCompleteSheet } from '../../components/MarkCompleteSheet'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#6B7CA8', paid: '#4F8C5E', overdue: '#7d2a1f', void: '#5C5C5C'
@@ -141,6 +142,7 @@ export default function JobDetailScreen() {
   const [payOpen, setPayOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [paySaving, setPaySaving] = useState(false)
+  const [completeOpen, setCompleteOpen] = useState(false)
   const [stageSaving, setStageSaving] = useState<string | null>(null)
 
   const [expOpen, setExpOpen] = useState(false)
@@ -624,6 +626,17 @@ export default function JobDetailScreen() {
             )
           })}
         </View>
+
+        {contact.stage !== 'closed' && contact.stage !== 'lost' ? (
+          <Pressable
+            onPress={() => setCompleteOpen(true)}
+            className="rounded-2xl py-3.5 mt-3 items-center flex-row justify-center border"
+            style={{ gap: 8, borderColor: 'rgba(79,140,94,0.4)', backgroundColor: 'rgba(79,140,94,0.12)' }}
+          >
+            <Flag color="#5BB97A" size={16} />
+            <Text className="font-bold" style={{ color: '#5BB97A' }}>Mark complete</Text>
+          </Pressable>
+        ) : null}
 
         {/* Client link */}
         <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Client</Text>
@@ -1641,6 +1654,17 @@ export default function JobDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {user && contact ? (
+        <MarkCompleteSheet
+          open={completeOpen}
+          onClose={() => setCompleteOpen(false)}
+          userId={user.id}
+          contactId={contact.id}
+          currentAmount={contact.amount}
+          balance={totals.balance}
+        />
+      ) : null}
     </View>
   )
 }
