@@ -1,21 +1,30 @@
 // mobile/app/(tabs)/index.tsx — Home dashboard.
-// Mirrors the web Home: a hero "revenue opportunity" card with a gold
-// sparkline + Won/Active/Lead breakdown, Quick Actions, Recent Activity,
-// and a Pipeline Preview — all on the premium v3 design primitives.
-import { useMemo } from 'react'
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native'
+// Mirrors the web mobile Home: branded header (logo/wordmark + search,
+// notifications, notes), greeting strip with live clock + weather pill,
+// a hero "revenue opportunity" card with trend chip + sparkline +
+// Won/Active/Lead breakdown, Quick Actions, Recent Activity, a 3-bucket
+// Next Actions queue, Today's Priorities, Today on Site, Pipeline Preview.
+import { useEffect, useMemo, useState } from 'react'
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Image, Alert } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
+import * as Location from 'expo-location'
 import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle } from 'react-native-svg'
-import { Plus, Calendar, Users, BarChart3, DollarSign, ChevronRight, Bell, Phone, FileText, CalendarClock, Search, PenSquare, Sun } from 'lucide-react-native'
-import { useJobs, useClientsBundle, useRecentActivity, useProfile, useAgenda, useWeather } from '../../lib/queries'
-import { weatherLabel } from '../../lib/weather'
+import {
+  Plus, Calendar, DollarSign, ChevronRight, Bell, Phone, FileText, CalendarClock,
+  Search, NotebookPen, CloudSun, MapPin, ArrowUpRight, ArrowDownRight, Sparkles, MessageSquare, Receipt
+} from 'lucide-react-native'
+import {
+  useJobs, useClientsBundle, useRecentActivity, useProfile, useAgenda,
+  useWeather, useInvoicesOverview, useNotifications, useSaveLocation
+} from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, SectionLabel, theme } from '../../components/ui'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 const STAGE_TINT: Record<string, string> = { lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E', invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f' }
+const DAY = 86400000
 
 function fullMoney(n: number) {
   return `$${Math.round(n).toLocaleString()}`
@@ -31,9 +40,8 @@ function greeting() {
   if (h < 18) return 'Good afternoon'
   return 'Good evening'
 }
-function dateLine() {
-  return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()
-}
+
+type NextAction = { id: string; title: string; sub: string; tone: string; label: string; onPress: () => void }
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets()
@@ -45,17 +53,36 @@ export default function HomeScreen() {
   const { data: profile } = useProfile(user?.id)
   const { data: agenda } = useAgenda(user?.id)
   const { data: weather } = useWeather(profile?.location_lat, profile?.location_lon)
+  const { data: invoices } = useInvoicesOverview(user?.id)
+  const { data: notifications = [] } = useNotifications(user?.id)
+  const saveLocation = useSaveLocation()
+
+  const [now, setNow] = useState(() => new Date())
+  const [pinning, setPinning] = useState(false)
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(t)
+  }, [])
+
+  const unread = useMemo(() => notifications.filter((n) => !n.read_at).length, [notifications])
+  const hasCoords = profile?.location_lat != null && profile?.location_lon != null
 
   const stats = useMemo(() => {
-    let pipeline = 0, won = 0, active = 0, lead = 0
+    let pipeline = 0, won = 0, active = 0, lead = 0, then = 0
+    const cutoff = Date.now() - 7 * DAY
     for (const j of jobs) {
       const stage = j.stage ?? ''
-      if (ACTIVE.has(stage)) pipeline += Number(j.amount || 0)
+      const amt = Number(j.amount || 0)
+      if (ACTIVE.has(stage)) {
+        pipeline += amt
+        if (j.created_at && new Date(j.created_at).getTime() <= cutoff) then += amt
+      }
       if (stage === 'closed') won += 1
       else if (stage === 'lead') lead += 1
       else if (stage === 'quote' || stage === 'job' || stage === 'invoice') active += 1
     }
-    return { pipeline, won, active, lead }
+    const trend = then > 0 ? Math.round(((pipeline - then) / then) * 100) : pipeline > 0 ? 100 : 0
+    return { pipeline, won, active, lead, trend }
   }, [jobs])
 
   const topDeals = useMemo(() =>
@@ -64,14 +91,70 @@ export default function HomeScreen() {
 
   const overdue = agenda?.overdue ?? []
   const todayEvents = agenda?.today ?? []
+
   const priorities = useMemo(() => ({
     followUps: jobs.filter((j) => j.stage === 'lead').length,
     quotes: jobs.filter((j) => j.stage === 'quote').length,
-    behind: overdue.length
-  }), [jobs, overdue.length])
+    collectedWeek: invoices?.collectedThisWeek ?? 0
+  }), [jobs, invoices?.collectedThisWeek])
+
+  const nextActions = useMemo<NextAction[]>(() => {
+    const out: (NextAction & { sort: number; overdue: boolean })[] = []
+    // 1. Overdue scheduled jobs
+    for (const e of overdue) {
+      out.push({
+        id: `o-${e.id}`, overdue: true, sort: Number.MAX_SAFE_INTEGER,
+        title: `Reschedule ${e.fh_contacts?.name || e.title || 'job'}`,
+        sub: 'Behind schedule', tone: theme.danger, label: 'Overdue',
+        onPress: () => e.contact_id && router.push(`/jobs/${e.contact_id}`)
+      })
+    }
+    // 2. Stale leads/quotes (no update in 7+ days)
+    for (const j of jobs) {
+      if (j.stage !== 'lead' && j.stage !== 'quote') continue
+      const touched = j.updated_at ? new Date(j.updated_at).getTime() : 0
+      const days = touched ? Math.floor((Date.now() - touched) / DAY) : 0
+      if (days < 7) continue
+      out.push({
+        id: `s-${j.id}`, overdue: false, sort: days,
+        title: `Follow up with ${j.name || 'lead'}`,
+        sub: `${j.stage === 'quote' ? 'Quote' : 'Lead'} gone cold · ${days}d`,
+        tone: days >= 14 ? theme.danger : theme.gold, label: 'Follow up',
+        onPress: () => router.push(`/jobs/${j.id}`)
+      })
+    }
+    // 3. Invoices unpaid 5+ days
+    for (const inv of invoices?.invoices ?? []) {
+      if (inv.status === 'paid' || inv.status === 'void' || inv.ageDays < 5) continue
+      out.push({
+        id: `i-${inv.id}`, overdue: false, sort: inv.ageDays,
+        title: `Chase invoice for ${inv.name || 'client'}`,
+        sub: `Unpaid · ${inv.ageDays}d`, tone: theme.success, label: 'Invoice',
+        onPress: () => inv.contactId && router.push(`/invoices/${inv.contactId}`)
+      })
+    }
+    out.sort((a, b) => (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0) || b.sort - a.sort)
+    return out.slice(0, 5)
+  }, [overdue, jobs, invoices?.invoices, router])
 
   const name = (user?.email?.split('@')[0] || 'there')
   const display = name.charAt(0).toUpperCase() + name.slice(1)
+  const eyebrow = `${now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · ${now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`.toUpperCase()
+
+  async function pinLocation() {
+    if (!user || pinning) return
+    setPinning(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') { Alert.alert('Location needed', 'Enable location to show your local forecast.'); return }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })
+      await saveLocation({ userId: user.id, lat: pos.coords.latitude, lon: pos.coords.longitude })
+    } catch {
+      Alert.alert('Could not get location', 'Try again outdoors or check permissions.')
+    } finally {
+      setPinning(false)
+    }
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -82,17 +165,27 @@ export default function HomeScreen() {
           <LinearGradient colors={['#F0CE86', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: theme.onGold, fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>FH</Text>
           </LinearGradient>
-          <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', flex: 1 }} numberOfLines={1}>
-            {profile?.company_name || 'FieldHorse'}
-          </Text>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            {profile?.logo_url ? (
+              <Image source={{ uri: profile.logo_url }} style={{ height: 26, width: 150 }} resizeMode="contain" />
+            ) : profile?.company_name ? (
+              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }} numberOfLines={1}>{profile.company_name}</Text>
+            ) : profile?.full_name ? (
+              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }} numberOfLines={1}>{profile.full_name}</Text>
+            ) : (
+              <Text style={{ fontSize: 13, fontWeight: '900', letterSpacing: 2 }}>
+                <Text style={{ color: theme.goldBright }}>FIELD</Text><Text style={{ color: theme.ink }}>HORSE</Text>
+              </Text>
+            )}
+          </View>
           <IconBtn onPress={() => router.push('/jobs')}><Search color={theme.goldBright} size={17} /></IconBtn>
-          <IconBtn onPress={() => router.push('/compose')}><PenSquare color={theme.goldBright} size={17} /></IconBtn>
-          <IconBtn onPress={() => router.push('/notifications')}><Bell color={theme.goldBright} size={17} /></IconBtn>
+          <IconBtn onPress={() => router.push('/notifications')} badge={unread}><Bell color={theme.goldBright} size={17} /></IconBtn>
+          <IconBtn onPress={() => router.push('/notes')}><NotebookPen color={theme.goldBright} size={17} /></IconBtn>
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }}>{dateLine()}</Text>
+            <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }}>{eyebrow}</Text>
             <Text style={{ fontSize: 28, fontWeight: '800', marginTop: 4, letterSpacing: -0.5 }}>
               <Text style={{ color: theme.ink }}>{greeting()}, </Text>
               <Text style={{ color: theme.goldBright }}>{display}.</Text>
@@ -101,13 +194,17 @@ export default function HomeScreen() {
               {todayEvents.length} on site today · {money(stats.pipeline)} pipeline
             </Text>
           </View>
-          {weather?.current ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, marginTop: 2 }}>
-              <Sun color={theme.goldBright} size={15} />
+          {hasCoords && weather?.current ? (
+            <Pressable onPress={() => router.push('/pour-window')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, marginTop: 2 }}>
+              <CloudSun color="#8FB4E3" size={16} />
               <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '800' }}>{Math.round(weather.current.temperature_2m)}°</Text>
-              <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }} numberOfLines={1}>{weatherLabel(weather.current.weather_code)}</Text>
-            </View>
-          ) : null}
+            </Pressable>
+          ) : (
+            <Pressable onPress={pinLocation} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderGold, marginTop: 2 }}>
+              {pinning ? <ActivityIndicator color={theme.goldBright} size="small" /> : <MapPin color={theme.goldBright} size={15} />}
+              <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800' }}>Pin</Text>
+            </Pressable>
+          )}
         </View>
 
         {isLoading ? (
@@ -118,8 +215,13 @@ export default function HomeScreen() {
             <Card glow style={{ marginBottom: 22 }}>
               <View style={{ padding: 20 }}>
                 <SectionLabel>Today's revenue opportunity</SectionLabel>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 10 }}>
-                  <Text style={{ color: theme.goldBright, fontSize: 38, fontWeight: '800', letterSpacing: -1 }}>{fullMoney(stats.pipeline)}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    <Text style={{ color: theme.gold, fontSize: 22, fontWeight: '700', marginTop: 4 }}>$</Text>
+                    <Text style={{ color: theme.goldBright, fontSize: 38, fontWeight: '800', letterSpacing: -1 }}>{Math.round(stats.pipeline).toLocaleString()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }} />
+                  <TrendChip pct={stats.trend} />
                 </View>
                 <Text style={{ color: theme.inkMuted, fontSize: 13, marginTop: 2 }}>Total Pipeline</Text>
 
@@ -150,10 +252,10 @@ export default function HomeScreen() {
             {/* Quick actions */}
             <SectionLabel style={{ marginBottom: 10 }}>Quick actions</SectionLabel>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
-              <QuickAction icon={<Plus color={theme.onGold} size={20} strokeWidth={2.6} />} label="Add lead" primary onPress={() => router.push('/jobs')} />
+              <QuickAction icon={<Plus color={theme.onGold} size={20} strokeWidth={2.6} />} label="New lead" primary onPress={() => router.push('/jobs')} />
+              <QuickAction icon={<Sparkles color={theme.goldBright} size={20} />} label="Estimate" onPress={() => router.push('/bid')} />
+              <QuickAction icon={<MessageSquare color={theme.goldBright} size={20} />} label="AI Compose" onPress={() => router.push('/compose')} />
               <QuickAction icon={<Calendar color={theme.goldBright} size={20} />} label="Schedule" onPress={() => router.push('/schedule')} />
-              <QuickAction icon={<Users color={theme.goldBright} size={20} />} label="Clients" onPress={() => router.push('/clients')} />
-              <QuickAction icon={<BarChart3 color={theme.goldBright} size={20} />} label="Reports" onPress={() => router.push('/analytics')} />
             </View>
 
             {/* Recent activity */}
@@ -180,23 +282,23 @@ export default function HomeScreen() {
             ) : null}
 
             {/* Next actions */}
-            {overdue.length > 0 ? (
+            {nextActions.length > 0 ? (
               <>
                 <SectionLabel style={{ marginBottom: 10 }}>Next actions</SectionLabel>
                 <View style={{ gap: 10, marginBottom: 24 }}>
-                  {overdue.slice(0, 4).map((e) => (
-                    <Pressable key={e.id} onPress={() => e.contact_id && router.push(`/jobs/${e.contact_id}`)}>
-                      <Card accent={theme.danger}>
+                  {nextActions.map((a) => (
+                    <Pressable key={a.id} onPress={a.onPress}>
+                      <Card accent={a.tone}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingLeft: 16 }}>
-                          <View style={{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(232,90,87,0.12)', borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)' }}>
-                            <CalendarClock color={theme.danger} size={16} />
+                          <View style={{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: `${a.tone}1f`, borderWidth: 1, borderColor: `${a.tone}55` }}>
+                            {a.label === 'Overdue' ? <CalendarClock color={a.tone} size={16} /> : a.label === 'Invoice' ? <Receipt color={a.tone} size={16} /> : <Phone color={a.tone} size={16} />}
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>Reschedule {e.fh_contacts?.name || e.title || 'job'}</Text>
-                            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }}>Behind schedule</Text>
+                            <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{a.title}</Text>
+                            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }}>{a.sub}</Text>
                           </View>
-                          <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(232,90,87,0.14)', borderWidth: 1, borderColor: 'rgba(232,90,87,0.4)' }}>
-                            <Text style={{ color: theme.danger, fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>Overdue</Text>
+                          <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: `${a.tone}1f`, borderWidth: 1, borderColor: `${a.tone}66` }}>
+                            <Text style={{ color: a.tone, fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>{a.label}</Text>
                           </View>
                         </View>
                       </Card>
@@ -209,9 +311,9 @@ export default function HomeScreen() {
             {/* Today's priorities */}
             <SectionLabel style={{ marginBottom: 10 }}>Today's priorities</SectionLabel>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
-              <Priority icon={<Phone color={theme.success} size={16} />} count={priorities.followUps} label="Follow-ups" sub="Calls to leads" tint={theme.success} />
-              <Priority icon={<FileText color="#6B7CA8" size={16} />} count={priorities.quotes} label="Quotes" sub="Need follow up" tint="#6B7CA8" />
-              <Priority icon={<CalendarClock color={theme.danger} size={16} />} count={priorities.behind} label="Behind" sub="Reschedule" tint={theme.danger} />
+              <Priority icon={<Phone color={theme.success} size={16} />} value={String(priorities.followUps)} label="Follow-ups" sub="Leads gone cold" tint={theme.success} />
+              <Priority icon={<FileText color="#6B7CA8" size={16} />} value={String(priorities.quotes)} label="Quotes" sub="Need attention" tint="#6B7CA8" />
+              <Priority icon={<DollarSign color={theme.goldBright} size={16} />} value={money(priorities.collectedWeek)} label="Invoicing" sub="Collected this week" tint={theme.goldBright} />
             </View>
 
             {/* Today on site */}
@@ -290,11 +392,27 @@ export default function HomeScreen() {
   )
 }
 
-function IconBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
+function IconBtn({ children, onPress, badge }: { children: React.ReactNode; onPress: () => void; badge?: number }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}>
       {children}
+      {badge && badge > 0 ? (
+        <View style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.danger, borderWidth: 1.5, borderColor: theme.bg }}>
+          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      ) : null}
     </Pressable>
+  )
+}
+
+function TrendChip({ pct }: { pct: number }) {
+  const up = pct >= 0
+  const tint = up ? theme.success : theme.danger
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, backgroundColor: `${tint}1f`, borderWidth: 1, borderColor: `${tint}55` }}>
+      {up ? <ArrowUpRight color={tint} size={13} /> : <ArrowDownRight color={tint} size={13} />}
+      <Text style={{ color: tint, fontSize: 11, fontWeight: '800' }}>{up ? '+' : ''}{pct}% · 7d</Text>
+    </View>
   )
 }
 
@@ -311,16 +429,16 @@ function Breakdown({ dot, label, count, onPress }: { dot: string; label: string;
   )
 }
 
-function Priority({ icon, count, label, sub, tint }: { icon: React.ReactNode; count: number; label: string; sub: string; tint: string }) {
+function Priority({ icon, value, label, sub, tint }: { icon: React.ReactNode; value: string; label: string; sub: string; tint: string }) {
   return (
     <Card style={{ flex: 1 }}>
       <View style={{ padding: 14, minHeight: 116 }}>
         <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${tint}1f`, borderWidth: 1, borderColor: `${tint}44` }}>
           {icon}
         </View>
-        <Text style={{ color: tint, fontSize: 26, fontWeight: '800', marginTop: 10 }}>{count}</Text>
+        <Text style={{ color: tint, fontSize: 24, fontWeight: '800', marginTop: 10 }} numberOfLines={1}>{value}</Text>
         <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '700', marginTop: 2 }}>{label}</Text>
-        <Text style={{ color: theme.inkMuted, fontSize: 11, marginTop: 1 }}>{sub}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{sub}</Text>
       </View>
     </Card>
   )
@@ -338,7 +456,7 @@ function QuickAction({ icon, label, primary, onPress }: { icon: React.ReactNode;
               </LinearGradient>
             ) : icon}
           </View>
-          <Text style={{ color: theme.ink, fontSize: 11, fontWeight: '700' }}>{label}</Text>
+          <Text style={{ color: theme.ink, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
         </LinearGradient>
       </View>
     </Pressable>

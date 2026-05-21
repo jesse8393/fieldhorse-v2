@@ -1231,6 +1231,7 @@ export type InvoicesOverview = {
   late: number
   overdue: number
   collectedThisMonth: number
+  collectedThisWeek: number
   outstandingCount: number
 }
 
@@ -1244,6 +1245,7 @@ export function useInvoicesOverview(userId: string | undefined) {
       ])
       const now = Date.now()
       const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); weekStart.setHours(0, 0, 0, 0)
       const invoices: InvoiceRow[] = ((invRes.data ?? []) as any[]).map((i) => {
         const issued = i.issued_at ? new Date(i.issued_at).getTime() : now
         return {
@@ -1260,12 +1262,15 @@ export function useInvoicesOverview(userId: string | undefined) {
         else if (inv.ageDays <= 60) late += inv.amount
         else overdue += inv.amount
       }
-      const collectedThisMonth = ((payRes.data ?? []) as any[]).reduce((s, p) => {
+      let collectedThisMonth = 0, collectedThisWeek = 0
+      for (const p of (payRes.data ?? []) as any[]) {
         const d = p.paid_on ? new Date(p.paid_on).getTime() : 0
-        return d >= monthStart.getTime() ? s + Number(p.amount || 0) : s
-      }, 0)
+        const amt = Number(p.amount || 0)
+        if (d >= monthStart.getTime()) collectedThisMonth += amt
+        if (d >= weekStart.getTime()) collectedThisWeek += amt
+      }
       return {
-        invoices, totalOutstanding, current, late, overdue, collectedThisMonth,
+        invoices, totalOutstanding, current, late, overdue, collectedThisMonth, collectedThisWeek,
         outstandingCount: invoices.filter((i) => i.status !== 'paid' && i.status !== 'void').length
       }
     },
