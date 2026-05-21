@@ -2,13 +2,14 @@
 // InvoiceDetail). :id is a contact id. Contract / paid / balance with a
 // payment history and a Collect Payment flow. PDF/email/public-link defer.
 import { useState } from 'react'
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Alert, Linking } from 'react-native'
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { DollarSign, Send, Briefcase } from 'lucide-react-native'
-import { useInvoiceDetail, useLogPayment } from '../../lib/queries'
+import { useInvoiceDetail } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui'
+import { PaymentSheet } from '../../components/PaymentSheet'
 
 function money(n: number) { return `$${Math.round(n).toLocaleString()}` }
 
@@ -18,12 +19,7 @@ export default function InvoiceDetailScreen() {
   const { user } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending } = useInvoiceDetail(id)
-  const logPayment = useLogPayment()
-
   const [payOpen, setPayOpen] = useState(false)
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('check')
-  const [saving, setSaving] = useState(false)
 
   if (isPending) {
     return <View style={{ flex: 1 }}><ScreenBackground /><ActivityIndicator color={theme.goldBright} style={{ marginTop: insets.top + 80 }} /></View>
@@ -46,16 +42,6 @@ export default function InvoiceDetailScreen() {
     : isPaid ? { label: 'PAID', tint: theme.success }
     : ageDays > 60 ? { label: 'OVERDUE', tint: theme.danger }
     : { label: 'OUTSTANDING', tint: theme.goldBright }
-
-  async function recordPayment() {
-    const amt = parseFloat(amount.replace(/[^0-9.]/g, ''))
-    if (!amt || !user) return
-    setSaving(true)
-    const { error } = await logPayment({ contactId: contact.id, userId: user.id, amount: amt, method })
-    setSaving(false)
-    if (error) { Alert.alert("Couldn't record payment", error.message); return }
-    setAmount(''); setPayOpen(false)
-  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -137,28 +123,9 @@ export default function InvoiceDetailScreen() {
         </Pressable>
       </View>
 
-      {/* Payment modal */}
-      <Modal visible={payOpen} transparent animationType="slide" onRequestClose={() => setPayOpen(false)}>
-        <Pressable onPress={() => setPayOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <Pressable onPress={(e) => e.stopPropagation()} style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, paddingBottom: insets.bottom + 20 }}>
-            <Text style={{ color: theme.goldBright, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' }}>Record payment</Text>
-            <Text style={{ color: theme.ink, fontSize: 22, fontWeight: '700', marginTop: 4, marginBottom: 18 }}>Collect on {contact.name || 'job'}</Text>
-            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Amount</Text>
-            <TextInput value={amount} onChangeText={setAmount} placeholder={`Balance ${money(balance)}`} placeholderTextColor={theme.inkMuted} keyboardType="decimal-pad" autoFocus style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: theme.ink, fontSize: 20, fontWeight: '700', marginBottom: 14 }} />
-            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Method</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-              {['check', 'card', 'cash', 'ach', 'other'].map((m) => (
-                <Pressable key={m} onPress={() => setMethod(m)} style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: method === m ? theme.goldBright : theme.borderMid, backgroundColor: method === m ? `${theme.goldBright}26` : 'transparent' }}>
-                  <Text style={{ color: method === m ? theme.goldBright : theme.inkMuted, fontSize: 13, fontWeight: '700', textTransform: 'capitalize' }}>{m}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable onPress={recordPayment} disabled={!amount.trim() || saving} style={{ alignItems: 'center', paddingVertical: 14, borderRadius: 12, backgroundColor: theme.goldBright, opacity: !amount.trim() || saving ? 0.5 : 1 }}>
-              <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 15 }}>{saving ? 'Recording…' : 'Record Payment'}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {user ? (
+        <PaymentSheet open={payOpen} onClose={() => setPayOpen(false)} userId={user.id} contactId={contact.id} balance={balance} />
+      ) : null}
     </View>
   )
 }

@@ -17,7 +17,7 @@ import {
   CheckSquare, Square, FileText, ClipboardCheck, Car, ShieldCheck, Flag, Paperclip, Download
 } from 'lucide-react-native'
 import {
-  useJobDetail, useLogPayment, useUpdateStage, useUpdateJob,
+  useJobDetail, useUpdateStage, useUpdateJob,
   useAddExpense, useDeletePayment, useDeleteExpense, useDeleteJob,
   useJobPhotos, useUploadPhoto, useDeletePhoto,
   useAddSub, useDeleteSub, useClientsBundle,
@@ -33,6 +33,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground } from '../../components/ui'
 import { MarkCompleteSheet } from '../../components/MarkCompleteSheet'
+import { PaymentSheet } from '../../components/PaymentSheet'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#6B7CA8', paid: '#4F8C5E', overdue: '#7d2a1f', void: '#5C5C5C'
@@ -63,7 +64,6 @@ export default function JobDetailScreen() {
   const { user } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending } = useJobDetail(id)
-  const logPayment = useLogPayment()
   const updateStage = useUpdateStage()
   const updateJob = useUpdateJob()
   const addExpense = useAddExpense()
@@ -140,8 +140,6 @@ export default function JobDetailScreen() {
   const [clientPickOpen, setClientPickOpen] = useState(false)
 
   const [payOpen, setPayOpen] = useState(false)
-  const [payAmount, setPayAmount] = useState('')
-  const [paySaving, setPaySaving] = useState(false)
   const [completeOpen, setCompleteOpen] = useState(false)
   const [stageSaving, setStageSaving] = useState<string | null>(null)
 
@@ -529,18 +527,6 @@ export default function JobDetailScreen() {
     setStageSaving(next)
     await updateStage({ contactId: contact.id, stage: next })
     setStageSaving(null)
-  }
-
-  async function submitPayment() {
-    const amt = Number(payAmount.replace(/[^0-9.]/g, ''))
-    if (!amt || !contact || !user) return
-    setPaySaving(true)
-    const { error } = await logPayment({ contactId: contact.id, userId: user.id, amount: amt })
-    setPaySaving(false)
-    if (!error) {
-      setPayOpen(false)
-      setPayAmount('')
-    }
   }
 
   if (isPending) {
@@ -1539,34 +1525,6 @@ export default function JobDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Log payment modal */}
-      <Modal visible={payOpen} transparent animationType="slide" onRequestClose={() => setPayOpen(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setPayOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
-            <Text className="text-ink text-xl font-bold mb-1">Log a payment</Text>
-            <Text className="text-ink-muted text-sm mb-5">Balance: {money(totals.balance)}</Text>
-            <TextInput
-              value={payAmount}
-              onChangeText={setPayAmount}
-              keyboardType="decimal-pad"
-              placeholder="$0"
-              placeholderTextColor="rgba(242,237,228,0.4)"
-              autoFocus
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-5"
-            />
-            <Pressable
-              onPress={submitPayment}
-              disabled={paySaving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: paySaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
-            >
-              {paySaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save payment</Text>}
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
       {/* Insurance modal */}
       <Modal visible={insOpen} transparent animationType="slide" onRequestClose={() => setInsOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -1656,14 +1614,17 @@ export default function JobDetailScreen() {
       </Modal>
 
       {user && contact ? (
-        <MarkCompleteSheet
-          open={completeOpen}
-          onClose={() => setCompleteOpen(false)}
-          userId={user.id}
-          contactId={contact.id}
-          currentAmount={contact.amount}
-          balance={totals.balance}
-        />
+        <>
+          <PaymentSheet open={payOpen} onClose={() => setPayOpen(false)} userId={user.id} contactId={contact.id} balance={totals.balance} />
+          <MarkCompleteSheet
+            open={completeOpen}
+            onClose={() => setCompleteOpen(false)}
+            userId={user.id}
+            contactId={contact.id}
+            currentAmount={contact.amount}
+            balance={totals.balance}
+          />
+        </>
       ) : null}
     </View>
   )
