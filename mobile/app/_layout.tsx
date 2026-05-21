@@ -63,6 +63,7 @@ function RootNavigator() {
       <Stack.Screen name="partners" />
       <Stack.Screen name="estimates" />
       <Stack.Screen name="notes" />
+      <Stack.Screen name="subs" />
     </Stack>
   )
 }

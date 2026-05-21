@@ -1331,3 +1331,50 @@ export function useDeleteNoteGlobal() {
     return { error }
   }
 }
+
+// ---- Subs directory (roster rolled up from fh_subs) ----
+export type SubRowRaw = {
+  id: string
+  name: string | null
+  trade: string | null
+  phone: string | null
+  rate: number | null
+  status: string | null
+  contactId: string | null
+  createdAt: string | null
+}
+export type SubsRoster = {
+  subs: SubRowRaw[]
+  contacts: Record<string, { id: string; name: string | null; jobTitle: string | null }>
+}
+
+export function useSubsRoster(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['subsRoster', userId],
+    queryFn: async (): Promise<SubsRoster> => {
+      const uid = userId as string
+      const [sRes, cRes] = await Promise.all([
+        supabase.from('fh_subs').select('id, name, trade, phone, rate, status, contact_id, created_at').eq('user_id', uid).order('created_at', { ascending: false }),
+        supabase.from('fh_contacts').select('id, name, job_title').eq('user_id', uid)
+      ])
+      const subs: SubRowRaw[] = ((sRes.data ?? []) as any[]).map((s) => ({
+        id: s.id, name: s.name, trade: s.trade, phone: s.phone, rate: s.rate, status: s.status, contactId: s.contact_id, createdAt: s.created_at
+      }))
+      const contacts: SubsRoster['contacts'] = {}
+      for (const c of (cRes.data ?? []) as any[]) contacts[c.id] = { id: c.id, name: c.name, jobTitle: c.job_title }
+      return { subs, contacts }
+    },
+    enabled: !!userId
+  })
+}
+
+export function useAddSubGlobal() {
+  const client = useQueryClient()
+  return async (input: { userId: string; name: string; trade: string | null; phone: string | null }) => {
+    const { error } = await supabase.from('fh_subs').insert({
+      user_id: input.userId, contact_id: null, name: input.name, trade: input.trade, phone: input.phone
+    } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['subsRoster', input.userId] })
+    return { error }
+  }
+}
