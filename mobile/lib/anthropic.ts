@@ -39,3 +39,32 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }: { sy
 export function claudeText(res: any): string {
   return res?.content?.[0]?.text || ''
 }
+
+// Vision call: send one base64 image + a prompt. Accepts a data-URL or raw
+// base64; strips the data-URL header and infers the media type.
+export async function claudeVision({ system, prompt, imageData, mediaType, maxTokens = 1024 }: {
+  system?: string; prompt: string; imageData: string; mediaType?: string; maxTokens?: number
+}) {
+  let base64 = imageData
+  let type = mediaType
+  if (imageData.startsWith('data:')) {
+    const [header, payload] = imageData.split(',', 2)
+    base64 = payload
+    if (!type) {
+      const m = header.match(/^data:([^;]+);/)
+      type = m ? m[1] : 'image/jpeg'
+    }
+  }
+  if (!type) type = 'image/jpeg'
+  return claudeMessage({
+    system,
+    maxTokens,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: type, data: base64 } },
+        { type: 'text', text: prompt }
+      ]
+    }]
+  })
+}

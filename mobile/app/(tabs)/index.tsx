@@ -21,6 +21,7 @@ import {
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, SectionLabel, theme } from '../../components/ui'
+import { NewLeadSheet } from '../../components/NewLeadSheet'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 const STAGE_TINT: Record<string, string> = { lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E', invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f' }
@@ -59,6 +60,7 @@ export default function HomeScreen() {
 
   const [now, setNow] = useState(() => new Date())
   const [pinning, setPinning] = useState(false)
+  const [leadOpen, setLeadOpen] = useState(false)
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30000)
     return () => clearInterval(t)
@@ -252,7 +254,7 @@ export default function HomeScreen() {
             {/* Quick actions */}
             <SectionLabel style={{ marginBottom: 10 }}>Quick actions</SectionLabel>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
-              <QuickAction icon={<Plus color={theme.onGold} size={20} strokeWidth={2.6} />} label="New lead" primary onPress={() => router.push('/jobs')} />
+              <QuickAction icon={<Plus color={theme.onGold} size={20} strokeWidth={2.6} />} label="New lead" primary onPress={() => setLeadOpen(true)} />
               <QuickAction icon={<Sparkles color={theme.goldBright} size={20} />} label="Estimate" onPress={() => router.push('/bid')} />
               <QuickAction icon={<MessageSquare color={theme.goldBright} size={20} />} label="AI Compose" onPress={() => router.push('/compose')} />
               <QuickAction icon={<Calendar color={theme.goldBright} size={20} />} label="Schedule" onPress={() => router.push('/schedule')} />
@@ -388,6 +390,9 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+      {user ? (
+        <NewLeadSheet open={leadOpen} onClose={() => setLeadOpen(false)} userId={user.id} onCreated={(id) => router.push(`/jobs/${id}`)} />
+      ) : null}
     </View>
   )
 }

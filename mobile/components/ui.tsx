@@ -6,9 +6,10 @@
 // RN has no CSS gradients/insets, so we compose them with
 // expo-linear-gradient + layered shadows.
 import { ReactNode } from 'react'
-import { View, Text, Pressable, StyleSheet, type ViewStyle, type StyleProp } from 'react-native'
+import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput, KeyboardAvoidingView, Platform, type ViewStyle, type StyleProp } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
-import { ChevronLeft } from 'lucide-react-native'
+import { ChevronLeft, X } from 'lucide-react-native'
 
 export const theme = {
   bg: '#0B0907',
@@ -139,6 +140,59 @@ export function Eyebrow({ children }: { children: ReactNode }) {
 
 export function SectionLabel({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return <Text style={[{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }, style as object]}>{children}</Text>
+}
+
+// Reusable gesture-less bottom sheet. Slide-up Modal with a grabber, a
+// title row with a close button, and a scrollable body. Every "sheet"
+// flow (new lead, new client, payment, etc.) is this shell + content.
+export function BottomSheet({ open, onClose, title, children }: {
+  open: boolean; onClose: () => void; title: string; children: ReactNode
+}) {
+  const insets = useSafeAreaInsets()
+  return (
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <View style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTopWidth: 1, borderColor: theme.borderMid, maxHeight: '92%', paddingBottom: insets.bottom + 12 }}>
+          <View style={{ alignItems: 'center', paddingTop: 10 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.borderMid }} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 12, paddingBottom: 4 }}>
+            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800' }}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={10} style={{ width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}>
+              <X color={theme.inkMuted} size={16} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 16 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  )
+}
+
+// Labeled text input for sheets/forms.
+export function SheetField({ label, value, onChange, ...rest }: {
+  label: string; value: string; onChange: (v: string) => void
+} & Record<string, unknown>) {
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholderTextColor={theme.inkFaint}
+        style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, fontSize: 15 }}
+        {...(rest as object)}
+      />
+    </View>
+  )
+}
+
+// Footer action row for sheets (Cancel + primary).
+export function SheetActions({ children }: { children: ReactNode }) {
+  return <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>{children}</View>
 }
 
 export function StagePill({ stage }: { stage: string }) {

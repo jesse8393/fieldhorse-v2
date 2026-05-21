@@ -536,9 +536,13 @@ export type NewLeadInput = {
   name: string
   phone?: string
   email?: string
+  address?: string
+  jobTitle?: string
   jobType?: string
   amount?: number
   stage?: string
+  notes?: string
+  referredBy?: string
 }
 
 export function useCreateLead() {
@@ -549,9 +553,13 @@ export function useCreateLead() {
       name: input.name,
       phone: input.phone || null,
       email: input.email || null,
+      address: input.address || null,
+      job_title: input.jobTitle || null,
       job_type: input.jobType || null,
       amount: input.amount ?? null,
-      stage: input.stage || 'lead'
+      stage: input.stage || 'lead',
+      notes: input.notes || null,
+      referred_by: input.referredBy || null
     } as any).select('id').single()
     if (!error) client.invalidateQueries({ queryKey: queryKeys.jobs })
     return { id: (data as any)?.id as string | undefined, error }

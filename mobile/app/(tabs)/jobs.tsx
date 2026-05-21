@@ -2,18 +2,16 @@
 // Same shared query hooks (useJobs / useJobsRealtime / useCreateLead),
 // rebuilt on the premium v3 design primitives.
 import { useMemo, useState } from 'react'
-import {
-  View, Text, FlatList, Pressable, TextInput, ActivityIndicator,
-  Modal, KeyboardAvoidingView, Platform, Image
-} from 'react-native'
+import { View, Text, FlatList, Pressable, TextInput, ActivityIndicator, Image } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Plus, User, ArrowUpRight, Star, Check } from 'lucide-react-native'
 import { useQueryClient } from '@tanstack/react-query'
-import { useJobs, useJobsRealtime, useCreateLead, useCoverPhotos, type JobRow } from '../../lib/queries'
+import { useJobs, useJobsRealtime, useCoverPhotos, type JobRow } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
-import { ScreenBackground, Card, Eyebrow, GoldButton, StagePill, STAGE_TINT, theme } from '../../components/ui'
+import { ScreenBackground, Card, StagePill, STAGE_TINT, theme } from '../../components/ui'
+import { NewLeadSheet } from '../../components/NewLeadSheet'
 
 const STAGE_FILTERS = ['all', 'lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
 const STAGE_INDEX: Record<string, number> = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
@@ -45,27 +43,9 @@ export default function JobsScreen() {
   const { data: jobs = [], isLoading } = useJobs()
   const { data: covers = {} } = useCoverPhotos(user?.id)
   useJobsRealtime(user?.id, queryClient)
-  const createLead = useCreateLead()
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [addOpen, setAddOpen] = useState(false)
-  const [leadName, setLeadName] = useState('')
-  const [leadAmount, setLeadAmount] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  async function submitLead() {
-    if (!leadName.trim() || !user || saving) return
-    setSaving(true)
-    const amt = Number(leadAmount.replace(/[^0-9.]/g, '')) || undefined
-    const { id, error } = await createLead({ userId: user.id, name: leadName.trim(), amount: amt })
-    setSaving(false)
-    if (!error) {
-      setAddOpen(false)
-      setLeadName('')
-      setLeadAmount('')
-      if (id) router.push(`/jobs/${id}`)
-    }
-  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -177,28 +157,9 @@ export default function JobsScreen() {
         </LinearGradient>
       </Pressable>
 
-      {/* New lead modal */}
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable style={{ flex: 1 }} onPress={() => setAddOpen(false)} />
-          <View style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderTopWidth: 1, borderColor: theme.borderMid, paddingBottom: insets.bottom + 24 }}>
-            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 20 }}>New lead</Text>
-            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Name</Text>
-            <TextInput
-              value={leadName} onChangeText={setLeadName} autoFocus
-              placeholder="Homeowner or company" placeholderTextColor={theme.inkFaint}
-              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16 }}
-            />
-            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Estimated value (optional)</Text>
-            <TextInput
-              value={leadAmount} onChangeText={setLeadAmount} keyboardType="decimal-pad"
-              placeholder="$0" placeholderTextColor={theme.inkFaint}
-              style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 20 }}
-            />
-            <GoldButton label="Create lead" onPress={submitLead} loading={saving} />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {user ? (
+        <NewLeadSheet open={addOpen} onClose={() => setAddOpen(false)} userId={user.id} onCreated={(id) => router.push(`/jobs/${id}`)} />
+      ) : null}
     </View>
   )
 }
