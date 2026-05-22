@@ -60,7 +60,7 @@ export type Payment = Database['public']['Tables']['fh_payments']['Row']
 export type ClientsBundle = {
   clients: Client[]
   jobs: Pick<Contact, 'id' | 'client_id' | 'amount' | 'stage'>[]
-  payments: Pick<Payment, 'contact_id' | 'amount'>[]
+  payments: Pick<Payment, 'contact_id' | 'amount' | 'paid_on'>[]
 }
 
 async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
@@ -69,7 +69,7 @@ async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }),
     supabase.from('fh_contacts').select('id, client_id, amount, stage').eq('user_id', userId),
-    supabase.from('fh_payments').select('contact_id, amount').eq('user_id', userId)
+    supabase.from('fh_payments').select('contact_id, amount, paid_on').eq('user_id', userId)
   ])
   if (clientsRes.error) throw clientsRes.error
   return {
