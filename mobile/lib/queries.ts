@@ -778,6 +778,61 @@ export function useDeleteInvoice() {
   }
 }
 
+// ---- Progress billing / draws ----
+// Each fh_invoices row is one draw against the contract. sequence_number
+// is assigned by a BEFORE INSERT trigger (migration 021), so we insert
+// sequentially when generating from terms to keep 1/2/3 deterministic.
+export function useInvoiceDraws(contactId: string | undefined) {
+  return useQuery({
+    queryKey: ['invoiceDraws', contactId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('fh_invoices')
+        .select('*')
+        .eq('contact_id', contactId as string)
+        .order('sequence_number', { ascending: true })
+      return (data ?? []) as Invoice[]
+    },
+    enabled: !!contactId
+  })
+}
+
+// Canonical 50 / 40 / 10 progress schedule (matches the proposal default).
+export const DEFAULT_DRAW_SCHEDULE = [
+  { label: 'Deposit', pct: 50 },
+  { label: 'Progress', pct: 40 },
+  { label: 'Final', pct: 10 }
+]
+
+export function useGenerateDraws() {
+  const client = useQueryClient()
+  return async (input: { userId: string; contactId: string; contractTotal: number }) => {
+    if (!(input.contractTotal > 0)) return { error: new Error('Set the contract amount first.') }
+    let allocated = 0
+    for (let i = 0; i < DEFAULT_DRAW_SCHEDULE.length; i++) {
+      const s = DEFAULT_DRAW_SCHEDULE[i]
+      // Last draw absorbs rounding so the draws sum to the contract exactly.
+      const amount = i === DEFAULT_DRAW_SCHEDULE.length - 1
+        ? Math.max(0, input.contractTotal - allocated)
+        : Math.round(input.contractTotal * (s.pct / 100))
+      allocated += amount
+      const { error } = await supabase.from('fh_invoices').insert({
+        user_id: input.userId,
+        contact_id: input.contactId,
+        amount,
+        title: `${s.label} (${s.pct}%)`,
+        status: 'draft',
+        issued_at: new Date().toISOString(),
+        sequence_number: 0
+      } as any)
+      if (error) return { error }
+    }
+    client.invalidateQueries({ queryKey: ['invoiceDraws', input.contactId] })
+    client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    return { error: null }
+  }
+}
+
 // ---- Quote / estimate line items ----
 export type QuoteItem = Database['public']['Tables']['fh_quote_items']['Row']
 

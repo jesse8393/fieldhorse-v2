@@ -9,7 +9,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { WebView } from 'react-native-webview'
 import { DollarSign, Briefcase, Eye, Share2, Send, Link as LinkIcon, X } from 'lucide-react-native'
-import { useInvoiceDetail, useProfile } from '../../lib/queries'
+import { useInvoiceDetail, useProfile, useInvoiceDraws, useGenerateDraws, useUpdateInvoiceStatus } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui'
 import { PaymentSheet } from '../../components/PaymentSheet'
@@ -27,11 +27,14 @@ export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending } = useInvoiceDetail(id)
   const { data: profile } = useProfile(user?.id)
+  const { data: draws = [] } = useInvoiceDraws(id)
+  const generateDraws = useGenerateDraws()
+  const updateDrawStatus = useUpdateInvoiceStatus()
   const queryClient = useQueryClient()
   const [payOpen, setPayOpen] = useState(false)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
-  const [busy, setBusy] = useState<null | 'send' | 'link'>(null)
+  const [busy, setBusy] = useState<null | 'send' | 'link' | 'draws'>(null)
 
   if (isPending) {
     return <View style={{ flex: 1 }}><ScreenBackground /><ActivityIndicator color={theme.goldBright} style={{ marginTop: insets.top + 80 }} /></View>
@@ -95,6 +98,23 @@ export default function InvoiceDetailScreen() {
     finally { setBusy(null) }
   }
 
+  const drawsIssued = draws.reduce((s: number, d: any) => s + Number(d.amount || 0), 0)
+  const unbilled = Math.max(0, total - drawsIssued)
+  async function onGenerateDraws() {
+    if (busy || !user) return
+    if (draws.length) { Alert.alert('Draws already exist', 'Delete them first to regenerate from terms.'); return }
+    setBusy('draws')
+    const { error } = await generateDraws({ userId: user.id, contactId: contact.id, contractTotal: total })
+    setBusy(null)
+    if (error) Alert.alert("Couldn't generate draws", error.message)
+  }
+  async function cycleDraw(d: any) {
+    const next = d.status === 'draft' ? 'sent' : d.status === 'sent' ? 'paid' : 'draft'
+    await updateDrawStatus({ id: d.id, contactId: contact.id, status: next })
+    queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] })
+  }
+  const drawTint = (s: string) => s === 'paid' ? theme.success : s === 'sent' ? theme.goldBright : theme.inkMuted
+
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
@@ -130,6 +150,39 @@ export default function InvoiceDetailScreen() {
             <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '800' }}>{money(total)}</Text>
           </View>
         </Card>
+
+        {/* Progress draws */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>Progress draws{draws.length ? ` · ${draws.length}` : ''}</Text>
+          {draws.length === 0 && total > 0 ? (
+            <Pressable onPress={onGenerateDraws} disabled={busy === 'draws'}>
+              {busy === 'draws' ? <ActivityIndicator color={theme.goldBright} /> : <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '700' }}>Generate 50/40/10</Text>}
+            </Pressable>
+          ) : null}
+        </View>
+        {draws.length === 0 ? (
+          <Text style={{ color: theme.inkMuted, fontSize: 13, marginBottom: 18 }}>
+            No draws yet. Generate a 50/40/10 schedule from the contract, or bill it all at once with Collect Payment.
+          </Text>
+        ) : (
+          <View style={{ gap: 8, marginBottom: 8 }}>
+            {draws.map((d: any) => (
+              <Card key={d.id}>
+                <Pressable onPress={() => cycleDraw(d)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{d.title || `Draw ${d.sequence_number}`}</Text>
+                    <Text style={{ color: drawTint(d.status), fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 2 }}>{d.status} · tap to change</Text>
+                  </View>
+                  <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '800' }}>{money(Number(d.amount || 0))}</Text>
+                </Pressable>
+              </Card>
+            ))}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, marginTop: 2, marginBottom: 18 }}>
+              <Text style={{ color: theme.inkMuted, fontSize: 12 }}>Billed {money(drawsIssued)}</Text>
+              <Text style={{ color: unbilled > 0 ? theme.goldBright : theme.inkMuted, fontSize: 12 }}>{unbilled > 0 ? `${money(unbilled)} unbilled` : 'Fully scheduled'}</Text>
+            </View>
+          </View>
+        )}
 
         {/* Payments */}
         <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>Payments{payments.length ? ` · ${payments.length}` : ''}</Text>
