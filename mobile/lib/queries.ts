@@ -1074,7 +1074,7 @@ export function useAddChangeOrder() {
       title: input.title,
       amount: input.amount,
       description: input.description || null,
-      status: 'pending'
+      status: 'draft'
     } as any)
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
@@ -1083,9 +1083,14 @@ export function useAddChangeOrder() {
 
 export function useUpdateChangeOrderStatus() {
   const client = useQueryClient()
-  return async (input: { id: string; contactId: string; status: string }) => {
+  return async (input: { id: string; contactId: string; status: string; approvedByName?: string | null }) => {
+    const approving = input.status === 'approved'
     const { error } = await supabase.from('fh_change_orders')
-      .update({ status: input.status, approved_at: input.status === 'approved' ? new Date().toISOString() : null } as any)
+      .update({
+        status: input.status,
+        approved_at: approving ? new Date().toISOString() : null,
+        approved_by_name: approving ? (input.approvedByName || null) : null
+      } as any)
       .eq('id', input.id)
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
