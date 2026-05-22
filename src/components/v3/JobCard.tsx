@@ -313,17 +313,19 @@ const JobCard = memo(function JobCard({
           }}>
             {contact.name || 'Untitled'}
           </div>
-          <div style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 12,
-            color: 'var(--v3-text-muted)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            lineHeight: 1.3
-          }}>
-            {contact.job_title || contact.job_type || 'No job title'}
-          </div>
+          {(contact.job_title || contact.job_type) && (
+            <div style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 12,
+              color: 'var(--v3-text-muted)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.3
+            }}>
+              {contact.job_title || contact.job_type}
+            </div>
+          )}
           {(contact.fh_clients?.name && !isSharedIn) && (
             <div style={{
               marginTop: 2,

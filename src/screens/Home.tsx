@@ -653,7 +653,7 @@ export default function Home() {
           color: 'var(--v3-text-muted)',
           letterSpacing: '0.16em'
         }}>
-          Today's Revenue Opportunity
+          Total Pipeline
         </span>
 
         {/* Money + trend row — money baseline-aligned with a tiny
@@ -718,18 +718,6 @@ export default function Home() {
               {trendUp ? '+' : ''}{trendPct}% · 7d
             </span>
           )}
-        </div>
-
-        {/* Sublabel under the figure — quiet caption naming the metric. */}
-        <div style={{
-          marginTop: 4,
-          fontFamily: 'var(--font-body)',
-          fontSize: 11,
-          fontWeight: 500,
-          color: 'var(--v3-text-muted)',
-          lineHeight: 1.3
-        }}>
-          Total Pipeline
         </div>
 
         {/* Gold sparkline — synthesized ascending wave that anchors the

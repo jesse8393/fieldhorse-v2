@@ -215,8 +215,9 @@ export default function Jobs() {
             <DrawerHeader>
               <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
               <DrawerDescription>
-                {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
-                {' · '}
+                {(drawerContact?.job_title || drawerContact?.job_type) && (
+                  <>{drawerContact.job_title || drawerContact.job_type}{' · '}</>
+                )}
                 {money(drawerContact?.amount || 0)}
               </DrawerDescription>
             </DrawerHeader>
@@ -441,8 +442,9 @@ export default function Jobs() {
           <DrawerHeader>
             <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
             <DrawerDescription>
-              {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
-              {' · '}
+              {(drawerContact?.job_title || drawerContact?.job_type) && (
+                <>{drawerContact.job_title || drawerContact.job_type}{' · '}</>
+              )}
               {money(drawerContact?.amount || 0)}
             </DrawerDescription>
           </DrawerHeader>

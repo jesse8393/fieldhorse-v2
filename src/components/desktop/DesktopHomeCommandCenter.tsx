@@ -167,7 +167,7 @@ export default function DesktopHomeCommandCenter({
       <div className="dt-home__row dt-home__row--hero">
         <section className="dt-card dt-home__pipeline" aria-label="Pipeline">
           <div className="dt-home__pipeline-head">
-            <span className="dt-home__pipeline-eyebrow">Today's revenue opportunity</span>
+            <span className="dt-home__pipeline-eyebrow">Total pipeline</span>
             {trendPct != null && (
               <span className={`dt-home__trend${trendUp ? ' dt-home__trend--up' : ' dt-home__trend--down'}`}>
                 {trendUp ? <ArrowUpRight size={11} aria-hidden="true" /> : <ArrowDownRight size={11} aria-hidden="true" />}
