@@ -1,0 +1,84 @@
+# Builds (and optionally submits) the FieldHorse mobile app via EAS.
+#
+# One-time setup before this can run:
+#   1. Locally: `cd mobile && eas login && eas init`  — this writes
+#      extra.eas.projectId + owner into mobile/app.json. Commit that.
+#   2. Repo → Settings → Secrets → Actions, add:
+#        EXPO_TOKEN  — from https://expo.dev/accounts/[you]/settings/access-tokens
+#      For App Store submission, configure an App Store Connect API key in
+#      EAS once (`eas credentials` or the submit profile in eas.json); EAS
+#      stores it server-side so CI doesn't need Apple secrets here.
+#
+# Trigger from the Actions tab ("Run workflow") and pick platform/profile,
+# or push a tag like `mobile-v1.2.3` for a production iOS build + submit.
+name: EAS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        options: [ios, android, all]
+        default: ios
+      profile:
+        description: EAS build profile
+        type: choice
+        options: [production, preview]
+        default: production
+      submit:
+        description: Submit to the store after build
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'mobile-v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Verify Expo token
+        if: ${{ env.EXPO_TOKEN_MISSING == 'true' }}
+        run: |
+          echo "::error::EXPO_TOKEN secret is not set. Add it in repo Settings → Secrets → Actions."
+          exit 1
+        env:
+          EXPO_TOKEN_MISSING: ${{ secrets.EXPO_TOKEN == '' }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Tag pushes -> production iOS build + auto-submit.
+      # Manual runs -> use the chosen platform/profile, submit if requested.
+      - name: Build (tag release)
+        if: ${{ github.event_name == 'push' }}
+        run: eas build --platform ios --profile production --auto-submit --non-interactive
+
+      - name: Build (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          eas build \
+            --platform "${{ inputs.platform }}" \
+            --profile "${{ inputs.profile }}" \
+            ${{ inputs.submit && '--auto-submit' || '' }} \
+            --non-interactive

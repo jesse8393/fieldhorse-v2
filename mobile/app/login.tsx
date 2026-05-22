@@ -14,11 +14,22 @@ import { useAuth } from '../contexts/AuthContext'
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets()
-  const { signIn } = useAuth()
+  const { signIn, resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  async function handleForgot() {
+    setError(''); setNotice('')
+    if (!email.trim()) { setError('Enter your email first, then tap reset.'); return }
+    setBusy(true)
+    const { error: err } = await resetPassword(email.trim())
+    setBusy(false)
+    if (err) setError(err.message || 'Could not send reset email.')
+    else setNotice('Check your email for a password reset link.')
+  }
 
   async function handleSignIn() {
     if (busy) return
@@ -74,6 +85,7 @@ export default function LoginScreen() {
         />
 
         {error ? <Text className="text-[#f5a294] text-sm mb-4">{error}</Text> : null}
+        {notice ? <Text className="text-[#7fc99a] text-sm mb-4">{notice}</Text> : null}
 
         <Pressable
           onPress={handleSignIn}
@@ -84,6 +96,10 @@ export default function LoginScreen() {
           {busy
             ? <ActivityIndicator color="#1A120A" />
             : <Text className="text-[#1A120A] text-base font-bold">Sign in</Text>}
+        </Pressable>
+
+        <Pressable onPress={handleForgot} disabled={busy} className="items-center mt-5" hitSlop={8}>
+          <Text className="text-ink-muted text-sm">Forgot password?</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>

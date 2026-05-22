@@ -1,38 +1,77 @@
-// mobile/app/(tabs)/more.tsx — account + tools.
-// Shows the signed-in account and a sign-out action. Sign-out clears the
-// Supabase session; the root redirect gate then bounces back to /login.
+// mobile/app/(tabs)/more.tsx — account + tools, on the premium primitives.
 import { View, Text, Pressable, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { LogOut } from 'lucide-react-native'
+import { useRouter } from 'expo-router'
+import { LogOut, Plug, ChevronRight, Building2, BarChart3, Bell, Receipt, Activity, Users, FileSignature, StickyNote, Hammer, CloudSun, Sparkles, MessageSquare, Bot } from 'lucide-react-native'
 import { useAuth } from '../../contexts/AuthContext'
+import { ScreenBackground, Card, Eyebrow, SectionLabel, theme } from '../../components/ui'
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets()
+  const router = useRouter()
   const { user, signOut } = useAuth()
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}
-    >
-      <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">More</Text>
-      <Text className="text-ink text-3xl font-bold mb-6">Account</Text>
+    <View style={{ flex: 1 }}>
+      <ScreenBackground />
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+        <Eyebrow>More</Eyebrow>
+        <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', letterSpacing: -0.5, marginBottom: 20 }}>Account</Text>
 
-      <View className="bg-surface rounded-2xl p-4 border border-[rgba(255,240,210,0.06)] mb-6">
-        <Text className="text-ink-muted text-[10px] font-bold tracking-wider uppercase mb-1">Signed in as</Text>
-        <Text className="text-ink text-base font-bold" numberOfLines={1}>{user?.email || '—'}</Text>
-      </View>
+        <Card style={{ marginBottom: 24 }}>
+          <View style={{ padding: 16 }}>
+            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Signed in as</Text>
+            <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{user?.email || '—'}</Text>
+          </View>
+        </Card>
 
-      <Pressable
-        onPress={signOut}
-        className="flex-row items-center justify-center rounded-2xl py-4 border border-[rgba(232,90,87,0.3)]"
-        style={{ gap: 8, backgroundColor: 'rgba(232,90,87,0.10)' }}
-      >
-        <LogOut color="#f5a294" size={16} />
-        <Text className="text-[#f5a294] text-base font-bold">Sign out</Text>
-      </Pressable>
+        <SectionLabel style={{ marginBottom: 10 }}>Tools</SectionLabel>
+        <View style={{ gap: 10, marginBottom: 24 }}>
+          <MenuRow icon={<Bot color={theme.goldBright} size={18} />} title="Dispatch AI" sub="Talk to add jobs, schedule & export" onPress={() => router.push('/assistant')} />
+          <MenuRow icon={<Sparkles color={theme.goldBright} size={18} />} title="AI estimate" sub="Scope to line-item bid in seconds" onPress={() => router.push('/bid')} />
+          <MenuRow icon={<MessageSquare color={theme.goldBright} size={18} />} title="Compose" sub="Draft on-brand texts & emails" onPress={() => router.push('/compose')} />
+          <MenuRow icon={<Receipt color={theme.goldBright} size={18} />} title="Invoices & Payments" sub="Money owed, aging & mark paid" onPress={() => router.push('/invoices')} />
+          <MenuRow icon={<StickyNote color={theme.goldBright} size={18} />} title="Notes" sub="Capture, link to jobs & review" onPress={() => router.push('/notes')} />
+          <MenuRow icon={<Activity color={theme.goldBright} size={18} />} title="Activity" sub="Payments, leads, invoices & notes" onPress={() => router.push('/activity')} />
+          <MenuRow icon={<FileSignature color={theme.goldBright} size={18} />} title="Estimates" sub="Proposals, win rate & open value" onPress={() => router.push('/estimates')} />
+          <MenuRow icon={<Users color={theme.goldBright} size={18} />} title="Partners" sub="People you've shared jobs with" onPress={() => router.push('/partners')} />
+          <MenuRow icon={<Hammer color={theme.goldBright} size={18} />} title="Subs" sub="Trade directory, rates & job history" onPress={() => router.push('/subs')} />
+          <MenuRow icon={<CloudSun color={theme.goldBright} size={18} />} title="Pour Window" sub="Weather work-window by trade" onPress={() => router.push('/pour-window')} />
+          <MenuRow icon={<BarChart3 color={theme.goldBright} size={18} />} title="Analytics" sub="Pipeline, revenue & stage breakdown" onPress={() => router.push('/analytics')} />
+          <MenuRow icon={<Bell color={theme.goldBright} size={18} />} title="Notifications" sub="Activity & alerts" onPress={() => router.push('/notifications')} />
+          <MenuRow icon={<Building2 color={theme.goldBright} size={18} />} title="Business profile" sub="Company info for quotes & invoices" onPress={() => router.push('/settings')} />
+          <MenuRow icon={<Plug color={theme.goldBright} size={18} />} title="Integrations" sub="QuickBooks, Stripe, Google, GHL, Jobber" onPress={() => router.push('/integrations')} />
+        </View>
 
-      <Text className="text-ink-muted text-xs text-center mt-8">FieldHorse · Built for the jobsite.</Text>
-    </ScrollView>
+        <Pressable
+          onPress={signOut}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 16, borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}
+        >
+          <LogOut color={theme.danger} size={16} />
+          <Text style={{ color: theme.danger, fontSize: 16, fontWeight: '700' }}>Sign out</Text>
+        </Pressable>
+
+        <Text style={{ color: theme.inkMuted, fontSize: 12, textAlign: 'center', marginTop: 28 }}>FieldHorse · Built for the jobsite.</Text>
+      </ScrollView>
+    </View>
+  )
+}
+
+function MenuRow({ icon, title, sub, onPress }: { icon: React.ReactNode; title: string; sub: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress}>
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
+          <View style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}>
+            {icon}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }}>{title}</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{sub}</Text>
+          </View>
+          <ChevronRight color="#9b948a" size={18} />
+        </View>
+      </Card>
+    </Pressable>
   )
 }
