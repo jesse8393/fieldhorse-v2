@@ -896,6 +896,7 @@ export type UpdateProfileInput = {
   brandAccentHex?: string | null
   insuredText?: string | null
   warrantyDefault?: string | null
+  estimateTemplate?: string | null
 }
 
 export function useUpdateProfile() {
@@ -913,6 +914,7 @@ export function useUpdateProfile() {
     if (input.brandAccentHex !== undefined) patch.brand_accent_hex = input.brandAccentHex
     if (input.insuredText !== undefined) patch.insured_text = input.insuredText
     if (input.warrantyDefault !== undefined) patch.warranty_default = input.warrantyDefault
+    if (input.estimateTemplate !== undefined) patch.estimate_template = input.estimateTemplate
     const { error } = await supabase.from('profiles')
       .update(patch as any)
       .eq('user_id', input.userId)
