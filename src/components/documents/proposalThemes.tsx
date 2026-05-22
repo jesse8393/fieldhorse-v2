@@ -126,7 +126,7 @@ function fmtLongDate(d: any) {
    photos, insurance, change orders, signature). Accent-tinted so it
    reads as part of each theme. ─── */
 function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }: any) {
-  const { scopeText, paymentTerms, warrantyText, exclusions = [], photos = [], insurance, changeOrders = [], company, recipient, approval } = view
+  const { scopeText, paymentTerms, warrantyText, exclusions = [], photos = [], insurance, changeOrders = [], company, recipient, approval, upgrades = [] } = view
   const Label = ({ children }: any) => (
     <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: accent, marginBottom: 6 }}>
       {children}
@@ -154,6 +154,24 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {upgrades.length > 0 && (
+        <section>
+          <Label>Optional upgrades</Label>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <tbody>
+              {upgrades.flatMap((g: any) => g.items).map((it: any, i: number) => (
+                <tr key={i} style={{ borderBottom: '1px solid #ECECEC' }}>
+                  <td style={{ ...tdL, color: mid }}>{it.description}</td>
+                  <td style={{ ...tdR, color: mid }}>{qtyLabel(it)}</td>
+                  <td style={{ ...tdR, color: mid }}>{money(it.rate, { cents: true })}</td>
+                  <td style={{ ...tdR, color: mid, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
 

@@ -1073,6 +1073,345 @@ function parseBrandAccentRgb(hex) {
  *                                  approvalNote, baseTotal, approvedAt }
  * @returns {{ doc: jsPDF, filename: string, number: string }}
  */
+// ============================================================
+// Themed proposal PDFs — slate / mint / editorial. These mirror the
+// HTML themes in src/components/documents/proposalThemes.tsx: a
+// distinctive header + line-item table + totals per theme, sharing a
+// common supporting tail (scope, payment terms, exclusions, photos,
+// signatures). Individual line items, not the trade-level rollup.
+// ============================================================
+
+const PDF_THEMES = {
+  slate: {
+    headFill: [26, 24, 20], headText: [255, 255, 255], accent: [63, 70, 81],
+    ink: [26, 24, 20], mid: [58, 56, 51], muted: [107, 106, 102], bg: null
+  },
+  mint: {
+    headFill: [79, 122, 99], headText: [255, 255, 255], accent: [79, 122, 99],
+    ink: [26, 24, 20], mid: [58, 56, 51], muted: [107, 106, 102], bg: null, soft: [234, 241, 237]
+  },
+  editorial: {
+    headFill: null, headText: [43, 38, 32], accent: [154, 123, 79],
+    ink: [43, 38, 32], mid: [74, 68, 59], muted: [138, 122, 96], bg: [237, 230, 218]
+  }
+}
+
+function fmtShortPdf(d) {
+  if (!d) return '—'
+  const dt = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(dt.getTime())) return '—'
+  return dt.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit', year: 'numeric' })
+}
+
+function drawPlainLogo(doc, { x, y, maxW, maxH, logo, company, align = 'left', monoColor = ONYX }) {
+  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
+    const aspect = logo.width / logo.height
+    let w = maxW, h = w / aspect
+    if (h > maxH) { h = maxH; w = h * aspect }
+    const drawX = align === 'right' ? x - w : x
+    try { doc.addImage(logo.dataUrl, logo.format || 'PNG', drawX, y, w, h); return h } catch { /* fall through */ }
+  }
+  const initials = (company?.name || 'MC')
+    .split(/\s+/).filter(Boolean).map((w) => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'MC'
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...monoColor)
+  doc.text(initials, x, y + 8, { align: align === 'right' ? 'right' : 'left' })
+  return 10
+}
+
+async function drawThemedProposal(doc, ctx) {
+  const {
+    template, pageWidth, pageHeight, margin, company, logo, contact,
+    number, issuedAt, expiresAt, projectTitle, scope, warranty, paymentTerms,
+    exclusions = [], lineItems = [], upgradeItems = [], subtotal, total, photos = []
+  } = ctx
+  const t = PDF_THEMES[template]
+  const innerW = pageWidth - margin * 2
+
+  // Page background (editorial). Idempotent per page so it paints each
+  // page exactly once *before* content — calling it again on an
+  // already-painted page is a no-op, which keeps autoTable's
+  // willDrawPage hook from erasing the header drawn above the table.
+  const paintedPages = new Set()
+  const paintBg = () => {
+    if (!t.bg) return
+    const pn = doc.internal.getCurrentPageInfo().pageNumber
+    if (paintedPages.has(pn)) return
+    paintedPages.add(pn)
+    doc.setFillColor(...t.bg); doc.rect(0, 0, pageWidth, pageHeight, 'F')
+  }
+  paintBg()
+
+  let cursor = 18
+
+  // ---- Header (per theme) ----
+  if (template === 'slate') {
+    drawPlainLogo(doc, { x: margin, y: cursor, maxW: 60, maxH: 18, logo, company, monoColor: t.ink })
+    cursor += 24
+    // Gray meta bar, full bleed
+    doc.setFillColor(...t.accent)
+    doc.rect(0, cursor, pageWidth, 16, 'F')
+    const cells = [
+      ['ESTIMATE NO.', number],
+      ['ISSUE DATE', fmtShortPdf(issuedAt)],
+      ['VALID UNTIL', fmtShortPdf(expiresAt)]
+    ]
+    const cw = innerW / 3
+    cells.forEach(([label, val], i) => {
+      const cx = margin + cw * i
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(255, 255, 255); doc.setCharSpace(0.5)
+      doc.text(label, cx, cursor + 6); doc.setCharSpace(0)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(String(val), cx, cursor + 12)
+    })
+    cursor += 24
+    // From / For
+    cursor = drawThemedParties(doc, { pageWidth, margin, y: cursor, company, recipient: contact, t, labels: ['FROM', 'FOR'] })
+    if (projectTitle) cursor = drawThemedProjectTitle(doc, { margin, y: cursor + 4, title: projectTitle, t })
+  } else if (template === 'mint') {
+    // Company top-left, logo top-right
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(...t.ink)
+    doc.text(company?.name || 'My Company', margin, cursor + 4)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...t.muted)
+    let cy = cursor + 9
+    for (const l of themedAddressLines(company)) { doc.text(l, margin, cy); cy += 4.2 }
+    drawPlainLogo(doc, { x: pageWidth - margin, y: cursor, maxW: 50, maxH: 18, logo, company, align: 'right', monoColor: t.accent })
+    cursor = Math.max(cy, cursor + 22)
+    // ESTIMATE wordmark, right
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(34); doc.setTextColor(...t.accent); doc.setCharSpace(1.5)
+    doc.text('ESTIMATE', pageWidth - margin, cursor + 6, { align: 'right' }); doc.setCharSpace(0)
+    cursor += 16
+    // To + meta
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...t.accent)
+    doc.text('TO', margin, cursor)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.setTextColor(...t.ink)
+    doc.text(contact?.name || '—', margin, cursor + 6)
+    doc.setFontSize(9); doc.setTextColor(...t.muted)
+    let ty = cursor + 11
+    for (const l of themedAddressLines(contact)) { doc.text(l, margin, ty); ty += 4.2 }
+    const metaR = [['Estimate #', number], ['Estimate date', fmtShortPdf(issuedAt)], ['Valid until', fmtShortPdf(expiresAt)]]
+    metaR.forEach(([label, val], i) => {
+      const my = cursor + i * 5.5
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...t.accent)
+      doc.text(label, pageWidth - margin - 38, my, { align: 'right' })
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(...t.ink)
+      doc.text(String(val), pageWidth - margin, my, { align: 'right' })
+    })
+    cursor = Math.max(ty, cursor + 18) + 4
+    if (projectTitle) cursor = drawThemedProjectTitle(doc, { margin, y: cursor, title: projectTitle, t })
+  } else {
+    // editorial
+    if (projectTitle) {
+      doc.setFont('times', 'normal'); doc.setFontSize(16); doc.setTextColor(...t.ink)
+      doc.text(projectTitle, margin, cursor + 4); cursor += 8
+    }
+    doc.setFont('times', 'normal'); doc.setFontSize(40); doc.setTextColor(...t.accent); doc.setCharSpace(1)
+    doc.text('ESTIMATE', margin, cursor + 12); doc.setCharSpace(0)
+    drawPlainLogo(doc, { x: pageWidth - margin, y: cursor - 4, maxW: 46, maxH: 18, logo, company, align: 'right', monoColor: t.accent })
+    cursor += 22
+    // Three columns: company / client / meta
+    const colW = innerW / 3
+    const coLines = [company?.name, ...themedAddressLines(company)].filter(Boolean)
+    const clLines = [contact?.name, ...themedAddressLines(contact)].filter(Boolean)
+    doc.setFontSize(9)
+    let yMax = cursor
+    ;[coLines, clLines].forEach((lines, ci) => {
+      let yy = cursor
+      lines.forEach((l, i) => {
+        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
+        doc.setTextColor(...(i === 0 ? t.ink : t.mid))
+        doc.text(String(l), margin + colW * ci, yy); yy += 4.4
+      })
+      yMax = Math.max(yMax, yy)
+    })
+    const meta = [['Date', fmtShortPdf(issuedAt)], ['Estimate #', number], ['Est. Total', moneyCompact(total)]]
+    meta.forEach(([label, val], i) => {
+      const my = cursor + i * 6
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...t.accent)
+      doc.text(label, margin + colW * 2, my)
+      doc.setTextColor(...t.ink); doc.text(String(val), pageWidth - margin, my, { align: 'right' })
+    })
+    cursor = Math.max(yMax, cursor + 18) + 6
+    // Scope prose up top
+    if (scope && scope.trim()) {
+      doc.setFont('times', 'normal'); doc.setFontSize(13); doc.setTextColor(...t.accent)
+      doc.text('SCOPE OF WORK', margin, cursor); cursor += 6
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.mid)
+      const sl = doc.splitTextToSize(scope.trim(), innerW)
+      doc.text(sl, margin, cursor); cursor += sl.length * 4.6 + 4
+    }
+    doc.setFont('times', 'normal'); doc.setFontSize(13); doc.setTextColor(...t.accent)
+    doc.text('COST BREAKDOWN', margin, cursor); cursor += 3
+  }
+
+  // ---- Line items table (individual) ----
+  cursor = drawThemedItemsTable(doc, { startY: cursor + 2, items: lineItems, margin, pageWidth, t, paintBg })
+
+  // ---- Totals ----
+  cursor = drawThemedTotals(doc, { startY: cursor + 4, pageWidth, margin, subtotal, total, t, template })
+
+  // ---- Optional upgrades ----
+  if (upgradeItems.length > 0) {
+    cursor += 6
+    if (cursor > pageHeight - 60) { doc.addPage(); paintBg(); cursor = 18 }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...t.accent); doc.setCharSpace(0.6)
+    doc.text('OPTIONAL UPGRADES', margin, cursor); doc.setCharSpace(0); cursor += 3
+    cursor = drawThemedItemsTable(doc, { startY: cursor + 2, items: upgradeItems, margin, pageWidth, t, paintBg })
+  }
+
+  // ---- Photos ----
+  if (Array.isArray(photos) && photos.length > 0) {
+    cursor = await drawProjectPhotosBlock(doc, { photos, margin, pageWidth, pageHeight, startY: cursor + 6, brandRGB: t.accent })
+  }
+
+  // ---- Supporting tail (scope for slate/mint, payment terms, warranty, exclusions) ----
+  const tailBlock = (label, body) => {
+    if (!body) return
+    cursor += 8
+    if (cursor > pageHeight - 40) { doc.addPage(); paintBg(); cursor = 18 }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...t.accent); doc.setCharSpace(0.8)
+    doc.text(String(label).toUpperCase(), margin, cursor); doc.setCharSpace(0); cursor += 5
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.mid)
+    const lines = doc.splitTextToSize(body, innerW)
+    doc.text(lines, margin, cursor); cursor += lines.length * 4.5
+  }
+  if (template !== 'editorial' && scope && scope.trim()) tailBlock('Scope of work', scope.trim())
+  tailBlock('Payment terms', paymentTerms)
+  if (warranty) tailBlock('Warranty', warranty)
+  if (exclusions.length) tailBlock('Exclusions', exclusions.join(' · '))
+
+  // ---- Signatures ----
+  cursor += 14
+  if (cursor > pageHeight - 50) { doc.addPage(); paintBg(); cursor = 18 }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...t.accent); doc.setCharSpace(0.8)
+  doc.text('APPROVAL', margin, cursor); doc.setCharSpace(0); cursor += 5
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.mid)
+  const al = doc.splitTextToSize('By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.', innerW)
+  doc.text(al, margin, cursor); cursor += al.length * 4.5 + 16
+  const colW = (innerW - 16) / 2
+  doc.setDrawColor(...t.ink); doc.setLineWidth(0.4)
+  doc.line(margin, cursor, margin + colW, cursor)
+  doc.line(margin + colW + 16, cursor, pageWidth - margin, cursor)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...t.muted); doc.setCharSpace(0.6)
+  doc.text('CLIENT SIGNATURE', margin, cursor + 5)
+  doc.text('CONTRACTOR SIGNATURE', margin + colW + 16, cursor + 5); doc.setCharSpace(0)
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
+  doc.text('Date', margin + colW, cursor + 5, { align: 'right' })
+  doc.text('Date', pageWidth - margin, cursor + 5, { align: 'right' })
+
+  // ---- Disclaimer on every page ----
+  const pages = doc.internal.getNumberOfPages()
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...t.muted)
+    const lines = doc.splitTextToSize(PROPOSAL_DISCLAIMER, pageWidth - margin * 2)
+    doc.text(lines, margin, pageHeight - 12 - (lines.length - 1) * 3.5)
+  }
+}
+
+function themedAddressLines(party) {
+  if (!party) return []
+  const out = []
+  if (party.address) out.push(String(party.address))
+  const c = [party.phone, party.email].filter(Boolean).join(' · ')
+  if (c) out.push(c)
+  if (party.website) out.push(String(party.website))
+  return out
+}
+
+function drawThemedParties(doc, { pageWidth, margin, y, company, recipient, t, labels }) {
+  const colW = (pageWidth - margin * 2 - 12) / 2
+  const leftX = margin, rightX = margin + colW + 12
+  doc.setDrawColor(...t.muted); doc.setLineWidth(0.3)
+  doc.line(leftX, y, leftX + colW, y); doc.line(rightX, y, rightX + colW, y)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...t.ink); doc.setCharSpace(0.8)
+  doc.text(labels[0], leftX, y + 6); doc.text(labels[1], rightX, y + 6); doc.setCharSpace(0)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
+  doc.text(company?.name || 'My Company', leftX, y + 12); doc.text(recipient?.name || '—', rightX, y + 12)
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...t.mid)
+  let ly = y + 17.5, ry = y + 17.5
+  for (const l of themedAddressLines(company)) { doc.text(doc.splitTextToSize(l, colW), leftX, ly); ly += 4.4 }
+  for (const l of themedAddressLines(recipient)) { doc.text(doc.splitTextToSize(l, colW), rightX, ry); ry += 4.4 }
+  return Math.max(ly, ry) + 4
+}
+
+function drawThemedProjectTitle(doc, { margin, y, title, t }) {
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...t.muted); doc.setCharSpace(0.8)
+  doc.text('PROJECT', margin, y); doc.setCharSpace(0)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(...t.accent)
+  doc.text(title, margin, y + 7)
+  return y + 12
+}
+
+function drawThemedItemsTable(doc, { startY, items, margin, pageWidth, t, paintBg }) {
+  const innerW = pageWidth - margin * 2
+  autoTable(doc, {
+    startY,
+    head: [['Description', 'Qty', 'Unit Price', 'Amount']],
+    body: items.map((it) => [
+      it.description || '—',
+      it.qty ? `${it.qty}${it.unit ? ` ${it.unit}` : ''}` : '',
+      money(it.rate),
+      money(it.amount)
+    ]),
+    theme: 'plain',
+    headStyles: {
+      fillColor: t.headFill || false,
+      textColor: t.headText,
+      fontStyle: 'bold',
+      fontSize: 9.5,
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
+      lineWidth: t.headFill ? 0 : { bottom: 0.5 },
+      lineColor: t.accent
+    },
+    bodyStyles: {
+      fontSize: 9.5, textColor: t.ink, valign: 'top',
+      cellPadding: { top: 4.5, right: 5, bottom: 4.5, left: 5 }, lineWidth: 0
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { halign: 'right', cellWidth: 20 },
+      2: { halign: 'right', cellWidth: 28 },
+      3: { halign: 'right', cellWidth: 28, fontStyle: 'bold' }
+    },
+    didDrawCell: (data) => {
+      if (data.section === 'body') {
+        const { doc: d, cell } = data
+        d.setDrawColor(228, 224, 216); d.setLineWidth(0.15)
+        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
+      }
+    },
+    willDrawPage: () => { if (paintBg) paintBg() },
+    margin: { left: margin, right: margin }
+  })
+  return doc.lastAutoTable.finalY
+}
+
+function drawThemedTotals(doc, { startY, pageWidth, margin, subtotal, total, t, template }) {
+  const rightX = pageWidth - margin
+  const labelX = rightX - 40
+  let cursor = startY + 6
+  // Subtotal (only meaningful if it differs from total)
+  if (Math.abs(subtotal - total) > 0.005) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.muted)
+    doc.text('Subtotal', labelX, cursor, { align: 'right' })
+    doc.setTextColor(...t.ink); doc.text(money(subtotal), rightX, cursor, { align: 'right' })
+    cursor += 6
+  }
+  if (template === 'editorial') {
+    doc.setFont('times', 'normal'); doc.setFontSize(15); doc.setTextColor(...t.accent)
+    doc.text('TOTAL', labelX, cursor + 4, { align: 'right' })
+    doc.setTextColor(...t.ink); doc.text(money(total), rightX, cursor + 4, { align: 'right' })
+    return cursor + 10
+  }
+  // Boxed/soft total for slate + mint
+  const boxW = 48, boxH = 11, boxX = rightX - boxW
+  if (template === 'mint' && t.soft) { doc.setFillColor(...t.soft); doc.rect(boxX, cursor, boxW, boxH, 'F') }
+  else { doc.setDrawColor(...t.ink); doc.setLineWidth(0.4); doc.rect(boxX, cursor, boxW, boxH, 'S') }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...(template === 'mint' ? t.accent : t.ink))
+  doc.text('Total', boxX - 4, cursor + 7.5, { align: 'right' })
+  doc.setFontSize(12); doc.text(money(total), rightX - 4, cursor + 7.5, { align: 'right' })
+  return cursor + boxH + 6
+}
+
 /**
  * Generate a branded proposal PDF — v3 letterhead (Phase 4b parity).
  *
@@ -1147,6 +1486,53 @@ export async function generateQuote({
   const baseTotal = Number(mapped.baseTotal || 0)
   const upgradeTotal = Number(mapped.upgradeTotal || 0)
   const grandTotal = Math.max(0, baseTotal + approvedCOAdjustment)
+
+  // Themed templates (slate / mint / editorial) — distinct designs with
+  // individual line items. 'classic' (and any unknown value) falls
+  // through to the editorial dark-accent layout below, unchanged.
+  const template = String(company?.estimate_template || 'classic').toLowerCase()
+  if (template === 'slate' || template === 'mint' || template === 'editorial') {
+    const lineItems = (mapped.scopeSections || []).flatMap((sec) =>
+      (sec.items || []).map((it) => ({
+        description: (it.description || '—').trim(),
+        qty: Number(it.qty || 1),
+        unit: (it.unit || '').trim(),
+        rate: Number(it.rate || 0),
+        amount: itemAmount(it)
+      }))
+    )
+    const upgradeItems = (mapped.upgrades || []).flatMap((sec) =>
+      (sec.items || []).map((it) => ({
+        description: (it.description || '—').trim(),
+        qty: Number(it.qty || 1),
+        unit: (it.unit || '').trim(),
+        rate: Number(it.rate || 0),
+        amount: itemAmount(it)
+      }))
+    )
+    const exclusionsArray = [
+      ...(mapped.exclusions || []),
+      ...((exclusions || '').split(/\n+/).map((s) => s.trim()).filter(Boolean))
+    ]
+    await drawThemedProposal(doc, {
+      template, pageWidth, pageHeight, margin, company, logo,
+      contact, number: shortDocNumber(number),
+      issuedAt: new Date(), expiresAt,
+      projectTitle: String(contact?.job_title || '').trim(),
+      scope: scope || '',
+      warranty: (company?.warranty_default || '').trim(),
+      paymentTerms: '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.',
+      exclusions: exclusionsArray,
+      lineItems, upgradeItems,
+      subtotal: baseTotal, total: grandTotal,
+      photos
+    })
+    return {
+      doc,
+      filename: `Proposal_${number}_${(contact?.name || 'client').replace(/\s+/g, '_')}.pdf`,
+      number
+    }
+  }
 
   // Letterhead
   let cursor = drawDocLetterhead(doc, {
