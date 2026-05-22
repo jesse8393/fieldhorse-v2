@@ -56,6 +56,23 @@ export default function AnalyticsScreen() {
     }
     const collected = (bundle?.payments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0)
 
+    // Collected revenue per month, last 6 months (oldest → newest).
+    const monthly: { label: string; value: number }[] = []
+    const monthIdx = new Map<string, number>()
+    const now = new Date()
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      monthIdx.set(`${d.getFullYear()}-${d.getMonth()}`, monthly.length)
+      monthly.push({ label: d.toLocaleDateString(undefined, { month: 'short' }), value: 0 })
+    }
+    for (const p of bundle?.payments ?? []) {
+      if (!p.paid_on) continue
+      const d = new Date(p.paid_on)
+      if (Number.isNaN(d.getTime())) continue
+      const idx = monthIdx.get(`${d.getFullYear()}-${d.getMonth()}`)
+      if (idx != null) monthly[idx].value += Number(p.amount || 0)
+    }
+
     const decided = wonCount + lostCount
     const closeRate = (wonCount >= 1 && lostCount >= 1 && decided >= 3) ? Math.round((wonCount / decided) * 100) : null
     const avgMargin = marginSamples.length ? Math.round((marginSamples.reduce((s, m) => s + m, 0) / marginSamples.length) * 100) : null
@@ -78,7 +95,7 @@ export default function AnalyticsScreen() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 5)
 
-    return { pipeline, won, active, collected, byStage, total: jobs.length, closeRate, avgMargin, winByType, topClients }
+    return { pipeline, won, active, collected, byStage, total: jobs.length, closeRate, avgMargin, winByType, topClients, monthly }
   }, [jobs, bundle])
 
   const maxStageValue = Math.max(1, ...STAGES.map((s) => stats.byStage.get(s)?.value ?? 0))
@@ -102,6 +119,33 @@ export default function AnalyticsScreen() {
               <Kpi label="Close rate" value={stats.closeRate != null ? `${stats.closeRate}%` : '—'} tone={theme.goldBright} />
               <Kpi label="Avg margin" value={stats.avgMargin != null ? `${stats.avgMargin}%` : '—'} tone={theme.success} />
             </View>
+
+            {stats.monthly.some((m) => m.value > 0) ? (
+              <>
+                <SectionLabel style={{ marginTop: 28, marginBottom: 12 }}>Collected — last 6 months</SectionLabel>
+                <Card>
+                  <View style={{ padding: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 120, gap: 8 }}>
+                      {stats.monthly.map((m, i) => {
+                        const max = Math.max(1, ...stats.monthly.map((x) => x.value))
+                        const h = Math.max(2, Math.round((m.value / max) * 96))
+                        return (
+                          <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+                            {m.value > 0 ? <Text style={{ color: theme.inkMuted, fontSize: 9, fontWeight: '700', marginBottom: 4 }}>{money(m.value)}</Text> : null}
+                            <View style={{ width: '70%', height: h, borderRadius: 6, backgroundColor: m.value > 0 ? theme.goldBright : 'rgba(255,240,210,0.08)' }} />
+                          </View>
+                        )
+                      })}
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
+                      {stats.monthly.map((m, i) => (
+                        <Text key={i} style={{ flex: 1, textAlign: 'center', color: theme.inkMuted, fontSize: 10, fontWeight: '700' }}>{m.label}</Text>
+                      ))}
+                    </View>
+                  </View>
+                </Card>
+              </>
+            ) : null}
 
             {stats.winByType.length > 0 ? (
               <>
