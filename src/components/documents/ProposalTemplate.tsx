@@ -25,6 +25,13 @@ import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { DOC_COLORS, DOC_FONTS } from './tokens.ts'
 import { money } from './format.ts'
 import { proposalNumber } from './numbers.ts'
+import { SlateProposal, MintProposal, EditorialProposal } from './proposalThemes.tsx'
+
+const TEMPLATE_COMPONENTS: Record<string, (props: { view: any }) => any> = {
+  slate: SlateProposal,
+  mint: MintProposal,
+  editorial: EditorialProposal
+}
 
 const DEFAULT_PAYMENT_COPY = '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
 const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, owner-requested additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
@@ -52,11 +59,20 @@ export default function ProposalTemplate({
   const issuedAt = meta.issuedAt || new Date()
   const expiresAt = meta.expiresAt || null
 
-  // One clean row per trade. The section title is the row label, its
-  // items list as scope lines in the description column, and the row
-  // carries a single lump-sum amount (the section total). Per-line
-  // Qty/Unit-Price columns are intentionally dropped — see sectioned
-  // layout in LineItemsTable.
+  // Individual line items — one row per service (Qty · Unit Price ·
+  // Amount), flattened across scope sections in their original order.
+  const lineItems = scopeSections.flatMap((sec: any) =>
+    (sec.items || []).map((it: any) => ({
+      description: (it.description || '—').trim(),
+      qty: Number(it.qty || 1),
+      unit: (it.unit || '').trim(),
+      rate: Number(it.rate || 0),
+      amount: itemAmount(it)
+    }))
+  )
+
+  // Classic layout keeps one row per trade (its items as stacked scope
+  // lines) so existing accounts render unchanged.
   const baseRows = scopeSections.map((sec: any) => ({
     id: sec.id,
     title: sec.title,
@@ -68,6 +84,19 @@ export default function ProposalTemplate({
     id: sec.id,
     title: sec.title,
     descriptionLines: (sec.items || []).map(scopeLine),
+    amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
+  }))
+
+  // Individual-line upgrade groups for the new themes.
+  const upgradeGroups = upgrades.map((sec: any) => ({
+    title: sec.title,
+    items: (sec.items || []).map((it: any) => ({
+      description: (it.description || '—').trim(),
+      qty: Number(it.qty || 1),
+      unit: (it.unit || '').trim(),
+      rate: Number(it.rate || 0),
+      amount: itemAmount(it)
+    })),
     amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
   }))
 
@@ -87,6 +116,41 @@ export default function ProposalTemplate({
   const grandTotal = Math.max(0, subtotal - discount + tax + coAdjustment)
 
   const statusChip = statusToChip(status)
+
+  // Template dispatch. 'classic' (default + legacy) renders the
+  // editorial DocumentShell layout below; the named themes render a
+  // fully distinct design from a normalized view bundle. Falls back to
+  // classic for any unknown value so a bad/empty column never breaks
+  // the render.
+  const template = String(company?.estimate_template || 'classic').toLowerCase()
+  const ThemeComponent = TEMPLATE_COMPONENTS[template]
+  if (ThemeComponent) {
+    const view = {
+      company,
+      recipient: contact,
+      number: shortNumber(number),
+      issuedAt,
+      expiresAt,
+      projectTitle,
+      scopeText: project?.scope || contact?.scope_text || '',
+      lineItems,
+      upgrades: upgradeGroups,
+      subtotal,
+      discount,
+      tax,
+      taxRate: Number(pricing.taxRate || 0),
+      total: grandTotal,
+      paymentTerms: DEFAULT_PAYMENT_COPY,
+      warrantyText,
+      exclusions,
+      status,
+      approval,
+      photos,
+      insurance,
+      changeOrders
+    }
+    return <ThemeComponent view={view} />
+  }
 
   return (
     <DocumentShell
