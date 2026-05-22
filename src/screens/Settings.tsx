@@ -54,6 +54,9 @@ export default function Settings() {
   // money numbers. Empty → save as null → downstream pdf.js +
   // template tokens fall back to the system default (#C8A154).
   const [brandAccentHex, setBrandAccentHex] = useState(profile?.brand_accent_hex || '')
+  // Estimate/proposal design (migration 031). One default per company;
+  // drives the HTML preview, the public client page, and the PDF export.
+  const [estimateTemplate, setEstimateTemplate] = useState((profile as any)?.estimate_template || 'classic')
   // Dedupe + canonicalize on read. Older onboarding flows wrote both
   // duplicates AND ghost entries (typos, deprecated names like
   // "Painters" / "Drywaller") into profile.services. The chip
@@ -114,6 +117,7 @@ export default function Settings() {
     setInsuredText(profile?.insured_text || '')
     setWarrantyDefault(profile?.warranty_default || '')
     setBrandAccentHex(profile?.brand_accent_hex || '')
+    setEstimateTemplate((profile as any)?.estimate_template || 'classic')
     setServices(() => {
       const canonical = new Set(SERVICES)
       return Array.from(new Set(
@@ -171,6 +175,7 @@ export default function Settings() {
       insured_text: nullIfBlank(insuredText),
       warranty_default: nullIfBlank(warrantyDefault),
       brand_accent_hex: safeAccent,
+      estimate_template: estimateTemplate || 'classic',
       services
     })
     refresh()
@@ -364,6 +369,13 @@ export default function Settings() {
               onChange={setBrandAccentHex}
               companyName={companyName}
             />
+          </BrandField>
+
+          <BrandField
+            label="Estimate template"
+            hint="The design used for every estimate you preview, share, or send. Your logo and details fill in automatically."
+          >
+            <EstimateTemplatePicker value={estimateTemplate} onChange={setEstimateTemplate} />
           </BrandField>
         </div>
       </Section>
@@ -738,6 +750,52 @@ const COLOR_PRESETS = [
   { hex: '#9E2B25', name: 'Brick' },
   { hex: '#1A1814', name: 'Onyx' }
 ]
+
+const ESTIMATE_TEMPLATES = [
+  { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark-accent layout grouped by trade.', swatch: ['#1A1814', '#C8A154', '#FFFFFF'] },
+  { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#3F4651', '#FFFFFF', '#ECECEC'] },
+  { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#4F7A63', '#EAF1ED', '#FFFFFF'] },
+  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#EDE6DA', '#9A7B4F', '#2B2620'] }
+]
+
+function EstimateTemplatePicker({ value, onChange }: any) {
+  const selected = value || 'classic'
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+      {ESTIMATE_TEMPLATES.map((t) => {
+        const on = selected === t.key
+        return (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onChange(t.key)}
+            aria-pressed={on}
+            style={{
+              textAlign: 'left',
+              padding: 12,
+              borderRadius: 12,
+              cursor: 'pointer',
+              background: on ? 'var(--v3-primary-soft, rgba(200,161,84,0.12))' : 'var(--surface, transparent)',
+              border: on ? '2px solid var(--v3-primary, #C8A154)' : '1px solid var(--rule)',
+              display: 'flex', flexDirection: 'column', gap: 8
+            }}
+          >
+            <div style={{ display: 'flex', gap: 4 }}>
+              {t.swatch.map((c, i) => (
+                <span key={i} style={{ width: 22, height: 22, borderRadius: 5, background: c, border: '1px solid rgba(0,0,0,0.08)' }} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
+              {on && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--v3-primary, #C8A154)' }}>SELECTED</span>}
+            </div>
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function BrandColorEditor({ value, onChange, companyName }: any) {
   const v = (value || '').trim()

@@ -57,6 +57,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     website: profile?.company_website || '',
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
+    estimate_template: (profile as any)?.estimate_template || 'classic',
     license_number: profile?.license_number || '',
     insured_text: profile?.insured_text || '',
     warranty_default: profile?.warranty_default || ''
