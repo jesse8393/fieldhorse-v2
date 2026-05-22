@@ -12,6 +12,7 @@ import { useEffect } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 import { getWeather } from './weather'
+import { claudeVision, claudeText } from './anthropic'
 import type { Database } from './database.types'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -395,12 +396,12 @@ export function useDeleteSub() {
 const PHOTO_BUCKET = 'job-photos'
 const PHOTO_SIGN_TTL = 3600
 
-export type JobPhoto = { id: string; path: string; url: string; uploadedAt: string | null }
+export type JobPhoto = { id: string; path: string; url: string; uploadedAt: string | null; caption: string | null }
 
 async function fetchJobPhotos(jobId: string): Promise<JobPhoto[]> {
   const { data: rows, error } = await supabase
     .from('fh_job_files')
-    .select('id, storage_path, uploaded_at')
+    .select('id, storage_path, uploaded_at, caption')
     .eq('job_id', jobId)
     .eq('kind', 'photo')
     .order('uploaded_at', { ascending: false })
@@ -412,7 +413,7 @@ async function fetchJobPhotos(jobId: string): Promise<JobPhoto[]> {
     if (s?.path && s.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl)
   }
   return rows
-    .map((r) => ({ id: r.id, path: r.storage_path, url: urlByPath.get(r.storage_path) || '', uploadedAt: r.uploaded_at }))
+    .map((r) => ({ id: r.id, path: r.storage_path, url: urlByPath.get(r.storage_path) || '', uploadedAt: r.uploaded_at, caption: (r as any).caption ?? null }))
     .filter((p) => p.url)
 }
 
@@ -433,8 +434,8 @@ export function useUploadPhoto() {
     const { error: upErr } = await supabase.storage
       .from(PHOTO_BUCKET)
       .upload(path, arrayBuffer, { contentType: 'image/jpeg', upsert: false })
-    if (upErr) return { error: upErr }
-    const { error: insErr } = await supabase.from('fh_job_files').insert({
+    if (upErr) return { error: upErr, id: null }
+    const { data: row, error: insErr } = await supabase.from('fh_job_files').insert({
       user_id: input.userId,
       job_id: input.jobId,
       filename: `${pathId}.jpg`,
@@ -442,9 +443,32 @@ export function useUploadPhoto() {
       mime_type: 'image/jpeg',
       size_bytes: (arrayBuffer as ArrayBuffer).byteLength,
       kind: 'photo'
-    } as any)
+    } as any).select('id').single()
     if (!insErr) client.invalidateQueries({ queryKey: ['jobPhotos', input.jobId] })
-    return { error: insErr }
+    return { error: insErr, id: (row as any)?.id ?? null }
+  }
+}
+
+// Fire-and-forget AI caption for a freshly uploaded jobsite photo.
+// Mirrors the web Photos auto-caption: Claude Vision describes the photo
+// in a few words, saved to fh_job_files.caption. Silent on failure
+// (network / quota / vision off) — the photo is unaffected.
+export function useCaptionPhoto() {
+  const client = useQueryClient()
+  return async (input: { rowId: string; jobId: string; imageBase64: string; mediaType?: string }) => {
+    try {
+      const res = await claudeVision({
+        system: 'You caption construction jobsite photos for a contractor. Reply with a short caption only — 4 to 9 words, no quotes, no preamble.',
+        prompt: 'Caption this jobsite photo: the work shown or the condition. Keep it under 9 words.',
+        imageData: input.imageBase64,
+        mediaType: input.mediaType || 'image/jpeg',
+        maxTokens: 60
+      })
+      const caption = claudeText(res).trim().replace(/^["']|["']$/g, '').slice(0, 120)
+      if (!caption) return
+      const { error } = await supabase.from('fh_job_files').update({ caption } as any).eq('id', input.rowId)
+      if (!error) client.invalidateQueries({ queryKey: ['jobPhotos', input.jobId] })
+    } catch { /* silent — caption is best-effort */ }
   }
 }
 

@@ -19,7 +19,7 @@ import {
 import {
   useJobDetail, useUpdateStage, useUpdateJob,
   useAddExpense, useDeletePayment, useDeleteExpense, useDeleteJob,
-  useJobPhotos, useUploadPhoto, useDeletePhoto,
+  useJobPhotos, useUploadPhoto, useDeletePhoto, useCaptionPhoto,
   useAddSub, useDeleteSub, useClientsBundle,
   useAddTodo, useToggleTodo, useDeleteTodo,
   useAddNote, useDeleteNote,
@@ -73,6 +73,7 @@ export default function JobDetailScreen() {
   const deleteJob = useDeleteJob()
   const uploadPhoto = useUploadPhoto()
   const deletePhoto = useDeletePhoto()
+  const captionPhoto = useCaptionPhoto()
   const addSub = useAddSub()
   const deleteSub = useDeleteSub()
   const addTodo = useAddTodo()
@@ -466,26 +467,30 @@ export default function JobDetailScreen() {
     ])
   }
 
-  async function runPhotoUpload(uri: string) {
+  async function runPhotoUpload(uri: string, base64?: string | null) {
     if (!contact || !user) return
     setPhotoBusy(true)
-    const { error } = await uploadPhoto({ userId: user.id, jobId: contact.id, uri })
+    const { error, id } = await uploadPhoto({ userId: user.id, jobId: contact.id, uri })
     setPhotoBusy(false)
-    if (error) Alert.alert("Couldn't upload photo", error.message)
+    if (error) { Alert.alert("Couldn't upload photo", error.message); return }
+    // Auto-caption in the background — never blocks the upload.
+    if (id && base64) {
+      captionPhoto({ rowId: id, jobId: contact.id, imageBase64: base64, mediaType: 'image/jpeg' })
+    }
   }
 
   async function pickFromLibrary() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access in Settings to attach photos.'); return }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 })
-    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri)
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true })
+    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri, res.assets[0].base64)
   }
 
   async function takePhoto() {
     const perm = await ImagePicker.requestCameraPermissionsAsync()
     if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access in Settings to capture photos.'); return }
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.7 })
-    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri)
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.6, base64: true })
+    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri, res.assets[0].base64)
   }
 
   function addPhoto() {
@@ -730,11 +735,14 @@ export default function JobDetailScreen() {
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {photos.map((ph) => (
-              <Pressable key={ph.id} onLongPress={() => confirmDeletePhoto(ph.id, ph.path)} delayLongPress={350}>
+              <Pressable key={ph.id} onLongPress={() => confirmDeletePhoto(ph.id, ph.path)} delayLongPress={350} style={{ width: 120 }}>
                 <Image
                   source={{ uri: ph.url }}
                   style={{ width: 120, height: 120, borderRadius: 14, backgroundColor: '#1B1816' }}
                 />
+                {ph.caption ? (
+                  <Text className="text-ink-muted text-[11px] mt-1.5" numberOfLines={2}>{ph.caption}</Text>
+                ) : null}
               </Pressable>
             ))}
           </ScrollView>
