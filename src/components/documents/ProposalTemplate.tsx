@@ -52,33 +52,26 @@ export default function ProposalTemplate({
   const issuedAt = meta.issuedAt || new Date()
   const expiresAt = meta.expiresAt || null
 
-  // Flatten scope sections + their items into a single list of table
-  // rows. Section title becomes the row's title; items collapse into
-  // descriptionLines so the customer sees one clean "Concrete add on /
-  // 12x14.5 concrete / 5x4 concrete" row per trade.
+  // One clean row per trade. The section title is the row label, its
+  // items list as scope lines in the description column, and the row
+  // carries a single lump-sum amount (the section total). Per-line
+  // Qty/Unit-Price columns are intentionally dropped — see sectioned
+  // layout in LineItemsTable.
   const baseRows = scopeSections.map((sec: any) => ({
     id: sec.id,
     title: sec.title,
-    descriptionLines: (sec.items || []).map((it: any) => {
-      const qty = Number(it.qty || 1)
-      const unit = it.unit ? ` ${it.unit}` : ''
-      return qty !== 1
-        ? `${qty}${unit} · ${it.description || '—'}`
-        : (it.description || '—')
-    }),
-    qty: 1,
-    rate: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
-    amount: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+    descriptionLines: (sec.items || []).map(scopeLine),
+    amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
   }))
 
   const upgradeRows = upgrades.map((sec: any) => ({
     id: sec.id,
     title: sec.title,
-    descriptionLines: (sec.items || []).map((it: any) => it.description || '—'),
-    qty: 1,
-    rate: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
-    amount: (sec.items || []).reduce((s: any, it: any) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+    descriptionLines: (sec.items || []).map(scopeLine),
+    amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
   }))
+
+  const projectTitle = (project?.title || project?.name || contact?.job_title || '').trim()
 
   // Approved change orders bump the contract total in the on-screen
   // grand total. They render as their own table row too so the
@@ -105,9 +98,36 @@ export default function ProposalTemplate({
       status={statusChip}
       footer={DEFAULT_DISCLAIMER}
     >
+      {/* Project title — what the estimate is for */}
+      {projectTitle && (
+        <section style={{ marginBottom: -8 }}>
+          <div style={{
+            fontFamily: DOC_FONTS.body,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: DOC_COLORS.inkMuted,
+            marginBottom: 4
+          }}>
+            Project
+          </div>
+          <div style={{
+            fontFamily: DOC_FONTS.serif,
+            fontSize: 24,
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            color: DOC_COLORS.ink,
+            lineHeight: 1.15
+          }}>
+            {projectTitle}
+          </div>
+        </section>
+      )}
+
       {/* Items table */}
       {baseRows.length > 0 && (
-        <LineItemsTable rows={baseRows} company={company} />
+        <LineItemsTable rows={baseRows} company={company} layout="sectioned" />
       )}
 
       {/* Totals — right-aligned with the boxed TOTAL */}
@@ -125,7 +145,7 @@ export default function ProposalTemplate({
       {upgradeRows.length > 0 && (
         <section>
           <SectionLabel>Optional upgrades</SectionLabel>
-          <LineItemsTable rows={upgradeRows} company={company} />
+          <LineItemsTable rows={upgradeRows} company={company} layout="sectioned" />
         </section>
       )}
 
@@ -174,6 +194,24 @@ export default function ProposalTemplate({
       />
     </DocumentShell>
   )
+}
+
+/* ─── Helpers ─── */
+
+function itemAmount(it: any) {
+  return Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0)))
+}
+
+// One scope line per item. Quantity is shown as a trailing tag only
+// when it carries information (qty > 1), so a "1 ls" line reads as
+// plain prose while "320 sf" still surfaces. Consistent placement —
+// always trailing — avoids the ragged mix of prefixed/unprefixed lines.
+function scopeLine(it: any) {
+  const desc = (it.description || '—').trim()
+  const qty = Number(it.qty || 1)
+  const unit = (it.unit || '').trim()
+  if (qty > 1) return `${desc} · ${qty}${unit ? ` ${unit}` : ''}`
+  return desc
 }
 
 /* ─── Internal blocks ─── */

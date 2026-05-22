@@ -14,13 +14,59 @@
 import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
 import { money } from './format.ts'
 
-export default function LineItemsTable({ rows = [], company, showQty = true }: { rows?: any[]; company?: any; showQty?: boolean }) {
+export default function LineItemsTable({ rows = [], company, showQty = true, layout = 'detailed' }: { rows?: any[]; company?: any; showQty?: boolean; layout?: 'detailed' | 'sectioned' }) {
   const brand = resolveBrandGold(company)
   // Dark header bar — uses the brand accent. Default contractors get
   // gold; Parker (brand_accent_hex=#1A1814 example) gets near-black,
   // matching the reference. The brand color reads as a confident
   // identity anchor without overwhelming the document.
   const headerBg = brand
+
+  // Sectioned layout: one row per trade. Each row shows the trade name,
+  // the scope lines that make it up, and a single lump-sum amount — no
+  // per-line Qty/Unit-Price columns (those read as noise when every
+  // section row is a rolled-up total).
+  if (layout === 'sectioned') {
+    return (
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontFamily: DOC_FONTS.body,
+          fontSize: 13,
+          color: DOC_COLORS.ink
+        }}
+      >
+        <thead>
+          <tr>
+            <Th align="left"  bg={headerBg} style={{ width: '30%' }}>Scope of Work</Th>
+            <Th align="left"  bg={headerBg} style={{ width: '52%' }}>Description</Th>
+            <Th align="right" bg={headerBg} style={{ width: '18%' }}>Amount</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const descLines = r.descriptionLines
+              || (r.description ? String(r.description).split(/\n+/).map((s) => s.trim()).filter(Boolean) : [])
+            const amount = Number(r.amount != null ? r.amount : Number(r.qty || 1) * Number(r.rate || 0))
+            return (
+              <tr key={r.id || r.title}>
+                <Td><div style={{ fontWeight: 700, color: DOC_COLORS.ink }}>{r.title || '—'}</div></Td>
+                <Td>
+                  {descLines.length > 0 ? descLines.map((line: string, i: number) => (
+                    <div key={i} style={{ marginTop: i === 0 ? 0 : 5, color: DOC_COLORS.inkMid }}>
+                      {line}
+                    </div>
+                  )) : <span style={{ color: DOC_COLORS.inkFaint }}>—</span>}
+                </Td>
+                <Td align="right" mono bold>{money(amount, { cents: true })}</Td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    )
+  }
 
   return (
     <table

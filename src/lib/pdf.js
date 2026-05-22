@@ -45,6 +45,22 @@ function today() {
   })
 }
 
+function itemAmount(it) {
+  return Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0)))
+}
+
+// One scope line per item. Quantity is shown as a trailing tag only
+// when it carries information (qty > 1), so a "1 ls" line reads as
+// plain prose while "320 sf" still surfaces. Mirrors the HTML preview's
+// scopeLine() so both surfaces render the same text.
+function proposalScopeLine(it) {
+  const desc = (it.description || '—').trim()
+  const qty = Number(it.qty || 1)
+  const unit = (it.unit || '').trim()
+  if (qty > 1) return `${desc} · ${qty}${unit ? ` ${unit}` : ''}`
+  return desc
+}
+
 /**
  * Derive a 2-3 letter document-number prefix from the contractor's
  * company name. "Parker Construction Company" → "PCC". "Acme Roofing"
@@ -402,7 +418,61 @@ function drawDocParties(doc, opts) {
 }
 
 function drawDocItemsTable(doc, opts) {
-  const { startY, rows, brandRGB, margin, pageWidth } = opts
+  const { startY, rows, brandRGB, margin, pageWidth, layout = 'detailed' } = opts
+
+  const commonStyles = {
+    theme: 'plain',
+    headStyles: {
+      fillColor: brandRGB,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 10,
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+    },
+    bodyStyles: {
+      fontSize: 10,
+      textColor: ONYX,
+      cellPadding: { top: 5, right: 5, bottom: 5, left: 5 },
+      lineWidth: 0,
+      valign: 'top'
+    },
+    didDrawCell: function (data) {
+      if (data.section === 'body') {
+        const { doc: d, cell } = data
+        d.setDrawColor(232, 228, 216)
+        d.setLineWidth(0.15)
+        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
+      }
+    },
+    margin: { left: margin, right: margin }
+  }
+
+  // Sectioned: one row per trade — Scope | Description | Amount. Drops
+  // the per-line Qty / Unit-Price columns (a section row rolls up to
+  // qty 1, so they read as noise) and gives the remaining columns
+  // enough width that no header wraps mid-word.
+  if (layout === 'sectioned') {
+    const innerWidth = pageWidth - margin * 2
+    autoTable(doc, {
+      startY,
+      head: [['Scope of Work', 'Description', 'Amount']],
+      body: rows.map((r) => {
+        const amount = Number(r.amount != null ? r.amount : Number(r.qty || 1) * Number(r.rate || 0))
+        const desc = r.descriptionLines && r.descriptionLines.length > 0
+          ? r.descriptionLines.join('\n')
+          : (r.description || '—')
+        return [r.title || '—', desc, money(amount)]
+      }),
+      ...commonStyles,
+      columnStyles: {
+        0: { cellWidth: innerWidth * 0.30, fontStyle: 'bold' },
+        1: { cellWidth: 'auto' },
+        2: { halign: 'right', cellWidth: innerWidth * 0.18, fontStyle: 'bold' }
+      }
+    })
+    return doc.lastAutoTable.finalY
+  }
+
   autoTable(doc, {
     startY,
     head: [['Product/Service', 'Description', 'Qty.', 'Unit Price', 'Total']],
@@ -421,41 +491,14 @@ function drawDocItemsTable(doc, opts) {
         money(amount)
       ]
     }),
-    theme: 'plain',
-    headStyles: {
-      fillColor: brandRGB,
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 10,
-      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
-    },
-    bodyStyles: {
-      fontSize: 10,
-      textColor: ONYX,
-      cellPadding: { top: 5, right: 5, bottom: 5, left: 5 },
-      lineWidth: 0,
-      valign: 'top'
-    },
-    didDrawCell: function (data) {
-      if (data.section === 'body') {
-        const { doc: d, cell, column } = data
-        d.setDrawColor(232, 228, 216)
-        d.setLineWidth(0.15)
-        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
-        // bold the title column
-        if (column.index === 0) {
-          // already painted plain — re-paint as bold
-        }
-      }
-    },
+    ...commonStyles,
     columnStyles: {
       0: { cellWidth: 36, fontStyle: 'bold' },
       1: { cellWidth: 'auto' },
       2: { halign: 'right', cellWidth: 16 },
       3: { halign: 'right', cellWidth: 26 },
       4: { halign: 'right', cellWidth: 26, fontStyle: 'bold' }
-    },
-    margin: { left: margin, right: margin }
+    }
   })
   return doc.lastAutoTable.finalY
 }
@@ -1082,28 +1125,19 @@ export async function generateQuote({
   const number = docProposalNumber(company?.name, quoteId || contact?.id)
 
   // Group items into rows. Each scope section (e.g. "Concrete add on")
-  // becomes ONE row, its items collapse into the description column.
+  // becomes ONE row, its items list as scope lines in the description
+  // column, and the row carries a single lump-sum amount.
   const mapped = mapItemsToScope(items)
   const baseRows = (mapped.scopeSections || []).map((sec) => ({
     title: sec.title,
-    descriptionLines: (sec.items || []).map((it) => {
-      const qty = Number(it.qty || 1)
-      const unit = it.unit ? ` ${it.unit}` : ''
-      return qty !== 1
-        ? `${qty}${unit} · ${it.description || '—'}`
-        : (it.description || '—')
-    }),
-    qty: 1,
-    rate: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
-    amount: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+    descriptionLines: (sec.items || []).map(proposalScopeLine),
+    amount: (sec.items || []).reduce((s, it) => s + itemAmount(it), 0)
   }))
 
   const upgradeRows = (mapped.upgrades || []).map((sec) => ({
     title: sec.title,
-    descriptionLines: (sec.items || []).map((it) => it.description || '—'),
-    qty: 1,
-    rate: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0),
-    amount: (sec.items || []).reduce((s, it) => s + Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0))), 0)
+    descriptionLines: (sec.items || []).map(proposalScopeLine),
+    amount: (sec.items || []).reduce((s, it) => s + itemAmount(it), 0)
   }))
 
   const approvedCOAdjustment = (changeOrders || [])
@@ -1128,9 +1162,28 @@ export async function generateQuote({
     recipient: contact, company
   })
 
+  // Project title — what the estimate is for
+  const projectTitle = String(contact?.job_title || '').trim()
+  if (projectTitle) {
+    cursor += 6
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.8)
+    doc.text('PROJECT', margin, cursor)
+    doc.setCharSpace(0)
+    cursor += 6
+    doc.setFont('times', 'normal')
+    doc.setFontSize(18)
+    doc.setTextColor(...ONYX)
+    const titleLines = doc.splitTextToSize(projectTitle, pageWidth - margin * 2)
+    doc.text(titleLines, margin, cursor)
+    cursor += titleLines.length * 7
+  }
+
   // Items
   if (baseRows.length > 0) {
-    cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows: baseRows, brandRGB, margin, pageWidth })
+    cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows: baseRows, brandRGB, margin, pageWidth, layout: 'sectioned' })
   }
 
   // Totals
@@ -1155,7 +1208,7 @@ export async function generateQuote({
     doc.text('OPTIONAL UPGRADES', margin, cursor)
     doc.setCharSpace(0)
     cursor += 4
-    cursor = drawDocItemsTable(doc, { startY: cursor, rows: upgradeRows, brandRGB, margin, pageWidth })
+    cursor = drawDocItemsTable(doc, { startY: cursor, rows: upgradeRows, brandRGB, margin, pageWidth, layout: 'sectioned' })
   }
 
   // Project photos — pre-load the signed URLs into base64 PNGs through
