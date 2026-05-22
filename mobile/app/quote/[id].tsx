@@ -9,13 +9,16 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ChevronLeft, Plus, Pencil } from 'lucide-react-native'
+import { WebView } from 'react-native-webview'
+import { ChevronLeft, Plus, Pencil, Eye, Share2, X } from 'lucide-react-native'
 import {
   useQuoteItems, useAddQuoteItem, useUpdateQuoteItem, useDeleteQuoteItem,
-  useApplyQuoteTotal, type QuoteItem
+  useApplyQuoteTotal, useProfile, useJobDetail, type QuoteItem
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground } from '../../components/ui'
+import { buildProposalHtml } from '../../lib/proposalHtml'
+import { shareProposalPdf } from '../../lib/quotePdf'
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -27,10 +30,38 @@ export default function QuoteScreen() {
   const { user } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data: items = [], isPending } = useQuoteItems(id)
+  const { data: profile } = useProfile(user?.id)
+  const { data: jobDetail } = useJobDetail(id)
   const addItem = useAddQuoteItem()
   const updateItem = useUpdateQuoteItem()
   const deleteItem = useDeleteQuoteItem()
   const applyTotal = useApplyQuoteTotal()
+
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const hasBase = items.some((it) => !it.is_optional && !it.is_excluded)
+
+  function buildHtml() {
+    const contact = jobDetail?.contact || ({} as any)
+    return buildProposalHtml(
+      (profile || {}) as any,
+      contact as any,
+      items as any,
+      { number: String(id || '').slice(0, 4).toUpperCase() || 'EST', issuedAt: new Date() }
+    )
+  }
+
+  async function onShare() {
+    if (!hasBase || sharing) return
+    setSharing(true)
+    try {
+      await shareProposalPdf(buildHtml(), `Estimate_${(jobDetail?.contact?.name || 'client').replace(/\s+/g, '_')}.pdf`)
+    } catch (e: any) {
+      Alert.alert("Couldn't create PDF", e?.message || 'Try again.')
+    } finally {
+      setSharing(false)
+    }
+  }
 
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<QuoteItem | null>(null)
@@ -122,7 +153,29 @@ export default function QuoteScreen() {
         </Pressable>
 
         <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Estimate</Text>
-        <Text className="text-ink text-3xl font-bold mb-5">Quote builder</Text>
+        <Text className="text-ink text-3xl font-bold mb-4">Quote builder</Text>
+
+        {/* Preview / Share — render the estimate in the design picked in
+            Settings, then share it as a PDF. */}
+        <View className="flex-row mb-5" style={{ gap: 10 }}>
+          <Pressable
+            onPress={() => { if (hasBase) setPreviewHtml(buildHtml()) }}
+            disabled={!hasBase}
+            className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
+            style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
+          >
+            <Eye color="#E8B865" size={16} />
+            <Text className="text-gold-bright font-bold text-sm">Preview</Text>
+          </Pressable>
+          <Pressable
+            onPress={onShare}
+            disabled={!hasBase || sharing}
+            className="flex-1 flex-row items-center justify-center rounded-xl py-3"
+            style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: '#E8B865' }}
+          >
+            {sharing ? <ActivityIndicator color="#1A120A" /> : <><Share2 color="#1A120A" size={16} /><Text className="text-[#1A120A] font-bold text-sm">Share PDF</Text></>}
+          </Pressable>
+        </View>
 
         {isPending ? (
           <ActivityIndicator color="#E8B865" />
@@ -253,6 +306,34 @@ export default function QuoteScreen() {
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Estimate preview — renders the same HTML the PDF/website uses */}
+      <Modal visible={!!previewHtml} animationType="slide" onRequestClose={() => setPreviewHtml(null)}>
+        <View style={{ flex: 1, backgroundColor: '#33302b' }}>
+          <View style={{ paddingTop: insets.top + 8, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1A1714' }}>
+            <Text style={{ color: '#F2EDE4', fontWeight: '700', fontSize: 16 }}>Estimate preview</Text>
+            <Pressable onPress={() => setPreviewHtml(null)} hitSlop={12}><X color="#F2EDE4" size={22} /></Pressable>
+          </View>
+          {previewHtml ? (
+            <WebView
+              originWhitelist={['*']}
+              source={{ html: previewHtml }}
+              style={{ flex: 1, backgroundColor: '#33302b' }}
+              scalesPageToFit
+            />
+          ) : null}
+          <View style={{ padding: 16, paddingBottom: insets.bottom + 16, backgroundColor: '#1A1714' }}>
+            <Pressable
+              onPress={onShare}
+              disabled={sharing}
+              className="rounded-xl py-4 flex-row items-center justify-center"
+              style={{ gap: 8, backgroundColor: '#E8B865' }}
+            >
+              {sharing ? <ActivityIndicator color="#1A120A" /> : <><Share2 color="#1A120A" size={18} /><Text className="text-[#1A120A] font-bold">Share PDF</Text></>}
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   )

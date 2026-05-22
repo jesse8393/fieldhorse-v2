@@ -23,6 +23,13 @@ const TRADES = [
 
 const ACCENTS = ['#E4BE6F', '#E85A57', '#4F8C5E', '#6B7CA8', '#B07A4A', '#9B6BC4', '#3FA6A0', '#D98736']
 
+const ESTIMATE_TEMPLATES = [
+  { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark-accent layout.', swatch: ['#1A1814', '#C8A154', '#FFFFFF'] },
+  { key: 'slate',     name: 'Slate',     blurb: 'Gray header, From/For, itemized.', swatch: ['#3F4651', '#FFFFFF', '#ECECEC'] },
+  { key: 'mint',      name: 'Mint',      blurb: 'Green ESTIMATE wordmark.', swatch: ['#4F7A63', '#EAF1ED', '#FFFFFF'] },
+  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, scope + breakdown.', swatch: ['#EDE6DA', '#9A7B4F', '#2B2620'] }
+]
+
 function Field({ label, value, onChange, ...rest }: {
   label: string; value: string; onChange: (v: string) => void
 } & Record<string, unknown>) {
@@ -67,6 +74,7 @@ export default function SettingsScreen() {
   const [warranty, setWarranty] = useState('')
   const [services, setServices] = useState<string[]>([])
   const [accent, setAccent] = useState<string>(ACCENTS[0])
+  const [template, setTemplate] = useState<string>('classic')
   const [cityName, setCityName] = useState<string | null>(null)
   const [pinning, setPinning] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -85,6 +93,7 @@ export default function SettingsScreen() {
     setWarranty(profile.warranty_default || '')
     setServices((profile.services as string[]) || [])
     setAccent(profile.brand_accent_hex || ACCENTS[0])
+    setTemplate((profile as any).estimate_template || 'classic')
   }, [profile])
 
   useEffect(() => {
@@ -129,7 +138,8 @@ export default function SettingsScreen() {
       insuredText: insured.trim() || null,
       warrantyDefault: warranty.trim() || null,
       services,
-      brandAccentHex: accent
+      brandAccentHex: accent,
+      estimateTemplate: template
     })
     setSaving(false)
     if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
@@ -192,6 +202,38 @@ export default function SettingsScreen() {
                 const on = accent.toLowerCase() === c.toLowerCase()
                 return (
                   <Pressable key={c} onPress={() => setAccent(c)} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: c, borderWidth: on ? 3 : 1, borderColor: on ? theme.ink : theme.border }} />
+                )
+              })}
+            </View>
+
+            <SectionTitle>Estimate template</SectionTitle>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, lineHeight: 17, marginBottom: 12 }}>
+              The design used when you preview or share an estimate. Your logo and details fill in automatically.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {ESTIMATE_TEMPLATES.map((t) => {
+                const on = template === t.key
+                return (
+                  <Pressable
+                    key={t.key}
+                    onPress={() => setTemplate(t.key)}
+                    style={{
+                      width: '47%', flexGrow: 1, padding: 12, borderRadius: 14,
+                      backgroundColor: on ? 'rgba(232,184,101,0.12)' : theme.surface,
+                      borderWidth: on ? 2 : 1, borderColor: on ? theme.goldBright : theme.borderMid
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
+                      {t.swatch.map((c, i) => (
+                        <View key={i} style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: c, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' }} />
+                      ))}
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{t.name}</Text>
+                      {on ? <Text style={{ color: theme.goldBright, fontSize: 9, fontWeight: '800', letterSpacing: 1 }}>SELECTED</Text> : null}
+                    </View>
+                    <Text style={{ color: theme.inkMuted, fontSize: 11, lineHeight: 15, marginTop: 2 }}>{t.blurb}</Text>
+                  </Pressable>
                 )
               })}
             </View>
