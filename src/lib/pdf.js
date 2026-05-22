@@ -1172,7 +1172,7 @@ async function drawThemedProposal(doc, ctx) {
     doc.text(company?.name || 'My Company', margin, cursor + 4)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...t.muted)
     let cy = cursor + 9
-    for (const l of themedAddressLines(company)) { doc.text(l, margin, cy); cy += 4.2 }
+    for (const l of themedAddressLines(company)) { const w = doc.splitTextToSize(l, innerW * 0.6); doc.text(w, margin, cy); cy += w.length * 4.2 }
     drawPlainLogo(doc, { x: pageWidth - margin, y: cursor, maxW: 50, maxH: 18, logo, company, align: 'right', monoColor: t.accent })
     cursor = Math.max(cy, cursor + 22)
     // ESTIMATE wordmark, right
@@ -1186,7 +1186,7 @@ async function drawThemedProposal(doc, ctx) {
     doc.text(contact?.name || '—', margin, cursor + 6)
     doc.setFontSize(9); doc.setTextColor(...t.muted)
     let ty = cursor + 11
-    for (const l of themedAddressLines(contact)) { doc.text(l, margin, ty); ty += 4.2 }
+    for (const l of themedAddressLines(contact)) { const w = doc.splitTextToSize(l, innerW * 0.5); doc.text(w, margin, ty); ty += w.length * 4.2 }
     const metaR = [['Estimate #', number], ['Estimate date', fmtShortPdf(issuedAt)], ['Valid until', fmtShortPdf(expiresAt)]]
     metaR.forEach(([label, val], i) => {
       const my = cursor + i * 5.5
@@ -1218,7 +1218,8 @@ async function drawThemedProposal(doc, ctx) {
       lines.forEach((l, i) => {
         doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
         doc.setTextColor(...(i === 0 ? t.ink : t.mid))
-        doc.text(String(l), margin + colW * ci, yy); yy += 4.4
+        const wrapped = doc.splitTextToSize(String(l), colW - 8)
+        doc.text(wrapped, margin + colW * ci, yy); yy += wrapped.length * 4.4
       })
       yMax = Math.max(yMax, yy)
     })
