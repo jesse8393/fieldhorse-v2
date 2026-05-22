@@ -41,7 +41,7 @@ const INVOICE_TINT: Record<string, string> = {
 }
 
 const CO_TINT: Record<string, string> = {
-  pending: '#C9963A', approved: '#4F8C5E', declined: '#7d2a1f'
+  draft: '#C9963A', sent: '#6B7CA8', approved: '#4F8C5E', rejected: '#7d2a1f', void: '#5C5C5C'
 }
 
 const INSP_TINT: Record<string, string> = {
@@ -324,9 +324,15 @@ export default function JobDetailScreen() {
 
   function cycleChangeOrder(co: { id: string; status: string }) {
     if (!contact) return
-    const order = ['pending', 'approved', 'declined']
-    const next = order[(order.indexOf(co.status) + 1) % order.length]
-    updateChangeOrderStatus({ id: co.id, contactId: contact.id, status: next })
+    const order = ['draft', 'approved', 'rejected']
+    const idx = order.indexOf(co.status)
+    const next = order[(idx === -1 ? 0 : idx + 1) % order.length]
+    updateChangeOrderStatus({
+      id: co.id,
+      contactId: contact.id,
+      status: next,
+      approvedByName: next === 'approved' ? (contact.name || null) : null
+    })
   }
 
   function confirmDeleteChangeOrder(cid: string) {
@@ -934,7 +940,9 @@ export default function JobDetailScreen() {
                 >
                   <View className="flex-1 pr-3">
                     <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{co.title}</Text>
-                    <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>{co.status}</Text>
+                    <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>
+                      {co.status}{co.status === 'approved' && (co as any).approved_by_name ? ` · ${(co as any).approved_by_name}` : ''}
+                    </Text>
                   </View>
                   <Text className="text-ink font-bold">{money(Number(co.amount || 0))}</Text>
                 </Pressable>
