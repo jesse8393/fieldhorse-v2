@@ -326,11 +326,11 @@ export function MintProposal({ view }: { view: ProposalView }) {
   const greenSoft = '#EAF1ED'
   return (
     <Page>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 16 }}>
+        <div style={{ minWidth: 0, maxWidth: '62%' }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: '#1A1814' }}>{company?.name || '—'}</div>
           {addressLines(company).map((l, i) => (
-            <div key={i} style={{ fontSize: 12, color: '#6B6A66', lineHeight: 1.5 }}>{l}</div>
+            <div key={i} style={{ fontSize: 12, color: '#6B6A66', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
           ))}
         </div>
         <LogoMark company={company} maxHeight={70} align="right" />
@@ -341,11 +341,11 @@ export function MintProposal({ view }: { view: ProposalView }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 26 }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: green, marginBottom: 4 }}>To</div>
           <div style={{ fontSize: 16, color: '#1A1814', marginBottom: 4 }}>{recipient?.name || '—'}</div>
           {addressLines(recipient).map((l, i) => (
-            <div key={i} style={{ fontSize: 12, color: '#6B6A66', lineHeight: 1.5 }}>{l}</div>
+            <div key={i} style={{ fontSize: 12, color: '#6B6A66', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
           ))}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -484,9 +484,9 @@ function EditMeta({ label, value, tan }: any) {
 function EditCol({ lines, tan }: any) {
   const arr = (lines || []).filter(Boolean)
   return (
-    <div>
+    <div style={{ minWidth: 0, paddingRight: 10 }}>
       {arr.map((l: string, i: number) => (
-        <div key={i} style={{ fontSize: 12, lineHeight: 1.6, color: i === 0 ? '#2B2620' : '#6B6258', fontWeight: i === 0 ? 700 : 400 }}>{l}</div>
+        <div key={i} style={{ fontSize: 12, lineHeight: 1.5, color: i === 0 ? '#2B2620' : '#6B6258', fontWeight: i === 0 ? 700 : 400, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
       ))}
     </div>
   )
@@ -495,7 +495,7 @@ function PartyCol({ label, name, lines }: any) {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#1A1814', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 13, color: '#3A3833', lineHeight: 1.55 }}>
+      <div style={{ fontSize: 13, color: '#3A3833', lineHeight: 1.55, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
         <div style={{ fontWeight: 700, color: '#1A1814' }}>{name || '—'}</div>
         {lines.map((l: string, i: number) => <div key={i}>{l}</div>)}
       </div>
