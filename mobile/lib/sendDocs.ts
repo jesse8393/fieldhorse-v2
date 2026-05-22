@@ -71,6 +71,36 @@ export async function sendProposalEmail(input: {
   return { ok: true }
 }
 
+export async function sendMessageEmail(input: {
+  userId: string
+  contactId: string
+  recipientEmail: string
+  recipientName?: string | null
+  subject?: string | null
+  body: string
+}): Promise<SendResult> {
+  const email = (input.recipientEmail || '').trim()
+  if (!email) return { ok: false, message: 'No recipient email.' }
+  const res = await fetch(`${API_BASE}/api/send-message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contact_id: input.contactId,
+      sender_user_id: input.userId,
+      recipient_email: email,
+      recipient_name: input.recipientName || null,
+      subject: input.subject || null,
+      body: input.body
+    })
+  })
+  const body = await res.json().catch(() => ({} as any))
+  if (res.status === 503 && body?.error === 'sender_not_configured') {
+    return { ok: false, notConfigured: true, message: 'Email sending is not configured on the server yet.' }
+  }
+  if (!res.ok || !body?.ok) return { ok: false, message: body?.detail || body?.error || 'Send failed.' }
+  return { ok: true }
+}
+
 export async function sendInvoiceEmail(input: {
   html: string
   filename: string

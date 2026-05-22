@@ -17,6 +17,7 @@ import { ScreenBackground, ScreenHeader, GoldButton, theme } from '../components
 import { claudeMessage, claudeText } from '../lib/anthropic'
 import { useJobs, useProfile, type JobRow } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
+import { sendMessageEmail } from '../lib/sendDocs'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -86,7 +87,8 @@ export default function ComposeScreen() {
     setTimeout(() => setCopied(false), 1800)
   }
 
-  function send() {
+  const [sending, setSending] = useState(false)
+  async function send() {
     if (channel === 'sms') {
       const to = contact?.phone || ''
       Linking.openURL(`sms:${to}?body=${encodeURIComponent(draft)}`)
@@ -95,6 +97,17 @@ export default function ComposeScreen() {
     if (channel === 'email') {
       const to = contact?.email || ''
       const subject = contact?.job_title ? `Re: ${contact.job_title}` : intent
+      // Prefer a platform send (logged + branded From) when we have a
+      // linked contact + user; fall back to the OS mail composer.
+      if (to && contactId && user && !sending) {
+        setSending(true)
+        try {
+          const res = await sendMessageEmail({ userId: user.id, contactId, recipientEmail: to, recipientName: contact?.name, subject, body: draft })
+          if (res.ok) { Alert.alert('Message sent', `Emailed to ${to}.`); return }
+          if (!res.notConfigured) { Alert.alert("Couldn't send", res.message || 'Opening your mail app instead.') }
+        } catch { /* fall through to mailto */ }
+        finally { setSending(false) }
+      }
       Linking.openURL(`mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(draft)}`)
       return
     }
