@@ -2,14 +2,21 @@
 // InvoiceDetail). :id is a contact id. Contract / paid / balance with a
 // payment history and a Collect Payment flow. PDF/email/public-link defer.
 import { useState } from 'react'
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native'
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { DollarSign, Send, Briefcase } from 'lucide-react-native'
-import { useInvoiceDetail } from '../../lib/queries'
+import { useQueryClient } from '@tanstack/react-query'
+import { WebView } from 'react-native-webview'
+import { DollarSign, Briefcase, Eye, Share2, Send, Link as LinkIcon, X } from 'lucide-react-native'
+import { useInvoiceDetail, useProfile } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui'
 import { PaymentSheet } from '../../components/PaymentSheet'
+import { buildInvoiceHtml } from '../../lib/invoiceHtml'
+import { shareProposalPdf } from '../../lib/quotePdf'
+import { sendInvoiceEmail } from '../../lib/sendDocs'
+import { mintPublicLink } from '../../lib/publicLink'
 
 function money(n: number) { return `$${Math.round(n).toLocaleString()}` }
 
@@ -19,7 +26,12 @@ export default function InvoiceDetailScreen() {
   const { user } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending } = useInvoiceDetail(id)
+  const { data: profile } = useProfile(user?.id)
+  const queryClient = useQueryClient()
   const [payOpen, setPayOpen] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const [busy, setBusy] = useState<null | 'send' | 'link'>(null)
 
   if (isPending) {
     return <View style={{ flex: 1 }}><ScreenBackground /><ActivityIndicator color={theme.goldBright} style={{ marginTop: insets.top + 80 }} /></View>
@@ -42,6 +54,46 @@ export default function InvoiceDetailScreen() {
     : isPaid ? { label: 'PAID', tint: theme.success }
     : ageDays > 60 ? { label: 'OVERDUE', tint: theme.danger }
     : { label: 'OUTSTANDING', tint: theme.goldBright }
+
+  function buildHtml() {
+    return buildInvoiceHtml((profile || {}) as any, contact as any, {
+      number: String(contact.id || '').slice(0, 4).toUpperCase(),
+      issuedAt: new Date(),
+      jobTitle: contact.jobTitle,
+      total, paid, balance,
+      payments: payments.map((p: any) => ({ method: p.method, amount: p.amount, paidOn: p.paidOn, reference: p.reference }))
+    })
+  }
+  const fileName = `Invoice_${(contact.name || 'client').replace(/\s+/g, '_')}.pdf`
+
+  async function onShare() {
+    if (sharing) return
+    setSharing(true)
+    try { await shareProposalPdf(buildHtml(), fileName) }
+    catch (e: any) { Alert.alert("Couldn't create PDF", e?.message || 'Try again.') }
+    finally { setSharing(false) }
+  }
+  async function onSendEmail() {
+    if (busy || !user) return
+    if (!(contact.email || '').trim()) { Alert.alert('Add a client email first', 'Add an email to the client, then send.'); return }
+    setBusy('send')
+    try {
+      const res = await sendInvoiceEmail({ html: buildHtml(), filename: fileName, userId: user.id, contact: { id: contact.id, name: contact.name, email: contact.email } })
+      if (res.ok) { queryClient.invalidateQueries({ queryKey: ['invoiceDetail', id] }); Alert.alert('Invoice sent', `Emailed to ${contact.email}.`) }
+      else Alert.alert(res.notConfigured ? 'Saved to Files' : "Couldn't send", res.message || 'Try again.')
+    } catch (e: any) { Alert.alert("Couldn't send", e?.message || 'Try again.') }
+    finally { setBusy(null) }
+  }
+  async function onCopyLink() {
+    if (busy || !user) return
+    setBusy('link')
+    try {
+      const { url } = await mintPublicLink({ contactId: contact.id, userId: user.id, kind: 'invoice' })
+      await Clipboard.setStringAsync(url)
+      Alert.alert('Share link copied', 'Paste it into a text or email — the customer can view and pay online.')
+    } catch (e: any) { Alert.alert("Couldn't create link", e?.message || 'Try again.') }
+    finally { setBusy(null) }
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -108,24 +160,48 @@ export default function InvoiceDetailScreen() {
       </ScrollView>
 
       {/* Sticky action bar */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: 'rgba(11,9,7,0.92)', borderTopWidth: 1, borderTopColor: theme.border }}>
-        {contact.email ? (
-          <Pressable onPress={() => Linking.openURL(`mailto:${contact.email}?subject=${encodeURIComponent('Invoice — ' + (contact.name || ''))}&body=${encodeURIComponent(`Balance due: ${money(balance)}`)}`)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, paddingVertical: 13, borderWidth: 1, borderColor: theme.borderMid }}>
-            <Send color={theme.ink} size={15} />
-            <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 14 }}>Email</Text>
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: 'rgba(11,9,7,0.92)', borderTopWidth: 1, borderTopColor: theme.border, gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <ActionBtn icon={<Eye color={theme.goldBright} size={15} />} label="Preview" onPress={() => setPreviewHtml(buildHtml())} outline />
+          <ActionBtn icon={sharing ? <ActivityIndicator color={theme.goldBright} /> : <Share2 color={theme.goldBright} size={15} />} label="Share PDF" onPress={onShare} outline />
+          <ActionBtn icon={busy === 'link' ? <ActivityIndicator color={theme.goldBright} /> : <LinkIcon color={theme.goldBright} size={15} />} label="Link" onPress={onCopyLink} outline />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {contact.email ? (
+            <ActionBtn icon={busy === 'send' ? <ActivityIndicator color={theme.ink} /> : <Send color={theme.ink} size={15} />} label="Send invoice" onPress={onSendEmail} outline />
+          ) : null}
+          <Pressable onPress={() => setPayOpen(true)} style={{ flex: 1.4, borderRadius: 12, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, backgroundColor: theme.goldBright }}>
+              <DollarSign color={theme.onGold} size={15} />
+              <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Collect Payment</Text>
+            </View>
           </Pressable>
-        ) : null}
-        <Pressable onPress={() => setPayOpen(true)} style={{ flex: 1.4, borderRadius: 12, overflow: 'hidden' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, backgroundColor: theme.goldBright }}>
-            <DollarSign color={theme.onGold} size={15} />
-            <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Collect Payment</Text>
-          </View>
-        </Pressable>
+        </View>
       </View>
+
+      {/* Invoice preview */}
+      <Modal visible={!!previewHtml} animationType="slide" onRequestClose={() => setPreviewHtml(null)}>
+        <View style={{ flex: 1, backgroundColor: '#33302b' }}>
+          <View style={{ paddingTop: insets.top + 8, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1A1714' }}>
+            <Text style={{ color: '#F2EDE4', fontWeight: '700', fontSize: 16 }}>Invoice preview</Text>
+            <Pressable onPress={() => setPreviewHtml(null)} hitSlop={12}><X color="#F2EDE4" size={22} /></Pressable>
+          </View>
+          {previewHtml ? <WebView originWhitelist={['*']} source={{ html: previewHtml }} style={{ flex: 1, backgroundColor: '#33302b' }} scalesPageToFit /> : null}
+        </View>
+      </Modal>
 
       {user ? (
         <PaymentSheet open={payOpen} onClose={() => setPayOpen(false)} userId={user.id} contactId={contact.id} balance={balance} />
       ) : null}
     </View>
+  )
+}
+
+function ActionBtn({ icon, label, onPress, outline }: { icon: React.ReactNode; label: string; onPress: () => void; outline?: boolean }) {
+  return (
+    <Pressable onPress={onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, paddingVertical: 13, borderWidth: outline ? 1 : 0, borderColor: theme.borderMid, backgroundColor: outline ? 'rgba(255,240,210,0.04)' : 'transparent' }}>
+      {icon}
+      <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 13 }}>{label}</Text>
+    </Pressable>
   )
 }
