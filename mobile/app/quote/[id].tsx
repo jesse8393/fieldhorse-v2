@@ -7,18 +7,24 @@ import {
   View, Text, ScrollView, Pressable, TextInput, ActivityIndicator,
   Modal, KeyboardAvoidingView, Platform, Alert, Switch
 } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { WebView } from 'react-native-webview'
-import { ChevronLeft, Plus, Pencil, Eye, Share2, X } from 'lucide-react-native'
+import { ChevronLeft, Plus, Pencil, Eye, Share2, X, Send, Link as LinkIcon } from 'lucide-react-native'
 import {
   useQuoteItems, useAddQuoteItem, useUpdateQuoteItem, useDeleteQuoteItem,
   useApplyQuoteTotal, useProfile, useJobDetail, type QuoteItem
 } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground } from '../../components/ui'
+import { ShieldCheck } from 'lucide-react-native'
 import { buildProposalHtml } from '../../lib/proposalHtml'
 import { shareProposalPdf } from '../../lib/quotePdf'
+import { sendProposalEmail } from '../../lib/sendDocs'
+import { mintPublicLink } from '../../lib/publicLink'
+import { approveQuoteVersion, type ApprovalMethod } from '../../lib/approveQuote'
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -37,29 +43,120 @@ export default function QuoteScreen() {
   const deleteItem = useDeleteQuoteItem()
   const applyTotal = useApplyQuoteTotal()
 
+  const queryClient = useQueryClient()
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
+  const [busy, setBusy] = useState<null | 'send' | 'link'>(null)
   const hasBase = items.some((it) => !it.is_optional && !it.is_excluded)
+  const contact = jobDetail?.contact || null
+  const isApproved = (contact?.proposal_status || '').toLowerCase() === 'approved'
+
+  // Approval modal state
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [apprMethod, setApprMethod] = useState<ApprovalMethod>('verbal')
+  const [apprName, setApprName] = useState('')
+  const [apprEmail, setApprEmail] = useState('')
+  const [apprNote, setApprNote] = useState('')
+  const [apprSig, setApprSig] = useState('')
+  const [approving, setApproving] = useState(false)
+
+  function openApprove() {
+    setApprMethod('verbal')
+    setApprName(contact?.name || '')
+    setApprEmail(contact?.email || '')
+    setApprNote(''); setApprSig('')
+    setApproveOpen(true)
+  }
+  async function onApprove() {
+    if (approving || !user || !contact) return
+    if (!apprName.trim()) { Alert.alert('Name required', 'Enter who approved the quote.'); return }
+    setApproving(true)
+    try {
+      await approveQuoteVersion({
+        userId: user.id,
+        contact: contact as any,
+        items: items as any,
+        method: apprMethod,
+        approvedByName: apprName,
+        approvedByEmail: apprEmail,
+        note: apprNote,
+        signatureKind: apprMethod === 'signature_typed' ? 'typed' : null,
+        signatureData: apprMethod === 'signature_typed' ? apprSig : null
+      })
+      queryClient.invalidateQueries({ queryKey: ['jobDetail', id] })
+      queryClient.invalidateQueries({ queryKey: ['estimates'] })
+      setApproveOpen(false)
+      Alert.alert('Quote approved', 'A locked, signed version was saved as the approved baseline.')
+    } catch (e: any) {
+      Alert.alert("Couldn't approve", e?.message || 'Try again.')
+    } finally {
+      setApproving(false)
+    }
+  }
 
   function buildHtml() {
-    const contact = jobDetail?.contact || ({} as any)
     return buildProposalHtml(
       (profile || {}) as any,
-      contact as any,
+      (contact || {}) as any,
       items as any,
       { number: String(id || '').slice(0, 4).toUpperCase() || 'EST', issuedAt: new Date() }
     )
+  }
+  function filename() {
+    return `Estimate_${(contact?.name || 'client').replace(/\s+/g, '_')}.pdf`
   }
 
   async function onShare() {
     if (!hasBase || sharing) return
     setSharing(true)
     try {
-      await shareProposalPdf(buildHtml(), `Estimate_${(jobDetail?.contact?.name || 'client').replace(/\s+/g, '_')}.pdf`)
+      await shareProposalPdf(buildHtml(), filename())
     } catch (e: any) {
       Alert.alert("Couldn't create PDF", e?.message || 'Try again.')
     } finally {
       setSharing(false)
+    }
+  }
+
+  async function onSendEmail() {
+    if (!hasBase || busy || !user) return
+    if (!(contact?.email || '').trim()) {
+      Alert.alert('Add a client email first', 'Open the client and add an email, then send.')
+      return
+    }
+    setBusy('send')
+    try {
+      const res = await sendProposalEmail({
+        html: buildHtml(),
+        filename: filename(),
+        userId: user.id,
+        contact: { id: String(id), name: contact?.name, email: contact?.email }
+      })
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ['jobDetail', id] })
+        queryClient.invalidateQueries({ queryKey: ['estimates'] })
+        Alert.alert('Proposal sent', `Emailed to ${contact?.email}.`)
+      } else {
+        Alert.alert(res.notConfigured ? 'Saved to Files' : "Couldn't send", res.message || 'Try again.')
+      }
+    } catch (e: any) {
+      Alert.alert("Couldn't send", e?.message || 'Try again.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onCopyLink() {
+    if (busy || !user) return
+    setBusy('link')
+    try {
+      const { url } = await mintPublicLink({ contactId: String(id), userId: user.id, kind: 'proposal' })
+      await Clipboard.setStringAsync(url)
+      Alert.alert('Share link copied', 'Paste it into a text or email — the customer can view and approve online.')
+    } catch (e: any) {
+      Alert.alert("Couldn't create link", e?.message || 'Try again.')
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -155,25 +252,54 @@ export default function QuoteScreen() {
         <Text className="text-gold-bright text-[10px] font-bold tracking-[2px] uppercase">Estimate</Text>
         <Text className="text-ink text-3xl font-bold mb-4">Quote builder</Text>
 
-        {/* Preview / Share — render the estimate in the design picked in
-            Settings, then share it as a PDF. */}
-        <View className="flex-row mb-5" style={{ gap: 10 }}>
+        {/* Customer-facing actions — render in the design picked in
+            Settings, then preview / share PDF / email / copy a link. */}
+        <View className="mb-5" style={{ gap: 10 }}>
+          <View className="flex-row" style={{ gap: 10 }}>
+            <Pressable
+              onPress={() => { if (hasBase) setPreviewHtml(buildHtml()) }}
+              disabled={!hasBase}
+              className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
+              style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
+            >
+              <Eye color="#E8B865" size={16} />
+              <Text className="text-gold-bright font-bold text-sm">Preview</Text>
+            </Pressable>
+            <Pressable
+              onPress={onShare}
+              disabled={!hasBase || sharing}
+              className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
+              style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
+            >
+              {sharing ? <ActivityIndicator color="#E8B865" /> : <><Share2 color="#E8B865" size={16} /><Text className="text-gold-bright font-bold text-sm">Share PDF</Text></>}
+            </Pressable>
+          </View>
+          <View className="flex-row" style={{ gap: 10 }}>
+            <Pressable
+              onPress={onSendEmail}
+              disabled={!hasBase || busy !== null}
+              className="flex-1 flex-row items-center justify-center rounded-xl py-3"
+              style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: '#E8B865' }}
+            >
+              {busy === 'send' ? <ActivityIndicator color="#1A120A" /> : <><Send color="#1A120A" size={16} /><Text className="text-[#1A120A] font-bold text-sm">Send to client</Text></>}
+            </Pressable>
+            <Pressable
+              onPress={onCopyLink}
+              disabled={!hasBase || busy !== null}
+              className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
+              style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
+            >
+              {busy === 'link' ? <ActivityIndicator color="#E8B865" /> : <><LinkIcon color="#E8B865" size={16} /><Text className="text-gold-bright font-bold text-sm">Copy link</Text></>}
+            </Pressable>
+          </View>
           <Pressable
-            onPress={() => { if (hasBase) setPreviewHtml(buildHtml()) }}
+            onPress={openApprove}
             disabled={!hasBase}
-            className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
-            style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
+            className="flex-row items-center justify-center rounded-xl py-3"
+            style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: isApproved ? 'rgba(72,130,95,0.18)' : 'rgba(72,130,95,0.14)', borderWidth: 1, borderColor: 'rgba(72,130,95,0.5)' }}
           >
-            <Eye color="#E8B865" size={16} />
-            <Text className="text-gold-bright font-bold text-sm">Preview</Text>
-          </Pressable>
-          <Pressable
-            onPress={onShare}
-            disabled={!hasBase || sharing}
-            className="flex-1 flex-row items-center justify-center rounded-xl py-3"
-            style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: '#E8B865' }}
-          >
-            {sharing ? <ActivityIndicator color="#1A120A" /> : <><Share2 color="#1A120A" size={16} /><Text className="text-[#1A120A] font-bold text-sm">Share PDF</Text></>}
+            <ShieldCheck color="#6FB387" size={16} />
+            <Text style={{ color: '#6FB387', fontWeight: '700', fontSize: 14 }}>{isApproved ? 'Approved · record another' : 'Approve quote'}</Text>
           </Pressable>
         </View>
 
@@ -334,6 +460,49 @@ export default function QuoteScreen() {
             </Pressable>
           </View>
         </View>
+      </Modal>
+
+      {/* Approve quote */}
+      <Modal visible={approveOpen} transparent animationType="slide" onRequestClose={() => setApproveOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable className="flex-1" onPress={() => setApproveOpen(false)} />
+          <ScrollView className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]" contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }} style={{ maxHeight: '90%' }}>
+            <Text className="text-ink text-xl font-bold mb-1">Approve quote</Text>
+            <Text className="text-ink-muted text-[13px] mb-5">Saves a locked, signed version as the approved baseline the job inherits.</Text>
+
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">How was it approved?</Text>
+            <View className="flex-row flex-wrap mb-4" style={{ gap: 8 }}>
+              {([['verbal', 'Verbal'], ['email', 'Email'], ['in_person', 'In person'], ['signature_typed', 'Typed signature']] as [ApprovalMethod, string][]).map(([m, label]) => {
+                const on = apprMethod === m
+                return (
+                  <Pressable key={m} onPress={() => setApprMethod(m)} className="rounded-full px-3 py-2" style={{ borderWidth: 1, borderColor: on ? '#6FB387' : '#3a352e', backgroundColor: on ? 'rgba(72,130,95,0.16)' : 'transparent' }}>
+                    <Text style={{ color: on ? '#6FB387' : '#9b948a', fontSize: 13, fontWeight: '700' }}>{label}</Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Approved by</Text>
+            <TextInput value={apprName} onChangeText={setApprName} placeholder="Customer name" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4" />
+
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Email (optional)</Text>
+            <TextInput value={apprEmail} onChangeText={setApprEmail} autoCapitalize="none" keyboardType="email-address" placeholder="customer@email.com" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4" />
+
+            {apprMethod === 'signature_typed' ? (
+              <>
+                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Typed signature</Text>
+                <TextInput value={apprSig} onChangeText={setApprSig} placeholder="Type full name as signature" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4" style={{ fontStyle: 'italic' }} />
+              </>
+            ) : null}
+
+            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Note (optional)</Text>
+            <TextInput value={apprNote} onChangeText={setApprNote} placeholder="Anything to record about the approval" placeholderTextColor="rgba(242,237,228,0.4)" multiline className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5" style={{ minHeight: 64, textAlignVertical: 'top' }} />
+
+            <Pressable onPress={onApprove} disabled={approving} className="rounded-xl py-4 flex-row items-center justify-center" style={{ gap: 8, backgroundColor: approving ? 'rgba(72,130,95,0.5)' : '#4F8C5E' }}>
+              {approving ? <ActivityIndicator color="#fff" /> : <><ShieldCheck color="#fff" size={18} /><Text style={{ color: '#fff', fontWeight: '800' }}>Approve & lock</Text></>}
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   )
