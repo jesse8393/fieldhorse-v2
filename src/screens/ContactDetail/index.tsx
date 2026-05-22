@@ -27,6 +27,7 @@ import {
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
 import { resolveNextAction } from './lib/jobNextAction.ts'
+import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
 import OverviewTab from './tabs/Overview.tsx'
 import QuoteTab from './tabs/Quote.tsx'
 import DetailsTab from './tabs/Details.tsx'
@@ -108,9 +109,14 @@ export default function ContactDetail() {
     fetchAll()
   }
 
-  // URL-synced tab state. Default to overview if the param is absent or invalid.
+  // URL-synced tab state. Default to overview if the param is absent,
+  // invalid, or not exposed by the current stage's workspace.
   const tabParam = searchParams.get('tab')
-  const tab = (tabParam && VALID_TABS.has(tabParam)) ? tabParam : 'overview'
+  const stageTabs = tabsForStage(contact?.stage)
+  const visibleTabs = TOP_TABS.filter((t) => stageTabs.includes(t.id as any))
+  const tab = (tabParam && VALID_TABS.has(tabParam))
+    ? resolveTabForStage(contact?.stage, tabParam)
+    : 'overview'
   function setTab(next: any) {
     if (next === tab) return
     const sp = new URLSearchParams(searchParams)
@@ -278,7 +284,7 @@ export default function ContactDetail() {
       <SegmentedTabs
         value={tab}
         onChange={setTab}
-        tabs={TOP_TABS}
+        tabs={visibleTabs}
         ariaLabel="Job detail tabs"
       />
 
