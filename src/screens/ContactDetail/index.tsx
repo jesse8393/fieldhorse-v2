@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, Phone, MessageSquare, Pencil, MoreHorizontal,
-  XCircle, Trash2, Users
+  XCircle, Trash2, Users, ArrowRight
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
@@ -27,6 +27,7 @@ import {
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
 import { resolveNextAction } from './lib/jobNextAction.ts'
+import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
 import OverviewTab from './tabs/Overview.tsx'
 import QuoteTab from './tabs/Quote.tsx'
 import DetailsTab from './tabs/Details.tsx'
@@ -108,9 +109,14 @@ export default function ContactDetail() {
     fetchAll()
   }
 
-  // URL-synced tab state. Default to overview if the param is absent or invalid.
+  // URL-synced tab state. Default to overview if the param is absent,
+  // invalid, or not exposed by the current stage's workspace.
   const tabParam = searchParams.get('tab')
-  const tab = (tabParam && VALID_TABS.has(tabParam)) ? tabParam : 'overview'
+  const stageTabs = tabsForStage(contact?.stage)
+  const visibleTabs = TOP_TABS.filter((t) => stageTabs.includes(t.id as any))
+  const tab = (tabParam && VALID_TABS.has(tabParam))
+    ? resolveTabForStage(contact?.stage, tabParam)
+    : 'overview'
   function setTab(next: any) {
     if (next === tab) return
     const sp = new URLSearchParams(searchParams)
@@ -204,6 +210,16 @@ export default function ContactDetail() {
   // the wrapper level so both branches can dispatch them.
   const useDesktopShell = isDesktop
 
+  // Per-stage primary action — gives the mobile deal screen the same
+  // "what do I do next at this stage" CTA the desktop shell already has
+  // (DesktopJobDetail's nextActionFor). Closed/lost are terminal → null.
+  const stageCta: { label: string; onClick: () => void } | null =
+    contact.stage === 'lead'    ? { label: 'Build quote',   onClick: () => setTab('quote') }
+    : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
+    : contact.stage === 'job'     ? { label: 'Mark complete',  onClick: () => setCompleteOpen(true) }
+    : contact.stage === 'invoice' ? { label: 'Log payment',    onClick: () => setPayModalOpen(true) }
+    : null
+
   return (
     <div
       className={`v3-screen v3-screen--job-detail${tab === 'quote' ? ' v3-screen--quote-active' : ''}`}
@@ -274,11 +290,34 @@ export default function ContactDetail() {
 
       <StageTimeline currentStage={contact.stage ?? undefined} />
 
+      {/* STAGE PRIMARY ACTION — one clear next step per stage */}
+      {stageCta && (
+        <div style={{ padding: '4px 20px 8px' }}>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.99 }}
+            onClick={() => { hapticTap(); stageCta.onClick() }}
+            style={{
+              width: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '12px 16px', borderRadius: 12, border: 'none',
+              background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
+              fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
+              cursor: 'pointer', boxShadow: 'var(--v3-gold-glow)',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            {stageCta.label}
+            <ArrowRight size={16} strokeWidth={2.4} aria-hidden="true" />
+          </motion.button>
+        </div>
+      )}
+
       {/* TOP-LEVEL TABS (underline variant) */}
       <SegmentedTabs
         value={tab}
         onChange={setTab}
-        tabs={TOP_TABS}
+        tabs={visibleTabs}
         ariaLabel="Job detail tabs"
       />
 

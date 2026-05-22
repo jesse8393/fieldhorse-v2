@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../../lib/haptics.ts'
 import { stageColor } from '../../lib/stages.ts'
+import { tabsForStage } from '../../screens/ContactDetail/lib/stageWorkspace.ts'
 import OverviewTab_ from '../../screens/ContactDetail/tabs/Overview.tsx'
 import QuoteTab_ from '../../screens/ContactDetail/tabs/Quote.tsx'
 import DetailsTab_ from '../../screens/ContactDetail/tabs/Details.tsx'
@@ -110,6 +111,7 @@ export default function DesktopJobDetail({
 }: any) {
   const contractValue = Number(contact?.amount || 0)
   const stageKey = String(contact?.stage || 'lead').toLowerCase()
+  const visibleTabs = TABS.filter((t) => tabsForStage(stageKey).includes(t.id as any))
   const stageLabel = STAGE_LABEL[stageKey] || stageKey
   const sc = stageColor(stageKey)
   const billedPct = contractValue > 0 ? Math.min(100, Math.round((Number(paid || 0) / contractValue) * 100)) : 0
@@ -223,7 +225,7 @@ export default function DesktopJobDetail({
 
       {/* TAB NAV */}
       <nav className="dt-jobdetail__tabs" aria-label="Job sections">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             type="button"

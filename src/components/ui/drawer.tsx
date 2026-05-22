@@ -39,7 +39,7 @@ const DrawerContent = React.forwardRef<any, any>(({ className, children, ...prop
 DrawerContent.displayName = 'DrawerContent'
 
 const DrawerHeader = ({ className, ...props }: any) => (
-  <div className={cn('ui:grid ui:gap-1.5 ui:p-4 ui:text-center ui:sm:text-left', className)} {...props} />
+  <div className={cn('ui:grid ui:gap-1 ui:px-4 ui:pt-2 ui:pb-3 ui:text-center ui:sm:text-left', className)} {...props} />
 )
 const DrawerFooter = ({ className, ...props }: any) => (
   <div className={cn('ui:mt-auto ui:flex ui:flex-col ui:gap-2 ui:p-4', className)} {...props} />

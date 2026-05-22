@@ -4,10 +4,12 @@ import { motion } from 'framer-motion'
 import {
   ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
   Briefcase, Paperclip, Image as ImageIcon, Download,
-  Phone, Mail, MapPin, Trash2, MessageSquare, Users
+  Phone, Mail, MapPin, Trash2, MessageSquare, Users,
+  Plus, FileText, Receipt
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'
@@ -57,6 +59,9 @@ export default function ClientDetail() {
   // Destructive-confirm sheet state for delete client.
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // "New" chooser sheet — spin up a quote / job / invoice under this client.
+  const [newOpen, setNewOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   // Derived metrics — computed from jobs[] + payments[].
   // Lifetime: sum of every job amount under this client, all stages.
@@ -102,6 +107,37 @@ export default function ClientDetail() {
     }
     toastInfo('Client deleted', 'Linked jobs unlinked')
     navigate('/clients')
+  }
+
+  // Create a new deal under this client at the chosen stage, prefilled
+  // with the client's contact info, then jump straight into it. A quote
+  // lands on the Quote builder; an invoice (materials/quick job, no quote
+  // needed) lands on Financials; a job lands on Overview.
+  async function createDealForClient(stage: 'quote' | 'job' | 'invoice') {
+    if (!client?.id || !user?.id || creating) return
+    setCreating(true)
+    const payload = {
+      user_id: user.id,
+      name: client.name || 'New ' + stage,
+      phone: client.phone || null,
+      email: client.email || null,
+      address: client.address || null,
+      amount: 0,
+      stage,
+      client_id: client.id
+    }
+    const { data, error } = await supabase.from('fh_contacts').insert(payload).select().single()
+    if (error) {
+      setCreating(false)
+      toast({ kind: 'error', title: "Couldn't create", body: error.message } as any)
+      return
+    }
+    hapticMedium()
+    await fetchClient()
+    setCreating(false)
+    setNewOpen(false)
+    const dest = stage === 'invoice' ? '?tab=financials' : stage === 'quote' ? '?tab=quote' : ''
+    navigate(`/jobs/${data.id}${dest}`)
   }
 
   if (loading) {
@@ -288,6 +324,27 @@ export default function ClientDetail() {
         </div>
       </div>
 
+      {/* PRIMARY — spin up a new quote / job / invoice for this client */}
+      <div style={{ padding: '0 20px 12px' }}>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.99 }}
+          onClick={() => { hapticTap(); setNewOpen(true) }}
+          style={{
+            width: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '13px 16px', borderRadius: 14, border: 'none',
+            background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
+            cursor: 'pointer', boxShadow: 'var(--v3-gold-glow)',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+        >
+          <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
+          New quote or invoice
+        </motion.button>
+      </div>
+
       {/* TABS — v3 segmented underline (Overview · Projects · Files · Notes) */}
       <SegmentedTabs
         value={tab}
@@ -331,7 +388,75 @@ export default function ClientDetail() {
           Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running — they just lose the client link.
         </p>
       </ActionSheet>
+
+      {/* NEW-DEAL CHOOSER — quote / job / invoice, all linked to this client */}
+      <Drawer open={newOpen} onOpenChange={(o: any) => { if (!o && !creating) setNewOpen(false) }}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>New for {client.name}</DrawerTitle>
+            <DrawerDescription>Start a quote, a quick job, or a standalone invoice — all linked to this client.</DrawerDescription>
+          </DrawerHeader>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
+            <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
+            <NewDealOption icon={Briefcase} label="New job" sub="Quick job — skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
+            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc — no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
+          </div>
+        </DrawerContent>
+      </Drawer>
     </motion.div>
+  )
+}
+
+/* ============================================================
+   NewDealOption — one row in the "New for {client}" chooser sheet
+   ============================================================ */
+
+function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={disabled ? undefined : { scale: 0.99 }}
+      onClick={() => { if (!disabled) { hapticTap(); onClick?.() } }}
+      disabled={disabled}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        width: '100%', textAlign: 'left',
+        padding: '14px 16px', borderRadius: 14,
+        background: 'var(--v3-surface-2)',
+        border: '1px solid var(--v3-border-strong)',
+        color: 'var(--v3-text)',
+        cursor: disabled ? 'wait' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        WebkitTapHighlightColor: 'transparent'
+      }}
+    >
+      <span aria-hidden="true" style={{
+        flexShrink: 0,
+        width: 40, height: 40, borderRadius: 11,
+        background: 'var(--v3-primary-soft)',
+        border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
+        color: 'var(--v3-primary)',
+        display: 'grid', placeItems: 'center'
+      }}>
+        <Icon size={18} />
+      </span>
+      <span style={{ minWidth: 0, flex: 1 }}>
+        <span style={{
+          display: 'block',
+          fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 700,
+          color: 'var(--v3-text)', lineHeight: 1.2
+        }}>
+          {label}
+        </span>
+        <span style={{
+          display: 'block', marginTop: 2,
+          fontFamily: 'var(--font-body)', fontSize: 12,
+          color: 'var(--v3-text-muted)', lineHeight: 1.3
+        }}>
+          {sub}
+        </span>
+      </span>
+    </motion.button>
   )
 }
 

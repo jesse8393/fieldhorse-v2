@@ -39,6 +39,19 @@ const TABS = [
   { id: 'won',    label: 'Complete', match: (c: any) => c.stage === 'invoice' || c.stage === 'closed' }
 ]
 
+// "All" view groups the pipeline into labeled stage blocks so leads,
+// quotes, jobs and invoices never interleave into one mixed pile. Order
+// follows the pipeline; empty groups are dropped at render. Lost is shown
+// last and only when present so it never clutters a healthy pipeline.
+const STAGE_GROUPS = [
+  { id: 'lead',    label: 'Leads',       match: (c: any) => c.stage === 'lead' },
+  { id: 'quote',   label: 'Quotes',      match: (c: any) => c.stage === 'quote' },
+  { id: 'job',     label: 'Active jobs', match: (c: any) => c.stage === 'job' },
+  { id: 'invoice', label: 'Invoicing',   match: (c: any) => c.stage === 'invoice' },
+  { id: 'closed',  label: 'Complete',    match: (c: any) => c.stage === 'closed' },
+  { id: 'lost',    label: 'Lost',        match: (c: any) => c.stage === 'lost' }
+]
+
 function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
@@ -167,6 +180,16 @@ export default function Jobs() {
     return topAmount > 0 ? topId : null
   }, [filtered])
 
+  // Grouped sections for the "All" view — split the (search-filtered)
+  // pipeline into stage blocks. null for single-stage tabs, which keep
+  // the flat grid since they're already one stage.
+  const groups = useMemo(() => {
+    if (filter !== 'all') return null
+    return STAGE_GROUPS
+      .map((g) => ({ id: g.id, label: g.label, items: filtered.filter(g.match) }))
+      .filter((g) => g.items.length > 0)
+  }, [filter, filtered])
+
   function openDrawer(contact: any) {
     setDrawerContact(contact)
   }
@@ -177,6 +200,42 @@ export default function Jobs() {
 
   function onDrawerOpenChange(next: any) {
     if (!next) closeDrawer()
+  }
+
+  // Single card renderer — shared by the grouped "All" view and the
+  // flat single-stage view so swipe actions + JobCard props stay in sync.
+  function renderCard(c: any, i: number) {
+    const rowPhone = c.phone || c.fh_clients?.phone || ''
+    const swipeActions: any[] = []
+    if (rowPhone) {
+      swipeActions.push({
+        icon: <PhoneIcon size={18} />,
+        label: `Call ${c.name || 'contact'}`,
+        color: 'rgba(46, 204, 113, 0.22)',
+        fg: 'var(--v3-success-bright)',
+        onClick: () => { window.location.href = `tel:${rowPhone}` }
+      })
+      swipeActions.push({
+        icon: <MsgIcon size={18} />,
+        label: `Text ${c.name || 'contact'}`,
+        color: 'rgba(212, 175, 55, 0.18)',
+        fg: 'var(--v3-primary)',
+        onClick: () => { window.location.href = `sms:${rowPhone}` }
+      })
+    }
+    return (
+      <SwipeableRow key={c.id} actions={swipeActions} disabled={!rowPhone}>
+        <JobCard
+          contact={c}
+          index={i}
+          isNew={c.id === justAddedId}
+          viewerUserId={user?.id}
+          photoUrl={photoUrlByJob[c.id]}
+          featured={c.id === featuredId}
+          onOpen={openDrawer}
+        />
+      </SwipeableRow>
+    )
   }
 
   // Effective contact info for the tile-peek action sheet. The job row
@@ -215,8 +274,9 @@ export default function Jobs() {
             <DrawerHeader>
               <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
               <DrawerDescription>
-                {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
-                {' · '}
+                {(drawerContact?.job_title || drawerContact?.job_type) && (
+                  <>{drawerContact.job_title || drawerContact.job_type}{' · '}</>
+                )}
                 {money(drawerContact?.amount || 0)}
               </DrawerDescription>
             </DrawerHeader>
@@ -388,52 +448,46 @@ export default function Jobs() {
           Net effect: 1 col on phone (≤520), 2 cols on tablet (520-820),
           3 cols on small desktop (820-1080), 4 cols on wide (≥1080).
           Was capping at 3 cols even on wide screens — left empty space. */}
-      <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
-        {loading && <SkeletonList rows={5} />}
-        {!loading && filtered.length === 0 && (
+      {loading && (
+        <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+          <SkeletonList rows={5} />
+        </motion.div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <motion.div className="fh-jobs__grid" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
           <EmptyView
             hasFilter={filter !== 'all' || !!search}
             onAdd={() => setAddOpen(true)}
           />
-        )}
-        <AnimatePresence>
-          {filtered.map((c, i) => {
-            // Fall back to client phone when the job row doesn't have
-            // one, same as the action sheet treatment above.
-            const rowPhone = c.phone || c.fh_clients?.phone || ''
-            const swipeActions = []
-            if (rowPhone) {
-              swipeActions.push({
-                icon: <PhoneIcon size={18} />,
-                label: `Call ${c.name || 'contact'}`,
-                color: 'rgba(46, 204, 113, 0.22)',
-                fg: 'var(--v3-success-bright)',
-                onClick: () => { window.location.href = `tel:${rowPhone}` }
-              })
-              swipeActions.push({
-                icon: <MsgIcon size={18} />,
-                label: `Text ${c.name || 'contact'}`,
-                color: 'rgba(212, 175, 55, 0.18)',
-                fg: 'var(--v3-primary)',
-                onClick: () => { window.location.href = `sms:${rowPhone}` }
-              })
-            }
-            return (
-              <SwipeableRow key={c.id} actions={swipeActions} disabled={!rowPhone}>
-                <JobCard
-                  contact={c}
-                  index={i}
-                  isNew={c.id === justAddedId}
-                  viewerUserId={user?.id}
-                  photoUrl={photoUrlByJob[c.id]}
-                  featured={c.id === featuredId}
-                  onOpen={openDrawer}
-                />
-              </SwipeableRow>
-            )
-          })}
-        </AnimatePresence>
-      </motion.div>
+        </motion.div>
+      )}
+
+      {/* GROUPED — "All" view splits into labeled stage blocks so leads,
+          quotes, jobs and invoices never interleave. */}
+      {!loading && filtered.length > 0 && groups && (
+        <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 22, padding: '0 var(--v3-gutter) 32px' }}>
+          {groups.map((g) => (
+            <section key={g.id}>
+              <SectionHeader label={g.label} count={g.items.length} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, marginTop: 8 }}>
+                <AnimatePresence>
+                  {g.items.map((c, i) => renderCard(c, i))}
+                </AnimatePresence>
+              </div>
+            </section>
+          ))}
+        </motion.div>
+      )}
+
+      {/* FLAT — single-stage tab is already one stage, so no headers. */}
+      {!loading && filtered.length > 0 && !groups && (
+        <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+          <AnimatePresence>
+            {filtered.map((c, i) => renderCard(c, i))}
+          </AnimatePresence>
+        </motion.div>
+      )}
 
       {/* VAUL DRAWER — quick actions */}
       <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>
@@ -441,8 +495,9 @@ export default function Jobs() {
           <DrawerHeader>
             <DrawerTitle>{drawerContact?.name || 'Contact'}</DrawerTitle>
             <DrawerDescription>
-              {drawerContact?.job_title || drawerContact?.job_type || 'No job title'}
-              {' · '}
+              {(drawerContact?.job_title || drawerContact?.job_type) && (
+                <>{drawerContact.job_title || drawerContact.job_type}{' · '}</>
+              )}
               {money(drawerContact?.amount || 0)}
             </DrawerDescription>
           </DrawerHeader>
@@ -580,6 +635,29 @@ function ActionTile({ icon: I, label, onClick, href, disabled, primary }: any) {
       <I size={18} />
       <span>{label}</span>
     </motion.button>
+  )
+}
+
+function SectionHeader({ label, count }: any) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+      <span style={{
+        fontFamily: 'var(--font-body)',
+        fontSize: 11, fontWeight: 700,
+        letterSpacing: '0.16em', textTransform: 'uppercase',
+        color: 'var(--v3-text-muted)'
+      }}>
+        {label}
+      </span>
+      <span style={{
+        fontFamily: 'var(--font-body)',
+        fontSize: 11, fontWeight: 700,
+        color: 'var(--v3-text-faint, var(--v3-text-muted))',
+        fontVariantNumeric: 'tabular-nums'
+      }}>
+        {count}
+      </span>
+    </div>
   )
 }
 

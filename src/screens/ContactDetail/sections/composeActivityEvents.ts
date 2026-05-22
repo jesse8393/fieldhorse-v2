@@ -109,7 +109,7 @@ export function composeActivityEvents({
         kind: 'stage',
         title: t.from_stage
           ? `${capitalize(t.from_stage)} → ${capitalize(t.to_stage)}`
-          : `Created at ${capitalize(t.to_stage)}`,
+          : `New ${capitalize(t.to_stage)}`,
         sub: null,
         tone
       })
