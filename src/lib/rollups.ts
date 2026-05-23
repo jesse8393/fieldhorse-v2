@@ -52,6 +52,12 @@ function paidByContact(payments: PaymentRow[] | null | undefined) {
 //               mental model of "all the work I've done with this client."
 // outstanding — sum of (amount - paid), clipped at 0, only for jobs in
 //               billing stages (job + invoice). Closed/lost drop out.
+//               Known divergence: this uses raw fh_contacts.amount and
+//               does NOT add approved change-order adjustments the way
+//               InvoiceDrawsSection / InvoiceTemplate do, so a job with
+//               approved COs reports a smaller outstanding here than on
+//               the invoice screen. Acceptable for list rollups today;
+//               revisit if COs become a primary balance driver.
 // activeCount — count of jobs in any active pipeline stage.
 // wonCount    — count of jobs where stage in (invoice, closed).
 // paidTotal   — sum of all payments received against these jobs.

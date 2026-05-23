@@ -107,7 +107,8 @@ export default function DesktopJobDetail({
   tab, setTab,
   userId, isEditing, fetchAll, patch,
   onBack, onEdit, onMarkLost, onDelete, onClientNav, onTodoDone,
-  onOpenLogPayment, onOpenAddEvent, onOpenInvitePartner, onOpenApproveQuote
+  onOpenLogPayment, onOpenAddEvent, onOpenInvitePartner, onOpenApproveQuote,
+  onBuildQuote
 }: any) {
   const contractValue = Number(contact?.amount || 0)
   const stageKey = String(contact?.stage || 'lead').toLowerCase()
@@ -326,6 +327,7 @@ export default function DesktopJobDetail({
               onOpenApproveQuote={onOpenApproveQuote}
               stage={stageKey}
               onGoToQuote={() => setTab('quote')}
+              onBuildQuote={onBuildQuote}
             />
             <ClientCard
               contact={contact}
@@ -371,11 +373,14 @@ function FinCell({ label, value, sub, progress, tone }: any) {
   )
 }
 
-function NextActionCard({ nextAction, nextTodo, onTodoDone, onOpenAddEvent, onOpenApproveQuote, stage, onGoToQuote }: any) {
+function NextActionCard({ nextAction, nextTodo, onTodoDone, onOpenAddEvent, onOpenApproveQuote, stage, onGoToQuote, onBuildQuote }: any) {
   // Surface whichever action the resolver picked. Fall back to a stage-
   // aware default so the rail never reads "no next action".
   const action = nextAction || (() => {
-    if (stage === 'lead') return { kind: 'stage', title: 'Send a quote', cta: 'Open Quote tab', onCta: onGoToQuote }
+    // Lead → run startQuote (transitions stage to quote) AND jump to the
+    // Quote tab. Falls back to onGoToQuote if the parent didn't supply
+    // the transition handler.
+    if (stage === 'lead') return { kind: 'stage', title: 'Send a quote', cta: 'Build quote', onCta: onBuildQuote || onGoToQuote }
     if (stage === 'quote') return { kind: 'stage', title: 'Get the quote approved', cta: 'Approve quote', onCta: onOpenApproveQuote }
     if (stage === 'job' || stage === 'active') return { kind: 'stage', title: 'Log progress + plan next site visit', cta: 'Add event', onCta: onOpenAddEvent }
     if (stage === 'invoice') return { kind: 'stage', title: 'Collect payment', cta: 'Open Financials', onCta: null }

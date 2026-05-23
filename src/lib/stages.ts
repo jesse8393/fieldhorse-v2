@@ -135,7 +135,12 @@ export async function logPayment(contact: Contact, { amount, method, kind, refer
     .eq('contact_id', contact.id)
     .eq('user_id', contact.user_id)
   const total = (pays || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  if (total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
+  // Auto-close only when there's a real contract amount that's now fully
+  // paid. Guarding on amount > 0 stops a job with no amount yet (e.g. a
+  // freshly created quick invoice before line items set the total) from
+  // auto-closing on its first payment — `total >= 0` is otherwise always true.
+  const contractAmount = Number(contact.amount || 0)
+  if (contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
     await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
   }
   return { total }

@@ -51,7 +51,9 @@ export async function markLost(contact: Contact) {
 }
 
 export async function reopen(contact: Contact) {
-  // Closed/lost → back to invoice (if amount owed) else job
+  // closed → invoice (lets the operator adjust billing / add a payment
+  // without going all the way back to active work). lost → lead (they're
+  // back in play but uncommitted).
   const next: StageId = contact.stage === 'closed' ? 'invoice' : 'lead'
   const res = await transitionStage(contact, next)
   if (!res.error) notify(next, 'Reopened to')
@@ -63,7 +65,12 @@ export async function logPayment(contact: Contact, input: { amount?: number | st
   hapticSuccess()
   const paid = Number(input.amount || 0)
   const total = res && 'total' in res ? res.total : undefined
-  if (total !== undefined && total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
+  // Mirror the guard in stages.ts logPayment: only call this "paid in
+  // full" when there's a real contract amount that's now covered.
+  // Otherwise (amount=0, e.g. a freshly created quick invoice) total >= 0
+  // is always true and the toast lies.
+  const contractAmount = Number(contact.amount || 0)
+  if (total !== undefined && contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
     toast(`Paid in full · moved to Closed`, { accent: 'closed', heavy: true })
   } else {
     toast(`Payment logged · $${paid.toLocaleString()}`, { accent: 'gold' })
