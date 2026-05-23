@@ -63,7 +63,12 @@ export async function logPayment(contact: Contact, input: { amount?: number | st
   hapticSuccess()
   const paid = Number(input.amount || 0)
   const total = res && 'total' in res ? res.total : undefined
-  if (total !== undefined && total >= Number(contact.amount || 0) && contact.stage !== 'closed') {
+  // Mirror the guard in stages.ts logPayment: only call this "paid in
+  // full" when there's a real contract amount that's now covered.
+  // Otherwise (amount=0, e.g. a freshly created quick invoice) total >= 0
+  // is always true and the toast lies.
+  const contractAmount = Number(contact.amount || 0)
+  if (total !== undefined && contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
     toast(`Paid in full · moved to Closed`, { accent: 'closed', heavy: true })
   } else {
     toast(`Payment logged · $${paid.toLocaleString()}`, { accent: 'gold' })

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
-import { markLost, startQuote } from '../../lib/pipeline.ts'
+import { markLost, startQuote, reopen } from '../../lib/pipeline.ts'
 import { stageColor } from '../../lib/stages.ts'
 import { toastSuccess, toastInfo, toastError } from '../../lib/toast.ts'
 import { hapticTap, hapticError } from '../../lib/haptics.ts'
@@ -227,11 +227,23 @@ export default function ContactDetail() {
     setTab('quote')
   }
 
+  async function onReopen() {
+    if (!contact) return
+    const res: any = await reopen(contact)
+    if (res?.error) {
+      toastError("Couldn't reopen", res.error.message || 'Try again')
+      return
+    }
+    await fetchAll()
+  }
+
   const stageCta: { label: string; onClick: () => void } | null =
     contact.stage === 'lead'    ? { label: 'Build quote',    onClick: onBuildQuote }
     : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
     : contact.stage === 'job'     ? { label: 'Mark complete',  onClick: () => setCompleteOpen(true) }
     : contact.stage === 'invoice' ? { label: 'Log payment',    onClick: () => setPayModalOpen(true) }
+    : contact.stage === 'closed'  ? { label: 'Reopen job',     onClick: onReopen }
+    : contact.stage === 'lost'    ? { label: 'Reopen lead',    onClick: onReopen }
     : null
 
   return (
