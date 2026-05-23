@@ -289,6 +289,7 @@ export default function ContactDetail() {
           onOpenInvitePartner={() => setInviteOpen(true)}
           onOpenApproveQuote={() => setApproveOpen(true)}
           onOpenMarkComplete={() => setCompleteOpen(true)}
+          onBuildQuote={onBuildQuote}
         />
       ) : (
       <>
