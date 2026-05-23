@@ -242,8 +242,8 @@ export default function ContactDetail() {
     : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
     : contact.stage === 'job'     ? { label: 'Mark complete',  onClick: () => setCompleteOpen(true) }
     : contact.stage === 'invoice' ? { label: 'Log payment',    onClick: () => setPayModalOpen(true) }
-    : contact.stage === 'closed'  ? { label: 'Reopen job',     onClick: onReopen }
-    : contact.stage === 'lost'    ? { label: 'Reopen lead',    onClick: onReopen }
+    : contact.stage === 'closed'  ? { label: 'Reopen',         onClick: onReopen }
+    : contact.stage === 'lost'    ? { label: 'Reopen',         onClick: onReopen }
     : null
 
   return (

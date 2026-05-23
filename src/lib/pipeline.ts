@@ -51,7 +51,9 @@ export async function markLost(contact: Contact) {
 }
 
 export async function reopen(contact: Contact) {
-  // Closed/lost → back to invoice (if amount owed) else job
+  // closed → invoice (lets the operator adjust billing / add a payment
+  // without going all the way back to active work). lost → lead (they're
+  // back in play but uncommitted).
   const next: StageId = contact.stage === 'closed' ? 'invoice' : 'lead'
   const res = await transitionStage(contact, next)
   if (!res.error) notify(next, 'Reopened to')
