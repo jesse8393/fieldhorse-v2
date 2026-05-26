@@ -50,9 +50,13 @@ The spec says "crews are a soft concept." Make that explicit in code. A crew is 
 
 `fh_schedule` already exists with 30 rows. It's for general appointments: site visits, inspections, deliveries, meetings. A shift is a different shape: it's specifically a user assigned to a job during a work window, with a state machine (scheduled, in progress, completed, missed, canceled). Build a separate `shifts` table. Let `fh_schedule` keep being what it is. Don't overload.
 
-### 3. Subs stay invite-only, not full users
+### 3. No employee versus sub distinction in the team model
 
-The existing `fh_job_partners` model is "owner emails a scoped link, recipient clicks it, sees only the one job, no account required." That pattern is nicer for subs than forcing them to be `org_members`. A plumber working three different contractors doesn't want three logins. Extend `fh_job_partners` with a vendor role (sub vs builder client vs estimator) and keep the no-signup flow. `org_members` is for actual employees of the contractor's company.
+The owner doesn't think in those terms and the app shouldn't make them. If someone is regularly on the crew, they're a member of the company in the app, whether they're W2 or 1099. They get a name, a login, and a role the owner picks. The legal employment classification (W2 vs 1099, taxes, insurance) lives in payroll, not here.
+
+So `org_members` covers anyone the owner brings on, full-time, part-time, or as a recurring sub. One invite flow, one user experience, one place the owner controls the team.
+
+`fh_job_partners` stays as it is, scoped strictly to one-off external collaborators: the plumber on a single job, the builder client you're sharing one job with, the inspector dropping in a report. No login needed, just a scoped link to that one job. That existing flow doesn't change.
 
 ### 4. Time tracking must be offline-first
 
@@ -118,12 +122,13 @@ create type org_role as enum (
   'admin',     -- everything except billing + delete
   'manager',   -- their crews + their jobs, financials visible
   'foreman',   -- their crews + their jobs, financials hidden
-  'crew',      -- own shifts, own time, own tasks only
-  'sub'        -- reserved; subs actually use fh_job_partners
+  'crew'       -- own shifts, own time, own tasks only
 );
 ```
 
-The `manager` vs `foreman` split is the only judgment call here. They're functionally similar; the distinction is whether they see dollar amounts. We can collapse to one role in v1 and split later if needed.
+No separate sub role. A recurring sub the owner wants on the schedule is an `org_member` like anyone else, role picked by the owner. One-off external subs (single job, no login) stay on `fh_job_partners`, which is a separate table for a separate purpose.
+
+The `manager` vs `foreman` split is the only remaining judgment call. They're functionally similar; the distinction is whether they see dollar amounts. We can collapse to one role in v1 and split later if needed.
 
 ---
 
