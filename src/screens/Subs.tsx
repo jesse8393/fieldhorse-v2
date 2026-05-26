@@ -8,6 +8,9 @@ import { formatPhone } from '../lib/utils.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
+import { useNavigate } from 'react-router-dom'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import SnowSubs from '../components/desktop/SnowSubs.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
@@ -147,6 +150,25 @@ export default function Subs() {
   }, [filtered])
 
   const { stagger, item } = useFhMotion()
+  const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
+
+  if (isDesktop) {
+    return (
+      <SnowSubs
+        filtered={filtered}
+        loading={loading}
+        q={q}
+        setQ={setQ}
+        tradeFilter={tradeFilter}
+        setTradeFilter={setTradeFilter}
+        allTrades={allTrades as string[]}
+        screenStats={screenStats}
+        onAddSub={() => setAddOpen(true)}
+        onOpenSub={(key) => navigate(`/subs/${encodeURIComponent(key)}`)}
+      />
+    )
+  }
 
   return (
     <motion.div
