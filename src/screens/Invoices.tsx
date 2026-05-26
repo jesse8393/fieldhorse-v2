@@ -16,6 +16,9 @@ import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import V3PaymentSheet from '../components/V3PaymentSheet.tsx'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useNavigate } from 'react-router-dom'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import SnowInvoices from '../components/desktop/SnowInvoices.tsx'
 
 // Invoices / AR — v3 money command screen.
 //
@@ -301,6 +304,35 @@ export default function Invoices() {
 
   const { stagger, item } = useFhMotion()
   const allCaughtUp = !loading && totals.count === 0
+  const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
+
+  if (isDesktop) {
+    return (
+      <>
+        <SnowInvoices
+          rows={rows}
+          filtered={filtered}
+          totals={totals}
+          loading={loading}
+          filter={filter as 'outstanding' | 'all'}
+          setFilter={(f) => setFilter(f)}
+          onOpenJob={(jobId) => navigate(`/jobs/${jobId}?tab=financials`)}
+          onPayRow={(r) => setPayingRow(r)}
+        />
+        <AnimatePresence>
+          {payingRow && (
+            <V3PaymentSheet
+              contact={payingRow.job}
+              balance={payingRow.balance}
+              onClose={() => setPayingRow(null)}
+              onLogged={() => { setPayingRow(null); refresh() }}
+            />
+          )}
+        </AnimatePresence>
+      </>
+    )
+  }
 
   return (
     <motion.div
