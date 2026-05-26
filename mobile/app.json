@@ -10,7 +10,15 @@
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "io.fieldhorse.app"
+      "bundleIdentifier": "io.fieldhorse.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "associatedDomains": [
+        "applinks:fieldhorse.app",
+        "applinks:fieldhorse.io"
+      ]
     },
     "android": {
       "package": "io.fieldhorse.app",
