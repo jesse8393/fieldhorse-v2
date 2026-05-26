@@ -20,7 +20,7 @@ import { getWeather, workWindow } from '../lib/weather.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import DesktopScheduleWorkspace from '../components/desktop/DesktopScheduleWorkspace.tsx'
+import SnowSchedule from '../components/desktop/SnowSchedule.tsx'
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
@@ -226,7 +226,7 @@ export default function Schedule() {
   if (isDesktop) {
     return (
       <>
-        <DesktopScheduleWorkspace
+        <SnowSchedule
           events={events}
           upcoming={upcoming}
           loading={loading}
