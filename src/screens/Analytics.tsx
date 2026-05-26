@@ -12,6 +12,8 @@ import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn,
 import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import SnowAnalytics from '../components/desktop/SnowAnalytics.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 
 function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
@@ -258,6 +260,19 @@ export default function Analytics() {
   }, [contacts, payments])
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  if (isDesktop) {
+    return (
+      <SnowAnalytics
+        loading={loading}
+        stats={stats}
+        byStage={byStage}
+        revenueByMonth={trendData}
+        topClients={topClients}
+      />
+    )
+  }
 
   return (
     <motion.div
