@@ -12,7 +12,7 @@ import { findDuplicateClusters } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.tsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.tsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
-import DesktopClientsDirectory from '../components/desktop/DesktopClientsDirectory.tsx'
+import SnowClients from '../components/desktop/SnowClients.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
 function money(n: any) {
@@ -140,7 +140,7 @@ export default function Clients() {
   if (isDesktop) {
     return (
       <>
-        <DesktopClientsDirectory
+        <SnowClients
           rows={rows}
           filtered={filtered}
           loading={loading}
