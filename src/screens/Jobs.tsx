@@ -10,7 +10,7 @@ import NewLeadSheet from '../components/NewLeadSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { JobCard, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
-import DesktopJobsBoard from '../components/desktop/DesktopJobsBoard.tsx'
+import SnowJobs from '../components/desktop/SnowJobs.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
@@ -255,7 +255,7 @@ export default function Jobs() {
   if (isDesktop) {
     return (
       <>
-        <DesktopJobsBoard
+        <SnowJobs
           contacts={contacts}
           filtered={filtered}
           loading={loading}
