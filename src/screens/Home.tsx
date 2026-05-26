@@ -31,7 +31,7 @@ import { hapticTap } from '../lib/haptics.ts'
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
 import { fetchCoverPhotosByJob } from '../lib/photos.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import DesktopHomeCommandCenter from '../components/desktop/DesktopHomeCommandCenter.tsx'
+import SnowHome from '../components/desktop/SnowHome.tsx'
 
 /* ----------------- helpers ----------------- */
 
@@ -421,7 +421,7 @@ export default function Home() {
   // existing motion.div.v3-screen--home flow renders verbatim.
   if (isDesktop) {
     return (
-      <DesktopHomeCommandCenter
+      <SnowHome
         firstName={firstName}
         now={now}
         hasCoords={hasCoords}
