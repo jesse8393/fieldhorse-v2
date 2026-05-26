@@ -50,13 +50,17 @@ The spec says "crews are a soft concept." Make that explicit in code. A crew is 
 
 `fh_schedule` already exists with 30 rows. It's for general appointments: site visits, inspections, deliveries, meetings. A shift is a different shape: it's specifically a user assigned to a job during a work window, with a state machine (scheduled, in progress, completed, missed, canceled). Build a separate `shifts` table. Let `fh_schedule` keep being what it is. Don't overload.
 
-### 3. No employee versus sub distinction in the team model
+### 3. Three things, not two: the team, the subs, the one-off invites
 
-The owner doesn't think in those terms and the app shouldn't make them. If someone is regularly on the crew, they're a member of the company in the app, whether they're W2 or 1099. They get a name, a login, and a role the owner picks. The legal employment classification (W2 vs 1099, taxes, insurance) lives in payroll, not here.
+Three distinct concepts, each backed by its own table. The owner picks where someone goes when they add them.
 
-So `org_members` covers anyone the owner brings on, full-time, part-time, or as a recurring sub. One invite flow, one user experience, one place the owner controls the team.
+**The team** is `org_members`. This is the contractor's roster: anyone the owner manages as "mine." Each gets a login and a role the owner picks. They appear on the schedule with real shifts, clock in for timesheets, and feed payroll. W2 or 1099 doesn't matter at the app level — that's a payroll classification. If the owner thinks of someone as "on my team," they're an org member.
 
-`fh_job_partners` stays as it is, scoped strictly to one-off external collaborators: the plumber on a single job, the builder client you're sharing one job with, the inspector dropping in a report. No login needed, just a scoped link to that one job. That existing flow doesn't change.
+**The subs** (the vendor kind) stay on `fh_subs` and `fh_sub_profiles`, unchanged. These are external companies the contractor contracts with: a plumbing company, a roofer's roofer, a backhoe operator who bills you. Tracked for expenses, COIs, W9s, payment status. They can show up on the schedule as "Smith Plumbing on site Tuesday 9 to 12" without being on the team, without a login, without a shift, without a timesheet.
+
+**The one-off scoped invites** stay on `fh_job_partners`, also unchanged. A single-job link for a sub who needs to drop in a photo, a builder client you're sharing one job with, an inspector posting a report. No login, just a scoped URL to one job.
+
+The owner decides the bucket. The model doesn't force a choice and doesn't make the owner learn employment law to use the app.
 
 ### 4. Time tracking must be offline-first
 
