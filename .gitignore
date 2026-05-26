@@ -18,3 +18,4 @@ lerna-debug.log*
 .netlify
 .claude/
 _reference/
+test_out/
