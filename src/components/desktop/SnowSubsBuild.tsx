@@ -20,7 +20,13 @@ type Sub = {
   totalRate?: number
   jobsCount?: number
   lastWorked?: Date | null
+  // True only when upstream actually carries an insurance/expiry
+  // field. The current fh_subs schema doesn't, so Subs.tsx sets this
+  // to false and the column renders "Not tracked" rather than
+  // implying an unknown date.
+  insuranceTracked?: boolean
   insurance_expires_at?: string | null
+  status?: string | null
   rating?: number | null
 }
 
@@ -55,7 +61,15 @@ function relDate(d: Date | null | undefined) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function insuranceStatus(iso: string | null | undefined): { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } {
+// Insurance pill resolver. When `tracked` is false (upstream has no
+// insurance column for this sub) we render "Not tracked" honestly
+// instead of pretending the value is "Unknown" — which used to imply
+// the data existed but was missing.
+function insuranceStatus(
+  tracked: boolean | undefined,
+  iso: string | null | undefined,
+): { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } {
+  if (tracked === false) return { label: 'Not tracked', tone: 'neutral' }
   if (!iso) return { label: 'Unknown', tone: 'neutral' }
   const t = new Date(iso).getTime()
   if (!Number.isFinite(t)) return { label: 'Unknown', tone: 'neutral' }
@@ -71,12 +85,20 @@ export default function SnowSubsBuild(props: Props) {
     onAddSub, onOpenSub,
   } = props
 
-  // Derived metrics
-  const insuranceExpiring = filtered.filter((s) => {
-    const st = insuranceStatus(s.insurance_expires_at)
-    return st.tone === 'warn' || st.tone === 'bad'
-  }).length
-  const needsReview = filtered.filter((s) => !s.insurance_expires_at && (s.jobsCount || 0) > 0).length
+  // Derived metrics — only count insurance signals on subs where the
+  // field is actually tracked. Untracked rows don't contribute either
+  // way (they're neither "expiring" nor "needs review").
+  const insuranceIsTracked = filtered.some((s) => s.insuranceTracked === true)
+  const insuranceExpiring = insuranceIsTracked
+    ? filtered.filter((s) => {
+        if (s.insuranceTracked === false) return false
+        const st = insuranceStatus(s.insuranceTracked, s.insurance_expires_at)
+        return st.tone === 'warn' || st.tone === 'bad'
+      }).length
+    : 0
+  const needsReview = insuranceIsTracked
+    ? filtered.filter((s) => s.insuranceTracked !== false && !s.insurance_expires_at && (s.jobsCount || 0) > 0).length
+    : 0
 
   // Trade coverage — count of distinct trades present in the filtered list
   const tradeCoverage = (() => {
@@ -137,7 +159,11 @@ export default function SnowSubsBuild(props: Props) {
 
           <div className="fh-build-mini-grid">
             <MiniMetric label="Active subs" value={String(screenStats.activeRecent)} accent />
-            <MiniMetric label="Insurance expiring" value={String(insuranceExpiring)} tone={insuranceExpiring > 0 ? 'warn' : undefined} />
+            <MiniMetric
+              label={insuranceIsTracked ? 'Insurance expiring' : 'Insurance'}
+              value={insuranceIsTracked ? String(insuranceExpiring) : 'Not tracked'}
+              tone={insuranceIsTracked && insuranceExpiring > 0 ? 'warn' : undefined}
+            />
             <MiniMetric label="Total billed" value={money(screenStats.totalBilled)} />
             <MiniMetric label="Trade coverage" value={String(tradeCoverage)} />
           </div>
@@ -167,7 +193,7 @@ export default function SnowSubsBuild(props: Props) {
               <div className="fh-build-table__empty">No teams match. <button type="button" className="fh-build-inline-link" onClick={onAddSub}>+ Add Team</button>.</div>
             )}
             {!loading && filtered.slice(0, 60).map((s: any) => {
-              const ins = insuranceStatus(s.insurance_expires_at)
+              const ins = insuranceStatus(s.insuranceTracked, s.insurance_expires_at)
               const trades = (s.trades || []).slice(0, 2)
               const extra = (s.trades || []).length - trades.length
               return (
@@ -211,9 +237,20 @@ export default function SnowSubsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Insurance expiring</div>
-              <strong style={{ color: insuranceExpiring > 0 ? '#e0a141' : undefined }}>{insuranceExpiring}</strong>
-              <span>{insuranceExpiring > 0 ? 'Verify before next use' : 'All current'}</span>
-              {insuranceExpiring > 0 && <div className="fh-build-spark is-gold" />}
+              {insuranceIsTracked ? (
+                <>
+                  <strong style={{ color: insuranceExpiring > 0 ? '#e0a141' : undefined }}>
+                    {insuranceExpiring}
+                  </strong>
+                  <span>{insuranceExpiring > 0 ? 'Verify before next use' : 'All current'}</span>
+                  {insuranceExpiring > 0 && <div className="fh-build-spark is-gold" />}
+                </>
+              ) : (
+                <>
+                  <strong>—</strong>
+                  <span>Insurance not tracked yet</span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
@@ -224,8 +261,17 @@ export default function SnowSubsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Needs review</div>
-              <strong>{needsReview}</strong>
-              <span>used without insurance on file</span>
+              {insuranceIsTracked ? (
+                <>
+                  <strong>{needsReview}</strong>
+                  <span>used without insurance on file</span>
+                </>
+              ) : (
+                <>
+                  <strong>—</strong>
+                  <span>Enable insurance tracking to surface</span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">

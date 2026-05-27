@@ -9873,6 +9873,13 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-bottom: 1px solid rgba(255,255,255,.075);
   }
 
+  /* Variant for screens without a primary +New action — drops the
+     trailing column so the bell sits flush right at the end of an
+     auto column instead of leaving a phantom 4th cell. */
+  .fh-build-topbar--no-cta {
+    grid-template-columns: minmax(280px, 560px) 1fr auto;
+  }
+
   .fh-build-search {
     height: 42px;
     display: flex;

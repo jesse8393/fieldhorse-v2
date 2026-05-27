@@ -91,7 +91,7 @@ export default function SnowNotesBuild(props: Props) {
 
   return (
     <div className="fh-build-page">
-      <header className="fh-build-topbar">
+      <header className="fh-build-topbar fh-build-topbar--no-cta">
         <div className="fh-build-search">
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>

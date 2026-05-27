@@ -83,9 +83,14 @@ export default function SnowAnalyticsBuild(props: Props) {
   const strongestStage = [...byStage].sort((a, b) => b.value - a.value)[0]
   const weakestStage = [...byStage].filter((s) => s.value === 0)[0]
 
-  const collectionRate = stats.invoiced && stats.invoiced > 0
-    ? (Number(stats.collected || 0) / Number(stats.invoiced))
+  // Only compute a real collection rate when BOTH invoiced and
+  // collected have come through as real numbers from the parent.
+  // If either side is null (no invoice/payment data loaded), the
+  // Cash risk card shows "Not connected" instead of a fabricated rate.
+  const collectionRate = (stats.invoiced != null && stats.collected != null && Number(stats.invoiced) > 0)
+    ? (Number(stats.collected) / Number(stats.invoiced))
     : null
+  const cashConnected = stats.invoiced != null && stats.collected != null
 
   const lastMonth = revenueByMonth[revenueByMonth.length - 1]
   const prevMonth = revenueByMonth[revenueByMonth.length - 2]
@@ -95,7 +100,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 
   return (
     <div className="fh-build-page">
-      <header className="fh-build-topbar">
+      <header className="fh-build-topbar fh-build-topbar--no-cta">
         <div className="fh-build-search">
           <Search size={14} />
           <span>Search reports, KPIs...</span>
@@ -134,10 +139,21 @@ export default function SnowAnalyticsBuild(props: Props) {
           </div>
         </section>
 
-        {/* Secondary KPI strip */}
+        {/* Secondary KPI strip. Invoiced/Collected render "Not
+            connected" when the parent passes null — that's the signal
+            the screen hasn't loaded an invoices/payments array yet
+            (vs. an honest $0 from a user with no activity). */}
         <div className="fh-build-kpi-strip">
-          <KpiCell label="Invoiced" value={money(stats.invoiced || 0)} />
-          <KpiCell label="Collected" value={money(stats.collected || 0)} />
+          <KpiCell
+            label="Invoiced YTD"
+            value={stats.invoiced == null ? 'Not connected' : money(stats.invoiced)}
+            muted={stats.invoiced == null}
+          />
+          <KpiCell
+            label="Collected YTD"
+            value={stats.collected == null ? 'Not connected' : money(stats.collected)}
+            muted={stats.collected == null}
+          />
           <KpiCell label="Active leads" value={String(stats.leads || 0)} />
           <KpiCell label="Quotes out" value={String(stats.quotes || 0)} />
           <KpiCell label="Miles YTD" value={Number(stats.milesYTD || 0).toLocaleString()} />
@@ -252,11 +268,24 @@ export default function SnowAnalyticsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Cash risk</div>
-              <strong style={{ color: (stats.invoiced || 0) > (stats.collected || 0) ? '#ee4942' : '#73c982' }}>
-                {collectionRate != null ? pct(collectionRate) : '—'}
-              </strong>
-              <span>{collectionRate != null ? 'collection rate YTD' : 'No invoicing data'}</span>
-              {collectionRate != null && collectionRate < 0.8 && <div className="fh-build-spark is-red" />}
+              {cashConnected ? (
+                <>
+                  <strong style={{
+                    color: collectionRate == null
+                      ? undefined
+                      : Number(stats.invoiced) > Number(stats.collected) ? '#ee4942' : '#73c982',
+                  }}>
+                    {collectionRate != null ? pct(collectionRate) : '—'}
+                  </strong>
+                  <span>{collectionRate != null ? 'collection rate YTD' : 'Nothing invoiced YTD'}</span>
+                  {collectionRate != null && collectionRate < 0.8 && <div className="fh-build-spark is-red" />}
+                </>
+              ) : (
+                <>
+                  <strong>Not connected</strong>
+                  <span>Invoice + payment data unavailable</span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
@@ -285,10 +314,12 @@ export default function SnowAnalyticsBuild(props: Props) {
   )
 }
 
-function KpiCell({ label, value }: { label: string; value: string }) {
+function KpiCell({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="fh-build-kpi-cell">
-      <strong>{value}</strong>
+      <strong style={muted ? { color: 'rgba(245,242,234,.42)', fontSize: 14, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' } : undefined}>
+        {value}
+      </strong>
       <span>{label}</span>
     </div>
   )

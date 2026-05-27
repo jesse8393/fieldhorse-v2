@@ -17,6 +17,7 @@ import {
   ChevronRight,
   CalendarDays,
 } from 'lucide-react'
+import { weatherLabel } from '../../lib/weather.ts'
 
 type DailyRow = {
   time: string
@@ -319,17 +320,6 @@ function MiniMetric({ label, value, accent, tone: t }: { label: string; value: s
   )
 }
 
-// Minimal weather-code → label mapper. Open-Meteo codes; falls back to
-// "Clear" so the topbar never shows a number to the user.
-function weatherLabel(code: any): string {
-  const c = Number(code)
-  if (!Number.isFinite(c)) return 'Clear'
-  if (c === 0) return 'Clear'
-  if (c <= 3) return 'Partly cloudy'
-  if (c <= 48) return 'Foggy'
-  if (c <= 67) return 'Rain'
-  if (c <= 77) return 'Snow'
-  if (c <= 82) return 'Showers'
-  if (c <= 99) return 'Thunderstorm'
-  return 'Clear'
-}
+// weatherLabel is now imported from ../../lib/weather.ts so the
+// desktop chrome stays in sync with whatever mapping the mobile flow
+// already ships.
