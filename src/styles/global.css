@@ -9784,3 +9784,629 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     padding: 20px 24px !important;
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — desktop dashboard ("LET'S BUILD.")
+   ============================================================
+   Activates only at >=900px (mobile Home is untouched).
+   Pairs with src/components/desktop/SnowHomeBuild.tsx and the
+   refreshed grouped layout in DesktopSidebar.tsx. */
+
+/* Sidebar emblem block + grouped-label refresh */
+@media (min-width: 900px) {
+  .fh-desktop-sidebar__brand--build {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 18px 16px !important;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+
+  .fh-mark {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+  }
+
+  .fh-mark__svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .fh-desktop-sidebar__brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .fh-desktop-sidebar__brand-name {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 18px;
+    line-height: 1;
+    letter-spacing: .03em;
+    color: #f4f1ea;
+  }
+
+  .fh-desktop-sidebar__brand-sub {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .20em;
+    text-transform: uppercase;
+    color: rgba(245,242,234,.45);
+  }
+
+  .fh-desktop-sidebar__eyebrow--build {
+    display: block;
+    margin: 18px 18px 8px;
+    color: rgba(245,242,234,.42);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+}
+
+/* Build dashboard page */
+@media (min-width: 900px) {
+  .fh-build-page {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 35% -20%, rgba(255,255,255,.045), transparent 34%),
+      linear-gradient(180deg, #080a0d 0%, #050607 100%);
+    color: #f4f1ea;
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+  }
+
+  .fh-build-topbar {
+    height: 76px;
+    display: grid;
+    grid-template-columns: minmax(280px, 560px) 1fr auto auto;
+    align-items: center;
+    gap: 16px;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
+  }
+
+  .fh-build-search {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid rgba(255,255,255,.105);
+    border-radius: 8px;
+    background: rgba(255,255,255,.035);
+    color: rgba(245,242,234,.45);
+    font-size: 12px;
+  }
+
+  .fh-build-search kbd {
+    margin-left: auto;
+    font-size: 10px;
+    color: rgba(245,242,234,.45);
+  }
+
+  .fh-build-topbar__meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+    color: rgba(245,242,234,.68);
+    font-size: 12px;
+  }
+
+  .fh-build-vline {
+    width: 1px;
+    height: 22px;
+    background: rgba(255,255,255,.12);
+  }
+
+  .fh-build-sun {
+    color: var(--v3-primary, #c9963a);
+  }
+
+  .fh-build-icon-btn,
+  .fh-build-new-btn {
+    height: 40px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,.09);
+    cursor: pointer;
+  }
+
+  .fh-build-icon-btn {
+    width: 40px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,.035);
+    color: rgba(245,242,234,.72);
+  }
+
+  .fh-build-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 18px;
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .fh-build-main {
+    padding: 24px 28px 40px;
+  }
+
+  .fh-build-hero-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px 330px;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 18px;
+  }
+
+  .fh-build-good {
+    color: var(--v3-primary, #c9963a);
+    font-size: 15px;
+    letter-spacing: .04em;
+  }
+
+  .fh-build-title {
+    margin: 12px 0 0;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: clamp(56px, 6vw, 82px);
+    line-height: .86;
+    letter-spacing: .02em;
+    color: #f7f4ec;
+    font-weight: 400;
+  }
+
+  .fh-build-focus,
+  .fh-build-mini,
+  .fh-build-card,
+  .fh-build-rail-card {
+    background:
+      linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.105);
+    box-shadow:
+      0 22px 60px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.055);
+  }
+
+  .fh-build-focus {
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  .fh-build-focus p {
+    margin: 12px 0 14px;
+    color: #f4f1ea;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .fh-build-focus button,
+  .fh-build-footer-link,
+  .fh-build-card-head button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: transparent;
+    color: var(--v3-primary, #c9963a);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .fh-build-mini-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .fh-build-mini {
+    min-height: 68px;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .fh-build-mini strong {
+    display: block;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 28px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-weight: 400;
+  }
+
+  .fh-build-mini span {
+    display: block;
+    margin-top: 7px;
+    color: rgba(245,242,234,.44);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-content-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.05fr) 270px;
+    gap: 18px;
+  }
+
+  .fh-build-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9px;
+  }
+
+  .fh-build-pipeline {
+    min-height: 280px;
+    padding: 24px 26px;
+    cursor: pointer;
+  }
+
+  .fh-build-card__overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent 0%, rgba(255,255,255,.025) 100%),
+      radial-gradient(circle at 75% 22%, rgba(255,255,255,.04), transparent 28%);
+  }
+
+  .fh-build-eyebrow {
+    color: rgba(245,242,234,.62);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-pipeline__top {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    margin-top: 22px;
+  }
+
+  .fh-build-money {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: clamp(76px, 7vw, 108px);
+    line-height: .85;
+    letter-spacing: .04em;
+    color: #f7f4ec;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #73c982;
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .fh-build-pipeline__copy {
+    position: relative;
+    margin: 16px 0 28px;
+    color: rgba(245,242,234,.72);
+    font-size: 14px;
+  }
+
+  .fh-build-stage-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .fh-build-stage-grid button {
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    padding: 0;
+  }
+
+  .fh-build-stage-grid span {
+    display: block;
+    color: var(--v3-primary, #c9963a);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-stage-grid strong {
+    display: block;
+    margin-top: 10px;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 28px;
+    line-height: 1;
+    color: #f7f4ec;
+    font-weight: 400;
+  }
+
+  .fh-build-stage-grid small {
+    display: block;
+    margin-top: 7px;
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+  }
+
+  .fh-build-stage-line {
+    position: relative;
+    display: flex;
+    height: 3px;
+    margin-top: 20px;
+    background: rgba(201,150,58,.20);
+  }
+
+  .fh-build-stage-line span {
+    height: 3px;
+    background: var(--v3-primary, #c9963a);
+    border-right: 1px solid rgba(5,6,7,.9);
+  }
+
+  .fh-build-today {
+    min-height: 280px;
+    display: grid;
+    grid-template-columns: .75fr 1fr;
+  }
+
+  .fh-build-today__image {
+    background:
+      linear-gradient(90deg, rgba(6,7,8,.25), rgba(6,7,8,.86)),
+      url('https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=80');
+    background-size: cover;
+    background-position: center;
+    opacity: .82;
+  }
+
+  .fh-build-today__body {
+    padding: 24px;
+  }
+
+  .fh-build-today__stats {
+    margin-top: 22px;
+    display: grid;
+    gap: 14px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid rgba(255,255,255,.09);
+  }
+
+  .fh-build-today__stats strong {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 48px;
+    line-height: .9;
+    font-weight: 400;
+    color: #f7f4ec;
+  }
+
+  .fh-build-today__stats span {
+    margin-left: 8px;
+    color: rgba(245,242,234,.72);
+    font-size: 13px;
+  }
+
+  .fh-build-today__actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .fh-build-today__actions button {
+    display: grid;
+    grid-template-columns: 18px 1fr 14px;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    background: transparent;
+    color: #f4f1ea;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+  }
+
+  .fh-build-today__actions small {
+    display: block;
+    margin-top: 4px;
+    color: var(--v3-primary, #c9963a);
+    font-size: 12px;
+  }
+
+  .fh-build-rail {
+    grid-column: 3;
+    grid-row: span 3;
+    display: grid;
+    gap: 12px;
+  }
+
+  .fh-build-rail-card {
+    border-radius: 9px;
+    padding: 18px;
+    min-height: 120px;
+  }
+
+  .fh-build-rail-card strong {
+    display: block;
+    margin-top: 12px;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 42px;
+    line-height: .9;
+    color: #f7f4ec;
+    font-weight: 400;
+  }
+
+  .fh-build-rail-card span {
+    display: block;
+    margin-top: 8px;
+    color: rgba(245,242,234,.62);
+    font-size: 12px;
+  }
+
+  .fh-build-spark {
+    height: 32px;
+    margin-top: 12px;
+    border-bottom: 1px solid currentColor;
+    opacity: .75;
+  }
+
+  .fh-build-spark.is-red {
+    color: #ee4942;
+    background: linear-gradient(135deg, transparent 20%, rgba(238,73,66,.25) 20% 24%, transparent 24% 42%, rgba(238,73,66,.35) 42% 46%, transparent 46%);
+  }
+
+  .fh-build-spark.is-gold {
+    color: var(--v3-primary, #c9963a);
+    background: linear-gradient(135deg, transparent 20%, rgba(201,150,58,.20) 20% 24%, transparent 24% 42%, rgba(201,150,58,.35) 42% 46%, transparent 46%);
+  }
+
+  .fh-build-owner {
+    min-height: 310px;
+  }
+
+  .fh-build-revenue {
+    min-height: 310px;
+  }
+
+  .fh-build-health {
+    grid-column: 1 / 3;
+    min-height: 250px;
+  }
+
+  .fh-build-card-head {
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px 8px;
+  }
+
+  .fh-build-card-head button {
+    border: 1px solid rgba(201,150,58,.55);
+    border-radius: 4px;
+    padding: 7px 12px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: 10px;
+  }
+
+  .fh-build-table__head,
+  .fh-build-table__row {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    padding: 0 22px;
+  }
+
+  .fh-build-table__head {
+    min-height: 34px;
+    color: rgba(245,242,234,.48);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-table__row {
+    position: relative;
+    min-height: 44px;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid rgba(255,255,255,.065);
+    background: transparent;
+    color: rgba(245,242,234,.72);
+    text-align: left;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .fh-build-table__row:hover {
+    background: rgba(255,255,255,.035);
+  }
+
+  .fh-build-table__row strong {
+    color: #f4f1ea;
+    font-weight: 750;
+  }
+
+  .fh-build-table__head.is-owner,
+  .fh-build-table__row.is-owner {
+    grid-template-columns: 28px 1.15fr 1fr .7fr .65fr .55fr 14px;
+  }
+
+  .fh-build-table__head.is-revenue,
+  .fh-build-table__row.is-revenue {
+    grid-template-columns: 1.2fr .7fr .7fr .7fr .9fr;
+  }
+
+  .fh-build-table__head.is-health,
+  .fh-build-table__row.is-health {
+    grid-template-columns: 1.15fr .8fr .8fr .8fr .8fr .7fr 1fr 14px;
+  }
+
+  .fh-build-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fh-build-dot::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .fh-build-dot.is-good {
+    color: #73c982;
+  }
+
+  .fh-build-dot.is-bad {
+    color: #ee4942;
+  }
+
+  .fh-build-dot.is-warn {
+    color: #e0a141;
+  }
+
+  .fh-build-dot.is-neutral {
+    color: rgba(245,242,234,.48);
+  }
+
+  .fh-build-footer-link {
+    width: 100%;
+    justify-content: center;
+    min-height: 42px;
+    border-top: 1px solid rgba(255,255,255,.065);
+  }
+
+  @media (max-width: 1280px) {
+    .fh-build-hero-row {
+      grid-template-columns: 1fr;
+    }
+
+    .fh-build-content-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .fh-build-rail,
+    .fh-build-health {
+      grid-column: auto;
+    }
+  }
+}

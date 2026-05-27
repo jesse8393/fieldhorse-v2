@@ -1,138 +1,139 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+// DesktopSidebar — grouped nav for the Build dashboard direction.
+//
+// Mounted in AppShell at >=900px. Below 900px the sidebar is
+// display:none and the existing BottomNav remains the primary nav
+// surface (mobile experience untouched).
+//
+// Brand area: corrected FieldHorseMark emblem + wordmark.
+// Nav: four labeled groups — COMMAND / EXECUTION / INTELLIGENCE /
+// SETTINGS — routed to the closest existing app routes.
+// Foot: account email + sign out (preserved from the prior sidebar).
+
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Home as HomeIcon,
-  Briefcase,
-  Users,
-  Calendar,
-  Calculator,
-  Receipt,
-  BarChart3,
+  LayoutDashboard,
+  Radio,
+  Sparkles,
   Hammer,
-  MessageSquare,
-  Upload,
-  CloudSun,
+  Calendar,
+  FileSpreadsheet,
+  Receipt,
+  ClipboardCheck,
+  BarChart3,
+  TrendingUp,
+  LineChart,
+  Users,
+  UsersRound,
+  FileText,
   Settings as SettingsIcon,
   LogOut,
-  Activity as ActivityIcon
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import { useProfile } from '../contexts/ProfileContext.tsx'
 
-/**
- * DesktopSidebar — Phase 1 of the Responsive Desktop Command Center.
- *
- * Visible only at >=900px (CSS-controlled via .fh-desktop-sidebar in
- * global.css). At narrow widths the existing BottomNav remains the
- * navigation surface and this sidebar is display:none, so the mobile
- * experience is unchanged.
- *
- * Mirrors the NAV_ITEMS roster from BottomNav's drawer so the desktop
- * surface offers the same destinations without forcing the user into
- * a "More" affordance — sidebar = persistent nav, drawer was a phone
- * compromise.
- *
- * Sidebar is position:fixed; left:0; top:0; bottom:0 with width 240px.
- * AppShell pads .fh-app__main left by the same width on desktop so
- * content never sits underneath the rail.
- */
+type Item = {
+  label: string
+  to: string
+  Icon: any
+  // Optional custom match — returns true when this item should show
+  // as active for the given location pathname.
+  match?: (pathname: string) => boolean
+}
 
-const PRIMARY_NAV = [
-  { to: '/',            label: 'Home',          Icon: HomeIcon,        end: true },
-  { to: '/jobs',        label: 'Jobs',          Icon: Briefcase },
-  { to: '/clients',     label: 'Clients',       Icon: Users },
-  { to: '/schedule',    label: 'Schedule',      Icon: Calendar }
-]
+type Group = { label: string; items: Item[] }
 
-const SECONDARY_NAV = [
-  { to: '/activity',    label: 'Activity',      Icon: ActivityIcon },
-  { to: '/bid',         label: 'Estimates',     Icon: Calculator },
-  { to: '/invoices',    label: 'Invoices',      Icon: Receipt },
-  { to: '/analytics',   label: 'Reports',       Icon: BarChart3 },
-  { to: '/subs',        label: 'Subs',          Icon: Hammer },
-  { to: '/compose',     label: 'AI Compose',    Icon: MessageSquare },
-  { to: '/import',      label: 'Import',        Icon: Upload },
-  { to: '/pour-window', label: 'Forecast',      Icon: CloudSun },
-  { to: '/settings',    label: 'Settings',      Icon: SettingsIcon }
+const exact = (target: string) => (p: string) => p === target
+const prefix = (target: string) => (p: string) => p === target || p.startsWith(target + '/')
+
+const GROUPS: Group[] = [
+  {
+    label: 'Command',
+    items: [
+      { label: 'Command Center', to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
+      { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
+      { label: 'Lead Desk',      to: '/jobs?stage=lead', Icon: Sparkles },
+      { label: 'Job Desk',       to: '/jobs',     Icon: Hammer,          match: exact('/jobs') },
+    ],
+  },
+  {
+    label: 'Execution',
+    items: [
+      { label: 'Schedule',       to: '/schedule', Icon: Calendar,        match: prefix('/schedule') },
+      { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
+      { label: 'Invoices',       to: '/invoices', Icon: Receipt,         match: prefix('/invoices') },
+      { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { label: 'Pipeline',       to: '/jobs',     Icon: BarChart3,       match: () => false },
+      { label: 'Analytics',      to: '/analytics',Icon: TrendingUp,      match: prefix('/analytics') },
+      { label: 'Forecast',       to: '/pour-window', Icon: LineChart,    match: prefix('/pour-window') },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
+      { label: 'Teams',          to: '/subs',     Icon: UsersRound,      match: prefix('/subs') },
+      { label: 'Templates',      to: '/settings', Icon: FileText,        match: () => false },
+      { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: prefix('/settings') },
+    ],
+  },
 ]
 
 export default function DesktopSidebar() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const { signOut, user } = useAuth()
-  const { profile } = useProfile()
 
   const userEmail = user?.email || ''
-  const company = profile?.company_name?.trim()
-  const logoSrc = profile?.logo_url
 
   async function handleSignOut() {
     await signOut()
     navigate('/login', { replace: true })
   }
 
-  // Sidebar brand block — logo-first.
-  //
-  // Per Phase 5 user feedback: the small FH-mark + tenant-text combo
-  // read as awkward. Restored the full company logo as the visual
-  // anchor at the top of the rail, matching the older Parker-on-top
-  // treatment. Layout stack:
-  //
-  //   small "FIELDHORSE" system label       (only when a tenant logo
-  //                                           or company name exists,
-  //                                           so the user always knows
-  //                                           which product they're in)
-  //   full company logo                     (max-height ~84px,
-  //                                           object-fit: contain — never
-  //                                           cropped, squeezed, or clipped)
-  //   thin divider
-  //   nav starts below
-  //
-  // Fallback chain when no logo_url:
-  //   1. company_name → wide serif Bebas Neue wordmark
-  //   2. nothing      → "FIELDHORSE" gold/ink wordmark
-  const hasLogo = !!logoSrc
-  const showSystemLabel = hasLogo || !!company  // when a tenant brand
-                                                // is shown, label what
-                                                // app it lives in.
-
   return (
     <aside className="fh-desktop-sidebar" aria-label="Primary navigation">
-      <div className="fh-desktop-sidebar__brand">
-        {showSystemLabel && (
-          <span className="fh-desktop-sidebar__system-label" aria-hidden="true">
-            FIELDHORSE
-          </span>
-        )}
-        {hasLogo ? (
-          <div className="fh-desktop-sidebar__logo-wrap">
-            <img
-              src={logoSrc}
-              alt={company || 'Company logo'}
-              className="fh-desktop-sidebar__logo"
-              onError={(e) => {
-                // Signed URL expired or 403'd — hide the img and let
-                // the wordmark fallback paint on next render. We don't
-                // hold a re-fetch state machine here on purpose; the
-                // tenant can hard-refresh to retry.
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-          </div>
-        ) : company ? (
-          <span className="fh-desktop-sidebar__co-wordmark" title={company}>
-            {company}
-          </span>
-        ) : (
-          <span className="fh-desktop-sidebar__co-wordmark fh-desktop-sidebar__co-wordmark--system">
-            <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
-            <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
-          </span>
-        )}
+      <div className="fh-desktop-sidebar__brand fh-desktop-sidebar__brand--build">
+        <FieldHorseMark />
+        <div className="fh-desktop-sidebar__brand-text">
+          <span className="fh-desktop-sidebar__brand-name">FieldHorse</span>
+          <span className="fh-desktop-sidebar__brand-sub">Construction Command</span>
+        </div>
       </div>
 
       <nav className="fh-desktop-sidebar__nav" aria-label="Primary">
-        <SidebarSection items={PRIMARY_NAV} />
-        <div className="fh-desktop-sidebar__divider" aria-hidden="true" />
-        <SidebarSection items={SECONDARY_NAV} eyebrow="Tools" />
+        {GROUPS.map((group, gi) => (
+          <div key={group.label} className="fh-desktop-sidebar__group">
+            <span className="fh-desktop-sidebar__eyebrow fh-desktop-sidebar__eyebrow--build">
+              {group.label}
+            </span>
+            <ul className="fh-desktop-sidebar__list">
+              {group.items.map((it) => {
+                const active = it.match
+                  ? it.match(pathname)
+                  : pathname === it.to.split('?')[0]
+                const I = it.Icon
+                return (
+                  <li key={`${gi}-${it.label}`}>
+                    <button
+                      type="button"
+                      className={`fh-desktop-sidebar__link${active ? ' is-active' : ''}`}
+                      onClick={() => navigate(it.to)}
+                    >
+                      <span className="fh-desktop-sidebar__link-icon" aria-hidden="true">
+                        <I size={15} />
+                      </span>
+                      <span className="fh-desktop-sidebar__link-label">{it.label}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       <div className="fh-desktop-sidebar__foot">
@@ -144,13 +145,6 @@ export default function DesktopSidebar() {
             </span>
           )}
         </div>
-        {/* Theme toggle hidden 5/17 — the light theme was half-implemented
-            (only repainted cards, left the sidebar + canvas dark per the
-            5/13 audit). Restore the button once full light parity ships
-            in tokens.css / global.css. The button used to live here:
-              <button onClick={toggleTheme}><Moon|Sun /></button>
-            ThemeContext still drives the data-theme attribute so the
-            current theme (dark by default) keeps rendering correctly. */}
         <button
           type="button"
           className="fh-desktop-sidebar__icon-btn"
@@ -165,33 +159,51 @@ export default function DesktopSidebar() {
   )
 }
 
-function SidebarSection({ items, eyebrow }: any) {
+function FieldHorseMark() {
   return (
-    <div className="fh-desktop-sidebar__group">
-      {eyebrow && (
-        <span className="fh-desktop-sidebar__eyebrow">{eyebrow}</span>
-      )}
-      <ul className="fh-desktop-sidebar__list">
-        {items.map((it: any) => {
-          const I = it.Icon
-          return (
-            <li key={it.to}>
-              <NavLink
-                to={it.to}
-                end={it.end}
-                className={({ isActive }: any) =>
-                  `fh-desktop-sidebar__link${isActive ? ' is-active' : ''}`
-                }
-              >
-                <span className="fh-desktop-sidebar__link-icon" aria-hidden="true">
-                  <I size={15} />
-                </span>
-                <span className="fh-desktop-sidebar__link-label">{it.label}</span>
-              </NavLink>
-            </li>
-          )
-        })}
-      </ul>
+    <div className="fh-mark" aria-label="FieldHorse">
+      <svg
+        className="fh-mark__svg"
+        viewBox="0 0 72 72"
+        role="img"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="fhOrange" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#F29A2E" />
+            <stop offset="100%" stopColor="#F26A21" />
+          </linearGradient>
+        </defs>
+
+        <rect
+          x="2"
+          y="2"
+          width="68"
+          height="68"
+          rx="16"
+          fill="#101317"
+          stroke="rgba(255,255,255,.10)"
+        />
+
+        <path
+          d="M18 19 H43 V29 H30 V34 H41 V44 H30 V55 H18 Z"
+          fill="#F4F4F0"
+        />
+
+        <path
+          d="M45 19 H55 V34 H62 V19 H72 V55 H62 V43 H55 V55 H45 Z"
+          fill="url(#fhOrange)"
+          transform="translate(-10 0)"
+        />
+
+        <rect
+          x="36"
+          y="30"
+          width="10"
+          height="18"
+          fill="#101317"
+        />
+      </svg>
     </div>
   )
 }

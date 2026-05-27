@@ -31,7 +31,7 @@ import { hapticTap } from '../lib/haptics.ts'
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
 import { fetchCoverPhotosByJob } from '../lib/photos.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowHome from '../components/desktop/SnowHomePrototype.tsx'
+import SnowHome from '../components/desktop/SnowHomeBuild.tsx'
 
 /* ----------------- helpers ----------------- */
 
