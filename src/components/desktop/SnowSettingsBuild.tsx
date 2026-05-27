@@ -30,7 +30,7 @@ export default function SnowSettingsBuild(props: Props) {
   const allClear = missingItems.length === 0
 
   return (
-    <div className="fh-build-page">
+    <div className="fh-build-page" data-build-screen="SnowSettingsBuild">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
         <div className="fh-build-search">
           <Search size={14} />

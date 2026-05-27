@@ -99,7 +99,7 @@ export default function SnowAnalyticsBuild(props: Props) {
     : 0
 
   return (
-    <div className="fh-build-page">
+    <div className="fh-build-page" data-build-screen="SnowAnalyticsBuild">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
         <div className="fh-build-search">
           <Search size={14} />

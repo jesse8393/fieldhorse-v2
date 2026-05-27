@@ -89,7 +89,7 @@ export default function SnowClientDetailBuild(props: Props) {
         : { label: 'On track', tone: 'good' as const }
 
   return (
-    <div className="fh-build-page fh-build-detail">
+    <div className="fh-build-page fh-build-detail" data-build-screen="SnowClientDetailBuild">
       <header className="fh-build-topbar fh-build-topbar--detail">
         <button type="button" className="fh-build-back" onClick={onBack} aria-label="Back to clients">
           <ChevronLeft size={16} /> Clients

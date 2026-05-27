@@ -90,7 +90,7 @@ export default function SnowNotesBuild(props: Props) {
   const unlinkedCount = recent.filter((n) => !n.contact_id).length
 
   return (
-    <div className="fh-build-page">
+    <div className="fh-build-page" data-build-screen="SnowNotesBuild">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
         <div className="fh-build-search">
           <Search size={14} />

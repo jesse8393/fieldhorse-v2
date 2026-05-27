@@ -64,7 +64,7 @@ export default function SnowInvoicesBuild({
   const overdueCount = filtered.filter((r) => r.ageDays > 60 && r.balance > 0).length
 
   return (
-    <div className="fh-build-page">
+    <div className="fh-build-page" data-build-screen="SnowInvoicesBuild">
       <header className="fh-build-topbar">
         <div className="fh-build-search">
           <Search size={14} />

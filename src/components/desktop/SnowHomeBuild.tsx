@@ -112,7 +112,7 @@ export default function SnowHomeBuild(props: Props) {
   const jobRows = buildJobHealthRows(todayOnSite, revenueRows)
 
   return (
-    <div className="fh-build-page">
+    <div className="fh-build-page" data-build-screen="SnowHomeBuild">
       <header className="fh-build-topbar">
         <div className="fh-build-search">
           <Search size={14} />

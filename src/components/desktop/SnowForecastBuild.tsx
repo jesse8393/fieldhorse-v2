@@ -113,7 +113,7 @@ export default function SnowForecastBuild(props: Props) {
   const noGoDays = daily.filter((d) => dayWorkStatus(d).tone === 'bad').length
 
   return (
-    <div className="fh-build-page">
+    <div className="fh-build-page" data-build-screen="SnowForecastBuild">
       <header className="fh-build-topbar">
         <div className="fh-build-search">
           <Search size={14} />

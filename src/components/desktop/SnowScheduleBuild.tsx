@@ -127,7 +127,7 @@ export default function SnowScheduleBuild(props: Props) {
   }).length
 
   return (
-    <div className="fh-build-page">
+    <div className="fh-build-page" data-build-screen="SnowScheduleBuild">
       <header className="fh-build-topbar">
         <div className="fh-build-search">
           <Search size={14} />

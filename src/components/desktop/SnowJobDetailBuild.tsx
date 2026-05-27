@@ -101,7 +101,7 @@ export default function SnowJobDetailBuild(props: Props) {
   })()
 
   return (
-    <div className="fh-build-page fh-build-detail">
+    <div className="fh-build-page fh-build-detail" data-build-screen="SnowJobDetailBuild">
       <header className="fh-build-topbar fh-build-topbar--detail">
         <button type="button" className="fh-build-back" onClick={onBack} aria-label="Back to jobs">
           <ChevronLeft size={16} /> Jobs
