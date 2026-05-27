@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -173,10 +174,12 @@ export default function Compose() {
   }
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
 
   return (
     <motion.div
-      className="v3-screen v3-screen--compose"
+      className={`v3-screen v3-screen--compose${isDesktop ? ' fh-build-utility' : ''}`}
+      data-build-screen={isDesktop ? 'Compose' : undefined}
       variants={stagger}
       initial="hidden"
       animate="show"

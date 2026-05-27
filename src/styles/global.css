@@ -12007,3 +12007,120 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     scrollbar-color: rgba(255,255,255,.18) transparent;
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — utility-screen polish
+   (Bid / Compose / Job-detail Quote)
+   ============================================================
+   Brings the three remaining older utility screens into the
+   LET'S BUILD desktop visual system without rewriting them.
+   Scoped under .fh-build-utility (Bid + Compose) and the
+   existing .fh-build-detail-main (Quote tab inside JobDetail). */
+
+@media (min-width: 900px) {
+  /* Common: a centered max-width page rhythm so utility screens
+     don't sprawl across an ultrawide canvas, matching the Build
+     dashboard inner padding. */
+  .fh-build-utility {
+    background: linear-gradient(180deg, #080a0d 0%, #050607 100%) !important;
+    color: #f4f1ea;
+    padding: 24px 28px 96px !important;
+  }
+  .fh-build-utility > * + * { margin-top: 0; }
+
+  /* Section cards — adopt the Build card look (gradient surface,
+     thin white border, soft shadow, 9px radius) without touching
+     the actual <Section> JSX. */
+  .fh-build-utility .v3-section {
+    margin: 0 0 18px !important;
+    padding: 22px 24px !important;
+    background:
+      linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92)) !important;
+    border: 1px solid rgba(255,255,255,.105) !important;
+    border-radius: 9px !important;
+    box-shadow:
+      0 22px 60px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.055) !important;
+  }
+  .fh-build-utility .v3-section--primary {
+    border-color: rgba(201,150,58,.40) !important;
+  }
+  .fh-build-utility .v3-section--primary-quiet {
+    border-color: rgba(255,255,255,.085) !important;
+  }
+
+  /* Inputs / textareas / selects — quiet onyx, gold focus ring. */
+  .fh-build-utility input:not([type="checkbox"]):not([type="radio"]),
+  .fh-build-utility textarea,
+  .fh-build-utility select {
+    background: rgba(0,0,0,.30) !important;
+    border: 1px solid rgba(255,255,255,.10) !important;
+    color: #f4f1ea !important;
+    border-radius: 6px;
+  }
+  .fh-build-utility input:focus,
+  .fh-build-utility textarea:focus,
+  .fh-build-utility select:focus {
+    outline: none !important;
+    border-color: rgba(201,150,58,.55) !important;
+    background: rgba(0,0,0,.40) !important;
+  }
+
+  /* Dark slim scrollbar everywhere inside utility surfaces. */
+  .fh-build-utility,
+  .fh-build-utility * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+  .fh-build-utility *::-webkit-scrollbar { width: 8px; height: 8px; }
+  .fh-build-utility *::-webkit-scrollbar-track { background: transparent; }
+  .fh-build-utility *::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.14);
+    border-radius: 8px;
+  }
+  .fh-build-utility *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.22); }
+
+  /* Compose: lay out side-by-side composer + preview instead of
+     stacking with empty space on the right. */
+  .v3-screen--compose.fh-build-utility .v3-section + .v3-section {
+    margin-top: 18px !important;
+  }
+
+  /* ─── Job-detail Quote builder ───
+     The two-pane workspace already exists (set in global.css around
+     line 3007). On desktop the right side is too wide and creates
+     dead space when no insurance/change-orders are present. Tighten
+     the rail to 290px to match the Build chrome rails, and adopt the
+     Build card look so it reads as part of the same system. */
+  .v3-screen--quote-active .fh-build-detail-main .fh-quote-workspace,
+  .fh-build-detail-main > .fh-quote-workspace {
+    grid-template-columns: minmax(0, 1fr) 290px !important;
+    gap: 18px !important;
+    padding: 0 !important;
+  }
+  .fh-build-detail-main .fh-quote-workspace__main { gap: 18px; }
+  .fh-build-detail-main .fh-quote-workspace__side {
+    padding: 0 !important;
+    gap: 12px;
+  }
+  .fh-build-detail-main .fh-quote-workspace .v3-section {
+    margin: 0 !important;
+    padding: 18px 20px !important;
+    background:
+      linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92)) !important;
+    border: 1px solid rgba(255,255,255,.105) !important;
+    border-radius: 9px !important;
+    box-shadow:
+      0 22px 60px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.055) !important;
+  }
+  /* When the rail has no content (no insurance/change-orders/etc),
+     the empty placeholders shouldn't take 480px+ width — kept at the
+     290px rail above. The main column expands to take the freed
+     space. */
+
+  /* ─── Narrow-viewport collapse ─── */
+  @media (max-width: 1180px) {
+    .v3-screen--quote-active .fh-build-detail-main .fh-quote-workspace,
+    .fh-build-detail-main > .fh-quote-workspace {
+      grid-template-columns: 1fr !important;
+    }
+  }
+}
