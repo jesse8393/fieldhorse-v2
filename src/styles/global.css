@@ -9784,3 +9784,2343 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     padding: 20px 24px !important;
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — desktop dashboard ("LET'S BUILD.")
+   ============================================================
+   Activates only at >=900px (mobile Home is untouched).
+   Pairs with src/components/desktop/SnowHomeBuild.tsx and the
+   refreshed grouped layout in DesktopSidebar.tsx. */
+
+/* Sidebar emblem block + grouped-label refresh */
+@media (min-width: 900px) {
+  .fh-desktop-sidebar__brand--build {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 18px 16px !important;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+
+  .fh-mark {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+  }
+
+  .fh-mark__svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .fh-desktop-sidebar__brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .fh-desktop-sidebar__brand-name {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 18px;
+    line-height: 1;
+    letter-spacing: .03em;
+    color: #f4f1ea;
+  }
+
+  .fh-desktop-sidebar__brand-sub {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .20em;
+    text-transform: uppercase;
+    color: rgba(245,242,234,.45);
+  }
+
+  .fh-desktop-sidebar__eyebrow--build {
+    display: block;
+    margin: 18px 18px 8px;
+    color: rgba(245,242,234,.42);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+}
+
+/* Build dashboard page */
+@media (min-width: 900px) {
+  .fh-build-page {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 35% -20%, rgba(255,255,255,.045), transparent 34%),
+      linear-gradient(180deg, #080a0d 0%, #050607 100%);
+    color: #f4f1ea;
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+  }
+
+  .fh-build-topbar {
+    height: 76px;
+    display: grid;
+    grid-template-columns: minmax(280px, 560px) 1fr auto auto;
+    align-items: center;
+    gap: 16px;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
+  }
+
+  /* Variant for screens without a primary +New action — drops the
+     trailing column so the bell sits flush right at the end of an
+     auto column instead of leaving a phantom 4th cell. */
+  .fh-build-topbar--no-cta {
+    grid-template-columns: minmax(280px, 560px) 1fr auto;
+  }
+
+  .fh-build-search {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid rgba(255,255,255,.105);
+    border-radius: 8px;
+    background: rgba(255,255,255,.035);
+    color: rgba(245,242,234,.45);
+    font-size: 12px;
+  }
+
+  .fh-build-search kbd {
+    margin-left: auto;
+    font-size: 10px;
+    color: rgba(245,242,234,.45);
+  }
+
+  .fh-build-topbar__meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+    color: rgba(245,242,234,.68);
+    font-size: 12px;
+  }
+
+  .fh-build-vline {
+    width: 1px;
+    height: 22px;
+    background: rgba(255,255,255,.12);
+  }
+
+  .fh-build-sun {
+    color: var(--v3-primary, #c9963a);
+  }
+
+  .fh-build-icon-btn,
+  .fh-build-new-btn {
+    height: 40px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,.09);
+    cursor: pointer;
+  }
+
+  .fh-build-icon-btn {
+    width: 40px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,.035);
+    color: rgba(245,242,234,.72);
+  }
+
+  .fh-build-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 18px;
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .fh-build-main {
+    padding: 24px 28px 40px;
+  }
+
+  .fh-build-hero-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px 330px;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 18px;
+  }
+
+  .fh-build-good {
+    color: var(--v3-primary, #c9963a);
+    font-size: 15px;
+    letter-spacing: .04em;
+  }
+
+  .fh-build-title {
+    margin: 12px 0 0;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: clamp(56px, 6vw, 82px);
+    line-height: .86;
+    letter-spacing: .02em;
+    color: #f7f4ec;
+    font-weight: 400;
+  }
+
+  .fh-build-focus,
+  .fh-build-mini,
+  .fh-build-card,
+  .fh-build-rail-card {
+    background:
+      linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.105);
+    box-shadow:
+      0 22px 60px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.055);
+  }
+
+  .fh-build-focus {
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  .fh-build-focus p {
+    margin: 12px 0 14px;
+    color: #f4f1ea;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .fh-build-focus button,
+  .fh-build-footer-link,
+  .fh-build-card-head button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: transparent;
+    color: var(--v3-primary, #c9963a);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .fh-build-mini-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .fh-build-mini {
+    min-height: 68px;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .fh-build-mini strong {
+    display: block;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 28px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-weight: 400;
+  }
+
+  .fh-build-mini span {
+    display: block;
+    margin-top: 7px;
+    color: rgba(245,242,234,.44);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-content-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.05fr) 270px;
+    gap: 18px;
+  }
+
+  .fh-build-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9px;
+  }
+
+  .fh-build-pipeline {
+    min-height: 280px;
+    padding: 24px 26px;
+    cursor: pointer;
+  }
+
+  .fh-build-card__overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent 0%, rgba(255,255,255,.025) 100%),
+      radial-gradient(circle at 75% 22%, rgba(255,255,255,.04), transparent 28%);
+  }
+
+  .fh-build-eyebrow {
+    color: rgba(245,242,234,.62);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-pipeline__top {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    margin-top: 22px;
+  }
+
+  .fh-build-money {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: clamp(76px, 7vw, 108px);
+    line-height: .85;
+    letter-spacing: .04em;
+    color: #f7f4ec;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #73c982;
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .fh-build-pipeline__copy {
+    position: relative;
+    margin: 16px 0 28px;
+    color: rgba(245,242,234,.72);
+    font-size: 14px;
+  }
+
+  .fh-build-stage-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .fh-build-stage-grid button {
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    padding: 0;
+  }
+
+  .fh-build-stage-grid span {
+    display: block;
+    color: var(--v3-primary, #c9963a);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-stage-grid strong {
+    display: block;
+    margin-top: 10px;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 28px;
+    line-height: 1;
+    color: #f7f4ec;
+    font-weight: 400;
+  }
+
+  .fh-build-stage-grid small {
+    display: block;
+    margin-top: 7px;
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+  }
+
+  .fh-build-stage-line {
+    position: relative;
+    display: flex;
+    height: 3px;
+    margin-top: 20px;
+    background: rgba(201,150,58,.20);
+  }
+
+  .fh-build-stage-line span {
+    height: 3px;
+    background: var(--v3-primary, #c9963a);
+    border-right: 1px solid rgba(5,6,7,.9);
+  }
+
+  .fh-build-today {
+    min-height: 280px;
+    display: grid;
+    grid-template-columns: .75fr 1fr;
+  }
+
+  .fh-build-today__image {
+    background:
+      linear-gradient(90deg, rgba(6,7,8,.25), rgba(6,7,8,.86)),
+      url('https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=80');
+    background-size: cover;
+    background-position: center;
+    opacity: .82;
+  }
+
+  .fh-build-today__body {
+    padding: 24px;
+  }
+
+  .fh-build-today__stats {
+    margin-top: 22px;
+    display: grid;
+    gap: 14px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid rgba(255,255,255,.09);
+  }
+
+  .fh-build-today__stats strong {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 48px;
+    line-height: .9;
+    font-weight: 400;
+    color: #f7f4ec;
+  }
+
+  .fh-build-today__stats span {
+    margin-left: 8px;
+    color: rgba(245,242,234,.72);
+    font-size: 13px;
+  }
+
+  .fh-build-today__actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .fh-build-today__actions button {
+    display: grid;
+    grid-template-columns: 18px 1fr 14px;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    background: transparent;
+    color: #f4f1ea;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+  }
+
+  .fh-build-today__actions small {
+    display: block;
+    margin-top: 4px;
+    color: var(--v3-primary, #c9963a);
+    font-size: 12px;
+  }
+
+  .fh-build-rail {
+    grid-column: 3;
+    grid-row: span 3;
+    display: grid;
+    gap: 12px;
+  }
+
+  .fh-build-rail-card {
+    border-radius: 9px;
+    padding: 18px;
+    min-height: 120px;
+  }
+
+  .fh-build-rail-card strong {
+    display: block;
+    margin-top: 12px;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 42px;
+    line-height: .9;
+    color: #f7f4ec;
+    font-weight: 400;
+  }
+
+  .fh-build-rail-card span {
+    display: block;
+    margin-top: 8px;
+    color: rgba(245,242,234,.62);
+    font-size: 12px;
+  }
+
+  .fh-build-spark {
+    height: 32px;
+    margin-top: 12px;
+    border-bottom: 1px solid currentColor;
+    opacity: .75;
+  }
+
+  .fh-build-spark.is-red {
+    color: #ee4942;
+    background: linear-gradient(135deg, transparent 20%, rgba(238,73,66,.25) 20% 24%, transparent 24% 42%, rgba(238,73,66,.35) 42% 46%, transparent 46%);
+  }
+
+  .fh-build-spark.is-gold {
+    color: var(--v3-primary, #c9963a);
+    background: linear-gradient(135deg, transparent 20%, rgba(201,150,58,.20) 20% 24%, transparent 24% 42%, rgba(201,150,58,.35) 42% 46%, transparent 46%);
+  }
+
+  .fh-build-owner {
+    min-height: 310px;
+  }
+
+  .fh-build-revenue {
+    min-height: 310px;
+  }
+
+  .fh-build-health {
+    grid-column: 1 / 3;
+    min-height: 250px;
+  }
+
+  .fh-build-card-head {
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px 8px;
+  }
+
+  .fh-build-card-head button {
+    border: 1px solid rgba(201,150,58,.55);
+    border-radius: 4px;
+    padding: 7px 12px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: 10px;
+  }
+
+  .fh-build-table__head,
+  .fh-build-table__row {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    padding: 0 22px;
+  }
+
+  .fh-build-table__head {
+    min-height: 34px;
+    color: rgba(245,242,234,.48);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-table__row {
+    position: relative;
+    min-height: 44px;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid rgba(255,255,255,.065);
+    background: transparent;
+    color: rgba(245,242,234,.72);
+    text-align: left;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .fh-build-table__row:hover {
+    background: rgba(255,255,255,.035);
+  }
+
+  .fh-build-table__row strong {
+    color: #f4f1ea;
+    font-weight: 750;
+  }
+
+  .fh-build-table__head.is-owner,
+  .fh-build-table__row.is-owner {
+    grid-template-columns: 28px 1.15fr 1fr .7fr .65fr .55fr 14px;
+  }
+
+  .fh-build-table__head.is-revenue,
+  .fh-build-table__row.is-revenue {
+    grid-template-columns: 1.2fr .7fr .7fr .7fr .9fr;
+  }
+
+  .fh-build-table__head.is-health,
+  .fh-build-table__row.is-health {
+    grid-template-columns: 1.15fr .8fr .8fr .8fr .8fr .7fr 1fr 14px;
+  }
+
+  .fh-build-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fh-build-dot::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .fh-build-dot.is-good {
+    color: #73c982;
+  }
+
+  .fh-build-dot.is-bad {
+    color: #ee4942;
+  }
+
+  .fh-build-dot.is-warn {
+    color: #e0a141;
+  }
+
+  .fh-build-dot.is-neutral {
+    color: rgba(245,242,234,.48);
+  }
+
+  .fh-build-footer-link {
+    width: 100%;
+    justify-content: center;
+    min-height: 42px;
+    border-top: 1px solid rgba(255,255,255,.065);
+  }
+
+  @media (max-width: 1280px) {
+    .fh-build-hero-row {
+      grid-template-columns: 1fr;
+    }
+
+    .fh-build-content-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .fh-build-rail,
+    .fh-build-health {
+      grid-column: auto;
+    }
+  }
+}
+
+/* ============================================================
+   BUILD DIRECTION — Phase 1 (Jobs, Pipeline, Invoices, Schedule)
+   ============================================================
+   Page-level pieces shared across the Phase 1 screens that the
+   home dashboard didn't need. All gated >=900px. */
+
+@media (min-width: 900px) {
+  /* Page hero variant — used on Jobs/Invoices/Schedule. */
+  .fh-build-hero-row--page {
+    align-items: stretch;
+  }
+
+  /* Functional search input on the topbar (not the home placeholder). */
+  .fh-build-search__input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: #f4f1ea;
+    font: inherit;
+  }
+
+  .fh-build-search__input::placeholder {
+    color: rgba(245,242,234,.45);
+  }
+
+  /* Generic page rail — slightly narrower than home's. */
+  .fh-build-rail--page {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  /* View toggle (Table | Pipeline, Day | Week | Month, etc.) */
+  .fh-build-view-card {
+    border-radius: 8px;
+    padding: 18px;
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.105);
+    box-shadow: 0 22px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055);
+  }
+
+  .fh-build-view-card__copy {
+    margin: 10px 0 0;
+    color: rgba(245,242,234,.55);
+    font-size: 12px;
+  }
+
+  .fh-build-view-toggle {
+    display: inline-flex;
+    margin-top: 10px;
+    padding: 3px;
+    gap: 2px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 7px;
+  }
+
+  .fh-build-view-toggle--inline {
+    display: flex;
+    margin-top: 10px;
+  }
+
+  .fh-build-view-toggle button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+
+  .fh-build-view-toggle button.is-active {
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+  }
+
+  /* Date nav (chevrons + Today) */
+  .fh-build-datenav {
+    display: inline-flex;
+    margin-top: 14px;
+    gap: 4px;
+  }
+
+  .fh-build-datenav button {
+    height: 28px;
+    min-width: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.03);
+    color: rgba(245,242,234,.72);
+    border-radius: 5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .fh-build-datenav button:hover {
+    background: rgba(255,255,255,.06);
+  }
+
+  .fh-build-datenav__today {
+    padding: 0 12px !important;
+  }
+
+  /* Filter pills row */
+  .fh-build-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 16px;
+  }
+
+  .fh-build-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.03);
+    color: rgba(245,242,234,.72);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: .02em;
+  }
+
+  .fh-build-pill:hover {
+    background: rgba(255,255,255,.06);
+    color: #f4f1ea;
+  }
+
+  .fh-build-pill.is-active {
+    background: var(--v3-primary, #c9963a);
+    border-color: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+  }
+
+  .fh-build-pill__count {
+    color: inherit;
+    opacity: .65;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pill.is-active .fh-build-pill__count {
+    opacity: .8;
+  }
+
+  /* Generic helpers used by Phase 1 tables */
+  .fh-build-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-rel {
+    color: rgba(245,242,234,.45);
+    font-size: 11px;
+  }
+
+  .fh-build-inline-link {
+    background: transparent;
+    border: 0;
+    color: var(--v3-primary, #c9963a);
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .fh-build-table__empty {
+    padding: 28px 22px;
+    color: rgba(245,242,234,.55);
+    font-size: 13px;
+    text-align: center;
+    border-top: 1px solid rgba(255,255,255,.065);
+  }
+
+  .fh-build-table__more {
+    padding: 12px 22px;
+    border-top: 1px solid rgba(255,255,255,.065);
+    color: rgba(245,242,234,.42);
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .fh-build-row-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 5px;
+    border: 1px solid rgba(201,150,58,.55);
+    background: transparent;
+    color: var(--v3-primary, #c9963a);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .fh-build-row-btn:hover {
+    background: color-mix(in srgb, var(--v3-primary, #c9963a) 12%, transparent);
+  }
+
+  /* ---------- JOBS / JOB DESK ---------- */
+  .fh-build-content-grid--jobs {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+
+  .fh-build-table__head.is-jobs,
+  .fh-build-table__row.is-jobs {
+    grid-template-columns: 1.4fr 1fr 110px 120px 100px 14px;
+  }
+
+  .fh-build-stage-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .fh-build-stage-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.02);
+    border-radius: 6px;
+    color: rgba(245,242,234,.72);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease;
+  }
+
+  .fh-build-stage-row:hover {
+    background: rgba(255,255,255,.06);
+  }
+
+  .fh-build-stage-row__count {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 22px;
+    line-height: 1;
+    color: #f4f1ea;
+  }
+
+  .fh-build-stage-row__money {
+    font-variant-numeric: tabular-nums;
+    color: var(--v3-primary, #c9963a);
+    font-weight: 700;
+  }
+
+  .fh-build-rail-card__action {
+    margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 0;
+    color: var(--v3-primary, #c9963a);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .fh-build-rail-card__spark {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(115,201,130,.30);
+    background: rgba(115,201,130,.10);
+    color: #73c982;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ---------- PIPELINE BOARD ---------- */
+  .fh-build-pipeline-board {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .fh-build-pipeline-col {
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.085);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
+  }
+
+  .fh-build-pipeline-col__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    border-top: 3px solid currentColor;
+  }
+
+  .fh-build-pipeline-col__head.is-stage-lead    { color: #6B7CA8; }
+  .fh-build-pipeline-col__head.is-stage-quote   { color: #B07A4A; }
+  .fh-build-pipeline-col__head.is-stage-job     { color: #4F8C5E; }
+  .fh-build-pipeline-col__head.is-stage-invoice { color: #C9963A; }
+  .fh-build-pipeline-col__head.is-stage-won     { color: #73C982; }
+
+  .fh-build-pipeline-col__label {
+    color: inherit;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-pipeline-col__total {
+    margin-top: 4px;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 24px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pipeline-col__count {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 32px;
+    line-height: 1;
+    color: rgba(245,242,234,.42);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pipeline-col__body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .fh-build-pipeline-col__empty {
+    padding: 22px 8px;
+    text-align: center;
+    color: rgba(245,242,234,.40);
+    font-size: 11px;
+  }
+
+  .fh-build-pipeline-col__empty-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px dashed rgba(201,150,58,.45);
+    border-radius: 6px;
+    color: var(--v3-primary, #c9963a);
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .fh-build-pipeline-col__more {
+    text-align: center;
+    color: rgba(245,242,234,.42);
+    font-size: 11px;
+    padding: 6px 0;
+  }
+
+  .fh-build-pipeline-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.025);
+    border-left: 3px solid currentColor;
+    border-radius: 6px;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+
+  .fh-build-pipeline-card:hover {
+    background: rgba(255,255,255,.06);
+    transform: translateY(-1px);
+  }
+
+  .fh-build-pipeline-card.is-stage-lead    { color: #6B7CA8; }
+  .fh-build-pipeline-card.is-stage-quote   { color: #B07A4A; }
+  .fh-build-pipeline-card.is-stage-job     { color: #4F8C5E; }
+  .fh-build-pipeline-card.is-stage-invoice { color: #C9963A; }
+  .fh-build-pipeline-card.is-stage-won     { color: #73C982; }
+
+  .fh-build-pipeline-card__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .fh-build-pipeline-card__name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f4f1ea;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.25;
+  }
+
+  .fh-build-pipeline-card__amount {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 18px;
+    color: var(--v3-primary, #c9963a);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pipeline-card__meta {
+    display: flex;
+    justify-content: space-between;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+  }
+
+  .fh-build-pipeline-card__sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .fh-build-pipeline-card__time {
+    flex-shrink: 0;
+    color: rgba(245,242,234,.42);
+  }
+
+  .fh-build-pipeline-card__chev {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    color: rgba(245,242,234,.30);
+  }
+
+  /* ---------- INVOICES ---------- */
+  .fh-build-content-grid--invoices {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+
+  .fh-build-table__head.is-invoices,
+  .fh-build-table__row.is-invoices {
+    grid-template-columns: 1.4fr 110px 60px 110px 90px 100px 130px;
+  }
+
+  .fh-build-table__row.is-clickable {
+    cursor: pointer;
+  }
+
+  .fh-build-inv-name {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .fh-build-inv-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  /* ---------- SCHEDULE ---------- */
+  .fh-build-content-grid--schedule {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+
+  .fh-build-agenda {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .fh-build-agenda__day {
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.085);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .fh-build-agenda__day.is-today {
+    border-color: rgba(201,150,58,.55);
+    box-shadow: 0 0 0 1px rgba(201,150,58,.15), 0 22px 60px rgba(0,0,0,.34);
+  }
+
+  .fh-build-agenda__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+
+  .fh-build-agenda__date {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .fh-build-agenda__weekday {
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: rgba(245,242,234,.55);
+  }
+
+  .fh-build-agenda__daynum {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 38px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-agenda__month {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    color: rgba(245,242,234,.45);
+  }
+
+  .fh-build-agenda__head-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(245,242,234,.55);
+    font-size: 12px;
+  }
+
+  .fh-build-agenda__today-chip {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-agenda__empty {
+    padding: 20px 22px;
+    color: rgba(245,242,234,.40);
+    font-size: 12px;
+  }
+
+  .fh-build-agenda__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .fh-build-agenda__event {
+    display: grid;
+    grid-template-columns: 140px 1fr auto;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 22px;
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+
+  .fh-build-agenda__event:first-child {
+    border-top: 0;
+  }
+
+  .fh-build-agenda__time {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+  }
+
+  .fh-build-agenda__title {
+    color: #f4f1ea;
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-agenda__loc {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+  }
+
+  /* Upcoming card in the rail */
+  .fh-build-upnext {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .fh-build-upnext__time {
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+
+  .fh-build-upnext__title {
+    color: #f4f1ea;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .fh-build-upnext__loc {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+  }
+
+  .fh-build-rail-list {
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .fh-build-rail-list li {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 10px;
+    align-items: baseline;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+
+  .fh-build-rail-list li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .fh-build-rail-list__time {
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-rail-list__title {
+    color: rgba(245,242,234,.78);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-rail-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 9px;
+    color: var(--v3-primary, #c9963a);
+    font-weight: 800;
+    letter-spacing: .04em;
+    font-size: 12px;
+    min-height: 56px;
+    padding: 0 18px !important;
+  }
+
+  .fh-build-rail-cta:hover {
+    background:
+      linear-gradient(180deg, rgba(201,150,58,.10), rgba(201,150,58,.05));
+  }
+
+  /* Phase 1 narrow-viewport collapse */
+  @media (max-width: 1280px) {
+    .fh-build-content-grid--jobs,
+    .fh-build-content-grid--invoices,
+    .fh-build-content-grid--schedule {
+      grid-template-columns: 1fr;
+    }
+
+    .fh-build-pipeline-board {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
+/* ============================================================
+   BUILD DIRECTION — Phase 2
+   (Clients, Notes, Subs, Analytics, Forecast)
+   ============================================================
+   Same chrome and tokens as Phase 1, plus shared primitives for
+   banners, selects, chips, capture panels, and chart bars.
+   All gated >=900px. */
+
+@media (min-width: 900px) {
+
+  /* Shared: warning banner used on Clients (duplicates) and
+     Forecast (weather error). */
+  .fh-build-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    background: rgba(224, 161, 65, .08);
+    border: 1px solid rgba(224, 161, 65, .28);
+    color: #f4f1ea;
+    cursor: pointer;
+    font-size: 13px;
+    width: 100%;
+    text-align: left;
+  }
+  .fh-build-banner.is-warn { color: #f4f1ea; }
+  .fh-build-banner svg { color: #e0a141; flex-shrink: 0; }
+  .fh-build-banner strong { color: #f4f1ea; font-weight: 800; }
+  .fh-build-banner__cta {
+    margin-left: auto;
+    color: var(--v3-primary, #c9963a);
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  /* Shared select control (Subs trade filter, Notes job link) */
+  .fh-build-select {
+    margin-top: 10px;
+    height: 34px;
+    width: 100%;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.04);
+    color: #f4f1ea;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .fh-build-select:hover { background: rgba(255,255,255,.07); }
+  .fh-build-select option { background: #16140f; color: #f4f1ea; }
+
+  /* Shared chip — used in Subs trades, Notes badges */
+  .fh-build-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.10);
+    color: rgba(245,242,234,.85);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .03em;
+  }
+  .fh-build-chip.is-muted   { color: rgba(245,242,234,.50); }
+  .fh-build-chip.is-gold    { background: rgba(201,150,58,.14); border-color: rgba(201,150,58,.40); color: var(--v3-primary, #c9963a); }
+  .fh-build-chip.is-warn    { background: rgba(224,161,65,.14); border-color: rgba(224,161,65,.40); color: #e0a141; }
+  .fh-build-chip.is-link    {
+    background: rgba(115,201,130,.10);
+    border-color: rgba(115,201,130,.32);
+    color: #73c982;
+    cursor: pointer;
+  }
+  .fh-build-chip.is-link:hover { background: rgba(115,201,130,.18); }
+
+  /* Shared primary / secondary buttons (Notes capture panel) */
+  .fh-build-primary-btn,
+  .fh-build-secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 6px;
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+  .fh-build-primary-btn {
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    border: 0;
+  }
+  .fh-build-primary-btn:hover:not(:disabled) {
+    background: #d4a64b;
+  }
+  .fh-build-primary-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+  }
+  .fh-build-secondary-btn {
+    background: rgba(255,255,255,.04);
+    color: rgba(245,242,234,.85);
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .fh-build-secondary-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,.08);
+  }
+  .fh-build-secondary-btn:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+
+  /* ---------- CLIENTS ---------- */
+  .fh-build-content-grid--clients {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-table__head.is-clients,
+  .fh-build-table__row.is-clients {
+    grid-template-columns: 1.4fr 100px 90px 110px 80px 1.1fr 14px;
+  }
+
+  /* ---------- SUBS / TEAMS ---------- */
+  .fh-build-content-grid--subs {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-table__head.is-subs,
+  .fh-build-table__row.is-subs {
+    grid-template-columns: 1.3fr 1fr 80px 110px 90px 90px 14px;
+  }
+  .fh-build-trade-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  /* ---------- NOTES / FIELD REPORTS ---------- */
+  .fh-build-content-grid--notes {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-notes-main {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+
+  .fh-build-capture { padding: 0; }
+  .fh-build-capture__body { padding: 0 22px 18px; }
+  .fh-build-capture__textarea {
+    width: 100%;
+    background: rgba(0,0,0,.30);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 6px;
+    padding: 12px 14px;
+    color: #f4f1ea;
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 100px;
+  }
+  .fh-build-capture__textarea:focus {
+    outline: 0;
+    border-color: rgba(201,150,58,.55);
+    background: rgba(0,0,0,.40);
+  }
+  .fh-build-capture__textarea::placeholder { color: rgba(245,242,234,.40); }
+
+  .fh-build-capture__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .fh-build-capture__row .fh-build-select { margin-top: 0; flex: 1; max-width: 320px; }
+  .fh-build-capture__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: rgba(245,242,234,.55);
+  }
+
+  .fh-build-capture__error {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(238,73,66,.10);
+    border: 1px solid rgba(238,73,66,.30);
+    color: #ee4942;
+    font-size: 12px;
+  }
+
+  .fh-build-capture__parsed {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    background: rgba(201,150,58,.06);
+    border: 1px solid rgba(201,150,58,.25);
+  }
+  .fh-build-capture__parsed p { margin: 6px 0 0; color: #f4f1ea; font-size: 13px; line-height: 1.45; }
+  .fh-build-capture__parsed ul { margin: 8px 0 0; padding-left: 18px; color: rgba(245,242,234,.78); font-size: 12px; }
+  .fh-build-capture__parsed li { margin-bottom: 3px; }
+
+  .fh-build-capture__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .fh-build-mic-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.03);
+    color: rgba(245,242,234,.78);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .fh-build-mic-btn.is-on {
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    border-color: var(--v3-primary, #c9963a);
+  }
+
+  /* Notes feed rows — list-style, not a strict grid table */
+  .fh-build-note-row {
+    display: flex;
+    gap: 14px;
+    padding: 14px 22px;
+    border-top: 1px solid rgba(255,255,255,.065);
+  }
+  .fh-build-note-row:first-of-type { border-top: 0; }
+  .fh-build-note-row__main { flex: 1; min-width: 0; }
+  .fh-build-note-row__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .fh-build-note-row__time {
+    margin-left: auto;
+    color: rgba(245,242,234,.45);
+    font-size: 11px;
+  }
+  .fh-build-note-row__body {
+    margin: 0;
+    color: #f4f1ea;
+    font-size: 13px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .fh-build-note-row__actions {
+    display: flex;
+    gap: 4px;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  .fh-build-icon-action {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 6px;
+    color: rgba(245,242,234,.55);
+    cursor: pointer;
+  }
+  .fh-build-icon-action:hover {
+    background: rgba(255,255,255,.06);
+    color: #f4f1ea;
+  }
+  .fh-build-icon-action.is-danger:hover {
+    color: #ee4942;
+    border-color: rgba(238,73,66,.30);
+    background: rgba(238,73,66,.10);
+  }
+
+  /* ---------- ANALYTICS ---------- */
+  .fh-build-content-grid--analytics {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-analytics-main {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+  .fh-build-table__head.is-topclients,
+  .fh-build-table__row.is-topclients {
+    grid-template-columns: 40px 1fr 120px;
+  }
+
+  /* Secondary KPI strip — 6-up tight tiles */
+  .fh-build-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .fh-build-kpi-cell {
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.10);
+  }
+  .fh-build-kpi-cell strong {
+    display: block;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 26px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-variant-numeric: tabular-nums;
+  }
+  .fh-build-kpi-cell span {
+    display: block;
+    margin-top: 6px;
+    color: rgba(245,242,234,.50);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  /* Stage bar chart (Analytics pipeline-by-stage) */
+  .fh-build-chart-card { padding: 0; }
+  .fh-build-stage-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 22px 22px;
+  }
+  .fh-build-stage-bar {
+    display: grid;
+    grid-template-columns: 160px 1fr 100px;
+    align-items: center;
+    gap: 14px;
+  }
+  .fh-build-stage-bar__label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    color: #f4f1ea;
+    font-weight: 700;
+  }
+  .fh-build-stage-bar__track {
+    height: 10px;
+    background: rgba(255,255,255,.05);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .fh-build-stage-bar__fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 320ms ease;
+  }
+  .fh-build-stage-bar__value {
+    text-align: right;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 20px;
+    color: var(--v3-primary, #c9963a);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Revenue trend (column chart) */
+  .fh-build-trend-chart {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    padding: 18px 22px 22px;
+    align-items: end;
+    min-height: 220px;
+  }
+  .fh-build-trend-col {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    cursor: default;
+    min-width: 0;
+  }
+  .fh-build-trend-col__bar {
+    background: linear-gradient(180deg, var(--v3-primary, #c9963a), rgba(201,150,58,.45));
+    border-radius: 3px 3px 0 0;
+    min-height: 6px;
+    margin-top: auto;
+    transition: opacity 120ms ease;
+  }
+  .fh-build-trend-col:hover .fh-build-trend-col__bar { opacity: .85; }
+  .fh-build-trend-col__label {
+    text-align: center;
+    color: rgba(245,242,234,.55);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .fh-build-trend-col__value {
+    text-align: center;
+    color: #f4f1ea;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- FORECAST / POUR WINDOW ---------- */
+  .fh-build-content-grid--forecast {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-forecast-main {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+  .fh-build-window-card { transition: border-color 200ms ease; }
+  .fh-build-window-card.is-good { border-color: rgba(115,201,130,.42); }
+  .fh-build-window-card.is-warn { border-color: rgba(224,161,65,.42); }
+  .fh-build-window-card.is-bad  { border-color: rgba(238,73,66,.42); }
+
+  .fh-build-forecast-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 10px;
+    padding: 18px 22px 22px;
+  }
+  .fh-build-forecast-day {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 12px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.02);
+    border-radius: 8px;
+    border-top: 3px solid currentColor;
+  }
+  .fh-build-forecast-day.is-good { color: #73c982; }
+  .fh-build-forecast-day.is-warn { color: #e0a141; }
+  .fh-build-forecast-day.is-bad  { color: #ee4942; }
+
+  .fh-build-forecast-day__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    color: rgba(245,242,234,.62);
+  }
+  .fh-build-forecast-day__weekday {
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .14em;
+    color: inherit;
+  }
+  .fh-build-forecast-day__date {
+    font-size: 10px;
+    color: rgba(245,242,234,.45);
+  }
+  .fh-build-forecast-day__temp {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .fh-build-forecast-day__temp strong {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 32px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-variant-numeric: tabular-nums;
+  }
+  .fh-build-forecast-day__temp span {
+    color: rgba(245,242,234,.45);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .fh-build-forecast-day__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(245,242,234,.72);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .fh-build-forecast-day__row svg { color: var(--v3-primary, #c9963a); }
+
+  .fh-build-table__head.is-trades,
+  .fh-build-table__row.is-trades {
+    grid-template-columns: 120px 130px 1fr;
+  }
+
+  /* Phase 2 narrow-viewport collapse */
+  @media (max-width: 1280px) {
+    .fh-build-content-grid--clients,
+    .fh-build-content-grid--subs,
+    .fh-build-content-grid--notes,
+    .fh-build-content-grid--analytics,
+    .fh-build-content-grid--forecast {
+      grid-template-columns: 1fr;
+    }
+    .fh-build-kpi-strip {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .fh-build-forecast-days {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .fh-build-forecast-days {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .fh-build-stage-bar {
+      grid-template-columns: 100px 1fr 80px;
+    }
+  }
+}
+
+/* ============================================================
+   BUILD DIRECTION — Phase 3
+   (Settings, Client Detail, Job Detail)
+   ============================================================
+   Adds detail-page chrome (back button, name title, tab strip,
+   detail content grid) on top of the existing Build primitives.
+   All gated >=900px. */
+
+@media (min-width: 900px) {
+
+  /* ---------- DETAIL TOPBAR ---------- */
+  /* Adds a back button on the left of the search.
+     5-column grid: back | search | meta | bell | (edit | delete) */
+  .fh-build-topbar--detail {
+    grid-template-columns: auto minmax(220px, 480px) 1fr auto auto auto;
+  }
+
+  .fh-build-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 38px;
+    padding: 0 14px 0 10px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.035);
+    color: rgba(245,242,234,.78);
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+  .fh-build-back:hover { background: rgba(255,255,255,.07); color: #f4f1ea; }
+
+  .fh-build-icon-btn.is-on {
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    border-color: var(--v3-primary, #c9963a);
+  }
+
+  /* ---------- DETAIL HERO ---------- */
+  /* Variant of the hero row used by detail pages — wider title slot,
+     no middle focus card (vitals live in mini-grid on the right). */
+  .fh-build-hero-row--detail {
+    grid-template-columns: minmax(0, 1fr) 480px;
+    gap: 24px;
+    align-items: center;
+  }
+
+  /* Big detail name. Smaller than the LET'S BUILD page headline so
+     it still respects the visual hierarchy ("page title > record
+     name") but feels like a primary heading. */
+  .fh-build-title--name {
+    font-size: clamp(38px, 4.6vw, 56px);
+    letter-spacing: .005em;
+    text-transform: none;
+  }
+
+  .fh-build-detail-sub {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .fh-build-dot-sep { color: rgba(255,255,255,.20); }
+
+  /* 4-up mini grid sits on the right side of the detail hero. */
+  .fh-build-mini-grid--detail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  /* ---------- TAB STRIP ---------- */
+  /* Quiet underline tabs that match the dashboard's gold-on-dark
+     language. Lives between the hero and the content grid. */
+  .fh-build-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 4px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid rgba(255,255,255,.09);
+  }
+  .fh-build-tab {
+    position: relative;
+    background: transparent;
+    border: 0;
+    padding: 12px 16px;
+    color: rgba(245,242,234,.55);
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .fh-build-tab:hover { color: #f4f1ea; }
+  .fh-build-tab.is-active {
+    color: var(--v3-primary, #c9963a);
+    border-bottom-color: var(--v3-primary, #c9963a);
+  }
+  .fh-build-tabs__cta {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 5px;
+    background: rgba(201,150,58,.10);
+    border: 1px solid rgba(201,150,58,.32);
+    color: var(--v3-primary, #c9963a);
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+  .fh-build-tabs__cta:hover { background: rgba(201,150,58,.18); }
+
+  /* ---------- DETAIL CONTENT GRID ---------- */
+  /* Main column hosts the existing tab content; the rail keeps the
+     dashboard signal pattern. */
+  .fh-build-content-grid--detail {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-detail-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  /* Neutralize the inherited mobile screen padding/background of any
+     existing tab content rendered inside the detail main column.
+     The tab components were authored to live inside .v3-screen on
+     mobile; on desktop the Build chrome owns those. */
+  .fh-build-detail-main > .v3-screen,
+  .fh-build-detail-main > .fh-screen {
+    padding: 0 !important;
+    background: transparent !important;
+    min-height: 0 !important;
+  }
+
+  /* ---------- CONTACT INFO LIST (rail) ---------- */
+  .fh-build-contact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .fh-build-contact-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    color: rgba(245,242,234,.78);
+    font-size: 12px;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+  .fh-build-contact-row:last-child { border-bottom: 0; }
+  .fh-build-contact-row:hover { color: var(--v3-primary, #c9963a); }
+  .fh-build-contact-row svg { color: var(--v3-primary, #c9963a); flex-shrink: 0; }
+  .fh-build-contact-row > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fh-build-contact-row__chev { color: rgba(245,242,234,.30); flex-shrink: 0; }
+
+  /* ---------- SETTINGS GRID ---------- */
+  .fh-build-content-grid--settings {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-settings-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  /* Re-style the legacy mobile <Section> blocks so they read as
+     Build cards inside the new chrome. We don't touch the form
+     fields themselves — only the section wrapper. */
+  .fh-build-settings-main > .v3-section {
+    margin: 0 !important;
+    padding: 18px 22px !important;
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92)) !important;
+    border: 1px solid rgba(255,255,255,.105) !important;
+    border-radius: 9px !important;
+    box-shadow: 0 22px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055) !important;
+  }
+
+  /* ---------- SETUP PROGRESS BAR (Settings hero) ---------- */
+  .fh-build-progress {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .fh-build-progress__track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .fh-build-progress__fill {
+    height: 100%;
+    background: var(--v3-primary, #c9963a);
+    border-radius: 3px;
+    transition: width 320ms ease;
+  }
+  .fh-build-progress span {
+    color: rgba(245,242,234,.62);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Narrow-viewport collapse for detail + settings */
+  @media (max-width: 1280px) {
+    .fh-build-content-grid--detail,
+    .fh-build-content-grid--settings {
+      grid-template-columns: 1fr;
+    }
+    .fh-build-hero-row--detail {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .fh-build-topbar--detail {
+      grid-template-columns: auto 1fr auto auto auto;
+    }
+    .fh-build-topbar--detail .fh-build-search { display: none; }
+  }
+}
+
+/* ============================================================
+   BUILD DIRECTION — Phase 4 (functional parity)
+   ============================================================
+   Polish + usability fixes after the manual walkthrough — no
+   visual redesign. All gated >=900px. */
+
+@media (min-width: 900px) {
+  /* Account card — fix cramped email in the Settings rail.
+     The email needs proper line-height + wrap so user@long-domain
+     no longer reads as a single mashed string. */
+  .fh-build-rail-card--account { word-break: break-word; }
+  .fh-build-account-email {
+    display: block;
+    margin-top: 8px;
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.45;
+    letter-spacing: 0;
+    color: #f4f1ea;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+  }
+
+  /* Settings legacy sticky "Save changes" bar — quieter footer so it
+     reads as a command rail, not a black wall. Pairs with a bottom
+     pad on the settings main column so cards aren't covered. */
+  .fh-build-settings-main { padding-bottom: 96px; }
+  .fh-build-settings-main + * { position: relative; }
+
+  /* Modal/drawer shared shell — apply consistently to existing
+     Drawer / Dialog / ActionSheet content so they fit the viewport
+     and have a clean dark scrollbar instead of the native white. */
+  [role="dialog"],
+  [data-vaul-drawer],
+  [data-radix-dialog-content],
+  [data-vaul-overlay] ~ [data-vaul-drawer] {
+    max-height: calc(100vh - 32px);
+  }
+
+  /* Internal scroll surfaces inside drawers/dialogs use a slim dark
+     scrollbar matching the chrome. Webkit + Firefox covered. */
+  [role="dialog"] *::-webkit-scrollbar,
+  [data-vaul-drawer] *::-webkit-scrollbar,
+  [data-radix-dialog-content] *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  [role="dialog"] *::-webkit-scrollbar-track,
+  [data-vaul-drawer] *::-webkit-scrollbar-track,
+  [data-radix-dialog-content] *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  [role="dialog"] *::-webkit-scrollbar-thumb,
+  [data-vaul-drawer] *::-webkit-scrollbar-thumb,
+  [data-radix-dialog-content] *::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.14);
+    border-radius: 8px;
+  }
+  [role="dialog"] *::-webkit-scrollbar-thumb:hover,
+  [data-vaul-drawer] *::-webkit-scrollbar-thumb:hover,
+  [data-radix-dialog-content] *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,.22);
+  }
+  [role="dialog"], [data-vaul-drawer], [data-radix-dialog-content] {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+}
+
+/* ============================================================
+   BUILD DIRECTION — utility-screen polish
+   (Bid / Compose / Job-detail Quote)
+   ============================================================
+   Brings the three remaining older utility screens into the
+   LET'S BUILD desktop visual system without rewriting them.
+   Scoped under .fh-build-utility (Bid + Compose) and the
+   existing .fh-build-detail-main (Quote tab inside JobDetail). */
+
+@media (min-width: 900px) {
+  /* Common: a centered max-width page rhythm so utility screens
+     don't sprawl across an ultrawide canvas, matching the Build
+     dashboard inner padding. */
+  .fh-build-utility {
+    background: linear-gradient(180deg, #080a0d 0%, #050607 100%) !important;
+    color: #f4f1ea;
+    padding: 24px 28px 96px !important;
+  }
+  .fh-build-utility > * + * { margin-top: 0; }
+
+  /* Section cards — adopt the Build card look (gradient surface,
+     thin white border, soft shadow, 9px radius) without touching
+     the actual <Section> JSX. */
+  .fh-build-utility .v3-section {
+    margin: 0 0 18px !important;
+    padding: 22px 24px !important;
+    background:
+      linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92)) !important;
+    border: 1px solid rgba(255,255,255,.105) !important;
+    border-radius: 9px !important;
+    box-shadow:
+      0 22px 60px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.055) !important;
+  }
+  .fh-build-utility .v3-section--primary {
+    border-color: rgba(201,150,58,.40) !important;
+  }
+  .fh-build-utility .v3-section--primary-quiet {
+    border-color: rgba(255,255,255,.085) !important;
+  }
+
+  /* Inputs / textareas / selects — quiet onyx, gold focus ring. */
+  .fh-build-utility input:not([type="checkbox"]):not([type="radio"]),
+  .fh-build-utility textarea,
+  .fh-build-utility select {
+    background: rgba(0,0,0,.30) !important;
+    border: 1px solid rgba(255,255,255,.10) !important;
+    color: #f4f1ea !important;
+    border-radius: 6px;
+  }
+  .fh-build-utility input:focus,
+  .fh-build-utility textarea:focus,
+  .fh-build-utility select:focus {
+    outline: none !important;
+    border-color: rgba(201,150,58,.55) !important;
+    background: rgba(0,0,0,.40) !important;
+  }
+
+  /* Dark slim scrollbar everywhere inside utility surfaces. */
+  .fh-build-utility,
+  .fh-build-utility * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+  .fh-build-utility *::-webkit-scrollbar { width: 8px; height: 8px; }
+  .fh-build-utility *::-webkit-scrollbar-track { background: transparent; }
+  .fh-build-utility *::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.14);
+    border-radius: 8px;
+  }
+  .fh-build-utility *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.22); }
+
+  /* Compose: lay out side-by-side composer + preview instead of
+     stacking with empty space on the right. */
+  .v3-screen--compose.fh-build-utility .v3-section + .v3-section {
+    margin-top: 18px !important;
+  }
+
+  /* ─── Job-detail Quote builder ───
+     The two-pane workspace already exists (set in global.css around
+     line 3007). On desktop the right side is too wide and creates
+     dead space when no insurance/change-orders are present. Tighten
+     the rail to 290px to match the Build chrome rails, and adopt the
+     Build card look so it reads as part of the same system. */
+  .v3-screen--quote-active .fh-build-detail-main .fh-quote-workspace,
+  .fh-build-detail-main > .fh-quote-workspace {
+    grid-template-columns: minmax(0, 1fr) 290px !important;
+    gap: 18px !important;
+    padding: 0 !important;
+  }
+  .fh-build-detail-main .fh-quote-workspace__main { gap: 18px; }
+  .fh-build-detail-main .fh-quote-workspace__side {
+    padding: 0 !important;
+    gap: 12px;
+  }
+  .fh-build-detail-main .fh-quote-workspace .v3-section {
+    margin: 0 !important;
+    padding: 18px 20px !important;
+    background:
+      linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92)) !important;
+    border: 1px solid rgba(255,255,255,.105) !important;
+    border-radius: 9px !important;
+    box-shadow:
+      0 22px 60px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.055) !important;
+  }
+  /* When the rail has no content (no insurance/change-orders/etc),
+     the empty placeholders shouldn't take 480px+ width — kept at the
+     290px rail above. The main column expands to take the freed
+     space. */
+
+  /* ─── Narrow-viewport collapse ─── */
+  @media (max-width: 1180px) {
+    .v3-screen--quote-active .fh-build-detail-main .fh-quote-workspace,
+    .fh-build-detail-main > .fh-quote-workspace {
+      grid-template-columns: 1fr !important;
+    }
+  }
+}

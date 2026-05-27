@@ -10,7 +10,7 @@ import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowSubs from '../components/desktop/SnowSubs.tsx'
+import SnowSubs from '../components/desktop/SnowSubsBuild.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
@@ -84,6 +84,16 @@ export default function Subs() {
           jobIds: new Set(),
           totalRate: 0,
           lastWorked: null,
+          // Truth flag: the fh_subs table has no insurance columns
+          // (only id/user_id/contact_id/name/phone/rate/status/trade/
+          // created_at). The Build component renders "Not tracked"
+          // instead of inventing dates. Flip to true when a future
+          // join with a vendor profile table exposes real expiry data.
+          insuranceTracked: false,
+          // Most recent non-empty status across this sub's rows —
+          // surfaces fh_subs.status (e.g. "active", "inactive") in
+          // the Build component when set.
+          status: null as string | null,
           rows: []
         })
       }
@@ -96,6 +106,11 @@ export default function Subs() {
       }
       const created = r.created_at ? new Date(r.created_at) : null
       if (created && (!g.lastWorked || created > g.lastWorked)) g.lastWorked = created
+      // Latest status wins (rows are iterated in arrival order; the
+      // newest-created row replaces older statuses).
+      if (r.status && (!g.status || (created && (!g.lastWorked || created >= g.lastWorked)))) {
+        g.status = r.status
+      }
       g.rows.push(r)
     }
     return Array.from(map.values()).sort((a, b) => {

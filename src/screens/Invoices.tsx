@@ -18,7 +18,7 @@ import V3PaymentSheet from '../components/V3PaymentSheet.tsx'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowInvoices from '../components/desktop/SnowInvoices.tsx'
+import SnowInvoices from '../components/desktop/SnowInvoicesBuild.tsx'
 
 // Invoices / AR — v3 money command screen.
 //

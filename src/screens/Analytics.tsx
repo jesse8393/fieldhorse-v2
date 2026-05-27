@@ -13,7 +13,7 @@ import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowAnalytics from '../components/desktop/SnowAnalytics.tsx'
+import SnowAnalytics from '../components/desktop/SnowAnalyticsBuild.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 
 function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
@@ -130,13 +130,33 @@ export default function Analytics() {
     const lostCount = contacts.filter((c) => c.stage === 'lost').length
     const milesYTD = mileage.reduce((s, m) => s + Number(m.miles || 0), 0)
     const mileageDeduction = milesYTD * 0.67
+    // Real YTD invoiced/collected totals, computed from the same
+    // payments/invoices arrays the rest of this screen reads.
+    // Returned as null when the underlying array is empty so the
+    // desktop Build component can render "—" instead of $0 — that
+    // distinguishes "no financial data hooked up" from "you've
+    // invoiced $0 this year".
+    const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime()
+    const invoiced = invoices.length === 0
+      ? null
+      : invoices.reduce((s, inv) => {
+          const t = new Date(inv.issued_at || inv.created_at || 0).getTime()
+          return (Number.isFinite(t) && t >= yearStart) ? s + Number(inv.amount || 0) : s
+        }, 0)
+    const collected = payments.length === 0
+      ? null
+      : payments.reduce((s, p) => {
+          const t = new Date(p.paid_on || p.created_at || 0).getTime()
+          return (Number.isFinite(t) && t >= yearStart) ? s + Number(p.amount || 0) : s
+        }, 0)
     return {
       pipeline, wonYTD, profitYTD, avgMargin, avgMarginNote,
       leads, quotes, jobs, closedCount, lostCount,
       closeRate, closeRateNote,
-      milesYTD, mileageDeduction
+      milesYTD, mileageDeduction,
+      invoiced, collected,
     }
-  }, [contacts, mileage])
+  }, [contacts, mileage, invoices, payments])
 
   const byStage = useMemo(() => {
     return STAGES.map((s) => ({

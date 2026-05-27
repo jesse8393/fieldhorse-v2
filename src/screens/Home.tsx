@@ -31,7 +31,7 @@ import { hapticTap } from '../lib/haptics.ts'
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
 import { fetchCoverPhotosByJob } from '../lib/photos.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowHome from '../components/desktop/SnowHome.tsx'
+import SnowHome from '../components/desktop/SnowHomeBuild.tsx'
 
 /* ----------------- helpers ----------------- */
 
@@ -440,6 +440,8 @@ export default function Home() {
         topPipeline={topPipeline}
         nextActions={nextActions}
         onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
+        onGoToLeads={() => navigate('/jobs?view=leads')}
+        onGoToActivity={() => navigate('/activity')}
         onGoToSchedule={() => navigate('/schedule')}
         onGoToInvoices={() => navigate('/invoices')}
         onGoToBid={() => navigate('/bid')}

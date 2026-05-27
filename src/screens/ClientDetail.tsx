@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import SnowClientDetailBuild from '../components/desktop/SnowClientDetailBuild.tsx'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import {
   ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
   Briefcase, Paperclip, Image as ImageIcon, Download,
@@ -140,6 +142,11 @@ export default function ClientDetail() {
     navigate(`/jobs/${data.id}${dest}`)
   }
 
+  // Rules-of-hooks: useIsDesktop must run before any conditional
+  // return, so React sees the same hook order on every render of
+  // this component (loading → not-found → desktop branch → mobile).
+  const isDesktop = useIsDesktop()
+
   if (loading) {
     return (
       <div className="v3-screen" style={{ paddingBottom: 120, padding: '20px 20px 120px', background: 'var(--v3-bg)' }}>
@@ -158,6 +165,48 @@ export default function ClientDetail() {
   }
 
   const initial = (client.name || '·').trim().charAt(0).toUpperCase()
+
+  // The tab body is the only piece we want to render inside the
+  // desktop Build chrome — everything else (top bar, hero, tabs) is
+  // already provided by SnowClientDetailBuild. The mobile branch
+  // below renders the original chrome + this same body unchanged.
+  const tabBody = (
+    <>
+      {tab === 'overview' && (
+        isEditing
+          ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
+          : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
+      )}
+      {tab === 'projects' && (
+        <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
+      )}
+      {tab === 'files' && <FilesList rows={files} />}
+      {tab === 'notes' && <NotesList notes={notes} />}
+    </>
+  )
+
+  if (isDesktop) {
+    return (
+      <SnowClientDetailBuild
+        client={client}
+        lifetime={lifetime}
+        outstanding={outstanding}
+        activeCount={activeCount}
+        jobs={jobs}
+        payments={payments}
+        tabs={TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        onBack={() => navigate('/clients')}
+        onEdit={() => setIsEditing(!isEditing)}
+        onDelete={() => setDeleteOpen(true)}
+        onNewDeal={() => setNewOpen(true)}
+        isEditing={isEditing}
+      >
+        {tabBody}
+      </SnowClientDetailBuild>
+    )
+  }
 
   return (
     <motion.div

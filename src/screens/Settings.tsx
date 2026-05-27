@@ -4,6 +4,8 @@ import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
+import SnowSettingsBuild from '../components/desktop/SnowSettingsBuild.tsx'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -217,19 +219,48 @@ export default function Settings() {
   }, [profile?.location_lat, profile?.location_lon])
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
 
-  return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
-      {/* HEADER */}
-      <motion.div variants={item} style={{ padding: '10px 20px 14px' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
-          Profile
-        </span>
-        <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
-          Your business,{' '}
-          organized.
-        </h1>
-      </motion.div>
+  // Sidebar "Templates" item routes to /settings#templates and the
+  // anchor lives on the Estimate-template picker further down the
+  // page. Honor the hash on first paint + on later hash changes so
+  // the user lands on template setup instead of the brand top.
+  useEffect(() => {
+    function jumpToHash() {
+      if (typeof window === 'undefined') return
+      const hash = window.location.hash
+      if (!hash) return
+      const el = document.getElementById(hash.slice(1))
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    // Wait one frame so the page has actually rendered the anchor.
+    const t = window.setTimeout(jumpToHash, 50)
+    window.addEventListener('hashchange', jumpToHash)
+    return () => { window.clearTimeout(t); window.removeEventListener('hashchange', jumpToHash) }
+  }, [])
+
+  // Real, honest "setup readiness" calculation — only counts fields
+  // that actually map to columns the profile screen exposes. No fake
+  // weight to inflate the percentage.
+  const profileChecks = [
+    { key: 'companyName', filled: !!(companyName && companyName.trim()), label: 'Company name' },
+    { key: 'companyPhone', filled: !!(companyPhone && companyPhone.trim()), label: 'Company phone' },
+    { key: 'companyEmail', filled: !!(companyEmail && companyEmail.trim()), label: 'Company email' },
+    { key: 'companyAddress', filled: !!(companyAddress && companyAddress.trim()), label: 'Company address' },
+    { key: 'licenseNumber', filled: !!(licenseNumber && licenseNumber.trim()), label: 'License number' },
+    { key: 'logo', filled: !!profile?.logo_url, label: 'Brand logo' },
+    { key: 'services', filled: services.length > 0, label: 'Services configured' },
+    { key: 'location', filled: !!(profile?.location_lat && profile?.location_lon), label: 'Pin business location' },
+  ]
+  const filledCount = profileChecks.filter((c) => c.filled).length
+  const profileCompletePct = Math.round((filledCount / profileChecks.length) * 100)
+  const missingItems = profileChecks.filter((c) => !c.filled).map((c) => c.label)
+  const brandReady = !!profile?.logo_url || !!(brandAccentHex && brandAccentHex.trim())
+  const hasLogo = !!profile?.logo_url
+  const hasLocation = !!(profile?.location_lat && profile?.location_lon)
+
+  const sections = (
+    <>
 
       {/* BRAND */}
       <Section variants={item} title={<>Your <em>brand.</em></>} sub="Make Fieldhorse feel like your app.">
@@ -371,12 +402,14 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField
-            label="Estimate template"
-            hint="The design used for every estimate you preview, share, or send. Your logo and details fill in automatically."
-          >
-            <EstimateTemplatePicker value={estimateTemplate} onChange={setEstimateTemplate} />
-          </BrandField>
+          <div id="templates" style={{ scrollMarginTop: 96 }}>
+            <BrandField
+              label="Estimate template"
+              hint="The design used for every estimate you preview, share, or send. Your logo and details fill in automatically."
+            >
+              <EstimateTemplatePicker value={estimateTemplate} onChange={setEstimateTemplate} />
+            </BrandField>
+          </div>
         </div>
       </Section>
 
@@ -613,6 +646,40 @@ export default function Settings() {
           {saving ? 'SAVING…' : saved ? 'SAVED' : 'SAVE CHANGES'}
         </motion.button>
       </div>
+    </>
+  )
+
+  if (isDesktop) {
+    return (
+      <SnowSettingsBuild
+        userEmail={user?.email}
+        companyName={companyName}
+        profileCompletePct={profileCompletePct}
+        brandReady={brandReady}
+        servicesCount={services.length}
+        hasLogo={hasLogo}
+        hasLocation={hasLocation}
+        missingItems={missingItems}
+        onSignOut={async () => { await signOut(); navigate('/login', { replace: true }) }}
+      >
+        {sections}
+      </SnowSettingsBuild>
+    )
+  }
+
+  return (
+    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+      {/* HEADER */}
+      <motion.div variants={item} style={{ padding: '10px 20px 14px' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+          Profile
+        </span>
+        <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
+          Your business,{' '}
+          organized.
+        </h1>
+      </motion.div>
+      {sections}
     </motion.div>
   )
 }

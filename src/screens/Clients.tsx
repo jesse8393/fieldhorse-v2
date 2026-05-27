@@ -12,7 +12,7 @@ import { findDuplicateClusters } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.tsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.tsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
-import SnowClients from '../components/desktop/SnowClients.tsx'
+import SnowClients from '../components/desktop/SnowClientsBuild.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
 function money(n: any) {

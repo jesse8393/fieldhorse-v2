@@ -34,7 +34,7 @@ import DetailsTab from './tabs/Details.tsx'
 import FinancialsTab from './tabs/Financials.tsx'
 import FilesTab from './tabs/Files.tsx'
 import ApproveQuoteSheet from './sections/ApproveQuoteSheet.tsx'
-import DesktopJobDetail from '../../components/desktop/DesktopJobDetail.tsx'
+import SnowJobDetailBuild from '../../components/desktop/SnowJobDetailBuild.tsx'
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
 const TOP_TABS = [
@@ -252,45 +252,118 @@ export default function ContactDetail() {
       style={{ position: 'relative' }}
     >
       {useDesktopShell ? (
-        <DesktopJobDetail
-          contact={contact}
-          clientSummary={clientSummary}
-          scheduleItems={scheduleItems}
-          todos={todos}
-          notes={notes}
-          subs={subs}
-          expenses={expenses}
-          payments={payments}
-          inspections={inspections}
-          paid={paid}
-          balance={balance}
-          scheduleCount={scheduleCount}
-          nextAction={nextAction}
-          nextTodo={nextTodo}
-          tab={tab}
-          setTab={setTab}
-          userId={user?.id}
-          isEditing={isEditing}
-          fetchAll={fetchAll}
-          patch={patch}
-          onBack={() => navigate('/jobs')}
-          onEdit={handleEditClick}
-          onMarkLost={async () => {
-            hapticError()
-            await markLost(contact)
-            toastInfo('Marked lost', 'Moved to lost column')
-            fetchAll()
-          }}
-          onDelete={() => setDeleteOpen(true)}
-          onClientNav={(cid: any) => navigate(`/clients/${cid}`)}
-          onTodoDone={markTodoDone}
-          onOpenLogPayment={() => setPayModalOpen(true)}
-          onOpenAddEvent={() => setEventOpen(true)}
-          onOpenInvitePartner={() => setInviteOpen(true)}
-          onOpenApproveQuote={() => setApproveOpen(true)}
-          onOpenMarkComplete={() => setCompleteOpen(true)}
-          onBuildQuote={onBuildQuote}
-        />
+        (() => {
+          // Compute truthful rail signals — null when there's no
+          // data to honestly answer the signal.
+          const today = Date.now()
+          const upcoming = (scheduleItems || []).filter((e: any) => {
+            const t = new Date(e.start_at || 0).getTime()
+            return Number.isFinite(t) && t >= today
+          })
+          const past = (scheduleItems || []).filter((e: any) => {
+            const t = new Date(e.start_at || 0).getTime()
+            return Number.isFinite(t) && t < today
+          })
+          const scheduleStatus: { label: string; tone: 'good' | 'warn' | 'bad' } | null =
+            (scheduleItems || []).length === 0
+              ? null
+              : upcoming.length === 0 && past.length > 0
+                ? { label: 'No upcoming events', tone: 'warn' }
+                : { label: `${upcoming.length} upcoming`, tone: 'good' }
+          // Reports / billing — render "Not tracked" rather than fake numbers.
+          const reportsMissing: number | null = null
+          const billingStatus: { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } | null =
+            (payments || []).length === 0 && Number(contact.amount || 0) === 0
+              ? null
+              : Number(balance || 0) > 0
+                ? { label: 'Outstanding', tone: 'warn' }
+                : Number(paid || 0) > 0
+                  ? { label: 'Paid', tone: 'good' }
+                  : { label: 'Not started', tone: 'neutral' }
+
+          return (
+            <SnowJobDetailBuild
+              contact={contact}
+              client={clientSummary}
+              tabs={visibleTabs}
+              activeTab={tab}
+              onTabChange={setTab}
+              onBack={() => navigate('/jobs')}
+              onEdit={handleEditClick}
+              onDelete={() => setDeleteOpen(true)}
+              onAddEvent={() => setEventOpen(true)}
+              isEditing={isEditing}
+              scheduleStatus={scheduleStatus}
+              reportsMissing={reportsMissing}
+              billingStatus={billingStatus}
+              paid={paid}
+              outstanding={balance}
+            >
+              {tab === 'overview' && (
+                <OverviewTab
+                  contact={contact}
+                  notes={notes}
+                  payments={payments}
+                  scheduleItems={scheduleItems}
+                  todos={todos}
+                  paid={paid}
+                  balance={balance}
+                  userId={user?.id}
+                  fetchAll={fetchAll}
+                  patch={patch}
+                  isEditing={isEditing}
+                  onExitEdit={() => setIsEditing(false)}
+                  onOpenAddEvent={() => setEventOpen(true)}
+                  onOpenLogPayment={() => setPayModalOpen(true)}
+                  onOpenInvitePartner={() => setInviteOpen(true)}
+                  onOpenApproveQuote={() => setApproveOpen(true)}
+                />
+              )}
+              {tab === 'quote' && (
+                <QuoteTab
+                  contact={contact}
+                  userId={user?.id}
+                  fetchAll={fetchAll}
+                  patch={patch}
+                  onOpenApprove={() => setApproveOpen(true)}
+                />
+              )}
+              {tab === 'details' && (
+                <DetailsTab
+                  contact={contact}
+                  inspections={inspections}
+                  scheduleItems={scheduleItems}
+                  userId={user?.id}
+                  fetchAll={fetchAll}
+                  patch={patch}
+                  onOpenAddEvent={() => setEventOpen(true)}
+                  onOpenInvitePartner={() => setInviteOpen(true)}
+                />
+              )}
+              {tab === 'financials' && (
+                <FinancialsTab
+                  contact={contact}
+                  subs={subs}
+                  expenses={expenses}
+                  payments={payments}
+                  paid={paid}
+                  balance={balance}
+                  userId={user?.id}
+                  fetchAll={fetchAll}
+                  onOpenLogPayment={() => setPayModalOpen(true)}
+                />
+              )}
+              {tab === 'files' && (
+                <FilesTab
+                  contact={contact}
+                  notes={notes}
+                  userId={user?.id}
+                  fetchAll={fetchAll}
+                />
+              )}
+            </SnowJobDetailBuild>
+          )
+        })()
       ) : (
       <>
       {/* HEADER — back / title / more, then action row, then stage timeline */}

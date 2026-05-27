@@ -17,6 +17,8 @@ import { useFhMotion } from '../lib/motion.ts'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import SnowNotes from '../components/desktop/SnowNotesBuild.tsx'
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
 
@@ -176,6 +178,7 @@ export default function Notes() {
 
   const listening = voiceState === 'listening'
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
 
   /* ───────── DATA SHAPING ───────── */
 
@@ -235,6 +238,35 @@ export default function Notes() {
     }
     return out.slice(0, 10)
   }, [notes])
+
+  if (isDesktop) {
+    return (
+      <SnowNotes
+        loading={loading}
+        contacts={contacts}
+        recent={recent}
+        linkedGroups={linkedGroups}
+        actionItems={actionItems}
+        cockpitStats={cockpitStats}
+        draft={draft}
+        setDraft={setDraft}
+        contactId={contactId}
+        setContactId={setContactId}
+        saving={saving}
+        parsing={parsing}
+        parsed={parsed}
+        parseError={parseError}
+        voiceState={voiceState}
+        onStartVoice={startVoice}
+        onStopVoice={stopVoice}
+        onParse={parseWithAI}
+        onSave={save}
+        onMarkDone={markDone}
+        onDelete={remove}
+        onOpenJob={(id) => navigate(`/jobs/${id}`)}
+      />
+    )
+  }
 
   return (
     <motion.div

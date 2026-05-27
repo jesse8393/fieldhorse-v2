@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Calculator, Sparkles, Copy, Check, FileText, Briefcase, BookmarkPlus, Trash2, X } from 'lucide-react'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { RATE_CARD, TRADE_LABELS, loadUserRateCard } from '../lib/rateCard.ts'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { JOB_TYPES } from '../lib/jobTypes.ts'
@@ -279,10 +280,12 @@ export default function Bid() {
   }
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
 
   return (
     <motion.div
-      className="v3-screen"
+      className={`v3-screen${isDesktop ? ' fh-build-utility' : ''}`}
+      data-build-screen={isDesktop ? 'Bid' : undefined}
       variants={stagger}
       initial="hidden"
       animate="show"
