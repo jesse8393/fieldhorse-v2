@@ -6,8 +6,10 @@ import { useProfile } from '../contexts/ProfileContext.tsx'
 import { getWeather, workWindow, hourlyStrip, weatherLabel, tradeStatus, reverseGeocode, MURFREESBORO } from '../lib/weather.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import Spotlight from '../components/fx/Spotlight.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
+import SnowForecast from '../components/desktop/SnowForecastBuild.tsx'
 
 // Status token → brand palette mapping used across the whole screen.
 // All three statuses get a solid hex fallback so the strip doesn't render
@@ -146,6 +148,24 @@ useEffect(() => {
   const currentRain = weather?.current?.precipitation ?? 0
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
+
+  if (isDesktop) {
+    return (
+      <SnowForecast
+        loading={loading}
+        err={err}
+        hasCoords={hasCoords}
+        cityName={cityName}
+        weather={weather}
+        currentWindow={currentWindow}
+        daily={daily}
+        tradeRows={tradeRows}
+        onPinLocation={pinLocation}
+        onGoToSchedule={() => navigate('/schedule')}
+      />
+    )
+  }
 
   return (
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>

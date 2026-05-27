@@ -13,7 +13,7 @@ import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowAnalytics from '../components/desktop/SnowAnalytics.tsx'
+import SnowAnalytics from '../components/desktop/SnowAnalyticsBuild.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 
 function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
