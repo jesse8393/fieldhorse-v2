@@ -11,7 +11,8 @@
 // contacts array. This is how the sidebar's "Lead Desk" / "Pipeline"
 // items show up in the dashboard without adding a new route.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowUpRight,
   Bell,
@@ -25,6 +26,15 @@ import {
   KanbanSquare,
 } from 'lucide-react'
 import SnowPipelineBuild from './SnowPipelineBuild.tsx'
+
+// Map the rail's stage-grouping keys to the parent screen's TABS ids
+// so clicking a stage row actually narrows the table. The parent's
+// 'won' tab covers both 'invoice' and 'closed' stages.
+function stageKeyToFilter(stageKey: string): string {
+  if (stageKey === 'job') return 'active'
+  if (stageKey === 'invoice' || stageKey === 'closed') return 'won'
+  return stageKey
+}
 
 type Props = {
   contacts: any[]
@@ -66,13 +76,16 @@ function relTime(iso: any) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// Keys MUST match the parent screen's TABS ids in Jobs.tsx:
+//   all, lead, quote, active (= stage 'job'), won (= stage 'invoice'|'closed')
+// If these drift the parent's `filtered` memo falls back to TABS[0]
+// and every filter pill behaves like "All".
 const FILTERS: { key: string; label: string }[] = [
-  { key: 'all',     label: 'All' },
-  { key: 'lead',    label: 'Leads' },
-  { key: 'quote',   label: 'Quotes' },
-  { key: 'job',     label: 'Active' },
-  { key: 'invoice', label: 'Invoicing' },
-  { key: 'closed',  label: 'Closed' },
+  { key: 'all',    label: 'All' },
+  { key: 'lead',   label: 'Leads' },
+  { key: 'quote',  label: 'Quotes' },
+  { key: 'active', label: 'Active' },
+  { key: 'won',    label: 'Closed' },
 ]
 
 export default function SnowJobsBuild(props: Props) {
@@ -81,7 +94,24 @@ export default function SnowJobsBuild(props: Props) {
     tabCounts, onOpenJob, onNewLead,
   } = props
 
-  const [view, setView] = useState<'table' | 'pipeline'>('table')
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Lead Desk vs Job Desk are the same /jobs route distinguished by
+  // ?view=. Lead Desk pre-applies the 'lead' filter and adjusts the
+  // hero copy; Job Desk is the production-default view (all stages).
+  const params = new URLSearchParams(location.search)
+  const routeView = params.get('view') // 'leads' | 'jobs' | 'pipeline' | null
+  const isLeadDesk = routeView === 'leads'
+
+  // Sync filter ↔ Lead Desk on first mount / view change so the table
+  // matches the sidebar destination the user picked.
+  useEffect(() => {
+    if (isLeadDesk && filter === 'all') setFilter('lead')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLeadDesk])
+
+  const [view, setView] = useState<'table' | 'pipeline'>(routeView === 'pipeline' ? 'pipeline' : 'table')
 
   // KPI strip — pipeline $, active count, need-eyes count, won YTD $
   const kpi = useMemo(() => {
@@ -143,7 +173,15 @@ export default function SnowJobsBuild(props: Props) {
           <span>72° · Clear</span>
           <Sun size={16} className="fh-build-sun" />
         </div>
-        <button className="fh-build-icon-btn" type="button"><Bell size={16} /></button>
+        <button
+          className="fh-build-icon-btn"
+          type="button"
+          onClick={() => navigate('/activity')}
+          aria-label="Open activity"
+          title="Activity"
+        >
+          <Bell size={16} />
+        </button>
         <button className="fh-build-new-btn" type="button" onClick={onNewLead}>
           <Plus size={15} /> New Lead
         </button>
@@ -153,8 +191,8 @@ export default function SnowJobsBuild(props: Props) {
         {/* Hero row — title + view picker + KPIs */}
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Job Desk</div>
-            <h1 className="fh-build-title">RUN THE WORK.</h1>
+            <div className="fh-build-good">{isLeadDesk ? 'Lead Desk' : 'Job Desk'}</div>
+            <h1 className="fh-build-title">{isLeadDesk ? 'CLOSE THE DEAL.' : 'RUN THE WORK.'}</h1>
           </div>
 
           <div className="fh-build-view-card">
@@ -266,7 +304,7 @@ export default function SnowJobsBuild(props: Props) {
                       key={s.key}
                       type="button"
                       className="fh-build-stage-row"
-                      onClick={() => setFilter(s.key)}
+                      onClick={() => setFilter(stageKeyToFilter(s.key))}
                     >
                       <span className={`fh-build-dot is-${stageTone(s.key)}`}>{s.label}</span>
                       <span className="fh-build-stage-row__count">{s.count}</span>

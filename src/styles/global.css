@@ -11936,3 +11936,74 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     .fh-build-topbar--detail .fh-build-search { display: none; }
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase 4 (functional parity)
+   ============================================================
+   Polish + usability fixes after the manual walkthrough — no
+   visual redesign. All gated >=900px. */
+
+@media (min-width: 900px) {
+  /* Account card — fix cramped email in the Settings rail.
+     The email needs proper line-height + wrap so user@long-domain
+     no longer reads as a single mashed string. */
+  .fh-build-rail-card--account { word-break: break-word; }
+  .fh-build-account-email {
+    display: block;
+    margin-top: 8px;
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.45;
+    letter-spacing: 0;
+    color: #f4f1ea;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+  }
+
+  /* Settings legacy sticky "Save changes" bar — quieter footer so it
+     reads as a command rail, not a black wall. Pairs with a bottom
+     pad on the settings main column so cards aren't covered. */
+  .fh-build-settings-main { padding-bottom: 96px; }
+  .fh-build-settings-main + * { position: relative; }
+
+  /* Modal/drawer shared shell — apply consistently to existing
+     Drawer / Dialog / ActionSheet content so they fit the viewport
+     and have a clean dark scrollbar instead of the native white. */
+  [role="dialog"],
+  [data-vaul-drawer],
+  [data-radix-dialog-content],
+  [data-vaul-overlay] ~ [data-vaul-drawer] {
+    max-height: calc(100vh - 32px);
+  }
+
+  /* Internal scroll surfaces inside drawers/dialogs use a slim dark
+     scrollbar matching the chrome. Webkit + Firefox covered. */
+  [role="dialog"] *::-webkit-scrollbar,
+  [data-vaul-drawer] *::-webkit-scrollbar,
+  [data-radix-dialog-content] *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  [role="dialog"] *::-webkit-scrollbar-track,
+  [data-vaul-drawer] *::-webkit-scrollbar-track,
+  [data-radix-dialog-content] *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  [role="dialog"] *::-webkit-scrollbar-thumb,
+  [data-vaul-drawer] *::-webkit-scrollbar-thumb,
+  [data-radix-dialog-content] *::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.14);
+    border-radius: 8px;
+  }
+  [role="dialog"] *::-webkit-scrollbar-thumb:hover,
+  [data-vaul-drawer] *::-webkit-scrollbar-thumb:hover,
+  [data-radix-dialog-content] *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,.22);
+  }
+  [role="dialog"], [data-vaul-drawer], [data-radix-dialog-content] {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+}

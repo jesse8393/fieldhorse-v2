@@ -440,6 +440,8 @@ export default function Home() {
         topPipeline={topPipeline}
         nextActions={nextActions}
         onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
+        onGoToLeads={() => navigate('/jobs?view=leads')}
+        onGoToActivity={() => navigate('/activity')}
         onGoToSchedule={() => navigate('/schedule')}
         onGoToInvoices={() => navigate('/invoices')}
         onGoToBid={() => navigate('/bid')}

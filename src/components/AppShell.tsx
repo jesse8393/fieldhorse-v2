@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster as SonnerToaster } from 'sonner'
 import AppHeader from './AppHeader.tsx'
 import BottomNav from './BottomNav.tsx'
@@ -102,10 +102,24 @@ function layoutForPath(pathname: any) {
 
 export default function AppShell() {
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [location.pathname])
+
+  // Global navigation event so chrome buttons inside Build components
+  // (bell, footer links, etc.) can navigate without each component
+  // pulling in react-router. Dispatch from anywhere via:
+  //   window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))
+  useEffect(() => {
+    function onNav(e: any) {
+      const to = e?.detail?.to
+      if (typeof to === 'string' && to.length > 0) navigate(to)
+    }
+    window.addEventListener('fh:navigate', onNav as EventListener)
+    return () => window.removeEventListener('fh:navigate', onNav as EventListener)
+  }, [navigate])
 
   const layoutMode = layoutForPath(location.pathname)
 

@@ -101,18 +101,23 @@ export default function SnowAnalyticsBuild(props: Props) {
   return (
     <div className="fh-build-page" data-build-screen="SnowAnalyticsBuild">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
-        <div className="fh-build-search">
+        <button
+          type="button"
+          className="fh-build-search"
+          onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
+          aria-label="Open command palette"
+        >
           <Search size={14} />
           <span>Search reports, KPIs...</span>
           <kbd>⌘K</kbd>
-        </div>
+        </button>
         <div className="fh-build-topbar__meta">
           <span>Year to date · {new Date().getFullYear()}</span>
           <span className="fh-build-vline" />
           <span>72° · Clear</span>
           <Sun size={16} className="fh-build-sun" />
         </div>
-        <button className="fh-build-icon-btn" type="button"><Bell size={16} /></button>
+        <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>
 
       <main className="fh-build-main">

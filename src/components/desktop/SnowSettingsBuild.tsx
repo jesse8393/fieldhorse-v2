@@ -32,18 +32,23 @@ export default function SnowSettingsBuild(props: Props) {
   return (
     <div className="fh-build-page" data-build-screen="SnowSettingsBuild">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
-        <div className="fh-build-search">
+        <button
+          type="button"
+          className="fh-build-search"
+          onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
+          aria-label="Open command palette"
+        >
           <Search size={14} />
           <span>Search settings, integrations, billing...</span>
           <kbd>⌘K</kbd>
-        </div>
+        </button>
         <div className="fh-build-topbar__meta">
           <span>{companyName || userEmail || 'Account'}</span>
           <span className="fh-build-vline" />
           <span>72° · Clear</span>
           <Sun size={16} className="fh-build-sun" />
         </div>
-        <button className="fh-build-icon-btn" type="button"><Bell size={16} /></button>
+        <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>
 
       <main className="fh-build-main">
@@ -130,11 +135,14 @@ export default function SnowSettingsBuild(props: Props) {
               <span>{brandReady && hasLogo ? 'Estimates + invoices branded' : 'Add logo for branded docs'}</span>
             </section>
 
-            <section className="fh-build-rail-card">
+            <section className="fh-build-rail-card fh-build-rail-card--account">
               <div className="fh-build-eyebrow">Account</div>
-              <strong style={{ fontSize: 14, fontWeight: 700, letterSpacing: '.02em' }}>
+              <div
+                className="fh-build-account-email"
+                title={userEmail || ''}
+              >
                 {userEmail || '—'}
-              </strong>
+              </div>
               <span>Signed in</span>
               {onSignOut && (
                 <button type="button" className="fh-build-rail-card__action" onClick={onSignOut}>

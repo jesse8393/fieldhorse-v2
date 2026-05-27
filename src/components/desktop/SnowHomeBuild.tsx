@@ -35,6 +35,8 @@ type Props = {
   topPipeline: any[] | null
   nextActions: any[] | null
   onGoToJobs: (filter?: string) => void
+  onGoToLeads?: () => void
+  onGoToActivity?: () => void
   onGoToSchedule: () => void
   onGoToInvoices: () => void
   onOpenJob: (id: string) => void
@@ -92,6 +94,8 @@ export default function SnowHomeBuild(props: Props) {
     topPipeline,
     nextActions,
     onGoToJobs,
+    onGoToLeads,
+    onGoToActivity,
     onGoToSchedule,
     onGoToInvoices,
     onOpenJob,
@@ -118,11 +122,20 @@ export default function SnowHomeBuild(props: Props) {
       data-build-route="/"
     >
       <header className="fh-build-topbar">
-        <div className="fh-build-search">
+        <button
+          type="button"
+          className="fh-build-search"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('fh:open-palette'))
+            }
+          }}
+          aria-label="Open command palette"
+        >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
           <kbd>⌘K</kbd>
-        </div>
+        </button>
 
         <div className="fh-build-topbar__meta">
           <span>{dateLabel}</span>
@@ -140,7 +153,13 @@ export default function SnowHomeBuild(props: Props) {
           )}
         </div>
 
-        <button className="fh-build-icon-btn" type="button">
+        <button
+          className="fh-build-icon-btn"
+          type="button"
+          onClick={() => onGoToActivity?.()}
+          aria-label="Open activity"
+          title="Activity"
+        >
           <Bell size={16} />
         </button>
 
@@ -191,11 +210,13 @@ export default function SnowHomeBuild(props: Props) {
           <OwnerQueue
             rows={queueRows}
             onOpenJobAtTab={onOpenJobAtTab}
+            onViewAll={onGoToActivity}
           />
 
           <RevenueOpportunities
             rows={revenueRows}
             onOpenJob={onOpenJob}
+            onViewAll={onGoToLeads}
           />
 
           <JobHealthPreview
@@ -357,7 +378,7 @@ function RailMetric({ title, value, sub, chart }: any) {
   )
 }
 
-function OwnerQueue({ rows, onOpenJobAtTab }: any) {
+function OwnerQueue({ rows, onOpenJobAtTab, onViewAll }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-owner">
       <CardHeader title="Owner Queue" />
@@ -387,12 +408,12 @@ function OwnerQueue({ rows, onOpenJobAtTab }: any) {
         </button>
       ))}
 
-      <FooterLink label="View all tasks" />
+      <FooterLink label="View all tasks" onClick={onViewAll} />
     </section>
   )
 }
 
-function RevenueOpportunities({ rows, onOpenJob }: any) {
+function RevenueOpportunities({ rows, onOpenJob, onViewAll }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-revenue">
       <CardHeader title="Revenue Opportunities" />
@@ -419,7 +440,7 @@ function RevenueOpportunities({ rows, onOpenJob }: any) {
         </button>
       ))}
 
-      <FooterLink label="View all opportunities" />
+      <FooterLink label="View all opportunities" onClick={onViewAll} />
     </section>
   )
 }
@@ -456,7 +477,7 @@ function JobHealthPreview({ rows, onGoToJobs }: any) {
         </button>
       ))}
 
-      <FooterLink label="View all jobs" />
+      <FooterLink label="View all jobs" onClick={() => onGoToJobs?.()} />
     </section>
   )
 }
@@ -470,9 +491,9 @@ function CardHeader({ title, action }: any) {
   )
 }
 
-function FooterLink({ label }: { label: string }) {
+function FooterLink({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
-    <button type="button" className="fh-build-footer-link">
+    <button type="button" className="fh-build-footer-link" onClick={onClick}>
       {label} <ChevronRight size={13} />
     </button>
   )

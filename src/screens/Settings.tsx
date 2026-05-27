@@ -221,6 +221,24 @@ export default function Settings() {
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
+  // Sidebar "Templates" item routes to /settings#templates and the
+  // anchor lives on the Estimate-template picker further down the
+  // page. Honor the hash on first paint + on later hash changes so
+  // the user lands on template setup instead of the brand top.
+  useEffect(() => {
+    function jumpToHash() {
+      if (typeof window === 'undefined') return
+      const hash = window.location.hash
+      if (!hash) return
+      const el = document.getElementById(hash.slice(1))
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    // Wait one frame so the page has actually rendered the anchor.
+    const t = window.setTimeout(jumpToHash, 50)
+    window.addEventListener('hashchange', jumpToHash)
+    return () => { window.clearTimeout(t); window.removeEventListener('hashchange', jumpToHash) }
+  }, [])
+
   // Real, honest "setup readiness" calculation — only counts fields
   // that actually map to columns the profile screen exposes. No fake
   // weight to inflate the percentage.
@@ -384,12 +402,14 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField
-            label="Estimate template"
-            hint="The design used for every estimate you preview, share, or send. Your logo and details fill in automatically."
-          >
-            <EstimateTemplatePicker value={estimateTemplate} onChange={setEstimateTemplate} />
-          </BrandField>
+          <div id="templates" style={{ scrollMarginTop: 96 }}>
+            <BrandField
+              label="Estimate template"
+              hint="The design used for every estimate you preview, share, or send. Your logo and details fill in automatically."
+            >
+              <EstimateTemplatePicker value={estimateTemplate} onChange={setEstimateTemplate} />
+            </BrandField>
+          </div>
         </div>
       </Section>
 

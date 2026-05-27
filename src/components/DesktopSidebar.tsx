@@ -50,8 +50,8 @@ const GROUPS: Group[] = [
     items: [
       { label: 'Command Center', to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
-      { label: 'Lead Desk',      to: '/jobs?stage=lead', Icon: Sparkles, match: () => false },
-      { label: 'Job Desk',       to: '/jobs',     Icon: Hammer,          match: exact('/jobs') },
+      { label: 'Lead Desk',      to: '/jobs?view=leads', Icon: Sparkles, match: (p) => p === '/jobs' && typeof window !== 'undefined' && window.location.search.includes('view=leads') },
+      { label: 'Job Desk',       to: '/jobs',     Icon: Hammer,          match: (p) => p === '/jobs' && !(typeof window !== 'undefined' && window.location.search.includes('view=leads')) },
     ],
   },
   {
@@ -76,7 +76,7 @@ const GROUPS: Group[] = [
     items: [
       { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
       { label: 'Teams',          to: '/subs',     Icon: UsersRound,      match: prefix('/subs') },
-      { label: 'Templates',      to: '/settings', Icon: FileText,        match: () => false },
+      { label: 'Templates',      to: '/settings#templates', Icon: FileText,        match: (p) => p === '/settings' && typeof window !== 'undefined' && window.location.hash === '#templates' },
       { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: prefix('/settings') },
     ],
   },

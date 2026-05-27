@@ -115,11 +115,16 @@ export default function SnowForecastBuild(props: Props) {
   return (
     <div className="fh-build-page" data-build-screen="SnowForecastBuild">
       <header className="fh-build-topbar">
-        <div className="fh-build-search">
+        <button
+          type="button"
+          className="fh-build-search"
+          onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
+          aria-label="Open command palette"
+        >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
           <kbd>⌘K</kbd>
-        </div>
+        </button>
         <div className="fh-build-topbar__meta">
           <span>
             <MapPin size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
@@ -135,7 +140,7 @@ export default function SnowForecastBuild(props: Props) {
             <span>—</span>
           )}
         </div>
-        <button className="fh-build-icon-btn" type="button"><Bell size={16} /></button>
+        <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onPinLocation}>
           <MapPin size={15} /> {hasCoords ? 'Re-pin' : 'Pin location'}
         </button>

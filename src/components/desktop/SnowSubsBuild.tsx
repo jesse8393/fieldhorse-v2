@@ -128,7 +128,7 @@ export default function SnowSubsBuild(props: Props) {
           <span>72° · Clear</span>
           <Sun size={16} className="fh-build-sun" />
         </div>
-        <button className="fh-build-icon-btn" type="button"><Bell size={16} /></button>
+        <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onAddSub}>
           <Plus size={15} /> Add Team
         </button>
@@ -260,6 +260,18 @@ export default function SnowSubsBuild(props: Props) {
               <div className="fh-build-eyebrow">On jobs today</div>
               <strong>—</strong>
               <span>Schedule integration coming</span>
+            </section>
+
+            <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Crew portal</div>
+              <strong>Not connected</strong>
+              <span>No employee/crew roster yet</span>
+            </section>
+
+            <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Owner / admin access</div>
+              <strong>Single owner</strong>
+              <span>Multi-user roles not yet configured</span>
             </section>
 
             <section className="fh-build-rail-card">
