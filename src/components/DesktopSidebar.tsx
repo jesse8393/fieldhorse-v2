@@ -50,7 +50,7 @@ const GROUPS: Group[] = [
     items: [
       { label: 'Command Center', to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
-      { label: 'Lead Desk',      to: '/jobs?stage=lead', Icon: Sparkles },
+      { label: 'Lead Desk',      to: '/jobs?stage=lead', Icon: Sparkles, match: () => false },
       { label: 'Job Desk',       to: '/jobs',     Icon: Hammer,          match: exact('/jobs') },
     ],
   },
@@ -160,6 +160,9 @@ export default function DesktopSidebar() {
 }
 
 function FieldHorseMark() {
+  // F + H rendered as non-overlapping rects so the F middle bar can't
+  // be visually clipped by an H/mask paint order. Coordinates centered
+  // in the 72x72 viewBox with a 4px gap between the two letters.
   return (
     <div className="fh-mark" aria-label="FieldHorse">
       <svg
@@ -185,24 +188,15 @@ function FieldHorseMark() {
           stroke="rgba(255,255,255,.10)"
         />
 
-        <path
-          d="M18 19 H43 V29 H30 V34 H41 V44 H30 V55 H18 Z"
-          fill="#F4F4F0"
-        />
+        {/* F — white. Stem + top bar + middle bar, no overlap with H. */}
+        <rect x="12" y="14" width="8"  height="44" fill="#F4F4F0" />
+        <rect x="12" y="14" width="22" height="8"  fill="#F4F4F0" />
+        <rect x="12" y="30" width="18" height="8"  fill="#F4F4F0" />
 
-        <path
-          d="M45 19 H55 V34 H62 V19 H72 V55 H62 V43 H55 V55 H45 Z"
-          fill="url(#fhOrange)"
-          transform="translate(-10 0)"
-        />
-
-        <rect
-          x="36"
-          y="30"
-          width="10"
-          height="18"
-          fill="#101317"
-        />
+        {/* H — orange gradient. Left stem + right stem + crossbar. */}
+        <rect x="38" y="14" width="8"  height="44" fill="url(#fhOrange)" />
+        <rect x="52" y="14" width="8"  height="44" fill="url(#fhOrange)" />
+        <rect x="38" y="30" width="22" height="8"  fill="url(#fhOrange)" />
       </svg>
     </div>
   )
