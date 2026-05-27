@@ -10410,3 +10410,744 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     }
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase 1 (Jobs, Pipeline, Invoices, Schedule)
+   ============================================================
+   Page-level pieces shared across the Phase 1 screens that the
+   home dashboard didn't need. All gated >=900px. */
+
+@media (min-width: 900px) {
+  /* Page hero variant — used on Jobs/Invoices/Schedule. */
+  .fh-build-hero-row--page {
+    align-items: stretch;
+  }
+
+  /* Functional search input on the topbar (not the home placeholder). */
+  .fh-build-search__input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: #f4f1ea;
+    font: inherit;
+  }
+
+  .fh-build-search__input::placeholder {
+    color: rgba(245,242,234,.45);
+  }
+
+  /* Generic page rail — slightly narrower than home's. */
+  .fh-build-rail--page {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  /* View toggle (Table | Pipeline, Day | Week | Month, etc.) */
+  .fh-build-view-card {
+    border-radius: 8px;
+    padding: 18px;
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.105);
+    box-shadow: 0 22px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055);
+  }
+
+  .fh-build-view-card__copy {
+    margin: 10px 0 0;
+    color: rgba(245,242,234,.55);
+    font-size: 12px;
+  }
+
+  .fh-build-view-toggle {
+    display: inline-flex;
+    margin-top: 10px;
+    padding: 3px;
+    gap: 2px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 7px;
+  }
+
+  .fh-build-view-toggle--inline {
+    display: flex;
+    margin-top: 10px;
+  }
+
+  .fh-build-view-toggle button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+
+  .fh-build-view-toggle button.is-active {
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+  }
+
+  /* Date nav (chevrons + Today) */
+  .fh-build-datenav {
+    display: inline-flex;
+    margin-top: 14px;
+    gap: 4px;
+  }
+
+  .fh-build-datenav button {
+    height: 28px;
+    min-width: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.03);
+    color: rgba(245,242,234,.72);
+    border-radius: 5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .fh-build-datenav button:hover {
+    background: rgba(255,255,255,.06);
+  }
+
+  .fh-build-datenav__today {
+    padding: 0 12px !important;
+  }
+
+  /* Filter pills row */
+  .fh-build-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 16px;
+  }
+
+  .fh-build-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.03);
+    color: rgba(245,242,234,.72);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: .02em;
+  }
+
+  .fh-build-pill:hover {
+    background: rgba(255,255,255,.06);
+    color: #f4f1ea;
+  }
+
+  .fh-build-pill.is-active {
+    background: var(--v3-primary, #c9963a);
+    border-color: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+  }
+
+  .fh-build-pill__count {
+    color: inherit;
+    opacity: .65;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pill.is-active .fh-build-pill__count {
+    opacity: .8;
+  }
+
+  /* Generic helpers used by Phase 1 tables */
+  .fh-build-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-rel {
+    color: rgba(245,242,234,.45);
+    font-size: 11px;
+  }
+
+  .fh-build-inline-link {
+    background: transparent;
+    border: 0;
+    color: var(--v3-primary, #c9963a);
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .fh-build-table__empty {
+    padding: 28px 22px;
+    color: rgba(245,242,234,.55);
+    font-size: 13px;
+    text-align: center;
+    border-top: 1px solid rgba(255,255,255,.065);
+  }
+
+  .fh-build-table__more {
+    padding: 12px 22px;
+    border-top: 1px solid rgba(255,255,255,.065);
+    color: rgba(245,242,234,.42);
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .fh-build-row-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 5px;
+    border: 1px solid rgba(201,150,58,.55);
+    background: transparent;
+    color: var(--v3-primary, #c9963a);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .fh-build-row-btn:hover {
+    background: color-mix(in srgb, var(--v3-primary, #c9963a) 12%, transparent);
+  }
+
+  /* ---------- JOBS / JOB DESK ---------- */
+  .fh-build-content-grid--jobs {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+
+  .fh-build-table__head.is-jobs,
+  .fh-build-table__row.is-jobs {
+    grid-template-columns: 1.4fr 1fr 110px 120px 100px 14px;
+  }
+
+  .fh-build-stage-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .fh-build-stage-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.02);
+    border-radius: 6px;
+    color: rgba(245,242,234,.72);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease;
+  }
+
+  .fh-build-stage-row:hover {
+    background: rgba(255,255,255,.06);
+  }
+
+  .fh-build-stage-row__count {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 22px;
+    line-height: 1;
+    color: #f4f1ea;
+  }
+
+  .fh-build-stage-row__money {
+    font-variant-numeric: tabular-nums;
+    color: var(--v3-primary, #c9963a);
+    font-weight: 700;
+  }
+
+  .fh-build-rail-card__action {
+    margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 0;
+    color: var(--v3-primary, #c9963a);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .fh-build-rail-card__spark {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(115,201,130,.30);
+    background: rgba(115,201,130,.10);
+    color: #73c982;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ---------- PIPELINE BOARD ---------- */
+  .fh-build-pipeline-board {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .fh-build-pipeline-col {
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.085);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
+  }
+
+  .fh-build-pipeline-col__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    border-top: 3px solid currentColor;
+  }
+
+  .fh-build-pipeline-col__head.is-stage-lead    { color: #6B7CA8; }
+  .fh-build-pipeline-col__head.is-stage-quote   { color: #B07A4A; }
+  .fh-build-pipeline-col__head.is-stage-job     { color: #4F8C5E; }
+  .fh-build-pipeline-col__head.is-stage-invoice { color: #C9963A; }
+  .fh-build-pipeline-col__head.is-stage-won     { color: #73C982; }
+
+  .fh-build-pipeline-col__label {
+    color: inherit;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-pipeline-col__total {
+    margin-top: 4px;
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 24px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pipeline-col__count {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 32px;
+    line-height: 1;
+    color: rgba(245,242,234,.42);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pipeline-col__body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .fh-build-pipeline-col__empty {
+    padding: 22px 8px;
+    text-align: center;
+    color: rgba(245,242,234,.40);
+    font-size: 11px;
+  }
+
+  .fh-build-pipeline-col__empty-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px dashed rgba(201,150,58,.45);
+    border-radius: 6px;
+    color: var(--v3-primary, #c9963a);
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .fh-build-pipeline-col__more {
+    text-align: center;
+    color: rgba(245,242,234,.42);
+    font-size: 11px;
+    padding: 6px 0;
+  }
+
+  .fh-build-pipeline-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.025);
+    border-left: 3px solid currentColor;
+    border-radius: 6px;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+
+  .fh-build-pipeline-card:hover {
+    background: rgba(255,255,255,.06);
+    transform: translateY(-1px);
+  }
+
+  .fh-build-pipeline-card.is-stage-lead    { color: #6B7CA8; }
+  .fh-build-pipeline-card.is-stage-quote   { color: #B07A4A; }
+  .fh-build-pipeline-card.is-stage-job     { color: #4F8C5E; }
+  .fh-build-pipeline-card.is-stage-invoice { color: #C9963A; }
+  .fh-build-pipeline-card.is-stage-won     { color: #73C982; }
+
+  .fh-build-pipeline-card__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .fh-build-pipeline-card__name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f4f1ea;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.25;
+  }
+
+  .fh-build-pipeline-card__amount {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 18px;
+    color: var(--v3-primary, #c9963a);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-pipeline-card__meta {
+    display: flex;
+    justify-content: space-between;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+  }
+
+  .fh-build-pipeline-card__sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .fh-build-pipeline-card__time {
+    flex-shrink: 0;
+    color: rgba(245,242,234,.42);
+  }
+
+  .fh-build-pipeline-card__chev {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    color: rgba(245,242,234,.30);
+  }
+
+  /* ---------- INVOICES ---------- */
+  .fh-build-content-grid--invoices {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+
+  .fh-build-table__head.is-invoices,
+  .fh-build-table__row.is-invoices {
+    grid-template-columns: 1.4fr 110px 60px 110px 90px 100px 130px;
+  }
+
+  .fh-build-table__row.is-clickable {
+    cursor: pointer;
+  }
+
+  .fh-build-inv-name {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .fh-build-inv-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  /* ---------- SCHEDULE ---------- */
+  .fh-build-content-grid--schedule {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+
+  .fh-build-agenda {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .fh-build-agenda__day {
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92));
+    border: 1px solid rgba(255,255,255,.085);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .fh-build-agenda__day.is-today {
+    border-color: rgba(201,150,58,.55);
+    box-shadow: 0 0 0 1px rgba(201,150,58,.15), 0 22px 60px rgba(0,0,0,.34);
+  }
+
+  .fh-build-agenda__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+
+  .fh-build-agenda__date {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .fh-build-agenda__weekday {
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: rgba(245,242,234,.55);
+  }
+
+  .fh-build-agenda__daynum {
+    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
+    font-size: 38px;
+    line-height: 1;
+    color: #f4f1ea;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-agenda__month {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    color: rgba(245,242,234,.45);
+  }
+
+  .fh-build-agenda__head-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(245,242,234,.55);
+    font-size: 12px;
+  }
+
+  .fh-build-agenda__today-chip {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .fh-build-agenda__empty {
+    padding: 20px 22px;
+    color: rgba(245,242,234,.40);
+    font-size: 12px;
+  }
+
+  .fh-build-agenda__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .fh-build-agenda__event {
+    display: grid;
+    grid-template-columns: 140px 1fr auto;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 22px;
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+
+  .fh-build-agenda__event:first-child {
+    border-top: 0;
+  }
+
+  .fh-build-agenda__time {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+  }
+
+  .fh-build-agenda__title {
+    color: #f4f1ea;
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-agenda__loc {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+  }
+
+  /* Upcoming card in the rail */
+  .fh-build-upnext {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .fh-build-upnext__time {
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+
+  .fh-build-upnext__title {
+    color: #f4f1ea;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .fh-build-upnext__loc {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+  }
+
+  .fh-build-rail-list {
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .fh-build-rail-list li {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 10px;
+    align-items: baseline;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+
+  .fh-build-rail-list li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .fh-build-rail-list__time {
+    color: var(--v3-primary, #c9963a);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-rail-list__title {
+    color: rgba(245,242,234,.78);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-rail-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 9px;
+    color: var(--v3-primary, #c9963a);
+    font-weight: 800;
+    letter-spacing: .04em;
+    font-size: 12px;
+    min-height: 56px;
+    padding: 0 18px !important;
+  }
+
+  .fh-build-rail-cta:hover {
+    background:
+      linear-gradient(180deg, rgba(201,150,58,.10), rgba(201,150,58,.05));
+  }
+
+  /* Phase 1 narrow-viewport collapse */
+  @media (max-width: 1280px) {
+    .fh-build-content-grid--jobs,
+    .fh-build-content-grid--invoices,
+    .fh-build-content-grid--schedule {
+      grid-template-columns: 1fr;
+    }
+
+    .fh-build-pipeline-board {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
