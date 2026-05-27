@@ -11697,3 +11697,242 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     }
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase 3
+   (Settings, Client Detail, Job Detail)
+   ============================================================
+   Adds detail-page chrome (back button, name title, tab strip,
+   detail content grid) on top of the existing Build primitives.
+   All gated >=900px. */
+
+@media (min-width: 900px) {
+
+  /* ---------- DETAIL TOPBAR ---------- */
+  /* Adds a back button on the left of the search.
+     5-column grid: back | search | meta | bell | (edit | delete) */
+  .fh-build-topbar--detail {
+    grid-template-columns: auto minmax(220px, 480px) 1fr auto auto auto;
+  }
+
+  .fh-build-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 38px;
+    padding: 0 14px 0 10px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.035);
+    color: rgba(245,242,234,.78);
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+  .fh-build-back:hover { background: rgba(255,255,255,.07); color: #f4f1ea; }
+
+  .fh-build-icon-btn.is-on {
+    background: var(--v3-primary, #c9963a);
+    color: #0c0d0f;
+    border-color: var(--v3-primary, #c9963a);
+  }
+
+  /* ---------- DETAIL HERO ---------- */
+  /* Variant of the hero row used by detail pages — wider title slot,
+     no middle focus card (vitals live in mini-grid on the right). */
+  .fh-build-hero-row--detail {
+    grid-template-columns: minmax(0, 1fr) 480px;
+    gap: 24px;
+    align-items: center;
+  }
+
+  /* Big detail name. Smaller than the LET'S BUILD page headline so
+     it still respects the visual hierarchy ("page title > record
+     name") but feels like a primary heading. */
+  .fh-build-title--name {
+    font-size: clamp(38px, 4.6vw, 56px);
+    letter-spacing: .005em;
+    text-transform: none;
+  }
+
+  .fh-build-detail-sub {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .fh-build-dot-sep { color: rgba(255,255,255,.20); }
+
+  /* 4-up mini grid sits on the right side of the detail hero. */
+  .fh-build-mini-grid--detail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  /* ---------- TAB STRIP ---------- */
+  /* Quiet underline tabs that match the dashboard's gold-on-dark
+     language. Lives between the hero and the content grid. */
+  .fh-build-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 4px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid rgba(255,255,255,.09);
+  }
+  .fh-build-tab {
+    position: relative;
+    background: transparent;
+    border: 0;
+    padding: 12px 16px;
+    color: rgba(245,242,234,.55);
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .fh-build-tab:hover { color: #f4f1ea; }
+  .fh-build-tab.is-active {
+    color: var(--v3-primary, #c9963a);
+    border-bottom-color: var(--v3-primary, #c9963a);
+  }
+  .fh-build-tabs__cta {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 5px;
+    background: rgba(201,150,58,.10);
+    border: 1px solid rgba(201,150,58,.32);
+    color: var(--v3-primary, #c9963a);
+    font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+  .fh-build-tabs__cta:hover { background: rgba(201,150,58,.18); }
+
+  /* ---------- DETAIL CONTENT GRID ---------- */
+  /* Main column hosts the existing tab content; the rail keeps the
+     dashboard signal pattern. */
+  .fh-build-content-grid--detail {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-detail-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  /* Neutralize the inherited mobile screen padding/background of any
+     existing tab content rendered inside the detail main column.
+     The tab components were authored to live inside .v3-screen on
+     mobile; on desktop the Build chrome owns those. */
+  .fh-build-detail-main > .v3-screen,
+  .fh-build-detail-main > .fh-screen {
+    padding: 0 !important;
+    background: transparent !important;
+    min-height: 0 !important;
+  }
+
+  /* ---------- CONTACT INFO LIST (rail) ---------- */
+  .fh-build-contact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .fh-build-contact-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    color: rgba(245,242,234,.78);
+    font-size: 12px;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+  .fh-build-contact-row:last-child { border-bottom: 0; }
+  .fh-build-contact-row:hover { color: var(--v3-primary, #c9963a); }
+  .fh-build-contact-row svg { color: var(--v3-primary, #c9963a); flex-shrink: 0; }
+  .fh-build-contact-row > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fh-build-contact-row__chev { color: rgba(245,242,234,.30); flex-shrink: 0; }
+
+  /* ---------- SETTINGS GRID ---------- */
+  .fh-build-content-grid--settings {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .fh-build-settings-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  /* Re-style the legacy mobile <Section> blocks so they read as
+     Build cards inside the new chrome. We don't touch the form
+     fields themselves — only the section wrapper. */
+  .fh-build-settings-main > .v3-section {
+    margin: 0 !important;
+    padding: 18px 22px !important;
+    background: linear-gradient(180deg, rgba(19,22,27,.82), rgba(9,11,14,.92)) !important;
+    border: 1px solid rgba(255,255,255,.105) !important;
+    border-radius: 9px !important;
+    box-shadow: 0 22px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055) !important;
+  }
+
+  /* ---------- SETUP PROGRESS BAR (Settings hero) ---------- */
+  .fh-build-progress {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .fh-build-progress__track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .fh-build-progress__fill {
+    height: 100%;
+    background: var(--v3-primary, #c9963a);
+    border-radius: 3px;
+    transition: width 320ms ease;
+  }
+  .fh-build-progress span {
+    color: rgba(245,242,234,.62);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Narrow-viewport collapse for detail + settings */
+  @media (max-width: 1280px) {
+    .fh-build-content-grid--detail,
+    .fh-build-content-grid--settings {
+      grid-template-columns: 1fr;
+    }
+    .fh-build-hero-row--detail {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .fh-build-topbar--detail {
+      grid-template-columns: auto 1fr auto auto auto;
+    }
+    .fh-build-topbar--detail .fh-build-search { display: none; }
+  }
+}
