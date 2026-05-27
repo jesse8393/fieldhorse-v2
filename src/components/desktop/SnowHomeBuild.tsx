@@ -25,7 +25,10 @@ type Props = {
   trendUp: boolean
   trendPct: number | null
   stageBreakdown: { won?: number; active?: number; lead?: number; invoice?: number } | null
-  dealsAtRisk: number | null
+  // Home.tsx stores dealsAtRisk as a shape: { count, value, followUps,
+  // quotesAttention, … } — older callers expect a plain number. We
+  // accept either and normalize at the render site.
+  dealsAtRisk: number | { count?: number; value?: number; [k: string]: any } | null
   jobsBehind: number | null
   invoicingWeek: number | null
   todayOnSite: any[] | null
@@ -54,6 +57,22 @@ function money(n: number | null | undefined) {
 
 function moneyFull(n: number | null | undefined) {
   return `$${Math.round(Number(n || 0)).toLocaleString()}`
+}
+
+// Coerces dealsAtRisk into { count, value } regardless of upstream
+// shape so the right-rail tile can interpolate primitives safely.
+function normalizeDealsAtRisk(
+  input: number | { count?: number; value?: number; [k: string]: any } | null | undefined,
+): { count: number; value: number } {
+  if (input == null) return { count: 6, value: 312500 } // fallback only when truly empty
+  if (typeof input === 'number') return { count: input, value: input * 10416 }
+  if (Array.isArray(input)) return { count: input.length, value: 0 }
+  if (typeof input === 'object') {
+    const count = typeof input.count === 'number' ? input.count : 0
+    const value = typeof input.value === 'number' ? input.value : count * 10416
+    return { count, value }
+  }
+  return { count: 0, value: 0 }
 }
 
 export default function SnowHomeBuild(props: Props) {
@@ -303,9 +322,18 @@ function TodayCard({ todayOnSite, onGoToSchedule, onNewLead }: any) {
 }
 
 function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
+  // dealsAtRisk may be a number (legacy), an object { count, value },
+  // or null. Pull primitives out before interpolating into strings —
+  // otherwise `${object}` renders as "[object Object]".
+  const risk = normalizeDealsAtRisk(dealsAtRisk)
   return (
     <aside className="fh-build-rail">
-      <RailMetric title="Deals at risk" value={moneyFull((dealsAtRisk || 0) * 10416 || 312500)} sub={`${dealsAtRisk || 6} deals`} chart="red" />
+      <RailMetric
+        title="Deals at risk"
+        value={moneyFull(risk.value)}
+        sub={`${risk.count} ${risk.count === 1 ? 'deal' : 'deals'}`}
+        chart="red"
+      />
       <RailMetric title="Jobs behind" value={String(jobsBehind || 3)} sub="needs attention" chart="gold" />
       <RailMetric title="Invoicing this week" value={moneyFull(invoicingWeek || 186750)} sub="11 invoices" />
       <RailMetric title="Follow-ups due" value="14" sub="this week" />

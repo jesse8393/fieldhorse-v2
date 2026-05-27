@@ -100,10 +100,12 @@ export default function SnowSubsBuild(props: Props) {
     ? filtered.filter((s) => s.insuranceTracked !== false && !s.insurance_expires_at && (s.jobsCount || 0) > 0).length
     : 0
 
-  // Trade coverage — count of distinct trades present in the filtered list
+  // Trade coverage — count of distinct trades present in the filtered list.
+  // s.trades upstream may be a Set, array, plain object, or a single
+  // string depending on the bundle shape; normalize before iterating.
   const tradeCoverage = (() => {
     const set = new Set<string>()
-    for (const s of filtered) for (const t of (s.trades || [])) set.add(t)
+    for (const s of filtered) for (const t of normalizeTrades(s.trades)) set.add(t)
     return set.size
   })()
 
@@ -194,8 +196,9 @@ export default function SnowSubsBuild(props: Props) {
             )}
             {!loading && filtered.slice(0, 60).map((s: any) => {
               const ins = insuranceStatus(s.insuranceTracked, s.insurance_expires_at)
-              const trades = (s.trades || []).slice(0, 2)
-              const extra = (s.trades || []).length - trades.length
+              const allTradesForRow = normalizeTrades(s.trades)
+              const trades = allTradesForRow.slice(0, 2)
+              const extra = allTradesForRow.length - trades.length
               return (
                 <button
                   key={s.key}
@@ -305,3 +308,16 @@ function MiniMetric({ label, value, accent, tone }: { label: string; value: stri
 
 // Silence unused icon import.
 void Hammer
+
+// normalizeTrades — Subs.tsx aggregates each sub's trades into a Set
+// (`new Set()`), so passing the grouped object straight into a
+// component that expects an array crashes on .slice / .map. Bundles
+// from older snapshots can also expose trades as a single string or
+// a plain object map, so the helper covers all four shapes.
+function normalizeTrades(input: any): string[] {
+  if (Array.isArray(input)) return input.filter(Boolean)
+  if (input instanceof Set) return Array.from(input).filter(Boolean)
+  if (typeof input === 'string') return input ? [input] : []
+  if (input && typeof input === 'object') return Object.values(input).filter(Boolean) as string[]
+  return []
+}

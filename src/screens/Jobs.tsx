@@ -266,7 +266,12 @@ export default function Jobs() {
           photoUrlByJob={photoUrlByJob}
           featuredId={featuredId}
           tabCounts={tabCounts}
-          onOpenJob={openDrawer}
+          // Desktop row click + chevron route directly to the job
+          // file. The contact bottom-sheet (with Text/Email/Call/Open)
+          // is still mounted below and used by the mobile flow; on
+          // desktop we skip it so the chevron lives up to its
+          // implied affordance.
+          onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
           onNewLead={() => setAddOpen(true)}
         />
         <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>

@@ -142,6 +142,11 @@ export default function ClientDetail() {
     navigate(`/jobs/${data.id}${dest}`)
   }
 
+  // Rules-of-hooks: useIsDesktop must run before any conditional
+  // return, so React sees the same hook order on every render of
+  // this component (loading → not-found → desktop branch → mobile).
+  const isDesktop = useIsDesktop()
+
   if (loading) {
     return (
       <div className="v3-screen" style={{ paddingBottom: 120, padding: '20px 20px 120px', background: 'var(--v3-bg)' }}>
@@ -160,7 +165,6 @@ export default function ClientDetail() {
   }
 
   const initial = (client.name || '·').trim().charAt(0).toUpperCase()
-  const isDesktop = useIsDesktop()
 
   // The tab body is the only piece we want to render inside the
   // desktop Build chrome — everything else (top bar, hero, tabs) is
