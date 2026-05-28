@@ -29,6 +29,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 
 type Item = {
   label: string
@@ -75,7 +76,8 @@ const GROUPS: Group[] = [
     label: 'Settings',
     items: [
       { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
-      { label: 'Teams',          to: '/subs',     Icon: UsersRound,      match: prefix('/subs') },
+      { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },
+      { label: 'Subs',           to: '/subs',     Icon: Hammer,          match: prefix('/subs') },
       { label: 'Templates',      to: '/settings#templates', Icon: FileText,        match: (p) => p === '/settings' && typeof window !== 'undefined' && window.location.hash === '#templates' },
       { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: prefix('/settings') },
     ],
@@ -86,6 +88,7 @@ export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
+  const { canViewRoute, role } = useMembership()
 
   const userEmail = user?.email || ''
 
@@ -105,13 +108,22 @@ export default function DesktopSidebar() {
       </div>
 
       <nav className="fh-desktop-sidebar__nav" aria-label="Primary">
-        {GROUPS.map((group, gi) => (
+        {GROUPS.map((group, gi) => {
+          // Filter items by the caller's role. While membership is
+          // still resolving (role === null), show everything so the
+          // first paint doesn't hide owner nav — once the membership
+          // query settles, items the role can't reach disappear.
+          const visibleItems = group.items.filter((it) =>
+            role == null ? true : canViewRoute(it.to.split('?')[0].split('#')[0])
+          )
+          if (visibleItems.length === 0) return null
+          return (
           <div key={group.label} className="fh-desktop-sidebar__group">
             <span className="fh-desktop-sidebar__eyebrow fh-desktop-sidebar__eyebrow--build">
               {group.label}
             </span>
             <ul className="fh-desktop-sidebar__list">
-              {group.items.map((it) => {
+              {visibleItems.map((it) => {
                 const active = it.match
                   ? it.match(pathname)
                   : pathname === it.to.split('?')[0]
@@ -133,7 +145,8 @@ export default function DesktopSidebar() {
               })}
             </ul>
           </div>
-        ))}
+          )
+        })}
       </nav>
 
       <div className="fh-desktop-sidebar__foot">

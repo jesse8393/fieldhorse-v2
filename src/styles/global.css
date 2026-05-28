@@ -12124,3 +12124,46 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     }
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase B (Crew Portal)
+   ============================================================
+   Team roster + pending invites. All gated >=900px. */
+
+@media (min-width: 900px) {
+  /* Team table — name / email / role / joined / chev */
+  .fh-build-table__head.is-team,
+  .fh-build-table__row.is-team {
+    grid-template-columns: 1.2fr 1.4fr 110px 110px 14px;
+  }
+
+  /* Pending-invite row inside the rail card */
+  .fh-build-invite-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,.025);
+    border: 1px solid rgba(255,255,255,.06);
+  }
+  .fh-build-invite-row__main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .fh-build-invite-row__email {
+    color: #f4f1ea;
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fh-build-invite-row__meta {
+    color: rgba(245,242,234,.55);
+    font-size: 11px;
+  }
+}
