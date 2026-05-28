@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Plus, Trash2, Calendar } from 'lucide-react'
+import { Check, Plus, Trash2, Calendar, UserRound } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.ts'
+import { orgMembersList, type OrgMember } from '../../../lib/orgApi.ts'
 
 /**
  * To-dos section — backed by fh_job_todos. Owns its own fetch (independent of
@@ -25,20 +26,47 @@ export default function TodosSection({ jobId, userId }: any) {
   // Optional due date for the new todo being composed. YYYY-MM-DD or ''.
   // Converted to a local-end-of-day ISO at insert time via dateInputToTimestamp.
   const [dueDraft, setDueDraft] = useState('')
+  // Optional assignee for the new todo. '' = unassigned ("anyone on
+  // the crew"). Populated from the org members list on first mount;
+  // a single-user org-of-one effectively just shows "Me".
+  const [assignDraft, setAssignDraft] = useState('')
+  const [members, setMembers] = useState<OrgMember[]>([])
+
+  // Fetch the org member list once for the assignee picker. Best-effort
+  // — if the call fails (e.g. org_members endpoint unreachable) the
+  // picker stays empty and the section still works for unassigned
+  // tasks.
+  useEffect(() => {
+    let cancelled = false
+    orgMembersList()
+      .then((res) => { if (!cancelled) setMembers(res.members || []) })
+      .catch(() => { /* ignore — picker just stays empty */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const memberById = (() => {
+    const m: Record<string, OrgMember> = {}
+    for (const x of members) m[x.user_id] = x
+    return m
+  })()
 
   const fetchRows = useCallback(async () => {
-    if (!jobId || !userId) return
+    if (!jobId) return
     setLoading(true)
+    // Org-scoped RLS (fh_job_todos_own / fh_job_todos_partner) already
+    // restricts visibility to teammates and accepted partners, so we
+    // can drop the legacy `user_id = me` filter and show every task
+    // on the job to every teammate. The user_id column stays as
+    // provenance ("created by X").
     const { data } = await supabase
       .from('fh_job_todos')
       .select('*')
       .eq('job_id', jobId)
-      .eq('user_id', userId)
       .order('done', { ascending: true })
       .order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
-  }, [jobId, userId])
+  }, [jobId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -48,6 +76,7 @@ export default function TodosSection({ jobId, userId }: any) {
     hapticTap()
     const payload: Record<string, any> = { user_id: userId, job_id: jobId, text: txt }
     if (dueDraft) payload.due_at = dateInputToTimestamp(dueDraft)
+    if (assignDraft) payload.assigned_to = assignDraft
     const { error } = await supabase.from('fh_job_todos').insert(payload as any)
     if (error) {
       toastError("Couldn't add to-do", error.message)
@@ -55,7 +84,22 @@ export default function TodosSection({ jobId, userId }: any) {
     }
     setDraft('')
     setDueDraft('')
+    setAssignDraft('')
     fetchRows()
+  }
+
+  // Reassign an existing task. Allowed for any teammate (org-scoped
+  // RLS on fh_job_todos governs the actual write).
+  async function reassign(rowId: any, nextAssignedTo: string | null) {
+    setRows((rs) => rs.map((r) => r.id === rowId ? { ...r, assigned_to: nextAssignedTo } : r))
+    const { error } = await supabase
+      .from('fh_job_todos')
+      .update({ assigned_to: nextAssignedTo })
+      .eq('id', rowId)
+    if (error) {
+      toastError("Couldn't reassign", error.message)
+      fetchRows()
+    }
   }
 
   // Inline edit: tap a row's due chip → native date picker → onChange
@@ -170,6 +214,29 @@ export default function TodosSection({ jobId, userId }: any) {
             WebkitTapHighlightColor: 'transparent'
           }}
         />
+        {members.length > 1 && (
+          <select
+            value={assignDraft}
+            onChange={(e) => setAssignDraft(e.target.value)}
+            aria-label="Assign to (optional)"
+            style={{
+              flex: '0 0 auto',
+              padding: '11px 10px', borderRadius: 12,
+              background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
+              color: assignDraft ? 'var(--v3-text)' : 'var(--v3-text-muted)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 13, outline: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="">Unassigned</option>
+            {members.map((m) => (
+              <option key={m.user_id} value={m.user_id}>
+                {m.is_self ? `${m.name || 'Me'} (me)` : (m.name || m.email || 'Teammate')}
+              </option>
+            ))}
+          </select>
+        )}
         <motion.button
           type="button"
           whileTap={{ scale: 0.96 }}
@@ -254,6 +321,15 @@ export default function TodosSection({ jobId, userId }: any) {
                   done={r.done}
                   onChange={(nextIso: any) => updateDueAt(r.id, nextIso)}
                 />
+                {members.length > 1 && (
+                  <AssignChipSelect
+                    members={members}
+                    value={r.assigned_to || ''}
+                    onChange={(next: string) => reassign(r.id, next || null)}
+                    selfId={userId}
+                    memberById={memberById}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => remove(r.id)}
@@ -346,6 +422,63 @@ function DueChipButton({ iso, done, onChange }: any) {
         }}
       />
       {status ? <span>{status.label}</span> : <Calendar size={12} aria-hidden="true" />}
+    </label>
+  )
+}
+
+// AssignChipSelect — wraps an invisible <select> in a styled chip so
+// every row's assignee can be re-picked with one tap. The chip text
+// shows the current assignee (or "Unassigned"); the native select
+// surface drives the choice. Only renders when the org has more than
+// one member.
+function AssignChipSelect({ members, value, onChange, selfId, memberById }: any) {
+  const current = value ? memberById[value] : null
+  const label = !value
+    ? 'Unassigned'
+    : value === selfId
+      ? 'Me'
+      : (current?.name || current?.email || 'Teammate')
+  return (
+    <label
+      style={{
+        flexShrink: 0,
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '4px 8px',
+        borderRadius: 999,
+        background: value ? 'color-mix(in srgb, var(--v3-primary) 12%, transparent)' : 'transparent',
+        border: value ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)' : '1px solid var(--v3-border)',
+        color: value ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+        fontFamily: 'var(--font-body)',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        cursor: 'pointer',
+      }}
+    >
+      <UserRound size={11} aria-hidden="true" />
+      <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Assignee"
+        style={{
+          position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer',
+          appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+          background: 'transparent', border: 'none', color: 'transparent',
+        }}
+      >
+        <option value="">Unassigned</option>
+        {members.map((m: any) => (
+          <option key={m.user_id} value={m.user_id}>
+            {m.is_self ? `${m.name || 'Me'} (me)` : (m.name || m.email || 'Teammate')}
+          </option>
+        ))}
+      </select>
     </label>
   )
 }

@@ -335,6 +335,69 @@ export type Database = {
           },
         ]
       }
+      fh_daily_logs: {
+        Row: {
+          contact_id: string
+          created_at: string
+          crew_count: number | null
+          hours_worked: number | null
+          id: string
+          log_date: string
+          next_steps: string | null
+          org_id: string | null
+          photos: Json
+          summary: string
+          updated_at: string
+          user_id: string
+          weather_text: string | null
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          crew_count?: number | null
+          hours_worked?: number | null
+          id?: string
+          log_date?: string
+          next_steps?: string | null
+          org_id?: string | null
+          photos?: Json
+          summary: string
+          updated_at?: string
+          user_id: string
+          weather_text?: string | null
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          crew_count?: number | null
+          hours_worked?: number | null
+          id?: string
+          log_date?: string
+          next_steps?: string | null
+          org_id?: string | null
+          photos?: Json
+          summary?: string
+          updated_at?: string
+          user_id?: string
+          weather_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fh_daily_logs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_daily_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fh_esign_envelopes: {
         Row: {
           completed_at: string | null
@@ -923,6 +986,7 @@ export type Database = {
       }
       fh_job_todos: {
         Row: {
+          assigned_to: string | null
           completed_at: string | null
           created_at: string
           done: boolean
@@ -934,6 +998,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           done?: boolean
@@ -945,6 +1010,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           done?: boolean

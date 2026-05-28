@@ -33,6 +33,7 @@ import QuoteTab from './tabs/Quote.tsx'
 import DetailsTab from './tabs/Details.tsx'
 import FinancialsTab from './tabs/Financials.tsx'
 import FilesTab from './tabs/Files.tsx'
+import DailyLogsSection from './sections/DailyLogs.tsx'
 import ApproveQuoteSheet from './sections/ApproveQuoteSheet.tsx'
 import SnowJobDetailBuild from '../../components/desktop/SnowJobDetailBuild.tsx'
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
@@ -41,6 +42,7 @@ const TOP_TABS = [
   { id: 'overview',   label: 'Overview' },
   { id: 'quote',      label: 'Quote' },
   { id: 'details',    label: 'Details' },
+  { id: 'logs',       label: 'Daily logs' },
   { id: 'financials', label: 'Financials' },
   { id: 'files',      label: 'Files' }
 ]
@@ -361,6 +363,9 @@ export default function ContactDetail() {
                   fetchAll={fetchAll}
                 />
               )}
+              {tab === 'logs' && (
+                <DailyLogsSection jobId={contact?.id} userId={user?.id} />
+              )}
             </SnowJobDetailBuild>
           )
         })()
@@ -493,6 +498,9 @@ export default function ContactDetail() {
             userId={user?.id}
             fetchAll={fetchAll}
           />
+        )}
+        {tab === 'logs' && (
+          <DailyLogsSection jobId={contact?.id} userId={user?.id} />
         )}
       </div>
       </>

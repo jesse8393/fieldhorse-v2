@@ -103,7 +103,11 @@ export default function Crew() {
         supabase
           .from('fh_job_todos')
           .select('id, text, job_id, due_at, done, completed_at')
-          .eq('user_id', user.id)
+          // Show tasks assigned to me, OR — if no assigned_to is set —
+          // tasks I created. This lets the page work both for the
+          // owner-of-one (legacy: every task user_id = self) and for
+          // multi-member orgs (managers assign via assigned_to).
+          .or(`assigned_to.eq.${user.id},and(assigned_to.is.null,user_id.eq.${user.id})`)
           .eq('done', false)
           .order('due_at', { ascending: true, nullsFirst: false })
           .limit(8),
