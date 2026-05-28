@@ -144,15 +144,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     // Step 1 — own membership row(s). RLS policy `org_members_self_read`
     // permits a direct read where user_id = auth.uid() with no
     // self-recursion (per migration 034 fix).
-    //
-    // `from(...) as any` is intentional here: migrations 032/034 added
-    // public.organizations, public.org_members, public.org_invites but
-    // src/lib/database.types.ts was generated BEFORE those landed.
-    // Regenerating that file is a large mechanical diff; until that
-    // happens, the two membership queries cast through `any` so tsc
-    // doesn't reject the unknown table names. The runtime query is
-    // unaffected.
-    const memberQuery = await (supabase as any)
+    const memberQuery = await supabase
       .from('org_members')
       .select('id, org_id, role, joined_at, revoked_at')
       .eq('user_id', user.id)
@@ -187,8 +179,8 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
 
     // Step 2 — the org row. RLS policy `organizations_member_read`
     // permits this read because picked.org_id matches my org_members
-    // row above. Same generated-types caveat as Step 1.
-    const orgQuery = await (supabase as any)
+    // row above.
+    const orgQuery = await supabase
       .from('organizations')
       .select('id, name, slug')
       .eq('id', picked.org_id)
