@@ -1038,6 +1038,90 @@ export type Database = {
           },
         ]
       }
+      fh_materials: {
+        Row: {
+          category: string | null
+          contact_id: string
+          created_at: string
+          id: string
+          installed_at: string | null
+          name: string
+          notes: string | null
+          ordered_at: string | null
+          ordered_qty: number | null
+          org_id: string | null
+          po_number: string | null
+          qty_needed: number
+          received_at: string | null
+          received_qty: number
+          source: Json
+          supplier: string | null
+          unit: string | null
+          unit_cost: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          contact_id: string
+          created_at?: string
+          id?: string
+          installed_at?: string | null
+          name: string
+          notes?: string | null
+          ordered_at?: string | null
+          ordered_qty?: number | null
+          org_id?: string | null
+          po_number?: string | null
+          qty_needed?: number
+          received_at?: string | null
+          received_qty?: number
+          source?: Json
+          supplier?: string | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          contact_id?: string
+          created_at?: string
+          id?: string
+          installed_at?: string | null
+          name?: string
+          notes?: string | null
+          ordered_at?: string | null
+          ordered_qty?: number | null
+          org_id?: string | null
+          po_number?: string | null
+          qty_needed?: number
+          received_at?: string | null
+          received_qty?: number
+          source?: Json
+          supplier?: string | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fh_materials_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_materials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fh_mileage: {
         Row: {
           contact_id: string | null

@@ -8,24 +8,19 @@
 //   - `invoice` / `closed` hide the Quote tab entirely — an invoice for
 //     materials or a quick job never needed a quote.
 
-export type DealTabId = 'overview' | 'quote' | 'details' | 'financials' | 'files' | 'logs' | 'selections'
+export type DealTabId = 'overview' | 'quote' | 'details' | 'financials' | 'files' | 'logs' | 'selections' | 'materials'
 
-const ALL_TABS: DealTabId[] = ['overview', 'quote', 'details', 'financials', 'files', 'logs', 'selections']
+const ALL_TABS: DealTabId[] = ['overview', 'quote', 'details', 'financials', 'files', 'logs', 'selections', 'materials']
 
-// Daily logs only show up once a job is actively running — there's
-// nothing to log before then. Job / invoice / closed stages all
-// expose the tab so a foreman can post during execution and the
-// owner can still browse the history after close-out.
-//
-// Selections appears starting at quote — clients need to pick finishes
-// before the build kicks off, and approved/installed picks stay
-// visible through closeout. Lead and lost stages skip it.
+// Materials appears on the same stages as daily logs — there's no
+// procurement to track on a lead, but quote/job/invoice/closed all
+// need it (estimators want a working list before the job starts).
 const STAGE_TABS: Record<string, DealTabId[]> = {
   lead:    ['overview', 'quote', 'details', 'files'],
-  quote:   ['overview', 'quote', 'details', 'selections', 'files'],
-  job:     ['overview', 'details', 'selections', 'logs', 'financials', 'files'],
-  invoice: ['overview', 'selections', 'logs', 'financials', 'files'],
-  closed:  ['overview', 'selections', 'logs', 'financials', 'files'],
+  quote:   ['overview', 'quote', 'details', 'selections', 'materials', 'files'],
+  job:     ['overview', 'details', 'selections', 'materials', 'logs', 'financials', 'files'],
+  invoice: ['overview', 'selections', 'materials', 'logs', 'financials', 'files'],
+  closed:  ['overview', 'selections', 'materials', 'logs', 'financials', 'files'],
   lost:    ['overview', 'files']
 }
 
