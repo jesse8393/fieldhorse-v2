@@ -50,6 +50,13 @@ type Props = {
   onGoToPourWindow?: () => void
 }
 
+function greetingFor(now: Date) {
+  const h = now.getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 function money(n: number | null | undefined) {
   const v = Number(n || 0)
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
@@ -61,20 +68,24 @@ function moneyFull(n: number | null | undefined) {
   return `$${Math.round(Number(n || 0)).toLocaleString()}`
 }
 
-// Coerces dealsAtRisk into { count, value } regardless of upstream
-// shape so the right-rail tile can interpolate primitives safely.
+// Coerces dealsAtRisk into { count, value, followUps, quotesAttention }
+// regardless of upstream shape so the right-rail tile can interpolate
+// primitives safely. Returns null when the data hasn't loaded yet so
+// callers can render '—' instead of guessing a value.
 function normalizeDealsAtRisk(
-  input: number | { count?: number; value?: number; [k: string]: any } | null | undefined,
-): { count: number; value: number } {
-  if (input == null) return { count: 6, value: 312500 } // fallback only when truly empty
-  if (typeof input === 'number') return { count: input, value: input * 10416 }
-  if (Array.isArray(input)) return { count: input.length, value: 0 }
+  input: number | { count?: number; value?: number; followUps?: number; quotesAttention?: number; [k: string]: any } | null | undefined,
+): { count: number; value: number; followUps: number | null; quotesAttention: number | null } | null {
+  if (input == null) return null
+  if (typeof input === 'number') return { count: input, value: 0, followUps: null, quotesAttention: null }
+  if (Array.isArray(input)) return { count: input.length, value: 0, followUps: null, quotesAttention: null }
   if (typeof input === 'object') {
     const count = typeof input.count === 'number' ? input.count : 0
-    const value = typeof input.value === 'number' ? input.value : count * 10416
-    return { count, value }
+    const value = typeof input.value === 'number' ? input.value : 0
+    const followUps = typeof input.followUps === 'number' ? input.followUps : null
+    const quotesAttention = typeof input.quotesAttention === 'number' ? input.quotesAttention : null
+    return { count, value, followUps, quotesAttention }
   }
-  return { count: 0, value: 0 }
+  return null
 }
 
 export default function SnowHomeBuild(props: Props) {
@@ -87,6 +98,7 @@ export default function SnowHomeBuild(props: Props) {
     pipeline,
     trendUp,
     trendPct,
+    stageBreakdown,
     dealsAtRisk,
     jobsBehind,
     invoicingWeek,
@@ -97,7 +109,6 @@ export default function SnowHomeBuild(props: Props) {
     onGoToLeads,
     onGoToActivity,
     onGoToSchedule,
-    onGoToInvoices,
     onOpenJob,
     onOpenJobAtTab,
     onNewLead,
@@ -110,10 +121,11 @@ export default function SnowHomeBuild(props: Props) {
     year: 'numeric',
   })
 
-  const pipelineRows = buildPipelineStages(topPipeline, pipeline)
+  const pipelineRows = buildPipelineStages(topPipeline, stageBreakdown)
+  const totalOppCount = pipelineRows.reduce((s, r) => s + (r.count || 0), 0)
   const queueRows = buildOwnerQueue(nextActions)
   const revenueRows = buildRevenueRows(topPipeline)
-  const jobRows = buildJobHealthRows(todayOnSite, revenueRows)
+  const jobRows = buildJobHealthRows(todayOnSite)
 
   return (
     <div
@@ -142,14 +154,11 @@ export default function SnowHomeBuild(props: Props) {
           <span className="fh-build-vline" />
           {hasCoords && tempStr ? (
             <>
-              <span>{tempStr} · {condStr || 'Clear'}</span>
+              <span>{tempStr}{condStr ? ` · ${condStr}` : ''}</span>
               <Sun size={16} className="fh-build-sun" />
             </>
           ) : (
-            <>
-              <span>72° · Clear</span>
-              <Sun size={16} className="fh-build-sun" />
-            </>
+            <span style={{ opacity: 0.6 }}>Weather not set</span>
           )}
         </div>
 
@@ -172,17 +181,17 @@ export default function SnowHomeBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row">
           <div>
-            <div className="fh-build-good">Good morning, {firstName || 'Jesse'}</div>
+            <div className="fh-build-good">{greetingFor(now)}, {firstName || 'there'}</div>
             <h1 className="fh-build-title">LET’S BUILD.</h1>
           </div>
 
           <FocusCard onGoToSchedule={onGoToSchedule} />
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Crews on site" value={todayOnSite == null ? '—' : String(todayOnSite.length || 4)} />
-            <MiniMetric label="Reports missing" value="2" />
-            <MiniMetric label="Client follow-ups" value={String(nextActions?.length || 6)} />
-            <MiniMetric label="Ready to invoice" value={money(invoicingWeek || 84000)} />
+            <MiniMetric label="Crews on site" value={todayOnSite == null ? '—' : String(todayOnSite.length)} />
+            <MiniMetric label="Reports missing" value="—" />
+            <MiniMetric label="Client follow-ups" value={nextActions == null ? '—' : String(nextActions.length)} />
+            <MiniMetric label="Ready to invoice" value={invoicingWeek == null ? '—' : money(invoicingWeek)} />
           </div>
         </section>
 
@@ -192,11 +201,13 @@ export default function SnowHomeBuild(props: Props) {
             trendUp={trendUp}
             trendPct={trendPct}
             rows={pipelineRows}
+            totalOppCount={totalOppCount}
             onGoToJobs={onGoToJobs}
           />
 
           <TodayCard
             todayOnSite={todayOnSite}
+            activeJobsCount={stageBreakdown?.active ?? null}
             onGoToSchedule={onGoToSchedule}
             onNewLead={onNewLead}
           />
@@ -233,7 +244,7 @@ function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
   return (
     <section className="fh-build-focus">
       <div className="fh-build-eyebrow">Today’s focus</div>
-      <p>Send the revised estimate to Glen Ridge before noon.</p>
+      <p>Open your schedule to plan today’s priorities.</p>
       <button type="button" onClick={onGoToSchedule}>
         Open Schedule <ChevronRight size={13} />
       </button>
@@ -250,14 +261,19 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PipelineHero({ pipeline, trendUp, trendPct, rows, onGoToJobs }: any) {
+function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, onGoToJobs }: any) {
+  const stageCount = rows.length
+  const oppLabel =
+    totalOppCount === 0
+      ? 'No active opportunities yet'
+      : `${totalOppCount} active ${totalOppCount === 1 ? 'opportunity' : 'opportunities'} across ${stageCount} ${stageCount === 1 ? 'stage' : 'stages'}`
   return (
     <section className="fh-build-card fh-build-pipeline" onClick={() => onGoToJobs()}>
       <div className="fh-build-card__overlay" />
       <div className="fh-build-eyebrow">Active Pipeline · All stages</div>
 
       <div className="fh-build-pipeline__top">
-        <div className="fh-build-money">{pipeline == null ? '$4,285,600' : moneyFull(pipeline)}</div>
+        <div className="fh-build-money">{pipeline == null ? '—' : moneyFull(pipeline)}</div>
 
         {trendPct != null && (
           <div className={trendUp ? 'fh-build-trend is-up' : 'fh-build-trend is-down'}>
@@ -267,9 +283,7 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, onGoToJobs }: any) {
         )}
       </div>
 
-      <p className="fh-build-pipeline__copy">
-        92 active opportunities across 8 stages
-      </p>
+      <p className="fh-build-pipeline__copy">{oppLabel}</p>
 
       <div className="fh-build-stage-grid">
         {rows.map((row: any) => (
@@ -297,14 +311,9 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, onGoToJobs }: any) {
   )
 }
 
-function TodayCard({ todayOnSite, onGoToSchedule, onNewLead }: any) {
-  const rows = todayOnSite?.length
-    ? todayOnSite.slice(0, 2)
-    : [
-        { title: 'Schedule', subtitle: 'View today’s schedule' },
-        { title: 'New Lead', subtitle: 'Start the next opportunity' },
-      ]
-
+function TodayCard({ todayOnSite, activeJobsCount, onGoToSchedule, onNewLead }: any) {
+  // Crew headcount isn't tracked yet — show '—' rather than a fake number.
+  // Jobs in progress comes from the real stage breakdown.
   return (
     <section className="fh-build-card fh-build-today">
       <div className="fh-build-today__image" />
@@ -313,11 +322,11 @@ function TodayCard({ todayOnSite, onGoToSchedule, onNewLead }: any) {
 
         <div className="fh-build-today__stats">
           <div>
-            <strong>18</strong>
-            <span>crew members</span>
+            <strong>{todayOnSite == null ? '—' : todayOnSite.length}</strong>
+            <span>{todayOnSite?.length === 1 ? 'visit today' : 'visits today'}</span>
           </div>
           <div>
-            <strong>7</strong>
+            <strong>{activeJobsCount == null ? '—' : activeJobsCount}</strong>
             <span>jobs in progress</span>
           </div>
         </div>
@@ -347,22 +356,31 @@ function TodayCard({ todayOnSite, onGoToSchedule, onNewLead }: any) {
 }
 
 function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
-  // dealsAtRisk may be a number (legacy), an object { count, value },
-  // or null. Pull primitives out before interpolating into strings —
-  // otherwise `${object}` renders as "[object Object]".
+  // dealsAtRisk may be a number (legacy), an object { count, value, followUps,
+  // quotesAttention }, or null. normalizeDealsAtRisk returns null when not
+  // yet loaded — render '—' rather than a fabricated number.
   const risk = normalizeDealsAtRisk(dealsAtRisk)
+  const dealsValue = risk == null ? '—' : moneyFull(risk.value)
+  const dealsSub =
+    risk == null ? 'Loading…' : `${risk.count} ${risk.count === 1 ? 'deal' : 'deals'}`
+  const jobsBehindValue = jobsBehind == null ? '—' : String(jobsBehind)
+  const jobsBehindSub =
+    jobsBehind == null ? 'Loading…' : jobsBehind === 0 ? 'All on track' : 'needs attention'
+  const invoicingValue = invoicingWeek == null ? '—' : moneyFull(invoicingWeek)
+  const invoicingSub = invoicingWeek == null ? 'Loading…' : 'this week'
+  const followUpsValue =
+    risk?.followUps == null ? '—' : String(risk.followUps)
+  const followUpsSub = risk?.followUps == null ? 'Loading…' : 'leads waiting'
+  const quotesValue =
+    risk?.quotesAttention == null ? '—' : String(risk.quotesAttention)
+  const quotesSub = risk?.quotesAttention == null ? 'Loading…' : 'quotes waiting'
   return (
     <aside className="fh-build-rail">
-      <RailMetric
-        title="Deals at risk"
-        value={moneyFull(risk.value)}
-        sub={`${risk.count} ${risk.count === 1 ? 'deal' : 'deals'}`}
-        chart="red"
-      />
-      <RailMetric title="Jobs behind" value={String(jobsBehind || 3)} sub="needs attention" chart="gold" />
-      <RailMetric title="Invoicing this week" value={moneyFull(invoicingWeek || 186750)} sub="11 invoices" />
-      <RailMetric title="Follow-ups due" value="14" sub="this week" />
-      <RailMetric title="Estimates needing action" value="9" sub="over 48h" />
+      <RailMetric title="Deals at risk" value={dealsValue} sub={dealsSub} chart="red" />
+      <RailMetric title="Jobs behind" value={jobsBehindValue} sub={jobsBehindSub} chart="gold" />
+      <RailMetric title="Invoicing this week" value={invoicingValue} sub={invoicingSub} />
+      <RailMetric title="Follow-ups due" value={followUpsValue} sub={followUpsSub} />
+      <RailMetric title="Quotes needing attention" value={quotesValue} sub={quotesSub} />
     </aside>
   )
 }
@@ -391,22 +409,26 @@ function OwnerQueue({ rows, onOpenJobAtTab, onViewAll }: any) {
         <span>Due</span>
       </div>
 
-      {rows.map((row: any, index: number) => (
-        <button
-          key={`${row.title}-${index}`}
-          type="button"
-          className="fh-build-table__row is-owner"
-          onClick={() => row.contactId && onOpenJobAtTab(row.contactId, row.tab)}
-        >
-          <span>{index + 1}</span>
-          <strong>{row.title}</strong>
-          <span>{row.client}</span>
-          <span>{row.amount}</span>
-          <span className={`fh-build-dot is-${row.statusTone}`}>{row.status}</span>
-          <span>{row.due}</span>
-          <ChevronRight size={13} />
-        </button>
-      ))}
+      {rows.length === 0 ? (
+        <EmptyRow label="No actions queued — you’re caught up." />
+      ) : (
+        rows.map((row: any, index: number) => (
+          <button
+            key={`${row.title}-${index}`}
+            type="button"
+            className="fh-build-table__row is-owner"
+            onClick={() => row.contactId && onOpenJobAtTab(row.contactId, row.tab)}
+          >
+            <span>{index + 1}</span>
+            <strong>{row.title}</strong>
+            <span>{row.client}</span>
+            <span>{row.amount}</span>
+            <span className={`fh-build-dot is-${row.statusTone}`}>{row.status}</span>
+            <span>{row.due}</span>
+            <ChevronRight size={13} />
+          </button>
+        ))
+      )}
 
       <FooterLink label="View all tasks" onClick={onViewAll} />
     </section>
@@ -425,20 +447,24 @@ function RevenueOpportunities({ rows, onOpenJob, onViewAll }: any) {
         <span>Next step</span>
       </div>
 
-      {rows.map((row: any, index: number) => (
-        <button
-          key={row.id || row.name}
-          type="button"
-          className="fh-build-table__row is-revenue"
-          onClick={() => row.id && onOpenJob(row.id)}
-        >
-          <strong>{row.name}</strong>
-          <span>{row.stage}</span>
-          <span>{row.amount}</span>
-          <span>{row.touch}</span>
-          <span>{row.next}</span>
-        </button>
-      ))}
+      {rows.length === 0 ? (
+        <EmptyRow label="No active deals yet — start a new lead to populate this list." />
+      ) : (
+        rows.map((row: any) => (
+          <button
+            key={row.id || row.name}
+            type="button"
+            className="fh-build-table__row is-revenue"
+            onClick={() => row.id && onOpenJob(row.id)}
+          >
+            <strong>{row.name}</strong>
+            <span>{row.stage}</span>
+            <span>{row.amount}</span>
+            <span>{row.touch}</span>
+            <span>{row.next}</span>
+          </button>
+        ))
+      )}
 
       <FooterLink label="View all opportunities" onClick={onViewAll} />
     </section>
@@ -459,26 +485,47 @@ function JobHealthPreview({ rows, onGoToJobs }: any) {
         <span>Next Action</span>
       </div>
 
-      {rows.map((row: any) => (
-        <button
-          key={row.job}
-          type="button"
-          className="fh-build-table__row is-health"
-          onClick={() => onGoToJobs()}
-        >
-          <strong>{row.job}</strong>
-          <span>{row.stage}</span>
-          <span className={`fh-build-dot is-${row.scheduleTone}`}>{row.schedule}</span>
-          <span className={`fh-build-dot is-${row.reportTone}`}>{row.report}</span>
-          <span className={`fh-build-dot is-${row.billingTone}`}>{row.billing}</span>
-          <span className={`fh-build-dot is-${row.riskTone}`}>{row.risk}</span>
-          <span>{row.next}</span>
-          <ChevronRight size={13} />
-        </button>
-      ))}
+      {rows.length === 0 ? (
+        <EmptyRow label="Job-health signals not connected yet." />
+      ) : (
+        rows.map((row: any) => (
+          <button
+            key={row.job}
+            type="button"
+            className="fh-build-table__row is-health"
+            onClick={() => onGoToJobs()}
+          >
+            <strong>{row.job}</strong>
+            <span>{row.stage}</span>
+            <span className={`fh-build-dot is-${row.scheduleTone}`}>{row.schedule}</span>
+            <span className={`fh-build-dot is-${row.reportTone}`}>{row.report}</span>
+            <span className={`fh-build-dot is-${row.billingTone}`}>{row.billing}</span>
+            <span className={`fh-build-dot is-${row.riskTone}`}>{row.risk}</span>
+            <span>{row.next}</span>
+            <ChevronRight size={13} />
+          </button>
+        ))
+      )}
 
       <FooterLink label="View all jobs" onClick={() => onGoToJobs?.()} />
     </section>
+  )
+}
+
+function EmptyRow({ label }: { label: string }) {
+  return (
+    <div
+      className="fh-build-table__row"
+      style={{
+        gridTemplateColumns: '1fr',
+        color: 'rgba(255,255,255,0.55)',
+        fontSize: 13,
+        padding: '18px 16px',
+        cursor: 'default',
+      }}
+    >
+      <span>{label}</span>
+    </div>
   )
 }
 
@@ -499,72 +546,97 @@ function FooterLink({ label, onClick }: { label: string; onClick?: () => void })
   )
 }
 
-function buildPipelineStages(_topPipeline: any[] | null, _pipeline: number | null) {
-  return [
-    { key: 'lead', label: 'Lead', amount: '$562K', count: 12, width: '13%' },
-    { key: 'qualified', label: 'Qualified', amount: '$842K', count: 18, width: '15%' },
-    { key: 'estimate', label: 'Estimate', amount: '$1.24M', count: 21, width: '24%' },
-    { key: 'proposal', label: 'Proposal', amount: '$876K', count: 17, width: '17%' },
-    { key: 'negotiation', label: 'Negotiation', amount: '$543K', count: 9, width: '13%' },
-    { key: 'won', label: 'Won', amount: '$220K', count: 5, width: '8%' },
-    { key: 'hold', label: 'On Hold', amount: '$0', count: 0, width: '5%' },
-    { key: 'lost', label: 'Lost', amount: '$0', count: 0, width: '5%' },
-  ]
+// Render 3 real funnel buckets (Lead/Active/Won) sourced from
+// stageBreakdown, with $ totals derived from topPipeline rows whose
+// stage falls into each bucket. We intentionally show 3 buckets
+// rather than fabricating 8 named stages — counts are the source of
+// truth, amounts are best-effort from the top-deal slice we have.
+function buildPipelineStages(
+  topPipeline: any[] | null,
+  stageBreakdown: { won?: number; active?: number; lead?: number } | null,
+) {
+  const buckets: Record<string, { key: string; label: string; stages: string[] }> = {
+    lead:   { key: 'lead',   label: 'Lead',   stages: ['lead', 'quote'] },
+    active: { key: 'active', label: 'Active', stages: ['job'] },
+    won:    { key: 'won',    label: 'Won',    stages: ['invoice', 'closed'] },
+  }
+  const sums: Record<string, number> = { lead: 0, active: 0, won: 0 }
+  for (const deal of topPipeline || []) {
+    for (const [bk, b] of Object.entries(buckets)) {
+      if (b.stages.includes(String(deal.stage || '').toLowerCase())) {
+        sums[bk] += Number(deal.amount || deal.value || 0)
+      }
+    }
+  }
+  const rows = (['lead', 'active', 'won'] as const).map((k) => ({
+    key: buckets[k].key,
+    label: buckets[k].label,
+    amount: sums[k] > 0 ? money(sums[k]) : '—',
+    count: stageBreakdown?.[k] ?? 0,
+  }))
+  const totalCount = rows.reduce((s, r) => s + r.count, 0)
+  return rows.map((r) => ({
+    ...r,
+    width: totalCount > 0 ? `${Math.max(5, Math.round((r.count / totalCount) * 100))}%` : '33%',
+  }))
 }
 
+// Map a real Next Action into the owner-queue row shape. urgencyTone
+// ('danger' | 'warn' | 'success') maps to the dot tone the table uses.
+// Amount/due aren't part of the action payload, so we leave them blank
+// rather than invent numbers.
 function buildOwnerQueue(nextActions: any[] | null) {
-  if (nextActions?.length) {
-    return nextActions.slice(0, 6).map((a: any, i: number) => ({
-      title: a.label || a.title || 'Action required',
-      client: a.contactName || a.subtitle || 'Open job',
-      amount: i === 0 ? '$240,000' : i === 1 ? '$18,750' : '—',
-      status: i < 2 ? 'High' : i < 5 ? 'Medium' : 'Low',
-      statusTone: i < 2 ? 'bad' : i < 5 ? 'warn' : 'good',
-      due: i < 3 ? 'Today' : 'Tomorrow',
+  if (!nextActions) return []
+  return nextActions.slice(0, 6).map((a: any) => {
+    const tone =
+      a.urgencyTone === 'danger' ? 'bad'
+      : a.urgencyTone === 'warn' ? 'warn'
+      : a.urgencyTone === 'success' ? 'good'
+      : 'neutral'
+    const status =
+      a.urgencyTone === 'danger' ? 'High'
+      : a.urgencyTone === 'warn' ? 'Medium'
+      : a.urgencyTone === 'success' ? 'Action'
+      : '—'
+    return {
+      title: a.title || a.label || 'Action required',
+      client: a.detail || a.contactName || a.subtitle || '',
+      amount: '—',
+      status,
+      statusTone: tone,
+      due: '—',
       contactId: a.contactId,
       tab: a.tab,
-    }))
-  }
-
-  return [
-    { title: 'Follow up stale lead', client: 'Smith Custom Home', amount: '$240,000', status: 'High', statusTone: 'bad', due: 'Today' },
-    { title: 'Chase invoice', client: 'Timberline Remodel', amount: '$18,750', status: 'High', statusTone: 'bad', due: 'Today' },
-    { title: 'Reschedule behind job', client: 'Pine Ridge Build', amount: '—', status: 'Medium', statusTone: 'warn', due: 'Today' },
-    { title: 'Send estimate', client: 'Riverfront Addition', amount: '$67,500', status: 'Medium', statusTone: 'warn', due: 'Tomorrow' },
-    { title: 'Open job', client: 'Aspen Heights', amount: '$385,000', status: 'Medium', statusTone: 'warn', due: 'Tomorrow' },
-    { title: 'Request field report', client: 'Silverthorne View', amount: '—', status: 'Low', statusTone: 'good', due: 'Fri, May 23' },
-  ]
+    }
+  })
 }
 
 function buildRevenueRows(topPipeline: any[] | null) {
-  if (topPipeline?.length) {
-    return topPipeline.slice(0, 5).map((c: any, i: number) => ({
-      id: c.id,
-      name: c.name || 'Unnamed',
-      stage: c.stage || 'Estimate',
-      amount: moneyFull(c.amount || c.value || 0),
-      touch: i === 0 ? '2d ago' : `${i + 1}d ago`,
-      next: i === 0 ? 'Send estimate' : i === 1 ? 'Follow up' : 'Review terms',
-    }))
+  if (!topPipeline) return []
+  const stageLabel: Record<string, string> = {
+    lead: 'Lead',
+    quote: 'Quote',
+    job: 'Job',
+    invoice: 'Invoice',
+    closed: 'Closed',
+    lost: 'Lost',
   }
-
-  return [
-    { name: 'Boulder Modern Home', stage: 'Estimate', amount: '$385,000', touch: '2d ago', next: 'Send estimate' },
-    { name: 'Mountain View Estate', stage: 'Proposal', amount: '$312,000', touch: '1d ago', next: 'Follow up' },
-    { name: 'Lone Pine Cabin', stage: 'Negotiation', amount: '$245,000', touch: '3d ago', next: 'Review terms' },
-    { name: 'West Ridge Renovation', stage: 'Estimate', amount: '$198,500', touch: '5d ago', next: 'Send estimate' },
-    { name: 'Clear Creek Addition', stage: 'Qualified', amount: '$142,000', touch: '6d ago', next: 'Discovery call' },
-  ]
+  return topPipeline.slice(0, 5).map((c: any) => ({
+    id: c.id,
+    name: c.name || 'Unnamed',
+    stage: stageLabel[String(c.stage || '').toLowerCase()] || c.stage || '—',
+    amount: moneyFull(c.amount || c.value || 0),
+    touch: '—',
+    next: '—',
+  }))
 }
 
-function buildJobHealthRows(_todayOnSite: any[] | null, _revenueRows: any[]) {
-  return [
-    { job: 'Timberline Remodel', stage: 'Construction', schedule: 'On Track', scheduleTone: 'good', report: 'Up to date', reportTone: 'good', billing: 'Current', billingTone: 'good', risk: 'Low', riskTone: 'good', next: 'Site walk tomorrow' },
-    { job: 'Pine Ridge Build', stage: 'Construction', schedule: 'Behind', scheduleTone: 'bad', report: '2 overdue', reportTone: 'bad', billing: 'Behind', billingTone: 'bad', risk: 'High', riskTone: 'bad', next: 'Reschedule + update client' },
-    { job: 'Riverfront Addition', stage: 'Pre-Construction', schedule: 'On Track', scheduleTone: 'good', report: 'Up to date', reportTone: 'good', billing: 'Deposit due', billingTone: 'warn', risk: 'Medium', riskTone: 'warn', next: 'Collect deposit' },
-    { job: 'Aspen Heights', stage: 'Permitting', schedule: 'On Track', scheduleTone: 'good', report: 'Up to date', reportTone: 'good', billing: 'Not billed', billingTone: 'neutral', risk: 'Low', riskTone: 'good', next: 'Permit follow up' },
-    { job: 'Silverthorne View', stage: 'Construction', schedule: 'On Track', scheduleTone: 'good', report: '1 overdue', reportTone: 'bad', billing: 'Current', billingTone: 'good', risk: 'Medium', riskTone: 'warn', next: 'Request field report' },
-  ]
+// Job Health requires per-job schedule / report / billing / risk
+// signals that aren't computed on Home yet. Until that data lands,
+// emit zero rows — the table will render its header + empty state
+// rather than fabricated rows with placeholder client names.
+function buildJobHealthRows(_todayOnSite: any[] | null) {
+  return [] as any[]
 }
 
 // Silence "imported but not used" warnings for icons reserved for future use.
