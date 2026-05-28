@@ -12203,3 +12203,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 110px 110px 110px 14px;
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase D pass 2 (Sub portal payments)
+   ============================================================
+   Job / Date / Kind / Method / Amount. */
+
+@media (min-width: 900px) {
+  .fh-build-table__head.is-subportal-pay,
+  .fh-build-table__row.is-subportal-pay {
+    grid-template-columns: minmax(0, 1.4fr) 110px 100px 110px 120px;
+  }
+}
