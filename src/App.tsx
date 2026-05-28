@@ -22,6 +22,7 @@ const OrgInvite      = lazy(() => import('./screens/OrgInvite.tsx'))
 const Team           = lazy(() => import('./screens/Team.tsx'))
 const Crew           = lazy(() => import('./screens/Crew.tsx'))
 const Timesheets     = lazy(() => import('./screens/Timesheets.tsx'))
+const Tasks          = lazy(() => import('./screens/Tasks.tsx'))
 const Privacy        = lazy(() => import('./screens/Privacy.tsx'))
 const Terms          = lazy(() => import('./screens/Terms.tsx'))
 const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="/team" element={<Team />} />
           <Route path="/crew" element={<Crew />} />
           <Route path="/timesheets" element={<Timesheets />} />
+          <Route path="/tasks" element={<Tasks />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
         </Route>

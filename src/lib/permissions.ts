@@ -105,6 +105,7 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/invoices':       return canSeeFinancials(role)
     case '/team':           return true                            // roster visible to all org members; mutations gated separately
     case '/timesheets':     return canApproveTimesheets(role)       // owner/admin/manager only
+    case '/tasks':          return canSeeAllJobs(role)               // cross-job dashboard — owner/admin only
     default:                return true
   }
 }

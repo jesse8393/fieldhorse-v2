@@ -8,15 +8,19 @@
 // Lives inside the Job Detail tab strip alongside Overview / Quote /
 // Details / Financials / Files.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CloudSun, Trash2, Users, Clock, Sparkles } from 'lucide-react'
+import { CloudSun, Trash2, Users, Clock, Sparkles, ImagePlus, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
 
 const SkeletonAny = SkeletonList as any
+const PHOTO_BUCKET = 'job-photos'
+const SIGN_TTL_SECONDS = 3600
+const MAX_BYTES = 10 * 1024 * 1024
 
 type LogRow = {
   id: string
@@ -28,6 +32,7 @@ type LogRow = {
   weather_text: string | null
   crew_count: number | null
   hours_worked: number | null
+  photos: any
   created_at: string
 }
 
@@ -44,10 +49,15 @@ function fmtTime(iso: string): string {
   } catch { return '' }
 }
 
+type DraftPhoto = { local_id: string; preview_url: string; storage_path: string; size: number; uploading: boolean }
+
 export default function DailyLogsSection({ jobId, userId }: any) {
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
+  // Map of storage_path → signed URL for photos referenced on rendered
+  // log cards. Filled lazily as rows arrive.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
 
   // Draft state (inline form, expanded on demand)
   const [summary, setSummary] = useState('')
@@ -55,14 +65,16 @@ export default function DailyLogsSection({ jobId, userId }: any) {
   const [weatherText, setWeatherText] = useState('')
   const [crewCount, setCrewCount] = useState('')
   const [hoursWorked, setHoursWorked] = useState('')
+  const [draftPhotos, setDraftPhotos] = useState<DraftPhoto[]>([])
   const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const load = useCallback(async () => {
     if (!jobId) return
     setLoading(true)
     const { data, error } = await supabase
       .from('fh_daily_logs')
-      .select('id, user_id, contact_id, log_date, summary, next_steps, weather_text, crew_count, hours_worked, created_at')
+      .select('id, user_id, contact_id, log_date, summary, next_steps, weather_text, crew_count, hours_worked, photos, created_at')
       .eq('contact_id', jobId)
       .order('log_date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -71,7 +83,30 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       toastError("Couldn't load daily logs", error.message)
       setRows([])
     } else {
-      setRows((data || []) as LogRow[])
+      const list = (data || []) as LogRow[]
+      setRows(list)
+      // Batch-sign every photo path referenced by these rows so the
+      // <img> tags get a fresh signed URL. One round-trip regardless
+      // of how many logs returned.
+      const paths = new Set<string>()
+      for (const r of list) {
+        const arr = Array.isArray(r.photos) ? r.photos : []
+        for (const p of arr) {
+          if (typeof p?.storage_path === 'string') paths.add(p.storage_path)
+        }
+      }
+      if (paths.size > 0) {
+        const { data: signed } = await supabase.storage
+          .from(PHOTO_BUCKET)
+          .createSignedUrls(Array.from(paths), SIGN_TTL_SECONDS)
+        const next: Record<string, string> = {}
+        for (const s of (signed || [])) {
+          if (s?.path && s.signedUrl && !s.error) next[s.path] = s.signedUrl
+        }
+        setPhotoUrls(next)
+      } else {
+        setPhotoUrls({})
+      }
     }
     setLoading(false)
   }, [jobId])
@@ -84,6 +119,82 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     setWeatherText('')
     setCrewCount('')
     setHoursWorked('')
+    // Revoke any blob: URLs we created for previews so we don't leak.
+    for (const p of draftPhotos) {
+      if (p.preview_url.startsWith('blob:')) URL.revokeObjectURL(p.preview_url)
+    }
+    setDraftPhotos([])
+  }
+
+  // Upload one file at a time so failures don't poison the whole batch.
+  // Matches the Photos.tsx pattern: compress → upload to job-photos →
+  // we DON'T insert a fh_job_files row from here; the photo lives only
+  // on the daily log. That keeps the Photos tab uncluttered with
+  // every site-update snap.
+  async function uploadOnePhoto(file: File): Promise<DraftPhoto | null> {
+    if (file.size > MAX_BYTES) {
+      toastError('Photo too large', `${file.name} exceeds 10 MB`)
+      return null
+    }
+    let blob: Blob | null
+    try {
+      blob = await compressImageToBlob(file, 1_500_000, 1800)
+    } catch (ex: any) {
+      toastError("Couldn't process photo", ex?.message || file.name)
+      return null
+    }
+    if (!blob) return null
+    const localId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const path = `${userId}/${jobId}/daily-${localId}.jpg`
+    const { error: upErr } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(path, blob, { upsert: false, contentType: 'image/jpeg' })
+    if (upErr) {
+      toastError('Upload failed', upErr.message)
+      return null
+    }
+    const previewUrl = URL.createObjectURL(blob)
+    return { local_id: localId, preview_url: previewUrl, storage_path: path, size: blob.size, uploading: false }
+  }
+
+  async function handlePickPhotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length === 0) return
+    hapticTap()
+    // Optimistic placeholders so the user sees progress.
+    const placeholders: DraftPhoto[] = files.map((f) => ({
+      local_id: `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      preview_url: URL.createObjectURL(f),
+      storage_path: '',
+      size: f.size,
+      uploading: true,
+    }))
+    setDraftPhotos((cur) => [...cur, ...placeholders])
+    for (let i = 0; i < files.length; i++) {
+      const ph = placeholders[i]
+      const done = await uploadOnePhoto(files[i])
+      setDraftPhotos((cur) => {
+        if (!done) return cur.filter((p) => p.local_id !== ph.local_id)
+        return cur.map((p) => (p.local_id === ph.local_id ? done : p))
+      })
+      // Revoke the placeholder blob URL — we now have a real one (or none).
+      URL.revokeObjectURL(ph.preview_url)
+    }
+  }
+
+  function removeDraftPhoto(localId: string) {
+    setDraftPhotos((cur) => {
+      const removed = cur.find((p) => p.local_id === localId)
+      if (removed?.preview_url?.startsWith('blob:')) URL.revokeObjectURL(removed.preview_url)
+      if (removed?.storage_path) {
+        // Best-effort cleanup of the just-uploaded object — silent failure.
+        supabase.storage.from(PHOTO_BUCKET).remove([removed.storage_path]).catch(() => {})
+      }
+      return cur.filter((p) => p.local_id !== localId)
+    })
   }
 
   async function save() {
@@ -100,6 +211,10 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     if (weatherText.trim()) payload.weather_text = weatherText.trim()
     if (crewCount && Number.isFinite(Number(crewCount))) payload.crew_count = parseInt(crewCount, 10)
     if (hoursWorked && Number.isFinite(Number(hoursWorked))) payload.hours_worked = Number(hoursWorked)
+    const readyPhotos = draftPhotos
+      .filter((p) => !p.uploading && p.storage_path)
+      .map((p) => ({ storage_path: p.storage_path, size: p.size }))
+    if (readyPhotos.length > 0) payload.photos = readyPhotos
     const { error } = await supabase.from('fh_daily_logs').insert(payload as any)
     setSaving(false)
     if (error) {
@@ -224,7 +339,68 @@ export default function DailyLogsSection({ jobId, userId }: any) {
               style={{ ...inputStyle, maxWidth: 100 }}
             />
           </div>
+
+          {/* Photo strip — drafts during compose. Tap a thumb's X to
+              remove (deletes from storage too). */}
+          {draftPhotos.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {draftPhotos.map((p) => (
+                <div
+                  key={p.local_id}
+                  style={{
+                    position: 'relative',
+                    width: 72, height: 72,
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    background: 'rgba(0,0,0,.3)',
+                    border: '1px solid var(--v3-border)',
+                  }}
+                >
+                  <img src={p.preview_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: p.uploading ? 0.45 : 1 }} />
+                  {p.uploading && (
+                    <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--v3-text)', fontSize: 10, fontWeight: 700 }}>
+                      Uploading…
+                    </div>
+                  )}
+                  {!p.uploading && (
+                    <button
+                      type="button"
+                      onClick={() => removeDraftPhoto(p.local_id)}
+                      aria-label="Remove photo"
+                      style={{
+                        position: 'absolute', top: 2, right: 2,
+                        width: 22, height: 22, borderRadius: 999,
+                        border: 'none', background: 'rgba(0,0,0,.65)',
+                        color: '#fff', cursor: 'pointer',
+                        display: 'grid', placeItems: 'center',
+                      }}
+                    >
+                      <X size={11} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePickPhotos}
+              style={{ display: 'none' }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={saving}
+              style={{ ...secondaryBtn, marginRight: 'auto' }}
+            >
+              <ImagePlus size={13} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
+              Add photos
+            </button>
             <button
               type="button"
               onClick={() => { clearDraft(); setComposing(false) }}
@@ -326,6 +502,35 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                       Next
                     </strong>
                     {r.next_steps}
+                  </div>
+                )}
+
+                {Array.isArray(r.photos) && r.photos.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
+                    {(r.photos as any[]).map((p, i) => {
+                      const url = p?.storage_path ? photoUrls[p.storage_path] : null
+                      return (
+                        <div
+                          key={(p?.storage_path || '') + i}
+                          style={{
+                            position: 'relative',
+                            aspectRatio: '1 / 1',
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                            background: 'rgba(0,0,0,.3)',
+                            border: '1px solid var(--v3-border)',
+                          }}
+                        >
+                          {url ? (
+                            <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--v3-text-muted)', fontSize: 10 }}>
+                              …
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 

@@ -12179,3 +12179,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     grid-template-columns: 110px minmax(0, 1.2fr) 140px 70px 80px 110px 36px;
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase C pass 2 (cross-job tasks)
+   ============================================================
+   Task / Job / Assignee / Due / done-btn. */
+
+@media (min-width: 900px) {
+  .fh-build-table__head.is-tasks,
+  .fh-build-table__row.is-tasks {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 140px 110px 36px;
+  }
+}

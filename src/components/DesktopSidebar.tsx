@@ -65,6 +65,7 @@ const GROUPS: Group[] = [
       { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
       { label: 'Invoices',       to: '/invoices', Icon: Receipt,         match: prefix('/invoices') },
       { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
+      { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
       { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },
     ],
   },
