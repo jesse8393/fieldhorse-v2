@@ -11,6 +11,7 @@
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
+  PlayCircle,
   LayoutDashboard,
   Radio,
   Sparkles,
@@ -50,6 +51,7 @@ const GROUPS: Group[] = [
     label: 'Command',
     items: [
       { label: 'Command Center', to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
+      { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
       { label: 'Lead Desk',      to: '/jobs?view=leads', Icon: Sparkles, match: (p) => p === '/jobs' && typeof window !== 'undefined' && window.location.search.includes('view=leads') },
       { label: 'Job Desk',       to: '/jobs',     Icon: Hammer,          match: (p) => p === '/jobs' && !(typeof window !== 'undefined' && window.location.search.includes('view=leads')) },

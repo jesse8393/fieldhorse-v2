@@ -1728,6 +1728,93 @@ export type Database = {
           },
         ]
       }
+      fh_time_punches: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          break_minutes: number
+          contact_id: string | null
+          created_at: string
+          flag_reason: string | null
+          flagged: boolean
+          hourly_rate: number | null
+          id: string
+          notes: string | null
+          org_id: string | null
+          punch_in_accuracy_m: number | null
+          punch_in_at: string
+          punch_in_lat: number | null
+          punch_in_lon: number | null
+          punch_out_accuracy_m: number | null
+          punch_out_at: string | null
+          punch_out_lat: number | null
+          punch_out_lon: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number
+          contact_id?: string | null
+          created_at?: string
+          flag_reason?: string | null
+          flagged?: boolean
+          hourly_rate?: number | null
+          id?: string
+          notes?: string | null
+          org_id?: string | null
+          punch_in_accuracy_m?: number | null
+          punch_in_at: string
+          punch_in_lat?: number | null
+          punch_in_lon?: number | null
+          punch_out_accuracy_m?: number | null
+          punch_out_at?: string | null
+          punch_out_lat?: number | null
+          punch_out_lon?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number
+          contact_id?: string | null
+          created_at?: string
+          flag_reason?: string | null
+          flagged?: boolean
+          hourly_rate?: number | null
+          id?: string
+          notes?: string | null
+          org_id?: string | null
+          punch_in_accuracy_m?: number | null
+          punch_in_at?: string
+          punch_in_lat?: number | null
+          punch_in_lon?: number | null
+          punch_out_accuracy_m?: number | null
+          punch_out_at?: string | null
+          punch_out_lat?: number | null
+          punch_out_lon?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fh_time_punches_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_time_punches_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_invites: {
         Row: {
           accepted_at: string | null

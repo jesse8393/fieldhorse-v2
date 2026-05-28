@@ -87,7 +87,8 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
   if (!role) return false
   switch (route) {
     case '/':
-    case '/home':           return true                            // owner dashboard for owner/admin/manager; crew home for foreman/crew (UI splits)
+    case '/home':           return true                            // home redirects foreman/crew to /crew (handled in screen)
+    case '/crew':           return canDoFieldWork(role)            // everyone with a role; crew/foreman LAND here
     case '/jobs':           return true                            // role-filtered in-view
     case '/clients':        return canSeeAllJobs(role)             // crew/foreman don't browse the client list
     case '/notes':          return true                            // field reports — everyone can read+write their own
@@ -102,6 +103,7 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/subs':           return canManageSubs(role)
     case '/partners':       return canManageSubs(role)
     case '/invoices':       return canSeeFinancials(role)
+    case '/team':           return true                            // roster visible to all org members; mutations gated separately
     default:                return true
   }
 }
