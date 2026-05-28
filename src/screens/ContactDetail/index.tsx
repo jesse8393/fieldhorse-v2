@@ -34,6 +34,7 @@ import DetailsTab from './tabs/Details.tsx'
 import FinancialsTab from './tabs/Financials.tsx'
 import FilesTab from './tabs/Files.tsx'
 import DailyLogsSection from './sections/DailyLogs.tsx'
+import SelectionsSection from './sections/Selections.tsx'
 import ApproveQuoteSheet from './sections/ApproveQuoteSheet.tsx'
 import SnowJobDetailBuild from '../../components/desktop/SnowJobDetailBuild.tsx'
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
@@ -42,6 +43,7 @@ const TOP_TABS = [
   { id: 'overview',   label: 'Overview' },
   { id: 'quote',      label: 'Quote' },
   { id: 'details',    label: 'Details' },
+  { id: 'selections', label: 'Selections' },
   { id: 'logs',       label: 'Daily logs' },
   { id: 'financials', label: 'Financials' },
   { id: 'files',      label: 'Files' }
@@ -366,6 +368,9 @@ export default function ContactDetail() {
               {tab === 'logs' && (
                 <DailyLogsSection jobId={contact?.id} userId={user?.id} />
               )}
+              {tab === 'selections' && (
+                <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
+              )}
             </SnowJobDetailBuild>
           )
         })()
@@ -501,6 +506,9 @@ export default function ContactDetail() {
         )}
         {tab === 'logs' && (
           <DailyLogsSection jobId={contact?.id} userId={user?.id} />
+        )}
+        {tab === 'selections' && (
+          <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
         )}
       </div>
       </>

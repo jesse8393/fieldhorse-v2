@@ -1609,6 +1609,91 @@ export type Database = {
           },
         ]
       }
+      fh_selections: {
+        Row: {
+          category: string | null
+          client_id: string | null
+          contact_id: string
+          created_at: string
+          decision_at: string | null
+          decision_by: string | null
+          description: string | null
+          due_at: string | null
+          id: string
+          notes: string | null
+          options: Json
+          org_id: string | null
+          room: string | null
+          selected_option_id: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          client_id?: string | null
+          contact_id: string
+          created_at?: string
+          decision_at?: string | null
+          decision_by?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          notes?: string | null
+          options?: Json
+          org_id?: string | null
+          room?: string | null
+          selected_option_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          client_id?: string | null
+          contact_id?: string
+          created_at?: string
+          decision_at?: string | null
+          decision_by?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          notes?: string | null
+          options?: Json
+          org_id?: string | null
+          room?: string | null
+          selected_option_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fh_selections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_selections_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_selections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fh_stage_transitions: {
         Row: {
           contact_id: string

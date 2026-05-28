@@ -8,20 +8,24 @@
 //   - `invoice` / `closed` hide the Quote tab entirely — an invoice for
 //     materials or a quick job never needed a quote.
 
-export type DealTabId = 'overview' | 'quote' | 'details' | 'financials' | 'files' | 'logs'
+export type DealTabId = 'overview' | 'quote' | 'details' | 'financials' | 'files' | 'logs' | 'selections'
 
-const ALL_TABS: DealTabId[] = ['overview', 'quote', 'details', 'financials', 'files', 'logs']
+const ALL_TABS: DealTabId[] = ['overview', 'quote', 'details', 'financials', 'files', 'logs', 'selections']
 
 // Daily logs only show up once a job is actively running — there's
 // nothing to log before then. Job / invoice / closed stages all
 // expose the tab so a foreman can post during execution and the
 // owner can still browse the history after close-out.
+//
+// Selections appears starting at quote — clients need to pick finishes
+// before the build kicks off, and approved/installed picks stay
+// visible through closeout. Lead and lost stages skip it.
 const STAGE_TABS: Record<string, DealTabId[]> = {
   lead:    ['overview', 'quote', 'details', 'files'],
-  quote:   ['overview', 'quote', 'details', 'files'],
-  job:     ['overview', 'details', 'logs', 'financials', 'files'],
-  invoice: ['overview', 'logs', 'financials', 'files'],
-  closed:  ['overview', 'logs', 'financials', 'files'],
+  quote:   ['overview', 'quote', 'details', 'selections', 'files'],
+  job:     ['overview', 'details', 'selections', 'logs', 'financials', 'files'],
+  invoice: ['overview', 'selections', 'logs', 'financials', 'files'],
+  closed:  ['overview', 'selections', 'logs', 'financials', 'files'],
   lost:    ['overview', 'files']
 }
 
