@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Clock, Play, Square, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { recalcCost } from '../lib/stages.ts'
+import { getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 
@@ -67,7 +68,12 @@ function fmtElapsed(ms: any) {
 }
 
 export default function TimeClockCard({ contact, userId, onLogged }: any) {
-  const [start, setStart] = useState(() => readActiveStart(contact.id))
+  // start (ms) drives the running meter. punchId is the fh_time_punches
+  // row we'll close on clock-out. We seed start from localStorage so
+  // the meter doesn't flicker before the DB read returns, then
+  // reconcile against the DB in the effect below.
+  const [start, setStart] = useState<number | null>(() => readActiveStart(contact.id))
+  const [punchId, setPunchId] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
   const [confirming, setConfirming] = useState(false)
   const [rate, setRate] = useState(readPreferredRate())
@@ -75,12 +81,36 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
   const [saving, setSaving] = useState(false)
   const tickRef = useRef<any>(null)
 
-  // Re-read on jobId change (navigation between jobs)
+  // Re-read on jobId change (navigation between jobs).
+  // We fall back to localStorage immediately for instant UI, then
+  // reconcile against fh_time_punches. If the DB says "not actually
+  // clocked in on this job," clear the localStorage seed so a stale
+  // pre-rewrite punch doesn't trick the UI into showing a fake meter.
   useEffect(() => {
+    let cancelled = false
     setStart(readActiveStart(contact.id))
+    setPunchId(null)
     setConfirming(false)
     setNote('')
-  }, [contact.id])
+    if (!userId) return
+    ;(async () => {
+      const active = await getActivePunchForContact(userId, contact.id)
+      if (cancelled) return
+      if (active) {
+        setPunchId(active.id)
+        const ms = new Date(active.punch_in_at).getTime()
+        if (Number.isFinite(ms)) {
+          setStart(ms)
+          writeActiveStart(contact.id, ms)
+        }
+      } else {
+        // DB says no active punch for this job — discard any stale cache.
+        setStart(null)
+        writeActiveStart(contact.id, null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [contact.id, userId])
 
   // Tick once a second only when running so the card doesn't waste
   // battery when nobody is on the clock.
@@ -94,11 +124,26 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
     return () => { if (tickRef.current) clearInterval(tickRef.current) }
   }, [start])
 
-  function handleClockIn() {
+  async function handleClockIn() {
     hapticTap()
-    const ts = Date.now()
-    writeActiveStart(contact.id, ts)
-    setStart(ts)
+    try {
+      const punch = await dbPunchIn({ userId, contactId: contact.id })
+      const ts = new Date(punch.punch_in_at).getTime()
+      setPunchId(punch.id)
+      setStart(ts)
+      writeActiveStart(contact.id, ts)
+    } catch (ex: any) {
+      const msg = String(ex?.message || '')
+      // Postgres unique_violation surfaces as 23505 or a message that
+      // mentions the partial index name. Either way it means the user
+      // is already clocked in somewhere — on another job, on /crew,
+      // or in another tab.
+      if (msg.includes('one_active_per_user') || ex?.code === '23505') {
+        toastError('Already on the clock', 'Clock out before starting a new shift.')
+      } else {
+        toastError("Couldn't clock in", msg || 'Try again')
+      }
+    }
   }
 
   function handleStopRequest() {
@@ -117,6 +162,27 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
     const billable = Math.round(hours * rate * 100) / 100
     setSaving(true)
     try {
+      // 1) Close the punch row. If we don't have a punchId in state
+      //    (e.g. the user's seed came from localStorage but the DB
+      //    reconcile hadn't returned yet), submission proceeds with
+      //    just the fh_expenses insert — fh_time_punches will be
+      //    missing this shift but cost tracking still works.
+      if (punchId) {
+        try {
+          await dbPunchOut({
+            punchId,
+            hourlyRate: rate,
+            notes: note.trim() || null,
+          })
+        } catch (punchErr: any) {
+          // Non-fatal — log it and continue with the cost insert so the
+          // operator's job cost stays accurate.
+          console.warn('[TimeClockCard] punch close failed', punchErr)
+        }
+      }
+
+      // 2) Cost row (kept verbatim — feeds the per-job cost / margin
+      //    rollup that the rest of the app already reads).
       const { error } = await supabase.from('fh_expenses').insert({
         user_id: userId,
         contact_id: contact.id,
@@ -129,6 +195,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       writePreferredRate(rate)
       writeActiveStart(contact.id, null)
       setStart(null)
+      setPunchId(null)
       setConfirming(false)
       setNote('')
       hapticSuccess()

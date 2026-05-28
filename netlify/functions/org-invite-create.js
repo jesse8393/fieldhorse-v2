@@ -90,12 +90,82 @@ export default async (request) => {
     ? `${SITE_URL.replace(/\/$/, '')}/invite/${token}`
     : `/invite/${token}`
 
+  // Best-effort email send. Mirrors the partner-invite.js Resend
+  // pattern. Returns sent:true on success, sent:false with a reason
+  // otherwise — never fails the invite create itself.
+  let emailResult = { sent: false, reason: 'not_configured' }
+  const RESEND_API_KEY = process.env.RESEND_API_KEY
+  const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
+  if (RESEND_API_KEY && SEND_EMAIL_FROM) {
+    try {
+      // Look up org name for the email body.
+      const { data: orgRow } = await admin
+        .from('organizations')
+        .select('name')
+        .eq('id', myMember.org_id)
+        .maybeSingle()
+      const orgName = orgRow?.name || 'their team'
+
+      const subject = `You're invited to join ${orgName} on FieldHorse`
+      const text = [
+        `You've been invited to join ${orgName} on FieldHorse as a ${role}.`,
+        '',
+        `Accept the invite: ${acceptUrl}`,
+        '',
+        'This link expires in 14 days.',
+      ].join('\n')
+      const html = `
+        <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;padding:24px;color:#1a1a1a">
+          <p style="font-size:14px;color:#666;letter-spacing:.14em;text-transform:uppercase;margin:0 0 8px">FieldHorse</p>
+          <h1 style="font-size:24px;margin:0 0 16px">Join ${orgName}</h1>
+          <p style="font-size:15px;line-height:1.5;margin:0 0 20px">
+            You've been invited to join <strong>${orgName}</strong> as a <strong>${role}</strong>.
+          </p>
+          <p style="margin:0 0 24px">
+            <a href="${acceptUrl}" style="display:inline-block;padding:12px 20px;background:#c9963a;color:#0c0d0f;text-decoration:none;font-weight:700;border-radius:6px">Accept invite →</a>
+          </p>
+          <p style="font-size:12px;color:#888;margin:0">This link expires in 14 days.</p>
+          <p style="font-size:11px;color:#aaa;margin:24px 0 0;word-break:break-all">${acceptUrl}</p>
+        </div>
+      `.trim()
+
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: SEND_EMAIL_FROM,
+          to: [email],
+          subject,
+          text,
+          html,
+        })
+      })
+      const respBody = await res.json().catch(() => ({}))
+      if (res.ok) {
+        emailResult = { sent: true, email_id: respBody?.id || null }
+      } else {
+        emailResult = {
+          sent: false,
+          reason: 'provider_rejected',
+          provider_status: res.status,
+          detail: respBody?.message || respBody?.error || null,
+        }
+      }
+    } catch (e) {
+      emailResult = { sent: false, reason: 'send_threw', detail: String(e?.message || e) }
+    }
+  }
+
   return json({
     ok: true,
     id: inviteRow.id,
     token,
     accept_url: acceptUrl,
     expires_at: inviteRow.expires_at,
+    email: emailResult,
   })
 }
 

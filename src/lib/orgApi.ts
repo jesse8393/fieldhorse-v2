@@ -107,3 +107,37 @@ export function orgInviteCreate(
 export function orgInviteRevoke(inviteId: string): Promise<{ ok: true }> {
   return callJson('/api/org-invite-revoke', { invite_id: inviteId })
 }
+
+// ────────────────────────────────────────────────────────────
+// Timesheets
+// ────────────────────────────────────────────────────────────
+
+export type PendingPunch = {
+  id: string
+  user_id: string
+  user_name: string | null
+  user_email: string | null
+  contact_id: string | null
+  contact_name: string | null
+  punch_in_at: string
+  punch_out_at: string
+  minutes: number
+  hourly_rate: number | null
+  cost: number | null
+  break_minutes: number
+  notes: string | null
+  flagged: boolean
+  flag_reason: string | null
+}
+
+export function orgTimesheetsList(
+  opts: { from?: string; to?: string } = {},
+): Promise<{ ok: true; caller_role: OrgRole; org_id: string; punches: PendingPunch[] }> {
+  return callJson('/api/org-timesheets-list', opts)
+}
+
+export function orgPunchApprove(
+  punchIds: string[],
+): Promise<{ ok: true; approved_count: number; approved_ids: string[] }> {
+  return callJson('/api/org-punch-approve', { punch_ids: punchIds })
+}

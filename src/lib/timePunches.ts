@@ -90,6 +90,30 @@ export async function getActivePunch(userId: string): Promise<TimePunch | null> 
   return (data as TimePunch | null) ?? null
 }
 
+/** Per-job active punch lookup — used by TimeClockCard so the meter
+ *  only restores when the active punch belongs to the job you're
+ *  looking at. Returns null if the active punch is on a different job
+ *  (the UI should treat that as "not clocked in here"). */
+export async function getActivePunchForContact(
+  userId: string,
+  contactId: string,
+): Promise<TimePunch | null> {
+  const { data, error } = await supabase
+    .from('fh_time_punches')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('contact_id', contactId)
+    .is('punch_out_at', null)
+    .order('punch_in_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) {
+    console.warn('[timePunches] active-for-contact fetch error', error)
+    return null
+  }
+  return (data as TimePunch | null) ?? null
+}
+
 /** Punch in. Inserts a new row with punch_in_at = now(). org_id is
  *  filled in by the BEFORE INSERT trigger from migration 035. */
 export async function punchIn(opts: {

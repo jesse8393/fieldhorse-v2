@@ -104,6 +104,7 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/partners':       return canManageSubs(role)
     case '/invoices':       return canSeeFinancials(role)
     case '/team':           return true                            // roster visible to all org members; mutations gated separately
+    case '/timesheets':     return canApproveTimesheets(role)       // owner/admin/manager only
     default:                return true
   }
 }

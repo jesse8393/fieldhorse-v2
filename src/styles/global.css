@@ -12167,3 +12167,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     font-size: 11px;
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase B pass 3 (Timesheets)
+   ============================================================
+   Date / Job / In→Out / Hours / Cost / Status / approve-btn. */
+
+@media (min-width: 900px) {
+  .fh-build-table__head.is-timesheet,
+  .fh-build-table__row.is-timesheet {
+    grid-template-columns: 110px minmax(0, 1.2fr) 140px 70px 80px 110px 36px;
+  }
+}
