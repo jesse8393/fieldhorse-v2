@@ -12191,3 +12191,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 140px 110px 36px;
   }
 }
+
+/* ============================================================
+   BUILD DIRECTION — Phase D pass 1 (Sub portal)
+   ============================================================
+   Job / Address / Role / Stage / Accepted / chev. */
+
+@media (min-width: 900px) {
+  .fh-build-table__head.is-subportal,
+  .fh-build-table__row.is-subportal {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 110px 110px 110px 14px;
+  }
+}

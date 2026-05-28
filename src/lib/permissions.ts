@@ -106,6 +106,7 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/team':           return true                            // roster visible to all org members; mutations gated separately
     case '/timesheets':     return canApproveTimesheets(role)       // owner/admin/manager only
     case '/tasks':          return canSeeAllJobs(role)               // cross-job dashboard — owner/admin only
+    case '/sub-portal':     return false                             // hidden from org members in the sidebar (DesktopSidebar shows it explicitly for sub-only / no-role users). The route itself is still reachable by URL — useful when an org member is also a sub on another contractor's job.
     default:                return true
   }
 }

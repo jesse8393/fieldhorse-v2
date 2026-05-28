@@ -13,6 +13,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   PlayCircle,
   Clock,
+  Briefcase,
   LayoutDashboard,
   Radio,
   Sparkles,
@@ -65,6 +66,7 @@ const GROUPS: Group[] = [
       { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
       { label: 'Invoices',       to: '/invoices', Icon: Receipt,         match: prefix('/invoices') },
       { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
+      { label: 'Sub Portal',     to: '/sub-portal', Icon: Briefcase,     match: prefix('/sub-portal') },
       { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
       { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },
     ],
@@ -93,7 +95,7 @@ export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
-  const { canViewRoute, role } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading } = useMembership()
 
   const userEmail = user?.email || ''
 
@@ -118,9 +120,19 @@ export default function DesktopSidebar() {
           // still resolving (role === null), show everything so the
           // first paint doesn't hide owner nav — once the membership
           // query settles, items the role can't reach disappear.
-          const visibleItems = group.items.filter((it) =>
-            role == null ? true : canViewRoute(it.to.split('?')[0].split('#')[0])
-          )
+          // Filter rules:
+          //   - membership still loading → show everything so the
+          //     first paint doesn't strip owner nav
+          //   - has a role → use canViewRoute (the role-aware gate)
+          //   - settled with NO role (sub-only / pre-onboarding) →
+          //     only show the Sub Portal so they don't bounce off
+          //     RLS errors on every owner screen
+          const visibleItems = group.items.filter((it) => {
+            const path = it.to.split('?')[0].split('#')[0]
+            if (membershipLoading) return true
+            if (role) return canViewRoute(path)
+            return path === '/sub-portal'
+          })
           if (visibleItems.length === 0) return null
           return (
           <div key={group.label} className="fh-desktop-sidebar__group">

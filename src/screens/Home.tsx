@@ -426,6 +426,14 @@ export default function Home() {
     return <Navigate to="/crew" replace />
   }
 
+  // Sub-only redirect: an authenticated user with NO org membership
+  // is, in practice, somebody who accepted a partner invite (or
+  // signed up without onboarding). Land them on /sub-portal — the
+  // owner dashboard would 403 every query they made.
+  if (!membership.loading && !membership.role && !membership.orgId) {
+    return <Navigate to="/sub-portal" replace />
+  }
+
   // Phase 10 — desktop dispatch. At >=900px the new
   // DesktopHomeCommandCenter renders the full command-center layout
   // using the same data this screen already fetches. Below 900px the
