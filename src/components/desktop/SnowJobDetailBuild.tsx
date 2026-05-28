@@ -30,6 +30,7 @@ type Props = {
   billingStatus?: { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } | null
   paid?: number | null
   outstanding?: number | null
+  changeOrderTotals?: { count: number; pending: number; approved: number; total: number } | null
   children: ReactNode
 }
 
@@ -65,7 +66,7 @@ export default function SnowJobDetailBuild(props: Props) {
     contact, client, tabs, activeTab, onTabChange,
     onBack, onEdit, onDelete, onAddEvent,
     isEditing,
-    scheduleStatus, reportsMissing, billingStatus, paid, outstanding,
+    scheduleStatus, reportsMissing, billingStatus, paid, outstanding, changeOrderTotals,
     children,
   } = props
 
@@ -299,6 +300,37 @@ export default function SnowJobDetailBuild(props: Props) {
                 <>
                   <strong>—</strong>
                   <span>No invoicing yet</span>
+                </>
+              )}
+            </section>
+
+            <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Change orders</div>
+              {changeOrderTotals == null ? (
+                <>
+                  <strong>—</strong>
+                  <span>No change orders yet</span>
+                </>
+              ) : (
+                <>
+                  <strong style={{
+                    color: changeOrderTotals.total < 0 ? '#ee4942' : undefined,
+                  }}>
+                    {moneyFull(changeOrderTotals.total)}
+                  </strong>
+                  <span>
+                    {changeOrderTotals.count} CO{changeOrderTotals.count === 1 ? '' : 's'}
+                    {changeOrderTotals.pending !== 0 && (
+                      <> · <span style={{ color: '#e0a141' }}>
+                        {moneyFull(changeOrderTotals.pending)} pending
+                      </span></>
+                    )}
+                    {changeOrderTotals.approved !== 0 && (
+                      <> · <span style={{ color: '#73c982' }}>
+                        {moneyFull(changeOrderTotals.approved)} approved
+                      </span></>
+                    )}
+                  </span>
                 </>
               )}
             </section>

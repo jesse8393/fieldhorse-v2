@@ -36,19 +36,21 @@ import FilesTab from './tabs/Files.tsx'
 import DailyLogsSection from './sections/DailyLogs.tsx'
 import SelectionsSection from './sections/Selections.tsx'
 import MaterialsSection from './sections/Materials.tsx'
+import ChangeOrdersSection from './sections/ChangeOrdersSection.tsx'
 import ApproveQuoteSheet from './sections/ApproveQuoteSheet.tsx'
 import SnowJobDetailBuild from '../../components/desktop/SnowJobDetailBuild.tsx'
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
 const TOP_TABS = [
-  { id: 'overview',   label: 'Overview' },
-  { id: 'quote',      label: 'Quote' },
-  { id: 'details',    label: 'Details' },
-  { id: 'selections', label: 'Selections' },
-  { id: 'materials',  label: 'Materials' },
-  { id: 'logs',       label: 'Daily logs' },
-  { id: 'financials', label: 'Financials' },
-  { id: 'files',      label: 'Files' }
+  { id: 'overview',      label: 'Overview' },
+  { id: 'quote',         label: 'Quote' },
+  { id: 'details',       label: 'Details' },
+  { id: 'selections',    label: 'Selections' },
+  { id: 'materials',     label: 'Materials' },
+  { id: 'change_orders', label: 'Change orders' },
+  { id: 'logs',          label: 'Daily logs' },
+  { id: 'financials',    label: 'Financials' },
+  { id: 'files',         label: 'Files' }
 ]
 const VALID_TABS = new Set(TOP_TABS.map((t) => t.id))
 
@@ -287,6 +289,30 @@ export default function ContactDetail() {
                   ? { label: 'Paid', tone: 'good' }
                   : { label: 'Not started', tone: 'neutral' }
 
+          // Change-order totals for the rail card. Sum approved
+          // separately from pending so the rail can flag in-flight
+          // amendments without lumping them into approved revenue.
+          // Negative amounts are credits — they net into the totals
+          // the same way they do in the existing invoice template
+          // (ChangeOrdersBlock + InvoiceBalanceBlock).
+          const changeOrderTotals = (() => {
+            const list = (changeOrders || []) as any[]
+            if (list.length === 0) return null
+            let pending = 0
+            let approved = 0
+            for (const co of list) {
+              const amt = Number(co.amount || 0)
+              if (co.status === 'approved') approved += amt
+              else if (co.status === 'draft' || co.status === 'sent') pending += amt
+            }
+            return {
+              count: list.length,
+              pending,
+              approved,
+              total: pending + approved,
+            }
+          })()
+
           return (
             <SnowJobDetailBuild
               contact={contact}
@@ -302,6 +328,7 @@ export default function ContactDetail() {
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
               billingStatus={billingStatus}
+              changeOrderTotals={changeOrderTotals}
               paid={paid}
               outstanding={balance}
             >
@@ -375,6 +402,14 @@ export default function ContactDetail() {
               )}
               {tab === 'materials' && (
                 <MaterialsSection jobId={contact?.id} userId={user?.id} />
+              )}
+              {tab === 'change_orders' && (
+                <ChangeOrdersSection
+                  contact={contact}
+                  userId={user?.id}
+                  changeOrders={changeOrders}
+                  onChange={() => fetchAll?.()}
+                />
               )}
             </SnowJobDetailBuild>
           )
@@ -517,6 +552,14 @@ export default function ContactDetail() {
         )}
         {tab === 'materials' && (
           <MaterialsSection jobId={contact?.id} userId={user?.id} />
+        )}
+        {tab === 'change_orders' && (
+          <ChangeOrdersSection
+            contact={contact}
+            userId={user?.id}
+            changeOrders={changeOrders}
+            onChange={() => fetchAll?.()}
+          />
         )}
       </div>
       </>
