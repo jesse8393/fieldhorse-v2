@@ -9,6 +9,10 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 type ProfileContextValue = {
   profile: Profile | null
   loading: boolean
+  // Most recent fetch error message, or null when the last load
+  // succeeded. Consumers (Home, Settings, onboarding) check this to
+  // show a retry banner instead of silently rendering empty state.
+  error: string | null
   isOnboarded: boolean
   refresh: () => Promise<void>
   upsertProfile: (patch: Record<string, unknown>) => Promise<{ data?: Profile; error: any }>
@@ -20,31 +24,40 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user, session } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null)
       setLoading(false)
+      setError(null)
       return
     }
     setLoading(true)
-    const { data, error } = await supabase
+    setError(null)
+    const { data, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle()
-    if (error) console.warn('[fieldhorse] profile fetch error', error)
+    if (fetchError) {
+      console.warn('[fieldhorse] profile fetch error', fetchError)
+      setError(fetchError.message || 'Could not load profile')
+      setLoading(false)
+      return
+    }
     // Multi-tenant guard: only accept the row if it actually belongs to
     // the current auth user. Prevents a stale cross-user profile from
     // leaking into state during a fast sign-out→sign-in transition.
     setProfile(data && data.user_id === user.id ? data : null)
     setLoading(false)
-  }, [user])
+  }, [user?.id])
 
   // Clear the prior profile the instant the auth user changes so a
   // renaming screen never paints with the previous user's name.
   useEffect(() => {
     setProfile(null)
+    setError(null)
   }, [user?.id])
 
   useEffect(() => {
@@ -63,12 +76,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (!error) setProfile(data)
       return { data: data ?? undefined, error }
     },
-    [user]
+    [user?.id]
   )
 
   const value = {
     profile,
     loading,
+    error,
     isOnboarded: Boolean(profile?.onboarded_at),
     refresh: fetchProfile,
     upsertProfile

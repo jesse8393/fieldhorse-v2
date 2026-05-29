@@ -195,7 +195,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
 
     setOrg((orgQuery.data as OrgRow | null) || null)
     setLoading(false)
-  }, [user])
+  }, [user?.id])
 
   // Reset on user change so we never paint a previous user's org name.
   useEffect(() => {
