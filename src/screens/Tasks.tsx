@@ -25,6 +25,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { orgMembersList, type OrgMember } from '../lib/orgApi.ts'
 import { toastError } from '../lib/toast.ts'
+import MiniMetric from '../components/MiniMetric.tsx'
 
 type TaskRow = {
   id: string
@@ -339,19 +340,6 @@ export default function Tasks() {
           )
         })}
       </main>
-    </div>
-  )
-}
-
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
     </div>
   )
 }

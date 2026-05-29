@@ -26,6 +26,7 @@ import {
   type SubPortalContext, type DocKind, type SubProfile, type SubProfileUpdate,
 } from '../lib/subApi.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
+import MiniMetric from '../components/MiniMetric.tsx'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -471,19 +472,6 @@ export default function SubPortal() {
           onSaved={() => { setEditOpen(false); load() }}
         />
       )}
-    </div>
-  )
-}
-
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
     </div>
   )
 }

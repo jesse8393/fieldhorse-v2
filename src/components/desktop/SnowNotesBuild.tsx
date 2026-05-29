@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Link as LinkIcon,
 } from 'lucide-react'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Contact = { id: string; name?: string | null }
 type Note = {
@@ -320,15 +321,3 @@ export default function SnowNotesBuild(props: Props) {
   )
 }
 
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
-    </div>
-  )
-}

@@ -14,6 +14,8 @@ import {
   Sun,
   Users,
 } from 'lucide-react'
+import { money, moneyFull } from '../../lib/format.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Props = {
   firstName: string
@@ -55,17 +57,6 @@ function greetingFor(now: Date) {
   if (h < 12) return 'Good morning'
   if (h < 18) return 'Good afternoon'
   return 'Good evening'
-}
-
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
-
-function moneyFull(n: number | null | undefined) {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
 }
 
 // Coerces dealsAtRisk into { count, value, followUps, quotesAttention }
@@ -249,15 +240,6 @@ function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
         Open Schedule <ChevronRight size={13} />
       </button>
     </section>
-  )
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="fh-build-mini">
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
   )
 }
 

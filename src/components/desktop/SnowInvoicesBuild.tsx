@@ -5,6 +5,8 @@
 // with collection signals. Onyx surface, gold accents.
 
 import { Bell, ChevronRight, Receipt, Search, Sun } from 'lucide-react'
+import { money, moneyFull } from '../../lib/format.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Row = {
   job: {
@@ -38,17 +40,6 @@ type Props = {
   setFilter: (f: 'outstanding' | 'all') => void
   onOpenJob: (id: string) => void
   onPayRow: (row: Row) => void
-}
-
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
-
-function moneyFull(n: number | null | undefined) {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
 }
 
 function ageBucket(days: number): { label: string; tone: 'good' | 'warn' | 'bad' } {
@@ -242,15 +233,3 @@ export default function SnowInvoicesBuild({
   )
 }
 
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
-    </div>
-  )
-}

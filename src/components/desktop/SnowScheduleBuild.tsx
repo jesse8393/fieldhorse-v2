@@ -16,6 +16,7 @@ import {
   Search,
   Sun,
 } from 'lucide-react'
+import MiniMetric from '../MiniMetric.tsx'
 
 type EventRow = {
   id: string
@@ -310,11 +311,3 @@ export default function SnowScheduleBuild(props: Props) {
   )
 }
 
-function MiniMetric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{ color: accent ? 'var(--v3-primary, #c9963a)' : undefined }}>{value}</strong>
-      <span>{label}</span>
-    </div>
-  )
-}

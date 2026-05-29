@@ -10,6 +10,8 @@ import {
   Bell, Search, Sun, ChevronLeft, Edit2, Trash2, Plus,
   AlertTriangle, ClipboardCheck, Receipt,
 } from 'lucide-react'
+import { money, moneyFull } from '../../lib/format.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Tab = { id: string; label: string }
 
@@ -32,16 +34,6 @@ type Props = {
   outstanding?: number | null
   changeOrderTotals?: { count: number; pending: number; approved: number; total: number } | null
   children: ReactNode
-}
-
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
-function moneyFull(n: number | null | undefined) {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -355,15 +347,3 @@ function stageToneClass(tone: string) {
   return 'neutral'
 }
 
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
-    </div>
-  )
-}

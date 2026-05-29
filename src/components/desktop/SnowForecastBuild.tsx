@@ -18,6 +18,7 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { weatherLabel } from '../../lib/weather.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 type DailyRow = {
   time: string
@@ -308,19 +309,6 @@ export default function SnowForecastBuild(props: Props) {
           </aside>
         </section>
       </main>
-    </div>
-  )
-}
-
-function MiniMetric({ label, value, accent, tone: t }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: t === 'bad' ? '#ee4942' : t === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
     </div>
   )
 }
