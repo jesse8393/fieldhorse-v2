@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Bell, MapPin, Search, Sun, ChevronRight, ShieldCheck, Briefcase,
+  Bell, MapPin, Search, ChevronRight, ShieldCheck, Briefcase,
   AlertTriangle, Mail, Edit2, Upload, Check, X, FileText,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
@@ -172,8 +172,7 @@ export default function SubPortal() {
         <div className="fh-build-topbar__meta">
           <span>{user?.email || 'Sub portal'}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button
           className="fh-build-icon-btn"
