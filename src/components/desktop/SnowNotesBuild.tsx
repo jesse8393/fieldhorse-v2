@@ -15,7 +15,6 @@ import {
   Search,
   Send,
   Sparkles,
-  Sun,
   Trash2,
   CheckCircle2,
   AlertTriangle,
@@ -106,8 +105,7 @@ export default function SnowNotesBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{cockpitStats.total.toLocaleString()} reports captured</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>

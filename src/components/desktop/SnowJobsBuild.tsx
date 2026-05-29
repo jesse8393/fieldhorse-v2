@@ -21,7 +21,6 @@ import {
   LayoutList,
   Plus,
   Search,
-  Sun,
   TrendingUp,
   KanbanSquare,
 } from 'lucide-react'
@@ -161,8 +160,7 @@ export default function SnowJobsBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{contacts.length.toLocaleString()} contacts in book</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button
           className="fh-build-icon-btn"

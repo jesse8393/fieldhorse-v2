@@ -6,7 +6,7 @@
 
 import type { ReactNode } from 'react'
 import {
-  Bell, Search, Sun, ChevronLeft, ChevronRight, Edit2, Trash2,
+  Bell, Search, ChevronLeft, ChevronRight, Edit2, Trash2,
   Phone, Mail, MapPin, AlertTriangle, Plus, ExternalLink,
 } from 'lucide-react'
 import { money, moneyFull } from '../../lib/format.ts'
@@ -100,8 +100,7 @@ export default function SnowClientDetailBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{(client?.name || 'Client').toString()}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         {onEdit && (
