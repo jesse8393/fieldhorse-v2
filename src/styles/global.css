@@ -12221,3 +12221,72 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     grid-template-columns: minmax(0, 1.4fr) 110px 100px 110px 120px;
   }
 }
+
+/* =========================================================================
+   ATMOSPHERE SCRUB (every viewport) — kill italic accents + foggy gold.
+
+   User feedback: screens read as foggy yellow with italic serif accents.
+   Three lingering atmospheric treatments propagate across every screen
+   via shared utility classes:
+
+     1. `.gold-italic` and `<em class="fh-font-serif-italic ...">` — the
+        big Instrument Serif italic + gold-gradient text-fill used on
+        sheet titles ("Add an event."), hero h1 accents, and the
+        notifications-bell pill copy.
+     2. `.v3-card--hero` — radial gold glow inside hero cards
+        (Revenue Opportunity etc.).
+     3. The `.v3-screen` 280px gold radial — already scrubbed above in
+        audit #8 for every viewport.
+
+   This block lives at the end of global.css so cascade-equal rules
+   earlier in the file lose to these overrides.
+
+   Kept intact (functional gold, not atmospheric):
+     • `.fh-btn--primary` — gold CTA buttons
+     • Stripe dividers / accent rules on top of cards
+     • Money badges that aren't paired with italic
+     • Gold chips / sparks signaling status
+   ========================================================================= */
+
+/* Italic + gold-gradient-fill kill on headline / accent text. */
+.gold-italic,
+.fh-font-serif-italic,
+.v3-h1 .v3-h1__accent,
+.fh-home__greet-btn.is-empty,
+.dt-jobs__h1 em,
+.dt-home__h1 em,
+h1 em,
+h2 em,
+h3 em {
+  font-style: normal !important;
+  font-family: var(--font-body) !important;
+  font-weight: 600;
+  background: none !important;
+  background-image: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--ink-strong, #f5f3ee) !important;
+}
+
+/* When `.fh-text-gradient-gold` is paired with an italic serif inside a
+   pill / accent (the notifications-bell pattern), the gradient fill is
+   what reads as "yellowish." Strip the gradient only on that nested
+   pairing; the standalone `.fh-text-gradient-gold` (used on money
+   amounts in LogMilesSheet etc.) keeps its gold treatment. */
+.fh-font-serif-italic.fh-text-gradient-gold,
+em.fh-text-gradient-gold {
+  background: none !important;
+  background-image: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--ink-strong, #f5f3ee) !important;
+  font-style: normal !important;
+  font-family: var(--font-body) !important;
+}
+
+/* Hero-card radial gold glow → flat surface. */
+.v3-card--hero {
+  background: var(--v3-surface, #1A1A1A) !important;
+  border-color: var(--v3-border, rgba(255, 255, 255, 0.06)) !important;
+  box-shadow: none !important;
+}
