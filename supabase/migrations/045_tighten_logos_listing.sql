@@ -1,0 +1,27 @@
+-- Migration 045 — tighten logos storage policies
+--
+-- Mirrors migration 044's fix for the jobphotos bucket. The `logos`
+-- bucket is configured public (storage.buckets.public = true), so
+-- every brand-logo URL we emit is consumable without auth. But a
+-- second, redundant policy on storage.objects granted broad SELECT
+-- to the `public` role WHERE bucket_id = 'logos', allowing any
+-- anonymous client to LIST every object in the bucket via the
+-- storage REST `.list()` endpoint.
+--
+-- Supabase advisor `public_bucket_allows_listing` (lint 0025) flags
+-- this exact pattern. Dropping the SELECT policy is safe because
+-- public-bucket URL access traverses a different code path that
+-- checks the bucket's public flag rather than the storage.objects
+-- RLS policy.
+--
+-- Verified before writing this migration:
+--   • src/ + netlify/ contain ZERO `.from('logos').list(` calls.
+--     The only consumers are LogoUploader.tsx which calls
+--     `.upload()` and `.getPublicUrl()` — both unaffected.
+--   • The three companion policies (logos_own_upload,
+--     logos_own_update, logos_own_delete) keep write-access
+--     tenant-scoped via the user_id path prefix.
+--
+-- Idempotent.
+
+drop policy if exists logos_public_read on storage.objects;
