@@ -2830,24 +2830,30 @@ a {
     display: none !important;
   }
 
-  /* #8 — Brown/hazy background scrub.
-     Root cause: .v3-screen at v3.css:631 paints a 280px gold radial
-     `radial-gradient(ellipse 100% 280px at 50% 0%, rgba(229, 193, 88,
-     0.04), transparent 70%)` across the top of every page, plus uses
-     --v3-bg (#0B0907 warm onyx) as the floor. On a calibrated dark
-     monitor that combination reads as brown/olive haze.
-     Fix: override on desktop only — kill the radial + noise grain
-     background-images on .v3-screen / .fh-screen and pin the page
-     floor to a neutral near-black. Mobile path keeps its existing
-     warm-onyx + gold-stage-light treatment. */
-  .fh-app {
-    background: #070708;
-  }
-  .fh-screen,
-  .v3-screen {
-    background-image: none !important;
-    background-color: #070708 !important;
-  }
+}
+
+/* #8 — Brown/hazy background scrub (all viewports).
+   Root cause: .v3-screen at v3.css:631 paints a 280px gold radial
+   `radial-gradient(ellipse 100% 280px at 50% 0%, rgba(229, 193, 88,
+   0.04), transparent 70%)` across the top of every page, plus uses
+   --v3-bg (#0B0907 warm onyx) as the floor. The combination reads
+   as a foggy yellowish haze on every screen — most obvious on
+   secondary screens that don't have a hero/card occupying the top
+   280px to mask the radial.
+
+   Originally only scrubbed on desktop (>=900px) on the theory that
+   the warm-onyx + gold-stage-light treatment was a deliberate mobile
+   look. In practice it reads as 'foggy yellow' on mobile too, so
+   the scrub now applies to every viewport. Cards / surfaces keep
+   their existing warm-onyx tokens; the contrast against a neutral
+   near-black page floor is intentional and reads as crisp. */
+.fh-app {
+  background: #070708;
+}
+.fh-screen,
+.v3-screen {
+  background-image: none !important;
+  background-color: #070708 !important;
 }
 
 /* =========================================================================
