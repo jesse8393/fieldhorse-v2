@@ -12332,3 +12332,30 @@ select:focus-visible,
   border-bottom-color: rgba(245, 242, 234, 0.32) !important;
   box-shadow: 0 0 0 3px rgba(245, 242, 234, 0.10) !important;
 }
+
+/* Card-accent + hover tint scrub.
+   Atmospheric gold lingered on:
+     • .v3-card--accent-primary — gold hairline border (other accents
+       like success/danger keep their semantic color, this one was
+       just "primary" = gold)
+     • .fh-home__ghost / .fh-loc__btn hover border tint
+     • .fh-qa hover arrow color
+     • Desktop .dt-icon-btn / .dt-pill-btn hover border tint
+   All flipped to a neutral hairline so the interaction feedback
+   remains visible but no longer reads as yellow. */
+.v3-card--accent-primary {
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+.fh-home__ghost:hover,
+.fh-loc__btn:hover:not(:disabled) {
+  border-color: rgba(245, 242, 234, 0.32) !important;
+}
+.fh-qa:hover .fh-qa__arrow {
+  color: var(--ink-strong, #f5f3ee) !important;
+}
+@media (min-width: 900px) {
+  .dt-icon-btn:hover,
+  .dt-pill-btn:hover {
+    border-color: rgba(245, 242, 234, 0.24) !important;
+  }
+}
