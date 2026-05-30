@@ -12290,3 +12290,72 @@ em.fh-text-gradient-gold {
   border-color: var(--v3-border, rgba(255, 255, 255, 0.06)) !important;
   box-shadow: none !important;
 }
+
+/* Action-sheet title accent (the gold-colored emphasis word inside a
+   bottom-sheet headline) → neutral. The 12 inline eyebrow tags in
+   sheet components are scrubbed at the source; this catches the CSS
+   pathway some sheets use via a class. */
+.fh-asheet__title-accent {
+  color: var(--ink-strong, #f5f3ee) !important;
+}
+
+/* Focus-ring + input-focus scrub.
+   Every focused element previously lit up gold:
+     • Global :focus-visible outline (every button/input/role=button)
+     • .v3-btn / .v3-card--interactive :focus-visible
+     • .fh-field__input border-bottom on focus
+     • .fh-form input / textarea / select border on focus
+     • .fh-inline-add input focus border
+     • .fh-capture__input focus border + halo
+   All flip to a neutral high-contrast color so a11y focus rings
+   stay visible without reading as foggy yellow. */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible,
+.v3-btn:focus-visible,
+.v3-card--interactive:focus-visible,
+.dispatch-card__tap:focus-visible,
+.cl-card__tap:focus-visible {
+  outline-color: rgba(245, 242, 234, 0.62) !important;
+}
+
+.fh-field__input:focus,
+.fh-form input:focus,
+.fh-form textarea:focus,
+.fh-form select:focus,
+.fh-inline-add input:focus,
+.fh-capture__input:focus {
+  border-color: rgba(245, 242, 234, 0.32) !important;
+  border-bottom-color: rgba(245, 242, 234, 0.32) !important;
+  box-shadow: 0 0 0 3px rgba(245, 242, 234, 0.10) !important;
+}
+
+/* Card-accent + hover tint scrub.
+   Atmospheric gold lingered on:
+     • .v3-card--accent-primary — gold hairline border (other accents
+       like success/danger keep their semantic color, this one was
+       just "primary" = gold)
+     • .fh-home__ghost / .fh-loc__btn hover border tint
+     • .fh-qa hover arrow color
+     • Desktop .dt-icon-btn / .dt-pill-btn hover border tint
+   All flipped to a neutral hairline so the interaction feedback
+   remains visible but no longer reads as yellow. */
+.v3-card--accent-primary {
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+.fh-home__ghost:hover,
+.fh-loc__btn:hover:not(:disabled) {
+  border-color: rgba(245, 242, 234, 0.32) !important;
+}
+.fh-qa:hover .fh-qa__arrow {
+  color: var(--ink-strong, #f5f3ee) !important;
+}
+@media (min-width: 900px) {
+  .dt-icon-btn:hover,
+  .dt-pill-btn:hover {
+    border-color: rgba(245, 242, 234, 0.24) !important;
+  }
+}
