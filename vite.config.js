@@ -21,6 +21,13 @@ export default defineConfig({
       },
       includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png'],
       manifest: {
+        // Stable identity across installs. Without `id`, Chrome treats
+        // the install as a brand-new app every time the start_url path
+        // changes (e.g. when a user shares a deep-link), and may re-prompt
+        // to install something the user already has installed. Pinning
+        // id='/' anchors the identity to the root regardless of how the
+        // user landed on the page.
+        id: '/',
         name: 'Fieldhorse',
         short_name: 'Fieldhorse',
         description: 'Contractor field operations',

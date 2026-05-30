@@ -6,6 +6,7 @@ import BottomNav from './BottomNav.tsx'
 import DesktopSidebar from './DesktopSidebar.tsx'
 import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.tsx'
+import InstallPrompt from './InstallPrompt.tsx'
 import Toaster from './Toaster.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 
@@ -181,6 +182,7 @@ export default function AppShell() {
       <BottomNav />
       <CommandPalette />
       <MobileSearchOverlay />
+      <InstallPrompt />
 
       {/* Existing custom toaster stays — Sonner runs alongside it */}
       <Toaster />
