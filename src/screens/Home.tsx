@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 import { motion } from 'framer-motion'
 import {
   CloudSun,
@@ -414,6 +415,24 @@ export default function Home() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+  const membership = useMembership()
+
+  // Role-based redirect: foreman + crew don't see the owner dashboard
+  // (no $ amounts, no AR, no pipeline). Send them straight to /crew,
+  // which surfaces their own schedule + own punches + own tasks.
+  // We wait for membership to resolve so the redirect doesn't fire
+  // mid-fetch and flap the URL.
+  if (!membership.loading && (membership.role === 'crew' || membership.role === 'foreman')) {
+    return <Navigate to="/crew" replace />
+  }
+
+  // Sub-only redirect: an authenticated user with NO org membership
+  // is, in practice, somebody who accepted a partner invite (or
+  // signed up without onboarding). Land them on /sub-portal — the
+  // owner dashboard would 403 every query they made.
+  if (!membership.loading && !membership.role && !membership.orgId) {
+    return <Navigate to="/sub-portal" replace />
+  }
 
   // Phase 10 — desktop dispatch. At >=900px the new
   // DesktopHomeCommandCenter renders the full command-center layout

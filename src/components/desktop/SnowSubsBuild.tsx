@@ -7,11 +7,12 @@ import {
   Bell,
   ChevronRight,
   Search,
-  Sun,
   Plus,
   ShieldCheck,
   Hammer,
 } from 'lucide-react'
+import { money } from '../../lib/format.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Sub = {
   key: string
@@ -41,13 +42,6 @@ type Props = {
   screenStats: { totalBilled: number; activeRecent: number }
   onAddSub: () => void
   onOpenSub: (key: string) => void
-}
-
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
 }
 
 function relDate(d: Date | null | undefined) {
@@ -125,8 +119,7 @@ export default function SnowSubsBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{filtered.length.toLocaleString()} on the bench</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onAddSub}>
@@ -301,19 +294,6 @@ export default function SnowSubsBuild(props: Props) {
           </aside>
         </section>
       </main>
-    </div>
-  )
-}
-
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
     </div>
   )
 }

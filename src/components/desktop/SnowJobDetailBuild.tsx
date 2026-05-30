@@ -7,9 +7,11 @@
 
 import type { ReactNode } from 'react'
 import {
-  Bell, Search, Sun, ChevronLeft, Edit2, Trash2, Plus,
+  Bell, Search, ChevronLeft, Edit2, Trash2, Plus,
   AlertTriangle, ClipboardCheck, Receipt,
 } from 'lucide-react'
+import { money, moneyFull } from '../../lib/format.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Tab = { id: string; label: string }
 
@@ -30,17 +32,8 @@ type Props = {
   billingStatus?: { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } | null
   paid?: number | null
   outstanding?: number | null
+  changeOrderTotals?: { count: number; pending: number; approved: number; total: number } | null
   children: ReactNode
-}
-
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
-function moneyFull(n: number | null | undefined) {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -65,7 +58,7 @@ export default function SnowJobDetailBuild(props: Props) {
     contact, client, tabs, activeTab, onTabChange,
     onBack, onEdit, onDelete, onAddEvent,
     isEditing,
-    scheduleStatus, reportsMissing, billingStatus, paid, outstanding,
+    scheduleStatus, reportsMissing, billingStatus, paid, outstanding, changeOrderTotals,
     children,
   } = props
 
@@ -119,8 +112,7 @@ export default function SnowJobDetailBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{(contact?.name || 'Job').toString()}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         {onEdit && (
@@ -304,6 +296,37 @@ export default function SnowJobDetailBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Change orders</div>
+              {changeOrderTotals == null ? (
+                <>
+                  <strong>—</strong>
+                  <span>No change orders yet</span>
+                </>
+              ) : (
+                <>
+                  <strong style={{
+                    color: changeOrderTotals.total < 0 ? '#ee4942' : undefined,
+                  }}>
+                    {moneyFull(changeOrderTotals.total)}
+                  </strong>
+                  <span>
+                    {changeOrderTotals.count} CO{changeOrderTotals.count === 1 ? '' : 's'}
+                    {changeOrderTotals.pending !== 0 && (
+                      <> · <span style={{ color: '#e0a141' }}>
+                        {moneyFull(changeOrderTotals.pending)} pending
+                      </span></>
+                    )}
+                    {changeOrderTotals.approved !== 0 && (
+                      <> · <span style={{ color: '#73c982' }}>
+                        {moneyFull(changeOrderTotals.approved)} approved
+                      </span></>
+                    )}
+                  </span>
+                </>
+              )}
+            </section>
+
+            <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Next action</div>
               <strong>{nextAction}</strong>
               <span>derived from current stage + signals</span>
@@ -323,15 +346,3 @@ function stageToneClass(tone: string) {
   return 'neutral'
 }
 
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
-    </div>
-  )
-}

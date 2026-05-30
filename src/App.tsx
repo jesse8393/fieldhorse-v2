@@ -18,6 +18,12 @@ import Login from './screens/Login.tsx'
 const ResetPassword  = lazy(() => import('./screens/ResetPassword.tsx'))
 const Onboarding     = lazy(() => import('./screens/Onboarding.tsx'))
 const PartnerInvite  = lazy(() => import('./screens/PartnerInvite.tsx'))
+const OrgInvite      = lazy(() => import('./screens/OrgInvite.tsx'))
+const Team           = lazy(() => import('./screens/Team.tsx'))
+const Crew           = lazy(() => import('./screens/Crew.tsx'))
+const Timesheets     = lazy(() => import('./screens/Timesheets.tsx'))
+const Tasks          = lazy(() => import('./screens/Tasks.tsx'))
+const SubPortal      = lazy(() => import('./screens/SubPortal.tsx'))
 const Privacy        = lazy(() => import('./screens/Privacy.tsx'))
 const Terms          = lazy(() => import('./screens/Terms.tsx'))
 const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
@@ -78,6 +84,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/partner-invite/:token" element={<PartnerInvite />} />
+        <Route path="/invite/:token" element={<OrgInvite />} />
         <Route path="/p/:token" element={<PublicDoc />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
@@ -107,6 +114,11 @@ export default function App() {
           <Route path="/subs" element={<Subs />} />
           <Route path="/subs/:key" element={<SubDetail />} />
           <Route path="/partners" element={<Partners />} />
+          <Route path="/team" element={<Team />} />
+          <Route path="/crew" element={<Crew />} />
+          <Route path="/timesheets" element={<Timesheets />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/sub-portal" element={<SubPortal />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
         </Route>

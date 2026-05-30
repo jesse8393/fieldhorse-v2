@@ -8,16 +8,25 @@
 //   - `invoice` / `closed` hide the Quote tab entirely — an invoice for
 //     materials or a quick job never needed a quote.
 
-export type DealTabId = 'overview' | 'quote' | 'details' | 'financials' | 'files'
+export type DealTabId = 'overview' | 'quote' | 'details' | 'financials' | 'files' | 'logs' | 'selections' | 'materials' | 'change_orders'
 
-const ALL_TABS: DealTabId[] = ['overview', 'quote', 'details', 'financials', 'files']
+const ALL_TABS: DealTabId[] = ['overview', 'quote', 'details', 'financials', 'files', 'logs', 'selections', 'materials', 'change_orders']
 
+// Materials appears on the same stages as daily logs — there's no
+// procurement to track on a lead, but quote/job/invoice/closed all
+// need it (estimators want a working list before the job starts).
+//
+// Change orders show on quote / job / invoice / closed — a CO
+// amends the originally-approved scope, so there's nothing to amend
+// on a lead. They're ALSO rendered inline inside the Quote tab on
+// the quote stage (the existing quote-authoring flow) so quote-stage
+// users see them in both places; that's intentional, not duplication.
 const STAGE_TABS: Record<string, DealTabId[]> = {
   lead:    ['overview', 'quote', 'details', 'files'],
-  quote:   ['overview', 'quote', 'details', 'files'],
-  job:     ['overview', 'details', 'financials', 'files'],
-  invoice: ['overview', 'financials', 'files'],
-  closed:  ['overview', 'financials', 'files'],
+  quote:   ['overview', 'quote', 'details', 'selections', 'materials', 'change_orders', 'files'],
+  job:     ['overview', 'details', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'files'],
+  invoice: ['overview', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'files'],
+  closed:  ['overview', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'files'],
   lost:    ['overview', 'files']
 }
 

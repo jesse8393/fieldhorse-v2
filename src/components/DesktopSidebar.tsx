@@ -11,6 +11,9 @@
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
+  PlayCircle,
+  Clock,
+  Briefcase,
   LayoutDashboard,
   Radio,
   Sparkles,
@@ -29,6 +32,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 
 type Item = {
   label: string
@@ -49,6 +53,7 @@ const GROUPS: Group[] = [
     label: 'Command',
     items: [
       { label: 'Command Center', to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
+      { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
       { label: 'Lead Desk',      to: '/jobs?view=leads', Icon: Sparkles, match: (p) => p === '/jobs' && typeof window !== 'undefined' && window.location.search.includes('view=leads') },
       { label: 'Job Desk',       to: '/jobs',     Icon: Hammer,          match: (p) => p === '/jobs' && !(typeof window !== 'undefined' && window.location.search.includes('view=leads')) },
@@ -61,6 +66,9 @@ const GROUPS: Group[] = [
       { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
       { label: 'Invoices',       to: '/invoices', Icon: Receipt,         match: prefix('/invoices') },
       { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
+      { label: 'Sub Portal',     to: '/sub-portal', Icon: Briefcase,     match: prefix('/sub-portal') },
+      { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
+      { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },
     ],
   },
   {
@@ -75,7 +83,8 @@ const GROUPS: Group[] = [
     label: 'Settings',
     items: [
       { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
-      { label: 'Teams',          to: '/subs',     Icon: UsersRound,      match: prefix('/subs') },
+      { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },
+      { label: 'Subs',           to: '/subs',     Icon: Hammer,          match: prefix('/subs') },
       { label: 'Templates',      to: '/settings#templates', Icon: FileText,        match: (p) => p === '/settings' && typeof window !== 'undefined' && window.location.hash === '#templates' },
       { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: prefix('/settings') },
     ],
@@ -86,6 +95,7 @@ export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
+  const { canViewRoute, role, loading: membershipLoading } = useMembership()
 
   const userEmail = user?.email || ''
 
@@ -105,13 +115,32 @@ export default function DesktopSidebar() {
       </div>
 
       <nav className="fh-desktop-sidebar__nav" aria-label="Primary">
-        {GROUPS.map((group, gi) => (
+        {GROUPS.map((group, gi) => {
+          // Filter items by the caller's role. While membership is
+          // still resolving (role === null), show everything so the
+          // first paint doesn't hide owner nav — once the membership
+          // query settles, items the role can't reach disappear.
+          // Filter rules:
+          //   - membership still loading → show everything so the
+          //     first paint doesn't strip owner nav
+          //   - has a role → use canViewRoute (the role-aware gate)
+          //   - settled with NO role (sub-only / pre-onboarding) →
+          //     only show the Sub Portal so they don't bounce off
+          //     RLS errors on every owner screen
+          const visibleItems = group.items.filter((it) => {
+            const path = it.to.split('?')[0].split('#')[0]
+            if (membershipLoading) return true
+            if (role) return canViewRoute(path)
+            return path === '/sub-portal'
+          })
+          if (visibleItems.length === 0) return null
+          return (
           <div key={group.label} className="fh-desktop-sidebar__group">
             <span className="fh-desktop-sidebar__eyebrow fh-desktop-sidebar__eyebrow--build">
               {group.label}
             </span>
             <ul className="fh-desktop-sidebar__list">
-              {group.items.map((it) => {
+              {visibleItems.map((it) => {
                 const active = it.match
                   ? it.match(pathname)
                   : pathname === it.to.split('?')[0]
@@ -133,7 +162,8 @@ export default function DesktopSidebar() {
               })}
             </ul>
           </div>
-        ))}
+          )
+        })}
       </nav>
 
       <div className="fh-desktop-sidebar__foot">

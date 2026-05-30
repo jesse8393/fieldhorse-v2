@@ -146,29 +146,50 @@ export default async (request) => {
     return json({ error: 'envelope_create_failed', detail: e?.message || 'network error' }, 502)
   }
 
-  // 5. Record it
-  try {
-    await supabase.from('fh_esign_envelopes').insert({
-      user_id: sender_user_id,
-      contact_id,
-      envelope_id: envelopeId,
-      provider: 'docusign',
-      status: 'sent',
-      recipient_email: email,
-      recipient_name: recipient_name || contact.name || null,
-      subject: docSubject
+  // 5. Record it. The envelope is already at DocuSign — we can't
+  //    un-send the email — so we always return ok:true with the
+  //    envelope_id. But if the local audit trail (fh_esign_envelopes
+  //    + activity note) fails, we surface that as an `audit_warning`
+  //    so the UI can flag the partial success and an operator can
+  //    investigate (likely an RLS regression or schema drift).
+  let auditWarning = null
+  const { error: envelopeRowErr } = await supabase.from('fh_esign_envelopes').insert({
+    user_id: sender_user_id,
+    contact_id,
+    envelope_id: envelopeId,
+    provider: 'docusign',
+    status: 'sent',
+    recipient_email: email,
+    recipient_name: recipient_name || contact.name || null,
+    subject: docSubject
+  })
+  if (envelopeRowErr) {
+    console.error('[docusign-send] fh_esign_envelopes insert failed', {
+      envelope_id: envelopeId, error: envelopeRowErr
     })
-    await supabase.from('fh_notes').insert({
-      user_id: sender_user_id,
-      contact_id,
-      text: `Sent proposal for e-signature to ${email} (DocuSign)`,
-      category: 'activity'
-    })
-  } catch (e) {
-    console.warn('[docusign-send] record insert failed', e)
+    auditWarning = 'envelope_audit_insert_failed'
   }
 
-  return json({ ok: true, envelope_id: envelopeId, status: 'sent' })
+  const { error: noteErr } = await supabase.from('fh_notes').insert({
+    user_id: sender_user_id,
+    contact_id,
+    text: `Sent proposal for e-signature to ${email} (DocuSign)`,
+    category: 'activity'
+  })
+  if (noteErr) {
+    console.error('[docusign-send] activity note insert failed', {
+      envelope_id: envelopeId, error: noteErr
+    })
+    // Don't overwrite the more important envelope-row failure if both fired.
+    if (!auditWarning) auditWarning = 'activity_note_insert_failed'
+  }
+
+  return json({
+    ok: true,
+    envelope_id: envelopeId,
+    status: 'sent',
+    ...(auditWarning ? { audit_warning: auditWarning } : {})
+  })
 }
 
 // ---- DocuSign JWT Grant ----

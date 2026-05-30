@@ -1,0 +1,28 @@
+-- Migration 044 — tighten jobphotos storage policies
+--
+-- The jobphotos bucket is configured as public (storage.buckets.public
+-- = true), which is how every job-photo URL we emit is consumable
+-- without auth. A second, redundant policy granted broad SELECT on
+-- storage.objects WHERE bucket_id = 'jobphotos' to the `public`
+-- role, meaning any client could LIST every object in the bucket
+-- (storage REST `.list()` endpoint), not just GET the specific
+-- object behind the URL they already have.
+--
+-- Supabase advisor `public_bucket_allows_listing` (lint 0025) flags
+-- this exact pattern. The fix is to drop the over-broad SELECT
+-- policy: public-bucket URL access keeps working because that
+-- traverses a different code path that checks the bucket's public
+-- flag, not the storage.objects RLS policy.
+--
+-- Verified before writing this migration:
+--   • src/ and netlify/ contain ZERO `.from('jobphotos').list(`
+--     or `.from('jobphotos').select(` calls — every consumer uses
+--     `createSignedUrls()` against known paths or getPublicUrl() to
+--     build URLs from DB-stored paths.
+--   • The three companion policies (`jobphotos_own_upload`,
+--     `jobphotos_own_update`, `jobphotos_own_delete`) keep
+--     write-access tenant-scoped via the user_id path prefix.
+--
+-- Idempotent.
+
+drop policy if exists jobphotos_public_read on storage.objects;

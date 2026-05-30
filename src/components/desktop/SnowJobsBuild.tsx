@@ -21,11 +21,12 @@ import {
   LayoutList,
   Plus,
   Search,
-  Sun,
   TrendingUp,
   KanbanSquare,
 } from 'lucide-react'
 import SnowPipelineBuild from './SnowPipelineBuild.tsx'
+import { money, moneyFull } from '../../lib/format.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 // Map the rail's stage-grouping keys to the parent screen's TABS ids
 // so clicking a stage row actually narrows the table. The parent's
@@ -52,17 +53,6 @@ type Props = {
 }
 
 const ACTIVE_STAGES = ['lead', 'quote', 'job']
-
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
-
-function moneyFull(n: number | null | undefined) {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
-}
 
 function relTime(iso: any) {
   if (!iso) return '—'
@@ -170,8 +160,7 @@ export default function SnowJobsBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{contacts.length.toLocaleString()} contacts in book</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button
           className="fh-build-icon-btn"
@@ -340,15 +329,6 @@ export default function SnowJobsBuild(props: Props) {
           </section>
         )}
       </main>
-    </div>
-  )
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="fh-build-mini">
-      <strong>{value}</strong>
-      <span>{label}</span>
     </div>
   )
 }

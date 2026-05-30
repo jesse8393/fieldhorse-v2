@@ -6,9 +6,11 @@
 
 import type { ReactNode } from 'react'
 import {
-  Bell, Search, Sun, ChevronLeft, ChevronRight, Edit2, Trash2,
+  Bell, Search, ChevronLeft, ChevronRight, Edit2, Trash2,
   Phone, Mail, MapPin, AlertTriangle, Plus, ExternalLink,
 } from 'lucide-react'
+import { money, moneyFull } from '../../lib/format.ts'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Tab = { id: string; label: string }
 
@@ -30,15 +32,6 @@ type Props = {
   children: ReactNode
 }
 
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
-function moneyFull(n: number | null | undefined) {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
-}
 function relTime(iso: any) {
   if (!iso) return '—'
   const t = new Date(iso).getTime()
@@ -107,8 +100,7 @@ export default function SnowClientDetailBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{(client?.name || 'Client').toString()}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         {onEdit && (
@@ -278,15 +270,3 @@ export default function SnowClientDetailBuild(props: Props) {
   )
 }
 
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
-    </div>
-  )
-}

@@ -48,7 +48,7 @@ export async function startQuote(contact: Contact) {
 
 export async function approveQuote(contact: Contact) {
   const { data, error } = await transitionStage(contact, 'job')
-  if (error) return { data, error }
+  if (error) return { data, error, scheduleError: null }
 
   // Default the kickoff to tomorrow 9am–5pm local. Operator can edit later.
   const start = new Date()
@@ -68,9 +68,16 @@ export async function approveQuote(contact: Contact) {
     start_at: start.toISOString(),
     end_at: end.toISOString()
   })
-  if (schedErr) console.warn('[fieldhorse] approveQuote schedule insert failed', schedErr)
+  // Secondary failure: the stage transition succeeded but the kickoff
+  // event didn't land. Log loudly (so it surfaces in monitoring) and
+  // surface `scheduleError` to callers who want to flag the partial
+  // success. The primary `error` stays null so the success toast keeps
+  // firing — the operator is now on the Job stage either way.
+  if (schedErr) {
+    console.error('[fieldhorse] approveQuote schedule insert failed', schedErr)
+  }
 
-  return { data, error: null }
+  return { data, error: null, scheduleError: schedErr ?? null }
 }
 
 export async function completeJob(contact: Contact) {
@@ -117,15 +124,22 @@ export async function logPayment(contact: Contact, { amount, method, kind, refer
       minimumFractionDigits: 0, maximumFractionDigits: 0
     })
     const kindTag = normalizedKind !== 'other' ? ` · ${normalizedKind}` : ''
-    await supabase.from('fh_notifications').insert({
+    const { error: notifErr } = await supabase.from('fh_notifications').insert({
       user_id: contact.user_id,
       kind: 'payment_received',
       title: `Payment received · ${money}`,
       body: `${contact.name || 'Client'}${kindTag}`,
       link: `/jobs/${contact.id}?tab=financials`
     })
-  } catch {
-    // RLS denial / migration 008 not applied → silently skip
+    // Best-effort: the payment row above is the source of truth, so a
+    // missing bell-badge entry doesn't break anything. But log it
+    // instead of swallowing — recurring failures here would signal an
+    // RLS regression on fh_notifications that we should investigate.
+    if (notifErr) {
+      console.error('[fieldhorse] logPayment notification insert failed', notifErr)
+    }
+  } catch (e) {
+    console.error('[fieldhorse] logPayment notification threw', e)
   }
 
   // Re-check balance

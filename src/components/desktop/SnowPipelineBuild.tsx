@@ -8,6 +8,7 @@
 // and drop is a future enhancement.
 
 import { ChevronRight, Plus } from 'lucide-react'
+import { money } from '../../lib/format.ts'
 
 type Contact = {
   id: string
@@ -35,13 +36,6 @@ const STAGES: StageDef[] = [
   { key: 'invoice', label: 'Invoicing', tone: 'invoice' },
   { key: 'closed',  label: 'Won',       tone: 'won' },
 ]
-
-function money(n: number | null | undefined) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
 
 function relTime(iso: any) {
   if (!iso) return ''

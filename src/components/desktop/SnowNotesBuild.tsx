@@ -15,12 +15,12 @@ import {
   Search,
   Send,
   Sparkles,
-  Sun,
   Trash2,
   CheckCircle2,
   AlertTriangle,
   Link as LinkIcon,
 } from 'lucide-react'
+import MiniMetric from '../MiniMetric.tsx'
 
 type Contact = { id: string; name?: string | null }
 type Note = {
@@ -105,8 +105,7 @@ export default function SnowNotesBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{cockpitStats.total.toLocaleString()} reports captured</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>
@@ -320,15 +319,3 @@ export default function SnowNotesBuild(props: Props) {
   )
 }
 
-function MiniMetric({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className="fh-build-mini">
-      <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
-      }}>
-        {value}
-      </strong>
-      <span>{label}</span>
-    </div>
-  )
-}

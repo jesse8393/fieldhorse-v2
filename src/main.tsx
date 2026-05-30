@@ -7,6 +7,7 @@ import AppErrorBoundary from './components/AppErrorBoundary.tsx'
 import { ConfirmProvider } from './components/ConfirmSheet.tsx'
 import { AuthProvider } from './contexts/AuthContext.tsx'
 import { ProfileProvider } from './contexts/ProfileContext.tsx'
+import { MembershipProvider } from './contexts/MembershipContext.tsx'
 import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import { queryClient } from './lib/queryClient.ts'
 import './styles/tokens.css'
@@ -67,9 +68,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <ThemeProvider>
             <AuthProvider>
               <ProfileProvider>
-                <ConfirmProvider>
-                  <App />
-                </ConfirmProvider>
+                <MembershipProvider>
+                  <ConfirmProvider>
+                    <App />
+                  </ConfirmProvider>
+                </MembershipProvider>
               </ProfileProvider>
             </AuthProvider>
           </ThemeProvider>
