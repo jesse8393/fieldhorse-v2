@@ -9,17 +9,21 @@
 // Security: DocuSign Connect sends an HMAC signature header
 // (X-DocuSign-Signature-1) when an HMAC key is configured.
 //
-//   • In production (Netlify CONTEXT=production) the HMAC key is
-//     REQUIRED. Missing key → 500. Signature mismatch → 401.
-//   • In deploy previews / branch contexts we fall back to warn-only
-//     mode (accept the payload, log loudly) so you can rehearse the
-//     full integration before flipping enforcement on. Set
-//     DOCUSIGN_ALLOW_UNSIGNED=1 to force warn-only mode in production
-//     during a staged rollout — log noise is intentional.
+//   • If DOCUSIGN_CONNECT_HMAC_KEY is set we always verify — a
+//     mismatch is 401 regardless of mode.
+//   • Enforcement of the key itself (rejecting unsigned events when
+//     the key is absent) is opt-in via DOCUSIGN_REQUIRE_HMAC=1. This
+//     keeps the merge cost-free: the verification code ships now, and
+//     you flip enforcement on later by setting two env vars
+//     (DOCUSIGN_CONNECT_HMAC_KEY + DOCUSIGN_REQUIRE_HMAC=1) after
+//     configuring DocuSign Connect HMAC signing.
+//   • Default (REQUIRE_HMAC unset) accepts unsigned events but logs
+//     loudly so the warning shows up in monitoring — you'll notice if
+//     it gets noisy.
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-//      DOCUSIGN_CONNECT_HMAC_KEY (required in prod),
-//      DOCUSIGN_ALLOW_UNSIGNED (optional, staged-rollout escape hatch)
+//      DOCUSIGN_CONNECT_HMAC_KEY (optional; required iff REQUIRE_HMAC=1),
+//      DOCUSIGN_REQUIRE_HMAC (optional opt-in to enforce)
 
 import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
@@ -42,13 +46,8 @@ export default async (request) => {
   const raw = await request.text()
 
   // HMAC verification.
-  //
-  // Netlify sets CONTEXT='production' on the prod branch and
-  // 'deploy-preview' / 'branch-deploy' otherwise; on local netlify dev
-  // CONTEXT is undefined, which we treat as non-prod.
   const hmacKey = process.env.DOCUSIGN_CONNECT_HMAC_KEY
-  const isProd = process.env.CONTEXT === 'production'
-  const allowUnsigned = process.env.DOCUSIGN_ALLOW_UNSIGNED === '1'
+  const requireHmac = process.env.DOCUSIGN_REQUIRE_HMAC === '1'
 
   if (hmacKey) {
     const sig = request.headers.get('x-docusign-signature-1') || ''
@@ -60,16 +59,18 @@ export default async (request) => {
       })
       return new Response('bad_signature', { status: 401 })
     }
-  } else if (isProd && !allowUnsigned) {
-    // Hard fail in production when nobody set the key. Without this we
-    // silently accept forged events from anyone who can guess an
-    // envelope_id GUID, which is the security gap the audit flagged.
-    console.error('[docusign-webhook] DOCUSIGN_CONNECT_HMAC_KEY missing in production — rejecting')
+  } else if (requireHmac) {
+    // Enforcement explicitly turned on but the key is missing — refuse
+    // to silently accept forged events. Operator needs to set
+    // DOCUSIGN_CONNECT_HMAC_KEY too.
+    console.error('[docusign-webhook] DOCUSIGN_REQUIRE_HMAC=1 but DOCUSIGN_CONNECT_HMAC_KEY is missing — rejecting')
     return new Response('hmac_key_missing', { status: 500 })
   } else {
-    console.warn('[docusign-webhook] accepting UNSIGNED payload', {
-      context: process.env.CONTEXT || 'unknown',
-      allow_unsigned: allowUnsigned
+    // Default mode: accept but warn. Forged-event risk remains until
+    // the operator configures DocuSign Connect HMAC + sets both env
+    // vars (DOCUSIGN_CONNECT_HMAC_KEY + DOCUSIGN_REQUIRE_HMAC=1).
+    console.warn('[docusign-webhook] accepting UNSIGNED payload (HMAC enforcement disabled)', {
+      context: process.env.CONTEXT || 'unknown'
     })
   }
 
