@@ -133,7 +133,7 @@ export default function DocIntakeButton({
               <X size={14} />
             </button>
 
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
               <Sparkles size={12} />
               AI doc parse
             </div>

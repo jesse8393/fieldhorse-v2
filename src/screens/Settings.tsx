@@ -671,7 +671,7 @@ export default function Settings() {
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '10px 20px 14px' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
           Profile
         </span>
         <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>

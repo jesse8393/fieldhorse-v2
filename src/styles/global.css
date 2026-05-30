@@ -12290,3 +12290,11 @@ em.fh-text-gradient-gold {
   border-color: var(--v3-border, rgba(255, 255, 255, 0.06)) !important;
   box-shadow: none !important;
 }
+
+/* Action-sheet title accent (the gold-colored emphasis word inside a
+   bottom-sheet headline) → neutral. The 12 inline eyebrow tags in
+   sheet components are scrubbed at the source; this catches the CSS
+   pathway some sheets use via a class. */
+.fh-asheet__title-accent {
+  color: var(--ink-strong, #f5f3ee) !important;
+}
