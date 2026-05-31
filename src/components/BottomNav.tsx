@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound } from 'lucide-react'
 import Icon from './icons/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
 
 const PRIMARY = [
@@ -14,10 +15,15 @@ const PRIMARY = [
   { to: '/schedule', label: 'Schedule', icon: 'schedule' }
 ]
 
-/* Flat navigation list per v3 mockup — reads as a clean nav drawer,
-   not stacked group cards. Order matches mockup primary nav. Items
-   pointing to non-existent routes (Files & Documents, Team, Help)
-   are intentionally omitted; reintroduce them when those routes ship. */
+/* Flat navigation list — mirrors the routes available in the desktop
+   sidebar (DesktopSidebar.tsx) so the phone app has the same reach.
+   Crew / Sub Portal / Tasks / Timesheets / Team were missing from the
+   mobile drawer even though their routes shipped with the org/role
+   foundation work — adding them here closes the gap.
+
+   Role gating happens at render time (see drawer body below) via
+   useMembership().canViewRoute(path), same pattern the desktop
+   sidebar uses. */
 const NAV_ITEMS = [
   { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
   { to: '/jobs',        label: 'Jobs & Pipeline',     Icon: Briefcase },
@@ -27,6 +33,13 @@ const NAV_ITEMS = [
   { to: '/bid',         label: 'Estimates',           Icon: Calculator },
   { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
   { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 },
+  // Org / crew block — new on mobile. Order + icons match the desktop
+  // sidebar's EXECUTION + INTELLIGENCE groups.
+  { to: '/crew',        label: 'Crew Home',           Icon: PlayCircle },
+  { to: '/sub-portal',  label: 'Sub Portal',          Icon: Briefcase },
+  { to: '/tasks',       label: 'Tasks',               Icon: ClipboardCheck },
+  { to: '/timesheets',  label: 'Timesheets',          Icon: Clock },
+  { to: '/team',        label: 'Team',                Icon: UsersRound },
   { to: '/subs',        label: 'Sub Directory',       Icon: Hammer },
   { to: '/partners',    label: 'Partners',            Icon: Users },
   { to: '/compose',     label: 'AI Compose',          Icon: MessageSquare },
@@ -40,7 +53,23 @@ export default function BottomNav() {
   const navigate = useNavigate()
   const { signOut, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { canViewRoute, role, loading: membershipLoading } = useMembership()
   const userEmail = user?.email || ''
+
+  // Filter the More-drawer nav list by the caller's role. Mirrors the
+  // desktop sidebar pattern:
+  //   • membership still loading → show everything so the first paint
+  //     doesn't strip owner nav
+  //   • has a role → use canViewRoute (the role-aware gate)
+  //   • settled with NO role (sub-only / pre-onboarding) → only show
+  //     the Sub Portal so they don't bounce off RLS errors on every
+  //     owner screen
+  const visibleNavItems = NAV_ITEMS.filter((it) => {
+    const path = it.to.split('?')[0].split('#')[0]
+    if (membershipLoading) return true
+    if (role) return canViewRoute(path)
+    return path === '/sub-portal'
+  })
 
   // Lock body scroll and listen for Escape while drawer is open
   useEffect(() => {
@@ -159,7 +188,7 @@ export default function BottomNav() {
               }}
               aria-label="Navigation"
             >
-              {NAV_ITEMS.map((it) => (
+              {visibleNavItems.map((it) => (
                 <NavRow key={it.to} item={it} onTap={() => go(it.to)} />
               ))}
             </nav>
