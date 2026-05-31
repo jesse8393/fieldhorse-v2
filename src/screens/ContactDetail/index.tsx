@@ -31,15 +31,20 @@ import { useJobData } from './hooks/useJobData.ts'
 import { resolveNextAction } from './lib/jobNextAction.ts'
 import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
 import OverviewTab from './tabs/Overview.tsx'
-import QuoteTab from './tabs/Quote.tsx'
-import DetailsTab from './tabs/Details.tsx'
-import FinancialsTab from './tabs/Financials.tsx'
-import FilesTab from './tabs/Files.tsx'
-import DailyLogsSection from './sections/DailyLogs.tsx'
-import SelectionsSection from './sections/Selections.tsx'
-import MaterialsSection from './sections/Materials.tsx'
-import ChangeOrdersSection from './sections/ChangeOrdersSection.tsx'
-import ApproveQuoteSheet from './sections/ApproveQuoteSheet.tsx'
+// Lazy — non-default tabs + sections + ApproveQuoteSheet only render
+// when the operator picks them. Saves ~290KB of code from the initial
+// ContactDetail route chunk. Overview stays eager because it's the
+// default tab (and would otherwise flash a suspense fallback on every
+// detail-page open).
+const QuoteTab = lazy(() => import('./tabs/Quote.tsx'))
+const DetailsTab = lazy(() => import('./tabs/Details.tsx'))
+const FinancialsTab = lazy(() => import('./tabs/Financials.tsx'))
+const FilesTab = lazy(() => import('./tabs/Files.tsx'))
+const DailyLogsSection = lazy(() => import('./sections/DailyLogs.tsx'))
+const SelectionsSection = lazy(() => import('./sections/Selections.tsx'))
+const MaterialsSection = lazy(() => import('./sections/Materials.tsx'))
+const ChangeOrdersSection = lazy(() => import('./sections/ChangeOrdersSection.tsx'))
+const ApproveQuoteSheet = lazy(() => import('./sections/ApproveQuoteSheet.tsx'))
 const SnowJobDetailBuild = lazy(() => import('../../components/desktop/SnowJobDetailBuild.tsx'))
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
@@ -355,63 +360,79 @@ export default function ContactDetail() {
                 />
               )}
               {tab === 'quote' && (
-                <QuoteTab
-                  contact={contact}
-                  userId={user?.id}
-                  fetchAll={fetchAll}
-                  patch={patch}
-                  onOpenApprove={() => setApproveOpen(true)}
-                />
+                <Suspense fallback={null}>
+                  <QuoteTab
+                    contact={contact}
+                    userId={user?.id}
+                    fetchAll={fetchAll}
+                    patch={patch}
+                    onOpenApprove={() => setApproveOpen(true)}
+                  />
+                </Suspense>
               )}
               {tab === 'details' && (
-                <DetailsTab
-                  contact={contact}
-                  inspections={inspections}
-                  scheduleItems={scheduleItems}
-                  userId={user?.id}
-                  fetchAll={fetchAll}
-                  patch={patch}
-                  onOpenAddEvent={() => setEventOpen(true)}
-                  onOpenInvitePartner={() => setInviteOpen(true)}
-                />
+                <Suspense fallback={null}>
+                  <DetailsTab
+                    contact={contact}
+                    inspections={inspections}
+                    scheduleItems={scheduleItems}
+                    userId={user?.id}
+                    fetchAll={fetchAll}
+                    patch={patch}
+                    onOpenAddEvent={() => setEventOpen(true)}
+                    onOpenInvitePartner={() => setInviteOpen(true)}
+                  />
+                </Suspense>
               )}
               {tab === 'financials' && (
-                <FinancialsTab
-                  contact={contact}
-                  subs={subs}
-                  expenses={expenses}
-                  payments={payments}
-                  paid={paid}
-                  balance={balance}
-                  userId={user?.id}
-                  fetchAll={fetchAll}
-                  onOpenLogPayment={() => setPayModalOpen(true)}
-                />
+                <Suspense fallback={null}>
+                  <FinancialsTab
+                    contact={contact}
+                    subs={subs}
+                    expenses={expenses}
+                    payments={payments}
+                    paid={paid}
+                    balance={balance}
+                    userId={user?.id}
+                    fetchAll={fetchAll}
+                    onOpenLogPayment={() => setPayModalOpen(true)}
+                  />
+                </Suspense>
               )}
               {tab === 'files' && (
-                <FilesTab
-                  contact={contact}
-                  notes={notes}
-                  userId={user?.id}
-                  fetchAll={fetchAll}
-                />
+                <Suspense fallback={null}>
+                  <FilesTab
+                    contact={contact}
+                    notes={notes}
+                    userId={user?.id}
+                    fetchAll={fetchAll}
+                  />
+                </Suspense>
               )}
               {tab === 'logs' && (
-                <DailyLogsSection jobId={contact?.id} userId={user?.id} />
+                <Suspense fallback={null}>
+                  <DailyLogsSection jobId={contact?.id} userId={user?.id} />
+                </Suspense>
               )}
               {tab === 'selections' && (
-                <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
+                <Suspense fallback={null}>
+                  <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
+                </Suspense>
               )}
               {tab === 'materials' && (
-                <MaterialsSection jobId={contact?.id} userId={user?.id} />
+                <Suspense fallback={null}>
+                  <MaterialsSection jobId={contact?.id} userId={user?.id} />
+                </Suspense>
               )}
               {tab === 'change_orders' && (
-                <ChangeOrdersSection
-                  contact={contact}
-                  userId={user?.id}
-                  changeOrders={changeOrders}
-                  onChange={() => fetchAll?.()}
-                />
+                <Suspense fallback={null}>
+                  <ChangeOrdersSection
+                    contact={contact}
+                    userId={user?.id}
+                    changeOrders={changeOrders}
+                    onChange={() => fetchAll?.()}
+                  />
+                </Suspense>
               )}
             </SnowJobDetailBuild></Suspense>
           )
@@ -499,69 +520,85 @@ export default function ContactDetail() {
           />
         )}
         {tab === 'quote' && (
-          <QuoteTab
-            contact={contact}
-            userId={user?.id}
-            fetchAll={fetchAll}
-            patch={patch}
-            onOpenApprove={() => setApproveOpen(true)}
-            insurance={insurance}
-            changeOrders={changeOrders}
-          />
+          <Suspense fallback={null}>
+            <QuoteTab
+              contact={contact}
+              userId={user?.id}
+              fetchAll={fetchAll}
+              patch={patch}
+              onOpenApprove={() => setApproveOpen(true)}
+              insurance={insurance}
+              changeOrders={changeOrders}
+            />
+          </Suspense>
         )}
         {tab === 'details' && (
-          <DetailsTab
-            contact={contact}
-            inspections={inspections}
-            scheduleItems={scheduleItems}
-            userId={user?.id}
-            fetchAll={fetchAll}
-            patch={patch}
-            onOpenAddEvent={() => setEventOpen(true)}
-            onOpenInvitePartner={() => setInviteOpen(true)}
-            insurance={insurance}
-          />
+          <Suspense fallback={null}>
+            <DetailsTab
+              contact={contact}
+              inspections={inspections}
+              scheduleItems={scheduleItems}
+              userId={user?.id}
+              fetchAll={fetchAll}
+              patch={patch}
+              onOpenAddEvent={() => setEventOpen(true)}
+              onOpenInvitePartner={() => setInviteOpen(true)}
+              insurance={insurance}
+            />
+          </Suspense>
         )}
         {tab === 'financials' && (
-          <FinancialsTab
-            contact={contact}
-            subs={subs}
-            expenses={expenses}
-            payments={payments}
-            paid={paid}
-            balance={balance}
-            userId={user?.id}
-            fetchAll={fetchAll}
-            patch={patch}
-            onOpenLogPayment={() => setPayModalOpen(true)}
-            insurance={insurance}
-            changeOrders={changeOrders}
-          />
+          <Suspense fallback={null}>
+            <FinancialsTab
+              contact={contact}
+              subs={subs}
+              expenses={expenses}
+              payments={payments}
+              paid={paid}
+              balance={balance}
+              userId={user?.id}
+              fetchAll={fetchAll}
+              patch={patch}
+              onOpenLogPayment={() => setPayModalOpen(true)}
+              insurance={insurance}
+              changeOrders={changeOrders}
+            />
+          </Suspense>
         )}
         {tab === 'files' && (
-          <FilesTab
-            contact={contact}
-            notes={notes}
-            userId={user?.id}
-            fetchAll={fetchAll}
-          />
+          <Suspense fallback={null}>
+            <FilesTab
+              contact={contact}
+              notes={notes}
+              userId={user?.id}
+              fetchAll={fetchAll}
+            />
+          </Suspense>
         )}
         {tab === 'logs' && (
-          <DailyLogsSection jobId={contact?.id} userId={user?.id} />
+          <Suspense fallback={null}>
+            <DailyLogsSection jobId={contact?.id} userId={user?.id} />
+          </Suspense>
         )}
         {tab === 'selections' && (
-          <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
+          <Suspense fallback={null}>
+            <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
+          </Suspense>
         )}
         {tab === 'materials' && (
-          <MaterialsSection jobId={contact?.id} userId={user?.id} />
+          <Suspense fallback={null}>
+            <MaterialsSection jobId={contact?.id} userId={user?.id} />
+          </Suspense>
         )}
         {tab === 'change_orders' && (
-          <ChangeOrdersSection
-            contact={contact}
-            userId={user?.id}
-            changeOrders={changeOrders}
-            onChange={() => fetchAll?.()}
-          />
+          <Suspense fallback={null}>
+            <ChangeOrdersSection
+              contact={contact}
+              userId={user?.id}
+              changeOrders={changeOrders}
+              onChange={() => fetchAll?.()}
+            />
+          </Suspense>
         )}
       </div>
       </>
@@ -607,13 +644,15 @@ export default function ContactDetail() {
         />
       </Suspense>
 
-      <ApproveQuoteSheet
-        open={approveOpen}
-        contact={contact}
-        userId={user?.id}
-        onClose={() => setApproveOpen(false)}
-        onApproved={fetchAll}
-      />
+      <Suspense fallback={null}>
+        <ApproveQuoteSheet
+          open={approveOpen}
+          contact={contact}
+          userId={user?.id}
+          onClose={() => setApproveOpen(false)}
+          onApproved={fetchAll}
+        />
+      </Suspense>
 
       <ActionSheet
         open={deleteOpen}
