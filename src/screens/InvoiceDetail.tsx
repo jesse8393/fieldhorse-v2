@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -23,7 +23,9 @@ import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../components/v3'
-import V3PaymentSheet from '../components/V3PaymentSheet.tsx'
+// Lazy — only loads when an operator taps "Mark Paid" (avoids ~440KB
+// in the InvoiceDetail route chunk).
+const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { InvoiceTemplate } from '../components/documents'
 
 /**
@@ -824,12 +826,14 @@ export default function InvoiceDetail() {
 
       <AnimatePresence>
         {paying && (
-          <V3PaymentSheet
-            contact={contact}
-            balance={totals.balance}
-            onClose={() => setPaying(false)}
-            onLogged={() => { setPaying(false); refresh() }}
-          />
+          <Suspense fallback={null}>
+            <V3PaymentSheet
+              contact={contact}
+              balance={totals.balance}
+              onClose={() => setPaying(false)}
+              onLogged={() => { setPaying(false); refresh() }}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
     </motion.div>
