@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { motion } from 'framer-motion'
@@ -32,7 +32,12 @@ import { hapticTap } from '../lib/haptics.ts'
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
 import { fetchCoverPhotosByJob } from '../lib/photos.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowHome from '../components/desktop/SnowHomeBuild.tsx'
+// Lazy — desktop-only variant. Home itself is an eager route (loaded
+// with the main bundle) so any static import here ships SnowHome to
+// mobile users too even though they never render it. Lazy keeps the
+// main bundle lean; desktop sees a near-instant suspense flash since
+// the chunk fetches in parallel with first paint.
+const SnowHome = lazy(() => import('../components/desktop/SnowHomeBuild.tsx'))
 
 /* ----------------- helpers ----------------- */
 
@@ -440,36 +445,38 @@ export default function Home() {
   // existing motion.div.v3-screen--home flow renders verbatim.
   if (isDesktop) {
     return (
-      <SnowHome
-        firstName={firstName}
-        now={now}
-        hasCoords={hasCoords}
-        tempStr={tempStr}
-        condStr={condStr}
-        weatherErr={weatherErr}
-        pinLocation={pinLocation}
-        pipeline={pipeline}
-        trendUp={trendUp}
-        trendPct={trendPct}
-        stageBreakdown={stageBreakdown}
-        dealsAtRisk={dealsAtRisk}
-        jobsBehind={jobsBehind}
-        invoicingWeek={invoicingWeek}
-        todayOnSite={todayOnSite}
-        topPipeline={topPipeline}
-        nextActions={nextActions}
-        onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
-        onGoToLeads={() => navigate('/jobs?view=leads')}
-        onGoToActivity={() => navigate('/activity')}
-        onGoToSchedule={() => navigate('/schedule')}
-        onGoToInvoices={() => navigate('/invoices')}
-        onGoToBid={() => navigate('/bid')}
-        onGoToCompose={() => navigate('/compose')}
-        onGoToPourWindow={() => navigate('/pour-window')}
-        onOpenJob={(id: any) => navigate(`/jobs/${id}`)}
-        onOpenJobAtTab={(id: any, tab: any) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
-        onNewLead={() => navigate('/jobs?new=1')}
-      />
+      <Suspense fallback={null}>
+        <SnowHome
+          firstName={firstName}
+          now={now}
+          hasCoords={hasCoords}
+          tempStr={tempStr}
+          condStr={condStr}
+          weatherErr={weatherErr}
+          pinLocation={pinLocation}
+          pipeline={pipeline}
+          trendUp={trendUp}
+          trendPct={trendPct}
+          stageBreakdown={stageBreakdown}
+          dealsAtRisk={dealsAtRisk}
+          jobsBehind={jobsBehind}
+          invoicingWeek={invoicingWeek}
+          todayOnSite={todayOnSite}
+          topPipeline={topPipeline}
+          nextActions={nextActions}
+          onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
+          onGoToLeads={() => navigate('/jobs?view=leads')}
+          onGoToActivity={() => navigate('/activity')}
+          onGoToSchedule={() => navigate('/schedule')}
+          onGoToInvoices={() => navigate('/invoices')}
+          onGoToBid={() => navigate('/bid')}
+          onGoToCompose={() => navigate('/compose')}
+          onGoToPourWindow={() => navigate('/pour-window')}
+          onOpenJob={(id: any) => navigate(`/jobs/${id}`)}
+          onOpenJobAtTab={(id: any, tab: any) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
+          onNewLead={() => navigate('/jobs?new=1')}
+        />
+      </Suspense>
     )
   }
 

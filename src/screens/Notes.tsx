@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -18,7 +18,7 @@ import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowNotes from '../components/desktop/SnowNotesBuild.tsx'
+const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
 
@@ -241,30 +241,32 @@ export default function Notes() {
 
   if (isDesktop) {
     return (
-      <SnowNotes
-        loading={loading}
-        contacts={contacts}
-        recent={recent}
-        linkedGroups={linkedGroups}
-        actionItems={actionItems}
-        cockpitStats={cockpitStats}
-        draft={draft}
-        setDraft={setDraft}
-        contactId={contactId}
-        setContactId={setContactId}
-        saving={saving}
-        parsing={parsing}
-        parsed={parsed}
-        parseError={parseError}
-        voiceState={voiceState}
-        onStartVoice={startVoice}
-        onStopVoice={stopVoice}
-        onParse={parseWithAI}
-        onSave={save}
-        onMarkDone={markDone}
-        onDelete={remove}
-        onOpenJob={(id) => navigate(`/jobs/${id}`)}
-      />
+      <Suspense fallback={null}>
+        <SnowNotes
+          loading={loading}
+          contacts={contacts}
+          recent={recent}
+          linkedGroups={linkedGroups}
+          actionItems={actionItems}
+          cockpitStats={cockpitStats}
+          draft={draft}
+          setDraft={setDraft}
+          contactId={contactId}
+          setContactId={setContactId}
+          saving={saving}
+          parsing={parsing}
+          parsed={parsed}
+          parseError={parseError}
+          voiceState={voiceState}
+          onStartVoice={startVoice}
+          onStopVoice={stopVoice}
+          onParse={parseWithAI}
+          onSave={save}
+          onMarkDone={markDone}
+          onDelete={remove}
+          onOpenJob={(id) => navigate(`/jobs/${id}`)}
+        />
+      </Suspense>
     )
   }
 

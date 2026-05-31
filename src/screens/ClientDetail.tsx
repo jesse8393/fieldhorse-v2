@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import SnowClientDetailBuild from '../components/desktop/SnowClientDetailBuild.tsx'
+const SnowClientDetailBuild = lazy(() => import('../components/desktop/SnowClientDetailBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import {
   ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
@@ -187,7 +187,7 @@ export default function ClientDetail() {
 
   if (isDesktop) {
     return (
-      <SnowClientDetailBuild
+      <Suspense fallback={null}><SnowClientDetailBuild
         client={client}
         lifetime={lifetime}
         outstanding={outstanding}
@@ -204,7 +204,7 @@ export default function ClientDetail() {
         isEditing={isEditing}
       >
         {tabBody}
-      </SnowClientDetailBuild>
+      </SnowClientDetailBuild></Suspense>
     )
   }
 

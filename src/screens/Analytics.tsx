@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
@@ -13,7 +13,7 @@ import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowAnalytics from '../components/desktop/SnowAnalyticsBuild.tsx'
+const SnowAnalytics = lazy(() => import('../components/desktop/SnowAnalyticsBuild.tsx'))
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 
 function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
@@ -284,13 +284,13 @@ export default function Analytics() {
 
   if (isDesktop) {
     return (
-      <SnowAnalytics
+      <Suspense fallback={null}><SnowAnalytics
         loading={loading}
         stats={stats}
         byStage={byStage}
         revenueByMonth={trendData}
         topClients={topClients}
-      />
+      /></Suspense>
     )
   }
 

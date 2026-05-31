@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ChevronLeft, MapPin, Wind, Droplets, Thermometer, CloudSun, AlertTriangle, Check, X } from 'lucide-react'
@@ -9,7 +9,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import Spotlight from '../components/fx/Spotlight.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
-import SnowForecast from '../components/desktop/SnowForecastBuild.tsx'
+const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.tsx'))
 
 // Status token → brand palette mapping used across the whole screen.
 // All three statuses get a solid hex fallback so the strip doesn't render
@@ -152,18 +152,20 @@ useEffect(() => {
 
   if (isDesktop) {
     return (
-      <SnowForecast
-        loading={loading}
-        err={err}
-        hasCoords={hasCoords}
-        cityName={cityName}
-        weather={weather}
-        currentWindow={currentWindow}
-        daily={daily}
-        tradeRows={tradeRows}
-        onPinLocation={pinLocation}
-        onGoToSchedule={() => navigate('/schedule')}
-      />
+      <Suspense fallback={null}>
+        <SnowForecast
+          loading={loading}
+          err={err}
+          hasCoords={hasCoords}
+          cityName={cityName}
+          weather={weather}
+          currentWindow={currentWindow}
+          daily={daily}
+          tradeRows={tradeRows}
+          onPinLocation={pinLocation}
+          onGoToSchedule={() => navigate('/schedule')}
+        />
+      </Suspense>
     )
   }
 

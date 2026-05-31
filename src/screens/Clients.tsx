@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
@@ -12,7 +12,7 @@ import { findDuplicateClusters } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.tsx'
 import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.tsx'
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
-import SnowClients from '../components/desktop/SnowClientsBuild.tsx'
+const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
 function money(n: any) {
@@ -140,26 +140,28 @@ export default function Clients() {
   if (isDesktop) {
     return (
       <>
-        <SnowClients
-          rows={rows}
-          filtered={filtered}
-          loading={loading}
-          q={q}
-          setQ={setQ}
-          filter={filter}
-          setFilter={setFilter}
-          filterCounts={filterCounts}
-          rollupFor={rollupFor}
-          jobs={jobs}
-          screenStats={screenStats}
-          topClientId={topClientId}
-          totalLifetime={totalLifetime}
-          duplicateClusters={duplicateClusters}
-          duplicateCount={duplicateCount}
-          onOpenClient={(id: any) => navigate(`/clients/${id}`)}
-          onNewClient={() => setAddOpen(true)}
-          onReviewDuplicates={() => setMergeOpen(true)}
-        />
+        <Suspense fallback={null}>
+          <SnowClients
+            rows={rows}
+            filtered={filtered}
+            loading={loading}
+            q={q}
+            setQ={setQ}
+            filter={filter}
+            setFilter={setFilter}
+            filterCounts={filterCounts}
+            rollupFor={rollupFor}
+            jobs={jobs}
+            screenStats={screenStats}
+            topClientId={topClientId}
+            totalLifetime={totalLifetime}
+            duplicateClusters={duplicateClusters}
+            duplicateCount={duplicateCount}
+            onOpenClient={(id: any) => navigate(`/clients/${id}`)}
+            onNewClient={() => setAddOpen(true)}
+            onReviewDuplicates={() => setMergeOpen(true)}
+          />
+        </Suspense>
         <NewClientSheet
           open={addOpen}
           userId={user?.id}

@@ -23,7 +23,7 @@ const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowInvoices from '../components/desktop/SnowInvoicesBuild.tsx'
+const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
 
 // Invoices / AR — v3 money command screen.
 //
@@ -317,16 +317,18 @@ export default function Invoices() {
   if (isDesktop) {
     return (
       <>
-        <SnowInvoices
-          rows={rows}
-          filtered={filtered}
-          totals={totals}
-          loading={loading}
-          filter={filter as 'outstanding' | 'all'}
-          setFilter={(f) => setFilter(f)}
-          onOpenJob={(jobId) => navigate(`/jobs/${jobId}?tab=financials`)}
-          onPayRow={(r) => setPayingRow(r)}
-        />
+        <Suspense fallback={null}>
+          <SnowInvoices
+            rows={rows}
+            filtered={filtered}
+            totals={totals}
+            loading={loading}
+            filter={filter as 'outstanding' | 'all'}
+            setFilter={(f) => setFilter(f)}
+            onOpenJob={(jobId) => navigate(`/jobs/${jobId}?tab=financials`)}
+            onPayRow={(r) => setPayingRow(r)}
+          />
+        </Suspense>
         <AnimatePresence>
           {payingRow && (
             <Suspense fallback={null}>
