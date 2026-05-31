@@ -3,7 +3,11 @@ import { motion } from 'framer-motion'
 import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon, PenLine } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
-import { generateQuote, downloadPdf } from '../../../lib/pdf.js'
+// Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
+// loads on Generate / Download / Send PDF actions.
+async function loadPdf(): Promise<any> {
+  return import('../../../lib/pdf.js')
+}
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { dateInputToTimestamp } from '../../../lib/dueDate.ts'
@@ -146,6 +150,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // toast — defensive even though the disabled state prevents this.
   async function buildPdf() {
     if (!contact?.id || !userId) throw new Error('Contact not loaded')
+    const { generateQuote } = await loadPdf()
 
     // Pull latest local state from QuoteTermsSection — published into
     // termsValuesRef on every change (V3-QA-1B fix). Falls back to the
@@ -254,6 +259,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     setBusy('download')
     try {
       const result = await buildPdf()
+      const { downloadPdf } = await loadPdf()
       downloadPdf(result)
       toastSuccess('Quote downloaded', result.filename)
     } catch (e: any) {
@@ -409,6 +415,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           "The PDF is saved to Files. Ask whoever set up the deploy to add the Resend keys."
         )
         // Still offer the local download so the operator can email manually.
+        const { downloadPdf } = await loadPdf()
         downloadPdf(result)
         return
       }
