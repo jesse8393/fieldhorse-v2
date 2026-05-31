@@ -6,7 +6,8 @@ import {
   Plus, Search, MessageSquare, Mail, Phone, ExternalLink,
   Phone as PhoneIcon, MessageSquare as MsgIcon
 } from 'lucide-react'
-import NewLeadSheet from '../components/NewLeadSheet.tsx'
+// Lazy — 34KB sheet only mounts when the operator taps "New Lead".
+const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 import { SkeletonList } from '../components/Skeleton.tsx'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { JobCard, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
@@ -322,23 +323,25 @@ export default function Jobs() {
             </div>
           </DrawerContent>
         </Drawer>
-        <NewLeadSheet
-          open={addOpen}
-          userId={user?.id}
-          initialStage={addInitialStage}
-          onClose={() => setAddOpen(false)}
-          onCreated={async (created: any) => {
-            setAddOpen(false)
-            if (created?.id) setJustAddedId(created.id)
-            await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
-            setTimeout(() => setJustAddedId(null), 1200)
-            const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
-            toastSuccess(
-              `New ${noun} added`,
-              created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
-            )
-          }}
-        />
+        <Suspense fallback={null}>
+          <NewLeadSheet
+            open={addOpen}
+            userId={user?.id}
+            initialStage={addInitialStage}
+            onClose={() => setAddOpen(false)}
+            onCreated={async (created: any) => {
+              setAddOpen(false)
+              if (created?.id) setJustAddedId(created.id)
+              await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
+              setTimeout(() => setJustAddedId(null), 1200)
+              const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
+              toastSuccess(
+                `New ${noun} added`,
+                created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+              )
+            }}
+          />
+        </Suspense>
       </>
     )
   }
@@ -545,23 +548,25 @@ export default function Jobs() {
       </Drawer>
 
       {/* PRESERVED — NewLeadSheet */}
-      <NewLeadSheet
-        open={addOpen}
-        userId={user?.id}
-        initialStage={addInitialStage}
-        onClose={() => setAddOpen(false)}
-        onCreated={async (created: any) => {
-          setAddOpen(false)
-          if (created?.id) setJustAddedId(created.id)
-          await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
-          setTimeout(() => setJustAddedId(null), 1200)
-          const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
-          toastSuccess(
-            `New ${noun} added`,
-            created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
-          )
-        }}
-      />
+      <Suspense fallback={null}>
+        <NewLeadSheet
+          open={addOpen}
+          userId={user?.id}
+          initialStage={addInitialStage}
+          onClose={() => setAddOpen(false)}
+          onCreated={async (created: any) => {
+            setAddOpen(false)
+            if (created?.id) setJustAddedId(created.id)
+            await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
+            setTimeout(() => setJustAddedId(null), 1200)
+            const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
+            toastSuccess(
+              `New ${noun} added`,
+              created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+            )
+          }}
+        />
+      </Suspense>
 
       {/* FAB — bottom-right above BottomNav. Thumb-reach primary action
           on phone. Per ruleset: "Max 1 primary action per screen" — on
