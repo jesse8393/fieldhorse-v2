@@ -1,52 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Fieldhorse">
+<!--
+  Fieldhorse emblem — canonical SVG used by:
+    - manifest icon entry (PWA install)
+    - favicon (browser tab)
+    - source for raster PNG renders (apple-touch-icon, icon-192, icon-512)
+
+  Geometry mirrors src/components/FieldhorseEmblem.tsx so the in-app
+  badge and the home-screen icon never drift.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="512" height="512" role="img" aria-label="Fieldhorse">
   <defs>
-    <radialGradient id="goldGlow" cx="50%" cy="50%" r="55%">
-      <stop offset="0%" stop-color="#C9963A" stop-opacity="0.18"/>
-      <stop offset="55%" stop-color="#C9963A" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#C9963A" stop-opacity="0"/>
-    </radialGradient>
-    <clipPath id="corners">
-      <rect x="0" y="0" width="512" height="512" rx="113" ry="113"/>
-    </clipPath>
+    <linearGradient id="goldBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8B04C"/>
+      <stop offset="55%" stop-color="#C9963A"/>
+      <stop offset="100%" stop-color="#A77A28"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.42"/>
+      <stop offset="48%" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.10"/>
+    </linearGradient>
+    <linearGradient id="bevel" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.25"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F3EFE6"/>
+    </linearGradient>
   </defs>
 
-  <g clip-path="url(#corners)">
-    <!-- Onyx plate -->
-    <rect x="0" y="0" width="512" height="512" fill="#141414"/>
-    <!-- Centered gold glow -->
-    <rect x="0" y="0" width="512" height="512" fill="url(#goldGlow)"/>
+  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#goldBody)"/>
 
-    <!-- Corner brackets: top-left + bottom-right, gold hairline -->
-    <g stroke="#C9963A" stroke-width="2" fill="none" stroke-linecap="square">
-      <!-- TL -->
-      <polyline points="58,100 58,58 100,58"/>
-      <!-- BR -->
-      <polyline points="454,412 454,454 412,454"/>
-    </g>
-
-    <!-- FH monogram + gold rule.
-         Bebas-style stacked capitals rendered as outlined geometry so the icon
-         stays crisp without needing the Bebas font embedded. -->
-    <g transform="translate(256 256)" text-anchor="middle">
-      <text y="0"
-        font-family="'Bebas Neue', 'Impact', 'Oswald', sans-serif"
-        font-size="210"
-        font-weight="400"
-        letter-spacing="18"
-        fill="#C9963A"
-        dominant-baseline="central">FH</text>
-      <!-- 80×2 rule 12px below the letterforms (centered) -->
-      <rect x="-40" y="118" width="80" height="2" fill="#C9963A"/>
-    </g>
-
-    <!-- Spec plate stamp: V2 bottom-right, steel mono -->
-    <text x="454" y="420"
-      font-family="'JetBrains Mono', 'SF Mono', ui-monospace, monospace"
-      font-size="22"
-      font-weight="500"
-      letter-spacing="4.4"
-      text-anchor="end"
-      fill="#8B8782">V2</text>
+  <g fill="#0E0E10">
+    <rect x="50" y="50" width="32" height="110" rx="4" ry="4"/>
+    <path d="M 50 50 L 158 50 L 152 88 Q 128 76 96 80 L 50 80 Z"/>
   </g>
+
+  <path d="M 50 96 L 132 96 Q 152 96 152 116 Q 152 144 122 158 Q 96 168 78 162 Q 96 156 110 142 Q 122 128 122 116 Q 122 110 116 110 L 50 110 Z" fill="url(#wing)"/>
+
+  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#gloss)"/>
+  <rect x="1.5" y="1.5" width="197" height="197" rx="43" ry="43" fill="none" stroke="url(#bevel)" stroke-width="1.5"/>
 </svg>
