@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { NotebookPen, Search } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import FieldhorseBadge from './FieldhorseBadge.tsx'
+import FieldhorseEmblem from './FieldhorseEmblem.tsx'
 import NotificationsBell from './NotificationsBell.tsx'
 
 function openPalette() {
@@ -77,10 +77,12 @@ export default function AppHeader() {
         pointerEvents: 'auto'
       }}
     >
-      {/* Brand badge — phone-only. Desktop mounts the wordmark in the
-          left rail (DesktopSidebar) so the header strip can stay quiet. */}
+      {/* Brand emblem — phone-only. Desktop mounts the wordmark in the
+          left rail (DesktopSidebar) so the header strip can stay quiet.
+          Replaces the prior FieldhorseBadge (FH text wordmark) with the
+          glassy gold emblem the user shared. */}
       <span className="fh-app-header__badge">
-        <FieldhorseBadge />
+        <FieldhorseEmblem size={28} />
       </span>
 
       <div
