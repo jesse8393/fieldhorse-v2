@@ -18,8 +18,9 @@ const SkeletonList = SkeletonList_ as any
 import ActionSheet from '../../components/ActionSheet.tsx'
 import AddEventSheet from '../../components/AddEventSheet.tsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
-import MarkCompleteSheet from '../../components/MarkCompleteSheet.tsx'
-// Lazy — sheet only mounts when operator records a payment.
+// Lazy — sheets only mount on operator action (Mark Complete /
+// Record Payment respectively).
+const MarkCompleteSheet = lazy(() => import('../../components/MarkCompleteSheet.tsx'))
 const V3PaymentSheet = lazy(() => import('../../components/V3PaymentSheet.tsx'))
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -596,13 +597,15 @@ export default function ContactDetail() {
         invitedByUserId={user?.id}
       />
 
-      <MarkCompleteSheet
-        open={completeOpen}
-        userId={user?.id}
-        contact={contact}
-        onClose={() => setCompleteOpen(false)}
-        onSaved={fetchAll}
-      />
+      <Suspense fallback={null}>
+        <MarkCompleteSheet
+          open={completeOpen}
+          userId={user?.id}
+          contact={contact}
+          onClose={() => setCompleteOpen(false)}
+          onSaved={fetchAll}
+        />
+      </Suspense>
 
       <ApproveQuoteSheet
         open={approveOpen}

@@ -10,7 +10,8 @@ import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
 import { findDuplicateClusters } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.tsx'
-import MergeDuplicatesSheet from '../components/MergeDuplicatesSheet.tsx'
+// Lazy — sheet only mounts when the operator opens the merge flow.
+const MergeDuplicatesSheet = lazy(() => import('../components/MergeDuplicatesSheet.tsx'))
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
 const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -172,13 +173,15 @@ export default function Clients() {
             else load()
           }}
         />
-        <MergeDuplicatesSheet
-          open={mergeOpen}
-          userId={user?.id}
-          clusters={duplicateClusters}
-          onClose={() => setMergeOpen(false)}
-          onMerged={load}
-        />
+        <Suspense fallback={null}>
+          <MergeDuplicatesSheet
+            open={mergeOpen}
+            userId={user?.id}
+            clusters={duplicateClusters}
+            onClose={() => setMergeOpen(false)}
+            onMerged={load}
+          />
+        </Suspense>
       </>
     )
   }
@@ -496,13 +499,15 @@ export default function Clients() {
           else load()
         }}
       />
-      <MergeDuplicatesSheet
-        open={mergeOpen}
-        userId={user?.id}
-        clusters={duplicateClusters}
-        onClose={() => setMergeOpen(false)}
-        onMerged={load}
-      />
+      <Suspense fallback={null}>
+        <MergeDuplicatesSheet
+          open={mergeOpen}
+          userId={user?.id}
+          clusters={duplicateClusters}
+          onClose={() => setMergeOpen(false)}
+          onMerged={load}
+        />
+      </Suspense>
       <FloatingActionButton
         onClick={() => setAddOpen(true)}
         ariaLabel="New client"
