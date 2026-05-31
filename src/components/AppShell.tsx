@@ -1,14 +1,18 @@
-import { Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster as SonnerToaster } from 'sonner'
 import AppHeader from './AppHeader.tsx'
 import BottomNav from './BottomNav.tsx'
-import DesktopSidebar from './DesktopSidebar.tsx'
+// Lazy + conditional — DesktopSidebar is hidden by CSS on mobile but
+// still shipped + parsed. Gating on useIsDesktop saves the JS code
+// + parse cost for phone users, who outnumber desktop usage.
+const DesktopSidebar = lazy(() => import('./DesktopSidebar.tsx'))
 import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
 import Toaster from './Toaster.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
@@ -104,6 +108,7 @@ function layoutForPath(pathname: any) {
 export default function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -145,7 +150,11 @@ export default function AppShell() {
       {/* Desktop-only persistent left rail. CSS hides this under 900px
           so phones / narrow tablets keep the BottomNav-driven mobile
           experience verbatim. */}
-      <DesktopSidebar />
+      {isDesktop && (
+        <Suspense fallback={null}>
+          <DesktopSidebar />
+        </Suspense>
+      )}
 
       <AppHeader />
 
