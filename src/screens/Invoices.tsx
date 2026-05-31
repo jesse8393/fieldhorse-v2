@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Receipt, FileDown, DollarSign, ChevronRight, Check, Send, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -14,7 +14,9 @@ import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
-import V3PaymentSheet from '../components/V3PaymentSheet.tsx'
+// V3PaymentSheet is lazy — only loads when an operator taps "Mark Paid".
+// Avoids dragging ~440KB into the initial Invoices route chunk.
+const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -322,12 +324,14 @@ export default function Invoices() {
         />
         <AnimatePresence>
           {payingRow && (
-            <V3PaymentSheet
-              contact={payingRow.job}
-              balance={payingRow.balance}
-              onClose={() => setPayingRow(null)}
-              onLogged={() => { setPayingRow(null); refresh() }}
-            />
+            <Suspense fallback={null}>
+              <V3PaymentSheet
+                contact={payingRow.job}
+                balance={payingRow.balance}
+                onClose={() => setPayingRow(null)}
+                onLogged={() => { setPayingRow(null); refresh() }}
+              />
+            </Suspense>
           )}
         </AnimatePresence>
       </>
@@ -546,12 +550,14 @@ export default function Invoices() {
           pipeline.ts (auto-close on overpayment) and we refresh. */}
       <AnimatePresence>
         {payingRow && (
-          <V3PaymentSheet
-            contact={payingRow.job}
-            balance={payingRow.balance}
-            onClose={() => setPayingRow(null)}
-            onLogged={() => { setPayingRow(null); refresh() }}
-          />
+          <Suspense fallback={null}>
+            <V3PaymentSheet
+              contact={payingRow.job}
+              balance={payingRow.balance}
+              onClose={() => setPayingRow(null)}
+              onLogged={() => { setPayingRow(null); refresh() }}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
     </motion.div>

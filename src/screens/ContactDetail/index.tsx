@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -19,7 +19,8 @@ import ActionSheet from '../../components/ActionSheet.tsx'
 import AddEventSheet from '../../components/AddEventSheet.tsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
 import MarkCompleteSheet from '../../components/MarkCompleteSheet.tsx'
-import V3PaymentSheet from '../../components/V3PaymentSheet.tsx'
+// Lazy — sheet only mounts when operator records a payment.
+const V3PaymentSheet = lazy(() => import('../../components/V3PaymentSheet.tsx'))
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
@@ -568,12 +569,14 @@ export default function ContactDetail() {
       {/* MODALS */}
       <AnimatePresence>
         {payModalOpen && (
-          <V3PaymentSheet
-            contact={contact}
-            balance={balance}
-            onClose={() => setPayModalOpen(false)}
-            onLogged={() => { setPayModalOpen(false); fetchAll() }}
-          />
+          <Suspense fallback={null}>
+            <V3PaymentSheet
+              contact={contact}
+              balance={balance}
+              onClose={() => setPayModalOpen(false)}
+              onLogged={() => { setPayModalOpen(false); fetchAll() }}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
