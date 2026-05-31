@@ -18,7 +18,11 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
-import { generateCertificate, downloadPdf } from '../lib/pdf.js'
+// Lazy — ~430KB pdf chunk only loads when the operator generates a
+// completion certificate.
+async function loadPdf(): Promise<any> {
+  return import('../lib/pdf.js')
+}
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals
@@ -151,6 +155,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     if (!isReopening || saving) return
     setSaving(true)
     try {
+      const { generateCertificate, downloadPdf } = await loadPdf()
       const result = await generateCertificate({ company: buildCompanyPayload(), contact, closeout: existing })
       downloadPdf(result)
       hapticSuccess()
@@ -176,6 +181,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       // 1. Build the PDF in-memory, then upload to job-files so the
       //    server function can pull it via service role for the Resend
       //    attachment. Mirrors the QuoteTab send-quote flow.
+      const { generateCertificate, downloadPdf } = await loadPdf()
       const result = await generateCertificate({ company: buildCompanyPayload(), contact, closeout: existing })
       const blob = result.doc.output('blob')
       const rowId = crypto.randomUUID()

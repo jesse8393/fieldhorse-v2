@@ -16,8 +16,11 @@ import { supabase } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { generateInvoice as generateInvoice_, downloadPdf } from '../lib/pdf.js'
-const generateInvoice = generateInvoice_ as any
+// Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
+// loads on the first PDF action (Generate, Share, Email Invoice).
+async function loadPdf(): Promise<any> {
+  return import('../lib/pdf.js')
+}
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
@@ -166,6 +169,7 @@ export default function InvoiceDetail() {
     if (!contact || generating) return
     setGenerating(true)
     try {
+      const { generateInvoice, downloadPdf } = await loadPdf()
       const result = await generateInvoice({
         company,
         contact: {
@@ -250,6 +254,7 @@ export default function InvoiceDetail() {
     }
     setSending(true)
     try {
+      const { generateInvoice, downloadPdf } = await loadPdf()
       const result = await generateInvoice({
         company,
         contact: {

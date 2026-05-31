@@ -6,8 +6,11 @@ import { supabase } from '../lib/supabase.ts'
 import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { generateInvoice as generateInvoice_, downloadPdf } from '../lib/pdf.js'
-const generateInvoice = generateInvoice_ as any
+// Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
+// loads on the first PDF action (per-row Generate or Email Invoice).
+async function loadPdf(): Promise<any> {
+  return import('../lib/pdf.js')
+}
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -163,6 +166,7 @@ export default function Invoices() {
     // and so the user sees a toast immediately on click instead of
     // wondering if anything happened.
     try {
+      const { generateInvoice, downloadPdf } = await loadPdf()
       // generateInvoice() became async in 4D-2D — pre-fetches the
       // contractor's logo via loadLogoForPdf before rendering.
       const c = resolveClient(row.job)
@@ -232,6 +236,7 @@ export default function Invoices() {
     }
     setSendingId(job.id)
     try {
+      const { generateInvoice } = await loadPdf()
       const { data: jobPayments } = await supabase
         .from('fh_payments')
         .select('*')
