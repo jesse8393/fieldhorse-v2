@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
@@ -20,7 +20,7 @@ import { getWeather, workWindow } from '../lib/weather.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import SnowSchedule from '../components/desktop/SnowScheduleBuild.tsx'
+const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
   { value: 'day', label: 'Day' },
@@ -226,16 +226,18 @@ export default function Schedule() {
   if (isDesktop) {
     return (
       <>
-        <SnowSchedule
-          events={events}
-          upcoming={upcoming}
-          loading={loading}
-          cursor={cursor}
-          setCursor={setCursor}
-          view={view}
-          setView={setView}
-          onAddEvent={() => setAddOpen(true)}
-        />
+        <Suspense fallback={null}>
+          <SnowSchedule
+            events={events}
+            upcoming={upcoming}
+            loading={loading}
+            cursor={cursor}
+            setCursor={setCursor}
+            view={view}
+            setView={setView}
+            onAddEvent={() => setAddOpen(true)}
+          />
+        </Suspense>
         <AddEventSheet
           open={addOpen}
           userId={user?.id}

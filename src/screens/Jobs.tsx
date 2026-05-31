@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,7 +10,7 @@ import NewLeadSheet from '../components/NewLeadSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { JobCard, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
-import SnowJobs from '../components/desktop/SnowJobsBuild.tsx'
+const SnowJobs = lazy(() => import('../components/desktop/SnowJobsBuild.tsx'))
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
@@ -255,25 +255,27 @@ export default function Jobs() {
   if (isDesktop) {
     return (
       <>
-        <SnowJobs
-          contacts={contacts}
-          filtered={filtered}
-          loading={loading}
-          filter={filter}
-          setFilter={setFilter}
-          search={search}
-          setSearch={setSearch}
-          photoUrlByJob={photoUrlByJob}
-          featuredId={featuredId}
-          tabCounts={tabCounts}
-          // Desktop row click + chevron route directly to the job
-          // file. The contact bottom-sheet (with Text/Email/Call/Open)
-          // is still mounted below and used by the mobile flow; on
-          // desktop we skip it so the chevron lives up to its
-          // implied affordance.
-          onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
-          onNewLead={() => setAddOpen(true)}
-        />
+        <Suspense fallback={null}>
+          <SnowJobs
+            contacts={contacts}
+            filtered={filtered}
+            loading={loading}
+            filter={filter}
+            setFilter={setFilter}
+            search={search}
+            setSearch={setSearch}
+            photoUrlByJob={photoUrlByJob}
+            featuredId={featuredId}
+            tabCounts={tabCounts}
+            // Desktop row click + chevron route directly to the job
+            // file. The contact bottom-sheet (with Text/Email/Call/Open)
+            // is still mounted below and used by the mobile flow; on
+            // desktop we skip it so the chevron lives up to its
+            // implied affordance.
+            onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
+            onNewLead={() => setAddOpen(true)}
+          />
+        </Suspense>
         <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>
           <DrawerContent>
             <DrawerHeader>

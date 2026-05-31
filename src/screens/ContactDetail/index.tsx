@@ -39,7 +39,7 @@ import SelectionsSection from './sections/Selections.tsx'
 import MaterialsSection from './sections/Materials.tsx'
 import ChangeOrdersSection from './sections/ChangeOrdersSection.tsx'
 import ApproveQuoteSheet from './sections/ApproveQuoteSheet.tsx'
-import SnowJobDetailBuild from '../../components/desktop/SnowJobDetailBuild.tsx'
+const SnowJobDetailBuild = lazy(() => import('../../components/desktop/SnowJobDetailBuild.tsx'))
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
 const TOP_TABS = [
@@ -315,7 +315,7 @@ export default function ContactDetail() {
           })()
 
           return (
-            <SnowJobDetailBuild
+            <Suspense fallback={null}><SnowJobDetailBuild
               contact={contact}
               client={clientSummary}
               tabs={visibleTabs}
@@ -412,7 +412,7 @@ export default function ContactDetail() {
                   onChange={() => fetchAll?.()}
                 />
               )}
-            </SnowJobDetailBuild>
+            </SnowJobDetailBuild></Suspense>
           )
         })()
       ) : (

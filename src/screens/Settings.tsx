@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
-import SnowSettingsBuild from '../components/desktop/SnowSettingsBuild.tsx'
+const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
@@ -651,7 +651,7 @@ export default function Settings() {
 
   if (isDesktop) {
     return (
-      <SnowSettingsBuild
+      <Suspense fallback={null}><SnowSettingsBuild
         userEmail={user?.email}
         companyName={companyName}
         profileCompletePct={profileCompletePct}
@@ -663,7 +663,7 @@ export default function Settings() {
         onSignOut={async () => { await signOut(); navigate('/login', { replace: true }) }}
       >
         {sections}
-      </SnowSettingsBuild>
+      </SnowSettingsBuild></Suspense>
     )
   }
 
