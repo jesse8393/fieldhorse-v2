@@ -1,46 +1,31 @@
 // src/lib/useDrawerKeyboard.ts
 //
-// Shared iOS keyboard handler for Vaul drawer-based sheets.
+// Layout helper for Vaul drawer-based sheets.
 //
-// iOS Safari and its in-app variant (Safari View Controller, opened
-// when a link click bounces into Mail/Messages/Slack preview) do NOT
-// reliably shrink 100dvh when the soft keyboard opens. So we must
-// measure the keyboard manually via visualViewport and lift the
-// drawer up by that amount. Three layered defenses keep the drawer
-// usable even when one signal fails:
+// Vaul's <Drawer.Root repositionInputs={true}> (the default) already
+// handles iOS soft-keyboard repositioning under the hood: it tracks
+// window.visualViewport, computes the keyboard height, and writes
+// drawerRef.style.height + drawerRef.style.bottom directly to lift
+// the drawer above the keyboard. We previously tried to do the same
+// thing here via React's style prop, which silently overwrote Vaul's
+// direct DOM writes on every re-render — the two handlers fought,
+// the drawer ended up tiny with one input visible and a big dead
+// zone below.
 //
-//   1. visualViewport detection → set --kbd in px. Works in iOS
-//      Safari proper.
-//   2. maxHeight uses 100dvh - kbd as a belt-and-suspenders cap.
-//      If dvh DOES shrink (most embedded browsers do), we don't
-//      double-subtract because kbd will be 0.
-//   3. scroll-padding-bottom on the form equals the kbd offset so
-//      scrollIntoView treats the bottom-kbd zone as occluded and
-//      lands the focused input ABOVE the keyboard, not behind it.
+// Now the hook stays out of the keyboard's way and only provides:
+//   - formRef: attach to the scrollable form so we can wire scroll
+//     padding for focused inputs.
+//   - drawerStyle: only the IMMUTABLE bits (maxWidth, overflow,
+//     flex column for header + form layout). No height or bottom
+//     overrides — Vaul owns those.
+//   - formStyle: overflow + scroll-padding-bottom so when the
+//     keyboard appears, scrollIntoView lands focused inputs in the
+//     non-occluded area.
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 
 export function useDrawerKeyboard(open: boolean) {
-  const [kbd, setKbd] = useState(0)
   const formRef = useRef<HTMLFormElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv!.height - (vv!.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      setKbd(0)
-    }
-  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -73,9 +58,6 @@ export function useDrawerKeyboard(open: boolean) {
   const drawerStyle: CSSProperties = {
     maxWidth: '100%',
     overflowX: 'hidden',
-    maxHeight: `calc(100dvh - ${kbd}px - env(safe-area-inset-top) - 24px)`,
-    bottom: kbd > 0 ? `${kbd}px` : undefined,
-    transition: 'bottom 220ms cubic-bezier(0.16, 1, 0.3, 1), max-height 220ms cubic-bezier(0.16, 1, 0.3, 1)',
     display: 'flex',
     flexDirection: 'column'
   }
@@ -95,15 +77,16 @@ export function useDrawerKeyboard(open: boolean) {
       overflowY: 'auto',
       WebkitOverflowScrolling: 'touch',
       overscrollBehavior: 'contain',
-      // Treat the bottom-kbd strip as occluded so scrollIntoView lands
-      // the focused input above the keyboard even when the drawer
-      // itself didn't lift (visualViewport silent in in-app browsers).
-      scrollPaddingBottom: kbd > 0 ? `${kbd + 40}px` : '40vh',
+      // Treat the bottom 40% as occluded so scrollIntoView never
+      // lands a focused field right against where the iOS keyboard
+      // *could* be. Vaul handles the drawer lift; this just keeps
+      // the focused input centered in the still-visible area.
+      scrollPaddingBottom: '40vh',
       flex: 1,
       minHeight: 0,
       ...extra
     }
   }
 
-  return { kbd, formRef, drawerStyle, formStyle }
+  return { kbd: 0, formRef, drawerStyle, formStyle }
 }
