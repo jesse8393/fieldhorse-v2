@@ -58,14 +58,15 @@ export function useDrawerKeyboard(open: boolean) {
   const drawerStyle: CSSProperties = {
     maxWidth: '100%',
     overflowX: 'hidden',
-    // CAP the drawer to the visible viewport so a tall form doesn't
-    // push content off the bottom of the screen. Uses maxHeight
-    // (NOT height) so it doesn't conflict with Vaul's direct
-    // style.height writes — Vaul manages height dynamically when
-    // the keyboard opens; maxHeight just acts as the static ceiling
-    // when the keyboard is closed. dvh shrinks for browser chrome
-    // changes but iOS treats the soft keyboard separately, so Vaul
-    // still owns the keyboard lift.
+    // Drawer scrolls internally when content exceeds maxHeight. This
+    // replaces the previous "form fills drawer via flex: 1 + form
+    // scrolls" pattern, which created a tall form box with content
+    // bunched at top/bottom and empty scrollable area in between —
+    // looked like the sheet was broken when the form was a few
+    // fields short of filling the drawer.
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
     maxHeight: 'calc(100dvh - env(safe-area-inset-top) - 24px)',
     display: 'flex',
     flexDirection: 'column'
@@ -83,16 +84,11 @@ export function useDrawerKeyboard(open: boolean) {
       boxSizing: 'border-box',
       maxWidth: '100%',
       minWidth: 0,
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
-      overscrollBehavior: 'contain',
-      // Treat the bottom 40% as occluded so scrollIntoView never
-      // lands a focused field right against where the iOS keyboard
-      // *could* be. Vaul handles the drawer lift; this just keeps
-      // the focused input centered in the still-visible area.
+      // Form is now intrinsic content height — no flex grow, no
+      // overflow box of its own. The drawer scrolls instead, which
+      // means the DrawerHeader scrolls with the form (acceptable,
+      // and matches how iOS native sheets feel).
       scrollPaddingBottom: '40vh',
-      flex: 1,
-      minHeight: 0,
       ...extra
     }
   }
