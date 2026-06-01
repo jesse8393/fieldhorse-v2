@@ -550,10 +550,10 @@ function chipStyle(active: any, disabled: any) {
     padding: '7px 12px',
     borderRadius: 999,
     border: active
-      ? '1px solid rgba(201,150,58,0.4)'
+      ? '1px solid rgba(255,255,255,0.22)'
       : '1px solid var(--rule)',
     background: active
-      ? 'rgba(201,150,58,0.14)'
+      ? 'rgba(255,255,255,0.06)'
       : 'var(--surface-2)',
     color: active
       ? 'var(--ink-strong)'
