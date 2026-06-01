@@ -166,7 +166,7 @@ export default function NotificationsBell() {
                 <DrawerTitle asChild>
                   <h2
                     className="fh-font-serif"
-                    style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+                    style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, fontStyle: 'normal', color: 'var(--ink-strong)' }}
                   >
                     {unread > 0 ? <>{unread} new <em style={{ fontStyle: 'normal', fontWeight: 600 }}>notifications.</em></> : <>All <em style={{ fontStyle: 'normal', fontWeight: 600 }}>caught up.</em></>}
                   </h2>
@@ -220,10 +220,15 @@ export default function NotificationsBell() {
                           gap: 10,
                           padding: '12px 14px 12px 18px',
                           borderRadius: 12,
+                          // User feedback: gold-tinted unread rows read as
+                          // yellow noise on the inbox. The colored left
+                          // stripe + bold title already signal "unread"
+                          // adequately. Now uses a neutral lift instead
+                          // of gold gradient.
                           background: isUnread
-                            ? 'linear-gradient(180deg, rgba(201,150,58,0.08), rgba(201,150,58,0.03))'
+                            ? 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))'
                             : 'var(--surface-2)',
-                          border: isUnread ? '1px solid rgba(201,150,58,0.25)' : '1px solid var(--rule)',
+                          border: isUnread ? '1px solid rgba(255,255,255,0.12)' : '1px solid var(--rule)',
                           cursor: 'pointer',
                           color: 'var(--ink-strong)',
                           position: 'relative',
