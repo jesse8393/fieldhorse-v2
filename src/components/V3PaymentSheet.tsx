@@ -171,7 +171,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
                 <span style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 28,
-                  color: showsAmount ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                  color: showsAmount ? 'var(--ink-strong)' : 'var(--ink-muted)',
                   lineHeight: 1
                 }}>
                   $
@@ -374,14 +374,19 @@ function chipStyle(active: any, disabled: any) {
   return {
     padding: '7px 12px',
     borderRadius: 999,
+    // User feedback: pill active state was reading as yellow noise
+    // on the Method/Kind rows. Swapped from gold border + gold bg +
+    // gold text to a neutral lift — white-12% border, white-6% fill,
+    // ink-strong text. Active vs inactive contrast preserved (border
+    // brightness + text weight already do the work).
     border: active
-      ? '1px solid rgba(201,150,58,0.4)'
+      ? '1px solid rgba(255, 255, 255, 0.22)'
       : '1px solid var(--rule)',
     background: active
-      ? 'rgba(201,150,58,0.14)'
+      ? 'rgba(255, 255, 255, 0.06)'
       : 'var(--surface-2)',
     color: active
-      ? 'var(--field-gold-bright)'
+      ? 'var(--ink-strong)'
       : 'var(--ink-muted)',
     fontFamily: 'var(--font-body)',
     fontSize: 12,
