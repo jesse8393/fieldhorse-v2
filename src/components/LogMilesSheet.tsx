@@ -166,7 +166,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
           </label>
 
           {milesNum > 0 && (
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 12, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 12, background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.22)' }}>
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Deduction</span>
               <span className="fh-text-gradient-gold" style={{ fontFamily: 'var(--font-display)', fontSize: 22, letterSpacing: '0.01em' }}>
                 ${deduction.toFixed(2)}

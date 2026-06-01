@@ -671,7 +671,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
             <div style={{ position: 'relative' }}>
               <span aria-hidden="true" style={{
                 position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-                color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 16,
+                color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 16,
                 pointerEvents: 'none'
               }}>$</span>
               <input
@@ -763,8 +763,8 @@ function TemplatePickerInline({ templates, value, onChange }: any) {
         ))}
       </div>
       {picked && (
-        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(201,150,58,0.07)', border: '1px solid rgba(201,150,58,0.22)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 10, letterSpacing: '0.14em', color: 'var(--field-gold-bright)' }}>
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.22)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 10, letterSpacing: '0.14em', color: 'var(--ink-strong)' }}>
             +{picked.todos.length}
           </span>
           <span style={{ flex: 1, fontFamily: 'var(--font-body)', fontSize: 11.5, color: 'var(--ink-muted)', lineHeight: 1.35 }}>
@@ -833,7 +833,7 @@ function V3ChipRow({ label, value, options, onChange }: any) {
                   ? 'rgba(201,150,58,0.14)'
                   : 'var(--surface-2)',
                 color: active
-                  ? 'var(--field-gold-bright)'
+                  ? 'var(--ink-strong)'
                   : 'var(--ink-muted)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 12, fontWeight: 700,
@@ -860,7 +860,7 @@ function TemplateChip({ active, onClick, label }: any) {
         borderRadius: 999,
         border: active ? '1px solid var(--field-gold-bright)' : '1px solid var(--rule)',
         background: active ? 'rgba(201,150,58,0.15)' : 'var(--surface-2)',
-        color: active ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
+        color: active ? 'var(--ink-strong)' : 'var(--ink-strong)',
         fontFamily: 'var(--font-body)',
         fontSize: 12,
         fontWeight: active ? 700 : 500,

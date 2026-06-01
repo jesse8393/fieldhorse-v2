@@ -91,9 +91,9 @@ export default function DocIntakeButton({
           gap: 6,
           padding: '8px 12px',
           borderRadius: 10,
-          background: 'rgba(201,150,58,0.12)',
-          border: '1px solid rgba(201,150,58,0.35)',
-          color: 'var(--field-gold-bright)',
+          background: 'rgba(255, 255, 255, 0.06)',
+          border: '1px solid rgba(255, 255, 255, 0.22)',
+          color: 'var(--ink-strong)',
           fontFamily: 'var(--font-display)',
           fontSize: 11,
           letterSpacing: '0.12em',
@@ -118,7 +118,7 @@ export default function DocIntakeButton({
               padding: 14,
               borderRadius: 14,
               background: 'linear-gradient(180deg, rgba(30,20,10,0.5), rgba(20,15,10,0.3))',
-              border: '1px solid rgba(201,150,58,0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.22)',
               position: 'relative',
               overflow: 'hidden'
             }}
@@ -151,7 +151,7 @@ export default function DocIntakeButton({
             )}
 
             {busy ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.12em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.22)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.12em' }}>
                 <Loader2 size={14} style={{ animation: 'fh-spin 700ms linear infinite' }} />
                 READING DOC…
               </div>

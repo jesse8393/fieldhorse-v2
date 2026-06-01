@@ -316,7 +316,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                           ? 'rgba(201,150,58,0.14)'
                           : 'var(--surface-2)',
                         color: active
-                          ? 'var(--field-gold-bright)'
+                          ? 'var(--ink-strong)'
                           : 'var(--ink-muted)',
                         fontFamily: 'var(--font-body)',
                         fontSize: 12,
@@ -418,8 +418,8 @@ function RecentPartnersStrip({ partners, onPick }: any) {
           >
             <span aria-hidden="true" style={{
               width: 22, height: 22, borderRadius: '50%',
-              background: 'rgba(201,150,58,0.16)',
-              color: 'var(--field-gold-bright)',
+              background: 'rgba(255, 255, 255, 0.06)',
+              color: 'var(--ink-strong)',
               display: 'grid', placeItems: 'center',
               fontFamily: 'var(--font-display)',
               fontSize: 11, letterSpacing: '0.04em',
@@ -470,8 +470,8 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
           style={{
             padding: '10px 12px',
             borderRadius: 10,
-            background: 'color-mix(in srgb, var(--field-gold-bright) 10%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--field-gold-bright) 40%, transparent)',
+            background: 'rgba(255, 255, 255, 0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
             color: 'var(--ink-strong)',
             fontFamily: 'var(--font-body)',
             fontSize: 12, lineHeight: 1.45

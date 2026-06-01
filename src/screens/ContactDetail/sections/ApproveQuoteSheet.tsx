@@ -475,7 +475,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               </span>
               <span style={{
                 fontFamily: 'var(--font-display)', fontSize: 18, lineHeight: 1,
-                color: 'var(--field-gold-bright)', fontVariantNumeric: 'tabular-nums'
+                color: 'var(--ink-strong)', fontVariantNumeric: 'tabular-nums'
               }}>
                 {money(totals.base)}
               </span>
@@ -502,10 +502,10 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
             padding: '10px 12px', borderRadius: 10,
-            background: 'rgba(201,150,58,0.10)',
-            border: '1px solid rgba(201,150,58,0.30)'
+            background: 'rgba(255, 255, 255, 0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.22)'
           }}>
-            <Lock size={14} aria-hidden="true" style={{ color: 'var(--field-gold-bright)', marginTop: 2, flexShrink: 0 }} />
+            <Lock size={14} aria-hidden="true" style={{ color: 'var(--ink-strong)', marginTop: 2, flexShrink: 0 }} />
             <span style={{
               fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
               color: 'var(--ink-strong)'
@@ -560,7 +560,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                       color: dis
                         ? 'var(--ink-faint, var(--ink-muted))'
                         : on
-                          ? 'var(--field-gold-bright)'
+                          ? 'var(--ink-strong)'
                           : 'var(--ink-muted)',
                       fontFamily: 'var(--font-body)',
                       fontSize: 12, fontWeight: 700,

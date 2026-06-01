@@ -171,7 +171,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
                 <span style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 28,
-                  color: showsAmount ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                  color: showsAmount ? 'var(--ink-strong)' : 'var(--ink-muted)',
                   lineHeight: 1
                 }}>
                   $
@@ -202,7 +202,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
                 marginTop: 6,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 fontFamily: 'var(--font-body)', fontSize: 11,
-                color: overage ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                color: overage ? 'var(--ink-strong)' : 'var(--ink-muted)',
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 <span>
@@ -216,7 +216,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
                     onClick={() => setAmount(String(Math.round(Number(balance))))}
                     style={{
                       background: 'transparent', border: 'none',
-                      color: 'var(--field-gold-bright)',
+                      color: 'var(--ink-strong)',
                       fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
                       textDecoration: 'underline', textUnderlineOffset: 2,
                       cursor: 'pointer', padding: 0
@@ -381,7 +381,7 @@ function chipStyle(active: any, disabled: any) {
       ? 'rgba(201,150,58,0.14)'
       : 'var(--surface-2)',
     color: active
-      ? 'var(--field-gold-bright)'
+      ? 'var(--ink-strong)'
       : 'var(--ink-muted)',
     fontFamily: 'var(--font-body)',
     fontSize: 12,

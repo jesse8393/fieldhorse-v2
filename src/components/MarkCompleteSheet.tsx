@@ -392,7 +392,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                 </div>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
                   <span style={labelStyle}>
-                    Customer name {signoffMethod === 'signature_typed' && <span style={{ color: 'var(--field-gold-bright)' }}>*</span>}
+                    Customer name {signoffMethod === 'signature_typed' && <span style={{ color: 'var(--ink-strong)' }}>*</span>}
                   </span>
                   <input
                     type="text"
@@ -540,8 +540,8 @@ function certificateBtnStyle(variant: any, busy: any) {
   return {
     ...base,
     background: 'var(--surface-2)',
-    border: '1px solid color-mix(in srgb, var(--field-gold-bright) 35%, transparent)',
-    color: 'var(--field-gold-bright)'
+    border: '1px solid rgba(255, 255, 255, 0.18)',
+    color: 'var(--ink-strong)'
   }
 }
 
@@ -556,7 +556,7 @@ function chipStyle(active: any, disabled: any) {
       ? 'rgba(201,150,58,0.14)'
       : 'var(--surface-2)',
     color: active
-      ? 'var(--field-gold-bright)'
+      ? 'var(--ink-strong)'
       : 'var(--ink-muted)',
     fontFamily: 'var(--font-body)',
     fontSize: 12,
