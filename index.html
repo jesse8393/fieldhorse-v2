@@ -12,6 +12,22 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Fieldhorse" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- SEO + social link previews. Fieldhorse is auth-gated so crawlers
+         only ever see the login screen; these meta tags make sure that
+         when someone shares fieldhorse.io they get a proper card preview
+         instead of a bare URL. -->
+    <meta name="description" content="Field operations for contractors. Run jobs, schedule crews, send proposals, collect payments — all on your phone." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Fieldhorse" />
+    <meta property="og:title" content="Fieldhorse" />
+    <meta property="og:description" content="Field operations for contractors. Run jobs, schedule crews, send proposals, collect payments — all on your phone." />
+    <meta property="og:image" content="https://fieldhorse.io/icon-512.png" />
+    <meta property="og:url" content="https://fieldhorse.io" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Fieldhorse" />
+    <meta name="twitter:description" content="Field operations for contractors. Run jobs, schedule crews, send proposals, collect payments — all on your phone." />
+    <meta name="twitter:image" content="https://fieldhorse.io/icon-512.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Supabase project origin — open TCP+TLS in parallel with HTML parse
