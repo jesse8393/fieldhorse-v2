@@ -10130,3 +10130,25 @@ select:focus-visible,
   font-family: var(--font-body) !important;
   font-style: normal !important;
 }
+
+/* ================================================================
+   iOS AUTO-ZOOM PREVENTION
+   ================================================================
+   iOS Safari (including the in-app Safari View Controller used by
+   Mail/Messages link previews) auto-zooms the entire page on input
+   focus when the input's font-size is < 16px. The page silently
+   scales to ~1.14x, the focused field fills the screen, and the
+   rest of the form is pushed off-canvas — making sheets look
+   completely broken. user-scalable=no in viewport meta DOES NOT
+   prevent this; only a font-size of at least 16px does.
+
+   All sheet inputs in this codebase use fontSize: 14 inline.
+   Rather than edit every sheet, this rule forces the minimum
+   font-size on every text-entry control globally. The visual
+   difference between 14px and 16px is barely perceptible.
+   ================================================================ */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
