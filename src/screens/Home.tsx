@@ -529,7 +529,12 @@ export default function Home() {
             fontWeight: 700,
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
-            color: 'var(--v3-primary)'
+            // Polish pass: date eyebrow demoted from gold to muted ink
+            // so the gold accent on the operator's first name (a few
+            // lines below) carries the brand moment alone. Two gold
+            // hits on the same row read as gaudy; one reads as
+            // intentional.
+            color: 'var(--v3-text-muted)'
           }}>
             {now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
             {' · '}
@@ -659,9 +664,14 @@ export default function Home() {
           // V3-SYSTEM-1B-1: section-to-section margin 14 → 12, card pad
           // 14/18 → 12/16, radius (token default 20) → 16. Home-only
           // density override; tokens stay alone for other screens.
-          margin: '0 var(--v3-gutter) 12px',
-          padding: '12px 16px',
-          borderRadius: 16,
+          // Polish pass: hero card pad 12/16 → 18/20 + section gap
+          // 12 → 16. The hero is the most important card on this
+          // screen; giving it breathing room and a more generous
+          // gutter against the next card reads premium instead of
+          // dense.
+          margin: '0 var(--v3-gutter) 16px',
+          padding: '18px 20px',
+          borderRadius: 18,
           // Glass-metal depth from V3-HOME-1C — kept verbatim. Inset top
           // highlight + inset bottom shadow + crisp outline + soft halo.
           border: '1px solid var(--v3-border-strong)',
@@ -698,12 +708,18 @@ export default function Home() {
             flex: 1,
             minWidth: 0,
             fontFamily: 'var(--font-body)',
-            fontSize: 32,
+            // Polish pass: hero money 32 → 38px. The pipeline number is
+            // the operator's "you're worth X right now" moment; bigger
+            // type makes it feel like a serious dashboard, not a quick
+            // status. Letter-spacing tightened from -0.012em to -0.018em
+            // because larger numbers benefit from more aggressive
+            // tracking.
+            fontSize: 38,
             fontWeight: 700,
-            letterSpacing: '-0.012em',
+            letterSpacing: '-0.018em',
             color: 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums',
-            lineHeight: 1.05,
+            lineHeight: 1.0,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -714,7 +730,9 @@ export default function Home() {
             ) : (
               <>
                 <span style={{
-                  fontSize: 22,
+                  // $ glyph scales with the hero number: 22 → 26 to
+                  // keep its baseline relationship to the larger digit.
+                  fontSize: 26,
                   fontWeight: 600,
                   marginRight: 1,
                   color: 'color-mix(in srgb, var(--v3-primary) 70%, var(--v3-text-muted))',
