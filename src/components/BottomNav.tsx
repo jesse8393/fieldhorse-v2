@@ -180,6 +180,10 @@ export default function BottomNav() {
               style={{
                 flex: 1,
                 overflowY: 'auto',
+                // Prevents iOS rubber-band scroll on the nav list from
+                // bouncing the page underneath the drawer.
+                overscrollBehavior: 'contain',
+                WebkitOverflowScrolling: 'touch',
                 padding: '4px 10px 12px',
                 display: 'flex',
                 flexDirection: 'column',

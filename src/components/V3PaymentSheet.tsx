@@ -80,7 +80,10 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
 
   function requestClose(v: any) {
     if (v) return
-    if (saving) return
+    // Allow dismissal once the success splash is showing — the parent
+    // will unmount us in ~700ms anyway, but the user shouldn't be locked
+    // out of swipe-to-dismiss during that window.
+    if (saving && !success) return
     setOpen(false)
     setTimeout(() => onClose?.(), 200)
   }

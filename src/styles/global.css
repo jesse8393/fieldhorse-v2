@@ -6861,7 +6861,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   max-width: calc(100vw - 32px);
 }
 .fh-toast {
-  pointer-events: auto;
+  /* Toasts carry no interactive children — let taps pass through to
+     elements underneath instead of intercepting clicks. */
+  pointer-events: none;
   display: inline-flex;
   align-items: center;
   gap: 10px;
