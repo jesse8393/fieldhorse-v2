@@ -173,8 +173,7 @@ function BrandSlot({ logoSrc, company, fullName }: any) {
   // immediate identification without taking over the header strip.
   if (logoSrc) {
     return (
-      <img
-        src={logoSrc}
+      <img loading="lazy"src={logoSrc}
         alt={company || 'Company logo'}
         style={{
           maxHeight: 'clamp(22px, 4.6vw, 30px)',

@@ -90,8 +90,7 @@ function LogoMark({ company, maxHeight = 64, align = 'left' }: any) {
     .toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'MC'
   if (company?.logo_url) {
     return (
-      <img
-        src={company.logo_url}
+      <img loading="lazy"src={company.logo_url}
         alt={`${company?.name || 'Company'} logo`}
         style={{ maxHeight, maxWidth: 220, objectFit: 'contain', display: 'block', margin: align === 'right' ? '0 0 0 auto' : 0 }}
       />
@@ -223,7 +222,7 @@ function SignatureLine({ label, name, dataUrl, date, muted }: any) {
     <div>
       <div style={{ height: 52, display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid #1A1814', paddingBottom: 4 }}>
         {dataUrl
-          ? <img src={dataUrl} alt="Signature" style={{ maxHeight: 46, maxWidth: '100%' }} />
+          ? <img loading="lazy"src={dataUrl} alt="Signature" style={{ maxHeight: 46, maxWidth: '100%' }} />
           : name ? <span style={{ fontFamily: "'Caveat', 'Snell Roundhand', cursive", fontSize: 22, color: muted }}>{name}</span> : null}
       </div>
       <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: muted, letterSpacing: '0.06em' }}>

@@ -203,8 +203,7 @@ export default function ScopeSectionCard({
                 }}
               >
                 {p.url && (
-                  <img
-                    src={p.url}
+                  <img loading="lazy"src={p.url}
                     alt={p.caption || ''}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     onError={(e) => { e.currentTarget.style.opacity = '0' }}

@@ -72,7 +72,7 @@ export default function LogoUploader({ logoUrl, companyName, onUpload, size = 'm
         title={logoUrl ? 'Replace logo' : 'Upload company logo'}
       >
         {logoUrl ? (
-          <img src={logoUrl} alt={companyName || 'Company logo'} className="fh-logo__img" />
+          <img loading="lazy"src={logoUrl} alt={companyName || 'Company logo'} className="fh-logo__img" />
         ) : (
           <span className="fh-logo__placeholder" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

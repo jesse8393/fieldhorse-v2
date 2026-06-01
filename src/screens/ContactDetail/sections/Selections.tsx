@@ -347,7 +347,7 @@ function SelectionCard({
                   background: 'rgba(0,0,0,.30)', display: 'grid', placeItems: 'center',
                 }}>
                   {o.image_url ? (
-                    <img src={o.image_url} alt={o.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img loading="lazy"src={o.image_url} alt={o.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <ImageIcon size={20} aria-hidden="true" color="rgba(245,242,234,.30)" />
                   )}

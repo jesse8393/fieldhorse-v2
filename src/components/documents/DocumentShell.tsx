@@ -152,8 +152,7 @@ function LogoBlock({ company, brand }: any) {
           overflow: 'hidden'
         }}
       >
-        <img
-          src={company.logo_url}
+        <img loading="lazy"src={company.logo_url}
           alt={`${company?.name || 'Company'} logo`}
           style={{
             maxWidth: size - 10,

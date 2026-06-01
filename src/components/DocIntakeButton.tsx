@@ -143,8 +143,7 @@ export default function DocIntakeButton({
 
             {previewUrl && (
               <div style={{ marginBottom: 10, padding: 6, borderRadius: 10, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--rule)' }}>
-                <img
-                  src={previewUrl}
+                <img loading="lazy"src={previewUrl}
                   alt="Preview"
                   style={{ width: '100%', maxHeight: 180, objectFit: 'contain', display: 'block', borderRadius: 6 }}
                 />
