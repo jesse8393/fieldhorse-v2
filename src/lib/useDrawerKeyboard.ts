@@ -58,15 +58,12 @@ export function useDrawerKeyboard(open: boolean) {
   const drawerStyle: CSSProperties = {
     maxWidth: '100%',
     overflowX: 'hidden',
-    // Drawer scrolls internally when content exceeds maxHeight. This
-    // replaces the previous "form fills drawer via flex: 1 + form
-    // scrolls" pattern, which created a tall form box with content
-    // bunched at top/bottom and empty scrollable area in between —
-    // looked like the sheet was broken when the form was a few
-    // fields short of filling the drawer.
-    overflowY: 'auto',
-    WebkitOverflowScrolling: 'touch',
-    overscrollBehavior: 'contain',
+    // Force the drawer to fill the available height. Using min-height
+    // (not just maxHeight) so even a short form gets a tall sheet —
+    // looks like a real sheet, not a squished strip at the bottom.
+    // Vaul writes inline style.height during keyboard repositioning;
+    // min/maxHeight don't conflict with that.
+    minHeight: 'calc(100dvh - env(safe-area-inset-top) - 96px)',
     maxHeight: 'calc(100dvh - env(safe-area-inset-top) - 24px)',
     display: 'flex',
     flexDirection: 'column'
@@ -84,11 +81,12 @@ export function useDrawerKeyboard(open: boolean) {
       boxSizing: 'border-box',
       maxWidth: '100%',
       minWidth: 0,
-      // Form is now intrinsic content height — no flex grow, no
-      // overflow box of its own. The drawer scrolls instead, which
-      // means the DrawerHeader scrolls with the form (acceptable,
-      // and matches how iOS native sheets feel).
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
+      overscrollBehavior: 'contain',
       scrollPaddingBottom: '40vh',
+      flex: 1,
+      minHeight: 0,
       ...extra
     }
   }
