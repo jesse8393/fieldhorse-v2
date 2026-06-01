@@ -1625,58 +1625,6 @@ a {
 }
 
 /* Editable greeting */
-.fh-home__greet {
-  display: flex;
-  align-items: center;
-}
-.fh-home__greet-btn {
-  appearance: none;
-  background: transparent;
-  border: 1px dashed transparent;
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font-family: var(--font-body);
-  font-size: 1.05rem;
-  font-weight: 500;
-  color: var(--ink-strong);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  text-align: left;
-  cursor: text;
-  max-width: 100%;
-  transition: border-color 160ms var(--ease), background 160ms var(--ease);
-}
-.fh-home__greet-btn:hover {
-  border-color: var(--rule);
-  background: var(--surface-1);
-}
-.fh-home__greet-btn.is-empty { color: var(--ink-muted); font-style: italic; }
-.fh-home__greet-edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-muted);
-  opacity: 0;
-  transition: opacity 160ms var(--ease);
-}
-.fh-home__greet-btn:hover .fh-home__greet-edit { opacity: 1; }
-
-.fh-home__greet-input {
-  width: 100%;
-  max-width: 620px;
-  min-height: 60px;
-  padding: var(--space-3);
-  font-family: var(--font-body);
-  font-size: 1.05rem;
-  line-height: 1.45;
-  color: var(--ink-strong);
-  background: var(--surface-1);
-  border: 1px solid var(--field-gold);
-  border-radius: var(--radius-sm);
-  outline: none;
-  resize: vertical;
-}
 
 /* Pin banner */
 .fh-pinbanner {
@@ -1945,45 +1893,6 @@ a {
 }
 
 /* Schedule */
-.fh-sched {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-5);
-  background: var(--surface-1);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-}
-.fh-sched__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--rule);
-}
-.fh-sched__eye {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-.fh-sched__count {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  letter-spacing: 0.12em;
-  color: var(--field-gold);
-}
-.fh-sched__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-4) 0;
-  color: var(--ink-muted);
-}
-.fh-sched__empty p { margin: 0; }
 .fh-link {
   background: none;
   border: none;
@@ -3556,124 +3465,6 @@ a {
    strong information hierarchy. Patterned on the handoff:
    _reference/fieldhorse-v3-design/desktop.jsx + desktop-flows-1.jsx.
    ========================================================================= */
-@media (min-width: 900px) {
-  /* ───── Shared desktop primitives ───── */
-
-  /* Filter pill — shared by jobs board + clients directory */
-
-  /* Detail-rail action pills */
-
-  /* Stage pills (jobs board) */
-
-  /* 5-segment progress bar */
-
-  /* Status pills (clients detail) */
-
-  /* ───────────────────────────────────────
-     JOBS BOARD
-     ─────────────────────────────────────── */
-  /* 4-col layout when there's room for it */
-
-  /* Featured card — spans 2 rows on the right edge of the first column */
-
-  /* ───────────────────────────────────────
-     CLIENTS DIRECTORY
-     ─────────────────────────────────────── */
-
-  /* KPI strip */
-
-  /* List + detail split */
-  /* Selected row — neutral surface lift + thin neutral inset highlight on
-     the left, NOT a gold stripe + gold wash. User feedback: prior gold
-     treatment read as "stuck hovering on a button" because the same gold
-     accent that the featured TOP CLIENT card uses was duplicated on the
-     list row. */
-  /* Top client — no per-row tint. The featured TOP CLIENT card above the
-     list already carries the emphasis. */
-  /* Selected row avatar — quiet surface lift, no gold gradient. */
-
-  /* Detail panel */
-
-  /* ───────────────────────────────────────
-     SCHEDULE WORKSPACE
-     ─────────────────────────────────────── */
-
-  /* Upcoming rail */
-
-  /* ───────────────────────────────────────
-     JOB DETAIL WORKSPACE — Phase 8
-     Renders only when tab !== 'quote' on desktop.
-     ─────────────────────────────────────── */
-
-  /* HEADER */
-
-  /* FINANCIAL STRIP */
-
-  /* TAB NAV */
-
-  /* WORK AREA */
-  /* 5/17 chrome unification: Quote tab now renders inside
-     DesktopJobDetail so the back button + tab nav stay consistent
-     across all 5 tabs. The Quote builder has its own 2-pane workspace
-     (.v3-screen--quote-active in global.css) so the desktop right
-     rail collapses when tab === 'quote' — Quote gets the full canvas
-     width. Fixes the 5/13 audit's "two design systems on one page"
-     complaint where switching Overview → Quote swapped the entire
-     chrome to a different design system. */
-  /* Strip per-section mobile gutters in the desktop work area for the
-     tab content, since the work-area column itself provides the gutter
-     via the .fh-app__main-inner padding. */
-
-  /* RIGHT RAIL */
-  /* Rail card variants — Phase 10b crisp-glass mandate.
-     Prior soft tone-fade gradients scrubbed. Identity now comes from
-     a hard 2px colored top stripe (inset box-shadow) + the colored
-     border + colored eyebrow. Solid surface, sharp edges, no haze. */
-
-  /* CLIENT CARD */
-
-  /* SCHEDULE PEEK */
-
-  /* BALANCE CARD */
-
-  /* ───────────────────────────────────────
-     HOME COMMAND CENTER — Phase 10
-     Renders only at >=900px via DesktopHomeCommandCenter.
-     Below 900px the existing v3-screen--home flow renders.
-     ─────────────────────────────────────── */
-
-  /* Greeting strip */
-
-  /* Hero + priorities row */
-
-  /* Pipeline hero card — Phase 10b crisp-glass mandate.
-     The radial gold mist + linear surface fade in the prior version
-     read as foggy halo. Replaced with a solid black-glass surface +
-     a crisper gold-tinted border + a 1px gold inner top highlight
-     that paints a clean lit edge instead of a wash. The premium
-     identity now lives in the leading edge highlight + gold border,
-     not in a hazy gradient. */
-
-  /* Priorities card */
-  /* Tone variants — Phase 10b crisp-glass mandate. The 5%-alpha tone
-     washes were reading as muddy low-contrast mud. Tone now lives
-     entirely in the colored border + colored icon chip + colored
-     count number. Background stays the same crisp surface-2 as
-     muted rows. */
-
-  /* Today on site card */
-
-  /* Pipeline preview card */
-
-  /* Next actions */
-
-  /* Quick actions row */
-  /* Quick-tile primary — Phase 10b crisp-glass mandate.
-     Prior soft-gold linear fade scrubbed; primary identity now comes
-     from the gold border + 1px gold inner top highlight + the gold
-     icon block. Solid surface keeps the panel feeling like polished
-     metal, not a cloudy gradient. */
-}
 
 /* More drawer */
 /* Legacy scrim kept for any caller still using it (non-portal modals).
@@ -3935,41 +3726,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   flex-direction: column;
   gap: 8px;
 }
-.fh-drawer__tile {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 14px var(--space-4);
-  background: var(--surface-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-spec);
-  color: var(--ink-strong);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 160ms var(--ease), transform 160ms var(--ease), background 160ms var(--ease);
-}
-.fh-drawer__tile:hover {
-  border-color: var(--field-gold);
-  transform: translateX(2px);
-}
-.fh-drawer__tile-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-spec);
-  background: color-mix(in srgb, var(--field-gold) 10%, transparent);
-  color: var(--field-gold);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.fh-drawer__tile-label {
-  flex: 1;
-  font-family: var(--font-display);
-  font-size: 1rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
 
 /* Footer: theme (primary ghost) + sign out (destructive ghost), 2:1 ratio */
 .fh-drawer__foot {
@@ -3984,7 +3740,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   background: transparent;
   border-top-color: var(--v3-border-strong);
 }
-.fh-drawer__theme,
 .fh-drawer__signout {
   display: inline-flex;
   align-items: center;
@@ -3998,30 +3753,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   text-transform: uppercase;
   cursor: pointer;
   transition: border-color 160ms var(--ease), background 160ms var(--ease), color 160ms var(--ease);
-}
-.fh-drawer__theme {
-  flex: 2;
-  background: var(--surface-2);
-  border: 1px solid var(--rule-bold);
-  color: var(--ink-strong);
-}
-.fh-drawer__theme:hover {
-  border-color: var(--field-gold);
-  color: var(--field-gold);
-}
-.fh-drawer__theme-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-.fh-drawer__theme-dot--dark {
-  background: var(--onyx);
-  box-shadow: 0 0 0 1px var(--rule-bold);
-}
-.fh-drawer__theme-dot--light {
-  background: var(--field-gold);
-  box-shadow: 0 0 8px rgba(201, 150, 58, 0.6);
 }
 .fh-drawer__signout {
   flex: 1;
@@ -4487,19 +4218,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 
 /* Margin pill */
-.fh-margin {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-.fh-margin--good { background: rgba(45, 122, 79, 0.12); color: var(--signal-green); }
-.fh-margin--warn { background: rgba(199, 164, 90, 0.16); color: var(--field-gold); }
-.fh-margin--thin { background: rgba(192, 57, 43, 0.12); color: var(--alert-red); }
-.fh-margin--neutral { background: var(--surface-2); color: var(--ink-muted); }
 
 /* =========================================================================
    EMPTY STATES
@@ -4753,30 +4471,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 @media (max-width: 540px) {
   .fh-summary-card { grid-template-columns: repeat(2, 1fr); }
 }
-.fh-sumitem {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.fh-sumitem__k {
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-.fh-sumitem__v {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  letter-spacing: 0.04em;
-  color: var(--ink-strong);
-}
-.fh-sumitem__v--good { color: var(--signal-green); }
-.fh-sumitem__v--warn { color: var(--field-gold); }
-.fh-sumitem__v--thin { color: var(--alert-red); }
-.fh-sumitem--good .fh-sumitem__v { color: var(--signal-green); transition: color 360ms var(--ease); }
-.fh-sumitem--warn .fh-sumitem__v { color: var(--field-gold); transition: color 360ms var(--ease); }
-.fh-sumitem--thin .fh-sumitem__v { color: var(--alert-red); transition: color 360ms var(--ease); }
 
 /* Progress bar (milestones) */
 .fh-progress {
@@ -5362,28 +5056,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-weatherbar--ok .fh-weatherbar__dot { background: var(--field-gold); color: var(--field-gold); }
 .fh-weatherbar--poor { border-left-color: var(--alert-red); }
 .fh-weatherbar--poor .fh-weatherbar__dot { background: var(--alert-red); color: var(--alert-red); }
-
-.fh-sched-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.fh-sched-bar__nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.fh-sched-bar__cur {
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-strong);
-  min-width: 180px;
-  text-align: center;
-}
 .fh-seg--view { flex: 0 0 auto; }
 
 .fh-timeline {
@@ -5403,55 +5075,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   left: 78px;
   width: 1px;
   background: var(--rule);
-}
-.fh-tl-item {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface-1);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  position: relative;
-  cursor: pointer;
-  transition: border-color 160ms var(--ease), transform 160ms var(--ease);
-}
-.fh-tl-item:hover { border-color: var(--field-gold); transform: translateX(2px); }
-.fh-tl-item__time {
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  color: var(--field-gold);
-  min-width: 64px;
-  flex: 0 0 64px;
-  position: relative;
-}
-.fh-tl-item__time::after {
-  content: '';
-  position: absolute;
-  right: -16px;
-  top: 6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--field-gold);
-  box-shadow: 0 0 0 3px var(--surface-1);
-}
-.fh-tl-item__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  padding-left: var(--space-3);
-}
-.fh-tl-item__title {
-  font-family: var(--font-body);
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: var(--ink-strong);
-}
-.fh-tl-item__sub {
-  font-size: 0.82rem;
-  color: var(--ink-muted);
 }
 
 /* Schedule Week view — v3-aligned grid + event card. Was using the
@@ -6058,8 +5681,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-month__num { font-size: 0.82rem; }
   .fh-month__count { font-size: 0.55rem; padding: 1px 4px; }
   .fh-month__dow { font-size: 0.58rem; padding: 4px 0; }
-
-  .fh-sched-bar__cur { min-width: 140px; font-size: 0.92rem; }
   .fh-bid__li { grid-template-columns: 1fr; gap: 4px; }
   .fh-bid__li > span { font-size: 0.8rem; }
   .fh-settings__row { flex-direction: column; align-items: stretch; }
@@ -6083,18 +5704,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-page-frame {
   position: relative;
 }
-.fh-corner {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--field-gold);
-  pointer-events: none;
-  z-index: 1;
-}
-.fh-corner--tl { top: 0; left: 0; border-right: 0; border-bottom: 0; }
-.fh-corner--tr { top: 0; right: 0; border-left: 0; border-bottom: 0; }
-.fh-corner--bl { bottom: 0; left: 0; border-right: 0; border-top: 0; }
-.fh-corner--br { bottom: 0; right: 0; border-left: 0; border-top: 0; }
 
 /* Fixed-viewport corner brackets for AppShell. Respect notch + home indicator. */
 .fh-page-corners {
@@ -6173,47 +5782,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-svc.is-on .fh-spec-code { color: var(--field-gold-hot); }
 
 /* ---- Status pill: pulsing dot + uppercase mono label ---- */
-.fh-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: rgba(45, 122, 79, 0.1);
-  border: 1px solid rgba(45, 122, 79, 0.3);
-  border-radius: var(--radius-spec);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--signal-green);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-.fh-status-pill::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  background: currentColor;
-  border-radius: 999px;
-  box-shadow: 0 0 8px currentColor;
-  animation: fh-pulse 2s infinite;
-}
-.fh-status-pill--gold {
-  background: rgba(201, 150, 58, 0.1);
-  border-color: rgba(201, 150, 58, 0.3);
-  color: var(--field-gold);
-}
-.fh-status-pill--red {
-  background: rgba(192, 57, 43, 0.1);
-  border-color: rgba(192, 57, 43, 0.3);
-  color: var(--alert-red);
-}
-.fh-status-pill--steel {
-  background: rgba(92, 92, 92, 0.1);
-  border-color: rgba(92, 92, 92, 0.3);
-  color: var(--ink-muted);
-}
 @keyframes fh-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -10034,7 +9602,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .gold-italic,
 .fh-font-serif-italic,
 .v3-h1 .v3-h1__accent,
-.fh-home__greet-btn.is-empty,
 h1 em,
 h2 em,
 h3 em {
