@@ -17,7 +17,49 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        // Runtime caching for assets the precache doesn't own (third-
+        // party origins + Supabase Storage public URLs). Cuts repeat
+        // network roundtrips on warm visits and gives a soft offline
+        // experience for previously-seen photos / logos.
+        runtimeCaching: [
+          {
+            // Google Fonts stylesheet — cache the CSS aggressively;
+            // it points to versioned woff2 files that get their own
+            // cache below.
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-stylesheets',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            // Google Fonts woff2 files — never change at a given URL,
+            // safe to cache for a year.
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-files',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Supabase Storage public-bucket URLs (job photos, logos).
+            // Stale-while-revalidate so the user sees a fast hit from
+            // cache while the SW refreshes in the background. Capped
+            // at 7 days so deleted-then-re-uploaded photos don't stay
+            // stale forever.
+            urlPattern: /\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'supabase-storage-public',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
       includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png'],
       manifest: {
