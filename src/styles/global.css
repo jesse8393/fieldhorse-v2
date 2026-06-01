@@ -3494,7 +3494,6 @@ a {
 /* ⌘K hint inside the search input — pointer-only affordance. The kbd chord
    is meaningless on a touch device, and the box steals input padding. */
 @media (hover: none) and (pointer: coarse) {
-  .fh-cmdk-hint { display: none !important; }
 }
 
 /* Floating Action Button (override of the earlier .fh-fab declaration
@@ -5816,11 +5815,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   gap: var(--space-4);
   flex-wrap: wrap;
 }
-.fh-spec-bar__div {
-  width: 1px;
-  height: 20px;
-  background: var(--rule);
-}
 .fh-spec-line {
   display: inline-flex;
   align-items: center;
@@ -5845,7 +5839,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   color: var(--ink-strong);
 }
 @media (max-width: 540px) {
-  .fh-spec-bar__div { display: none; }
   .fh-spec-bar__left, .fh-spec-bar__right { gap: var(--space-3); }
 }
 
@@ -6245,12 +6238,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-.fh-asheet-field__code {
-  color: var(--field-gold);
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  font-size: 9px;
 }
 .fh-asheet-field input:not([type='checkbox']):not([type='radio']),
 .fh-asheet-field textarea,
