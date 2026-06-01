@@ -151,8 +151,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
         <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.04em', opacity: 0.72 }}>FH</span>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 36 }}>
           {displayedLogo ? (
-            <img
-              src={displayedLogo}
+            <img loading="lazy"src={displayedLogo}
               alt={companyName || 'Company logo preview'}
               style={{ maxHeight: 36, maxWidth: '70%', objectFit: 'contain' }}
             />

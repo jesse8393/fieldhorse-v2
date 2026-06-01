@@ -356,7 +356,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                     border: '1px solid var(--v3-border)',
                   }}
                 >
-                  <img src={p.preview_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: p.uploading ? 0.45 : 1 }} />
+                  <img loading="lazy"src={p.preview_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: p.uploading ? 0.45 : 1 }} />
                   {p.uploading && (
                     <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--v3-text)', fontSize: 10, fontWeight: 700 }}>
                       Uploading…
@@ -522,7 +522,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                           }}
                         >
                           {url ? (
-                            <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img loading="lazy"src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--v3-text-muted)', fontSize: 10 }}>
                               …

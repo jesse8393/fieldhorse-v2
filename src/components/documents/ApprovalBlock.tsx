@@ -89,8 +89,7 @@ function SignatureField({ label, name, dataUrl, dateLabel, date, gold }: any) {
         }}
       >
         {dataUrl ? (
-          <img
-            src={dataUrl}
+          <img loading="lazy"src={dataUrl}
             alt={`${name || 'Signature'} signature`}
             style={{ maxHeight: 56, maxWidth: '100%', display: 'block' }}
           />

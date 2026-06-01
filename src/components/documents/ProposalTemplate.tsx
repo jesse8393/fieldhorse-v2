@@ -548,7 +548,7 @@ function SigLine({ label, name, dataUrl, date }: any) {
         }}
       >
         {dataUrl ? (
-          <img src={dataUrl} alt="Signature" style={{ maxHeight: 48, maxWidth: '100%' }} />
+          <img loading="lazy"src={dataUrl} alt="Signature" style={{ maxHeight: 48, maxWidth: '100%' }} />
         ) : name ? (
           <span
             style={{

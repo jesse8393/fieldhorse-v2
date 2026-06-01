@@ -647,8 +647,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           padding: '0 8px', position: 'relative'
         }}>
           {url ? (
-            <img
-              src={url}
+            <img loading="lazy"src={url}
               alt={row.caption || row.filename}
               style={{
                 maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
@@ -841,8 +840,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
       }}
     >
       {/* AFTER — full width underneath */}
-      <img
-        src={afterUrl}
+      <img loading="lazy"src={afterUrl}
         alt={afterLabel || 'After'}
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
       />
@@ -851,8 +849,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         position: 'absolute', inset: 0,
         clipPath: `polygon(0 0, ${pct}% 0, ${pct}% 100%, 0 100%)`
       }}>
-        <img
-          src={beforeUrl}
+        <img loading="lazy"src={beforeUrl}
           alt={beforeLabel || 'Before'}
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
