@@ -168,7 +168,7 @@ export default function NotificationsBell() {
                     className="fh-font-serif"
                     style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
                   >
-                    {unread > 0 ? <>{unread} new <em className="fh-font-serif-italic fh-text-gradient-gold">notifications.</em></> : <>All <em className="fh-font-serif-italic fh-text-gradient-gold">caught up.</em></>}
+                    {unread > 0 ? <>{unread} new <em style={{ fontStyle: 'normal', fontWeight: 600 }}>notifications.</em></> : <>All <em style={{ fontStyle: 'normal', fontWeight: 600 }}>caught up.</em></>}
                   </h2>
                 </DrawerTitle>
               </div>

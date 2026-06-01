@@ -10096,3 +10096,23 @@ select:focus-visible,
   color: var(--field-gold-bright, #e8b04c);
   flex-shrink: 0;
 }
+
+/* Rail-card mobile layout — children stack so a <strong>label</strong>
+   followed by a <span>description</span> doesn't render as
+   "labelDescription". Desktop already had this via flex; mobile didn't,
+   producing "NoneNo outstanding", "Phase BOwn schedule", "SeparateOne-off"
+   in the user's screenshots. */
+.fh-build-rail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fh-build-rail-card > strong {
+  font-weight: 700;
+  color: var(--ink-strong, #f5f3ee);
+}
+.fh-build-rail-card > span {
+  color: rgba(245, 242, 234, 0.72);
+  font-size: 13px;
+  line-height: 1.4;
+}
