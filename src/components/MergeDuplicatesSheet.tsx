@@ -115,9 +115,9 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span aria-hidden="true" style={{
               width: 32, height: 32, borderRadius: 10,
-              background: 'var(--v3-primary-soft)',
-              border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-              color: 'var(--v3-primary)',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.18)',
+              color: 'var(--ink-strong)',
               display: 'grid', placeItems: 'center'
             }}>
               <Users size={16} />
@@ -203,12 +203,12 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
         borderBottom: '1px solid var(--v3-border)',
         background: 'var(--v3-surface-2)'
       }}>
-        <AlertTriangle size={13} aria-hidden="true" style={{ color: 'var(--v3-primary)' }} />
+        <AlertTriangle size={13} aria-hidden="true" style={{ color: 'var(--ink-strong)' }} />
         <span style={{
           fontFamily: 'var(--font-body)',
           fontSize: 10, fontWeight: 700,
           letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: 'var(--v3-primary-bright, var(--v3-primary))'
+          color: 'var(--ink-strong)'
         }}>
           {cluster.members.length} duplicates · matched on {matchedOn}
         </span>
@@ -240,8 +240,8 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
               >
                 <span aria-hidden="true" style={{
                   width: 18, height: 18, borderRadius: '50%',
-                  border: `2px solid ${isSurvivor ? 'var(--v3-primary)' : 'var(--v3-border-strong)'}`,
-                  background: isSurvivor ? 'var(--v3-primary)' : 'transparent',
+                  border: `2px solid ${isSurvivor ? 'var(--ink-strong)' : 'var(--v3-border-strong)'}`,
+                  background: isSurvivor ? 'var(--ink-strong)' : 'transparent',
                   display: 'grid', placeItems: 'center',
                   color: 'var(--v3-on-primary)'
                 }}>
@@ -261,7 +261,7 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                         fontFamily: 'var(--font-body)',
                         fontSize: 9, fontWeight: 700,
                         letterSpacing: '0.16em', textTransform: 'uppercase',
-                        color: 'var(--v3-primary)'
+                        color: 'var(--ink-strong)'
                       }}>
                         Keep
                       </span>

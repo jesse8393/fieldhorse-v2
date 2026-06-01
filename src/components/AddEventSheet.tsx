@@ -251,7 +251,7 @@ function chipStyle(active: any, disabled: any) {
       ? 'rgba(201,150,58,0.14)'
       : 'var(--surface-2)',
     color: active
-      ? 'var(--field-gold-bright)'
+      ? 'var(--ink-strong)'
       : 'var(--ink-muted)',
     fontFamily: 'var(--font-body)',
     fontSize: 12,
