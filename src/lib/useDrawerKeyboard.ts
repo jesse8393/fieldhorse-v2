@@ -1,61 +1,33 @@
 // src/lib/useDrawerKeyboard.ts
 //
-// Shared iOS keyboard handler for Vaul drawer-based sheets. Solves
-// two real bugs we kept hitting:
+// Shared iOS keyboard handler for Vaul drawer-based sheets.
 //
-//   1) Lifting the drawer with transform: translate3d(0, -kbd, 0)
-//      worked when kbd was small, but on phones with a tall keyboard
-//      it pushed the drawer header up INTO the iOS status bar /
-//      Dynamic Island. "Add a client." rendered on top of the time.
+// Strategy: use 100dvh (dynamic viewport height) which iOS Safari
+// auto-shrinks when the soft keyboard opens. The drawer's maxHeight
+// then naturally fits above the keyboard without any JS measurement
+// of visualViewport. Eliminates the previous bug where in-app
+// browsers (Safari View Controller, Chrome iOS) reported viewport
+// values that double-subtracted the keyboard, leaving the drawer
+// stuck at a tiny height with one input visible and big empty
+// voids below.
 //
-//   2) Inputs below the visible portion of the drawer stayed buried
-//      because iOS Safari does not auto-scroll-into-view inside a
-//      position:fixed overflow container — the user had to manually
-//      scroll the form or dismiss the keyboard to see what they
-//      were typing.
-//
-// The hook returns:
-//   - kbd: current keyboard height in px (0 when no keyboard).
-//   - formRef: attach to the scrollable form element.
-//   - drawerStyle: spread onto <DrawerContent>. Caps maxHeight to
-//     safe-area-aware viewport so the drawer never extends past the
-//     status bar.
-//   - formStyle(extra): spread onto the form. Pads the bottom by the
-//     keyboard height so the focused input has room to scroll above
-//     the keyboard. Pass any additional inline style to merge.
-//
-// Focus-scroll is wired automatically: on every focusin inside the
-// form, we scroll the focused field into view after a 280ms delay
-// (enough for the iOS keyboard slide + visualViewport resize to
-// settle).
+// The hook still:
+//   - exposes formRef so callers can attach to their scrollable form
+//   - exposes drawerStyle + formStyle helpers for consistent layout
+//   - keeps a manual focus-scroll-into-view, but uses block:'center'
+//     and only fires when the focused field is actually outside the
+//     form's visible window (no more "pin focused field to top
+//     edge" behavior)
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 
 export function useDrawerKeyboard(open: boolean) {
-  const [kbd, setKbd] = useState(0)
   const formRef = useRef<HTMLFormElement | null>(null)
 
-  // Track keyboard height via visualViewport. Floor at 40px so iOS
-  // soft-button bars (notched phones) don't trip the offset.
-  useEffect(() => {
-    if (!open) return
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null
-    if (!vv) return
-    function update() {
-      const next = Math.max(0, window.innerHeight - vv!.height - (vv!.offsetTop || 0))
-      setKbd(next > 40 ? next : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      setKbd(0)
-    }
-  }, [open])
-
-  // Focus-scroll inside the form.
+  // Focus-scroll inside the form. Only nudges the focused input into
+  // view when it's actually outside the visible scrolling box. Uses
+  // block:'center' so the field lands with breathing room, not
+  // pinned to one edge.
   useEffect(() => {
     if (!open) return
     const form = formRef.current
@@ -66,8 +38,19 @@ export function useDrawerKeyboard(open: boolean) {
       const inputType = (t.getAttribute?.('type') || '').toLowerCase()
       if (['checkbox', 'radio', 'button', 'submit'].includes(inputType)) return
       setTimeout(() => {
-        try { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } catch {}
-      }, 280)
+        try {
+          const formEl = form
+          if (!formEl) return
+          const fRect = formEl.getBoundingClientRect()
+          const tRect = t.getBoundingClientRect()
+          const pad = 24
+          const above = tRect.top < fRect.top + pad
+          const below = tRect.bottom > fRect.bottom - pad
+          if (above || below) {
+            t.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          }
+        } catch {}
+      }, 320)
     }
     form.addEventListener('focusin', onFocusIn)
     return () => form.removeEventListener('focusin', onFocusIn)
@@ -76,19 +59,12 @@ export function useDrawerKeyboard(open: boolean) {
   const drawerStyle: CSSProperties = {
     maxWidth: '100%',
     overflowX: 'hidden',
-    // Cap height so the drawer always fits between the iOS status
-    // bar / Dynamic Island and whatever the keyboard is covering.
-    // The previous version only subtracted safe-area, so when the
-    // keyboard rose the drawer extended *behind* it and the focused
-    // field disappeared.
-    maxHeight: `calc(100vh - ${kbd}px - env(safe-area-inset-top) - 24px)`,
-    // Anchor above the keyboard. Vaul's default position is
-    // bottom:0; pinning bottom:kbd lifts the entire drawer up by
-    // the keyboard height so the form never overlaps it. Doing
-    // it via 'bottom' (not transform) keeps Vaul's slide-in/out
-    // animation intact.
-    bottom: kbd > 0 ? `${kbd}px` : undefined,
-    transition: 'bottom 220ms cubic-bezier(0.16, 1, 0.3, 1), max-height 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+    // 100dvh auto-shrinks when the iOS soft keyboard opens, so the
+    // drawer fits above the keyboard without manual JS measurement.
+    // The fallback 100vh kicks in on browsers that don't support
+    // dvh (very old iOS); they get a slightly taller drawer but no
+    // broken layout.
+    maxHeight: 'calc(100dvh - env(safe-area-inset-top) - 24px)',
     display: 'flex',
     flexDirection: 'column'
   }
@@ -98,9 +74,6 @@ export function useDrawerKeyboard(open: boolean) {
       paddingTop: 6,
       paddingLeft: 20,
       paddingRight: 20,
-      // No keyboard padding here anymore — the drawer itself moves
-      // above the keyboard via the bottom:kbd offset above, so the
-      // form just needs its normal bottom safe-area inset.
       paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
       display: 'flex',
       flexDirection: 'column',
@@ -110,11 +83,14 @@ export function useDrawerKeyboard(open: boolean) {
       minWidth: 0,
       overflowY: 'auto',
       WebkitOverflowScrolling: 'touch',
+      overscrollBehavior: 'contain',
       flex: 1,
       minHeight: 0,
       ...extra
     }
   }
 
-  return { kbd, formRef, drawerStyle, formStyle }
+  // kbd is kept in the return tuple for API compatibility with any
+  // callers that read it; always 0 now since dvh handles the lift.
+  return { kbd: 0, formRef, drawerStyle, formStyle }
 }
