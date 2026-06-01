@@ -74,7 +74,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
   // reconcile against the DB in the effect below.
   const [start, setStart] = useState<number | null>(() => readActiveStart(contact.id))
   const [punchId, setPunchId] = useState<string | null>(null)
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [confirming, setConfirming] = useState(false)
   const [rate, setRate] = useState(readPreferredRate())
   const [note, setNote] = useState('')

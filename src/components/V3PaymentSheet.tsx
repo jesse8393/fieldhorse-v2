@@ -49,7 +49,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
   const [method, setMethod] = useState('check')
   const [kind, setKind] = useState('other')
   const [reference, setReference] = useState('')
-  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
+  const [paidOn, setPaidOn] = useState(() => new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   // Drawer always opens when this component is mounted; parent controls
