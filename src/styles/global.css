@@ -10116,3 +10116,15 @@ select:focus-visible,
   font-size: 13px;
   line-height: 1.4;
 }
+
+/* User feedback: serif sheet titles ("Log what was paid.", "New lead.",
+   "Add an event.", "3 new notifications.") read as old design vs the
+   premium sans direction the user wants. Override .fh-font-serif so
+   every consumer flips to upright sans body font in one move.
+
+   The .fh-font-serif-italic utility was already targeted by #160's
+   italic scrub and remains overridden. */
+.fh-font-serif {
+  font-family: var(--font-body) !important;
+  font-style: normal !important;
+}
