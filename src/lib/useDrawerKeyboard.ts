@@ -58,6 +58,15 @@ export function useDrawerKeyboard(open: boolean) {
   const drawerStyle: CSSProperties = {
     maxWidth: '100%',
     overflowX: 'hidden',
+    // CAP the drawer to the visible viewport so a tall form doesn't
+    // push content off the bottom of the screen. Uses maxHeight
+    // (NOT height) so it doesn't conflict with Vaul's direct
+    // style.height writes — Vaul manages height dynamically when
+    // the keyboard opens; maxHeight just acts as the static ceiling
+    // when the keyboard is closed. dvh shrinks for browser chrome
+    // changes but iOS treats the soft keyboard separately, so Vaul
+    // still owns the keyboard lift.
+    maxHeight: 'calc(100dvh - env(safe-area-inset-top) - 24px)',
     display: 'flex',
     flexDirection: 'column'
   }
