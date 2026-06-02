@@ -54,11 +54,15 @@ function fmtDayHeading(d: Date): string {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
+// Duration formatter for the display-font (Bebas Neue) metrics on Crew.
+// Bebas Neue has only uppercase glyphs, so "0m" silently rendered as
+// "0M" / "1h 30m" → "1H 30M" which the audit flagged as a bug. Using
+// HH:MM digits and ":" avoids the case-sensitivity issue — they look
+// identical in any font.
 function fmtMinutes(min: number): string {
-  if (min < 60) return `${min}m`
   const h = Math.floor(min / 60)
   const m = min % 60
-  return m === 0 ? `${h}h` : `${h}h ${m}m`
+  return `${h}:${String(m).padStart(2, '0')}`
 }
 
 export default function Crew() {

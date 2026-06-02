@@ -235,7 +235,7 @@ export default function SnowNotesBuild(props: Props) {
                 const linkedJob = contacts.find((c) => c.id === n.contact_id)
                 const hasParsed = !!(n.parsed && (n.parsed.summary || n.parsed.action_items?.length || n.parsed.risks?.length))
                 const hasRisk = !!(n.parsed?.risks?.length)
-                const body = (n.body || n.title || '').toString()
+                const body = (n.text || n.body || n.title || '').toString()
                 return (
                   <div key={n.id} className="fh-build-note-row">
                     <div className="fh-build-note-row__main">

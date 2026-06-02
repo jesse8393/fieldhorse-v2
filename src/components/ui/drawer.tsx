@@ -2,7 +2,14 @@ import * as React from 'react'
 import { Drawer as VaulDrawer } from 'vaul'
 import { cn } from '@/lib/utils'
 
-const Drawer = ({ shouldScaleBackground = true, ...props }) => (
+// shouldScaleBackground defaults to FALSE — Vaul's true-by-default
+// background-scale effect requires a data-vaul-drawer-wrapper attribute
+// on the app root, which we don't set. Without that, on desktop the
+// Drawer can silently fail to open when triggered programmatically
+// (audit: "+ New buttons do nothing on every desktop page"). We don't
+// want the iOS-style scale anyway, so flipping the default fixes both
+// the bug and the UX.
+const Drawer = ({ shouldScaleBackground = false, ...props }) => (
   <VaulDrawer.Root shouldScaleBackground={shouldScaleBackground} {...props} />
 )
 Drawer.displayName = 'Drawer'

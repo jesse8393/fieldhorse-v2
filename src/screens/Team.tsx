@@ -127,10 +127,10 @@ export default function Team() {
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Active members" value={String(activeCount)} accent />
-            <MiniMetric label="Owners + admins" value={String(ownerCount + members.filter((m) => m.role === 'admin').length)} />
-            <MiniMetric label="Foremen + crew" value={String(fieldCount)} />
-            <MiniMetric label="Pending invites" value={String(invites.length)} tone={invites.length > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Active members" value={loading ? '—' : String(activeCount)} accent />
+            <MiniMetric label="Owners + admins" value={loading ? '—' : String(ownerCount + members.filter((m) => m.role === 'admin').length)} />
+            <MiniMetric label="Foremen + crew" value={loading ? '—' : String(fieldCount)} />
+            <MiniMetric label="Pending invites" value={loading ? '—' : String(invites.length)} tone={!loading && invites.length > 0 ? 'warn' : undefined} />
           </div>
         </section>
 

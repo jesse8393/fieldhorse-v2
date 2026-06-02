@@ -255,10 +255,10 @@ export default function Tasks() {
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Total open" value={String(kpi.total)} accent />
-            <MiniMetric label="Overdue" value={String(kpi.overdue)} tone={kpi.overdue > 0 ? 'bad' : undefined} />
-            <MiniMetric label="Due today" value={String(kpi.today)} tone={kpi.today > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Unassigned" value={String(kpi.unassigned)} tone={kpi.unassigned > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Total open" value={loading ? '—' : String(kpi.total)} accent />
+            <MiniMetric label="Overdue" value={loading ? '—' : String(kpi.overdue)} tone={!loading && kpi.overdue > 0 ? 'bad' : undefined} />
+            <MiniMetric label="Due today" value={loading ? '—' : String(kpi.today)} tone={!loading && kpi.today > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Unassigned" value={loading ? '—' : String(kpi.unassigned)} tone={!loading && kpi.unassigned > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
