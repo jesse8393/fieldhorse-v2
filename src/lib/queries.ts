@@ -45,13 +45,21 @@ export const queryKeys = {
 async function fetchJobs(): Promise<JobRow[]> {
   // No JS-layer user_id filter — RLS (owner + partner-read) is the
   // enforcement layer, matching the prior Jobs.load behavior so
-  // partner-shared jobs still surface.
+  // partner-shared jobs still surface. Partner-shared rows can come
+  // back twice — once as the owner's row, once via the partnership
+  // join — so dedupe by id before returning, mirroring the Home
+  // pipeline dedupe in screens/Home.tsx.
   const { data, error } = await supabase
     .from('fh_contacts')
     .select('*, fh_clients(name, phone, email)')
     .order('updated_at', { ascending: false })
   if (error) throw error
-  return (data ?? []) as JobRow[]
+  const rows = (data ?? []) as JobRow[]
+  const byId = new Map<string, JobRow>()
+  for (const r of rows) {
+    if (r?.id && !byId.has(r.id)) byId.set(r.id, r)
+  }
+  return Array.from(byId.values())
 }
 
 export function useJobs() {

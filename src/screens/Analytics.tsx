@@ -120,9 +120,13 @@ export default function Analytics() {
           return s + (a - k) / a
         }, 0) / winsWithCost.length) * 100
       : null
+    // The "won job" qualifier is misleading without context — the
+    // operator sees "Across 1 won job" while Win Rate reads "4/4"
+    // and the pipeline shows 6+ closed deals. Be explicit: this
+    // average is only across jobs WITH cost data logged.
     const avgMarginNote = (avgMargin == null)
       ? 'Log a job cost to enable'
-      : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'}`
+      : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'} with cost data`
     const leads = contacts.filter((c) => c.stage === 'lead').length
     const quotes = contacts.filter((c) => c.stage === 'quote').length
     const jobs = contacts.filter((c) => c.stage === 'job').length

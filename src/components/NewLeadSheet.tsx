@@ -289,8 +289,11 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
     // If the user didn't pick an existing client via the picker, find or
     // create one from the lead's name/phone/email so the new job shows
     // up on /clients (audit: "lead created but not visible on Clients").
-    // Match-then-create strategy: phone first (most reliable), email
-    // second, name+empty-phone third.
+    // Match strategy: phone first (most reliable identifier), email
+    // second, normalized-name third. Without the name fallback, every
+    // lead created without phone/email seeded a brand-new fh_clients
+    // row — that's how the audit found duplicate "MMC Properties" /
+    // "Jeff Roy" client entries.
     let resolvedClientId = client?.id || null
     if (!resolvedClientId) {
       try {
@@ -306,6 +309,16 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
         if (!existing && email) {
           const { data } = await supabase
             .from('fh_clients').select('id').eq('user_id', userId).ilike('email', email).maybeSingle()
+          existing = data
+        }
+        // Name fallback — case-insensitive exact match, scoped to this
+        // user. ilike with no wildcards = case-insensitive equality in
+        // postgres. Picks the most-recent if there are somehow already
+        // duplicates, to avoid splitting future jobs further.
+        if (!existing && nm) {
+          const { data } = await supabase
+            .from('fh_clients').select('id').eq('user_id', userId).ilike('name', nm)
+            .order('created_at', { ascending: false }).limit(1).maybeSingle()
           existing = data
         }
         if (existing) {
