@@ -57,16 +57,12 @@ export function useDrawerKeyboard(open: boolean) {
 
   const drawerStyle: CSSProperties = {
     maxWidth: '100%',
-    overflowX: 'hidden',
-    // Force the drawer to fill the available height. Using min-height
-    // (not just maxHeight) so even a short form gets a tall sheet —
-    // looks like a real sheet, not a squished strip at the bottom.
-    // Vaul writes inline style.height during keyboard repositioning;
-    // min/maxHeight don't conflict with that.
-    minHeight: 'calc(100dvh - env(safe-area-inset-top) - 96px)',
-    maxHeight: 'calc(100dvh - env(safe-area-inset-top) - 24px)',
-    display: 'flex',
-    flexDirection: 'column'
+    overflowX: 'hidden'
+    // Intentionally no height/min-height/max-height/display rules.
+    // Vaul owns sizing and keyboard repositioning via direct
+    // style.height + style.bottom writes — any CSS we add here
+    // either fights with those writes or constrains the keyboard
+    // shrink so the drawer extends behind the keyboard.
   }
 
   function formStyle(extra: CSSProperties = {}): CSSProperties {
@@ -85,8 +81,6 @@ export function useDrawerKeyboard(open: boolean) {
       WebkitOverflowScrolling: 'touch',
       overscrollBehavior: 'contain',
       scrollPaddingBottom: '40vh',
-      flex: 1,
-      minHeight: 0,
       ...extra
     }
   }
