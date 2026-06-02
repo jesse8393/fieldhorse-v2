@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, ChevronRight, Search, Sun, AlertTriangle } from 'lucide-react'
+import { Bell, Check, CheckCheck, ChevronRight, Search, AlertTriangle } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { orgPunchApprove, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
@@ -152,8 +152,7 @@ export default function Timesheets() {
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button
           className="fh-build-icon-btn"

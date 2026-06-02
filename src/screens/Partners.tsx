@@ -55,12 +55,25 @@ export default function Partners() {
   const [filter, setFilter] = useState('all')
   const [busyKey, setBusyKey] = useState<any>(null)
 
-  const counts = useMemo(() => ({
-    all: rows.length,
-    pending: rows.filter((p) => p.status === 'pending').length,
-    accepted: rows.filter((p) => p.status === 'accepted').length,
-    revoked: rows.filter((p) => p.status === 'revoked').length
-  }), [rows])
+  // The Pending metric used to count only top-level partner records with
+  // status='pending'. But the data model also has per-job share status —
+  // an "accepted" partner can have individual jobs still in pending
+  // state. The audit caught the summary saying "Pending 0" while an
+  // accepted partner's card showed a "Matthew Addition — PENDING" row.
+  // Now: pending = partner-level pending + any job-level pending shares
+  // on otherwise-accepted partners.
+  const counts = useMemo(() => {
+    const partnerPending = rows.filter((p) => p.status === 'pending').length
+    const jobPending = rows
+      .filter((p) => p.status === 'accepted')
+      .reduce((s, p) => s + (Array.isArray(p.jobs) ? p.jobs.filter((j: any) => j.status === 'pending').length : 0), 0)
+    return {
+      all: rows.length,
+      pending: partnerPending + jobPending,
+      accepted: rows.filter((p) => p.status === 'accepted').length,
+      revoked: rows.filter((p) => p.status === 'revoked').length
+    }
+  }, [rows])
 
   const filtered = useMemo(() => {
     const cfg = STATUS_FILTERS.find((f) => f.id === filter)

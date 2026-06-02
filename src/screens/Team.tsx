@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Bell, ChevronRight, Copy, Plus, Search, Sun, Trash2, UserCheck, UserPlus, Mail, X,
+  Bell, ChevronRight, Copy, Plus, Search, Trash2, UserCheck, UserPlus, Mail, X,
 } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
@@ -89,8 +89,7 @@ export default function Team() {
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button
           className="fh-build-icon-btn"
