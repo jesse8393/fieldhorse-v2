@@ -27,6 +27,31 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [] }:
     return { score: 0, tier: 'unknown', label: '—', breakdown: null }
   }
 
+  // Terminal stages override the score: a job that's closed (delivered +
+  // signed off) or lost is not "at risk" or "behind" — it's done. The
+  // composite formula treats milestones / payments / overdue events as
+  // signals of in-flight risk, but those signals are meaningless once
+  // the deal is no longer in flight. Previously, fully-paid completed
+  // jobs read as "Behind 30%" because the saved milestones aren't
+  // mirrored on contact.milestones JSON (operator marks them via the
+  // closeout sheet, not the Milestones section).
+  if (contact.stage === 'closed') {
+    return {
+      score: 100,
+      tier: 'good',
+      label: 'Complete',
+      breakdown: { milestones: null, payments: null, schedule: 'closed' }
+    }
+  }
+  if (contact.stage === 'lost') {
+    return {
+      score: 0,
+      tier: 'lost',
+      label: 'Lost',
+      breakdown: { milestones: null, payments: null, schedule: 'lost' }
+    }
+  }
+
   // Execution: milestones complete / total
   const milestones = Array.isArray(contact.milestones) ? contact.milestones : []
   const milestonesDone = milestones.filter((m: any) => m && m.done).length

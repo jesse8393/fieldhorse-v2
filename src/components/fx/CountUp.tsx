@@ -1,11 +1,12 @@
 import { motion, useSpring, useTransform } from 'framer-motion'
 import { useEffect } from 'react'
 
-// Spring-driven count-up. Stiffness 120 / damping 20 gives a subtle bouncy
-// arrival — the number overshoots the target by a hair then settles. Tuned
-// to feel "premium" without overshooting wildly enough to ship wrong values
-// mid-animation. The `duration` prop (legacy from the tween-based version)
-// is accepted and ignored — spring physics use stiffness/damping instead.
+// Spring-driven count-up. Critically damped — damping > 2*sqrt(stiffness)
+// ensures the spring monotonically approaches `to` without overshooting
+// or oscillating. The previous tuning (stiffness 120, damping 20) was
+// underdamped: the number would overshoot the target before settling,
+// so users who happened to glance at the hero card during animation saw
+// values like $43k when the real total was $160k.
 type CountUpProps = {
   to?: number
   duration?: number
@@ -15,7 +16,7 @@ type CountUpProps = {
 }
 
 export default function CountUp({ to = 0, duration, prefix = '', suffix = '', formatter }: CountUpProps) {
-  const count = useSpring(0, { stiffness: 120, damping: 20 })
+  const count = useSpring(0, { stiffness: 90, damping: 30, mass: 1 })
   const rounded = useTransform(count, (v) => {
     const n = Math.round(v)
     if (formatter) return formatter(n)

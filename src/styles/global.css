@@ -7760,6 +7760,33 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     .fh-build-health {
       grid-column: auto;
     }
+
+    /* Job-detail grid was overriding the mobile fallback with
+       `minmax(0,1fr) 290px`, so the screen rendered ~580px wide
+       inside a 389px viewport — the entire page scrolled
+       horizontally, clipping the header and contact name when
+       users tapped Financials/Files. Collapse to a single column
+       on mobile and tablet; rail card stacks below the tab
+       content like every other build screen. */
+    .fh-build-content-grid--detail {
+      grid-template-columns: 1fr;
+    }
+
+    /* Tab strip should scroll horizontally on its own, not push
+       the whole page width. min-width:0 lets the flex container
+       shrink below content width so overflow-x kicks in. */
+    .fh-build-tabs {
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex-wrap: nowrap;
+      scrollbar-width: none;
+    }
+    .fh-build-tabs::-webkit-scrollbar { display: none; }
+    .fh-build-tab,
+    .fh-build-tabs__cta {
+      flex-shrink: 0;
+    }
   }
 }
 
