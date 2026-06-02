@@ -10035,14 +10035,21 @@ select:focus-visible,
 }
 
 /* Desktop topbar grid collapses to a vertical stack on mobile because
-   the four-column 280-560px layout doesn't fit. */
-.fh-build-topbar,
-.fh-build-topbar--no-cta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 4px 0 10px;
+   the four-column 280-560px layout doesn't fit. Scoped to max-width
+   so this doesn't override the desktop @media (min-width: 900px)
+   grid rule that appears earlier in the file — source-order made
+   the desktop grid lose to this unscoped flex-column on every build
+   page, which is why the + New button rendered below/over the page
+   eyebrow and read as "broken" in the audit. */
+@media (max-width: 899px) {
+  .fh-build-topbar,
+  .fh-build-topbar--no-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0 10px;
+  }
 }
 
 .fh-build-topbar__meta {

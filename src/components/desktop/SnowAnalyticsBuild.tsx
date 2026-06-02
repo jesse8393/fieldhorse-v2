@@ -63,8 +63,21 @@ type Props = {
 }
 
 function pct(n: number | null | undefined) {
+  // stats.avgMargin and stats.closeRate are already delivered as 0-100
+  // percentage values from screens/Analytics.tsx (they multiply by 100
+  // before passing). Multiplying again here gave the desktop audit a
+  // "5398% margin" reading — the double-multiplication bug. Fixed by
+  // formatting the value as-is. Mobile uses fmtPct which always
+  // expected 0-100, so the source-of-truth was already correct.
   const v = Number(n || 0)
-  return `${(v * 100).toFixed(0)}%`
+  return `${Math.round(v)}%`
+}
+
+// collectionRate is computed locally below as a 0-1 ratio (paid/total),
+// not a percentage. Wrap it through this helper before passing to pct().
+function ratioToPct(r: number | null | undefined) {
+  if (r == null) return null
+  return Number(r) * 100
 }
 
 export default function SnowAnalyticsBuild(props: Props) {
@@ -273,7 +286,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                       ? undefined
                       : Number(stats.invoiced) > Number(stats.collected) ? '#ee4942' : '#73c982',
                   }}>
-                    {collectionRate != null ? pct(collectionRate) : '—'}
+                    {collectionRate != null ? pct(ratioToPct(collectionRate)) : '—'}
                   </strong>
                   <span>{collectionRate != null ? 'collection rate YTD' : 'Nothing invoiced YTD'}</span>
                   {collectionRate != null && collectionRate < 0.8 && <div className="fh-build-spark is-red" />}
