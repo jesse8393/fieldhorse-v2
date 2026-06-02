@@ -115,7 +115,6 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
             <span style={labelStyle}>Title *</span>
             <input
               type="text"
-              autoFocus
               required
               disabled={saving}
               value={title}

@@ -131,7 +131,6 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
                 inputMode="decimal"
                 step="0.1"
                 min="0"
-                autoFocus
                 value={miles}
                 onChange={(e) => setMiles(e.target.value)}
                 placeholder="0"

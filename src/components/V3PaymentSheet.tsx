@@ -181,7 +181,6 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
                 </span>
                 <input
                   id="v3-pay-amount"
-                  autoFocus
                   type="text"
                   inputMode="decimal"
                   value={amount}

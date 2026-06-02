@@ -594,7 +594,6 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
               so paste flows can't bypass. */}
           <V3Field label="Name">
             <input
-              autoFocus
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               maxLength={FIELD_LIMITS.name}

@@ -80,7 +80,12 @@ export function useDrawerKeyboard(open: boolean) {
       overflowY: 'auto',
       WebkitOverflowScrolling: 'touch',
       overscrollBehavior: 'contain',
-      scrollPaddingBottom: '40vh',
+      // Modest scroll-padding so focused inputs land slightly above
+      // dead-center, leaving room for the label above. Was 40vh
+      // which pushed inputs too far up and left the rest of the
+      // form completely off-screen.
+      scrollPaddingBottom: '80px',
+      scrollPaddingTop: '60px',
       ...extra
     }
   }
