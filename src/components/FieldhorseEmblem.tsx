@@ -29,7 +29,7 @@ export default function FieldhorseEmblem({
   const isDecorative = title == null
   return (
     <img
-      src="/icon-source.png"
+      src="/icon-192.png"
       width={size}
       height={size}
       alt={isDecorative ? '' : title}
