@@ -29,7 +29,10 @@ export default function FieldhorseEmblem({
   const isDecorative = title == null
   return (
     <img
-      src="/icon-192.png"
+      // Versioned query string busts the iOS Safari + service worker
+      // cache when the underlying PNG changes. Bump the number when
+      // /public/icon-192.png is regenerated from a new icon-source.png.
+      src="/icon-192.png?v=2"
       width={size}
       height={size}
       alt={isDecorative ? '' : title}
