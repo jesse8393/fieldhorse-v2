@@ -4,123 +4,43 @@
     - manifest icon entry (PWA install)
     - favicon (browser tab)
     - source for raster PNG renders (apple-touch-icon, icon-192, icon-512)
-    - in-app FieldhorseEmblem component (geometry mirrored)
 
-  Design: brushed-gold "F" with a horse-head silhouette punched
-  through it as negative space, set on a black rounded plate with
-  a thin gold inner ring. Replaces the prior winged-F badge with
-  the new identity the operator provided.
+  Geometry mirrors src/components/FieldhorseEmblem.tsx so the in-app
+  badge and the home-screen icon never drift.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="512" height="512" role="img" aria-label="Fieldhorse">
   <defs>
-    <!-- Plate gradient — near-black with a faint warm wash so the
-         icon doesn't read as a flat #000 swatch on iOS dark mode. -->
-    <linearGradient id="plate" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#15110b"/>
-      <stop offset="55%" stop-color="#0c0b09"/>
-      <stop offset="100%" stop-color="#070605"/>
+    <linearGradient id="goldBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8B04C"/>
+      <stop offset="55%" stop-color="#C9963A"/>
+      <stop offset="100%" stop-color="#A77A28"/>
     </linearGradient>
-
-    <!-- Gold body — diagonal warm-to-deep gradient + a brighter spec
-         line at the top edge to fake a brushed metal highlight. -->
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#F0CC78"/>
-      <stop offset="38%"  stop-color="#D9A648"/>
-      <stop offset="72%"  stop-color="#A77A28"/>
-      <stop offset="100%" stop-color="#6B4D16"/>
-    </linearGradient>
-
-    <!-- Thin gold ring — softer mid-gold so the inner border doesn't
-         compete with the F's brighter highlights. -->
-    <linearGradient id="ring" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%"   stop-color="#D9A648"/>
-      <stop offset="100%" stop-color="#7A5A1F"/>
-    </linearGradient>
-
-    <!-- Top-half glass gloss — the wet-glass sheen on every iOS app
-         icon. Soft white wash that fades to transparent by mid-icon. -->
     <linearGradient id="gloss" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%"  stop-color="#FFFFFF" stop-opacity="0.18"/>
-      <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.04"/>
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.42"/>
+      <stop offset="48%" stop-color="#FFFFFF" stop-opacity="0.08"/>
       <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#000000" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.10"/>
     </linearGradient>
-
-    <!-- Specular shine cutting diagonally across the F (upper-left
-         to lower-right) — sells the "polished metal" finish. -->
-    <linearGradient id="shine" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"  stop-color="#FFFFFF" stop-opacity="0.32"/>
-      <stop offset="22%" stop-color="#FFFFFF" stop-opacity="0"/>
-      <stop offset="78%" stop-color="#FFFFFF" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#000000" stop-opacity="0.22"/>
+    <linearGradient id="bevel" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.25"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F3EFE6"/>
     </linearGradient>
   </defs>
 
-  <!-- Plate -->
-  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#plate)"/>
+  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#goldBody)"/>
 
-  <!-- Inner gold ring -->
-  <rect x="9" y="9" width="182" height="182" rx="36" ry="36"
-        fill="none" stroke="url(#ring)" stroke-width="1.6" opacity="0.9"/>
-  <rect x="13" y="13" width="174" height="174" rx="33" ry="33"
-        fill="none" stroke="url(#ring)" stroke-width="0.6" opacity="0.5"/>
+  <g fill="#0E0E10">
+    <rect x="50" y="50" width="32" height="110" rx="4" ry="4"/>
+    <path d="M 50 50 L 158 50 L 152 88 Q 128 76 96 80 L 50 80 Z"/>
+  </g>
 
-  <!-- F letterform with horse-head silhouette as a negative-space
-       cutout. Single path using fill-rule:evenodd — the outer F
-       outline is drawn clockwise, the horse head inside is drawn
-       counter-clockwise so it punches through. -->
-  <path
-    fill="url(#gold)"
-    fill-rule="evenodd"
-    d="
-      M 56 38
-      L 158 38
-      Q 162 38 162 42
-      L 162 70
-      Q 162 74 158 74
-      L 108 74
-      L 108 92
-      L 146 92
-      Q 150 92 150 96
-      L 150 122
-      Q 150 126 146 126
-      L 108 126
-      L 108 162
-      Q 108 166 104 166
-      L 60 166
-      Q 56 166 56 162
-      Z
+  <path d="M 50 96 L 132 96 Q 152 96 152 116 Q 152 144 122 158 Q 96 168 78 162 Q 96 156 110 142 Q 122 128 122 116 Q 122 110 116 110 L 50 110 Z" fill="url(#wing)"/>
 
-      M 90 62
-      L 96 56 L 100 64
-      Q 104 70 110 76
-      Q 122 86 132 96
-      Q 138 104 132 104
-      L 124 104
-      Q 122 100 118 98
-      Q 116 102 116 106
-      Q 116 110 113 110
-      Q 110 110 108 107
-      L 108 92
-      L 100 92
-      Q 96 92 92 88
-      Q 88 84 86 80
-      Q 82 78 78 86
-      Q 74 96 74 110
-      Q 74 124 76 134
-      Q 78 142 82 146
-      Q 78 148 74 144
-      Q 66 134 64 120
-      Q 60 104 64 90
-      Q 68 76 78 70
-      Q 84 66 90 62
-      Z
-    "
-  />
-
-  <!-- Diagonal specular shine on top of the F -->
-  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#shine)" pointer-events="none"/>
-
-  <!-- Top-half wet-glass gloss -->
-  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#gloss)" pointer-events="none"/>
+  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#gloss)"/>
+  <rect x="1.5" y="1.5" width="197" height="197" rx="43" ry="43" fill="none" stroke="url(#bevel)" stroke-width="1.5"/>
 </svg>

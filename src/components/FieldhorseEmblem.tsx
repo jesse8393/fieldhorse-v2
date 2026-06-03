@@ -1,9 +1,10 @@
 // FieldhorseEmblem — the glassy gold app emblem.
 //
-// Brushed-gold "F" with a horse-head silhouette punched through it as
-// negative space, set on a black rounded plate with a thin gold inner
-// ring. Geometry mirrors /public/icon.svg so the in-app badge and the
-// home-screen icon never drift.
+// Stylized "F" letterform with a swooshing wing detail cutting through
+// the middle bar, set on a rounded-square plate. Modeled on the
+// reference splash mark the user shared (originally orange) — recolored
+// to brand gold, with a top-down glass highlight and subtle inner
+// bevel.
 //
 // Self-contained SVG; no external font dependency. Renders crisp at
 // any size because every shape is path / rect geometry.
@@ -28,11 +29,12 @@ export default function FieldhorseEmblem({
   style,
   className,
 }: Props) {
-  const plateId = 'fh-emblem-plate'
+  // Stable IDs so multiple emblems on one page don't collide on the
+  // <defs> gradient references.
   const goldId = 'fh-emblem-gold'
-  const ringId = 'fh-emblem-ring'
   const glossId = 'fh-emblem-gloss'
-  const shineId = 'fh-emblem-shine'
+  const bevelId = 'fh-emblem-bevel'
+  const wingId = 'fh-emblem-wing'
 
   return (
     <svg
@@ -47,99 +49,88 @@ export default function FieldhorseEmblem({
       className={className}
     >
       <defs>
-        <linearGradient id={plateId} x1="50%" y1="0%" x2="50%" y2="100%">
-          <stop offset="0%" stopColor="#15110b" />
-          <stop offset="55%" stopColor="#0c0b09" />
-          <stop offset="100%" stopColor="#070605" />
-        </linearGradient>
-
+        {/* Gold body — slight diagonal warm-to-deeper gradient so the
+            plate doesn't read as a flat swatch. */}
         <linearGradient id={goldId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#F0CC78" />
-          <stop offset="38%" stopColor="#D9A648" />
-          <stop offset="72%" stopColor="#A77A28" />
-          <stop offset="100%" stopColor="#6B4D16" />
+          <stop offset="0%" stopColor="#E8B04C" />
+          <stop offset="55%" stopColor="#C9963A" />
+          <stop offset="100%" stopColor="#A77A28" />
         </linearGradient>
 
-        <linearGradient id={ringId} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#D9A648" />
-          <stop offset="100%" stopColor="#7A5A1F" />
-        </linearGradient>
-
+        {/* Glass gloss highlight — top half soft white wash that fades
+            to transparent, sells the "wet glass" finish. */}
         <linearGradient id={glossId} x1="50%" y1="0%" x2="50%" y2="100%">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.18" />
-          <stop offset="35%" stopColor="#FFFFFF" stopOpacity="0.04" />
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.42" />
+          <stop offset="48%" stopColor="#FFFFFF" stopOpacity="0.08" />
           <stop offset="55%" stopColor="#FFFFFF" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.10" />
         </linearGradient>
 
-        <linearGradient id={shineId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.32" />
-          <stop offset="22%" stopColor="#FFFFFF" stopOpacity="0" />
-          <stop offset="78%" stopColor="#FFFFFF" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.22" />
+        {/* Inner bevel — 1px lighter inner stroke at top, darker at
+            bottom, gives the icon a faint embossed edge. */}
+        <linearGradient id={bevelId} x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.35" />
+          <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.25" />
+        </linearGradient>
+
+        {/* White wing — slight top-to-bottom fade to give the swoosh
+            its own subtle depth instead of reading as paper-flat. */}
+        <linearGradient id={wingId} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="100%" stopColor="#F3EFE6" />
         </linearGradient>
       </defs>
 
-      <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill={`url(#${plateId})`} />
+      {/* Rounded-square plate. Corner radius ~22% of side matches the
+          iOS app-icon squircle proportion the reference uses. */}
+      <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill={`url(#${goldId})`} />
 
-      <rect x="9" y="9" width="182" height="182" rx="36" ry="36"
-            fill="none" stroke={`url(#${ringId})`} strokeWidth="1.6" opacity="0.9" />
-      <rect x="13" y="13" width="174" height="174" rx="33" ry="33"
-            fill="none" stroke={`url(#${ringId})`} strokeWidth="0.6" opacity="0.5" />
+      {/* F letterform — left stem + top bar with a black "sail" wedge
+          biting into it from the top edge. The wedge is what gives
+          the top bar its slanted profile in the reference. */}
+      <g fill="#0E0E10">
+        {/* Vertical stem */}
+        <rect x="50" y="50" width="32" height="110" rx="4" ry="4" />
+        {/* Sail wedge — clipped polygon eating into the top bar so the
+            top bar reads as a thick curved arc rather than a flat
+            rectangle. Approximated with a path. */}
+        <path d="M 50 50 L 158 50 L 152 88 Q 128 76 96 80 L 50 80 Z" />
+      </g>
 
+      {/* White wing swoosh through the middle. Sweeps from the stem
+          out to the right and curls down, finishing the "F" as a
+          stylized winged form. */}
       <path
-        fill={`url(#${goldId})`}
-        fillRule="evenodd"
-        d="
-          M 56 38
-          L 158 38
-          Q 162 38 162 42
-          L 162 70
-          Q 162 74 158 74
-          L 108 74
-          L 108 92
-          L 146 92
-          Q 150 92 150 96
-          L 150 122
-          Q 150 126 146 126
-          L 108 126
-          L 108 162
-          Q 108 166 104 166
-          L 60 166
-          Q 56 166 56 162
-          Z
-
-          M 90 62
-          L 96 56 L 100 64
-          Q 104 70 110 76
-          Q 122 86 132 96
-          Q 138 104 132 104
-          L 124 104
-          Q 122 100 118 98
-          Q 116 102 116 106
-          Q 116 110 113 110
-          Q 110 110 108 107
-          L 108 92
-          L 100 92
-          Q 96 92 92 88
-          Q 88 84 86 80
-          Q 82 78 78 86
-          Q 74 96 74 110
-          Q 74 124 76 134
-          Q 78 142 82 146
-          Q 78 148 74 144
-          Q 66 134 64 120
-          Q 60 104 64 90
-          Q 68 76 78 70
-          Q 84 66 90 62
-          Z
-        "
+        d="M 50 96
+           L 132 96
+           Q 152 96 152 116
+           Q 152 144 122 158
+           Q 96 168 78 162
+           Q 96 156 110 142
+           Q 122 128 122 116
+           Q 122 110 116 110
+           L 50 110 Z"
+        fill={`url(#${wingId})`}
       />
 
-      <rect x="0" y="0" width="200" height="200" rx="44" ry="44"
-            fill={`url(#${shineId})`} pointerEvents="none" />
-      <rect x="0" y="0" width="200" height="200" rx="44" ry="44"
-            fill={`url(#${glossId})`} pointerEvents="none" />
+      {/* Glass gloss on top, slight darken at bottom. Sits ABOVE the
+          letterform so the F reads as embedded in glass. */}
+      <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill={`url(#${glossId})`} />
+
+      {/* Inner bevel stroke — 1.5px stroke on a slightly inset rect,
+          gradient stroke fakes the bevel without filters. */}
+      <rect
+        x="1.5"
+        y="1.5"
+        width="197"
+        height="197"
+        rx="43"
+        ry="43"
+        fill="none"
+        stroke={`url(#${bevelId})`}
+        strokeWidth="1.5"
+      />
     </svg>
   )
 }
