@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Bell, ChevronRight, Copy, Plus, Search, Sun, Trash2, UserCheck, UserPlus, Mail, X,
+  Bell, ChevronRight, Copy, Plus, Search, Trash2, UserCheck, UserPlus, Mail, X,
 } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
@@ -89,8 +89,7 @@ export default function Team() {
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button
           className="fh-build-icon-btn"
@@ -128,10 +127,10 @@ export default function Team() {
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Active members" value={String(activeCount)} accent />
-            <MiniMetric label="Owners + admins" value={String(ownerCount + members.filter((m) => m.role === 'admin').length)} />
-            <MiniMetric label="Foremen + crew" value={String(fieldCount)} />
-            <MiniMetric label="Pending invites" value={String(invites.length)} tone={invites.length > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Active members" value={loading ? '—' : String(activeCount)} accent />
+            <MiniMetric label="Owners + admins" value={loading ? '—' : String(ownerCount + members.filter((m) => m.role === 'admin').length)} />
+            <MiniMetric label="Foremen + crew" value={loading ? '—' : String(fieldCount)} />
+            <MiniMetric label="Pending invites" value={loading ? '—' : String(invites.length)} tone={!loading && invites.length > 0 ? 'warn' : undefined} />
           </div>
         </section>
 

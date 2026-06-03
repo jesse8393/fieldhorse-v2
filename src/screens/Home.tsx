@@ -203,7 +203,18 @@ export default function Home() {
 
       if (cancelled) return
 
-      const contacts = contactsRes.data || []
+      // Deduplicate by id. The fh_contacts query intentionally omits the
+      // user_id filter so partner-shared jobs flow through (RLS does the
+      // auth), but partner-shared rows can come back twice — once as the
+      // owner's row, once via the partnership join — producing different
+      // totals on every reload. Audit caught $160k / $143k / $130k
+      // bouncing on the same page; this dedup nails the value down.
+      const rawContacts = contactsRes.data || []
+      const contactsById = new Map<string, any>()
+      for (const c of rawContacts) {
+        if (c?.id && !contactsById.has(c.id)) contactsById.set(c.id, c)
+      }
+      const contacts = Array.from(contactsById.values())
 
       // Pipeline = sum of $ across active stages.
       const totalPipeline = contacts

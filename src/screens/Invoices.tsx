@@ -437,9 +437,15 @@ export default function Invoices() {
                   return (
                     <div key={b.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                       <StampNumber size="md" tone={tone}>{fmtMoney(value)}</StampNumber>
-                      <Eyebrow>
-                        {b.label} <span style={{ opacity: 0.55, marginLeft: 2 }}>· {b.short}</span>
-                      </Eyebrow>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                        <Eyebrow style={{ whiteSpace: 'nowrap' }}>{b.label}</Eyebrow>
+                        <span style={{
+                          fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 600,
+                          letterSpacing: '0.08em', textTransform: 'uppercase',
+                          color: 'var(--v3-text-faint, color-mix(in srgb, var(--v3-text-muted) 70%, transparent))',
+                          whiteSpace: 'nowrap'
+                        }}>{b.short}</span>
+                      </div>
                     </div>
                   )
                 })}

@@ -61,7 +61,7 @@ export default defineConfig({
           },
         ],
       },
-      includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         // Stable identity across installs. Without `id`, Chrome treats
         // the install as a brand-new app every time the start_url path

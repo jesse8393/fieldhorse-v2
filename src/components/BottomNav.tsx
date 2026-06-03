@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound } from 'lucide-react'
 import Icon from './icons/Icon.tsx'
@@ -51,6 +51,15 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Belt-and-suspenders: close the More drawer whenever the route
+  // changes, even if the navigation happened from somewhere other
+  // than our go() handler (a NavLink in the body, a deep link from
+  // a toast, etc). Audit caught the drawer staying open after taps.
+  useEffect(() => {
+    setMoreOpen(false)
+  }, [location.pathname])
   const { signOut, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { canViewRoute, role, loading: membershipLoading } = useMembership()
@@ -180,6 +189,10 @@ export default function BottomNav() {
               style={{
                 flex: 1,
                 overflowY: 'auto',
+                // Prevents iOS rubber-band scroll on the nav list from
+                // bouncing the page underneath the drawer.
+                overscrollBehavior: 'contain',
+                WebkitOverflowScrolling: 'touch',
                 padding: '4px 10px 12px',
                 display: 'flex',
                 flexDirection: 'column',

@@ -246,7 +246,7 @@ useEffect(() => {
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 10 }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 72, letterSpacing: '0.01em', lineHeight: 0.9, color: 'var(--ink-strong)' }}>
-                {loading ? '—' : (currentTemp != null ? <CountUp to={Math.round(currentTemp)} /> : '—')}
+                {loading || currentTemp == null ? '—' : Math.round(currentTemp)}
               </span>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--ink-muted)', marginTop: 6 }}>°F</span>
             </div>

@@ -10,14 +10,14 @@ import { hapticTap } from '../lib/haptics.ts'
 // Map notification kind → icon + accent color. Add cases as new kinds
 // are introduced server-side; default falls back to Inbox + steel.
 const KIND_META: Record<string, any> = {
-  partner_accepted:   { Icon: Users,           color: 'var(--field-gold-bright)' },
+  partner_accepted:   { Icon: Users,           color: 'var(--ink-strong)' },
   inspection_logged:  { Icon: ClipboardCheck,  color: 'var(--signal-green)' },
   payment_received:   { Icon: DollarSign,      color: 'var(--signal-green)' },
-  schedule_change:    { Icon: Calendar,        color: 'var(--field-gold-bright)' },
-  sub_responded:      { Icon: MessageSquare,   color: 'var(--field-gold-bright)' },
-  public_link_viewed: { Icon: Eye,             color: 'var(--field-gold-bright)' },
+  schedule_change:    { Icon: Calendar,        color: 'var(--ink-strong)' },
+  sub_responded:      { Icon: MessageSquare,   color: 'var(--ink-strong)' },
+  public_link_viewed: { Icon: Eye,             color: 'var(--ink-strong)' },
   quote_approved:     { Icon: ShieldCheck,     color: 'var(--signal-green)' },
-  change_order_added: { Icon: FileEdit,        color: 'var(--field-gold-bright)' }
+  change_order_added: { Icon: FileEdit,        color: 'var(--ink-strong)' }
 }
 function metaFor(kind: any) {
   return KIND_META[kind] || { Icon: Inbox, color: 'var(--ink-muted)' }

@@ -8,17 +8,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, ChevronRight, Search, Sun, AlertTriangle } from 'lucide-react'
+import { Bell, Check, CheckCheck, ChevronRight, Search, AlertTriangle } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { orgPunchApprove, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 
+// HH:MM format — see comment in screens/Crew.tsx. Bebas Neue
+// (the display font on duration metrics) is uppercase-only, so
+// "1h 30m" rendered as "1H 30M" which read as wrong. Digits +
+// colon survive any case.
 function fmtMinutes(min: number): string {
-  if (min < 60) return `${min}m`
   const h = Math.floor(min / 60)
   const m = min % 60
-  return m === 0 ? `${h}h` : `${h}h ${m}m`
+  return `${h}:${String(m).padStart(2, '0')}`
 }
 function fmtDate(iso: string): string {
   try {
@@ -152,8 +155,7 @@ export default function Timesheets() {
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>
           <span className="fh-build-vline" />
-          <span>72° · Clear</span>
-          <Sun size={16} className="fh-build-sun" />
+          <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
         <button
           className="fh-build-icon-btn"

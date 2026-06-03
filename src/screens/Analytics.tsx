@@ -113,16 +113,27 @@ export default function Analytics() {
       Number(c.amount) > 0 &&
       Number(c.cost) > 0
     )
+    // Per-job margin clamped to [-1, 1]. Without the clamp, a job with
+    // a unit mismatch (cost stored in cents vs amount stored in dollars,
+    // or a stale rate vs revised amount) produced a 5398% average — the
+    // audit flagged it as a calculation error. The clamp keeps each
+    // job's contribution in physically-possible territory before the
+    // mean is taken.
     const avgMargin = winsWithCost.length >= 1
       ? (winsWithCost.reduce((s, c) => {
           const a = Number(c.amount || 0)
           const k = Number(c.cost || 0)
-          return s + (a - k) / a
+          const m = (a - k) / a
+          return s + Math.max(-1, Math.min(1, m))
         }, 0) / winsWithCost.length) * 100
       : null
+    // The "won job" qualifier is misleading without context — the
+    // operator sees "Across 1 won job" while Win Rate reads "4/4"
+    // and the pipeline shows 6+ closed deals. Be explicit: this
+    // average is only across jobs WITH cost data logged.
     const avgMarginNote = (avgMargin == null)
       ? 'Log a job cost to enable'
-      : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'}`
+      : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'} with cost data`
     const leads = contacts.filter((c) => c.stage === 'lead').length
     const quotes = contacts.filter((c) => c.stage === 'quote').length
     const jobs = contacts.filter((c) => c.stage === 'job').length
@@ -137,12 +148,24 @@ export default function Analytics() {
     // distinguishes "no financial data hooked up" from "you've
     // invoiced $0 this year".
     const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime()
-    const invoiced = invoices.length === 0
-      ? null
-      : invoices.reduce((s, inv) => {
-          const t = new Date(inv.issued_at || inv.created_at || 0).getTime()
-          return (Number.isFinite(t) && t >= yearStart) ? s + Number(inv.amount || 0) : s
-        }, 0)
+    // Prefer fh_invoices rows when present (operators who use the full
+    // invoice flow). Fall back to summing contract amounts on jobs that
+    // have reached the invoice or closed stage this year — matches the
+    // Invoices screen's own definition (it also computes from contacts,
+    // not fh_invoices), so "Invoiced YTD" stays connected even for
+    // operators who skip the formal invoice creation step.
+    const invoicedFromInvoices = invoices.reduce((s, inv) => {
+      const t = new Date(inv.issued_at || inv.created_at || 0).getTime()
+      return (Number.isFinite(t) && t >= yearStart) ? s + Number(inv.amount || 0) : s
+    }, 0)
+    const invoicedFromContacts = contacts.reduce((s, c) => {
+      if (c.stage !== 'invoice' && c.stage !== 'closed') return s
+      const t = new Date(c.updated_at || c.created_at || 0).getTime()
+      return (Number.isFinite(t) && t >= yearStart) ? s + Number(c.amount || 0) : s
+    }, 0)
+    const invoiced = invoicedFromInvoices > 0
+      ? invoicedFromInvoices
+      : (invoicedFromContacts > 0 ? invoicedFromContacts : null)
     const collected = payments.length === 0
       ? null
       : payments.reduce((s, p) => {

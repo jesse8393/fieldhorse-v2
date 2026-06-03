@@ -54,7 +54,7 @@ describe('computeJobHealth', () => {
       scheduleItems: []
     })
     // 0 milestones + payment capped at 30 + on-track 20 = 50
-    expect(h.breakdown?.payments.pct).toBe(100)
+    expect(h.breakdown?.payments?.pct).toBe(100)
     expect(h.score).toBe(50)
   })
 

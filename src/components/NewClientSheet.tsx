@@ -111,7 +111,6 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
             <input
               type="text"
               required
-              autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Jane Homeowner"

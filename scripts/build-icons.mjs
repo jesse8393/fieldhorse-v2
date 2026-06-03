@@ -1,5 +1,8 @@
-// Renders /public/icon.svg into PNGs used for the PWA manifest + iOS home screen.
-// Run with `node scripts/build-icons.mjs` (requires sharp).
+// Renders /public/icon-source.png (operator-provided 1254×1254 PNG) into the
+// PWA + iOS home-screen icon variants. Run with `node scripts/build-icons.mjs`
+// (requires sharp). The PNG source is the canonical brand artwork; the SVG
+// sources (icon.svg / favicon.svg) are kept as small fallbacks for browser
+// tabs but the install-screen + home-screen icons all derive from the PNG.
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
@@ -8,7 +11,7 @@ import sharp from 'sharp'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = resolve(__dirname, '..', 'public')
 
-const SOURCE = resolve(publicDir, 'icon.svg')
+const SOURCE = resolve(publicDir, 'icon-source.png')
 
 const TARGETS = [
   { out: 'icon-192.png', size: 192 },
@@ -17,10 +20,10 @@ const TARGETS = [
 ]
 
 async function main() {
-  const svg = await readFile(SOURCE)
+  const src = await readFile(SOURCE)
   for (const t of TARGETS) {
-    const buf = await sharp(svg, { density: 384 })
-      .resize(t.size, t.size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    const buf = await sharp(src)
+      .resize(t.size, t.size, { fit: 'cover', position: 'center' })
       .png({ compressionLevel: 9 })
       .toBuffer()
     await writeFile(resolve(publicDir, t.out), buf)

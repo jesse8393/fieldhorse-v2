@@ -80,7 +80,10 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
 
   function requestClose(v: any) {
     if (v) return
-    if (saving) return
+    // Allow dismissal once the success splash is showing — the parent
+    // will unmount us in ~700ms anyway, but the user shouldn't be locked
+    // out of swipe-to-dismiss during that window.
+    if (saving && !success) return
     setOpen(false)
     setTimeout(() => onClose?.(), 200)
   }
@@ -178,7 +181,6 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
                 </span>
                 <input
                   id="v3-pay-amount"
-                  autoFocus
                   type="text"
                   inputMode="decimal"
                   value={amount}
@@ -375,10 +377,10 @@ function chipStyle(active: any, disabled: any) {
     padding: '7px 12px',
     borderRadius: 999,
     border: active
-      ? '1px solid rgba(201,150,58,0.4)'
+      ? '1px solid rgba(255,255,255,0.22)'
       : '1px solid var(--rule)',
     background: active
-      ? 'rgba(201,150,58,0.14)'
+      ? 'rgba(255,255,255,0.06)'
       : 'var(--surface-2)',
     color: active
       ? 'var(--ink-strong)'
