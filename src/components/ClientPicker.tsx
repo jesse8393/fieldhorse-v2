@@ -121,11 +121,16 @@ export default function ClientPicker({ userId, value, onChange }: any) {
             // an absolute dropdown floats over the form siblings and
             // when iOS scrolls the focused input into view the
             // overlay + form behind it desync. Inline pushes the
-            // form down, the drawer's overflow:auto scrolls cleanly,
-            // and the dropdown stays visually tied to the input.
+            // form down and scrolls cleanly as one block.
+            //
+            // Max-height 55vh: when the user is focused on picking a
+            // client, give the picker most of the visible drawer
+            // height instead of a short list with a long empty void
+            // underneath it. Other form fields remain reachable by
+            // scrolling past the dropdown.
             position: 'relative',
             marginTop: 4,
-            maxHeight: 260,
+            maxHeight: '55vh',
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
             padding: 4,
