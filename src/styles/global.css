@@ -9916,11 +9916,24 @@ select:focus-visible,
 }
 
 .fh-build-dot {
-  display: inline-block;
+  /* Label pill with a colored dot indicator. The previous unscoped
+     rule shrank this to a 6×6 circle, which (a) broke every desktop
+     consumer via source-order override of the @media rule and (b)
+     squashed the label + icon on top of each other on mobile (audit
+     screenshot showed "Unassigned" overlapping the user-avatar icon
+     in every Tasks row). Now matches the desktop layout at all
+     widths. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fh-build-dot::before {
+  content: "";
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: rgba(245, 242, 234, 0.32);
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .fh-build-search,
