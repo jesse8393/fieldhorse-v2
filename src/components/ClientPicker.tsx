@@ -117,13 +117,17 @@ export default function ClientPicker({ userId, value, onChange }: any) {
         <div
           role="listbox"
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            zIndex: 40,
+            // Inline (not absolute) — on mobile inside a Vaul drawer,
+            // an absolute dropdown floats over the form siblings and
+            // when iOS scrolls the focused input into view the
+            // overlay + form behind it desync. Inline pushes the
+            // form down, the drawer's overflow:auto scrolls cleanly,
+            // and the dropdown stays visually tied to the input.
+            position: 'relative',
+            marginTop: 4,
             maxHeight: 260,
             overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
             padding: 4,
             borderRadius: 12,
             background: 'rgba(20,20,20,0.96)',
