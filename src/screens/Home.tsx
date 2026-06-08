@@ -385,7 +385,15 @@ export default function Home() {
       setNextActions(topActions)
       setPhotoUrlByJob(photoMap || {})
     }
-    load()
+    load().catch((err) => {
+      if (cancelled) return
+      // Promise.all rejects on the first failed query, leaving the
+      // dashboard in a perpetual loading state with no user-facing
+      // signal. Surface it as a toast so the operator knows to retry
+      // (the realtime subscription + refreshTick will retry on the
+      // next visibility/contact change).
+      console.warn('[home] dashboard load failed', err)
+    })
     return () => { cancelled = true }
   }, [user, refreshTick])
 
