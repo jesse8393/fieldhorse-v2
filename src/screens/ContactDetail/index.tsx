@@ -48,6 +48,21 @@ const ApproveQuoteSheet = lazy(() => import('./sections/ApproveQuoteSheet.tsx'))
 const SnowJobDetailBuild = lazy(() => import('../../components/desktop/SnowJobDetailBuild.tsx'))
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
+// Tab fallback for Suspense — replaces fallback={null}, which made tab
+// taps look broken (active state animates, then blank space for the
+// 100-500ms the lazy chunk takes to load). Now shows three muted bars
+// so the user gets immediate "loading something" feedback the moment
+// they tap.
+function TabFallback() {
+  return (
+    <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 10 }} aria-busy="true" aria-label="Loading">
+      <span style={{ width: '60%', maxWidth: 240, height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.07)' }} />
+      <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
+      <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.32 }} />
+    </div>
+  )
+}
+
 const TOP_TABS = [
   { id: 'overview',      label: 'Overview' },
   { id: 'quote',         label: 'Quote' },
@@ -360,7 +375,7 @@ export default function ContactDetail() {
                 />
               )}
               {tab === 'quote' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <QuoteTab
                     contact={contact}
                     userId={user?.id}
@@ -371,7 +386,7 @@ export default function ContactDetail() {
                 </Suspense>
               )}
               {tab === 'details' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <DetailsTab
                     contact={contact}
                     inspections={inspections}
@@ -385,7 +400,7 @@ export default function ContactDetail() {
                 </Suspense>
               )}
               {tab === 'financials' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <FinancialsTab
                     contact={contact}
                     subs={subs}
@@ -400,7 +415,7 @@ export default function ContactDetail() {
                 </Suspense>
               )}
               {tab === 'files' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <FilesTab
                     contact={contact}
                     notes={notes}
@@ -410,22 +425,22 @@ export default function ContactDetail() {
                 </Suspense>
               )}
               {tab === 'logs' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <DailyLogsSection jobId={contact?.id} userId={user?.id} />
                 </Suspense>
               )}
               {tab === 'selections' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
                 </Suspense>
               )}
               {tab === 'materials' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <MaterialsSection jobId={contact?.id} userId={user?.id} />
                 </Suspense>
               )}
               {tab === 'change_orders' && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<TabFallback />}>
                   <ChangeOrdersSection
                     contact={contact}
                     userId={user?.id}
@@ -520,7 +535,7 @@ export default function ContactDetail() {
           />
         )}
         {tab === 'quote' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <QuoteTab
               contact={contact}
               userId={user?.id}
@@ -533,7 +548,7 @@ export default function ContactDetail() {
           </Suspense>
         )}
         {tab === 'details' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <DetailsTab
               contact={contact}
               inspections={inspections}
@@ -548,7 +563,7 @@ export default function ContactDetail() {
           </Suspense>
         )}
         {tab === 'financials' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <FinancialsTab
               contact={contact}
               subs={subs}
@@ -566,7 +581,7 @@ export default function ContactDetail() {
           </Suspense>
         )}
         {tab === 'files' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <FilesTab
               contact={contact}
               notes={notes}
@@ -576,22 +591,22 @@ export default function ContactDetail() {
           </Suspense>
         )}
         {tab === 'logs' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <DailyLogsSection jobId={contact?.id} userId={user?.id} />
           </Suspense>
         )}
         {tab === 'selections' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
           </Suspense>
         )}
         {tab === 'materials' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <MaterialsSection jobId={contact?.id} userId={user?.id} />
           </Suspense>
         )}
         {tab === 'change_orders' && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<TabFallback />}>
             <ChangeOrdersSection
               contact={contact}
               userId={user?.id}

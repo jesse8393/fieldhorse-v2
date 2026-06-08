@@ -135,7 +135,11 @@ const JobCard = memo(function JobCard({
       type="button"
       layout
       className={`fh-job-card${hasPhotoBanner ? ' fh-job-card--with-photo' : ''}${featured ? ' fh-job-card--featured' : ''}`}
-      onClick={() => { hapticTap(); onOpen?.(contact) }}
+      onClick={onOpen ? () => { hapticTap(); onOpen(contact) } : undefined}
+      // Card-tap feedback (scale + cursor) only fires when there's an
+      // actual onOpen handler — otherwise the user sees the press
+      // animation but nothing happens, which reads as broken.
+      disabled={!onOpen}
       initial={isNew ? { opacity: 0, scale: 0.94 } : { opacity: 0, y: 8 }}
       animate={isNew ? { opacity: 1, scale: [0.94, 1.02, 1] } : { opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
@@ -143,7 +147,7 @@ const JobCard = memo(function JobCard({
         ? { duration: 0.55, ease: [0.16, 1, 0.3, 1] }
         : { duration: 0.22, delay: Math.min(index * 0.035, 0.22), ease: [0.2, 0.8, 0.2, 1] }
       }
-      whileTap={{ scale: 0.97 }}
+      whileTap={onOpen ? { scale: 0.97 } : undefined}
       whileHover={{
         y: -4,
         backgroundColor: 'var(--v3-surface-3)',
