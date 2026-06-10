@@ -20,3 +20,17 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Baseline security headers for every response. Intentionally no
+# Content-Security-Policy yet — a strict CSP needs testing against
+# framer-motion inline styles, Google Fonts, Supabase realtime
+# websockets, and the Netlify function endpoints before it can ship
+# safely; add it as its own change with report-only first.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self)"

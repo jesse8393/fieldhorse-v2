@@ -207,14 +207,22 @@ export default function Importer() {
     setTimeout(() => setProgress(0), 400)
     setImporting(false)
     const finalCount = count ?? payload.length
-    if (!error) hapticSuccess(); setDone(error ? { err: error.message } : { count: finalCount })
-    if (!error) {
-      setRows([])
-      setMapped([])
-      setCsvHeaders([])
-      setHeaderMap({})
-      toastSuccess(`Imported ${finalCount} contacts`, 'Now in your Pipeline')
+    if (error) {
+      // Failure path previously only set the red banner — no toast, no
+      // haptic, and the one-liner `if (!error) hapticSuccess(); setDone(...)`
+      // read like the haptic was conditional on the whole line. Split
+      // for symmetry with the success path.
+      setDone({ err: error.message })
+      toastError("Import failed", error.message)
+      return
     }
+    hapticSuccess()
+    setDone({ count: finalCount })
+    setRows([])
+    setMapped([])
+    setCsvHeaders([])
+    setHeaderMap({})
+    toastSuccess(`Imported ${finalCount} contacts`, 'Now in your Pipeline')
   }
 
   async function copyWebhook() {

@@ -1278,11 +1278,16 @@ function deriveStatus(contact: any, pastQuote = false) {
     return { label, tone, sub }
   }
 
-  if (isExpired) {
+  // Expiry only applies to quotes still awaiting a decision. Approved
+  // and rejected are terminal — an approved quote whose expiry date
+  // passes is still approved (the customer already committed); flipping
+  // it to "Expired · danger" made closed-won jobs look like they fell
+  // through (audit FH-QA-009).
+  if (isExpired && raw !== 'approved' && raw !== 'rejected') {
     label = 'Expired'
     tone = 'danger'
     sub = expIso ? `Was due ${shortDate(expIso)}` : null
-  } else if (expIso) {
+  } else if (expIso && raw !== 'approved' && raw !== 'rejected') {
     sub = sub ? `${sub} · Expires ${shortDate(expIso)}` : `Expires ${shortDate(expIso)}`
   }
 

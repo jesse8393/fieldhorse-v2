@@ -161,9 +161,18 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // assigns sequence_numbers 1, 2, 3 deterministically. Batch insert
       // would race the sequence assignment.
       let createdCount = 0
-      for (const row of schedule) {
+      let issuedSoFar = 0
+      for (let i = 0; i < schedule.length; i++) {
+        const row = schedule[i]
         const pct = Number(row.pct || 0)
-        const amount = Math.round(contractTotal * (pct / 100))
+        // Each draw rounds independently EXCEPT the last, which takes
+        // the remainder — otherwise per-draw Math.round drifts and the
+        // schedule doesn't reconcile to the contract total (e.g. $3,000
+        // ÷ 3 → $1,000 + $1,000 + $999 if every draw rounds on its own).
+        const amount = i === schedule.length - 1
+          ? Math.round(contractTotal - issuedSoFar)
+          : Math.round(contractTotal * (pct / 100))
+        issuedSoFar += amount
         const { error } = await supabase.from('fh_invoices').insert({
           contact_id: contact.id,
           user_id: userId,
