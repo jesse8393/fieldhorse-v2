@@ -130,7 +130,7 @@ export default function SnowSubsBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Teams</div>
+            <div className="fh-build-good">Subs</div>
             <h1 className="fh-build-title">FIELD BENCH.</h1>
           </div>
 

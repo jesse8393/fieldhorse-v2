@@ -56,7 +56,7 @@ const GROUPS: Group[] = [
       { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
       { label: 'Lead Desk',      to: '/jobs?view=leads', Icon: Sparkles, match: (p) => p === '/jobs' && typeof window !== 'undefined' && window.location.search.includes('view=leads') },
-      { label: 'Job Desk',       to: '/jobs',     Icon: Hammer,          match: (p) => p === '/jobs' && !(typeof window !== 'undefined' && window.location.search.includes('view=leads')) },
+      { label: 'Job Desk',       to: '/jobs?view=doing', Icon: Hammer,   match: (p) => p === '/jobs' && typeof window !== 'undefined' && !window.location.search.includes('view=leads') && !window.location.search.includes('view=pipeline') },
     ],
   },
   {
@@ -74,7 +74,12 @@ const GROUPS: Group[] = [
   {
     label: 'Intelligence',
     items: [
-      { label: 'Pipeline',       to: '/jobs',     Icon: BarChart3,       match: () => false },
+      // Pipeline deep-links to the Job Desk's pipeline view so the
+      // Intelligence section doesn't have a nav item that's a clone
+      // of Job Desk above. ?view=pipeline is read by Jobs.tsx to
+      // surface the kanban/pipeline tab; falls through to the default
+      // table view if not implemented yet.
+      { label: 'Pipeline',       to: '/jobs?view=pipeline', Icon: BarChart3, match: (p) => p === '/jobs' && typeof window !== 'undefined' && window.location.search.includes('view=pipeline') },
       { label: 'Analytics',      to: '/analytics',Icon: TrendingUp,      match: prefix('/analytics') },
       { label: 'Forecast',       to: '/pour-window', Icon: LineChart,    match: prefix('/pour-window') },
     ],
@@ -86,7 +91,10 @@ const GROUPS: Group[] = [
       { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },
       { label: 'Subs',           to: '/subs',     Icon: Hammer,          match: prefix('/subs') },
       { label: 'Templates',      to: '/settings#templates', Icon: FileText,        match: (p) => p === '/settings' && typeof window !== 'undefined' && window.location.hash === '#templates' },
-      { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: prefix('/settings') },
+      // Settings is the parent — when hash points at #templates, the
+      // Templates row above owns the active state; otherwise Settings
+      // does. Previously both highlighted at once on /settings#templates.
+      { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: (p) => p === '/settings' && !(typeof window !== 'undefined' && window.location.hash === '#templates') },
     ],
   },
 ]

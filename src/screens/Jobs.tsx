@@ -111,11 +111,21 @@ export default function Jobs() {
   // ignored. Empty stage param falls through to the default tab.
   useEffect(() => {
     const stage = searchParams.get('stage')
-    if (!stage) return
-    const validIds = TABS.map((t) => t.id)
-    if (validIds.includes(stage)) setFilter(stage)
-    searchParams.delete('stage')
-    setSearchParams(searchParams, { replace: true })
+    if (stage) {
+      const validIds = TABS.map((t) => t.id)
+      if (validIds.includes(stage)) setFilter(stage)
+      searchParams.delete('stage')
+      setSearchParams(searchParams, { replace: true })
+      return
+    }
+    // Sidebar nav: ?view=leads → Lead Desk lands on the Lead tab;
+    // ?view=pipeline → Pipeline lands on All; default (Job Desk) shows
+    // active jobs ("Doing") so Job Desk isn't a clone of Lead Desk
+    // when the operator clicks it.
+    const view = searchParams.get('view')
+    if (view === 'leads') setFilter('lead')
+    else if (view === 'pipeline') setFilter('all')
+    else if (view === 'doing') setFilter('active')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

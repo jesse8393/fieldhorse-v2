@@ -7251,6 +7251,19 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     gap: 18px;
     color: rgba(245,242,234,.68);
     font-size: 12px;
+    /* Audit Jun 2026: long meta strings ("Year to date · 2026", "14
+       invoices on the books") were wrapping to 3-4 lines because the
+       individual <span>s had no nowrap. The topbar grid column has a
+       fixed width, so wrapping doesn't help — it just stacks vertically
+       and breaks alignment. Force each item to one line; the grid
+       column expands as needed because column 3 above is `auto`. */
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .fh-build-topbar__meta > * {
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .fh-build-vline {

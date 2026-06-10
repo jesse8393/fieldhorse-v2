@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Calculator, Sparkles, Copy, Check, FileText, Briefcase, BookmarkPlus, Trash2, X } from 'lucide-react'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { RATE_CARD, TRADE_LABELS, loadUserRateCard } from '../lib/rateCard.ts'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { JOB_TYPES } from '../lib/jobTypes.ts'
@@ -291,9 +292,12 @@ export default function Bid() {
       animate="show"
       style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
+      {isDesktop && <BuildTopbar />}
       {/* HEADER — working-tool, no serif italic. Dropped per the design
           direction: editorial type belongs on hero/marketing surfaces,
-          not on a tool the operator uses to build a bid. */}
+          not on a tool the operator uses to build a bid. Desktop H1
+          uses the same Bebas Neue display style as Jobs/Clients/
+          Schedule so /bid matches the rest of the command center. */}
       <motion.div
         variants={item}
         style={{
@@ -305,7 +309,7 @@ export default function Bid() {
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{
+          <span className={isDesktop ? 'fh-build-good' : undefined} style={isDesktop ? undefined : {
             fontFamily: 'var(--font-body)',
             fontSize: 10, fontWeight: 700,
             letterSpacing: '0.16em', textTransform: 'uppercase',
@@ -315,7 +319,7 @@ export default function Bid() {
             <Calculator size={11} aria-hidden="true" />
             AI Estimate
           </span>
-          <h1 style={{
+          <h1 className={isDesktop ? 'fh-build-title' : undefined} style={isDesktop ? undefined : {
             margin: '6px 0 0',
             fontFamily: 'var(--font-body)',
             fontSize: 'clamp(20px, 5.5vw, 26px)',
@@ -324,7 +328,7 @@ export default function Bid() {
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
-            Build a clean estimate
+            {isDesktop ? 'BUILD THE BID.' : 'Build a clean estimate'}
           </h1>
           <p style={{
             margin: '6px 0 0',

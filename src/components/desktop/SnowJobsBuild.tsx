@@ -172,7 +172,12 @@ export default function SnowJobsBuild(props: Props) {
           <Bell size={16} />
         </button>
         <button className="fh-build-new-btn" type="button" onClick={onNewLead}>
-          <Plus size={15} /> New Lead
+          {/* CTA label tracks the active filter so Job Desk ("Doing"
+              or "Complete") shows "+ New Job" and Lead Desk ("Lead"
+              or "Quote") shows "+ New Lead". "All" stays on the
+              broader "New Lead" since that's still the most common
+              entry. */}
+          <Plus size={15} /> {(filter === 'active' || filter === 'won') ? 'New Job' : 'New Lead'}
         </button>
       </header>
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -185,6 +186,13 @@ export default function Compose() {
       animate="show"
       style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
+      {isDesktop && <BuildTopbar />}
+      {isDesktop && (
+        <div style={{ padding: '12px var(--v3-gutter) 14px' }}>
+          <div className="fh-build-good">Dispatch</div>
+          <h1 className="fh-build-title">SAY IT FAST.</h1>
+        </div>
+      )}
       {/* INPUT COCKPIT — black-glass panel: header eyebrow + channel pills
           + intent + contact + context chips + CTA */}
       <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
