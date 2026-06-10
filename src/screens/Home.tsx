@@ -114,6 +114,7 @@ export default function Home() {
   // Renders as a glanceable list at the bottom of Home so the operator sees
   // their highest-value open work without leaving the screen.
   const [topPipeline, setTopPipeline] = useState<any>(null)
+  const [jobHealth, setJobHealth] = useState<any>(null)
   // Stage breakdown for Pipeline card footer (mockup: Won / Active / Lead)
   const [stageBreakdown, setStageBreakdown] = useState<any>(null)
   const [stageRailData, setStageRail] = useState<any>(null)
@@ -263,17 +264,30 @@ export default function Home() {
       // Operator-facing copy (no CRM shorthand): subline names the
       // stage + days waiting in plain English.
       for (const c of risky) {
-        const daysWaiting = Math.max(1, Math.floor((nowD.getTime() - new Date(c.updated_at || c.created_at || 0).getTime()) / 86400000))
+        const lastTouchMs = new Date(c.updated_at || c.created_at || 0).getTime()
+        const daysWaiting = Math.max(1, Math.floor((nowD.getTime() - lastTouchMs) / 86400000))
         const dayWord = daysWaiting === 1 ? 'day' : 'days'
         actions.push({
           id: `followup-${c.id}`,
           kind: 'followup',
           contactId: c.id,
+          // Owner Queue Phase 1 §2: split Action / Client / Amount /
+          // Due into discrete fields. `title` keeps the legacy combined
+          // phrase for anything else that reads it; the new fields
+          // (verb / contactName / contactAmount / dueIso) drive the
+          // table columns.
+          verb: 'Follow up',
+          contactName: c.name || 'Unnamed lead',
+          contactAmount: Number(c.amount || 0),
+          // Follow-ups don't have a calendar due date; the "due" cell
+          // shows wait time (e.g. "15d ago") computed from last touch.
+          dueIso: new Date(lastTouchMs).toISOString(),
+          dueKind: 'waited',
           title: `Follow up with ${c.name || 'lead'}`,
           detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} waiting ${daysWaiting} ${dayWord}`,
           urgencyLabel: 'Follow up',
           urgencyTone: daysWaiting >= 14 ? 'danger' : 'warn',
-          urgency: new Date(c.updated_at || c.created_at || 0).getTime()
+          urgency: lastTouchMs
         })
       }
       // 2. Overdue jobs — needs a reschedule. Urgency = danger (red) —
@@ -283,6 +297,12 @@ export default function Home() {
           id: `reschedule-${c.id}`,
           kind: 'reschedule',
           contactId: c.id,
+          verb: 'Reschedule',
+          contactName: c.name || 'Unnamed job',
+          contactAmount: Number(c.amount || 0),
+          // Reschedules are "due today" — the job is already overdue.
+          dueIso: new Date(nowD).toISOString(),
+          dueKind: 'overdue',
           title: `Reschedule ${c.name || 'job'}`,
           detail: 'Job behind schedule',
           urgencyLabel: 'Overdue',
@@ -301,6 +321,11 @@ export default function Home() {
           id: `invoice-${c.id}`,
           kind: 'invoice',
           contactId: c.id,
+          verb: 'Chase invoice',
+          contactName: c.name || 'Unnamed job',
+          contactAmount: Number(c.amount || 0),
+          dueIso: updated.toISOString(),
+          dueKind: 'invoiced',
           title: `Chase invoice for ${c.name || 'job'}`,
           detail: Number(c.amount) > 0 ? `$${Number(c.amount).toLocaleString()} owed` : 'Awaiting payment',
           urgencyLabel: 'Invoice pending',
@@ -390,12 +415,76 @@ export default function Home() {
           updatedAt: c.updated_at || c.created_at || null
         }))
 
+      // Job Health Preview (Phase 1 §3): the bottom-row table on the
+      // Command Center. Joins each active job (stage=job/invoice) with
+      // the schedule + payment signals we already have in scope so the
+      // card prints real status dots instead of "signals not connected
+      // yet". Sources:
+      //   schedule → overdueSchedRes (entry with end_at in the past)
+      //   billing  → contact.amount vs sum(payments for that contact)
+      //   reports  → not yet tracked → 'unknown'
+      //   risk     → derived from the three signals above
+      //   next     → stage-derived prompt
+      const payByContact = new Map<string, number>()
+      for (const p of (paysRes.data || []) as any[]) {
+        if (!p?.contact_id) continue
+        payByContact.set(p.contact_id, (payByContact.get(p.contact_id) || 0) + Number(p.amount || 0))
+      }
+      const overdueByContact = new Set(overdueContactIds)
+      const jobHealthRows = contacts
+        .filter((c) => c.stage === 'job' || c.stage === 'invoice')
+        .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
+        .slice(0, 6)
+        .map((c) => {
+          const isBehind = overdueByContact.has(c.id)
+          const scheduleTone: 'good' | 'warn' | 'bad' = isBehind ? 'bad' : 'good'
+          const schedule = isBehind ? 'Behind' : 'On track'
+          const amount = Number(c.amount || 0)
+          const paid = payByContact.get(c.id) || 0
+          const outstanding = amount > 0 ? amount - paid : 0
+          const billingTone: 'good' | 'warn' | 'bad' =
+            c.stage === 'invoice' && outstanding > 0 ? 'warn'
+            : c.stage === 'job' && amount === 0 ? 'warn'
+            : amount > 0 && outstanding <= 0 ? 'good'
+            : 'good'
+          const billing =
+            c.stage === 'invoice' && outstanding > 0 ? 'Outstanding'
+            : amount === 0 ? 'Not set'
+            : outstanding > 0 ? 'In progress'
+            : 'Paid'
+          // Composite risk = worst of the per-column tones. 'bad' wins.
+          const tones: ('good' | 'warn' | 'bad')[] = [scheduleTone, billingTone]
+          const riskTone: 'good' | 'warn' | 'bad' =
+            tones.includes('bad') ? 'bad' : tones.includes('warn') ? 'warn' : 'good'
+          const risk = riskTone === 'bad' ? 'High' : riskTone === 'warn' ? 'Medium' : 'Low'
+          const next =
+            isBehind ? 'Reschedule + update client'
+            : c.stage === 'invoice' && outstanding > 0 ? 'Chase outstanding invoice'
+            : c.stage === 'invoice' ? 'Collect remaining balance'
+            : 'Keep crew moving'
+          return {
+            id: c.id,
+            job: c.name || 'Untitled',
+            stage: c.stage === 'invoice' ? 'Invoicing' : 'Active',
+            schedule,
+            scheduleTone,
+            report: '—',          // reports cadence not tracked yet
+            reportTone: 'neutral',
+            billing,
+            billingTone,
+            risk,
+            riskTone,
+            next,
+          }
+        })
+
       setPipeline(totalPipeline)
       setPipelinePrev(prevPipeline)
       setDealsAtRisk({ count: risky.length, value: riskValue, followUps, quotesAttention })
       setJobsBehind(behind.length)
       setInvoicingWeek(weekTotal)
       setTopPipeline(topActiveDeals)
+      setJobHealth(jobHealthRows)
       setStageBreakdown(stageCounts)
       setStageRail(stageRail)
       setTodayOnSite(todayRows)
@@ -495,6 +584,7 @@ export default function Home() {
           trendPct={trendPct}
           stageBreakdown={stageBreakdown}
           stageRail={stageRailData}
+          jobHealth={jobHealth}
           dealsAtRisk={dealsAtRisk}
           jobsBehind={jobsBehind}
           invoicingWeek={invoicingWeek}
