@@ -32,8 +32,12 @@ export function toast(message: string, options: ToastOptions = {}) {
     accent: options.accent || 'gold',   // gold | green | red | steel | stageId
     duration: options.duration ?? (heavy ? HEAVY_DURATION : DEFAULT_DURATION)
   }
-  // eslint-disable-next-line no-console
-  console.log(`[toast] ${detail.accent}: ${message}`)
+  // Dev-only — audit L2 caught the same toast logged 4× in production
+  // (the Sonner forward dispatches its own event handlers downstream).
+  if ((import.meta as any).env?.DEV) {
+    // eslint-disable-next-line no-console
+    console.log(`[toast] ${detail.accent}: ${message}`)
+  }
   window.dispatchEvent(new CustomEvent('fh:toast', { detail }))
 
   // Sonner forward. Explicit variant wins; otherwise infer from accent.

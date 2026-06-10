@@ -7422,7 +7422,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 
   .fh-build-content-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.05fr) 270px;
+    /* Right rail bumped 270 → 320 per the approved mock (audit M4). */
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.05fr) 320px;
     gap: 18px;
   }
 
@@ -7505,6 +7506,28 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     padding: 0;
   }
 
+  /* Stage-key colored dot per cell — audit M2. Color comes from the
+     --stage-* tokens already defined for pills / cards elsewhere so
+     all surfaces stay in sync. Anchored absolute so the existing
+     text positioning inside each cell is untouched. */
+  .fh-build-stage-grid__dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--steel);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
+    transform: translateY(-22px);
+  }
+  .fh-build-stage-grid [data-stage="lead"]    .fh-build-stage-grid__dot { background: var(--stage-lead); }
+  .fh-build-stage-grid [data-stage="quote"]   .fh-build-stage-grid__dot { background: var(--stage-quote); }
+  .fh-build-stage-grid [data-stage="active"]  .fh-build-stage-grid__dot { background: var(--stage-job); }
+  .fh-build-stage-grid [data-stage="job"]     .fh-build-stage-grid__dot { background: var(--stage-job); }
+  .fh-build-stage-grid [data-stage="invoice"] .fh-build-stage-grid__dot { background: var(--stage-invoice); }
+  .fh-build-stage-grid [data-stage="closed"]  .fh-build-stage-grid__dot { background: var(--stage-closed); }
+  .fh-build-stage-grid [data-stage="lost"]    .fh-build-stage-grid__dot { background: var(--stage-lost); }
+  .fh-build-stage-grid [data-stage="won"]     .fh-build-stage-grid__dot { background: var(--stage-closed); }
+
   .fh-build-stage-grid span {
     display: block;
     color: var(--v3-primary, #c9963a);
@@ -7552,12 +7575,17 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-today__image {
+    /* Removed external Unsplash dependency (audit M5). The mock used
+       a hero project photo here, not a generic interior stock shot —
+       and shipping a runtime request to images.unsplash.com from the
+       flagship screen is both off-brand and a privacy footgun. Until
+       we have a per-operator brand photo to wire in, render an
+       on-brand gradient panel. */
     background:
-      linear-gradient(90deg, rgba(6,7,8,.25), rgba(6,7,8,.86)),
-      url('https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=80');
+      radial-gradient(circle at 30% 20%, rgba(229, 190, 111, 0.10), transparent 60%),
+      linear-gradient(180deg, rgba(20, 18, 14, 0.85) 0%, rgba(8, 7, 5, 0.95) 100%);
     background-size: cover;
     background-position: center;
-    opacity: .82;
   }
 
   .fh-build-today__body {
@@ -7736,7 +7764,19 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-table__head.is-revenue,
   .fh-build-table__row.is-revenue {
     grid-template-columns: 1.2fr .7fr .7fr .7fr .9fr;
+    /* Stage-key colored left border per row — audit M3. Matches the
+       mock's stage-keyed accent bar. Color set via the [data-stage]
+       attribute selectors below. Default neutral steel for rows
+       missing a stage key. */
+    border-left: 3px solid var(--steel);
+    padding-left: 13px;
   }
+  .fh-build-table__row.is-revenue[data-stage="lead"]    { border-left-color: var(--stage-lead); }
+  .fh-build-table__row.is-revenue[data-stage="quote"]   { border-left-color: var(--stage-quote); }
+  .fh-build-table__row.is-revenue[data-stage="job"]     { border-left-color: var(--stage-job); }
+  .fh-build-table__row.is-revenue[data-stage="invoice"] { border-left-color: var(--stage-invoice); }
+  .fh-build-table__row.is-revenue[data-stage="closed"]  { border-left-color: var(--stage-closed); }
+  .fh-build-table__row.is-revenue[data-stage="lost"]    { border-left-color: var(--stage-lost); }
 
   .fh-build-table__head.is-health,
   .fh-build-table__row.is-health {
@@ -9775,11 +9815,16 @@ select:focus-visible,
   gap: 16px;
 }
 
-.fh-build-hero-row,
-.fh-build-hero-row--page {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Mobile-only — same source-order trap as .fh-build-content-grid above.
+   Desktop @media block at line ~7330 sets display:grid for the hero
+   row; this unscoped flex rule was beating it. */
+@media (max-width: 899px) {
+  .fh-build-hero-row,
+  .fh-build-hero-row--page {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
 }
 
 .fh-build-eyebrow {
@@ -9981,10 +10026,21 @@ select:focus-visible,
   min-height: 40px;
 }
 
-.fh-build-content-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Mobile-only stacked fallback. Scoped to max-width:899px so it can't
+   beat the desktop @media (min-width: 900px) `display: grid` rule
+   earlier in this file — that was the H1 bug from the Jun 10 audit:
+   the desktop grid rule had `display: grid` + 3-column template, this
+   unscoped flex rule landed later in source order and pinned every
+   build screen to a single flex column on desktop, collapsing the
+   Command Center's pipeline / today / rail into stacked full-width
+   bands. Same source-order pattern fixed for .fh-build-topbar and
+   .fh-build-dot in prior audits. */
+@media (max-width: 899px) {
+  .fh-build-content-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
 }
 
 .fh-build-invite-row {

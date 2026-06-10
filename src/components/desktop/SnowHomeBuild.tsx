@@ -123,7 +123,17 @@ export default function SnowHomeBuild(props: Props) {
   const pipelineRows = Array.isArray(stageRail) && stageRail.length > 0
     ? buildStageRailRows(stageRail)
     : buildPipelineStages(topPipeline, stageBreakdown)
-  const totalOppCount = pipelineRows.reduce((s: number, r: any) => s + (r.count || 0), 0)
+  // Active opportunities = the ACTIVE_STAGES set (lead+quote+job+invoice)
+  // — closed/lost don't belong in an "active" count even though they're
+  // visible columns on the stage rail. Audit H2 caught the subtitle
+  // saying "24 active opportunities" by counting every row including
+  // the 8 closed and 1 lost.
+  const ACTIVE_RAIL_KEYS = new Set(['lead', 'quote', 'active', 'invoice'])
+  const totalOppCount = pipelineRows.reduce(
+    (s: number, r: any) => s + (ACTIVE_RAIL_KEYS.has(r.key) ? (r.count || 0) : 0),
+    0
+  )
+  const activeStageCount = pipelineRows.filter((r: any) => ACTIVE_RAIL_KEYS.has(r.key) && (r.count || 0) > 0).length
   const queueRows = buildOwnerQueue(nextActions)
   const revenueRows = buildRevenueRows(topPipeline)
   const jobRows = buildJobHealthRows(todayOnSite)
@@ -203,6 +213,7 @@ export default function SnowHomeBuild(props: Props) {
             trendPct={trendPct}
             rows={pipelineRows}
             totalOppCount={totalOppCount}
+            activeStageCount={activeStageCount}
             onGoToJobs={onGoToJobs}
           />
 
@@ -253,8 +264,11 @@ function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
   )
 }
 
-function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, onGoToJobs }: any) {
-  const stageCount = rows.length
+function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs }: any) {
+  // stageCount = active stages that actually have deals (not every
+  // rail column). Otherwise the subtitle reads "across 5 stages" on
+  // a book that only has work in 3 of them.
+  const stageCount = activeStageCount ?? rows.length
   const oppLabel =
     totalOppCount === 0
       ? 'No active opportunities yet'
@@ -282,11 +296,17 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, onGoTo
           <button
             key={row.label}
             type="button"
+            data-stage={row.key}
             onClick={(e) => {
               e.stopPropagation()
               onGoToJobs(row.key)
             }}
           >
+            {/* Stage-key colored dot — sourced from CSS via the
+                data-stage attribute (audit M2). Previously the cell
+                had no dot at all; the mock shows a colored dot per
+                stage on the gold track. */}
+            <span className="fh-build-stage-grid__dot" aria-hidden="true" />
             <span>{row.label}</span>
             <strong>{row.amount}</strong>
             <small>{row.count}</small>
@@ -368,11 +388,14 @@ function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
   const quotesSub = risk?.quotesAttention == null ? 'Loading…' : 'quotes waiting'
   return (
     <aside className="fh-build-rail">
-      <RailMetric title="Deals at risk" value={dealsValue} sub={dealsSub} chart="red" />
+      {/* Card names aligned to the approved mock (audit M4):
+          "Deals at risk" → "Goals at risk", "Quotes needing attention"
+          → "Estimates needing action". Other titles already matched. */}
+      <RailMetric title="Goals at risk" value={dealsValue} sub={dealsSub} chart="red" />
       <RailMetric title="Jobs behind" value={jobsBehindValue} sub={jobsBehindSub} chart="gold" />
       <RailMetric title="Invoicing this week" value={invoicingValue} sub={invoicingSub} />
       <RailMetric title="Follow-ups due" value={followUpsValue} sub={followUpsSub} />
-      <RailMetric title="Quotes needing attention" value={quotesValue} sub={quotesSub} />
+      <RailMetric title="Estimates needing action" value={quotesValue} sub={quotesSub} />
     </aside>
   )
 }
@@ -447,6 +470,7 @@ function RevenueOpportunities({ rows, onOpenJob, onViewAll }: any) {
             key={row.id || row.name}
             type="button"
             className="fh-build-table__row is-revenue"
+            data-stage={String(row.stageKey || '').toLowerCase()}
             onClick={() => row.id && onOpenJob(row.id)}
           >
             <strong>{row.name}</strong>
@@ -549,9 +573,15 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
     invoice: 'Invoicing', closed: 'Won', lost: 'Lost',
   }
   // Map rail keys to the /jobs?stage= filter ids used by onGoToJobs.
+  // Post-H3 the Jobs screen has distinct 'invoice' and 'closed' chips,
+  // so each rail column routes to its own filter. (The old invoice→won
+  // alias also broke the hero subtitle: ACTIVE_RAIL_KEYS counts the
+  // 'invoice' key, which never appeared because it was remapped —
+  // spot-check caught "16 active across 3 stages" under a $138k
+  // headline that spans 17 deals across 4 stages.)
   const FILTER: Record<string, string> = {
     lead: 'lead', quote: 'quote', job: 'active',
-    invoice: 'won', closed: 'won', lost: 'all',
+    invoice: 'invoice', closed: 'closed', lost: 'all',
   }
   const rows = stageRail
     .filter((s) => s.key !== 'lost' || s.count > 0)
@@ -661,6 +691,7 @@ function buildRevenueRows(topPipeline: any[] | null) {
       id: c.id,
       name: c.name || 'Unnamed',
       stage: stageLabel[sid] || c.stage || '—',
+      stageKey: sid,
       amount: moneyFull(c.amount || c.value || 0),
       touch: days == null ? '—' : days <= 0 ? 'Today' : `${days}d ago`,
       next: nextByStage[sid] || '—',

@@ -32,12 +32,18 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 // in the pipeline, tab "Doing" means stage='job' specifically (the
 // pipeline-depth filter). The tab id ('active') is unchanged so the
 // Phase 11 ?stage=active deep-link from Home still routes here.
+// Audit H3 (Jun 10): the prior "won" chip was labeled "Complete" but
+// matched stage in (invoice, closed) — a job that was still invoicing
+// ($14,800 outstanding) showed under "Closed/Complete". Split into
+// distinct Invoicing and Closed chips so each chip matches exactly
+// one stage and the count is honest.
 const TABS = [
-  { id: 'all',    label: 'All',    match: () => true },
-  { id: 'lead',   label: 'Lead',   match: (c: any) => c.stage === 'lead' },
-  { id: 'quote',  label: 'Quote',  match: (c: any) => c.stage === 'quote' },
-  { id: 'active', label: 'Doing',  match: (c: any) => c.stage === 'job' },
-  { id: 'won',    label: 'Complete', match: (c: any) => c.stage === 'invoice' || c.stage === 'closed' }
+  { id: 'all',     label: 'All',       match: () => true },
+  { id: 'lead',    label: 'Lead',      match: (c: any) => c.stage === 'lead' },
+  { id: 'quote',   label: 'Quote',     match: (c: any) => c.stage === 'quote' },
+  { id: 'active',  label: 'Doing',     match: (c: any) => c.stage === 'job' },
+  { id: 'invoice', label: 'Invoicing', match: (c: any) => c.stage === 'invoice' },
+  { id: 'closed',  label: 'Closed',    match: (c: any) => c.stage === 'closed' }
 ]
 
 // "All" view groups the pipeline into labeled stage blocks so leads,
@@ -288,7 +294,7 @@ export default function Jobs() {
             // CTA is honest: "+ New Job" (Doing/Complete filters) opens
             // a Job-stage form, "+ New Lead" opens a Lead-stage form.
             onNewLead={() => {
-              setAddInitialStage(filter === 'active' || filter === 'won' ? 'job' : 'lead')
+              setAddInitialStage(filter === 'active' || filter === 'invoice' || filter === 'closed' ? 'job' : 'lead')
               setAddOpen(true)
             }}
           />

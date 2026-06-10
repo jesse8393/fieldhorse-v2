@@ -223,20 +223,55 @@ export default function Settings() {
 
   // Sidebar "Templates" item routes to /settings#templates and the
   // anchor lives on the Estimate-template picker further down the
-  // page. Honor the hash on first paint + on later hash changes so
-  // the user lands on template setup instead of the brand top.
+  // page. Honor the hash on first paint + on later hash changes.
+  //
+  // Audit M1 (Jun 10): the single 50ms timeout missed because the
+  // template list above the anchor loads async — at 50ms the element
+  // exists, scrollIntoView lands, but more layout shifts in below
+  // and the user ends up back at top. Retry at 50/250/600/1200ms
+  // and treat the page as scrolled once scrollY > 0, so settling
+  // layout doesn't undo the jump. Also listen for popstate since
+  // React Router's programmatic navigate uses pushState (which does
+  // NOT fire hashchange) — the prior code only re-fired the jump on
+  // a real <a> click between hash routes.
   useEffect(() => {
-    function jumpToHash() {
-      if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
+    let cancelled = false
+    let timer: number | undefined
+    // Verify-and-retry until the anchor exists AND the jump actually
+    // landed. Fixed-schedule timers (50/250/600/1200ms) missed on cold
+    // loads because the desktop body is a lazy chunk
+    // (SnowSettingsBuild) + a profile fetch — the #templates anchor
+    // wasn't in the DOM until after the last retry (Jun 10 spot-check:
+    // scrollY pinned at 0 with the anchor at 1944px). behavior:'auto'
+    // (instant) so the landing check isn't racing a smooth animation.
+    function attemptScroll(deadline: number) {
+      if (cancelled) return
       const hash = window.location.hash
       if (!hash) return
       const el = document.getElementById(hash.slice(1))
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (el) {
+        el.scrollIntoView({ behavior: 'auto', block: 'start' })
+        const top = el.getBoundingClientRect().top
+        if (top >= -8 && top < 240) return // landed — stop retrying
+      }
+      if (Date.now() < deadline) {
+        timer = window.setTimeout(() => attemptScroll(deadline), 250)
+      }
     }
-    // Wait one frame so the page has actually rendered the anchor.
-    const t = window.setTimeout(jumpToHash, 50)
+    function jumpToHash() {
+      if (timer) window.clearTimeout(timer)
+      attemptScroll(Date.now() + 8000)
+    }
+    jumpToHash()
     window.addEventListener('hashchange', jumpToHash)
-    return () => { window.clearTimeout(t); window.removeEventListener('hashchange', jumpToHash) }
+    window.addEventListener('popstate', jumpToHash)
+    return () => {
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
+      window.removeEventListener('hashchange', jumpToHash)
+      window.removeEventListener('popstate', jumpToHash)
+    }
   }, [])
 
   // Real, honest "setup readiness" calculation — only counts fields
