@@ -158,7 +158,22 @@ export default function DesktopSidebar() {
                     <button
                       type="button"
                       className={`fh-desktop-sidebar__link${active ? ' is-active' : ''}`}
-                      onClick={() => navigate(it.to)}
+                      onClick={() => {
+                        // Split path/search/hash so React Router treats
+                        // each portion explicitly. Passing the raw
+                        // '/settings#templates' string was sending the
+                        // navigator to /settings%23templates, which then
+                        // fell through to the catch-all and bounced to
+                        // /. (Audit Jun 2026.)
+                        const raw = it.to
+                        const hashIdx = raw.indexOf('#')
+                        const beforeHash = hashIdx >= 0 ? raw.slice(0, hashIdx) : raw
+                        const hash = hashIdx >= 0 ? raw.slice(hashIdx) : ''
+                        const searchIdx = beforeHash.indexOf('?')
+                        const pathname = searchIdx >= 0 ? beforeHash.slice(0, searchIdx) : beforeHash
+                        const search = searchIdx >= 0 ? beforeHash.slice(searchIdx) : ''
+                        navigate({ pathname, search, hash })
+                      }}
                     >
                       <span className="fh-desktop-sidebar__link-icon" aria-hidden="true">
                         <I size={15} />
