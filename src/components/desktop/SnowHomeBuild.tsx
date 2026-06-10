@@ -573,9 +573,15 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
     invoice: 'Invoicing', closed: 'Won', lost: 'Lost',
   }
   // Map rail keys to the /jobs?stage= filter ids used by onGoToJobs.
+  // Post-H3 the Jobs screen has distinct 'invoice' and 'closed' chips,
+  // so each rail column routes to its own filter. (The old invoice→won
+  // alias also broke the hero subtitle: ACTIVE_RAIL_KEYS counts the
+  // 'invoice' key, which never appeared because it was remapped —
+  // spot-check caught "16 active across 3 stages" under a $138k
+  // headline that spans 17 deals across 4 stages.)
   const FILTER: Record<string, string> = {
     lead: 'lead', quote: 'quote', job: 'active',
-    invoice: 'won', closed: 'won', lost: 'all',
+    invoice: 'invoice', closed: 'closed', lost: 'all',
   }
   const rows = stageRail
     .filter((s) => s.key !== 'lost' || s.count > 0)

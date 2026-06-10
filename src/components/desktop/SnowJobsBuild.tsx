@@ -125,8 +125,13 @@ export default function SnowJobsBuild(props: Props) {
       return Number.isFinite(last) && last < sevenDaysAgo
     }).length
     const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime()
+    // Won = closed only. Invoicing deals are still active (money owed,
+    // they're in ACTIVE_STAGES above) — counting them in both "Active
+    // Pipeline" and "Won YTD" double-reported them and made this KPI
+    // disagree with the Command Center rail's "Won" column ($113k vs
+    // $98k in the Jun 10 spot-check).
     const wonYTD = contacts
-      .filter((c) => c.stage === 'invoice' || c.stage === 'closed')
+      .filter((c) => c.stage === 'closed')
       .filter((c) => {
         const t = new Date(c.updated_at || c.created_at || 0).getTime()
         return Number.isFinite(t) && t >= yearStart

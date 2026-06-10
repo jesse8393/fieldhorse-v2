@@ -237,23 +237,38 @@ export default function Settings() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     let cancelled = false
-    function jumpToHash() {
+    let timer: number | undefined
+    // Verify-and-retry until the anchor exists AND the jump actually
+    // landed. Fixed-schedule timers (50/250/600/1200ms) missed on cold
+    // loads because the desktop body is a lazy chunk
+    // (SnowSettingsBuild) + a profile fetch — the #templates anchor
+    // wasn't in the DOM until after the last retry (Jun 10 spot-check:
+    // scrollY pinned at 0 with the anchor at 1944px). behavior:'auto'
+    // (instant) so the landing check isn't racing a smooth animation.
+    function attemptScroll(deadline: number) {
+      if (cancelled) return
       const hash = window.location.hash
       if (!hash) return
       const el = document.getElementById(hash.slice(1))
-      if (!el) return
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (el) {
+        el.scrollIntoView({ behavior: 'auto', block: 'start' })
+        const top = el.getBoundingClientRect().top
+        if (top >= -8 && top < 240) return // landed — stop retrying
+      }
+      if (Date.now() < deadline) {
+        timer = window.setTimeout(() => attemptScroll(deadline), 250)
+      }
     }
-    function retry() {
-      if (cancelled) return
-      jumpToHash()
+    function jumpToHash() {
+      if (timer) window.clearTimeout(timer)
+      attemptScroll(Date.now() + 8000)
     }
-    const timers = [50, 250, 600, 1200].map((ms) => window.setTimeout(retry, ms))
+    jumpToHash()
     window.addEventListener('hashchange', jumpToHash)
     window.addEventListener('popstate', jumpToHash)
     return () => {
       cancelled = true
-      timers.forEach((t) => window.clearTimeout(t))
+      if (timer) window.clearTimeout(timer)
       window.removeEventListener('hashchange', jumpToHash)
       window.removeEventListener('popstate', jumpToHash)
     }
