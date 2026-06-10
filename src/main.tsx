@@ -16,6 +16,23 @@ import './styles/v3.css'
 // Loaded LAST so cascade-equal rules win. See file header for context.
 import './styles/mobile-keyboard-fix.css'
 
+// Build stamp — emits <meta name="fh-build" content="SHA · ISO"> on
+// every load so a live audit can confirm which commit is deployed
+// (audit L1). Defines come from vite.config.js. Falls back to "dev"
+// when running outside the Vite build.
+declare const __FH_BUILD_SHA__: string
+declare const __FH_BUILD_AT__: string
+if (typeof document !== 'undefined') {
+  try {
+    const sha = typeof __FH_BUILD_SHA__ === 'string' ? __FH_BUILD_SHA__ : 'dev'
+    const at = typeof __FH_BUILD_AT__ === 'string' ? __FH_BUILD_AT__ : ''
+    const meta = document.createElement('meta')
+    meta.name = 'fh-build'
+    meta.content = at ? `${sha} · ${at}` : sha
+    document.head.appendChild(meta)
+  } catch { /* non-fatal */ }
+}
+
 /*
  * ONE-TIME SERVICE WORKER KILL SWITCH (5/17)
  * ------------------------------------------------------

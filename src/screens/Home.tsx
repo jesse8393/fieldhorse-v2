@@ -851,7 +851,7 @@ export default function Home() {
               label="Won"
               count={stageBreakdown.won}
               tone="success"
-              onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=won') }}
+              onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=closed') }}
             />
             <PipelineBreakdownCell
               dotColor="var(--v3-primary)"

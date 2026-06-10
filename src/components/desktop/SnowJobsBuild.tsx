@@ -29,11 +29,14 @@ import { money, moneyFull } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
 // Map the rail's stage-grouping keys to the parent screen's TABS ids
-// so clicking a stage row actually narrows the table. The parent's
-// 'won' tab covers both 'invoice' and 'closed' stages.
+// so clicking a stage row actually narrows the table. Each rail key
+// now maps to exactly one TABS id (post audit H3 — the old 'won'
+// alias for both invoice + closed was hiding invoicing jobs under
+// "Closed").
 function stageKeyToFilter(stageKey: string): string {
   if (stageKey === 'job') return 'active'
-  if (stageKey === 'invoice' || stageKey === 'closed') return 'won'
+  if (stageKey === 'invoice') return 'invoice'
+  if (stageKey === 'closed') return 'closed'
   return stageKey
 }
 
@@ -52,7 +55,12 @@ type Props = {
   onNewLead: () => void
 }
 
-const ACTIVE_STAGES = ['lead', 'quote', 'job']
+// Match the canonical lib/stages.ts ACTIVE_STAGES — every screen that
+// shows "Active Pipeline" must count the same set, otherwise the desks
+// said $119k while Command Center said $134k for the same data (audit
+// H2). Invoicing deals are still in flight (money owed) so they belong
+// in the active set.
+const ACTIVE_STAGES = ['lead', 'quote', 'job', 'invoice']
 
 function relTime(iso: any) {
   if (!iso) return '—'
@@ -71,11 +79,12 @@ function relTime(iso: any) {
 // If these drift the parent's `filtered` memo falls back to TABS[0]
 // and every filter pill behaves like "All".
 const FILTERS: { key: string; label: string }[] = [
-  { key: 'all',    label: 'All' },
-  { key: 'lead',   label: 'Leads' },
-  { key: 'quote',  label: 'Quotes' },
-  { key: 'active', label: 'Active' },
-  { key: 'won',    label: 'Closed' },
+  { key: 'all',     label: 'All' },
+  { key: 'lead',    label: 'Leads' },
+  { key: 'quote',   label: 'Quotes' },
+  { key: 'active',  label: 'Active' },
+  { key: 'invoice', label: 'Invoicing' },
+  { key: 'closed',  label: 'Closed' },
 ]
 
 export default function SnowJobsBuild(props: Props) {
@@ -177,7 +186,7 @@ export default function SnowJobsBuild(props: Props) {
               or "Quote") shows "+ New Lead". "All" stays on the
               broader "New Lead" since that's still the most common
               entry. */}
-          <Plus size={15} /> {(filter === 'active' || filter === 'won') ? 'New Job' : 'New Lead'}
+          <Plus size={15} /> {(filter === 'active' || filter === 'invoice' || filter === 'closed') ? 'New Job' : 'New Lead'}
         </button>
       </header>
 
@@ -215,8 +224,12 @@ export default function SnowJobsBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid">
+            {/* Renamed "Active jobs" → "Open deals" (audit H2): the
+                count includes leads/quotes/invoicing, not just stage=job,
+                so the prior label misled an operator who added a LEAD
+                and watched "Active Jobs 15 → 16". */}
             <MiniMetric label="Active pipeline" value={money(kpi.pipeline)} />
-            <MiniMetric label="Active jobs" value={String(kpi.active)} />
+            <MiniMetric label="Open deals" value={String(kpi.active)} />
             <MiniMetric label="Need eyes (7d)" value={String(kpi.needEyes)} />
             <MiniMetric label="Won YTD" value={money(kpi.wonYTD)} />
           </div>

@@ -223,20 +223,40 @@ export default function Settings() {
 
   // Sidebar "Templates" item routes to /settings#templates and the
   // anchor lives on the Estimate-template picker further down the
-  // page. Honor the hash on first paint + on later hash changes so
-  // the user lands on template setup instead of the brand top.
+  // page. Honor the hash on first paint + on later hash changes.
+  //
+  // Audit M1 (Jun 10): the single 50ms timeout missed because the
+  // template list above the anchor loads async — at 50ms the element
+  // exists, scrollIntoView lands, but more layout shifts in below
+  // and the user ends up back at top. Retry at 50/250/600/1200ms
+  // and treat the page as scrolled once scrollY > 0, so settling
+  // layout doesn't undo the jump. Also listen for popstate since
+  // React Router's programmatic navigate uses pushState (which does
+  // NOT fire hashchange) — the prior code only re-fired the jump on
+  // a real <a> click between hash routes.
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    let cancelled = false
     function jumpToHash() {
-      if (typeof window === 'undefined') return
       const hash = window.location.hash
       if (!hash) return
       const el = document.getElementById(hash.slice(1))
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-    // Wait one frame so the page has actually rendered the anchor.
-    const t = window.setTimeout(jumpToHash, 50)
+    function retry() {
+      if (cancelled) return
+      jumpToHash()
+    }
+    const timers = [50, 250, 600, 1200].map((ms) => window.setTimeout(retry, ms))
     window.addEventListener('hashchange', jumpToHash)
-    return () => { window.clearTimeout(t); window.removeEventListener('hashchange', jumpToHash) }
+    window.addEventListener('popstate', jumpToHash)
+    return () => {
+      cancelled = true
+      timers.forEach((t) => window.clearTimeout(t))
+      window.removeEventListener('hashchange', jumpToHash)
+      window.removeEventListener('popstate', jumpToHash)
+    }
   }, [])
 
   // Real, honest "setup readiness" calculation — only counts fields

@@ -1,9 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { execSync } from 'child_process'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Build stamp injected into <meta name="fh-build">. Lets a live audit
+// confirm which commit is actually deployed (audit L1). Netlify
+// provides COMMIT_REF; falls back to local git for dev builds.
+const BUILD_SHA = (() => {
+  const env = process.env.COMMIT_REF || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA
+  if (env) return env.slice(0, 12)
+  try { return execSync('git rev-parse --short=12 HEAD').toString().trim() } catch { return 'dev' }
+})()
+
 export default defineConfig({
+  define: {
+    __FH_BUILD_SHA__: JSON.stringify(BUILD_SHA),
+    __FH_BUILD_AT__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({
