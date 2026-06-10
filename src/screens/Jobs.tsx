@@ -111,11 +111,21 @@ export default function Jobs() {
   // ignored. Empty stage param falls through to the default tab.
   useEffect(() => {
     const stage = searchParams.get('stage')
-    if (!stage) return
-    const validIds = TABS.map((t) => t.id)
-    if (validIds.includes(stage)) setFilter(stage)
-    searchParams.delete('stage')
-    setSearchParams(searchParams, { replace: true })
+    if (stage) {
+      const validIds = TABS.map((t) => t.id)
+      if (validIds.includes(stage)) setFilter(stage)
+      searchParams.delete('stage')
+      setSearchParams(searchParams, { replace: true })
+      return
+    }
+    // Sidebar nav: ?view=leads → Lead Desk lands on the Lead tab;
+    // ?view=pipeline → Pipeline lands on All; default (Job Desk) shows
+    // active jobs ("Doing") so Job Desk isn't a clone of Lead Desk
+    // when the operator clicks it.
+    const view = searchParams.get('view')
+    if (view === 'leads') setFilter('lead')
+    else if (view === 'pipeline') setFilter('all')
+    else if (view === 'doing') setFilter('active')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -274,7 +284,13 @@ export default function Jobs() {
             // desktop we skip it so the chevron lives up to its
             // implied affordance.
             onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
-            onNewLead={() => setAddOpen(true)}
+            // Seed the sheet's Stage chip from the active filter so the
+            // CTA is honest: "+ New Job" (Doing/Complete filters) opens
+            // a Job-stage form, "+ New Lead" opens a Lead-stage form.
+            onNewLead={() => {
+              setAddInitialStage(filter === 'active' || filter === 'won' ? 'job' : 'lead')
+              setAddOpen(true)
+            }}
           />
         </Suspense>
         <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>

@@ -116,6 +116,7 @@ export default function Home() {
   const [topPipeline, setTopPipeline] = useState<any>(null)
   // Stage breakdown for Pipeline card footer (mockup: Won / Active / Lead)
   const [stageBreakdown, setStageBreakdown] = useState<any>(null)
+  const [stageRailData, setStageRail] = useState<any>(null)
   // Today on Site = schedule entries that start today (or are happening
   // now). Read-only fetch, no schema change. Joined with fh_contacts so
   // each row shows the job name + stage at a glance.
@@ -332,6 +333,20 @@ export default function Home() {
         lead:   contacts.filter((c) => c.stage === 'lead' || c.stage === 'quote').length
       }
 
+      // Full per-stage rail for the desktop pipeline hero (audit §E:
+      // the mock shows every stage with $ + count on the rail, not 3
+      // collapsed buckets). Computed over the COMPLETE deduped contact
+      // list so amounts are real totals — not the top-deal slice the
+      // old buildPipelineStages approximated from.
+      const stageRail = (['lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const).map((sid) => {
+        const rows = contacts.filter((c) => c.stage === sid)
+        return {
+          key: sid,
+          count: rows.length,
+          total: rows.reduce((s, c) => s + Number(c.amount || 0), 0)
+        }
+      })
+
       // Quotes Needing Attention — quotes with no update in 7+ days
       // (separate KPI from leads needing follow-up; the mockup splits
       // them into 3 distinct priority signals).
@@ -371,7 +386,8 @@ export default function Home() {
           id: c.id,
           name: c.name || 'Untitled',
           amount: Number(c.amount || 0),
-          stage: c.stage
+          stage: c.stage,
+          updatedAt: c.updated_at || c.created_at || null
         }))
 
       setPipeline(totalPipeline)
@@ -381,6 +397,7 @@ export default function Home() {
       setInvoicingWeek(weekTotal)
       setTopPipeline(topActiveDeals)
       setStageBreakdown(stageCounts)
+      setStageRail(stageRail)
       setTodayOnSite(todayRows)
       setNextActions(topActions)
       setPhotoUrlByJob(photoMap || {})
@@ -477,6 +494,7 @@ export default function Home() {
           trendUp={trendUp}
           trendPct={trendPct}
           stageBreakdown={stageBreakdown}
+          stageRail={stageRailData}
           dealsAtRisk={dealsAtRisk}
           jobsBehind={jobsBehind}
           invoicingWeek={invoicingWeek}

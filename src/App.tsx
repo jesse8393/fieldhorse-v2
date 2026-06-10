@@ -121,6 +121,12 @@ export default function App() {
           <Route path="/sub-portal" element={<SubPortal />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
+          {/* Alias routes — these URLs exist in muscle memory / older
+              links but the screens live elsewhere. Explicit redirects
+              beat the silent catch-all bounce to Home (audit: "/leads
+              and /templates resolve to Command Center"). */}
+          <Route path="/leads" element={<Navigate to="/jobs?view=leads" replace />} />
+          <Route path="/templates" element={<Navigate to={{ pathname: '/settings', hash: '#templates' }} replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

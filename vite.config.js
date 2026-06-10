@@ -56,7 +56,13 @@ export default defineConfig({
             options: {
               cacheName: 'supabase-storage-public',
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
-              cacheableResponse: { statuses: [0, 200] },
+              // 200 only — status 0 (opaque) can wrap an error response
+              // and pin it in cache for 7 days. Supabase Storage serves
+              // proper CORS headers so responses are never opaque here.
+              // (Google Fonts above keeps [0, 200]: gstatic requests are
+              // legitimately opaque in no-cors mode — official Workbox
+              // recipe.)
+              cacheableResponse: { statuses: [200] },
             },
           },
         ],

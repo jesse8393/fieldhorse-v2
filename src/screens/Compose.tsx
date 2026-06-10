@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -185,6 +186,21 @@ export default function Compose() {
       animate="show"
       style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
     >
+      {isDesktop && (
+        // gridColumn:1/-1 — .v3-screen--compose is a 2-col grid
+        // (360px + 350px) for the cockpit + draft-preview layout.
+        // Without the span, the topbar landed in col 1 (squeezing the
+        // search to 360px so the placeholder wrapped to two lines) and
+        // the title fell into col 2 beside it. Wrapping both in a
+        // full-width spanner pins them above the columned content.
+        <div style={{ gridColumn: '1 / -1' }}>
+          <BuildTopbar />
+          <div style={{ padding: '12px var(--v3-gutter) 14px' }}>
+            <div className="fh-build-good">Dispatch</div>
+            <h1 className="fh-build-title">SAY IT FAST.</h1>
+          </div>
+        </div>
+      )}
       {/* INPUT COCKPIT — black-glass panel: header eyebrow + channel pills
           + intent + contact + context chips + CTA */}
       <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>

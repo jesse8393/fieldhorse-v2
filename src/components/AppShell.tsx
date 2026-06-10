@@ -92,6 +92,14 @@ function layoutForPath(pathname: any) {
   if (pathname === '/pour-window') return 'responsive'
   if (pathname === '/notes') return 'responsive'
   if (pathname === '/activity') return 'responsive'
+  // V3-CMD-CENTER-FIX (audit Jun 2026): Crew Home / Tasks / Team /
+  // Timesheets were falling through to mobile-frame and rendering as
+  // a 440px column floating in the desktop viewport. They use the same
+  // Snow*Build chrome as Jobs/Clients/etc and need the wide canvas.
+  if (pathname === '/crew') return 'responsive'
+  if (pathname === '/tasks') return 'responsive'
+  if (pathname === '/team') return 'responsive'
+  if (pathname === '/timesheets') return 'responsive'
   // Phase 4: Job Detail (`/jobs/:id`) is the host of the Estimate
   // workspace (Quote tab) and gets the responsive canvas. Non-quote
   // tabs (Overview / Details / Financials / Files) inherit the wider

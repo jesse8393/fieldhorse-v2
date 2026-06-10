@@ -27,6 +27,9 @@ type Props = {
   trendUp: boolean
   trendPct: number | null
   stageBreakdown: { won?: number; active?: number; lead?: number; invoice?: number } | null
+  // Full per-stage rail (lead/quote/job/invoice/closed/lost with real
+  // counts + $ totals) — preferred over stageBreakdown when present.
+  stageRail?: Array<{ key: string; count: number; total: number }> | null
   // Home.tsx stores dealsAtRisk as a shape: { count, value, followUps,
   // quotesAttention, … } — older callers expect a plain number. We
   // accept either and normalize at the render site.
@@ -103,7 +106,8 @@ export default function SnowHomeBuild(props: Props) {
     onOpenJob,
     onOpenJobAtTab,
     onNewLead,
-  } = props
+    stageRail,
+  } = props as any
 
   const dateLabel = now.toLocaleDateString(undefined, {
     weekday: 'long',
@@ -112,8 +116,14 @@ export default function SnowHomeBuild(props: Props) {
     year: 'numeric',
   })
 
-  const pipelineRows = buildPipelineStages(topPipeline, stageBreakdown)
-  const totalOppCount = pipelineRows.reduce((s, r) => s + (r.count || 0), 0)
+  // Full per-stage rail (real totals over the deduped contact list)
+  // when the parent provides it — matches the approved mock where
+  // every stage shows $ + count. Falls back to the 3-bucket
+  // approximation for any caller that hasn't wired stageRail yet.
+  const pipelineRows = Array.isArray(stageRail) && stageRail.length > 0
+    ? buildStageRailRows(stageRail)
+    : buildPipelineStages(topPipeline, stageBreakdown)
+  const totalOppCount = pipelineRows.reduce((s: number, r: any) => s + (r.count || 0), 0)
   const queueRows = buildOwnerQueue(nextActions)
   const revenueRows = buildRevenueRows(topPipeline)
   const jobRows = buildJobHealthRows(todayOnSite)
@@ -528,6 +538,36 @@ function FooterLink({ label, onClick }: { label: string; onClick?: () => void })
   )
 }
 
+// Full-stage rail rows from the per-stage breakdown Home.tsx computes
+// over the complete contact list. Real $ totals per stage — the mock's
+// "every stage with $ + count" rail without fabricating stages the
+// data model doesn't have. Lost is dropped from the rail when empty
+// so a healthy book doesn't dedicate a column to zero.
+function buildStageRailRows(stageRail: Array<{ key: string; count: number; total: number }>) {
+  const LABEL: Record<string, string> = {
+    lead: 'Lead', quote: 'Quote', job: 'Active',
+    invoice: 'Invoicing', closed: 'Won', lost: 'Lost',
+  }
+  // Map rail keys to the /jobs?stage= filter ids used by onGoToJobs.
+  const FILTER: Record<string, string> = {
+    lead: 'lead', quote: 'quote', job: 'active',
+    invoice: 'won', closed: 'won', lost: 'all',
+  }
+  const rows = stageRail
+    .filter((s) => s.key !== 'lost' || s.count > 0)
+    .map((s) => ({
+      key: FILTER[s.key] || 'all',
+      label: LABEL[s.key] || s.key,
+      amount: s.total > 0 ? money(s.total) : '—',
+      count: s.count,
+    }))
+  const totalCount = rows.reduce((sum, r) => sum + r.count, 0)
+  return rows.map((r) => ({
+    ...r,
+    width: totalCount > 0 ? `${Math.max(5, Math.round((r.count / totalCount) * 100))}%` : `${Math.round(100 / rows.length)}%`,
+  }))
+}
+
 // Render 3 real funnel buckets (Lead/Active/Won) sourced from
 // stageBreakdown, with $ totals derived from topPipeline rows whose
 // stage falls into each bucket. We intentionally show 3 buckets
@@ -603,14 +643,29 @@ function buildRevenueRows(topPipeline: any[] | null) {
     closed: 'Closed',
     lost: 'Lost',
   }
-  return topPipeline.slice(0, 5).map((c: any) => ({
-    id: c.id,
-    name: c.name || 'Unnamed',
-    stage: stageLabel[String(c.stage || '').toLowerCase()] || c.stage || '—',
-    amount: moneyFull(c.amount || c.value || 0),
-    touch: '—',
-    next: '—',
-  }))
+  // Stage-derived next step keeps the column honest without a tasks
+  // join: the operator's obvious move at each stage.
+  const nextByStage: Record<string, string> = {
+    lead: 'Qualify + follow up',
+    quote: 'Send / chase quote',
+    job: 'Keep crew moving',
+    invoice: 'Collect balance',
+    closed: 'Request referral',
+    lost: '—',
+  }
+  return topPipeline.slice(0, 5).map((c: any) => {
+    const sid = String(c.stage || '').toLowerCase()
+    const t = c.updatedAt ? new Date(c.updatedAt).getTime() : NaN
+    const days = Number.isFinite(t) ? Math.floor((Date.now() - t) / 86400000) : null
+    return {
+      id: c.id,
+      name: c.name || 'Unnamed',
+      stage: stageLabel[sid] || c.stage || '—',
+      amount: moneyFull(c.amount || c.value || 0),
+      touch: days == null ? '—' : days <= 0 ? 'Today' : `${days}d ago`,
+      next: nextByStage[sid] || '—',
+    }
+  })
 }
 
 // Job Health requires per-job schedule / report / billing / risk

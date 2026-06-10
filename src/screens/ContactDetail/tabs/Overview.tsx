@@ -202,7 +202,8 @@ export default function OverviewTab({
   const paidNum = Number(paid || 0)
   const remaining = Math.max(0, contractValue - paidNum)
   const billedPct = contractValue > 0 ? Math.min(1, paidNum / contractValue) : 0
-  const showCockpit = contractValue > 0 && (contact?.stage === 'job' || contact?.stage === 'invoice' || contact?.stage === 'closed')
+  const isExecutionStage = contact?.stage === 'job' || contact?.stage === 'invoice' || contact?.stage === 'closed'
+  const showCockpit = contractValue > 0 && isExecutionStage
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '8px 20px 32px' }}>
@@ -254,8 +255,25 @@ export default function OverviewTab({
         </div>
       )}
 
-      {/* PRIMARY ROW — NextAction + HealthDonut. Stacks on mobile, side-by-side ≥768px. */}
-      <div className="v3-overview-grid">
+      {/* PRIMARY ROW — NextAction (+ HealthDonut on execution stages).
+          A lead/quote has no scheduled work, so "Health 20% · Behind"
+          is structurally meaningless before the job is active —
+          audit §D3 ("a deal with no scheduled work cannot be behind").
+          Health + Progress only render from stage='job' onward. */}
+      {isExecutionStage ? (
+        <div className="v3-overview-grid">
+          <NextActionCard
+            title={nextAction.kind === 'idle' ? null : nextAction.title}
+            date={nextAction.date}
+            dueIso={nextAction.kind === 'todo' ? nextAction.dueAt : null}
+            cta={nextAction.ctaLabel}
+            onComplete={handleNextActionComplete}
+            onSchedule={handleNextActionSchedule}
+            loading={actionLoading}
+          />
+          <HealthDonut value={health.score} label={health.label} />
+        </div>
+      ) : (
         <NextActionCard
           title={nextAction.kind === 'idle' ? null : nextAction.title}
           date={nextAction.date}
@@ -265,18 +283,19 @@ export default function OverviewTab({
           onSchedule={handleNextActionSchedule}
           loading={actionLoading}
         />
-        <HealthDonut value={health.score} label={health.label} />
-      </div>
+      )}
 
-      {/* PROGRESS — milestone completion */}
-      <ProgressMeter
-        label="Job Progress"
-        value={milestonePct}
-        caption={milestones.length
-          ? `${milestones.filter((m: any) => m.done).length} of ${milestones.length} milestones complete`
-          : 'No milestones added yet'
-        }
-      />
+      {/* PROGRESS — milestone completion (execution stages only) */}
+      {isExecutionStage && (
+        <ProgressMeter
+          label="Job Progress"
+          value={milestonePct}
+          caption={milestones.length
+            ? `${milestones.filter((m: any) => m.done).length} of ${milestones.length} milestones complete`
+            : 'No milestones added yet'
+          }
+        />
+      )}
 
       {/* RECENT ACTIVITY */}
       <div className="v3-section">

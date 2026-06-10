@@ -7211,7 +7211,14 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-topbar {
     height: 76px;
     display: grid;
-    grid-template-columns: minmax(280px, 560px) 1fr auto auto;
+    /* search | meta | bell | cta. Meta is `auto` so the column matches
+       the natural width of its (nowrap) content — previously meta was
+       `1fr` which gave it a fixed slice that long strings overflowed
+       to the left INTO the search column (audit Jun 2026: "X contacts
+       in book" colliding with the search placeholder). The search
+       column is now 1fr so it absorbs leftover space, has a 240px
+       minimum so the placeholder still fits on narrow viewports. */
+    grid-template-columns: minmax(240px, 1fr) auto auto auto;
     align-items: center;
     gap: 16px;
     padding: 0 28px;
@@ -7222,7 +7229,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
      trailing column so the bell sits flush right at the end of an
      auto column instead of leaving a phantom 4th cell. */
   .fh-build-topbar--no-cta {
-    grid-template-columns: minmax(280px, 560px) 1fr auto;
+    grid-template-columns: minmax(240px, 1fr) auto auto;
   }
 
   .fh-build-search {
@@ -7236,6 +7243,19 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     background: rgba(255,255,255,.035);
     color: rgba(245,242,234,.45);
     font-size: 12px;
+    /* Belt for narrow viewports: clip the placeholder if the column
+       gets squeezed before its 240px minimum, instead of letting it
+       wrap to two lines and burst the 76px topbar height. */
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .fh-build-search > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .fh-build-search kbd {
@@ -7251,6 +7271,19 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     gap: 18px;
     color: rgba(245,242,234,.68);
     font-size: 12px;
+    /* Audit Jun 2026: long meta strings ("Year to date · 2026", "14
+       invoices on the books") were wrapping to 3-4 lines because the
+       individual <span>s had no nowrap. The topbar grid column has a
+       fixed width, so wrapping doesn't help — it just stacks vertically
+       and breaks alignment. Force each item to one line; the grid
+       column expands as needed because column 3 above is `auto`. */
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .fh-build-topbar__meta > * {
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .fh-build-vline {

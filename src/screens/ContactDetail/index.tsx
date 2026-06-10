@@ -139,21 +139,31 @@ export default function ContactDetail() {
     fetchAll()
   }
 
-  // URL-synced tab state. Default to overview if the param is absent,
-  // invalid, or not exposed by the current stage's workspace.
+  // Tab state. Local state is the source of truth for the rendered
+  // panel; the URL (?tab=) is a synced mirror for deep links and
+  // refresh-persistence. Previously the URL was the only source —
+  // audit found the Quote tab needed two clicks because the panel
+  // waited on the searchParams round-trip. Local-first makes the
+  // first click switch immediately; the URL catches up after.
   const tabParam = searchParams.get('tab')
   const stageTabs = tabsForStage(contact?.stage)
   const visibleTabs = TOP_TABS.filter((t) => stageTabs.includes(t.id as any))
-  const tab = (tabParam && VALID_TABS.has(tabParam))
+  const urlTab = (tabParam && VALID_TABS.has(tabParam))
     ? resolveTabForStage(contact?.stage, tabParam)
     : 'overview'
+  const [localTab, setLocalTab] = useState<string | null>(null)
+  const tab = localTab ?? urlTab
   function setTab(next: any) {
     if (next === tab) return
+    setLocalTab(next)
     const sp = new URLSearchParams(searchParams)
     if (next === 'overview') sp.delete('tab')
     else sp.set('tab', next)
     setSearchParams(sp, { replace: true })
   }
+  // External URL change (back button, deep link) resets the local
+  // override so the URL wins again.
+  useEffect(() => { setLocalTab(null) }, [tabParam])
 
   // Modals — own state, parent dispatches
   const [eventOpen, setEventOpen] = useState(false)

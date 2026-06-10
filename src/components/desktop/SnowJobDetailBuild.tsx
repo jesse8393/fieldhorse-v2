@@ -66,6 +66,17 @@ export default function SnowJobDetailBuild(props: Props) {
   const stageLabel = STAGE_LABEL[stage] || stage || '—'
   const stageTone = STAGE_TONE[stage] || 'neutral'
 
+  // Stage-aware chrome (audit §D). Execution panels (health, schedule,
+  // reports, billing, change orders) and contract/paid/outstanding
+  // stats only exist once the deal is actually being delivered. A $0
+  // unquoted lead showing "JOB HEALTH — AT RISK" and three "—" money
+  // stats read as broken, not premium.
+  const isExecution = stage === 'job' || stage === 'invoice' || stage === 'closed'
+  const recordNoun = stage === 'lead' ? 'Lead'
+    : stage === 'quote' ? 'Quote'
+    : stage === 'lost' ? 'Lost deal'
+    : 'Job file'
+
   // Overall job health — best of available signals; honest "Not tracked"
   // when no data points exist yet.
   const healthSignals = [
@@ -81,17 +92,9 @@ export default function SnowJobDetailBuild(props: Props) {
         ? { label: 'Watch', tone: 'warn' as const }
         : { label: 'On track', tone: 'good' as const }
 
-  // Next action heuristic from real signals only.
-  const nextAction = (() => {
-    if (reportsMissing != null && reportsMissing > 0) return 'Request field report'
-    if (scheduleStatus?.tone === 'bad') return 'Reschedule + update client'
-    if (billingStatus?.tone === 'bad') return 'Chase outstanding invoice'
-    if (stage === 'quote') return 'Send / follow up on quote'
-    if (stage === 'lead') return 'Qualify lead'
-    if (stage === 'job') return 'Continue execution'
-    if (stage === 'invoice') return 'Collect remaining balance'
-    return 'On track'
-  })()
+  // The rail's "Next action" card was removed — the Overview tab's
+  // NextActionCard is the single NEXT ACTION source of truth (audit
+  // found the two derivations disagreeing on the same record).
 
   return (
     <div className="fh-build-page fh-build-detail" data-build-screen="SnowJobDetailBuild">
@@ -142,7 +145,7 @@ export default function SnowJobDetailBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--detail">
           <div>
-            <div className="fh-build-good">Job file</div>
+            <div className="fh-build-good">{recordNoun}</div>
             <h1 className="fh-build-title fh-build-title--name">{contact?.name || 'Untitled job'}</h1>
             <div className="fh-build-detail-sub">
               <span className={`fh-build-dot is-${stageToneClass(stageTone)}`}>{stageLabel}</span>
@@ -162,21 +165,44 @@ export default function SnowJobDetailBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid fh-build-mini-grid--detail">
-            <MiniMetric
-              label="Contract"
-              value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '—'}
-              accent={Number(contact?.amount || 0) > 0}
-            />
-            <MiniMetric
-              label="Paid"
-              value={paid == null ? '—' : moneyFull(paid)}
-            />
-            <MiniMetric
-              label="Outstanding"
-              value={outstanding == null ? '—' : outstanding > 0 ? moneyFull(outstanding) : 'Paid'}
-              tone={outstanding != null && outstanding > 0 ? 'warn' : undefined}
-            />
-            <MiniMetric label="Stage" value={stageLabel} />
+            {isExecution ? (
+              <>
+                <MiniMetric
+                  label="Contract"
+                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '—'}
+                  accent={Number(contact?.amount || 0) > 0}
+                />
+                <MiniMetric
+                  label="Paid"
+                  value={paid == null ? '—' : moneyFull(paid)}
+                />
+                <MiniMetric
+                  label="Outstanding"
+                  value={outstanding == null ? '—' : outstanding > 0 ? moneyFull(outstanding) : 'Paid'}
+                  tone={outstanding != null && outstanding > 0 ? 'warn' : undefined}
+                />
+                <MiniMetric label="Stage" value={stageLabel} />
+              </>
+            ) : (
+              <>
+                {/* Pre-deal stats: a lead has no contract/paid/outstanding —
+                    show what matters for winning it instead. */}
+                <MiniMetric
+                  label="Est. value"
+                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '—'}
+                  accent={Number(contact?.amount || 0) > 0}
+                />
+                <MiniMetric
+                  label="Source"
+                  value={contact?.referred_by || '—'}
+                />
+                <MiniMetric
+                  label="Last touch"
+                  value={relDate(contact?.last_contact || contact?.updated_at)}
+                />
+                <MiniMetric label="Stage" value={stageLabel} />
+              </>
+            )}
           </div>
         </section>
 
@@ -206,6 +232,23 @@ export default function SnowJobDetailBuild(props: Props) {
           </div>
 
           <aside className="fh-build-rail fh-build-rail--page">
+            {/* Pre-deal rail — contact + source context, no execution
+                signals (a deal with no scheduled work can't be
+                "behind"). The Overview tab's NextActionCard is the
+                single NEXT ACTION source of truth; the duplicate rail
+                card was removed (audit §B4/§D4). */}
+            {!isExecution && (
+              <section className="fh-build-rail-card">
+                <div className="fh-build-eyebrow">Deal</div>
+                <strong>{contact?.referred_by ? `via ${contact.referred_by}` : 'Source not set'}</strong>
+                <span>
+                  {contact?.phone || contact?.email
+                    ? [contact?.phone, contact?.email].filter(Boolean).join(' · ')
+                    : 'No contact info yet'}
+                </span>
+              </section>
+            )}
+            {isExecution && (<>
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Job health</div>
               <strong style={{
@@ -325,12 +368,7 @@ export default function SnowJobDetailBuild(props: Props) {
                 </>
               )}
             </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Next action</div>
-              <strong>{nextAction}</strong>
-              <span>derived from current stage + signals</span>
-            </section>
+            </>)}
           </aside>
         </section>
       </main>
@@ -344,5 +382,17 @@ function stageToneClass(tone: string) {
   if (tone === 'job' || tone === 'won') return 'good'
   if (tone === 'lead' || tone === 'invoice') return 'warn'
   return 'neutral'
+}
+
+// Compact relative date for the pre-deal "Last touch" stat.
+function relDate(iso: string | null | undefined) {
+  if (!iso) return '—'
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return '—'
+  const days = Math.floor((Date.now() - t) / 86400000)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 30) return `${days}d ago`
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
