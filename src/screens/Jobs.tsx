@@ -284,7 +284,13 @@ export default function Jobs() {
             // desktop we skip it so the chevron lives up to its
             // implied affordance.
             onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
-            onNewLead={() => setAddOpen(true)}
+            // Seed the sheet's Stage chip from the active filter so the
+            // CTA is honest: "+ New Job" (Doing/Complete filters) opens
+            // a Job-stage form, "+ New Lead" opens a Lead-stage form.
+            onNewLead={() => {
+              setAddInitialStage(filter === 'active' || filter === 'won' ? 'job' : 'lead')
+              setAddOpen(true)
+            }}
           />
         </Suspense>
         <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>

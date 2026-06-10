@@ -654,32 +654,52 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
             onChange={(v: any) => set('stage', v)}
           />
 
-          <V3ChipRow
-            label="Job type"
-            value={form.job_type}
-            options={JOB_TYPES}
-            onChange={(v: any) => set('job_type', v)}
-          />
-
-          {availableTemplates.length > 0 && (
-            <TemplatePickerInline
-              templates={availableTemplates}
-              value={templateSlug}
-              onChange={setTemplateSlug}
-            />
+          {/* Stage-aware capture (audit §C2): a lead is a CRM record,
+              not a job. Lead stage shows Source + estimated value;
+              job-execution fields (job type / template / title) only
+              appear once the deal reaches Quote or Job stage. */}
+          {form.stage === 'lead' && (
+            <V3Field label="Source">
+              <input
+                value={form.referred_by}
+                onChange={(e) => set('referred_by', e.target.value)}
+                maxLength={FIELD_LIMITS.referred_by}
+                placeholder="Referral, web, repeat client, yard sign…"
+                style={V3_INPUT}
+              />
+            </V3Field>
           )}
 
-          <V3Field label="Job title">
-            <input
-              value={form.job_title}
-              onChange={(e) => set('job_title', e.target.value)}
-              maxLength={FIELD_LIMITS.job_title}
-              placeholder="Kitchen remodel + island"
-              style={V3_INPUT}
-            />
-          </V3Field>
+          {form.stage !== 'lead' && (
+            <>
+              <V3ChipRow
+                label="Job type"
+                value={form.job_type}
+                options={JOB_TYPES}
+                onChange={(v: any) => set('job_type', v)}
+              />
 
-          <V3Field label="Amount">
+              {availableTemplates.length > 0 && (
+                <TemplatePickerInline
+                  templates={availableTemplates}
+                  value={templateSlug}
+                  onChange={setTemplateSlug}
+                />
+              )}
+
+              <V3Field label="Job title">
+                <input
+                  value={form.job_title}
+                  onChange={(e) => set('job_title', e.target.value)}
+                  maxLength={FIELD_LIMITS.job_title}
+                  placeholder="Kitchen remodel + island"
+                  style={V3_INPUT}
+                />
+              </V3Field>
+            </>
+          )}
+
+          <V3Field label={form.stage === 'lead' ? 'Estimated value (optional)' : 'Amount'}>
             <div style={{ position: 'relative' }}>
               <span aria-hidden="true" style={{
                 position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',

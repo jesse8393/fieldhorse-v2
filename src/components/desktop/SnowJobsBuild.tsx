@@ -242,21 +242,27 @@ export default function SnowJobsBuild(props: Props) {
         </div>
 
         {view === 'pipeline' ? (
-          <SnowPipelineBuild contacts={contacts} onOpenJob={onOpenJob} />
+          <SnowPipelineBuild contacts={contacts} onOpenJob={onOpenJob} onNewLead={onNewLead} />
         ) : (
           <section className="fh-build-content-grid fh-build-content-grid--jobs">
             <section className="fh-build-card fh-build-table fh-build-jobs-table">
               <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">All jobs · {filtered.length.toLocaleString()}</div>
+                <div className="fh-build-eyebrow">
+                  {isLeadDesk ? 'Open deals' : 'All jobs'} · {filtered.length.toLocaleString()}
+                </div>
                 <button type="button">Export CSV</button>
               </header>
 
+              {/* Lead Desk gets pipeline/CRM columns (Source, Est. value,
+                  Last touch); Job Desk keeps execution columns
+                  (Job title, Amount, Updated). Audit §C1 — the two
+                  desks share table primitives but read differently. */}
               <div className="fh-build-table__head is-jobs">
-                <span>Job</span>
-                <span>Client</span>
+                <span>{isLeadDesk ? 'Lead' : 'Job'}</span>
+                <span>{isLeadDesk ? 'Source' : 'Client'}</span>
                 <span>Stage</span>
-                <span>Amount</span>
-                <span>Updated</span>
+                <span>{isLeadDesk ? 'Est. value' : 'Amount'}</span>
+                <span>{isLeadDesk ? 'Last touch' : 'Updated'}</span>
                 <span />
               </div>
 
@@ -274,10 +280,16 @@ export default function SnowJobsBuild(props: Props) {
                   onClick={() => onOpenJob(c.id)}
                 >
                   <strong className="fh-build-truncate" title={c.name}>{c.name || 'Untitled'}</strong>
-                  <span className="fh-build-truncate">{c.job_title || c.job_type || '—'}</span>
+                  <span className="fh-build-truncate">
+                    {isLeadDesk
+                      ? (c.referred_by || '—')
+                      : (c.job_title || c.job_type || '—')}
+                  </span>
                   <span><StagePill stage={c.stage} /></span>
                   <span className="fh-build-num">{moneyFull(c.amount || 0)}</span>
-                  <span className="fh-build-rel">{relTime(c.updated_at || c.created_at)}</span>
+                  <span className="fh-build-rel">
+                    {relTime((isLeadDesk ? c.last_contact : null) || c.updated_at || c.created_at)}
+                  </span>
                   <ChevronRight size={13} />
                 </button>
               ))}
