@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, X as XIcon, ShieldCheck } from 'lucide-react'
+import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import {
@@ -60,7 +60,8 @@ export default function OverviewTab({
   onOpenLogPayment,
   onOpenInvitePartner,
   onOpenApproveQuote,
-  onOpenMarkComplete
+  onOpenMarkComplete,
+  onOpenSendInvoice
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
   const confirm = useConfirm() as any
@@ -167,10 +168,18 @@ export default function OverviewTab({
             onOpenApproveQuote()
             break
           }
+          // Billing intercept (pipeline v2): "Send invoice" opens the
+          // SendInvoiceSheet in the parent rather than mutating stage —
+          // invoicing isn't a stage anymore.
+          if (nextAction.pipelineFn === 'sendInvoice') {
+            hapticStageChange()
+            onOpenSendInvoice?.()
+            break
+          }
           const fn = STAGE_FN_MAP[nextAction.pipelineFn || ""]
           if (fn) {
             // Heavier haptic on stage boundary — matches haptics.ts convention
-            // that lead→quote→job→invoice transitions get hapticStageChange.
+            // that lead→quote→job transitions get hapticStageChange.
             // pipeline.ts fires its own commit haptic; this one announces the
             // boundary BEFORE the network call.
             hapticStageChange()
@@ -351,6 +360,13 @@ export default function OverviewTab({
           label="Schedule event"
           onClick={() => { hapticTap(); onOpenAddEvent?.() }}
         />
+        {(contact?.stage === 'invoice' || contact?.stage === 'job') && (
+          <SecondaryAction
+            icon={Receipt}
+            label="Send invoice"
+            onClick={() => { hapticTap(); onOpenSendInvoice?.() }}
+          />
+        )}
         {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
           <SecondaryAction
             icon={Plus}

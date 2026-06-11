@@ -2,10 +2,13 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Receipt, FileDown, DollarSign, ChevronRight, Check, Send, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { supabase, authHeaders } from '../lib/supabase.ts'
+import { supabase } from '../lib/supabase.ts'
 import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
+import {
+  createInvoice, sendInvoiceEmail, buildInvoicePdf, setInvoiceStatus
+} from '../lib/invoices.ts'
 // Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (per-row Generate or Email Invoice).
 async function loadPdf(): Promise<any> {
@@ -27,12 +30,13 @@ const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.
 
 // Invoices / AR — v3 money command screen.
 //
-// Aggregates jobs in the active money pipeline (stage in ['job',
-// 'invoice', 'closed']) and computes outstanding balance per job by
-// subtracting paid totals from contract amount. Auto-buckets by aging.
-//
-// Pure presentation refactor (Session A): every business calculation,
-// PDF generation call, mark-paid flow, and Supabase query is unchanged.
+// Pipeline v2: two layers on one screen.
+//   1. ISSUED INVOICES — real fh_invoices rows (deposit / draws /
+//      final), each with its own status + send / download / mark-paid.
+//   2. JOB BALANCES — per-job outstanding (contract − paid), the
+//      who-owes-me-what aging view, kept from the original screen.
+// The per-job Email action now creates a first-class invoice for the
+// balance instead of firing an untracked ad-hoc PDF.
 
 const AGING_BUCKETS = [
   { id: '0-30',  label: 'Current',  short: '0–30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'rgba(255, 255, 255, 0.18)' },
@@ -71,15 +75,25 @@ export default function Invoices() {
   const refresh = useInvalidateInvoices()
   const jobs = bundle?.jobs ?? []
   const payments = bundle?.payments ?? []
+  const invoices = bundle?.invoices ?? []
   const [filter, setFilter] = useState('outstanding') // 'outstanding' | 'all'
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
+  // When the sheet was opened from a specific issued invoice, `invoice`
+  // rides along so the payment settles that fh_invoices row.
   const [payingRow, setPayingRow] = useState<any>(null)
-  // Which row is mid-send (job.id) and which just succeeded — drives
-  // the per-row Email button's loading + green Sent morph.
+  // Which row is mid-send (job.id or invoice.id) and which just
+  // succeeded — drives the per-row Email button's loading + Sent morph.
   const [sendingId, setSendingId] = useState<any>(null)
   const [sentId, setSentId] = useState<any>(null)
   const confirm = useConfirm()
+
+  // Fast lookup: contact_id → job row (for invoice card labels + sends).
+  const jobById = useMemo(() => {
+    const m = new Map()
+    for (const j of jobs) m.set(j.id, j)
+    return m
+  }, [jobs])
 
   // Roll up payment totals per contact for fast lookup.
   const paidByJob = useMemo(() => {
@@ -110,6 +124,26 @@ export default function Invoices() {
   }, [jobs, paidByJob])
 
   const filtered = filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows
+
+  // Issued invoices (first-class fh_invoices rows), enriched with their
+  // job + effective status — a 'sent' invoice past its due date reads
+  // as overdue at display time without a background job mutating rows.
+  const invoiceRows = useMemo(() => {
+    const now = Date.now()
+    return invoices.map((inv) => {
+      const job = jobById.get(inv.contact_id) || null
+      const pastDue = inv.status === 'sent' && inv.due_at && new Date(inv.due_at).getTime() < now
+      const effStatus = pastDue ? 'overdue' : (inv.status || 'draft')
+      return { invoice: inv, job, effStatus }
+    })
+  }, [invoices, jobById])
+
+  const shownInvoiceRows = useMemo(
+    () => filter === 'outstanding'
+      ? invoiceRows.filter((r) => ['draft', 'sent', 'overdue'].includes(r.effStatus))
+      : invoiceRows,
+    [invoiceRows, filter]
+  )
 
   const totals = useMemo(() => {
     const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
@@ -220,12 +254,15 @@ export default function Invoices() {
     setPayingRow(row)
   }
 
-  // Email an invoice straight from the Money Owed list — mirrors the
-  // handleSendInvoice flow on InvoiceDetail (build PDF → upload to
-  // job-files → POST /api/send-invoice). The user reported clicking
-  // "Invoice PDF" expecting it to send; only the inner detail page
-  // had a real Send button. This wires it into the list so the
-  // operator never has to dive into the detail page just to email.
+  // Payments scoped to one job — feeds the per-invoice PDF's balance
+  // summary + payment history blocks.
+  function paymentsForJob(jobId: string) {
+    return payments.filter((p) => p.contact_id === jobId)
+  }
+
+  // Email the remaining balance straight from a job row. Pipeline v2:
+  // this now mints a real fh_invoices row first, so the send is tracked
+  // (status, due date, mark-paid) instead of an untracked ad-hoc PDF.
   async function handleSendEmail(row: any) {
     const job = row?.job
     if (!user || !job) return
@@ -236,77 +273,113 @@ export default function Invoices() {
     }
     setSendingId(job.id)
     try {
-      const { generateInvoice } = await loadPdf()
-      const { data: jobPayments } = await supabase
-        .from('fh_payments')
-        .select('*')
-        .eq('contact_id', job.id)
-        .order('paid_on', { ascending: false })
-      const result = await generateInvoice({
+      const { data: invoice, error } = await createInvoice({
+        contact: job,
+        userId: user.id,
+        title: 'Balance due',
+        amount: row.balance,
+        due_at: new Date(Date.now() + 14 * 86400000).toISOString()
+      })
+      if (error || !invoice) throw new Error(error?.message || "Couldn't create the invoice")
+      const res = await sendInvoiceEmail({
+        invoice,
+        contact: job,
         company,
-        contact: {
-          id: job.id,
-          name: c.name || 'Client',
-          address: c.address,
-          phone: c.phone,
-          email: c.email,
-          job_title: job.job_title
-        },
-        lineItems: [
-          { description: job.job_title || 'Construction services per agreement', qty: 1, rate: row.amount, amount: row.amount }
-        ],
-        taxRate: 0,
-        notes: '',
-        dueDate: '',
-        invoiceId: job.id,
-        payments: jobPayments || [],
-        contractTotal: row.amount,
-        previouslyPaid: row.paid
+        userId: user.id,
+        recipientEmail: c.email,
+        payments: paymentsForJob(job.id)
       })
-      if (!result?.doc) throw new Error('PDF generator returned no document')
-
-      const blob = result.doc.output('blob')
-      const rowId = crypto.randomUUID()
-      const path = `${user.id}/${job.id}/${rowId}.pdf`
-      const { error: upErr } = await supabase.storage
-        .from('job-files')
-        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
-
-      const sendRes = await fetch('/api/send-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: JSON.stringify({
-          contact_id: job.id,
-          sender_user_id: user.id,
-          recipient_email: c.email,
-          recipient_name: c.name || null,
-          storage_path: path,
-          filename: result.filename,
-          amount_due: row.balance
-        })
-      })
-      const sendBody = await sendRes.json().catch(() => ({}))
-
-      if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
-        toastError("Email NOT sent — sender isn't configured", 'Add Resend keys in Netlify env then try again.')
-        return
+      if (res.ok) {
+        toastSuccess(`Invoice sent to ${res.recipient}`, res.filename)
+        setSentId(job.id)
+        setTimeout(() => setSentId(null), 2400)
+      } else if (res.reason === 'sender_not_configured') {
+        toastError("Email NOT sent — sender isn't configured", 'Downloaded the PDF so you can email it manually. Saved as a draft invoice.')
+      } else {
+        throw new Error(res.message || 'Send failed')
       }
-      if (!sendRes.ok || !sendBody?.ok) {
-        const detail = sendBody?.detail || sendBody?.error || 'Unknown provider error'
-        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-        throw new Error(`Resend rejected${status}: ${detail}`)
-      }
-
-      toastSuccess(`Invoice sent to ${c.email}`, result.filename)
-      setSentId(job.id)
-      setTimeout(() => setSentId(null), 2400)
       refresh()
     } catch (e: any) {
       toastError("Couldn't send invoice", e?.message || 'Try again')
     } finally {
       setSendingId(null)
     }
+  }
+
+  // Per-invoice actions — operate on the first-class fh_invoices rows.
+  async function handleInvoiceSend(r: any) {
+    const { invoice, job } = r
+    if (!user || !job) {
+      toastError("Couldn't resolve the job", 'This invoice belongs to a job that is no longer in the money pipeline.')
+      return
+    }
+    const c = resolveClient(job)
+    if (!c.email) {
+      toastError('Add a client email first', `Open the linked client to add an email for ${c.name || 'this client'}.`)
+      return
+    }
+    setSendingId(invoice.id)
+    try {
+      const res = await sendInvoiceEmail({
+        invoice,
+        contact: job,
+        company,
+        userId: user.id,
+        recipientEmail: c.email,
+        payments: paymentsForJob(job.id)
+      })
+      if (res.ok) {
+        toastSuccess(`Invoice sent to ${res.recipient}`, res.filename)
+        setSentId(invoice.id)
+        setTimeout(() => setSentId(null), 2400)
+        refresh()
+      } else if (res.reason === 'sender_not_configured') {
+        toastError("Email NOT sent — sender isn't configured", 'Downloaded the PDF so you can email it manually.')
+      } else {
+        throw new Error(res.message || 'Send failed')
+      }
+    } catch (e: any) {
+      toastError("Couldn't send invoice", e?.message || 'Try again')
+    } finally {
+      setSendingId(null)
+    }
+  }
+
+  async function handleInvoiceDownload(r: any) {
+    const { invoice, job } = r
+    if (!job) {
+      toastError("Couldn't resolve the job", 'This invoice belongs to a job that is no longer in the money pipeline.')
+      return
+    }
+    try {
+      const result = await buildInvoicePdf({
+        invoice, contact: job, company,
+        payments: paymentsForJob(job.id)
+      })
+      const { downloadPdf } = await loadPdf()
+      downloadPdf(result)
+      toastSuccess('Invoice PDF downloaded', result.filename)
+    } catch (e: any) {
+      toastError("Couldn't generate PDF", e?.message || 'Try again')
+    }
+  }
+
+  async function handleInvoiceVoid(r: any) {
+    const { invoice } = r
+    const ok = await confirm({
+      title: `Void ${invoice.title || `invoice #${invoice.sequence_number}`}?`,
+      body: 'It stops counting toward the job’s billed total. The record stays for the books.',
+      destructive: true,
+      confirmLabel: 'Void invoice'
+    })
+    if (!ok) return
+    const { error } = await setInvoiceStatus(invoice, 'void')
+    if (error) {
+      toastError("Couldn't void", error.message || 'Try again')
+      return
+    }
+    toastSuccess('Invoice voided', '')
+    refresh()
   }
 
   const { stagger, item } = useFhMotion()
@@ -335,6 +408,7 @@ export default function Invoices() {
               <V3PaymentSheet
                 contact={payingRow.job}
                 balance={payingRow.balance}
+                invoice={payingRow.invoice || null}
                 onClose={() => setPayingRow(null)}
                 onLogged={() => { setPayingRow(null); refresh() }}
               />
@@ -495,6 +569,49 @@ export default function Invoices() {
         </div>
       </motion.div>
 
+      {/* ISSUED INVOICES — first-class fh_invoices rows. Every deposit,
+          progress draw, and final bill lives here with its own status
+          + actions. Created from the job screen's Send Invoice sheet
+          (or the per-job Email button below). */}
+      {!loading && shownInvoiceRows.length > 0 && (
+        <motion.div
+          variants={item}
+          className="v3-section"
+          style={{ margin: '0 var(--v3-gutter) 24px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+            <SectionHeader label={filter === 'outstanding' ? 'Open invoices' : 'All invoices'} />
+            <span style={{
+              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+              color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
+            }}>
+              {shownInvoiceRows.length}
+            </span>
+          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {shownInvoiceRows.map((r) => (
+              <InvoiceCard
+                key={r.invoice.id}
+                row={r}
+                isSending={sendingId === r.invoice.id}
+                isSent={sentId === r.invoice.id}
+                onSend={() => handleInvoiceSend(r)}
+                onDownload={() => handleInvoiceDownload(r)}
+                onVoid={() => handleInvoiceVoid(r)}
+                onMarkPaid={() => {
+                  if (!r.job) return
+                  setPayingRow({
+                    job: r.job,
+                    balance: Number(r.invoice.amount || 0),
+                    invoice: r.invoice
+                  })
+                }}
+              />
+            ))}
+          </ul>
+        </motion.div>
+      )}
+
       {/* FILTER + LIST SECTION */}
       <motion.div
         variants={item}
@@ -502,7 +619,7 @@ export default function Invoices() {
         style={{ margin: '0 var(--v3-gutter) 28px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-          <SectionHeader label={filter === 'outstanding' ? 'Outstanding' : 'All money jobs'} />
+          <SectionHeader label={filter === 'outstanding' ? 'Job balances' : 'All money jobs'} />
           <div style={{ display: 'flex', gap: 6 }}>
             <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
             <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
@@ -567,6 +684,7 @@ export default function Invoices() {
             <V3PaymentSheet
               contact={payingRow.job}
               balance={payingRow.balance}
+              invoice={payingRow.invoice || null}
               onClose={() => setPayingRow(null)}
               onLogged={() => { setPayingRow(null); refresh() }}
             />
@@ -681,6 +799,151 @@ function AgingBar({ totals }: any) {
         )
       })}
     </div>
+  )
+}
+
+/* ============================================================
+   InvoiceCard — one issued fh_invoices row. Compact: status spine +
+   title/job + amount/due + actions (Send · Download · Mark paid ·
+   Void). Paid/void rows render quiet with no actions.
+   ============================================================ */
+const INVOICE_STATUS_META: Record<string, { label: string; color: string }> = {
+  draft:   { label: 'Draft',   color: 'var(--v3-text-muted)' },
+  sent:    { label: 'Sent',    color: 'var(--v3-primary)' },
+  overdue: { label: 'Overdue', color: 'var(--v3-danger-bright)' },
+  paid:    { label: 'Paid',    color: 'var(--v3-success-bright, #4ade80)' },
+  void:    { label: 'Void',    color: 'var(--v3-text-muted)' }
+}
+
+function shortDate(iso: any) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, onVoid }: any) {
+  const { invoice, job, effStatus } = row
+  const meta = INVOICE_STATUS_META[effStatus] || INVOICE_STATUS_META.draft
+  const settled = effStatus === 'paid' || effStatus === 'void'
+  const title = invoice.title || `Invoice #${invoice.sequence_number}`
+
+  return (
+    <li>
+      <article style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        padding: '12px 14px 12px 20px',
+        borderRadius: 12,
+        background: 'var(--v3-surface)',
+        border: effStatus === 'overdue'
+          ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
+          : '1px solid var(--v3-border)',
+        opacity: settled ? 0.72 : 1,
+        overflow: 'hidden'
+      }}>
+        <span aria-hidden="true" style={{
+          position: 'absolute', left: 0, top: 10, bottom: 10, width: 3,
+          background: meta.color, borderRadius: '0 3px 3px 0', pointerEvents: 'none'
+        }} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 14,
+              color: 'var(--v3-text)',
+              textDecoration: effStatus === 'void' ? 'line-through' : 'none'
+            }}>
+              {title}
+            </div>
+            <div style={{
+              marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+              fontSize: 11, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)'
+            }}>
+              {job ? (
+                <Link to={`/jobs/${job.id}?tab=financials`} style={{ color: 'var(--v3-text-muted)', textDecoration: 'none' }}>
+                  {job.name || 'Job'} ›
+                </Link>
+              ) : (
+                <span>Job removed</span>
+              )}
+              {invoice.due_at && <span>· due {shortDate(invoice.due_at)}</span>}
+              {invoice.issued_at && effStatus !== 'draft' && <span>· sent {shortDate(invoice.issued_at)}</span>}
+            </div>
+          </div>
+          <div style={{ flexShrink: 0, textAlign: 'right' }}>
+            <div style={{
+              fontFamily: 'var(--font-display)', fontSize: 18, lineHeight: 1,
+              color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums',
+              textDecoration: effStatus === 'void' ? 'line-through' : 'none'
+            }}>
+              {fmtMoney(invoice.amount)}
+            </div>
+            <span style={{
+              marginTop: 4,
+              display: 'inline-flex', alignItems: 'center',
+              padding: '2px 8px', borderRadius: 999,
+              background: `color-mix(in srgb, ${meta.color} 12%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${meta.color} 35%, transparent)`,
+              color: meta.color,
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.14em',
+              textTransform: 'uppercase', lineHeight: 1.4
+            }}>
+              {meta.label}
+            </span>
+          </div>
+        </div>
+        {!settled && (
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <InvoiceAction onClick={onSend} disabled={isSending} success={isSent}>
+              {isSent ? <CheckCircle2 size={12} /> : <Send size={12} />}
+              {isSent ? 'Sent' : isSending ? 'Sending…' : effStatus === 'draft' ? 'Send' : 'Resend'}
+            </InvoiceAction>
+            <InvoiceAction onClick={onDownload}>
+              <FileDown size={12} /> PDF
+            </InvoiceAction>
+            <InvoiceAction onClick={onMarkPaid} primary>
+              <DollarSign size={12} /> Mark paid
+            </InvoiceAction>
+            <InvoiceAction onClick={onVoid}>
+              Void
+            </InvoiceAction>
+          </div>
+        )}
+      </article>
+    </li>
+  )
+}
+
+function InvoiceAction({ children, onClick, disabled, primary, success }: any) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '8px 11px', minHeight: 34, borderRadius: 8,
+        border: success
+          ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
+          : primary
+            ? '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)'
+            : '1px solid var(--v3-border-strong)',
+        background: success
+          ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
+          : primary
+            ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+            : 'var(--v3-surface-2)',
+        color: success ? '#0a0a0a' : primary ? 'var(--v3-on-primary)' : 'var(--v3-text)',
+        fontFamily: 'var(--font-body)', fontSize: 11,
+        fontWeight: primary ? 700 : 600,
+        cursor: disabled ? 'wait' : 'pointer',
+        WebkitTapHighlightColor: 'transparent'
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
