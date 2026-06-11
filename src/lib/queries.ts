@@ -134,6 +134,8 @@ async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
       .eq('user_id', userId)
   ])
   if (clientsRes.error) throw clientsRes.error
+  if (jobsRes.error) throw jobsRes.error
+  if (paymentsRes.error) throw paymentsRes.error
   return {
     clients: (clientsRes.data ?? []) as Client[],
     jobs: (jobsRes.data ?? []) as ClientsBundle['jobs'],

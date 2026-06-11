@@ -16,7 +16,7 @@ import { Check, ShieldCheck, X, Calendar as CalendarIcon, Trash2, Download, Send
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { supabase } from '../lib/supabase.ts'
+import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 // Lazy — ~430KB pdf chunk only loads when the operator generates a
 // completion certificate.
@@ -213,7 +213,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       // 2. Server send.
       const sendRes = await fetch('/api/send-certificate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,

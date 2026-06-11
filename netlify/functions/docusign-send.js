@@ -55,6 +55,15 @@ export default async (request) => {
     }, 503)
   }
 
+  // Caller must be signed in. sender_user_id is client input; without
+  // verifying it against the caller's Supabase access token anyone
+  // could send envelopes as any user. Token is validated below.
+  const authHeader = request.headers.get('authorization') || ''
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  if (!accessToken) {
+    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+  }
+
   let body
   try { body = await request.json() } catch { return json({ error: 'invalid_json' }, 400) }
   const { contact_id, sender_user_id, recipient_email, recipient_name, storage_path, subject } = body || {}
@@ -65,6 +74,14 @@ export default async (request) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'invalid_email' }, 400)
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+
+  const { data: authData, error: authErr } = await supabase.auth.getUser(accessToken)
+  if (authErr || !authData?.user) {
+    return json({ error: 'invalid_token' }, 401)
+  }
+  if (authData.user.id !== sender_user_id) {
+    return json({ error: 'forbidden', detail: 'sender_user_id must match the signed-in user.' }, 403)
+  }
 
   // 1. Ownership check
   const { data: contact, error: cErr } = await supabase
@@ -231,7 +248,7 @@ function cors() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   }
 }
 function json(obj, status = 200) {

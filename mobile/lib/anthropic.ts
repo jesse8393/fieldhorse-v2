@@ -7,11 +7,24 @@
 //
 // Base URL is configurable via EXPO_PUBLIC_API_BASE_URL (defaults to the
 // production site). The model matches the web default.
+import { supabase } from './supabase'
+
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
-const MODEL = (process.env.EXPO_PUBLIC_ANTHROPIC_MODEL as string) || 'claude-sonnet-4-20250514'
+const MODEL = (process.env.EXPO_PUBLIC_ANTHROPIC_MODEL as string) || 'claude-sonnet-4-6'
 const REQUEST_TIMEOUT_MS = 20000
 
 type ClaudeMessage = { role: string; content: unknown }
+
+// /api/claude requires the signed-in user's Supabase access token.
+async function authHeaders(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
+}
 
 export async function claudeMessage({ system, messages, maxTokens = 1024 }: { system?: string; messages: ClaudeMessage[]; maxTokens?: number }) {
   const controller = new AbortController()
@@ -19,7 +32,7 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }: { sy
   try {
     const res = await fetch(`${API_BASE}/api/claude`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens }),
       signal: controller.signal
     })

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon, PenLine } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.ts'
+import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
 // Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on Generate / Download / Send PDF actions.
@@ -397,7 +397,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       // pill to stay 'draft' until the email actually went out.
       const sendRes = await fetch('/api/send-quote', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,
@@ -469,7 +469,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
       const res = await fetch('/api/docusign-send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,

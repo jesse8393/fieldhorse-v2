@@ -63,6 +63,15 @@ export default async (request) => {
     }, 503)
   }
 
+  // Caller must be signed in. sender_user_id is client input; without
+  // verifying it against the caller's Supabase access token this
+  // endpoint is an open relay. Token is validated against auth below.
+  const authHeader = request.headers.get('authorization') || ''
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  if (!accessToken) {
+    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+  }
+
   let body
   try { body = await request.json() }
   catch { return json({ error: 'invalid_json' }, 400) }
@@ -92,6 +101,14 @@ export default async (request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
+
+  const { data: authData, error: authErr } = await supabase.auth.getUser(accessToken)
+  if (authErr || !authData?.user) {
+    return json({ error: 'invalid_token' }, 401)
+  }
+  if (authData.user.id !== sender_user_id) {
+    return json({ error: 'forbidden', detail: 'sender_user_id must match the signed-in user.' }, 403)
+  }
 
   // 1. Verify the caller owns the contact (job). Service role bypasses
   // RLS, so we filter explicitly on user_id to prevent open-relay use.
@@ -279,7 +296,7 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   }
 }
 

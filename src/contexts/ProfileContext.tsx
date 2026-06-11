@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from './AuthContext.tsx'
@@ -25,6 +25,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Tracks the auth user a fetch was started for. An in-flight fetch
+  // for user A can resolve after a fast sign-out→sign-in to user B;
+  // without this guard the stale response would overwrite B's profile
+  // (the closure check below compares against its own stale user).
+  const activeUserIdRef = useRef<string | null>(null)
 
   const fetchProfile = useCallback(async () => {
     if (!user) {
@@ -40,6 +45,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle()
+    // Drop the response if the auth user changed while we were waiting.
+    if (activeUserIdRef.current !== user.id) return
     if (fetchError) {
       console.warn('[fieldhorse] profile fetch error', fetchError)
       setError(fetchError.message || 'Could not load profile')
@@ -56,6 +63,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // Clear the prior profile the instant the auth user changes so a
   // renaming screen never paints with the previous user's name.
   useEffect(() => {
+    activeUserIdRef.current = user?.id ?? null
     setProfile(null)
     setError(null)
   }, [user?.id])
