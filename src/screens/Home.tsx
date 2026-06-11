@@ -310,10 +310,13 @@ export default function Home() {
           urgency: 0 // top priority — sort first
         })
       }
-      // 3. Invoiced jobs with no payment yet. Urgency = success (green) —
-      // money in motion, action results in cash flowing in.
+      // 3. Completed jobs with no payment yet. Urgency = success (green)
+      // — money in motion, action results in cash flowing in. ('invoice'
+      // stage is the legacy alias; v2 jobs flag completion via
+      // completed_at.)
       for (const c of contacts) {
-        if (c.stage !== 'invoice') continue
+        const awaitingPayment = c.stage === 'invoice' || (c.stage === 'job' && c.completed_at)
+        if (!awaitingPayment) continue
         if (paidContactIds.has(c.id)) continue
         const updated = new Date(c.updated_at || c.created_at || 0)
         if (updated > fiveDaysAgo) continue // give it 5 days to land naturally
@@ -340,21 +343,13 @@ export default function Home() {
       // Stage breakdown for the Pipeline card footer — 3 chips that
       // partition the funnel and match the Jobs tab filters one-to-one
       // so a tap on a chip lands on a tab with the same count.
-      //   Lead  = stage in (lead, quote)       → /jobs?stage=lead
-      //   Doing = stage = job                  → /jobs?stage=active (tab "Doing")
-      //   Won   = stage in (invoice, closed)   → /jobs?stage=won
-      //
-      // 5/13 audit changes:
-      //   • Won was previously stage='closed' only — now matches the
-      //     canonical WON_STAGES from rollups.ts (invoice + closed) so
-      //     Home agrees with the Jobs "Won" tab + Reports "Won YTD".
-      //   • Active was previously stage in (job, invoice) which read as
-      //     "all the work in progress" but conflicted with the Jobs
-      //     header's "active" reading (ACTIVE_STAGES count). We narrow
-      //     it to stage='job' so it matches the Jobs "Doing" tab exactly.
+      // Pipeline v2 partition:
+      //   Lead     = stage in (lead, quote)        → /leads
+      //   Active   = stage job (+legacy invoice)   → /jobs?stage=active
+      //   Complete = stage closed                  → /jobs?stage=closed
       const stageCounts = {
-        won:    contacts.filter((c) => c.stage === 'invoice' || c.stage === 'closed').length,
-        active: contacts.filter((c) => c.stage === 'job').length,
+        won:    contacts.filter((c) => c.stage === 'closed').length,
+        active: contacts.filter((c) => c.stage === 'job' || c.stage === 'invoice').length,
         lead:   contacts.filter((c) => c.stage === 'lead' || c.stage === 'quote').length
       }
 
@@ -363,7 +358,7 @@ export default function Home() {
       // collapsed buckets). Computed over the COMPLETE deduped contact
       // list so amounts are real totals — not the top-deal slice the
       // old buildPipelineStages approximated from.
-      const stageRail = (['lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const).map((sid) => {
+      const stageRail = (['lead', 'quote', 'job', 'closed', 'lost'] as const).map((sid) => {
         const rows = contacts.filter((c) => c.stage === sid)
         return {
           key: sid,
@@ -442,13 +437,14 @@ export default function Home() {
           const amount = Number(c.amount || 0)
           const paid = payByContact.get(c.id) || 0
           const outstanding = amount > 0 ? amount - paid : 0
+          const workDone = !!c.completed_at || c.stage === 'invoice'
           const billingTone: 'good' | 'warn' | 'bad' =
-            c.stage === 'invoice' && outstanding > 0 ? 'warn'
-            : c.stage === 'job' && amount === 0 ? 'warn'
+            workDone && outstanding > 0 ? 'warn'
+            : amount === 0 ? 'warn'
             : amount > 0 && outstanding <= 0 ? 'good'
             : 'good'
           const billing =
-            c.stage === 'invoice' && outstanding > 0 ? 'Outstanding'
+            workDone && outstanding > 0 ? 'Outstanding'
             : amount === 0 ? 'Not set'
             : outstanding > 0 ? 'In progress'
             : 'Paid'
@@ -459,13 +455,13 @@ export default function Home() {
           const risk = riskTone === 'bad' ? 'High' : riskTone === 'warn' ? 'Medium' : 'Low'
           const next =
             isBehind ? 'Reschedule + update client'
-            : c.stage === 'invoice' && outstanding > 0 ? 'Chase outstanding invoice'
-            : c.stage === 'invoice' ? 'Collect remaining balance'
+            : workDone && outstanding > 0 ? 'Send the final invoice'
+            : workDone ? 'Close out the job'
             : 'Keep crew moving'
           return {
             id: c.id,
             job: c.name || 'Untitled',
-            stage: c.stage === 'invoice' ? 'Invoicing' : 'Active',
+            stage: workDone && outstanding > 0 ? 'Invoicing' : 'Active',
             schedule,
             scheduleTone,
             report: '—',          // reports cadence not tracked yet
@@ -592,7 +588,7 @@ export default function Home() {
           topPipeline={topPipeline}
           nextActions={nextActions}
           onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
-          onGoToLeads={() => navigate('/jobs?view=leads')}
+          onGoToLeads={() => navigate('/leads')}
           onGoToActivity={() => navigate('/activity')}
           onGoToSchedule={() => navigate('/schedule')}
           onGoToInvoices={() => navigate('/invoices')}
@@ -955,7 +951,7 @@ export default function Home() {
               label="Lead"
               count={stageBreakdown.lead}
               tone="muted"
-              onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=lead') }}
+              onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/leads') }}
             />
           </div>
         )}
@@ -984,7 +980,7 @@ export default function Home() {
             marginTop: 4
           }}
         >
-          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/jobs?new=1')} />
+          <QuickAction icon={Plus} label="Add Lead" primary onTap={() => navigate('/leads?new=1')} />
           <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1&asStage=job')} />
           <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
           <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
@@ -1093,7 +1089,7 @@ export default function Home() {
             value={dealsAtRisk?.followUps}
             label="Follow-ups"
             subline={dealsAtRisk?.followUps > 0 ? 'Calls to leads' : null}
-            onTap={() => navigate('/jobs?stage=lead')}
+            onTap={() => navigate('/leads')}
           />
           <CompactKpi
             tone="lead"

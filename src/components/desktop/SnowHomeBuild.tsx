@@ -142,7 +142,7 @@ export default function SnowHomeBuild(props: Props) {
   // visible columns on the stage rail. Audit H2 caught the subtitle
   // saying "24 active opportunities" by counting every row including
   // the 8 closed and 1 lost.
-  const ACTIVE_RAIL_KEYS = new Set(['lead', 'quote', 'active', 'invoice'])
+  const ACTIVE_RAIL_KEYS = new Set(['lead', 'quote', 'active'])
   const totalOppCount = pipelineRows.reduce(
     (s: number, r: any) => s + (ACTIVE_RAIL_KEYS.has(r.key) ? (r.count || 0) : 0),
     0
@@ -593,7 +593,7 @@ function FooterLink({ label, onClick }: { label: string; onClick?: () => void })
 function buildStageRailRows(stageRail: Array<{ key: string; count: number; total: number }>) {
   const LABEL: Record<string, string> = {
     lead: 'Lead', quote: 'Quote', job: 'Active',
-    invoice: 'Invoicing', closed: 'Won', lost: 'Lost',
+    closed: 'Complete', lost: 'Lost',
   }
   // Map rail keys to the /jobs?stage= filter ids used by onGoToJobs.
   // Post-H3 the Jobs screen has distinct 'invoice' and 'closed' chips,
@@ -604,7 +604,7 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
   // headline that spans 17 deals across 4 stages.)
   const FILTER: Record<string, string> = {
     lead: 'lead', quote: 'quote', job: 'active',
-    invoice: 'invoice', closed: 'closed', lost: 'all',
+    closed: 'closed', lost: 'all',
   }
   const rows = stageRail
     .filter((s) => s.key !== 'lost' || s.count > 0)
@@ -631,9 +631,9 @@ function buildPipelineStages(
   stageBreakdown: { won?: number; active?: number; lead?: number } | null,
 ) {
   const buckets: Record<string, { key: string; label: string; stages: string[] }> = {
-    lead:   { key: 'lead',   label: 'Lead',   stages: ['lead', 'quote'] },
-    active: { key: 'active', label: 'Active', stages: ['job'] },
-    won:    { key: 'won',    label: 'Won',    stages: ['invoice', 'closed'] },
+    lead:   { key: 'lead',   label: 'Lead',     stages: ['lead', 'quote'] },
+    active: { key: 'active', label: 'Active',   stages: ['job', 'invoice'] },
+    won:    { key: 'won',    label: 'Complete', stages: ['closed'] },
   }
   const sums: Record<string, number> = { lead: 0, active: 0, won: 0 }
   for (const deal of topPipeline || []) {

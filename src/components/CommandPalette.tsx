@@ -20,7 +20,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 // Static nav — shown as the "empty state" when the input is blank.
 // When the user starts typing, the data search results take over.
 const QUICK_ACTIONS = [
-  { id: 'newLead', label: 'New lead', hint: 'Open Pipeline card', icon: Plus, to: '/jobs?new=1' },
+  { id: 'newLead', label: 'New lead', hint: 'Open the Leads board', icon: Plus, to: '/leads?new=1' },
   { id: 'voice', label: 'Voice capture', hint: 'Dictate a note', icon: Mic, to: '/notes?voice=1' }
 ]
 // Home hint adapts to time of day so the palette doesn't say
@@ -33,7 +33,8 @@ function homeHint() {
 }
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'jobs', label: 'Jobs', hint: 'Pipeline', icon: Briefcase, to: '/jobs' },
+  { id: 'leads', label: 'Leads', hint: 'Follow-ups + quotes', icon: Plus, to: '/leads' },
+  { id: 'jobs', label: 'Jobs', hint: 'Active work', icon: Briefcase, to: '/jobs' },
   { id: 'clients', label: 'Clients', hint: 'Directory', icon: Users, to: '/clients' },
   { id: 'notes', label: 'Field notes', hint: 'Capture anything', icon: FileText, to: '/notes' },
   { id: 'schedule', label: 'Schedule', hint: 'Day / week / month', icon: Calendar, to: '/schedule' }

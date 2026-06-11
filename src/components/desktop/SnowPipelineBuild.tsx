@@ -29,12 +29,13 @@ type Props = {
 
 type StageDef = { key: string; label: string; tone: 'lead' | 'quote' | 'job' | 'invoice' | 'won' }
 
+// Pipeline v2: no Invoicing column — invoicing is per-job fh_invoices
+// rows, not a stage.
 const STAGES: StageDef[] = [
   { key: 'lead',    label: 'Lead',      tone: 'lead' },
   { key: 'quote',   label: 'Quote',     tone: 'quote' },
   { key: 'job',     label: 'Active',    tone: 'job' },
-  { key: 'invoice', label: 'Invoicing', tone: 'invoice' },
-  { key: 'closed',  label: 'Won',       tone: 'won' },
+  { key: 'closed',  label: 'Complete',  tone: 'won' },
 ]
 
 function relTime(iso: any) {

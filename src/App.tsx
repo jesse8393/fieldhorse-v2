@@ -27,6 +27,7 @@ const SubPortal      = lazy(() => import('./screens/SubPortal.tsx'))
 const Privacy        = lazy(() => import('./screens/Privacy.tsx'))
 const Terms          = lazy(() => import('./screens/Terms.tsx'))
 const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
+const Leads          = lazy(() => import('./screens/Leads.tsx'))
 const ContactDetail  = lazy(() => import('./screens/ContactDetail/index.tsx'))
 const Clients        = lazy(() => import('./screens/Clients.tsx'))
 const ClientDetail   = lazy(() => import('./screens/ClientDetail.tsx'))
@@ -98,6 +99,7 @@ export default function App() {
         />
         <Route element={<Gated><AppShell /></Gated>}>
           <Route path="/" element={<Home />} />
+          <Route path="/leads" element={<Leads />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:id" element={<ContactDetail />} />
           <Route path="/clients" element={<Clients />} />
@@ -123,9 +125,8 @@ export default function App() {
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
           {/* Alias routes — these URLs exist in muscle memory / older
               links but the screens live elsewhere. Explicit redirects
-              beat the silent catch-all bounce to Home (audit: "/leads
-              and /templates resolve to Command Center"). */}
-          <Route path="/leads" element={<Navigate to="/jobs?view=leads" replace />} />
+              beat the silent catch-all bounce to Home. (/leads is a
+              real route now — pipeline v2.) */}
           <Route path="/templates" element={<Navigate to={{ pathname: '/settings', hash: '#templates' }} replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

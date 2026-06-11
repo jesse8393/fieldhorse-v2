@@ -21,42 +21,21 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobPhotos, useJobsRealtime, queryKeys } from '../lib/queries.ts'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
-// Tabs collapse 6 raw stages to 5 honest groupings.
-//
-// 5/13 audit flagged a labeling collision: the header summary showed
-// "14 ACTIVE" (count of every contact in ACTIVE_STAGES = lead+quote+
-// job+invoice) while a tab below it was also labeled "Active" but
-// only matched stage='job' (7 rows). Same word, two definitions, and
-// the operator couldn't reconcile the numbers. We renamed the tab to
-// "Doing" so the words are honest: header "Active" means everything
-// in the pipeline, tab "Doing" means stage='job' specifically (the
-// pipeline-depth filter). The tab id ('active') is unchanged so the
-// Phase 11 ?stage=active deep-link from Home still routes here.
-// Audit H3 (Jun 10): the prior "won" chip was labeled "Complete" but
-// matched stage in (invoice, closed) — a job that was still invoicing
-// ($14,800 outstanding) showed under "Closed/Complete". Split into
-// distinct Invoicing and Closed chips so each chip matches exactly
-// one stage and the count is honest.
+// Pipeline v2 — this screen shows JOBS only. Leads and quotes live on
+// /leads now; 'lost' belongs to the lead lifecycle. 'invoice' matches
+// only legacy pre-migration rows (it was retired as a stage) and rides
+// in the Active group as an alias of 'job'.
 const TABS = [
-  { id: 'all',     label: 'All',       match: () => true },
-  { id: 'lead',    label: 'Lead',      match: (c: any) => c.stage === 'lead' },
-  { id: 'quote',   label: 'Quote',     match: (c: any) => c.stage === 'quote' },
-  { id: 'active',  label: 'Doing',     match: (c: any) => c.stage === 'job' },
-  { id: 'invoice', label: 'Invoicing', match: (c: any) => c.stage === 'invoice' },
-  { id: 'closed',  label: 'Closed',    match: (c: any) => c.stage === 'closed' }
+  { id: 'all',    label: 'All',      match: (c: any) => c.stage !== 'lost' },
+  { id: 'active', label: 'Active',   match: (c: any) => c.stage === 'job' || c.stage === 'invoice' },
+  { id: 'closed', label: 'Complete', match: (c: any) => c.stage === 'closed' }
 ]
 
-// "All" view groups the pipeline into labeled stage blocks so leads,
-// quotes, jobs and invoices never interleave into one mixed pile. Order
-// follows the pipeline; empty groups are dropped at render. Lost is shown
-// last and only when present so it never clutters a healthy pipeline.
+// "All" view groups jobs into labeled blocks. Empty groups are dropped
+// at render.
 const STAGE_GROUPS = [
-  { id: 'lead',    label: 'Leads',       match: (c: any) => c.stage === 'lead' },
-  { id: 'quote',   label: 'Quotes',      match: (c: any) => c.stage === 'quote' },
-  { id: 'job',     label: 'Active jobs', match: (c: any) => c.stage === 'job' },
-  { id: 'invoice', label: 'Invoicing',   match: (c: any) => c.stage === 'invoice' },
-  { id: 'closed',  label: 'Complete',    match: (c: any) => c.stage === 'closed' },
-  { id: 'lost',    label: 'Lost',        match: (c: any) => c.stage === 'lost' }
+  { id: 'job',    label: 'Active jobs', match: (c: any) => c.stage === 'job' || c.stage === 'invoice' },
+  { id: 'closed', label: 'Complete',    match: (c: any) => c.stage === 'closed' }
 ]
 
 function money(n: any) {
@@ -78,16 +57,21 @@ export default function Jobs() {
   // pattern. useJobs caches the contacts list; useJobPhotos signs cover
   // photos separately; useJobsRealtime invalidates on any fh_contacts
   // change so the list stays live without a manual counter.
-  const { data: contacts = [], isLoading: loading } = useJobs()
+  const { data: allContacts = [], isLoading: loading } = useJobs()
   const { data: photoUrlByJob = {} } = useJobPhotos(user?.id)
   useJobsRealtime(user?.id, queryClient)
+  // Jobs screen scope: jobs only (pipeline v2). Leads/quotes render on
+  // /leads. 'invoice' is the legacy alias of 'job' for pre-migration rows.
+  const contacts = useMemo(
+    () => allContacts.filter((c: any) => c.stage === 'job' || c.stage === 'invoice' || c.stage === 'closed'),
+    [allContacts]
+  )
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
-  // Initial stage for the New-Lead sheet. Defaults to 'lead'; flips to
-  // 'job' when the entry point was the Home "New Job" quick action
-  // (which passes ?asStage=job). Keeps the title + default chip honest.
-  const [addInitialStage, setAddInitialStage] = useState('lead')
+  // Initial stage for the New sheet. Jobs screen defaults to 'job'
+  // (pipeline v2 — lead capture lives on /leads).
+  const [addInitialStage, setAddInitialStage] = useState('job')
   const [justAddedId, setJustAddedId] = useState<any>(null)
   const [drawerContact, setDrawerContact] = useState<any>(null)
   const navigate = useNavigate()
@@ -95,14 +79,13 @@ export default function Jobs() {
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
-      // ?asStage=job|quote|lead seeds the sheet's default stage so the
-      // Home "New Job" tile opens the sheet pre-configured for a job
-      // instead of a lead. Whitelisted to known stage values; anything
-      // else falls back to 'lead' (the original default).
+      // ?asStage=job|quote|lead seeds the sheet's default stage. The
+      // Jobs screen defaults to 'job' now — lead capture moved to
+      // /leads (pipeline v2).
       const requested = searchParams.get('asStage')
       const seed = requested === 'job' || requested === 'quote' || requested === 'lead'
         ? requested
-        : 'lead'
+        : 'job'
       setAddInitialStage(seed)
       setAddOpen(true)
       searchParams.delete('new')
@@ -111,26 +94,24 @@ export default function Jobs() {
     }
   }, [searchParams, setSearchParams])
 
-  // Phase 11 stabilization — Home priority cards deep-link via
-  // ?stage=lead|quote|active|won. Apply the matching tab on mount and
-  // strip the param so the URL stays clean. Unrecognized stages are
-  // ignored. Empty stage param falls through to the default tab.
+  // Deep links. Lead-shaped destinations bounce to /leads (their home
+  // since pipeline v2); job-shaped ?stage= params pick the tab.
   useEffect(() => {
     const stage = searchParams.get('stage')
+    const view = searchParams.get('view')
+    if (view === 'leads' || stage === 'lead' || stage === 'quote') {
+      navigate('/leads', { replace: true })
+      return
+    }
     if (stage) {
       const validIds = TABS.map((t) => t.id)
       if (validIds.includes(stage)) setFilter(stage)
+      else if (stage === 'invoice' || stage === 'won') setFilter('active')
       searchParams.delete('stage')
       setSearchParams(searchParams, { replace: true })
       return
     }
-    // Sidebar nav: ?view=leads → Lead Desk lands on the Lead tab;
-    // ?view=pipeline → Pipeline lands on All; default (Job Desk) shows
-    // active jobs ("Doing") so Job Desk isn't a clone of Lead Desk
-    // when the operator clicks it.
-    const view = searchParams.get('view')
-    if (view === 'leads') setFilter('lead')
-    else if (view === 'pipeline') setFilter('all')
+    if (view === 'pipeline') setFilter('all')
     else if (view === 'doing') setFilter('active')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -290,11 +271,8 @@ export default function Jobs() {
             // desktop we skip it so the chevron lives up to its
             // implied affordance.
             onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
-            // Seed the sheet's Stage chip from the active filter so the
-            // CTA is honest: "+ New Job" (Doing/Complete filters) opens
-            // a Job-stage form, "+ New Lead" opens a Lead-stage form.
             onNewLead={() => {
-              setAddInitialStage(filter === 'active' || filter === 'invoice' || filter === 'closed' ? 'job' : 'lead')
+              setAddInitialStage('job')
               setAddOpen(true)
             }}
           />
@@ -391,7 +369,7 @@ export default function Jobs() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 className="jobs-title">
             Jobs{' '}
-            <span style={{ color: 'var(--v3-primary-bright)' }}>& Pipeline</span>
+            <span style={{ color: 'var(--v3-primary-bright)' }}>& Active Work</span>
           </h1>
           <div className="jobs-stats">
             {loading ? (
@@ -425,10 +403,10 @@ export default function Jobs() {
           type="button"
           className="fh-jobs__action fh-desktop-only-action"
           onClick={() => { hapticMedium(); setAddOpen(true) }}
-          aria-label="New lead"
+          aria-label="New job"
         >
           <Plus size={15} strokeWidth={2.4} />
-          <span>New lead</span>
+          <span>New job</span>
         </button>
       </motion.div>
 
@@ -598,7 +576,7 @@ export default function Jobs() {
           ancestor. */}
       <FloatingActionButton
         onClick={() => setAddOpen(true)}
-        ariaLabel="New lead"
+        ariaLabel="New job"
         hideOnDesktop
       />
 
@@ -712,7 +690,7 @@ function EmptyView({ hasFilter, onAdd }: any) {
         No jobs on the board.
       </div>
       <div style={{ fontSize: 12, marginBottom: 10 }}>
-        Drop in your first lead. Watch the Pipeline fill.
+        Win a lead on the Leads board, or add a job directly.
       </div>
       <button
         type="button"
@@ -727,7 +705,7 @@ function EmptyView({ hasFilter, onAdd }: any) {
           cursor: 'pointer'
         }}
       >
-        Add first lead →
+        Add a job →
       </button>
     </div>
   )
