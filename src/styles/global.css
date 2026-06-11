@@ -7493,8 +7493,13 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-stage-grid {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 12px;
+    /* auto-fit so 5 stages (or 6 if Lost is present) don't get crushed
+       into the dead-pixel 1/8 cells the prior repeat(8, 1fr) template
+       allocated. Each cell needs ~110px to fit the "INVOICING" label
+       on one line at the current type scale (Phase 1 §1: rail
+       collision @1504px). Cells flex up when there's extra room. */
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 12px 14px;
   }
 
   .fh-build-stage-grid button {
@@ -7504,6 +7509,23 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     cursor: pointer;
     color: inherit;
     padding: 0;
+    /* Tight typography mode kicks in when the cell falls below ~120px
+       wide (container query). Below 120 the eyebrow loses letter-
+       spacing + drops a hair of size, and the $ amount scales from
+       28→24px so 6-figure totals never overlap the next cell.
+       Browser support: container queries shipped Chrome 105 / Safari
+       16 / Firefox 110, all desktop-baseline now. */
+    container-type: inline-size;
+  }
+
+  @container (max-width: 120px) {
+    .fh-build-stage-grid button > span:not(.fh-build-stage-grid__dot) {
+      letter-spacing: 0.06em;
+      font-size: 9px;
+    }
+    .fh-build-stage-grid strong {
+      font-size: 24px;
+    }
   }
 
   /* Stage-key colored dot per cell — audit M2. Color comes from the
@@ -7528,13 +7550,22 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-stage-grid [data-stage="lost"]    .fh-build-stage-grid__dot { background: var(--stage-lost); }
   .fh-build-stage-grid [data-stage="won"]     .fh-build-stage-grid__dot { background: var(--stage-closed); }
 
-  .fh-build-stage-grid span {
+  /* The label span (NOT the dot span) — scope by :not so the dot
+     stays its absolute 8px circle. nowrap + ellipsis so an oversized
+     label clips with an ellipsis instead of overflowing into the
+     neighbor cell (the audit's "INVOICING renders into WON"
+     collision). */
+  .fh-build-stage-grid button > span:not(.fh-build-stage-grid__dot) {
     display: block;
     color: var(--v3-primary, #c9963a);
     font-size: 10px;
     font-weight: 850;
     letter-spacing: .11em;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .fh-build-stage-grid strong {
@@ -7545,6 +7576,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     line-height: 1;
     color: #f7f4ec;
     font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
   }
 
   .fh-build-stage-grid small {
@@ -7820,7 +7854,39 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-top: 1px solid rgba(255,255,255,.065);
   }
 
-  @media (max-width: 1280px) {
+  /* Phase 0 (Jun 10 rollout): collapse threshold dropped 1280 → 1000.
+     Jesse's laptop runs Windows 150% scaling and tops out at ~1003 CSS
+     px, so the old 1280 collapse rendered the stacked phone layout on
+     every screen for him. New cascade:
+       ≥1280   full 3-zone Home (pipeline | today | rail) per the mock
+       1000-1279  intermediate: 2-col (pipeline | today), rail wraps
+                  below as a 3-up horizontal row
+       <1000   single column stack (mobile + zoomed desktop) */
+  @media (max-width: 1279px) and (min-width: 1000px) {
+    .fh-build-content-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    /* Rail spans the full row underneath pipeline+today and lays its
+       cards out horizontally so the right-rail KPIs stay visible
+       without taking a full screen of vertical space. */
+    .fh-build-rail {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-auto-flow: row dense;
+      gap: 12px;
+    }
+    .fh-build-health {
+      grid-column: 1 / -1;
+    }
+    /* Hero row still stacks at this tier — the mock's 3-col hero
+       (title | view-card | mini-grid) needs ~1330px to fit cleanly. */
+    .fh-build-hero-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 999px) {
     .fh-build-hero-row {
       grid-template-columns: 1fr;
     }
@@ -8591,7 +8657,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   /* Phase 1 narrow-viewport collapse */
-  @media (max-width: 1280px) {
+  /* Phase 0: keep the 1fr + 290px sidebar layout down to 1000 (was
+     1280). Below 1000 the page collapses to single-column stack. */
+  @media (max-width: 999px) {
     .fh-build-content-grid--jobs,
     .fh-build-content-grid--invoices,
     .fh-build-content-grid--schedule {
@@ -9117,7 +9185,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   /* Phase 2 narrow-viewport collapse */
-  @media (max-width: 1280px) {
+  /* Phase 0: keep 1fr + 290px sidebar down to 1000. */
+  @media (max-width: 999px) {
     .fh-build-content-grid--clients,
     .fh-build-content-grid--subs,
     .fh-build-content-grid--notes,
@@ -9364,7 +9433,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   /* Narrow-viewport collapse for detail + settings */
-  @media (max-width: 1280px) {
+  /* Phase 0: detail + settings keep their 1fr + sidebar grid down to
+     1000. */
+  @media (max-width: 999px) {
     .fh-build-content-grid--detail,
     .fh-build-content-grid--settings {
       grid-template-columns: 1fr;

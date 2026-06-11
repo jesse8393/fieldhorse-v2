@@ -30,6 +30,19 @@ type Props = {
   // Full per-stage rail (lead/quote/job/invoice/closed/lost with real
   // counts + $ totals) — preferred over stageBreakdown when present.
   stageRail?: Array<{ key: string; count: number; total: number }> | null
+  // Job Health Preview rows (Phase 1 §3). Each row already carries
+  // the per-column status text + tone keyed to the .fh-build-dot
+  // palette so SnowHomeBuild renders them verbatim.
+  jobHealth?: Array<{
+    id: string
+    job: string
+    stage: string
+    schedule: string; scheduleTone: 'good' | 'warn' | 'bad' | 'neutral'
+    report: string;   reportTone: 'good' | 'warn' | 'bad' | 'neutral'
+    billing: string;  billingTone: 'good' | 'warn' | 'bad' | 'neutral'
+    risk: string;     riskTone: 'good' | 'warn' | 'bad' | 'neutral'
+    next: string
+  }> | null
   // Home.tsx stores dealsAtRisk as a shape: { count, value, followUps,
   // quotesAttention, … } — older callers expect a plain number. We
   // accept either and normalize at the render site.
@@ -107,6 +120,7 @@ export default function SnowHomeBuild(props: Props) {
     onOpenJobAtTab,
     onNewLead,
     stageRail,
+    jobHealth,
   } = props as any
 
   const dateLabel = now.toLocaleDateString(undefined, {
@@ -136,7 +150,10 @@ export default function SnowHomeBuild(props: Props) {
   const activeStageCount = pipelineRows.filter((r: any) => ACTIVE_RAIL_KEYS.has(r.key) && (r.count || 0) > 0).length
   const queueRows = buildOwnerQueue(nextActions)
   const revenueRows = buildRevenueRows(topPipeline)
-  const jobRows = buildJobHealthRows(todayOnSite)
+  // Job Health Preview rows come from Home.tsx (which has the contacts
+  // + overdue-schedule + payments joined). Empty array while loading
+  // so the card prints its loading state instead of a wired stub.
+  const jobRows = Array.isArray(jobHealth) ? jobHealth : []
 
   return (
     <div
@@ -245,6 +262,7 @@ export default function SnowHomeBuild(props: Props) {
           <JobHealthPreview
             rows={jobRows}
             onGoToJobs={onGoToJobs}
+            onOpenJob={onOpenJob}
           />
         </section>
       </main>
@@ -429,13 +447,16 @@ function OwnerQueue({ rows, onOpenJobAtTab, onViewAll }: any) {
       ) : (
         rows.map((row: any, index: number) => (
           <button
-            key={`${row.title}-${index}`}
+            key={`${row.action}-${row.client}-${index}`}
             type="button"
             className="fh-build-table__row is-owner"
+            // Wait-status string ("Lead waiting 15 days") moves to a
+            // tooltip so the table stays clean (Phase 1 §2).
+            title={row.tooltip || undefined}
             onClick={() => row.contactId && onOpenJobAtTab(row.contactId, row.tab)}
           >
             <span>{index + 1}</span>
-            <strong>{row.title}</strong>
+            <strong>{row.action}</strong>
             <span>{row.client}</span>
             <span>{row.amount}</span>
             <span className={`fh-build-dot is-${row.statusTone}`}>{row.status}</span>
@@ -487,7 +508,7 @@ function RevenueOpportunities({ rows, onOpenJob, onViewAll }: any) {
   )
 }
 
-function JobHealthPreview({ rows, onGoToJobs }: any) {
+function JobHealthPreview({ rows, onGoToJobs, onOpenJob }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-health">
       <CardHeader title="Job Health Preview" action="Operational Risks" />
@@ -506,10 +527,12 @@ function JobHealthPreview({ rows, onGoToJobs }: any) {
       ) : (
         rows.map((row: any) => (
           <button
-            key={row.job}
+            key={row.id || row.job}
             type="button"
             className="fh-build-table__row is-health"
-            onClick={() => onGoToJobs()}
+            // Deep-link to the specific job file when an id is present
+            // — previously every row routed to /jobs (no target).
+            onClick={() => row.id ? onOpenJob?.(row.id) : onGoToJobs()}
           >
             <strong>{row.job}</strong>
             <span>{row.stage}</span>
@@ -637,6 +660,12 @@ function buildPipelineStages(
 // ('danger' | 'warn' | 'success') maps to the dot tone the table uses.
 // Amount/due aren't part of the action payload, so we leave them blank
 // rather than invent numbers.
+// Phase 1 §2: render the Owner Queue table to spec — Action column is
+// a verb phrase, Client / Job column is the actual record name, Amount
+// is the deal value, Due is a date or "Today" / "Nd ago" label. The
+// `detail` wait-status string (e.g. "Lead waiting 15 days") moves to
+// the row's title attribute as a tooltip so it's still discoverable
+// without crowding the table.
 function buildOwnerQueue(nextActions: any[] | null) {
   if (!nextActions) return []
   return nextActions.slice(0, 6).map((a: any) => {
@@ -650,17 +679,44 @@ function buildOwnerQueue(nextActions: any[] | null) {
       : a.urgencyTone === 'warn' ? 'Medium'
       : a.urgencyTone === 'success' ? 'Action'
       : '—'
+    // Verb-only action. New payload provides `verb`; legacy payload
+    // (no verb) falls back to the full title.
+    const action = a.verb || a.title || a.label || 'Action required'
+    const client = a.contactName || a.client || ''
+    const amount = Number(a.contactAmount || 0) > 0
+      ? moneyFull(Number(a.contactAmount))
+      : '—'
+    const due = formatDue(a.dueIso, a.dueKind)
     return {
-      title: a.title || a.label || 'Action required',
-      client: a.detail || a.contactName || a.subtitle || '',
-      amount: '—',
+      action,
+      client,
+      amount,
       status,
       statusTone: tone,
-      due: '—',
+      due,
+      tooltip: a.detail || '',
       contactId: a.contactId,
       tab: a.tab,
     }
   })
+}
+
+function formatDue(iso: string | null | undefined, kind: string | null | undefined) {
+  if (!iso) return '—'
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return '—'
+  // `waited` → "Nd ago" (last touch was N days back, follow-up overdue)
+  // `overdue` → "Today" (action is needed right now)
+  // `invoiced` → "Nd ago" (invoice sent N days back, payment expected)
+  // anything else → short date
+  const days = Math.floor((Date.now() - t) / 86400000)
+  if (kind === 'overdue') return 'Today'
+  if (kind === 'waited' || kind === 'invoiced') {
+    if (days <= 0) return 'Today'
+    if (days === 1) return '1d ago'
+    return `${days}d ago`
+  }
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 function buildRevenueRows(topPipeline: any[] | null) {
@@ -703,9 +759,9 @@ function buildRevenueRows(topPipeline: any[] | null) {
 // signals that aren't computed on Home yet. Until that data lands,
 // emit zero rows — the table will render its header + empty state
 // rather than fabricated rows with placeholder client names.
-function buildJobHealthRows(_todayOnSite: any[] | null) {
-  return [] as any[]
-}
+// (buildJobHealthRows removed — Job Health rows are now computed in
+// screens/Home.tsx where the contacts + overdue-schedule + payments
+// data lives. Phase 1 §3.)
 
 // Silence "imported but not used" warnings for icons reserved for future use.
 void BarChart3; void CalendarDays; void CircleDollarSign; void Clock3; void MapPin; void Users
