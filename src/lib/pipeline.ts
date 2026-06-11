@@ -40,7 +40,10 @@ export async function approveQuote(contact: Contact) {
 
 export async function markComplete(contact: Contact) {
   const res = await baseCompleteJob(contact)
-  if (!res.error) notify('invoice')
+  if (!res.error) {
+    hapticMedium()
+    toast('Marked complete · send the final invoice', { accent: 'gold', heavy: true })
+  }
   return res
 }
 
@@ -51,10 +54,10 @@ export async function markLost(contact: Contact) {
 }
 
 export async function reopen(contact: Contact) {
-  // closed → invoice (lets the operator adjust billing / add a payment
-  // without going all the way back to active work). lost → lead (they're
+  // closed → job (billing adjustments / extra payments happen on the
+  // job itself now that invoicing isn't a stage). lost → lead (they're
   // back in play but uncommitted).
-  const next: StageId = contact.stage === 'closed' ? 'invoice' : 'lead'
+  const next: StageId = contact.stage === 'closed' ? 'job' : 'lead'
   const res = await transitionStage(contact, next)
   if (!res.error) notify(next, 'Reopened to')
   return res
