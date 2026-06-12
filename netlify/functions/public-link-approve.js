@@ -24,6 +24,7 @@
 // so a customer double-tap doesn't double-write a version row.
 
 import { createClient } from '@supabase/supabase-js'
+import { sendPushToUser } from './lib/push.js'
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -238,7 +239,7 @@ export default async function handler(req) {
     console.error('[public-link-approve] contact update failed', upErr)
   }
 
-  // 7. Notification to the contractor's bell.
+  // 7. Notification to the contractor's bell + lock screen.
   try {
     await supabase.from('fh_notifications').insert({
       user_id: link.user_id,
@@ -250,6 +251,12 @@ export default async function handler(req) {
   } catch (e) {
     console.warn('[public-link-approve] notification insert failed', e)
   }
+  await sendPushToUser(supabase, link.user_id, {
+    title: `Quote approved · ${moneyFmt(baseTotal)} 🎉`,
+    body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
+    link: `/jobs/${contact.id}`,
+    tag: `quote-approved-${contact.id}`
+  })
 
   return json({
     ok: true,

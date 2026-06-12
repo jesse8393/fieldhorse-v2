@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, Trash2, LogOut, Upload as UploadIcon } from 'lucide-react'
+import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
@@ -14,6 +14,7 @@ import { reverseGeocode } from '../lib/weather.ts'
 // the toggle when full light-theme parity ships.
 // import { useTheme } from '../contexts/ThemeContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
+import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Switch } from '@/components/ui/switch'
@@ -560,6 +561,14 @@ export default function Settings() {
        */}
 
       {/* ACCOUNT */}
+      <Section
+        variants={item}
+        title={<>On your <em>lock screen.</em></>}
+        sub="Get pinged the moment a quote is approved or a new lead lands."
+      >
+        <PushRow userId={user?.id} />
+      </Section>
+
       <Section variants={item} title={<>Your <em>session.</em></>}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
           <div style={{ minWidth: 0 }}>
@@ -716,6 +725,100 @@ export default function Settings() {
       </motion.div>
       {sections}
     </motion.div>
+  )
+}
+
+/* Push notifications row. Three device states:
+   - ready          → Enable / Enabled toggle
+   - needs-install  → iOS Safari tab: push only works once the app is
+                      added to the Home Screen, so say exactly that
+   - unsupported    → hide the noise, show a quiet dash */
+function PushRow({ userId }: { userId?: string }) {
+  const support = pushSupport()
+  const [enabled, setEnabled] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { pushEnabled().then(setEnabled) }, [])
+
+  async function toggle() {
+    if (busy || !userId) return
+    setBusy(true)
+    try {
+      if (enabled) {
+        await disablePush()
+        setEnabled(false)
+        toastSuccess('Push off', 'This device will stay quiet')
+      } else {
+        const r = await enablePush(userId)
+        if (r === 'enabled') {
+          setEnabled(true)
+          toastSuccess('Push on', "You'll get pinged on this device")
+        } else if (r === 'denied') {
+          toastError('Notifications blocked', 'Allow notifications for Fieldhorse in system settings')
+        } else {
+          toastError("Couldn't enable push", 'Try again in a minute')
+        }
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' } as const
+
+  if (support === 'needs-install') {
+    return (
+      <div style={rowStyle}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>
+            Add to Home Screen first
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>
+            iPhone: Share → Add to Home Screen, then open Fieldhorse from the icon and flip this on.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (support === 'unsupported') {
+    return (
+      <div style={rowStyle}>
+        <div style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+          This browser doesn't support push notifications.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={rowStyle}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>
+          Push notifications
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>
+          {enabled ? 'On for this device' : 'Off — approvals and new leads stay silent'}
+        </div>
+      </div>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.97 }}
+        onClick={toggle} className="fh-press-instant"
+        disabled={busy || !userId}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 10,
+          background: enabled ? 'var(--v3-surface-2)' : 'var(--v3-primary-soft)',
+          border: enabled ? '1px solid var(--v3-border-strong)' : '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)',
+          color: enabled ? 'var(--v3-text-muted)' : 'var(--v3-primary)',
+          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          opacity: busy ? 0.6 : 1
+        }}
+      >
+        <Bell size={14} />
+        {busy ? 'Working…' : enabled ? 'Turn off' : 'Enable'}
+      </motion.button>
+    </div>
   )
 }
 

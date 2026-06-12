@@ -3531,6 +3531,28 @@ a {
 }
 .fh-fab:active { transform: scale(0.94); }
 
+/* Universal Capture FAB — the circular mic variant of .fh-fab.
+   Default position is the canonical FAB spot. When the current screen
+   renders its own "+" FAB (Leads / Jobs / Clients / Schedule), capture
+   slides up to stack above it instead of overlapping. Both buttons are
+   portaled to <body>, so body:has() sees them regardless of route. */
+.fh-fab--capture {
+  border-radius: 999px;
+  transition: transform 160ms ease, box-shadow 160ms ease, bottom 200ms ease;
+}
+body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
+  bottom: calc(164px + env(safe-area-inset-bottom, 0px));
+}
+/* Desktop: screens that hide their own FAB at >=900px (inline header
+   action instead) release the stacked offset — capture drops back to
+   the canonical spot. Schedule keeps its FAB on desktop, so the
+   stacked rule above still applies there. */
+@media (min-width: 900px) {
+  body:has(.fh-fab--hide-desktop) .fh-fab.fh-fab--capture {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* AppHeader right-slot icon buttons — steel at rest, gold on hover/active.
    Same visual treatment for both the search and notes shortcuts so they
    read as a coherent pair. */

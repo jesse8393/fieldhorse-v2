@@ -20,8 +20,10 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 // Static nav — shown as the "empty state" when the input is blank.
 // When the user starts typing, the data search results take over.
 const QUICK_ACTIONS = [
-  { id: 'newLead', label: 'New lead', hint: 'Open the Leads board', icon: Plus, to: '/leads?new=1' },
-  { id: 'voice', label: 'Voice capture', hint: 'Dictate a note', icon: Mic, to: '/notes?voice=1' }
+  // `event` actions fire a window event instead of navigating —
+  // Capture opens the global CaptureSheet wherever you already are.
+  { id: 'capture', label: 'Capture anything', hint: 'Voice, text, or receipt — auto-filed (⌘J)', icon: Mic, event: 'fh:open-capture' },
+  { id: 'newLead', label: 'New lead', hint: 'Open the Leads board', icon: Plus, to: '/leads?new=1' }
 ]
 // Home hint adapts to time of day so the palette doesn't say
 // "Morning brief" at 9 PM.
@@ -174,7 +176,19 @@ export default function CommandPalette() {
         {items.map((it: any) => {
           const I = it.icon
           return (
-            <CommandItem key={it.id} value={`${it.id} ${it.label} ${it.hint}`} onSelect={() => go(it.to)} className="ui:gap-3">
+            <CommandItem
+              key={it.id}
+              value={`${it.id} ${it.label} ${it.hint}`}
+              onSelect={() => {
+                if (it.event) {
+                  setOpen(false)
+                  window.dispatchEvent(new CustomEvent(it.event))
+                } else {
+                  go(it.to)
+                }
+              }}
+              className="ui:gap-3"
+            >
               <I className="ui:text-fh-gold-bright" style={{ width: 16, height: 16 }} />
               <div className="ui:flex ui:flex-col">
                 <span>{it.label}</span>

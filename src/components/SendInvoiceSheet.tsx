@@ -57,6 +57,11 @@ export default function SendInvoiceSheet({
   const [amount, setAmount] = useState('')
   const [dueDays, setDueDays] = useState(14)
   const [notes, setNotes] = useState('')
+  // Customer-facing "what is this bill for". Prefilled from the job's
+  // title + property address — repeat clients with several properties
+  // need the invoice to say which one this covers. Prints in the line
+  // item's Description column on the PDF.
+  const [description, setDescription] = useState('')
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   const totals = useMemo(
@@ -82,6 +87,7 @@ export default function SendInvoiceSheet({
       setAmount(suggestion.amount > 0 ? String(suggestion.amount) : '')
       setDueDays(14)
       setNotes('')
+      setDescription([contact?.job_title, contact?.address].filter(Boolean).join(' — '))
       setLoading(false)
     })()
     return () => { alive = false }
@@ -114,7 +120,8 @@ export default function SendInvoiceSheet({
       title, amount: amountNum,
       status: 'draft',
       due_at,
-      notes
+      notes,
+      description
     })
     if (error || !data) throw new Error(error?.message || "Couldn't create the invoice")
     return data
@@ -325,6 +332,19 @@ export default function SendInvoiceSheet({
                   </div>
                 )}
               </div>
+
+              {/* Description — what the customer reads on the PDF */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={labelStyle}>Description (shows on the invoice)</span>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Handrail painting — 615 N Highland Ave"
+                  disabled={!!busy}
+                  style={{ ...fieldStyle, resize: 'vertical' }}
+                />
+              </label>
 
               {/* Due window */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

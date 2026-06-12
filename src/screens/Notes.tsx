@@ -13,6 +13,8 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
+import { canHover } from '../lib/hover.ts'
+import { resilientInsert } from '../lib/outbox.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
@@ -141,14 +143,17 @@ export default function Notes() {
       text: draft.trim(),
       category: 'note'
     }
-    const { data, error } = await supabase.from('fh_notes').insert(payload).select().single()
+    // resilientInsert mints the id client-side, so the optimistic row
+    // below is the same row that lands in the DB (online or queued).
+    const { queued, error, id } = await resilientInsert('fh_notes', payload)
     setSaving(false)
-    if (!error && data) {
+    if (!error) {
+      const localRow = { ...payload, id, created_at: new Date().toISOString(), done: false }
       setDraft('')
       setParsed(null)
       setContactId('')
-      patchNotes((n: any) => [data, ...n])
-      toastSuccess('Note saved', 'Synced across devices')
+      patchNotes((n: any) => [localRow, ...n])
+      toastSuccess('Note saved', queued ? 'Will sync when signal returns' : 'Synced across devices')
     }
   }
 
@@ -828,6 +833,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
         }}
         onMouseEnter={(e) => {
+          if (!canHover) return
           e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
           e.currentTarget.style.background = 'var(--v3-surface-3)'
         }}
@@ -933,6 +939,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                   transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
                 }}
                 onMouseEnter={(ev) => {
+                  if (!canHover) return
                   ev.currentTarget.style.color = 'var(--v3-danger-bright)'
                   ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
                   ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'

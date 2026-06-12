@@ -32,6 +32,9 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        // Web-push handlers (push + notificationclick) live in
+        // public/push-sw.js and are pulled into the generated SW here.
+        importScripts: ['push-sw.js'],
         // Runtime caching for assets the precache doesn't own (third-
         // party origins + Supabase Storage public URLs). Cuts repeat
         // network roundtrips on warm visits and gives a soft offline

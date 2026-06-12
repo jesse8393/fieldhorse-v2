@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
-import { toastError, toastUndo } from '../../../lib/toast.ts'
+import { toastError, toastUndo, toastSuccess } from '../../../lib/toast.ts'
+import { resilientInsert } from '../../../lib/outbox.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { canHover } from '../../../lib/hover.ts'
 import { PostedByChip } from '../../../components/v3'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
@@ -25,7 +27,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
     if (!txt || saving) return
     hapticTap()
     setSaving(true)
-    const { error } = await supabase.from('fh_notes').insert({
+    const { queued, error } = await resilientInsert('fh_notes', {
       user_id: userId,
       contact_id: contactId,
       text: txt,
@@ -36,6 +38,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
       toastError("Couldn't add note", error.message)
       return
     }
+    if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')
     setDraft('')
     fetchAll?.()
   }
@@ -200,6 +203,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     touchAction: 'manipulation'
                   }}
                   onMouseEnter={(ev) => {
+                    if (!canHover) return
                     ev.currentTarget.style.color = 'var(--v3-danger-bright)'
                     ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
                     ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'

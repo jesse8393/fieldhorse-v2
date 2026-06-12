@@ -8,7 +8,7 @@ import LogMilesSheet from '../components/LogMilesSheet.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
-import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn } from '../lib/rollups.ts'
+import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn, computeFunnel } from '../lib/rollups.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -41,6 +41,7 @@ export default function Analytics() {
   const invoices = bundle?.invoices ?? []
   const changeOrders = bundle?.changeOrders ?? []
   const clients = bundle?.clients ?? []
+  const stageTransitions = bundle?.stageTransitions ?? []
   const [logOpen, setLogOpen] = useState(false)
 
   // 12-week pipeline trend — bucket contacts by created_at week,
@@ -70,6 +71,12 @@ export default function Analytics() {
     }
     return buckets
   }, [contacts])
+
+  // Funnel — trailing 90 days from the stage-transition audit log.
+  const funnel = useMemo(
+    () => computeFunnel(stageTransitions as any, contacts as any, 90),
+    [stageTransitions, contacts]
+  )
 
   const stats = useMemo(() => {
     // Pipeline = sum of all jobs in active stages.
@@ -402,6 +409,43 @@ export default function Analytics() {
               <KPI label="Mileage Deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
             </div>
           </motion.div>
+
+          {/* SALES FUNNEL — trailing 90 days from stage transitions */}
+          <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
+            <div className="v3-section-header">
+              <span className="v3-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Target size={11} color="var(--v3-primary)" />
+                Funnel · last 90 days
+              </span>
+              {funnel.avgDaysToDecision > 0 && (
+                <span className="v3-eyebrow" style={{ opacity: 0.65 }}>
+                  ~{Math.round(funnel.avgDaysToDecision)}d to a yes/no
+                </span>
+              )}
+            </div>
+            {funnel.newLeads === 0 && funnel.quoted === 0 ? (
+              <div className="v3-empty" style={{ padding: '14px 0' }}>
+                <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--v3-text-muted)' }}>
+                  No pipeline movement in the last 90 days yet.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                <FunnelBar label="New leads" count={funnel.newLeads} max={Math.max(funnel.newLeads, funnel.quoted, 1)} />
+                <FunnelBar
+                  label="Quoted" count={funnel.quoted}
+                  max={Math.max(funnel.newLeads, funnel.quoted, 1)}
+                  note={funnel.newLeads > 0 ? `${Math.round(funnel.quoteRate * 100)}% of new leads` : undefined}
+                />
+                <FunnelBar
+                  label="Won" count={funnel.won}
+                  max={Math.max(funnel.newLeads, funnel.quoted, 1)} gold
+                  note={funnel.won + funnel.lost > 0 ? `${Math.round(funnel.winRate * 100)}% win rate` : undefined}
+                />
+                <FunnelBar label="Lost" count={funnel.lost} max={Math.max(funnel.newLeads, funnel.quoted, 1)} danger />
+              </div>
+            )}
+          </motion.section>
 
           {/* PIPELINE TREND — 12-week area chart */}
           <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
@@ -742,6 +786,49 @@ function RevenueBars({ data, maxValue }: any) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/* Horizontal funnel bar — width scales to the largest step so the
+   shape of the funnel is readable at a glance. */
+function FunnelBar({ label, count, max, note, gold, danger }: any) {
+  const pct = Math.max(4, Math.round((count / Math.max(max, 1)) * 100))
+  const color = danger
+    ? 'var(--v3-danger-bright)'
+    : gold
+      ? 'var(--v3-primary)'
+      : 'var(--v3-text-muted)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{
+        width: 76, flexShrink: 0,
+        fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+        color: 'var(--v3-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em'
+      }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: 22, borderRadius: 7, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', overflow: 'hidden' }}>
+        <div style={{
+          width: `${pct}%`, height: '100%',
+          borderRadius: 6,
+          background: `color-mix(in srgb, ${color} ${danger || gold ? 22 : 14}%, transparent)`,
+          borderRight: `2px solid color-mix(in srgb, ${color} 55%, transparent)`,
+          transition: 'width 400ms ease'
+        }} />
+      </div>
+      <span style={{
+        flexShrink: 0, minWidth: 24, textAlign: 'right',
+        fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700,
+        color: danger ? 'var(--v3-danger-bright)' : gold ? 'var(--v3-primary)' : 'var(--v3-text)'
+      }}>
+        {count}
+      </span>
+      {note && (
+        <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+          {note}
+        </span>
+      )}
     </div>
   )
 }

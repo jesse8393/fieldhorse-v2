@@ -1,7 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import App from './App.tsx'
 import AppErrorBoundary from './components/AppErrorBoundary.tsx'
 import { ConfirmProvider } from './components/ConfirmSheet.tsx'
@@ -70,6 +71,16 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   }
 }
 
+// Offline reads: persist the TanStack Query cache to localStorage so a
+// cold open with no signal still shows jobs / leads / schedule from the
+// last sync instead of blank screens. The outbox (lib/outbox.ts) covers
+// the write side. `buster` ties the cache to the deployed build so a
+// schema-shaped change never rehydrates stale rows into new code.
+const queryPersister = createSyncStoragePersister({
+  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  key: 'fh-query-cache'
+})
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppErrorBoundary>
@@ -81,7 +92,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           v7_relativeSplatPath: true
         }}
       >
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: queryPersister,
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            buster: typeof __FH_BUILD_SHA__ === 'string' ? __FH_BUILD_SHA__ : 'dev'
+          }}
+        >
           <ThemeProvider>
             <AuthProvider>
               <ProfileProvider>
@@ -93,7 +111,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               </ProfileProvider>
             </AuthProvider>
           </ThemeProvider>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </BrowserRouter>
     </AppErrorBoundary>
   </React.StrictMode>

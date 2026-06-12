@@ -27,6 +27,7 @@ import CountUp from '../components/fx/CountUp.tsx'
 import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
 import HomeActivityCard from '../components/HomeActivityCard.tsx'
 import { hapticTap } from '../lib/haptics.ts'
+import { canHover } from '../lib/hover.ts'
 // V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
 // same batch helper Jobs already uses (one query + one signed-URL
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
@@ -166,7 +167,7 @@ export default function Home() {
       // existing four queries. Failure is non-fatal — empty map → rows
       // fall back to neutral initial tiles. No N+1: helper does one
       // fh_job_files query + one batch signed-URL call total.
-      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes, photoMap] = await Promise.all([
+      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes, photoMap, linkViewsRes, sentCOsRes, openInvoicesRes] = await Promise.all([
         // Contacts: stages + amounts + last update for at-risk calc.
         // updated_at falls back to created_at if missing.
         // V3-PARTNERS: dropped the .eq('user_id', user!.id) JS-layer filter
@@ -174,7 +175,7 @@ export default function Home() {
         // on Site / Pipeline Preview. RLS enforces owner+partner access.
         supabase
           .from('fh_contacts')
-          .select('id, name, amount, stage, updated_at, created_at'),
+          .select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status'),
         // Schedule entries that should already have ended → if linked to a
         // job-stage contact, that contact is "behind schedule".
         supabase
@@ -200,7 +201,23 @@ export default function Home() {
           .order('start_at', { ascending: true })
           .limit(6),
         // Cover photos keyed by contact id — same helper Jobs uses.
-        fetchCoverPhotosByJob(user!.id).catch(() => ({}))
+        fetchCoverPhotosByJob(user!.id).catch(() => ({})),
+        // Proposal-link views — powers "they looked, then went quiet".
+        supabase
+          .from('fh_public_links')
+          .select('contact_id, last_viewed_at')
+          .eq('kind', 'proposal')
+          .not('last_viewed_at', 'is', null),
+        // Change orders sitting in 'sent' — signature never came back.
+        supabase
+          .from('fh_change_orders')
+          .select('id, contact_id, sequence_number, title, amount, updated_at')
+          .eq('status', 'sent'),
+        // Issued invoices past their due date and still unpaid.
+        supabase
+          .from('fh_invoices')
+          .select('id, contact_id, title, amount, due_date, status')
+          .in('status', ['sent', 'overdue'])
       ])
 
       if (cancelled) return
@@ -336,9 +353,116 @@ export default function Home() {
           urgency: updated.getTime()
         })
       }
+      // 4. Follow-up date came due (Pipeline v2 follow_up_on). The
+      // operator set this date on purpose — it outranks every heuristic.
+      const todayYmd = nowD.toISOString().slice(0, 10)
+      for (const c of contacts) {
+        if (!c.follow_up_on || c.follow_up_on > todayYmd) continue
+        if (!['lead', 'quote'].includes(c.stage as string)) continue
+        const overdueDays = Math.max(0, Math.round((nowD.getTime() - new Date(c.follow_up_on + 'T12:00:00').getTime()) / 86400000))
+        actions.push({
+          id: `followup-due-${c.id}`,
+          kind: 'followup-due',
+          contactId: c.id,
+          verb: 'Call',
+          contactName: c.name || 'Unnamed lead',
+          contactAmount: Number(c.amount || 0),
+          dueIso: new Date(c.follow_up_on + 'T12:00:00').toISOString(),
+          dueKind: 'overdue',
+          title: `Call ${c.name || 'lead'}`,
+          detail: overdueDays === 0 ? 'Follow-up due today' : `Follow-up ${overdueDays}d overdue`,
+          urgencyLabel: overdueDays === 0 ? 'Due today' : 'Overdue',
+          urgencyTone: overdueDays >= 2 ? 'danger' : 'warn',
+          urgency: 1 + Math.max(0, 5 - overdueDays) // older = closer to top
+        })
+      }
+
+      // 5. Proposal viewed, then silence ≥48h — they engaged; strike
+      // while it's warm-ish.
+      const latestViewByContact = new Map<string, number>()
+      for (const r of (linkViewsRes?.data || []) as any[]) {
+        const t = new Date(r.last_viewed_at).getTime()
+        if (Number.isNaN(t)) continue
+        const prev = latestViewByContact.get(r.contact_id) || 0
+        if (t > prev) latestViewByContact.set(r.contact_id, t)
+      }
+      for (const c of contacts) {
+        if (c.stage !== 'quote') continue
+        if (!['sent', 'viewed'].includes((c.proposal_status || '').toLowerCase())) continue
+        const viewedAt = latestViewByContact.get(c.id)
+        if (!viewedAt) continue
+        const hoursSince = (nowD.getTime() - viewedAt) / 3600000
+        if (hoursSince < 48) continue
+        if (actions.some((a) => a.contactId === c.id)) continue // one row per job
+        actions.push({
+          id: `viewed-quiet-${c.id}`,
+          kind: 'viewed-quiet',
+          contactId: c.id,
+          verb: 'Follow up',
+          contactName: c.name || 'Unnamed lead',
+          contactAmount: Number(c.amount || 0),
+          dueIso: new Date(viewedAt).toISOString(),
+          dueKind: 'waited',
+          title: `They read your quote — follow up`,
+          detail: `${c.name || 'Customer'} viewed it ${Math.round(hoursSince / 24)}d ago, no answer`,
+          urgencyLabel: 'Engaged',
+          urgencyTone: 'warn',
+          urgency: 10 + hoursSince / 24
+        })
+      }
+
+      // 6. Change order sent ≥3d, signature never came back.
+      for (const co of (sentCOsRes?.data || []) as any[]) {
+        const sentAt = new Date(co.updated_at || 0).getTime()
+        const days = (nowD.getTime() - sentAt) / 86400000
+        if (!(days >= 3)) continue
+        const c = contactsById.get(co.contact_id)
+        actions.push({
+          id: `co-unsigned-${co.id}`,
+          kind: 'co-unsigned',
+          contactId: co.contact_id,
+          verb: 'Re-send',
+          contactName: c?.name || 'Job',
+          contactAmount: Math.abs(Number(co.amount || 0)),
+          dueIso: new Date(sentAt).toISOString(),
+          dueKind: 'waited',
+          title: `CO #${co.sequence_number} unsigned`,
+          detail: `Sent ${Math.round(days)}d ago — nudge ${c?.name || 'the customer'}`,
+          urgencyLabel: 'Unsigned',
+          urgencyTone: 'warn',
+          urgency: 100 + days
+        })
+      }
+
+      // 7. Issued invoice past due — the politest money chase there is.
+      for (const inv of (openInvoicesRes?.data || []) as any[]) {
+        if (!inv.due_date) continue
+        const due = new Date(inv.due_date + (inv.due_date.length <= 10 ? 'T12:00:00' : ''))
+        if (Number.isNaN(due.getTime()) || due > nowD) continue
+        const daysLate = Math.round((nowD.getTime() - due.getTime()) / 86400000)
+        const c = contactsById.get(inv.contact_id)
+        actions.push({
+          id: `inv-overdue-${inv.id}`,
+          kind: 'inv-overdue',
+          contactId: inv.contact_id,
+          verb: 'Nudge',
+          contactName: c?.name || 'Job',
+          contactAmount: Number(inv.amount || 0),
+          dueIso: due.toISOString(),
+          dueKind: 'overdue',
+          title: `Invoice ${daysLate}d past due`,
+          detail: `${inv.title || 'Invoice'} · $${Number(inv.amount || 0).toLocaleString()} — ${c?.name || 'customer'}`,
+          urgencyLabel: 'Past due',
+          urgencyTone: 'danger',
+          // More days late = closer to the top; floor keeps it under
+          // the reschedule slot (0) no matter how ancient.
+          urgency: Math.max(1, 100 - daysLate)
+        })
+      }
+
       // Sort: lowest urgency value first (overdue=0 wins, then oldest last-touch)
       actions.sort((a, b) => a.urgency - b.urgency)
-      const topActions = actions.slice(0, 5)
+      const topActions = actions.slice(0, 6)
 
       // Stage breakdown for the Pipeline card footer — 3 chips that
       // partition the funnel and match the Jobs tab filters one-to-one
@@ -1037,7 +1161,7 @@ export default function Home() {
               onClick={() => { hapticTap(); navigate('/jobs') }}
               className="v3-section-link"
               style={{ color: 'var(--v3-text-muted)', transition: 'color 160ms ease' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--v3-primary)' }}
+              onMouseEnter={(e) => { if (canHover) e.currentTarget.style.color = 'var(--v3-primary)' }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--v3-text-muted)' }}
             >
               View all
@@ -1340,6 +1464,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
       }}
       onMouseEnter={(e) => {
+        if (!canHover) return
         // Hover stays neutral — black/charcoal/white. Stage color
         // shows on the spine + label only (functional). No ambient
         // blue/purple bleed onto the card's halo.

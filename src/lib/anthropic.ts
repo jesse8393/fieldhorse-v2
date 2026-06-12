@@ -14,14 +14,14 @@ const REQUEST_TIMEOUT_MS = 15000
 
 type ClaudeMessage = { role: string; content: unknown }
 
-export async function claudeMessage({ system, messages, maxTokens = 1024 }: { system?: string; messages: ClaudeMessage[]; maxTokens?: number }) {
+export async function claudeMessage({ system, messages, maxTokens = 1024, model }: { system?: string; messages: ClaudeMessage[]; maxTokens?: number; model?: string }) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens }),
+      body: JSON.stringify({ model: model || MODEL, system, messages, max_tokens: maxTokens }),
       signal: controller.signal
     })
     if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)

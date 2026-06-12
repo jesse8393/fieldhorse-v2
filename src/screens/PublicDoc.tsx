@@ -89,8 +89,153 @@ export default function PublicDoc() {
         </>
       )}
       {!loading && data && data.kind === 'invoice'  && <InvoiceView  data={data} />}
+      {!loading && data && data.kind === 'change_order' && (
+        <ChangeOrderView data={data} token={token} onApproved={load} />
+      )}
     </div>
   )
+}
+
+/* Customer-facing change-order page: contractor letterhead feel, the
+   one CO this link points at, contract before/after, and the same
+   typed-signature approval bar proposals use. */
+function ChangeOrderView({ data, token, onApproved }: any) {
+  const { contact, company, changeOrders } = data
+  const co = (changeOrders || []).find((c: any) => c.id === data.change_order_id)
+  if (!co) return <ErrorState message="This change order is no longer available." />
+
+  const priorApproved = (changeOrders || [])
+    .filter((c: any) => c.status === 'approved' && c.id !== co.id)
+    .reduce((s: number, c: any) => s + Number(c.amount || 0), 0)
+  const contractBefore = Number(contact?.amount || 0) + priorApproved
+  const delta = Number(co.amount || 0)
+  const contractAfter = contractBefore + delta
+  const isCredit = delta < 0
+  const approved = co.status === 'approved'
+
+  return (
+    <>
+      <div style={{
+        maxWidth: 760, margin: '0 auto',
+        padding: '32px 28px 28px',
+        borderRadius: 6, background: 'white',
+        boxShadow: '0 24px 64px -32px rgba(31, 30, 28, 0.3)',
+        fontFamily: "'DM Sans', system-ui, sans-serif", color: '#1A1814'
+      }}>
+        {/* Letterhead */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, paddingBottom: 18, borderBottom: '2px solid #1A1814' }}>
+          <div style={{ minWidth: 0 }}>
+            {company?.logo_url && (
+              <img src={company.logo_url} alt="" style={{ height: 34, marginBottom: 8, display: 'block' }} />
+            )}
+            <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, letterSpacing: '0.02em' }}>
+              {company?.name || 'Contractor'}
+            </div>
+            {(company?.phone || company?.email) && (
+              <div style={{ fontSize: 11, color: '#6B6A66', marginTop: 2 }}>
+                {[company.phone, company.email].filter(Boolean).join(' · ')}
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A154' }}>
+              Change order
+            </div>
+            <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 28, fontWeight: 600 }}>
+              #{co.sequence_number}
+            </div>
+          </div>
+        </div>
+
+        {/* Project + change */}
+        <div style={{ padding: '18px 0 4px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6A66' }}>
+            Project
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginTop: 3 }}>
+            {contact?.job_title || contact?.name || 'Construction services'}
+          </div>
+          {contact?.address && (
+            <div style={{ fontSize: 12, color: '#6B6A66', marginTop: 2 }}>{contact.address}</div>
+          )}
+
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6A66', marginTop: 18 }}>
+            Change in scope
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginTop: 3 }}>{co.title}</div>
+          {co.description && (
+            <p style={{ margin: '8px 0 0', fontSize: 13.5, lineHeight: 1.6, color: '#3A3833', whiteSpace: 'pre-wrap' }}>
+              {co.description}
+            </p>
+          )}
+        </div>
+
+        {/* Money table */}
+        <div style={{ marginTop: 20, borderTop: '1px solid #e8e2d4' }}>
+          <MoneyRow label="Contract before this change" value={moneyFmt(contractBefore)} />
+          <MoneyRow
+            label={isCredit ? 'This change (credit)' : 'This change'}
+            value={`${isCredit ? '−' : '+'}${moneyFmt(Math.abs(delta))}`}
+            accent={isCredit ? '#48825F' : '#C8A154'}
+          />
+          <MoneyRow label="Contract after approval" value={moneyFmt(contractAfter)} strong />
+        </div>
+      </div>
+
+      {!approved && (
+        <ApproveProposalBar
+          token={token}
+          variant="change_order"
+          companyName={company?.name || ''}
+          contactName={contact?.name || ''}
+          contractTotal={contractAfter}
+          initialName={contact?.name || ''}
+          onApproved={onApproved}
+        />
+      )}
+      {approved && (
+        <div style={{
+          maxWidth: 760, margin: '24px auto 0', padding: '20px 24px',
+          borderRadius: 6, background: 'rgba(72, 130, 95, 0.10)',
+          border: '1px solid rgba(72, 130, 95, 0.40)',
+          fontFamily: "'DM Sans', system-ui, sans-serif", color: '#1A1814', textAlign: 'center'
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#48825F', marginBottom: 6 }}>
+            Change order approved
+          </div>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5 }}>
+            Signed{co.approved_by_name ? ` by ${co.approved_by_name}` : ''}{co.approved_at ? ` on ${new Date(co.approved_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}` : ''}. {company?.name || 'The contractor'} has been notified.
+          </p>
+        </div>
+      )}
+    </>
+  )
+}
+
+function MoneyRow({ label, value, strong, accent }: any) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
+      padding: '10px 0', borderBottom: '1px solid #f0ece2'
+    }}>
+      <span style={{ fontSize: strong ? 13 : 12.5, fontWeight: strong ? 700 : 500, color: strong ? '#1A1814' : '#6B6A66' }}>
+        {label}
+      </span>
+      <span style={{
+        fontFamily: "'Cormorant Garamond', Georgia, serif",
+        fontSize: strong ? 22 : 17, fontWeight: 600,
+        color: accent || '#1A1814'
+      }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function moneyFmt(n: any) {
+  return Number(n || 0).toLocaleString(undefined, {
+    style: 'currency', currency: 'USD', maximumFractionDigits: 0
+  })
 }
 
 function ApprovedNote({ companyName }: any) {

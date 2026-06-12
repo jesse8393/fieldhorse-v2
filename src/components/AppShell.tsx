@@ -9,10 +9,13 @@ import BottomNav from './BottomNav.tsx'
 const DesktopSidebar = lazy(() => import('./DesktopSidebar.tsx'))
 import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.tsx'
+import CaptureFab from './CaptureFab.tsx'
+import CaptureSheet from './CaptureSheet.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
 import Toaster from './Toaster.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { startOutboxSync } from '../lib/outbox.ts'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
@@ -122,6 +125,10 @@ export default function AppShell() {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [location.pathname])
 
+  // Offline outbox: drain queued writes on app start, on regaining
+  // network, and whenever the tab becomes visible. See lib/outbox.ts.
+  useEffect(() => startOutboxSync(), [])
+
   // Global navigation event so chrome buttons inside Build components
   // (bell, footer links, etc.) can navigate without each component
   // pulling in react-router. Dispatch from anywhere via:
@@ -197,6 +204,11 @@ export default function AppShell() {
       </main>
 
       <BottomNav />
+      {/* Universal Capture — the global "say it / type it / snap it"
+          entry point. FAB opens the sheet; the sheet also answers
+          Cmd/Ctrl+J and the `fh:open-capture` event. */}
+      <CaptureFab />
+      <CaptureSheet />
       <CommandPalette />
       <MobileSearchOverlay />
       <InstallPrompt />

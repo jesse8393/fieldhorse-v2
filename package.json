@@ -29,7 +29,9 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/postcss": "^4.1.18",
+    "@tanstack/query-sync-storage-persister": "^5.101.0",
     "@tanstack/react-query": "^5.100.11",
+    "@tanstack/react-query-persist-client": "^5.101.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -47,7 +49,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.18",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",
@@ -56,6 +59,7 @@
     "eslint": "^9.12.0",
     "eslint-plugin-react": "^7.37.1",
     "eslint-plugin-react-hooks": "^5.0.0",
+    "postcss-hover-media-feature": "^1.0.2",
     "sharp": "^0.34.5",
     "typescript": "^5.9.3",
     "vite": "^5.4.8",

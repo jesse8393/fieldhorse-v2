@@ -4,7 +4,9 @@ import { Receipt, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Check, X as XIco
 import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { canHover } from '../../../lib/hover.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { loadUserRateCard } from '../../../lib/rateCard.ts'
 
 /**
  * Quote items section — fh_quote_items CRUD editor.
@@ -24,6 +26,98 @@ import { SkeletonList } from '../../../components/Skeleton.tsx'
  */
 
 const SECTION_SUGGESTIONS = ['Labor', 'Materials', 'Subs', 'Equipment', 'Other']
+
+/* ============================================================
+   Line-item autocomplete — kills the typing on the highest-
+   frequency action in the app. Two sources, merged:
+     • history — the operator's own past fh_quote_items, ranked by
+       how often a description recurs (most-used first), carrying
+       the most recent unit + rate for each
+     • rates   — the Settings rate card (defaults + overrides),
+       priced at the midpoint of the low/high band
+   ============================================================ */
+export type ItemSuggestion = {
+  description: string
+  unit: string | null
+  rate: number
+  uses: number
+  source: 'history' | 'rates'
+}
+
+function useItemSuggestions(userId: any): ItemSuggestion[] {
+  const [suggestions, setSuggestions] = useState<ItemSuggestion[]>([])
+  useEffect(() => {
+    let alive = true
+    if (!userId) { setSuggestions([]); return }
+    ;(async () => {
+      const out: ItemSuggestion[] = []
+      // History — newest first so the first row seen per description
+      // carries the operator's latest pricing.
+      const { data } = await supabase
+        .from('fh_quote_items')
+        .select('description, unit, rate')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(500)
+      const byDesc = new Map<string, ItemSuggestion>()
+      for (const r of (data || []) as any[]) {
+        const desc = (r.description || '').trim()
+        if (!desc) continue
+        const key = desc.toLowerCase()
+        const hit = byDesc.get(key)
+        if (hit) hit.uses += 1
+        else byDesc.set(key, {
+          description: desc,
+          unit: r.unit || null,
+          rate: Number(r.rate) || 0,
+          uses: 1,
+          source: 'history'
+        })
+      }
+      out.push(...byDesc.values())
+      // Rate card — Settings trades priced at the band midpoint.
+      try {
+        const { merged } = await loadUserRateCard(userId)
+        for (const entry of Object.values(merged)) {
+          const low = Number(entry.low) || 0
+          const high = Number(entry.high) || low
+          const label = (entry as any).label || ''
+          if (!label) continue
+          if (byDesc.has(label.toLowerCase())) continue
+          out.push({
+            description: label,
+            unit: entry.unit || null,
+            rate: +(((low + high) / 2) || 0).toFixed(2),
+            uses: 0,
+            source: 'rates'
+          })
+        }
+      } catch { /* rate card optional */ }
+      if (alive) setSuggestions(out)
+    })()
+    return () => { alive = false }
+  }, [userId])
+  return suggestions
+}
+
+/** Top matches for the current input. Empty input → most-used history. */
+function matchSuggestions(all: ItemSuggestion[], input: string): ItemSuggestion[] {
+  const q = (input || '').trim().toLowerCase()
+  if (!q) {
+    return all.filter((s) => s.source === 'history').sort((a, b) => b.uses - a.uses).slice(0, 6)
+  }
+  const starts: ItemSuggestion[] = []
+  const contains: ItemSuggestion[] = []
+  for (const s of all) {
+    const d = s.description.toLowerCase()
+    if (d === q) continue // already typed exactly — no popup noise
+    if (d.startsWith(q)) starts.push(s)
+    else if (d.includes(q)) contains.push(s)
+  }
+  starts.sort((a, b) => b.uses - a.uses)
+  contains.sort((a, b) => b.uses - a.uses)
+  return [...starts, ...contains].slice(0, 6)
+}
 
 // Mobile keyboard fix — when an input gains focus, the soft keyboard
 // commonly covers the active field on phones. Defer the scroll until
@@ -121,6 +215,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   const [loading, setLoading] = useState(true)
 
   const [draft, setDraft] = useState(emptyDraft)
+  const suggestions = useItemSuggestions(userId)
   const [adding, setAdding] = useState(false)
 
   const [editingId, setEditingId] = useState<any>(null)
@@ -298,6 +393,25 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     return 'base'
   }
 
+  // Apply a picked suggestion: description + unit + rate land together,
+  // amount recomputes from the current qty, and amountOverridden resets
+  // so subsequent qty tweaks keep auto-calculating.
+  function applySuggestion(setter: any, s: ItemSuggestion) {
+    hapticTap()
+    setter((d: any) => {
+      const qty = Number(d.qty)
+      const amount = Number.isFinite(qty) ? +(qty * s.rate).toFixed(2) : s.rate
+      return {
+        ...d,
+        description: s.description,
+        unit: s.unit || d.unit,
+        rate: String(s.rate),
+        amount: String(amount),
+        amountOverridden: false
+      }
+    })
+  }
+
   async function handleAdd() {
     if (adding) return
     const err = validateDraft(draft)
@@ -419,6 +533,8 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         onPrimary={handleAdd}
         primaryDisabled={!draft.description.trim() || adding}
         showCancel={false}
+        suggestions={suggestions}
+        onPickSuggestion={(s: ItemSuggestion) => applySuggestion(setDraft, s)}
       />
 
       {/* Items list */}
@@ -459,6 +575,8 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
                   primaryDisabled={!editDraft.description.trim() || editing}
                   showCancel
                   onCancel={cancelEdit}
+                  suggestions={suggestions}
+                  onPickSuggestion={(s: ItemSuggestion) => applySuggestion(setEditDraft, s)}
                 />
               </motion.li>
             ) : (
@@ -603,7 +721,7 @@ function RowActionButton({ children, ariaLabel, onClick, disabled, tone }: any) 
       onClick={onClick}
       disabled={disabled}
       onMouseEnter={(e) => {
-        if (disabled) return
+        if (disabled || !canHover) return
         e.currentTarget.style.color = tone === 'danger'
           ? 'var(--v3-danger-bright)'
           : 'var(--v3-text)'
@@ -656,7 +774,13 @@ function StatusChip({ label, tone }: any) {
 /* ============================================================
    DraftCard — shared form layout for both Add and Edit.
    ============================================================ */
-function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel }: any) {
+function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel, suggestions = [], onPickSuggestion }: any) {
+  // Suggestion popup state. Closes on blur (after a beat so a tap on a
+  // row lands first) and on pick.
+  const [descFocused, setDescFocused] = useState(false)
+  const matches = descFocused && onPickSuggestion
+    ? matchSuggestions(suggestions, draft.description)
+    : []
   return (
     <div style={{
       padding: '14px 16px',
@@ -671,16 +795,66 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
         {eyebrow}
       </span>
 
-      {/* Description (full width) */}
+      {/* Description (full width) — with rate-card / history autocomplete */}
       <FormField label="Description" required>
-        <input
-          type="text"
-          value={draft.description}
-          onChange={(e) => onChange('description', e.target.value)}
-          onFocus={scrollIntoCenterOnFocus}
-          placeholder="What's this line for?"
-          style={inputStyle}
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text"
+            value={draft.description}
+            onChange={(e) => onChange('description', e.target.value)}
+            onFocus={(e) => { setDescFocused(true); scrollIntoCenterOnFocus(e) }}
+            onBlur={() => setTimeout(() => setDescFocused(false), 180)}
+            placeholder="What's this line for?"
+            style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+          />
+          {matches.length > 0 && (
+            <div style={{
+              position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)',
+              zIndex: 30,
+              borderRadius: 12,
+              background: 'var(--v3-surface-3)',
+              border: '1px solid var(--v3-border-strong)',
+              boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
+              overflow: 'hidden'
+            }}>
+              {matches.map((s: ItemSuggestion) => (
+                <button
+                  key={`${s.source}-${s.description}`}
+                  type="button"
+                  // mousedown beats the input's blur, so the pick lands
+                  // before the popup unmounts.
+                  onMouseDown={(ev) => { ev.preventDefault(); onPickSuggestion(s); setDescFocused(false) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    width: '100%', padding: '10px 12px',
+                    background: 'transparent', border: 'none',
+                    borderBottom: '1px solid var(--v3-border)',
+                    color: 'var(--v3-text)', textAlign: 'left',
+                    fontFamily: 'var(--font-body)', fontSize: 13,
+                    cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {s.description}
+                  </span>
+                  <span style={{ flexShrink: 0, fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                    {money(s.rate)}{s.unit ? `/${s.unit}` : ''}
+                  </span>
+                  <span style={{
+                    flexShrink: 0, fontSize: 9, letterSpacing: '0.08em',
+                    padding: '2px 6px', borderRadius: 999,
+                    fontFamily: 'var(--font-display)',
+                    background: s.source === 'rates' ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
+                    border: '1px solid var(--v3-border)',
+                    color: s.source === 'rates' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                  }}>
+                    {s.source === 'rates' ? 'RATE CARD' : `×${s.uses}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </FormField>
 
       {/* Numeric row — section / qty / unit / rate / amount. Wraps on narrow viewports. */}

@@ -35,6 +35,7 @@
  */
 import { useState } from 'react'
 import type { ButtonHTMLAttributes } from 'react'
+import { canHover } from '../../lib/hover.ts'
 
 type IconBtnVariant = 'default' | 'primary' | 'ghost' | 'danger'
 type IconBtnSize = 'sm' | 'md' | 'lg'
@@ -110,7 +111,7 @@ export default function IconButton({
       aria-label={ariaLabel}
       title={title || ariaLabel}
       disabled={disabled}
-      onMouseEnter={() => setHover(true)}
+      onMouseEnter={() => canHover && setHover(true)}
       onMouseLeave={() => setHover(false)}
       className={className}
       style={{

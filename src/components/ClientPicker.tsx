@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, UserPlus, Check, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
+import { canHover } from '../lib/hover.ts'
 
 /**
  * ClientPicker — inline autocomplete + inline-create, built on the
@@ -166,7 +167,7 @@ export default function ClientPicker({ userId, value, onChange }: any) {
               }}
               onClick={(ev) => { ev.preventDefault(); ev.stopPropagation() }}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 10px', background: 'transparent', border: 'none', borderRadius: 8, color: 'var(--ink-strong)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)', touchAction: 'manipulation' }}
-              onMouseEnter={(ev) => { ev.currentTarget.style.background = 'rgba(201,150,58,0.1)' }}
+              onMouseEnter={(ev) => { if (canHover) ev.currentTarget.style.background = 'rgba(201,150,58,0.1)' }}
               onMouseLeave={(ev) => { ev.currentTarget.style.background = 'transparent' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>

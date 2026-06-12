@@ -172,3 +172,91 @@ export function avgMargin(jobs: JobRow[] | null | undefined) {
   }, 0)
   return sum / won.length
 }
+
+// ---------------------------------------------------------------------
+// Sales funnel over a trailing window, computed from the stage-
+// transition audit log (migration 023) + contact created_at dates.
+// Counts are distinct contacts, not transition rows, so a lead bounced
+// back and re-quoted only counts once.
+export type FunnelStats = {
+  newLeads: number          // contacts created in the window
+  quoted: number            // distinct contacts that hit 'quote'
+  won: number               // distinct contacts that hit 'job' (won)
+  lost: number              // distinct contacts that hit 'lost'
+  quoteRate: number         // quoted / newLeads, 0..1
+  winRate: number           // won / (won + lost), 0..1
+  avgDaysToDecision: number // first 'quote' → first 'job'/'lost', days
+}
+
+type TransitionRow = {
+  contact_id: string
+  to_stage: string
+  transitioned_at: string
+}
+
+export function computeFunnel(
+  transitions: TransitionRow[] | null | undefined,
+  contacts: Record<string, unknown>[] | null | undefined,
+  windowDays = 90,
+  now = new Date()
+): FunnelStats {
+  const cutoff = new Date(now.getTime() - windowDays * 86400000)
+
+  const newLeads = (contacts || []).filter((c) => {
+    const created = new Date(String(c.created_at || ''))
+    return !Number.isNaN(created.getTime()) && created >= cutoff
+  }).length
+
+  const quotedSet = new Set<string>()
+  const wonSet = new Set<string>()
+  const lostSet = new Set<string>()
+  // Per contact: first quote time + first decision (won/lost) AFTER it.
+  const firstQuote = new Map<string, number>()
+  const firstDecisionAfterQuote = new Map<string, number>()
+
+  for (const t of transitions || []) {
+    const at = new Date(t.transitioned_at)
+    if (Number.isNaN(at.getTime())) continue
+    const inWindow = at >= cutoff
+    if (t.to_stage === 'quote') {
+      if (inWindow) quotedSet.add(t.contact_id)
+      if (!firstQuote.has(t.contact_id)) firstQuote.set(t.contact_id, at.getTime())
+    } else if (t.to_stage === 'job') {
+      if (inWindow) wonSet.add(t.contact_id)
+      noteDecision(t.contact_id, at.getTime())
+    } else if (t.to_stage === 'lost') {
+      if (inWindow) lostSet.add(t.contact_id)
+      noteDecision(t.contact_id, at.getTime())
+    }
+  }
+
+  function noteDecision(id: string, time: number) {
+    const q = firstQuote.get(id)
+    if (q == null || time < q) return
+    if (!firstDecisionAfterQuote.has(id)) firstDecisionAfterQuote.set(id, time)
+  }
+
+  let daysSum = 0
+  let daysN = 0
+  for (const [id, decidedAt] of firstDecisionAfterQuote) {
+    const q = firstQuote.get(id)
+    if (q == null) continue
+    // Only average decisions inside the window so ancient history
+    // doesn't skew "how fast do customers answer me lately".
+    if (decidedAt < cutoff.getTime()) continue
+    daysSum += (decidedAt - q) / 86400000
+    daysN += 1
+  }
+
+  const won = wonSet.size
+  const lost = lostSet.size
+  return {
+    newLeads,
+    quoted: quotedSet.size,
+    won,
+    lost,
+    quoteRate: newLeads === 0 ? 0 : Math.min(1, quotedSet.size / newLeads),
+    winRate: won + lost === 0 ? 0 : won / (won + lost),
+    avgDaysToDecision: daysN === 0 ? 0 : daysSum / daysN
+  }
+}

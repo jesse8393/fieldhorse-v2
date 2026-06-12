@@ -13,8 +13,9 @@
 // captures + manages the data.
 
 import { useState } from 'react'
-import { Plus, FileEdit, Check, X, Trash2, FileText } from 'lucide-react'
+import { Plus, FileEdit, Check, X, Trash2, FileText, Share2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
+import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 
 function money(n: any) {
@@ -127,6 +128,44 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
     })
   }
 
+  // Mint a public sign-off link for this CO, flip it to 'sent', and
+  // hand the link to the share sheet (SMS is the field default) with
+  // clipboard fallback. The customer signs by typed name; approval
+  // lands back here via realtime/refresh and folds into the next
+  // invoice through contractTotals().
+  async function handleGetSignature(co: any) {
+    try {
+      const link = await mintPublicLink({
+        contactId: contact?.id || co.contact_id,
+        userId,
+        kind: 'change_order',
+        changeOrderId: co.id
+      })
+      if (co.status === 'draft') {
+        await supabase
+          .from('fh_change_orders')
+          .update({ status: 'sent' })
+          .eq('id', co.id)
+          .eq('user_id', userId)
+        onChange?.()
+      }
+      const sign = Number(co.amount) >= 0 ? '+' : '−'
+      const shareText = `Change order #${co.sequence_number} — ${co.title} (${sign}${money(Math.abs(Number(co.amount) || 0))}). Review and sign here: ${link.url}`
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: `Change order #${co.sequence_number}`, text: shareText })
+          return
+        } catch (ex: any) {
+          if (ex?.name === 'AbortError') return // user closed the sheet
+        }
+      }
+      await navigator.clipboard.writeText(link.url)
+      toastSuccess('Sign-off link copied', 'Text it to the customer — they sign right on the page')
+    } catch (e: any) {
+      toastError("Couldn't create sign-off link", e?.message || 'Try again.')
+    }
+  }
+
   async function handleVoid(co: any) {
     if (!window.confirm(`Void CO #${co.sequence_number}? It will stop counting toward the contract total.`)) return
     await handleSave({ ...co, status: 'void' })
@@ -169,6 +208,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         onCancelEdit={() => setEditingId(null)}
         onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setEditingId(null) }}
         onApprove={handleApprove}
+        onGetSignature={handleGetSignature}
         onVoid={handleVoid}
         onDelete={handleDelete}
       />
@@ -235,7 +275,7 @@ function SectionHeader({ count, canAdd, onAdd }: any) {
   )
 }
 
-function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave, onApprove, onVoid, onDelete }: any) {
+function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave, onApprove, onGetSignature, onVoid, onDelete }: any) {
   if (!changeOrders.length) {
     return (
       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--v3-text-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
@@ -260,6 +300,7 @@ function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave,
               readOnly={readOnly}
               onEdit={() => onEdit?.(co.id)}
               onApprove={() => onApprove?.(co)}
+              onGetSignature={() => onGetSignature?.(co)}
               onVoid={() => onVoid?.(co)}
               onDelete={() => onDelete?.(co)}
             />
@@ -270,7 +311,7 @@ function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave,
   )
 }
 
-function Row({ co, readOnly, onEdit, onApprove, onVoid, onDelete }: any) {
+function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete }: any) {
   const isApproved = co.status === 'approved'
   const isVoid = co.status === 'void'
   const isDraft = co.status === 'draft'
@@ -320,7 +361,12 @@ function Row({ co, readOnly, onEdit, onApprove, onVoid, onDelete }: any) {
         {!readOnly && (
           <div style={{ display: 'flex', gap: 4 }}>
             {!isApproved && !isVoid && (
-              <IconBtn onClick={onApprove} aria-label="Approve change order" title="Approve">
+              <IconBtn onClick={onGetSignature} aria-label="Send for signature" title="Get signature">
+                <Share2 size={12} aria-hidden="true" />
+              </IconBtn>
+            )}
+            {!isApproved && !isVoid && (
+              <IconBtn onClick={onApprove} aria-label="Approve change order" title="Mark approved (verbal)">
                 <Check size={12} aria-hidden="true" />
               </IconBtn>
             )}

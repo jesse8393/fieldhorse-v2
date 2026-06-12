@@ -7,6 +7,9 @@
 //   SUPABASE_URL       (e.g. https://pnmhblvslftdzfcdezbw.supabase.co)
 //   SUPABASE_SERVICE_ROLE_KEY  (service-role, server-only)
 
+import { createClient } from '@supabase/supabase-js'
+import { sendPushToUser } from './lib/push.js'
+
 const REQUIRED_FIELDS = ['name']
 
 export default async (request) => {
@@ -96,7 +99,32 @@ export default async (request) => {
     return json({ error: 'insert_failed', detail: msg }, 502)
   }
   const inserted = await insertRes.json()
-  return json({ ok: true, id: inserted[0]?.id, stage: 'lead' }, 200)
+  const newId = inserted[0]?.id
+
+  // Bell + lock screen: a new lead is the most time-sensitive event in
+  // the app — speed-to-call decides whether it converts. Best effort.
+  try {
+    const supabase = createClient(supaUrl, supaKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+    await supabase.from('fh_notifications').insert({
+      user_id: userId,
+      kind: 'new_lead',
+      title: `New lead · ${row.name}`,
+      body: [row.job_title, row.phone].filter(Boolean).join(' · ') || 'Tap to view',
+      link: newId ? `/jobs/${newId}` : '/leads'
+    })
+    await sendPushToUser(supabase, userId, {
+      title: `New lead · ${row.name}`,
+      body: [row.job_title, row.phone].filter(Boolean).join(' · ') || 'Tap to view',
+      link: newId ? `/jobs/${newId}` : '/leads',
+      tag: `new-lead-${newId || row.name}`
+    })
+  } catch (e) {
+    console.warn('[webhook-lead] notify failed', e)
+  }
+
+  return json({ ok: true, id: newId, stage: 'lead' }, 200)
 }
 
 function corsHeaders() {
