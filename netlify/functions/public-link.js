@@ -22,6 +22,7 @@
 // policy enforced across send-quote / send-invoice / send-message.
 
 import { createClient } from '@supabase/supabase-js'
+import { sendPushToUser } from './lib/push.js'
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -168,6 +169,14 @@ export default async function handler(req) {
       body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
       link: `/jobs/${link.contact_id}`
     }).then(() => {}, () => {})
+    // Lock screen too — "they're looking at it right now" is the best
+    // possible moment to call. Same debounce as the bell row.
+    sendPushToUser(supabase, link.user_id, {
+      title: `Customer is viewing your ${kindLabel} 👀`,
+      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : 'Tap to open the job',
+      link: `/jobs/${link.contact_id}`,
+      tag: `link-viewed-${link.id}`
+    })
   }
 
   return json({

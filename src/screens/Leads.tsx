@@ -16,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, Phone as PhoneIcon, MessageSquare as MsgIcon,
-  Sparkles, CalendarClock, FileText, Trophy, XCircle, MoreHorizontal
+  Sparkles, CalendarClock, FileText, Trophy, XCircle, MoreHorizontal, Eye
 } from 'lucide-react'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
@@ -71,6 +71,26 @@ function followUpMeta(c: any): { label: string; tone: 'danger' | 'warn' | 'muted
   return { label: `Follow up ${due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, tone: 'muted' }
 }
 
+// "They saw it" intel for quote-sent leads, derived from the public
+// proposal link's view tracking. Two days of silence after a view is
+// the follow-up trigger — engaged-then-quiet is the hottest call to make.
+function viewedMeta(intel: { viewed_at: string | null } | undefined, statusId: string):
+  { label: string; tone: 'warn' | 'muted' } | null {
+  if (statusId !== 'sent') return null
+  if (!intel) return null
+  if (!intel.viewed_at) return { label: 'Not viewed yet', tone: 'muted' }
+  const viewed = new Date(intel.viewed_at)
+  if (Number.isNaN(viewed.getTime())) return null
+  const mins = Math.max(0, Math.round((Date.now() - viewed.getTime()) / 60000))
+  const ago = mins < 60
+    ? `${mins || 1}m ago`
+    : mins < 60 * 24
+      ? `${Math.round(mins / 60)}h ago`
+      : `${Math.round(mins / (60 * 24))}d ago`
+  if (mins >= 60 * 48) return { label: `Viewed ${ago} — follow up`, tone: 'warn' }
+  return { label: `Viewed ${ago}`, tone: 'muted' }
+}
+
 const TABS = [
   { id: 'open',   label: 'Open',       match: (c: any) => LEAD_STAGES.includes(c.stage) },
   { id: 'new',    label: 'New',        match: (c: any) => c.stage === 'lead' },
@@ -90,6 +110,31 @@ export default function Leads() {
   const [addOpen, setAddOpen] = useState(false)
   const [justAddedId, setJustAddedId] = useState<any>(null)
   const [busyId, setBusyId] = useState<any>(null)
+
+  // Proposal-link view intel, keyed by contact. Owner-only via RLS.
+  const [viewIntel, setViewIntel] = useState<Record<string, { viewed_at: string | null }>>({})
+  useEffect(() => {
+    if (!user?.id) return
+    let alive = true
+    ;(async () => {
+      const { data } = await supabase
+        .from('fh_public_links')
+        .select('contact_id, last_viewed_at')
+        .eq('kind', 'proposal')
+      if (!alive || !data) return
+      const map: Record<string, { viewed_at: string | null }> = {}
+      for (const r of data as any[]) {
+        if (!r.contact_id) continue
+        const prev = map[r.contact_id]?.viewed_at
+        // Keep the most recent view across multiple links per contact.
+        if (!prev || (r.last_viewed_at && r.last_viewed_at > prev)) {
+          map[r.contact_id] = { viewed_at: r.last_viewed_at || prev || null }
+        }
+      }
+      setViewIntel(map)
+    })()
+    return () => { alive = false }
+  }, [user?.id, contacts.length])
 
   // ?new=1 deep link (Command palette / Home quick action).
   useEffect(() => {
@@ -344,6 +389,7 @@ export default function Leads() {
                 onLost={() => onLost(c)}
                 onReopen={() => onReopen(c)}
                 onFollowUp={(days: number | null) => setFollowUp(c, days)}
+                viewIntel={viewIntel[c.id]}
               />
             ))}
           </AnimatePresence>
@@ -383,8 +429,9 @@ export default function Leads() {
    follow-up, with the three moves that matter (Quote / Won / Lost)
    right on the card. Swipe for call/text.
    ============================================================ */
-function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onReopen, onFollowUp }: any) {
+function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onReopen, onFollowUp, viewIntel }: any) {
   const status = leadStatus(c)
+  const viewed = viewedMeta(viewIntel, status.id)
   const follow = followUpMeta(c)
   const phone = c.phone || c.fh_clients?.phone || ''
   const est = money(c.amount)
@@ -482,6 +529,28 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
             </span>
           </div>
         </button>
+
+        {/* Viewed-intel chip — only on quote-sent leads */}
+        {viewed && !isLost && (
+          <div>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '3px 9px', borderRadius: 999,
+              background: viewed.tone === 'warn'
+                ? 'var(--v3-primary-soft, rgba(228,190,111,0.12))'
+                : 'var(--v3-surface-2)',
+              border: viewed.tone === 'warn'
+                ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
+                : '1px solid var(--v3-border)',
+              color: viewed.tone === 'warn' ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.4
+            }}>
+              <Eye size={10} aria-hidden="true" />
+              {viewed.label}
+            </span>
+          </div>
+        )}
 
         {/* Follow-up chip */}
         {follow && !isLost && (
