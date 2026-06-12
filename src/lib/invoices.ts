@@ -64,7 +64,7 @@ export async function fetchInvoicesForContact(contactId: string) {
   return { data: (data || []) as InvoiceRow[], error }
 }
 
-export async function createInvoice({ contact, userId, title, amount, status = 'draft', due_at = null, notes = null }: {
+export async function createInvoice({ contact, userId, title, amount, status = 'draft', due_at = null, notes = null, description = null }: {
   contact: Pick<Contact, 'id'>
   userId: string
   title: string
@@ -72,6 +72,7 @@ export async function createInvoice({ contact, userId, title, amount, status = '
   status?: InvoiceStatus
   due_at?: string | null
   notes?: string | null
+  description?: string | null
 }) {
   const { data, error } = await supabase
     .from('fh_invoices')
@@ -83,8 +84,9 @@ export async function createInvoice({ contact, userId, title, amount, status = '
       amount: Number(amount) || 0,
       status,
       due_at,
-      notes: notes?.trim() || null
-    })
+      notes: notes?.trim() || null,
+      description: description?.trim() || null
+    } as any)
     .select('*')
     .single()
   return { data: data as InvoiceRow | null, error }
@@ -114,6 +116,12 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
 }) {
   const { contractTotal, paid } = contractTotals({ contact, payments, changeOrders })
   const title = invoice.title?.trim() || `Invoice #${invoice.sequence_number}`
+  // Customer-facing "what is this for". Falls back to the job's
+  // title + property address so repeat clients with several
+  // properties can always tell which one the bill covers.
+  const description = (invoice as any).description?.trim()
+    || [contact.job_title, contact.address].filter(Boolean).join(' — ')
+    || 'Construction services'
   return generateInvoice({
     company,
     contact: {
@@ -124,7 +132,7 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
       email: contact.email,
       job_title: `${title} — ${contact.job_title || 'Construction services'}`
     },
-    lineItems: [{ description: title, qty: 1, rate: invoice.amount, amount: invoice.amount }],
+    lineItems: [{ description, qty: 1, rate: invoice.amount, amount: invoice.amount }],
     notes: invoice.notes || '',
     dueDate: invoice.due_at
       ? new Date(invoice.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
