@@ -182,6 +182,9 @@ export default async function handler(req) {
   return json({
     ok: true,
     kind: link.kind,
+    // change_order links point at one specific CO; the client picks it
+    // out of the changeOrders array below.
+    change_order_id: link.change_order_id || null,
     contact: {
       id: contact.id,
       name: contact.name,

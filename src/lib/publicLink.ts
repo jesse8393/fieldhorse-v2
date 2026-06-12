@@ -21,20 +21,22 @@ function randomToken() {
   return out
 }
 
-export type PublicLinkKind = 'proposal' | 'invoice'
+export type PublicLinkKind = 'proposal' | 'invoice' | 'change_order'
 
 /**
  * Create a new public link for the given contact. Returns the full
  * row including the token + the public URL ready to share.
  */
-export async function mintPublicLink({ contactId, userId, kind, expiresAt = null }: {
+export async function mintPublicLink({ contactId, userId, kind, expiresAt = null, changeOrderId = null }: {
   contactId: string | undefined
   userId: string | undefined
   kind: PublicLinkKind
   expiresAt?: Date | null
+  changeOrderId?: string | null
 }) {
   if (!contactId || !userId || !kind) throw new Error('contactId, userId, kind required')
-  if (kind !== 'proposal' && kind !== 'invoice') throw new Error(`unknown kind: ${kind}`)
+  if (kind !== 'proposal' && kind !== 'invoice' && kind !== 'change_order') throw new Error(`unknown kind: ${kind}`)
+  if (kind === 'change_order' && !changeOrderId) throw new Error('changeOrderId required for change_order links')
   const token = randomToken()
   const { data, error } = await supabase
     .from('fh_public_links')
@@ -43,8 +45,9 @@ export async function mintPublicLink({ contactId, userId, kind, expiresAt = null
       contact_id: contactId,
       kind,
       token,
-      expires_at: expiresAt ? expiresAt.toISOString() : null
-    })
+      expires_at: expiresAt ? expiresAt.toISOString() : null,
+      change_order_id: changeOrderId
+    } as any)
     .select('*')
     .single()
   if (error) throw error

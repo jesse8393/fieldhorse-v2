@@ -16,8 +16,14 @@ export default function ApproveProposalBar({
   contactName,
   contractTotal,
   initialName = '',
-  onApproved
+  onApproved,
+  // 'proposal' (default) or 'change_order' — switches the endpoint and
+  // the customer-facing copy; the signature mechanics are identical.
+  variant = 'proposal'
 }: any) {
+  const isCO = variant === 'change_order'
+  const endpoint = isCO ? '/api/public-co-approve' : '/api/public-link-approve'
+  const docLabel = isCO ? 'change order' : 'proposal'
   const [name, setName] = useState(initialName)
   const [authorized, setAuthorized] = useState(false)
   const [note, setNote] = useState('')
@@ -33,7 +39,7 @@ export default function ApproveProposalBar({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch('/api/public-link-approve', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -45,10 +51,11 @@ export default function ApproveProposalBar({
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
         const friendly =
-          body?.error === 'already_approved' ? 'This proposal has already been approved — thank you.'
+          body?.error === 'already_approved' ? `This ${docLabel} has already been approved — thank you.`
           : body?.error === 'expired' ? 'This link has expired. Please ask the contractor for a fresh one.'
           : body?.error === 'revoked' ? 'This link has been revoked.'
           : body?.error === 'empty_proposal' ? 'This proposal is empty — please contact the sender.'
+          : body?.error === 'gone' ? `This ${docLabel} is no longer open for approval.`
           : body?.message || 'We could not record your approval. Please try again.'
         throw new Error(friendly)
       }
@@ -87,15 +94,17 @@ export default function ApproveProposalBar({
 
   return (
     <form style={panelStyle} onSubmit={submit}>
-      <div style={eyebrowStyle}>Approve this proposal</div>
+      <div style={eyebrowStyle}>Approve this {docLabel}</div>
       <h3 style={headlineStyle}>
-        Ready to start{contactName ? ` ${contactName}` : ''}?
+        {isCO ? 'Approve this change?' : <>Ready to start{contactName ? ` ${contactName}` : ''}?</>}
       </h3>
       <p style={bodyStyle}>
-        Typing your full name below approves the scope, line items, and terms above.
+        {isCO
+          ? 'Typing your full name below approves the change in scope and price shown above.'
+          : 'Typing your full name below approves the scope, line items, and terms above.'}
         {companyName ? ` ${companyName} will be notified instantly.` : ''}
         {contractTotal != null
-          ? <> The approved contract total is <strong style={{ color: '#1A1814' }}>{moneyFmt(contractTotal)}</strong>.</>
+          ? <> The {isCO ? 'updated contract total' : 'approved contract total'} is <strong style={{ color: '#1A1814' }}>{moneyFmt(contractTotal)}</strong>.</>
           : null}
       </p>
 
@@ -134,7 +143,7 @@ export default function ApproveProposalBar({
           style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: '#C8A154' }}
         />
         <span>
-          I have the authority to approve this proposal on behalf of {contactName || 'the property owner'}, and I agree to the scope and terms shown above. Approving creates a binding record with my name, the date, and my IP address.
+          I have the authority to approve this {docLabel} on behalf of {contactName || 'the property owner'}, and I agree to the scope and terms shown above. Approving creates a binding record with my name, the date, and my IP address.
         </span>
       </label>
 
