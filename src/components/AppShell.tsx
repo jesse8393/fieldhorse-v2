@@ -9,6 +9,8 @@ import BottomNav from './BottomNav.tsx'
 const DesktopSidebar = lazy(() => import('./DesktopSidebar.tsx'))
 import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.tsx'
+import CaptureFab from './CaptureFab.tsx'
+import CaptureSheet from './CaptureSheet.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
 import Toaster from './Toaster.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
@@ -197,6 +199,11 @@ export default function AppShell() {
       </main>
 
       <BottomNav />
+      {/* Universal Capture — the global "say it / type it / snap it"
+          entry point. FAB opens the sheet; the sheet also answers
+          Cmd/Ctrl+J and the `fh:open-capture` event. */}
+      <CaptureFab />
+      <CaptureSheet />
       <CommandPalette />
       <MobileSearchOverlay />
       <InstallPrompt />
