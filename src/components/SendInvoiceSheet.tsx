@@ -87,7 +87,7 @@ export default function SendInvoiceSheet({
       setAmount(suggestion.amount > 0 ? String(suggestion.amount) : '')
       setDueDays(14)
       setNotes('')
-      setDescription([contact?.job_title, contact?.address].filter(Boolean).join(' — '))
+      setDescription(contact?.job_title || '')
       setLoading(false)
     })()
     return () => { alive = false }
@@ -340,7 +340,7 @@ export default function SendInvoiceSheet({
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. Handrail painting — 615 N Highland Ave"
+                  placeholder="e.g. Summit Townhomes sidewalk repair"
                   disabled={!!busy}
                   style={{ ...fieldStyle, resize: 'vertical' }}
                 />
