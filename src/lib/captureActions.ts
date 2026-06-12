@@ -6,6 +6,7 @@
 // so captured data is indistinguishable from manually entered data.
 
 import { supabase } from './supabase.ts'
+import { resilientInsert } from './outbox.ts'
 import { logPayment, recalcCost } from './stages.ts'
 import type { CaptureIntent } from './captureIntelligence.ts'
 
@@ -36,21 +37,24 @@ export async function commitCapture({ intent, userId, contacts }: {
 
   switch (intent.kind) {
     case 'note': {
-      const { error } = await supabase.from('fh_notes').insert({
+      const { queued, error } = await resilientInsert('fh_notes', {
         user_id: userId,
         contact_id: job?.id || null,
         text: intent.text,
         category: 'note'
       })
       if (error) throw error
-      return { link: job ? `/jobs/${job.id}` : '/notes', toast: 'Note saved' }
+      return {
+        link: job ? `/jobs/${job.id}` : '/notes',
+        toast: queued ? 'Note saved — will sync when back online' : 'Note saved'
+      }
     }
 
     case 'todo': {
       // fh_job_todos requires a job — without one the capture is still
       // worth keeping, so it lands as a note the operator can re-file.
       if (!job) {
-        const { error } = await supabase.from('fh_notes').insert({
+        const { error } = await resilientInsert('fh_notes', {
           user_id: userId,
           contact_id: null,
           text: `To-do: ${intent.text}`,
@@ -59,7 +63,7 @@ export async function commitCapture({ intent, userId, contacts }: {
         if (error) throw error
         return { link: '/notes', toast: 'Saved as note (no job attached)' }
       }
-      const { error } = await supabase.from('fh_job_todos').insert({
+      const { queued, error } = await resilientInsert('fh_job_todos', {
         user_id: userId,
         job_id: job.id,
         text: intent.text || '',
@@ -67,7 +71,7 @@ export async function commitCapture({ intent, userId, contacts }: {
         due_at: intent.due_at ? new Date(`${intent.due_at}T12:00:00`).toISOString() : null
       })
       if (error) throw error
-      return { link: `/jobs/${job.id}`, toast: 'To-do added' }
+      return { link: `/jobs/${job.id}`, toast: queued ? 'To-do saved — will sync' : 'To-do added' }
     }
 
     case 'payment': {
@@ -84,7 +88,7 @@ export async function commitCapture({ intent, userId, contacts }: {
 
     case 'expense': {
       if (!intent.amount) throw new Error('Enter the expense amount.')
-      const { error } = await supabase.from('fh_expenses').insert({
+      const { queued, error } = await resilientInsert('fh_expenses', {
         user_id: userId,
         contact_id: job?.id || null,
         description: intent.description,
@@ -94,12 +98,14 @@ export async function commitCapture({ intent, userId, contacts }: {
       })
       if (error) throw error
       // Keep the per-job cost/margin rollup honest (same as Expenses tab).
-      if (job) await recalcCost(job.id, userId)
+      // Offline, the rollup recalc waits for the queue — the expense row
+      // itself is what must not be lost.
+      if (job && !queued) await recalcCost(job.id, userId)
       return { link: job ? `/jobs/${job.id}?tab=financials` : '/invoices', toast: 'Expense logged' }
     }
 
     case 'schedule': {
-      const { error } = await supabase.from('fh_schedule').insert({
+      const { queued, error } = await resilientInsert('fh_schedule', {
         user_id: userId,
         contact_id: job?.id || null,
         title: intent.title,
@@ -107,11 +113,13 @@ export async function commitCapture({ intent, userId, contacts }: {
         end_at: intent.end_at
       })
       if (error) throw error
-      return { link: '/schedule', toast: 'Added to schedule' }
+      return { link: '/schedule', toast: queued ? 'Saved — will sync' : 'Added to schedule' }
     }
 
     case 'lead': {
-      const { data, error } = await supabase.from('fh_contacts').insert({
+      // resilientInsert mints the id client-side, so the success link
+      // works even when the row is still queued for sync.
+      const { queued, error, id } = await resilientInsert('fh_contacts', {
         user_id: userId,
         name: intent.name || intent.title || 'New lead',
         phone: intent.phone || null,
@@ -121,9 +129,12 @@ export async function commitCapture({ intent, userId, contacts }: {
         amount: intent.amount || null,
         follow_up_on: intent.follow_up_on || null,
         stage: 'lead'
-      }).select('id').single()
+      })
       if (error) throw error
-      return { link: data ? `/jobs/${data.id}` : '/leads', toast: 'Lead created' }
+      return {
+        link: queued ? '/leads' : `/jobs/${id}`,
+        toast: queued ? 'Lead saved — will sync' : 'Lead created'
+      }
     }
   }
 }

@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
+import { queuePhoto, isNetworkError } from '../../../lib/outbox.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
 
@@ -112,6 +113,7 @@ export default function PhotosSection({ jobId, userId }: any) {
     if (files.length === 0) return
     setUploading(true)
     const newPhotoIds: any[] = []
+    let queuedCount = 0
     try {
       for (const file of files) {
         if (file.size > MAX_BYTES) {
@@ -132,11 +134,7 @@ export default function PhotosSection({ jobId, userId }: any) {
         }
         const rowId = crypto.randomUUID()
         const path = `${userId}/${jobId}/${rowId}.jpg`
-        const { error: upErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, uploadBlob, { upsert: false, contentType: 'image/jpeg' })
-        if (upErr) throw upErr
-        const { error: insErr } = await supabase.from('fh_job_files').insert({
+        const row = {
           id: rowId,
           user_id: userId,
           job_id: jobId,
@@ -145,12 +143,36 @@ export default function PhotosSection({ jobId, userId }: any) {
           mime_type: 'image/jpeg',
           size_bytes: uploadBlob.size,
           kind: 'photo'
-        })
+        }
+        // Dead-zone path: park the compressed blob + row in the outbox
+        // (IndexedDB) and move on — it uploads when signal returns.
+        if (navigator.onLine === false) {
+          await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
+          queuedCount += 1
+          continue
+        }
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, uploadBlob, { upsert: false, contentType: 'image/jpeg' })
+        if (upErr) {
+          if (isNetworkError(upErr)) {
+            await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
+            queuedCount += 1
+            continue
+          }
+          throw upErr
+        }
+        const { error: insErr } = await supabase.from('fh_job_files').insert(row)
         if (insErr) throw insErr
         newPhotoIds.push({ id: rowId, file: uploadBlob })
       }
       hapticSuccess()
-      toastSuccess('Photos uploaded', `Added ${files.length}`)
+      if (queuedCount > 0) {
+        toastSuccess('Saved offline', `${queuedCount} photo${queuedCount === 1 ? '' : 's'} will upload when signal returns`)
+      }
+      if (newPhotoIds.length > 0) {
+        toastSuccess('Photos uploaded', `Added ${newPhotoIds.length}`)
+      }
       await fetchRows()
       // Vision captioning runs async. If column missing → silent.
       if (newPhotoIds.length > 0) {

@@ -15,6 +15,7 @@ import InstallPrompt from './InstallPrompt.tsx'
 import Toaster from './Toaster.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { startOutboxSync } from '../lib/outbox.ts'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
@@ -123,6 +124,10 @@ export default function AppShell() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [location.pathname])
+
+  // Offline outbox: drain queued writes on app start, on regaining
+  // network, and whenever the tab becomes visible. See lib/outbox.ts.
+  useEffect(() => startOutboxSync(), [])
 
   // Global navigation event so chrome buttons inside Build components
   // (bell, footer links, etc.) can navigate without each component

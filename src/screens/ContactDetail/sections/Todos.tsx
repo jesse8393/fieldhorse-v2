@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Plus, Trash2, Calendar, UserRound } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError, toastUndo } from '../../../lib/toast.ts'
+import { resilientInsert, resilientUpdate } from '../../../lib/outbox.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.ts'
@@ -77,11 +78,12 @@ export default function TodosSection({ jobId, userId }: any) {
     const payload: Record<string, any> = { user_id: userId, job_id: jobId, text: txt }
     if (dueDraft) payload.due_at = dateInputToTimestamp(dueDraft)
     if (assignDraft) payload.assigned_to = assignDraft
-    const { error } = await supabase.from('fh_job_todos').insert(payload as any)
+    const { queued, error } = await resilientInsert('fh_job_todos', payload)
     if (error) {
       toastError("Couldn't add to-do", error.message)
       return
     }
+    if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')
     setDraft('')
     setDueDraft('')
     setAssignDraft('')
@@ -125,11 +127,11 @@ export default function TodosSection({ jobId, userId }: any) {
       ? { ...r, done: next, completed_at: next ? new Date().toISOString() : null }
       : r
     ))
-    const { error } = await supabase
-      .from('fh_job_todos')
-      .update({ done: next, completed_at: next ? new Date().toISOString() : null })
-      .eq('id', row.id)
-      .eq('user_id', userId)
+    const { error } = await resilientUpdate(
+      'fh_job_todos',
+      { id: row.id, user_id: userId },
+      { done: next, completed_at: next ? new Date().toISOString() : null }
+    )
     if (error) {
       toastError("Couldn't update", error.message)
       fetchRows() // rollback to truth

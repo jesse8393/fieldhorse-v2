@@ -11,6 +11,7 @@
 // URL-sharing from letting a non-invited account accept.
 
 import { createClient } from '@supabase/supabase-js'
+import { sendPushToUser } from './lib/push.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -64,7 +65,7 @@ export default async (request) => {
   // Load the invite.
   const { data: invite, error: invErr } = await admin
     .from('fh_job_partners')
-    .select('id, job_id, partner_email, status')
+    .select('id, job_id, partner_email, status, user_id')
     .eq('invite_token', token)
     .maybeSingle()
 
@@ -93,6 +94,15 @@ export default async (request) => {
     .eq('id', invite.id)
 
   if (updErr) return json({ error: 'accept_failed', message: updErr.message }, 500)
+
+  // Lock-screen ping to the inviting contractor (bell row already
+  // exists via the fh_notifications trigger path). Best effort.
+  await sendPushToUser(admin, invite.user_id, {
+    title: 'Partner joined your job',
+    body: `${invite.partner_email} accepted the invite`,
+    link: `/jobs/${invite.job_id}?tab=partners`,
+    tag: `partner-accepted-${invite.id}`
+  })
 
   return json({ ok: true, job_id: invite.job_id })
 }
