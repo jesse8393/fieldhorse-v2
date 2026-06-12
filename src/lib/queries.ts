@@ -559,6 +559,13 @@ export function useInvalidateClientDetail() {
 // slim client list (id/name, for the top-revenue list without N+1
 // lookups). Bundled so the screen keeps one loading flag.
 
+export type StageTransition = {
+  contact_id: string
+  from_stage: string | null
+  to_stage: string
+  transitioned_at: string
+}
+
 export type AnalyticsBundle = {
   contacts: Contact[]
   mileage: Database['public']['Tables']['fh_mileage']['Row'][]
@@ -566,16 +573,24 @@ export type AnalyticsBundle = {
   invoices: Database['public']['Tables']['fh_invoices']['Row'][]
   changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
   clients: Pick<Client, 'id' | 'name'>[]
+  stageTransitions: StageTransition[]
 }
 
 async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
-  const [c, m, p, inv, co, cli] = await Promise.all([
+  const [c, m, p, inv, co, cli, st] = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('user_id', userId),
     supabase.from('fh_mileage').select('*').eq('user_id', userId).order('drove_on', { ascending: false }),
     supabase.from('fh_payments').select('*').eq('user_id', userId),
     supabase.from('fh_invoices').select('*').eq('user_id', userId),
     supabase.from('fh_change_orders').select('*').eq('user_id', userId),
-    supabase.from('fh_clients').select('id, name').eq('user_id', userId)
+    supabase.from('fh_clients').select('id, name').eq('user_id', userId),
+    // Funnel source — every stage move with its timestamp (mig 023).
+    supabase
+      .from('fh_stage_transitions')
+      .select('contact_id, from_stage, to_stage, transitioned_at')
+      .eq('user_id', userId)
+      .order('transitioned_at', { ascending: true })
+      .limit(4000)
   ])
   return {
     contacts: (c.data ?? []) as Contact[],
@@ -583,7 +598,8 @@ async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
     payments: (p.data ?? []) as Payment[],
     invoices: (inv.data ?? []) as AnalyticsBundle['invoices'],
     changeOrders: (co.data ?? []) as AnalyticsBundle['changeOrders'],
-    clients: (cli.data ?? []) as AnalyticsBundle['clients']
+    clients: (cli.data ?? []) as AnalyticsBundle['clients'],
+    stageTransitions: (st.data ?? []) as StageTransition[]
   }
 }
 

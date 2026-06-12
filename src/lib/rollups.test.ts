@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  rollupJobs, rollupByClient, closeRate, avgMargin, wonYTD, profitYTD
+  rollupJobs, rollupByClient, closeRate, avgMargin, wonYTD, profitYTD, computeFunnel
 } from './rollups.ts'
 
 const jobs = [
@@ -85,5 +85,52 @@ describe('wonYTD / profitYTD', () => {
   })
   it('sums profit (amount - cost) for won-this-year jobs', () => {
     expect(profitYTD(jobs, now)).toBe(900) // a 400 + b 500 + c 0
+  })
+})
+
+describe('computeFunnel', () => {
+  const now = new Date('2026-06-12T12:00:00Z')
+  const day = (n: number) => new Date(now.getTime() - n * 86400000).toISOString()
+  const contacts = [
+    { created_at: day(10) },  // in window
+    { created_at: day(50) },  // in window
+    { created_at: day(120) }  // outside 90d
+  ]
+  const transitions = [
+    // contact A: quote → won, 5 days to decide
+    { contact_id: 'a', to_stage: 'quote', transitioned_at: day(30) },
+    { contact_id: 'a', to_stage: 'job',   transitioned_at: day(25) },
+    // contact B: quote → lost, 10 days
+    { contact_id: 'b', to_stage: 'quote', transitioned_at: day(40) },
+    { contact_id: 'b', to_stage: 'lost',  transitioned_at: day(30) },
+    // contact C: quoted twice (counts once), no decision yet
+    { contact_id: 'c', to_stage: 'quote', transitioned_at: day(20) },
+    { contact_id: 'c', to_stage: 'quote', transitioned_at: day(5) },
+    // contact D: won outside the window — excluded from counts
+    { contact_id: 'd', to_stage: 'quote', transitioned_at: day(200) },
+    { contact_id: 'd', to_stage: 'job',   transitioned_at: day(150) }
+  ]
+
+  it('counts distinct contacts per funnel step inside the window', () => {
+    const f = computeFunnel(transitions, contacts, 90, now)
+    expect(f.newLeads).toBe(2)
+    expect(f.quoted).toBe(3)   // a, b, c — c only once
+    expect(f.won).toBe(1)      // a (d is outside window)
+    expect(f.lost).toBe(1)     // b
+  })
+
+  it('derives rates and decision speed', () => {
+    const f = computeFunnel(transitions, contacts, 90, now)
+    expect(f.winRate).toBeCloseTo(0.5, 5)            // 1 won / (1 won + 1 lost)
+    expect(f.quoteRate).toBeCloseTo(1, 5)            // 3 quoted / 2 new, clamped to 1
+    expect(f.avgDaysToDecision).toBeCloseTo(7.5, 5)  // (5 + 10) / 2
+  })
+
+  it('handles empty inputs', () => {
+    const f = computeFunnel([], [], 90, now)
+    expect(f).toEqual({
+      newLeads: 0, quoted: 0, won: 0, lost: 0,
+      quoteRate: 0, winRate: 0, avgDaysToDecision: 0
+    })
   })
 })
