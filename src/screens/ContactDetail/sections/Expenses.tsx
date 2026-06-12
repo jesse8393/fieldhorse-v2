@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, Receipt } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { recalcCost } from '../../../lib/stages.ts'
+import { crewLaborForContact, type CrewLabor } from '../../../lib/labor.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_, SheetMoneyField as SheetMoneyField_ } from '../../../components/ActionSheet.tsx'
@@ -38,6 +39,17 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
   })
   const [saving, setSaving] = useState(false)
   const total = expenses.reduce((s: any, e: any) => s + Number(e.amount || 0), 0)
+
+  // Crew clock-ins for this job (other org members' punches). Computed,
+  // not stored — the rows live in fh_time_punches, the dollars land in
+  // contact.cost via recalcCost. Shown so the operator can see WHY the
+  // job's cost is higher than the expense list alone.
+  const [crewLabor, setCrewLabor] = useState<CrewLabor | null>(null)
+  useEffect(() => {
+    let alive = true
+    crewLaborForContact(contact?.id, userId).then((cl) => { if (alive) setCrewLabor(cl) })
+    return () => { alive = false }
+  }, [contact?.id, userId, expenses.length])
 
   useEffect(() => {
     if (!open) setForm({
@@ -115,6 +127,34 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
           </strong>
         </span>
       </div>
+
+      {/* Crew labor — clock-in time from team members, priced at their
+          punch rate. Counted into job cost automatically. */}
+      {crewLabor && crewLabor.punches > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+          padding: '10px 12px', borderRadius: 12,
+          background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)'
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, color: 'var(--v3-text)' }}>
+              Crew labor · {crewLabor.hours.toFixed(1)}h
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--v3-text-muted)', marginTop: 2 }}>
+              {crewLabor.punches} clock-in{crewLabor.punches === 1 ? '' : 's'}
+              {crewLabor.unratedHours > 0.05
+                ? ` · ${crewLabor.unratedHours.toFixed(1)}h missing a rate — set rates in Timesheets`
+                : ' · counted in job cost'}
+            </div>
+          </div>
+          <span style={{
+            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+            color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
+          }}>
+            {money(crewLabor.cost)}
+          </span>
+        </div>
+      )}
 
       <motion.button
         type="button"

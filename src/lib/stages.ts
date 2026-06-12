@@ -1,5 +1,6 @@
 // Fieldhorse pipeline stages + auto-transitions
 import { supabase } from './supabase.ts'
+import { crewLaborForContact } from './labor.ts'
 import type { Database } from './database.types.ts'
 
 type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -215,19 +216,25 @@ export async function logPayment(contact: Contact, { amount, method, kind, refer
 
 export async function recalcCost(contactId: string | undefined, userId: string | undefined) {
   if (!contactId || !userId) return 0
-  const { data: subs } = await supabase
-    .from('fh_subs')
-    .select('rate')
-    .eq('contact_id', contactId)
-    .eq('user_id', userId)
-  const { data: exps } = await supabase
-    .from('fh_expenses')
-    .select('amount')
-    .eq('contact_id', contactId)
-    .eq('user_id', userId)
+  const [{ data: subs }, { data: exps }, crewLabor] = await Promise.all([
+    supabase
+      .from('fh_subs')
+      .select('rate')
+      .eq('contact_id', contactId)
+      .eq('user_id', userId),
+    supabase
+      .from('fh_expenses')
+      .select('amount')
+      .eq('contact_id', contactId)
+      .eq('user_id', userId),
+    // Crew clock-ins (other org members' completed punches × their
+    // hourly rate). The owner's own job-screen clock already lands in
+    // fh_expenses as category='Labor' — see lib/labor.ts for the split.
+    crewLaborForContact(contactId, userId)
+  ])
   const subsTotal = (subs || []).reduce((s, r) => s + Number(r.rate || 0), 0)
   const expsTotal = (exps || []).reduce((s, r) => s + Number(r.amount || 0), 0)
-  const cost = subsTotal + expsTotal
+  const cost = subsTotal + expsTotal + crewLabor.cost
   await supabase.from('fh_contacts').update({ cost }).eq('id', contactId).eq('user_id', userId)
   return cost
 }
