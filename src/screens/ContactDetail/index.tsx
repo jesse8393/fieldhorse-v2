@@ -22,6 +22,7 @@ import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
 // Record Payment respectively).
 const MarkCompleteSheet = lazy(() => import('../../components/MarkCompleteSheet.tsx'))
 const V3PaymentSheet = lazy(() => import('../../components/V3PaymentSheet.tsx'))
+const SendInvoiceSheet = lazy(() => import('../../components/SendInvoiceSheet.tsx'))
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
@@ -177,6 +178,10 @@ export default function ContactDetail() {
   // duplicating state. Phase 4C-2.
   const [approveOpen, setApproveOpen] = useState(false)
   const [completeOpen, setCompleteOpen] = useState(false)
+  // Send-invoice sheet (pipeline v2) — the job screen's one-tap billing
+  // action. Opened by the stage CTA, Overview quick action, and the
+  // next-action resolver's 'sendInvoice' suggestion.
+  const [invoiceOpen, setInvoiceOpen] = useState(false)
   // Edit mode is a flag the Overview tab + section editors read.
   // Header EDIT button toggles + jumps to overview if currently on another tab.
   const [isEditing, setIsEditing] = useState(false)
@@ -277,11 +282,17 @@ export default function ContactDetail() {
     await fetchAll()
   }
 
+  // Job-stage CTA: the user's #1 ask — invoice straight from the job.
+  // While money is still owed the primary action is Send invoice; once
+  // the balance is collected the job is ready for its closeout.
+  // ('invoice' is the legacy alias of 'job' — same treatment.)
   const stageCta: { label: string; onClick: () => void } | null =
     contact.stage === 'lead'    ? { label: 'Build quote',    onClick: onBuildQuote }
     : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
-    : contact.stage === 'job'     ? { label: 'Mark complete',  onClick: () => setCompleteOpen(true) }
-    : contact.stage === 'invoice' ? { label: 'Log payment',    onClick: () => setPayModalOpen(true) }
+    : contact.stage === 'job' || contact.stage === 'invoice'
+      ? (Number(balance || 0) > 0
+          ? { label: 'Send invoice',   onClick: () => setInvoiceOpen(true) }
+          : { label: 'Mark complete',  onClick: () => setCompleteOpen(true) })
     : contact.stage === 'closed'  ? { label: 'Reopen',         onClick: onReopen }
     : contact.stage === 'lost'    ? { label: 'Reopen',         onClick: onReopen }
     : null
@@ -382,6 +393,7 @@ export default function ContactDetail() {
                   onOpenLogPayment={() => setPayModalOpen(true)}
                   onOpenInvitePartner={() => setInviteOpen(true)}
                   onOpenApproveQuote={() => setApproveOpen(true)}
+                  onOpenSendInvoice={() => setInvoiceOpen(true)}
                 />
               )}
               {tab === 'quote' && (
@@ -542,6 +554,7 @@ export default function ContactDetail() {
             onOpenInvitePartner={() => setInviteOpen(true)}
             onOpenApproveQuote={() => setApproveOpen(true)}
             onOpenMarkComplete={() => setCompleteOpen(true)}
+            onOpenSendInvoice={() => setInvoiceOpen(true)}
           />
         )}
         {tab === 'quote' && (
@@ -666,6 +679,19 @@ export default function ContactDetail() {
           contact={contact}
           onClose={() => setCompleteOpen(false)}
           onSaved={fetchAll}
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <SendInvoiceSheet
+          open={invoiceOpen}
+          userId={user?.id}
+          contact={contact}
+          payments={payments}
+          changeOrders={changeOrders}
+          insurance={insurance}
+          onClose={() => setInvoiceOpen(false)}
+          onDone={fetchAll}
         />
       </Suspense>
 

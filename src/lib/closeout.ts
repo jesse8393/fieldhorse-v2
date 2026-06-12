@@ -127,7 +127,7 @@ export async function saveCloseout({ userId, contact, payload, advanceStage = tr
 }
 
 // Delete an existing closeout (and optionally reopen the stage).
-export async function clearCloseout({ userId, contact, reopenTo = 'invoice' }: { userId: string | undefined; contact: Contact; reopenTo?: 'invoice' | 'job' | 'lead' | 'quote' | 'closed' | 'lost' }) {
+export async function clearCloseout({ userId, contact, reopenTo = 'job' }: { userId: string | undefined; contact: Contact; reopenTo?: 'invoice' | 'job' | 'lead' | 'quote' | 'closed' | 'lost' }) {
   if (!userId || !contact?.id) throw new Error('clearCloseout: userId + contact required')
   const { error } = await supabase
     .from('fh_closeouts')

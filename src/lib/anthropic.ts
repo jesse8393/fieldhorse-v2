@@ -1,7 +1,10 @@
 // Claude API client. Calls route through serverless function in production
 // so the key never ships to the browser. Local dev can hit the edge route too.
+// /api/claude requires a signed-in Supabase session (Bearer token).
 
-const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
+import { authHeaders } from './supabase.ts'
+
+const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-6'
 
 // Hard ceiling so a stuck /api/claude call never leaves the UI in an
 // indefinite "parsing…" or "drafting…" state. 15s is comfortably above
@@ -17,7 +20,7 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }: { sy
   try {
     const res = await fetch('/api/claude', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens }),
       signal: controller.signal
     })
@@ -71,7 +74,7 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
   try {
     const res = await fetch('/api/claude', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens }),
       signal: controller.signal
     })

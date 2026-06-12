@@ -29,13 +29,9 @@ import { money, moneyFull } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
 // Map the rail's stage-grouping keys to the parent screen's TABS ids
-// so clicking a stage row actually narrows the table. Each rail key
-// now maps to exactly one TABS id (post audit H3 — the old 'won'
-// alias for both invoice + closed was hiding invoicing jobs under
-// "Closed").
+// so clicking a stage row actually narrows the table.
 function stageKeyToFilter(stageKey: string): string {
-  if (stageKey === 'job') return 'active'
-  if (stageKey === 'invoice') return 'invoice'
+  if (stageKey === 'job' || stageKey === 'invoice') return 'active'
   if (stageKey === 'closed') return 'closed'
   return stageKey
 }
@@ -55,12 +51,10 @@ type Props = {
   onNewLead: () => void
 }
 
-// Match the canonical lib/stages.ts ACTIVE_STAGES — every screen that
-// shows "Active Pipeline" must count the same set, otherwise the desks
-// said $119k while Command Center said $134k for the same data (audit
-// H2). Invoicing deals are still in flight (money owed) so they belong
-// in the active set.
-const ACTIVE_STAGES = ['lead', 'quote', 'job', 'invoice']
+// Pipeline v2: this board shows jobs only (leads live on /leads), so
+// "active" = running jobs. 'invoice' matches legacy pre-migration rows
+// as an alias of 'job'.
+const ACTIVE_STAGES = ['job', 'invoice']
 
 function relTime(iso: any) {
   if (!iso) return '—'
@@ -79,12 +73,9 @@ function relTime(iso: any) {
 // If these drift the parent's `filtered` memo falls back to TABS[0]
 // and every filter pill behaves like "All".
 const FILTERS: { key: string; label: string }[] = [
-  { key: 'all',     label: 'All' },
-  { key: 'lead',    label: 'Leads' },
-  { key: 'quote',   label: 'Quotes' },
-  { key: 'active',  label: 'Active' },
-  { key: 'invoice', label: 'Invoicing' },
-  { key: 'closed',  label: 'Closed' },
+  { key: 'all',    label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'closed', label: 'Complete' },
 ]
 
 export default function SnowJobsBuild(props: Props) {
@@ -96,19 +87,10 @@ export default function SnowJobsBuild(props: Props) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Lead Desk vs Job Desk are the same /jobs route distinguished by
-  // ?view=. Lead Desk pre-applies the 'lead' filter and adjusts the
-  // hero copy; Job Desk is the production-default view (all stages).
+  // Lead Desk is its own route now (/leads, pipeline v2). This board is
+  // always the Job Desk; ?view=pipeline still flips the kanban on.
   const params = new URLSearchParams(location.search)
-  const routeView = params.get('view') // 'leads' | 'jobs' | 'pipeline' | null
-  const isLeadDesk = routeView === 'leads'
-
-  // Sync filter ↔ Lead Desk on first mount / view change so the table
-  // matches the sidebar destination the user picked.
-  useEffect(() => {
-    if (isLeadDesk && filter === 'all') setFilter('lead')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLeadDesk])
+  const routeView = params.get('view') // 'jobs' | 'pipeline' | null
 
   const [view, setView] = useState<'table' | 'pipeline'>(routeView === 'pipeline' ? 'pipeline' : 'table')
 
@@ -140,13 +122,12 @@ export default function SnowJobsBuild(props: Props) {
     return { pipeline, active, needEyes, wonYTD }
   }, [contacts])
 
-  // Right rail: stage counts
+  // Right rail: stage counts (jobs only — leads have their own desk)
   const stages = useMemo(() => {
     const map: Record<string, { count: number; total: number; label: string }> = {
-      lead:    { count: 0, total: 0, label: 'Leads' },
-      quote:   { count: 0, total: 0, label: 'Quotes' },
       job:     { count: 0, total: 0, label: 'Active' },
-      invoice: { count: 0, total: 0, label: 'Invoicing' },
+      invoice: { count: 0, total: 0, label: 'Awaiting payment' },
+      closed:  { count: 0, total: 0, label: 'Complete' },
     }
     for (const c of contacts) {
       const s = String(c.stage || '').toLowerCase()
@@ -191,7 +172,7 @@ export default function SnowJobsBuild(props: Props) {
               or "Quote") shows "+ New Lead". "All" stays on the
               broader "New Lead" since that's still the most common
               entry. */}
-          <Plus size={15} /> {(filter === 'active' || filter === 'invoice' || filter === 'closed') ? 'New Job' : 'New Lead'}
+          <Plus size={15} /> New Job
         </button>
       </header>
 
@@ -199,8 +180,8 @@ export default function SnowJobsBuild(props: Props) {
         {/* Hero row — title + view picker + KPIs */}
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">{isLeadDesk ? 'Lead Desk' : 'Job Desk'}</div>
-            <h1 className="fh-build-title">{isLeadDesk ? 'CLOSE THE DEAL.' : 'RUN THE WORK.'}</h1>
+            <div className="fh-build-good">Job Desk</div>
+            <h1 className="fh-build-title">RUN THE WORK.</h1>
           </div>
 
           <div className="fh-build-view-card">
@@ -229,12 +210,8 @@ export default function SnowJobsBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid">
-            {/* Renamed "Active jobs" → "Open deals" (audit H2): the
-                count includes leads/quotes/invoicing, not just stage=job,
-                so the prior label misled an operator who added a LEAD
-                and watched "Active Jobs 15 → 16". */}
-            <MiniMetric label="Active pipeline" value={money(kpi.pipeline)} />
-            <MiniMetric label="Open deals" value={String(kpi.active)} />
+            <MiniMetric label="Active contracts" value={money(kpi.pipeline)} />
+            <MiniMetric label="Active jobs" value={String(kpi.active)} />
             <MiniMetric label="Need eyes (7d)" value={String(kpi.needEyes)} />
             <MiniMetric label="Won YTD" value={money(kpi.wonYTD)} />
           </div>
@@ -266,21 +243,17 @@ export default function SnowJobsBuild(props: Props) {
             <section className="fh-build-card fh-build-table fh-build-jobs-table">
               <header className="fh-build-card-head">
                 <div className="fh-build-eyebrow">
-                  {isLeadDesk ? 'Open deals' : 'All jobs'} · {filtered.length.toLocaleString()}
+                  All jobs · {filtered.length.toLocaleString()}
                 </div>
                 <button type="button">Export CSV</button>
               </header>
 
-              {/* Lead Desk gets pipeline/CRM columns (Source, Est. value,
-                  Last touch); Job Desk keeps execution columns
-                  (Job title, Amount, Updated). Audit §C1 — the two
-                  desks share table primitives but read differently. */}
               <div className="fh-build-table__head is-jobs">
-                <span>{isLeadDesk ? 'Lead' : 'Job'}</span>
-                <span>{isLeadDesk ? 'Source' : 'Client'}</span>
+                <span>Job</span>
+                <span>Client</span>
                 <span>Stage</span>
-                <span>{isLeadDesk ? 'Est. value' : 'Amount'}</span>
-                <span>{isLeadDesk ? 'Last touch' : 'Updated'}</span>
+                <span>Amount</span>
+                <span>Updated</span>
                 <span />
               </div>
 
@@ -288,7 +261,7 @@ export default function SnowJobsBuild(props: Props) {
                 <div className="fh-build-table__empty">Loading jobs…</div>
               )}
               {!loading && filtered.length === 0 && (
-                <div className="fh-build-table__empty">No jobs match. Adjust the filter or hit <button type="button" className="fh-build-inline-link" onClick={onNewLead}>+ New Lead</button>.</div>
+                <div className="fh-build-table__empty">No jobs match. Adjust the filter or hit <button type="button" className="fh-build-inline-link" onClick={onNewLead}>+ New Job</button>.</div>
               )}
               {!loading && filtered.slice(0, 50).map((c: any) => (
                 <button
@@ -299,14 +272,12 @@ export default function SnowJobsBuild(props: Props) {
                 >
                   <strong className="fh-build-truncate" title={c.name}>{c.name || 'Untitled'}</strong>
                   <span className="fh-build-truncate">
-                    {isLeadDesk
-                      ? (c.referred_by || '—')
-                      : (c.job_title || c.job_type || '—')}
+                    {c.job_title || c.job_type || '—'}
                   </span>
                   <span><StagePill stage={c.stage} /></span>
                   <span className="fh-build-num">{moneyFull(c.amount || 0)}</span>
                   <span className="fh-build-rel">
-                    {relTime((isLeadDesk ? c.last_contact : null) || c.updated_at || c.created_at)}
+                    {relTime(c.updated_at || c.created_at)}
                   </span>
                   <ChevronRight size={13} />
                 </button>
@@ -345,7 +316,7 @@ export default function SnowJobsBuild(props: Props) {
                 <button
                   type="button"
                   className="fh-build-rail-card__action"
-                  onClick={() => setFilter('lead')}
+                  onClick={() => navigate('/leads')}
                 >
                   Review leads <ChevronRight size={13} />
                 </button>

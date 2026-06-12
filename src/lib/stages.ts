@@ -4,6 +4,13 @@ import type { Database } from './database.types.ts'
 
 type Contact = Database['public']['Tables']['fh_contacts']['Row']
 
+// Pipeline v2 (migration 047): the 'invoice' stage is retired. A record
+// in lead/quote is a Lead; job/closed is a Job (every job is a won
+// deal); lost is a dead lead. Invoicing is fh_invoices rows issued
+// against a job — not a stage the whole job moves into. "Work done,
+// money out" is contact.completed_at. The legacy 'invoice' value stays
+// in the type + maps so pre-migration rows and old stage-transition
+// history still render; treat it as a synonym of 'job' everywhere.
 export type StageId = 'lead' | 'quote' | 'job' | 'invoice' | 'closed' | 'lost'
 
 export type Stage = { id: StageId; label: string; color: string; icon: string }
@@ -12,14 +19,33 @@ export const STAGES: Stage[] = [
   { id: 'lead',    label: 'Lead',    color: 'var(--stage-lead)',    icon: 'lead' },
   { id: 'quote',   label: 'Quote',   color: 'var(--stage-quote)',   icon: 'quote' },
   { id: 'job',     label: 'Job',     color: 'var(--stage-job)',     icon: 'job' },
-  { id: 'invoice', label: 'Invoice', color: 'var(--stage-invoice)', icon: 'invoice' },
   { id: 'closed',  label: 'Closed',  color: 'var(--stage-closed)',  icon: 'closed' },
   { id: 'lost',    label: 'Lost',    color: 'var(--stage-lost)',    icon: 'lost' }
 ]
 
-export const STAGE_MAP: Record<string, Stage> = Object.fromEntries(STAGES.map((s) => [s.id, s]))
+export const STAGE_MAP: Record<string, Stage> = {
+  ...Object.fromEntries(STAGES.map((s) => [s.id, s])),
+  // Legacy display entry only — never offered as a destination.
+  invoice: { id: 'invoice', label: 'Invoice', color: 'var(--stage-invoice)', icon: 'invoice' }
+}
 
+// A Lead — its own thing now: own screen (/leads), own lifecycle.
+// 'quote' is a lead with a quote in flight, not a separate entity.
+export const LEAD_STAGES = ['lead', 'quote']
+// A Job. 'invoice' included only as the legacy alias of 'job'.
+export const JOB_STAGES = ['job', 'invoice']
+// Won deals — every job is a won deal in the v2 model.
+export const WON_STAGES = ['job', 'invoice', 'closed']
+// Everything still in motion (open leads + active jobs).
 export const ACTIVE_STAGES = ['lead', 'quote', 'job', 'invoice']
+
+export function isLeadStage(stage: string | null | undefined) {
+  return LEAD_STAGES.includes(stage || '')
+}
+
+export function isJobStage(stage: string | null | undefined) {
+  return JOB_STAGES.includes(stage || '')
+}
 
 export function stageColor(id: string): string {
   return STAGE_MAP[id]?.color || 'var(--steel)'
@@ -80,8 +106,18 @@ export async function approveQuote(contact: Contact) {
   return { data, error: null, scheduleError: schedErr ?? null }
 }
 
+// Work wrapped. Stays a 'job' (no more invoice stage) — completed_at
+// flags "done, awaiting payment" so the money screens can chase the
+// balance. Paying off the balance still auto-closes via logPayment.
 export async function completeJob(contact: Contact) {
-  return transitionStage(contact, 'invoice')
+  const { data, error } = await supabase
+    .from('fh_contacts')
+    .update({ completed_at: new Date().toISOString() })
+    .eq('id', contact.id)
+    .eq('user_id', contact.user_id)
+    .select()
+    .single()
+  return { data, error }
 }
 
 export async function markLost(contact: Contact) {
@@ -94,9 +130,10 @@ type LogPaymentOpts = {
   kind?: string | null
   reference?: string | null
   paid_on?: string | null
+  invoice_id?: string | null
 }
 
-export async function logPayment(contact: Contact, { amount, method, kind, reference, paid_on }: LogPaymentOpts) {
+export async function logPayment(contact: Contact, { amount, method, kind, reference, paid_on, invoice_id }: LogPaymentOpts) {
   const normalizedAmount = Number(amount) || 0
   const normalizedKind = ['deposit','progress','final','retainage','other'].includes(kind ?? '') ? (kind as string) : 'other'
   const payload = {
@@ -109,10 +146,26 @@ export async function logPayment(contact: Contact, { amount, method, kind, refer
     // defaults to 'other' so legacy callers stay valid.
     kind: normalizedKind,
     reference: reference || null,
-    paid_on: paid_on || new Date().toISOString().slice(0, 10)
+    paid_on: paid_on || new Date().toISOString().slice(0, 10),
+    // Optional pointer to the fh_invoices row this payment satisfies
+    // (migration 047). Contact-level payments pass nothing.
+    invoice_id: invoice_id || null
   }
   const { error: insErr } = await supabase.from('fh_payments').insert(payload)
   if (insErr) return { error: insErr }
+
+  // Payment against a specific invoice settles that invoice. Best-effort:
+  // the payment row is the source of truth for money math either way.
+  if (invoice_id) {
+    const { error: invErr } = await supabase
+      .from('fh_invoices')
+      .update({ status: 'paid' })
+      .eq('id', invoice_id)
+      .eq('user_id', contact.user_id)
+    if (invErr) {
+      console.error('[fieldhorse] logPayment invoice status update failed', invErr)
+    }
+  }
 
   // Write a notification for the contractor's own inbox so the bell
   // badge pings when a payment is recorded (even if they recorded it

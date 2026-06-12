@@ -29,9 +29,12 @@ export type JobRollup = {
   paidTotal: number
 }
 
+// Pipeline v2: 'invoice' survives in these sets only as the legacy
+// alias of 'job' (pre-migration rows). Every job is a won deal now —
+// a converted lead counts as won the moment it becomes a job.
 const ACTIVE_BILLING_STAGES = new Set(['job', 'invoice'])
 const ACTIVE_PIPELINE_STAGES = new Set(['lead', 'quote', 'job', 'invoice'])
-const WON_STAGES = new Set(['invoice', 'closed'])
+const WON_STAGES = new Set(['job', 'invoice', 'closed'])
 
 // Sum payments per contact_id from a flat fh_payments array.
 function paidByContact(payments: PaymentRow[] | null | undefined) {
@@ -59,7 +62,8 @@ function paidByContact(payments: PaymentRow[] | null | undefined) {
 //               the invoice screen. Acceptable for list rollups today;
 //               revisit if COs become a primary balance driver.
 // activeCount — count of jobs in any active pipeline stage.
-// wonCount    — count of jobs where stage in (invoice, closed).
+// wonCount    — count of won deals: stage in (job, closed) — plus the
+//               legacy 'invoice' alias.
 // paidTotal   — sum of all payments received against these jobs.
 export function rollupJobs(jobs: JobRow[] | null | undefined, payments: PaymentRow[] | null | undefined): JobRollup {
   const paidMap = paidByContact(payments)

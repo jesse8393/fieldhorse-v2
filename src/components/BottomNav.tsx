@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound, Sparkles } from 'lucide-react'
 import Icon from './icons/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
 
+// Pipeline v2: Leads earned the thumb-bar slot — chasing new work is
+// daily, Clients is reference material (lives in the More drawer).
 const PRIMARY = [
   { to: '/', label: 'Home', icon: 'home', end: true },
+  { to: '/leads', label: 'Leads', icon: 'lead' },
   { to: '/jobs', label: 'Jobs', icon: 'jobs' },
-  { to: '/clients', label: 'Clients', icon: 'clients' },
   { to: '/schedule', label: 'Schedule', icon: 'schedule' }
 ]
 
@@ -26,7 +28,8 @@ const PRIMARY = [
    sidebar uses. */
 const NAV_ITEMS = [
   { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
-  { to: '/jobs',        label: 'Jobs & Pipeline',     Icon: Briefcase },
+  { to: '/leads',       label: 'Leads',               Icon: Sparkles },
+  { to: '/jobs',        label: 'Jobs',                Icon: Briefcase },
   { to: '/clients',     label: 'Clients',             Icon: Users },
   { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
   { to: '/activity',    label: 'Activity',            Icon: ActivityIcon },

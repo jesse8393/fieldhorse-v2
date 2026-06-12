@@ -14,12 +14,13 @@ import { GripVertical } from 'lucide-react'
 import { hapticStageChange, hapticTap } from '../lib/haptics.ts'
 
 // Stage columns shown left-to-right. "lost" lives off-board (URL-only).
+// Pipeline v2: the Invoice column is gone — invoicing is fh_invoices
+// rows on the job, not a stage.
 const COLUMNS = [
   { id: 'lead',    label: 'Lead' },
   { id: 'quote',   label: 'Quote' },
   { id: 'job',     label: 'Active' },
-  { id: 'invoice', label: 'Invoice' },
-  { id: 'closed',  label: 'Closed' }
+  { id: 'closed',  label: 'Complete' }
 ]
 
 function money(n: any) {

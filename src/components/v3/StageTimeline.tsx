@@ -1,11 +1,13 @@
 import { Check } from 'lucide-react'
 import { STAGES, STAGE_MAP } from '../../lib/stages.ts'
 
-// Visual stage progression — collapses 6 raw stages to a 5-step linear
-// timeline that matches the mockup. `lost` is rendered as a small inline
-// banner above the timeline rather than a sixth dot, since it's a
-// terminal failure state, not a position in the flow.
-const TIMELINE_STAGES = ['lead', 'quote', 'job', 'invoice', 'closed']
+// Visual stage progression — 4 steps in pipeline v2 (the 'invoice'
+// stage is retired; invoicing happens on the job via fh_invoices).
+// `lost` is rendered as a small inline banner above the timeline
+// rather than a fifth dot, since it's a terminal failure state, not a
+// position in the flow. Legacy 'invoice' rows index as -1 → handled
+// below by aliasing to 'job'.
+const TIMELINE_STAGES = ['lead', 'quote', 'job', 'closed']
 
 /**
  * 5-dot stage timeline matching the Job Detail mockup.
@@ -39,7 +41,8 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
     )
   }
 
-  const currentIdx = TIMELINE_STAGES.indexOf(currentStage ?? '')
+  const effectiveStage = currentStage === 'invoice' ? 'job' : currentStage
+  const currentIdx = TIMELINE_STAGES.indexOf(effectiveStage ?? '')
   // unknown / unmapped → render as if we're at the very start, no dots filled
   const safeIdx = currentIdx === -1 ? -1 : currentIdx
 

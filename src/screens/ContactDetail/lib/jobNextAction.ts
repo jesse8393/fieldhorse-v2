@@ -36,9 +36,18 @@ const STAGE_DEFAULTS: Record<string, { title: string; ctaLabel: string; pipeline
   lead:    { title: 'Send a quote.',                   ctaLabel: 'Start quote',     pipelineFn: 'startQuote' },
   quote:   { title: 'Approve the quote and kick off.', ctaLabel: 'Approve quote',   pipelineFn: 'approveQuote' },
   job:     { title: 'Wrap up and invoice.',            ctaLabel: 'Mark complete',   pipelineFn: 'markComplete' },
-  invoice: { title: 'Log final payment.',              ctaLabel: 'Log payment',     pipelineFn: 'logPayment' },
+  // Legacy alias of 'job' (pipeline v2 retired the invoice stage).
+  invoice: { title: 'Collect the balance.',            ctaLabel: 'Send invoice',    pipelineFn: 'sendInvoice' },
   closed:  { title: 'Job done. Reopen if needed.',     ctaLabel: 'Reopen',          pipelineFn: 'reopen' },
   lost:    { title: 'Reopen if back in play.',         ctaLabel: 'Reopen',          pipelineFn: 'reopen' }
+}
+
+// Job-stage default, work already marked complete: the next move is
+// collecting the money, not completing again.
+const JOB_COMPLETED_DEFAULT = {
+  title: 'Work’s done — collect the balance.',
+  ctaLabel: 'Send invoice',
+  pipelineFn: 'sendInvoice'
 }
 
 export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: { contact?: any; scheduleItems?: any[]; todos?: any[] } = {}) {
@@ -93,7 +102,9 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
 
   // 4. STAGE DEFAULT — falls back to a sensible "what does this stage need?"
   const stage = contact.stage || 'lead'
-  const fallback = STAGE_DEFAULTS[stage] || STAGE_DEFAULTS.lead
+  const fallback = (stage === 'job' && contact.completed_at)
+    ? JOB_COMPLETED_DEFAULT
+    : STAGE_DEFAULTS[stage] || STAGE_DEFAULTS.lead
   return {
     kind: 'stage',
     title: fallback.title,

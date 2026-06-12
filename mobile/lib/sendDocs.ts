@@ -16,6 +16,18 @@ import { supabase } from './supabase'
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://fieldhorse.io').replace(/\/+$/, '')
 
+// The send-* Netlify functions require the signed-in user's access
+// token; sender_user_id alone is no longer trusted server-side.
+async function authHeaders(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
+}
+
 async function uploadPdf(html: string, userId: string, contactId: string, filename: string): Promise<string> {
   const { uri } = await Print.printToFileAsync({ html, base64: false })
   const arrayBuffer = await fetch(uri).then((r) => r.arrayBuffer())
@@ -51,7 +63,7 @@ export async function sendProposalEmail(input: {
   const storagePath = await uploadPdf(input.html, input.userId, input.contact.id, input.filename)
   const res = await fetch(`${API_BASE}/api/send-quote`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
       contact_id: input.contact.id,
       sender_user_id: input.userId,
@@ -83,7 +95,7 @@ export async function sendMessageEmail(input: {
   if (!email) return { ok: false, message: 'No recipient email.' }
   const res = await fetch(`${API_BASE}/api/send-message`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
       contact_id: input.contactId,
       sender_user_id: input.userId,
@@ -113,7 +125,7 @@ export async function sendInvoiceEmail(input: {
   const storagePath = await uploadPdf(input.html, input.userId, input.contact.id, input.filename)
   const res = await fetch(`${API_BASE}/api/send-invoice`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
       contact_id: input.contact.id,
       invoice_id: input.invoiceId || null,

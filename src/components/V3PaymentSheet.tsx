@@ -44,8 +44,15 @@ const PAYMENT_KINDS = [
   { value: 'other',     label: 'Other' }
 ]
 
-export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: any) {
-  const [amount, setAmount] = useState(balance > 0 ? String(Math.round(balance)) : '')
+// `invoice` (optional) — an fh_invoices row this payment settles.
+// Prefills the amount from the invoice and links the payment via
+// invoice_id so logPayment also flips that invoice to 'paid'.
+export default function V3PaymentSheet({ contact, balance, invoice = null, onClose, onLogged }: any) {
+  const [amount, setAmount] = useState(() => {
+    const invoiceAmt = Number(invoice?.amount || 0)
+    if (invoiceAmt > 0) return String(Math.round(invoiceAmt))
+    return balance > 0 ? String(Math.round(balance)) : ''
+  })
   const [method, setMethod] = useState('check')
   const [kind, setKind] = useState('other')
   const [reference, setReference] = useState('')
@@ -67,7 +74,7 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
     }
     setSaving(true)
     try {
-      await logPayment(contact, { amount: numeric, method, kind, reference, paid_on: paidOn })
+      await logPayment(contact, { amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: invoice?.id || null })
       hapticTap()
       setSuccess(true)
       toastSuccess('Payment recorded', `${money(numeric)} · ${methodLabel(method)}`)
@@ -115,9 +122,11 @@ export default function V3PaymentSheet({ contact, balance, onClose, onLogged }: 
           <DrawerDescription
             style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
-            {contact?.name
-              ? <>Records a payment against <strong style={{ color: 'var(--ink-strong)' }}>{contact.name}</strong>. This is a receipt log — not a card processor.</>
-              : <>Records a payment against this job. This is a receipt log — not a card processor.</>}
+            {invoice
+              ? <>Settles <strong style={{ color: 'var(--ink-strong)' }}>{invoice.title || `Invoice #${invoice.sequence_number}`}</strong>{contact?.name ? <> on {contact.name}</> : null}. This is a receipt log — not a card processor.</>
+              : contact?.name
+                ? <>Records a payment against <strong style={{ color: 'var(--ink-strong)' }}>{contact.name}</strong>. This is a receipt log — not a card processor.</>
+                : <>Records a payment against this job. This is a receipt log — not a card processor.</>}
           </DrawerDescription>
         </DrawerHeader>
 

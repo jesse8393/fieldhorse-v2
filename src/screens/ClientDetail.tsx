@@ -111,21 +111,24 @@ export default function ClientDetail() {
     navigate('/clients')
   }
 
-  // Create a new deal under this client at the chosen stage, prefilled
+  // Create a new deal under this client at the chosen kind, prefilled
   // with the client's contact info, then jump straight into it. A quote
-  // lands on the Quote builder; an invoice (materials/quick job, no quote
-  // needed) lands on Financials; a job lands on Overview.
+  // lands on the Quote builder; an "invoice" (materials/quick job, no
+  // quote needed) is a job in v2 — it lands on Financials where the
+  // Send Invoice flow lives; a job lands on Overview.
   async function createDealForClient(stage: 'quote' | 'job' | 'invoice') {
     if (!client?.id || !user?.id || creating) return
     setCreating(true)
     const payload = {
       user_id: user.id,
-      name: client.name || 'New ' + stage,
+      name: client.name || 'New ' + (stage === 'invoice' ? 'invoice' : stage),
       phone: client.phone || null,
       email: client.email || null,
       address: client.address || null,
       amount: 0,
-      stage,
+      // 'invoice' isn't a stage anymore (pipeline v2) — a quick
+      // standalone invoice is a job you bill immediately.
+      stage: stage === 'invoice' ? 'job' : stage,
       client_id: client.id
     }
     const { data, error } = await supabase.from('fh_contacts').insert(payload).select().single()
@@ -943,8 +946,7 @@ const PIPELINE_ROWS = [
   { id: 'lead',    label: 'Leads' },
   { id: 'quote',   label: 'Quotes' },
   { id: 'job',     label: 'Active jobs' },
-  { id: 'invoice', label: 'Invoicing' },
-  { id: 'closed',  label: 'Closed' },
+  { id: 'closed',  label: 'Complete' },
   { id: 'lost',    label: 'Lost' }
 ]
 
@@ -952,7 +954,8 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
   const buckets = useMemo(() => {
     const out = Object.fromEntries(PIPELINE_ROWS.map((r) => [r.id, { count: 0, value: 0 }]))
     for (const j of jobs) {
-      const b = out[j.stage]
+      // Legacy 'invoice'-stage rows bucket under 'job' (their v2 home).
+      const b = out[j.stage === 'invoice' ? 'job' : j.stage]
       if (!b) continue
       b.count += 1
       b.value += Number(j.amount || 0)

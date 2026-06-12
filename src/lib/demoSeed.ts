@@ -125,7 +125,8 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
         job_type: 'Renovation',
         amount: 87000,
         cost: 54200,
-        stage: 'invoice',
+        stage: 'job',
+        completed_at: new Date().toISOString(),
         notes: 'Final walkthrough complete. Invoice sent. NET-15 expected by 5/9.'
       },
       {

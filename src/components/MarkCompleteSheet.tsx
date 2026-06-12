@@ -16,7 +16,7 @@ import { Check, ShieldCheck, X, Calendar as CalendarIcon, Trash2, Download, Send
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { supabase } from '../lib/supabase.ts'
+import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 // Lazy — ~430KB pdf chunk only loads when the operator generates a
 // completion certificate.
@@ -124,9 +124,9 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     if (!isReopening || saving) return
     setSaving(true)
     try {
-      await clearCloseout({ userId, contact, reopenTo: 'invoice' })
+      await clearCloseout({ userId, contact, reopenTo: 'job' })
       hapticSuccess()
-      toastSuccess('Job reopened', 'Stage moved back to Invoice')
+      toastSuccess('Job reopened', 'Back on the active board')
       onSaved?.()
       onClose?.()
     } catch (err: any) {
@@ -213,7 +213,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       // 2. Server send.
       const sendRes = await fetch('/api/send-certificate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,
@@ -287,7 +287,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
             style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
             {isReopening
-              ? <>Edit the closeout record for <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this job'}</strong>. Reopen the job to move it back into the Invoice stage.</>
+              ? <>Edit the closeout record for <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this job'}</strong>. Reopen the job to put it back on the active board.</>
               : <>Locks the warranty start, customer sign-off, and a snapshot of dollars + photos for <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this job'}</strong>. Advances the stage to Complete.</>
             }
           </DrawerDescription>

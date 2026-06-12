@@ -217,10 +217,12 @@ export type Database = {
           amount: number | null
           approved_quote_version_id: string | null
           client_id: string | null
+          completed_at: string | null
           cost: number | null
           created_at: string | null
           email: string | null
           exclusions_text: string | null
+          follow_up_on: string | null
           has_inspections: boolean | null
           heat_score: number | null
           id: string
@@ -250,10 +252,12 @@ export type Database = {
           amount?: number | null
           approved_quote_version_id?: string | null
           client_id?: string | null
+          completed_at?: string | null
           cost?: number | null
           created_at?: string | null
           email?: string | null
           exclusions_text?: string | null
+          follow_up_on?: string | null
           has_inspections?: boolean | null
           heat_score?: number | null
           id?: string
@@ -283,10 +287,12 @@ export type Database = {
           amount?: number | null
           approved_quote_version_id?: string | null
           client_id?: string | null
+          completed_at?: string | null
           cost?: number | null
           created_at?: string | null
           email?: string | null
           exclusions_text?: string | null
+          follow_up_on?: string | null
           has_inspections?: boolean | null
           heat_score?: number | null
           id?: string
@@ -1280,6 +1286,7 @@ export type Database = {
           contact_id: string | null
           created_at: string | null
           id: string
+          invoice_id: string | null
           kind: string | null
           method: string | null
           org_id: string | null
@@ -1292,6 +1299,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           id?: string
+          invoice_id?: string | null
           kind?: string | null
           method?: string | null
           org_id?: string | null
@@ -1304,6 +1312,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           id?: string
+          invoice_id?: string | null
           kind?: string | null
           method?: string | null
           org_id?: string | null
@@ -1317,6 +1326,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "fh_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "fh_invoices"
             referencedColumns: ["id"]
           },
           {

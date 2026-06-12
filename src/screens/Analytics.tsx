@@ -85,7 +85,8 @@ export default function Analytics() {
     // the denominator (won + lost) is meaningful, and a total sample
     // of at least 3 so a single 1-of-1 win doesn't read as 100%.
     // Below either threshold the KPI tile renders "—" via its null branch.
-    const wonCount = contacts.filter((c) => c.stage === 'invoice' || c.stage === 'closed').length
+    // Pipeline v2: every job is a won deal ('invoice' is the legacy alias).
+    const wonCount = contacts.filter((c) => c.stage === 'job' || c.stage === 'invoice' || c.stage === 'closed').length
     const lostTerminalCount = contacts.filter((c) => c.stage === 'lost').length
     const terminalSample = wonCount + lostTerminalCount
     const closeRate = (wonCount >= 1 && lostTerminalCount >= 1 && terminalSample >= 3)
@@ -109,7 +110,7 @@ export default function Analytics() {
     // are the rows where margin is mathematically real. If fewer than
     // 1 such row exists, the KPI renders "—".
     const winsWithCost = contacts.filter((c) =>
-      (c.stage === 'invoice' || c.stage === 'closed') &&
+      (c.stage === 'job' || c.stage === 'invoice' || c.stage === 'closed') &&
       Number(c.amount) > 0 &&
       Number(c.cost) > 0
     )
@@ -159,7 +160,10 @@ export default function Analytics() {
       return (Number.isFinite(t) && t >= yearStart) ? s + Number(inv.amount || 0) : s
     }, 0)
     const invoicedFromContacts = contacts.reduce((s, c) => {
-      if (c.stage !== 'invoice' && c.stage !== 'closed') return s
+      // Closed jobs + jobs whose work is complete (legacy 'invoice'
+      // stage rides along for pre-migration rows).
+      const billed = c.stage === 'closed' || c.stage === 'invoice' || (c.stage === 'job' && c.completed_at)
+      if (!billed) return s
       const t = new Date(c.updated_at || c.created_at || 0).getTime()
       return (Number.isFinite(t) && t >= yearStart) ? s + Number(c.amount || 0) : s
     }, 0)
@@ -182,10 +186,12 @@ export default function Analytics() {
   }, [contacts, mileage, invoices, payments])
 
   const byStage = useMemo(() => {
+    // Legacy 'invoice'-stage rows count under 'job' (their v2 home).
+    const matches = (c: any, id: string) => c.stage === id || (id === 'job' && c.stage === 'invoice')
     return STAGES.map((s) => ({
       ...s,
-      count: contacts.filter((c) => c.stage === s.id).length,
-      value: contacts.filter((c) => c.stage === s.id).reduce((sum, c) => sum + Number(c.amount || 0), 0)
+      count: contacts.filter((c) => matches(c, s.id)).length,
+      value: contacts.filter((c) => matches(c, s.id)).reduce((sum, c) => sum + Number(c.amount || 0), 0)
     }))
   }, [contacts])
 

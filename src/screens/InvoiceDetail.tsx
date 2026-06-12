@@ -12,7 +12,7 @@ import {
   Send,
   Link as LinkIcon
 } from 'lucide-react'
-import { supabase } from '../lib/supabase.ts'
+import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -311,7 +311,7 @@ export default function InvoiceDetail() {
 
       const sendRes = await fetch('/api/send-invoice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: user!.id,

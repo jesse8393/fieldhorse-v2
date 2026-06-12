@@ -134,6 +134,8 @@ async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
       .eq('user_id', userId)
   ])
   if (clientsRes.error) throw clientsRes.error
+  if (jobsRes.error) throw jobsRes.error
+  if (paymentsRes.error) throw paymentsRes.error
   return {
     clients: (clientsRes.data ?? []) as Client[],
     jobs: (jobsRes.data ?? []) as ClientsBundle['jobs'],
@@ -283,22 +285,27 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
 }
 
 // ---- Invoices / AR ----
-// Two datasets: jobs in the active money pipeline (with the joined
-// fh_clients fallback fields) and every payment (for per-job paid
-// rollups + month-to-date collection pace). Bundled so the screen
-// keeps a single loading flag, matching its prior behavior.
+// Three datasets: jobs in the active money pipeline (with the joined
+// fh_clients fallback fields), every payment (for per-job paid
+// rollups + month-to-date collection pace), and — pipeline v2 — the
+// first-class fh_invoices rows so the screen can list real issued
+// invoices, not just per-job balances. Bundled so the screen keeps a
+// single loading flag, matching its prior behavior.
 
 export type InvoiceJob = Contact & {
   fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
 }
 
+export type InvoiceRecord = Database['public']['Tables']['fh_invoices']['Row']
+
 export type InvoicesBundle = {
   jobs: InvoiceJob[]
   payments: Payment[]
+  invoices: InvoiceRecord[]
 }
 
 async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
-  const [jobsRes, paymentsRes] = await Promise.all([
+  const [jobsRes, paymentsRes, invoicesRes] = await Promise.all([
     supabase
       .from('fh_contacts')
       .select('*, fh_clients(name, email, phone, address)')
@@ -308,13 +315,20 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
     supabase
       .from('fh_payments')
       .select('*')
+      .eq('user_id', userId),
+    supabase
+      .from('fh_invoices')
+      .select('*')
       .eq('user_id', userId)
+      .order('created_at', { ascending: false })
   ])
   if (jobsRes.error) throw jobsRes.error
   if (paymentsRes.error) throw paymentsRes.error
+  if (invoicesRes.error) throw invoicesRes.error
   return {
     jobs: (jobsRes.data ?? []) as InvoiceJob[],
-    payments: (paymentsRes.data ?? []) as Payment[]
+    payments: (paymentsRes.data ?? []) as Payment[],
+    invoices: (invoicesRes.data ?? []) as InvoiceRecord[]
   }
 }
 

@@ -20,7 +20,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.ts'
+import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
@@ -375,7 +375,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
       const sendRes = await fetch('/api/send-invoice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: user.id,

@@ -22,7 +22,7 @@ describe('rollupJobs', () => {
     expect(r.lifetime).toBe(4600)       // every job amount, all stages
     expect(r.outstanding).toBe(600)     // only billing stages: a 600 + b 0
     expect(r.activeCount).toBe(3)       // lead/quote/job/invoice → a,b,d
-    expect(r.wonCount).toBe(2)          // invoice/closed → b,c
+    expect(r.wonCount).toBe(3)          // every job is a won deal → a,b,c
     expect(r.paidTotal).toBe(2900)
   })
 
@@ -52,14 +52,14 @@ describe('rollupJobs', () => {
 describe('rollupByClient', () => {
   it('splits totals per client and attributes payments via their job', () => {
     const byClient = rollupByClient(jobs, payments)
-    expect(byClient.get('c1')).toMatchObject({ lifetime: 1500, outstanding: 600, activeCount: 2, wonCount: 1, paidTotal: 900 })
+    expect(byClient.get('c1')).toMatchObject({ lifetime: 1500, outstanding: 600, activeCount: 2, wonCount: 2, paidTotal: 900 })
     expect(byClient.get('c2')).toMatchObject({ lifetime: 3100, outstanding: 0, activeCount: 1, wonCount: 1, paidTotal: 2000 })
   })
 })
 
 describe('closeRate', () => {
-  it('is won / (won + lost) over terminal jobs', () => {
-    expect(closeRate(jobs)).toBeCloseTo(2 / 3) // won b,c ; lost e
+  it('is won / (won + lost) over decided deals', () => {
+    expect(closeRate(jobs)).toBeCloseTo(3 / 4) // won a,b,c ; lost e
   })
   it('is 0 when nothing has reached a terminal stage', () => {
     expect(closeRate([{ stage: 'lead' }, { stage: 'quote' }])).toBe(0)
@@ -69,8 +69,8 @@ describe('closeRate', () => {
 
 describe('avgMargin', () => {
   it('averages per-job margin ratios over won jobs', () => {
-    // b: (500-0)/500 = 1.0 ; c: (2000-2000)/2000 = 0 → mean 0.5
-    expect(avgMargin(jobs)).toBeCloseTo(0.5)
+    // a: (1000-600)/1000 = 0.4 ; b: 1.0 ; c: 0 → mean ≈ 0.4667
+    expect(avgMargin(jobs)).toBeCloseTo(0.4667, 3)
   })
   it('is 0 with no qualifying jobs', () => {
     expect(avgMargin([])).toBe(0)
@@ -81,9 +81,9 @@ describe('avgMargin', () => {
 describe('wonYTD / profitYTD', () => {
   const now = new Date('2026-06-01T12:00:00')
   it('sums won amounts updated this calendar year (excludes last year)', () => {
-    expect(wonYTD(jobs, now)).toBe(2500) // b 500 + c 2000 ; e is 2025/lost
+    expect(wonYTD(jobs, now)).toBe(3500) // a 1000 + b 500 + c 2000 ; e is 2025/lost
   })
   it('sums profit (amount - cost) for won-this-year jobs', () => {
-    expect(profitYTD(jobs, now)).toBe(500) // b 500-0 ; c 2000-2000
+    expect(profitYTD(jobs, now)).toBe(900) // a 400 + b 500 + c 0
   })
 })

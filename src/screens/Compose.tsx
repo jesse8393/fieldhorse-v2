@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
-import { supabase } from '../lib/supabase.ts'
+import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { claudeMessage } from '../lib/anthropic.ts'
@@ -131,7 +131,7 @@ export default function Compose() {
         : intent || `Message from ${profile?.company_name || 'your contractor'}`
       const res = await fetch('/api/send-message', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: user!.id,
