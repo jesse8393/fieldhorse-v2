@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
+import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
@@ -828,6 +829,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
         }}
         onMouseEnter={(e) => {
+          if (!canHover) return
           e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
           e.currentTarget.style.background = 'var(--v3-surface-3)'
         }}
@@ -933,6 +935,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                   transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
                 }}
                 onMouseEnter={(ev) => {
+                  if (!canHover) return
                   ev.currentTarget.style.color = 'var(--v3-danger-bright)'
                   ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
                   ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'

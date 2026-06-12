@@ -4,6 +4,7 @@ import { Plus, FileText, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { canHover } from '../../../lib/hover.ts'
 import { PostedByChip } from '../../../components/v3'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
@@ -200,6 +201,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     touchAction: 'manipulation'
                   }}
                   onMouseEnter={(ev) => {
+                    if (!canHover) return
                     ev.currentTarget.style.color = 'var(--v3-danger-bright)'
                     ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
                     ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'

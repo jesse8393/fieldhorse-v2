@@ -18,6 +18,7 @@ import {
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { getWeather, workWindow } from '../lib/weather.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
+import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
@@ -941,7 +942,7 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
             WebkitTapHighlightColor: 'transparent',
             transition: 'opacity 160ms ease, color 160ms ease'
           }}
-          onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
+          onMouseEnter={(ev) => { if (!canHover) return; ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
           onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.35'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
         >
           <Trash2 size={12} />
@@ -989,7 +990,7 @@ function WeekView({ start, events, onClick, onDelete }: any) {
                         opacity: 0.6,
                         WebkitTapHighlightColor: 'transparent'
                       }}
-                      onMouseEnter={(ev) => { ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
+                      onMouseEnter={(ev) => { if (!canHover) return; ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
                       onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.6'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
                     >
                       <Trash2 size={13} />

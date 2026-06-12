@@ -4,6 +4,7 @@ import { Receipt, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Check, X as XIco
 import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { canHover } from '../../../lib/hover.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 
 /**
@@ -603,7 +604,7 @@ function RowActionButton({ children, ariaLabel, onClick, disabled, tone }: any) 
       onClick={onClick}
       disabled={disabled}
       onMouseEnter={(e) => {
-        if (disabled) return
+        if (disabled || !canHover) return
         e.currentTarget.style.color = tone === 'danger'
           ? 'var(--v3-danger-bright)'
           : 'var(--v3-text)'

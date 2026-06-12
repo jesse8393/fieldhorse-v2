@@ -7,6 +7,7 @@ import Icon from './icons/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
+import { canHover } from '../lib/hover.ts'
 
 // Pipeline v2: Leads earned the thumb-bar slot — chasing new work is
 // daily, Clients is reference material (lives in the More drawer).
@@ -296,6 +297,7 @@ export default function BottomNav() {
                   transition: 'color 140ms ease, border-color 140ms ease'
                 }}
                 onMouseEnter={(e) => {
+                  if (!canHover) return
                   e.currentTarget.style.color = 'var(--v3-danger-bright)'
                   e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger) 50%, transparent)'
                 }}
@@ -388,7 +390,7 @@ function NavRow({ item, onTap }: any) {
         transition: 'background-color 140ms ease'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--v3-surface-2)'
+        if (canHover) e.currentTarget.style.background = 'var(--v3-surface-2)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'transparent'

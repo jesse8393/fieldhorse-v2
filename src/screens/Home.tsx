@@ -27,6 +27,7 @@ import CountUp from '../components/fx/CountUp.tsx'
 import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
 import HomeActivityCard from '../components/HomeActivityCard.tsx'
 import { hapticTap } from '../lib/haptics.ts'
+import { canHover } from '../lib/hover.ts'
 // V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
 // same batch helper Jobs already uses (one query + one signed-URL
 // batch call, no N+1). Returns { [contactId]: signedUrl }.
@@ -1037,7 +1038,7 @@ export default function Home() {
               onClick={() => { hapticTap(); navigate('/jobs') }}
               className="v3-section-link"
               style={{ color: 'var(--v3-text-muted)', transition: 'color 160ms ease' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--v3-primary)' }}
+              onMouseEnter={(e) => { if (canHover) e.currentTarget.style.color = 'var(--v3-primary)' }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--v3-text-muted)' }}
             >
               View all
@@ -1340,6 +1341,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
       }}
       onMouseEnter={(e) => {
+        if (!canHover) return
         // Hover stays neutral — black/charcoal/white. Stage color
         // shows on the spine + label only (functional). No ambient
         // blue/purple bleed onto the card's halo.
