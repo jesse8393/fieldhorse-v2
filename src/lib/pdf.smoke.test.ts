@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest'
 // pdf.js is a large untyped legacy module — array params infer as
 // never[], so fixture payloads go through `as any` at the call sites.
-import { generateInvoice, generateQuote, generateCertificate } from './pdf.js'
+import { generateInvoice, generateQuote, generateCertificate, generateStatement } from './pdf.js'
 
 const company = {
   name: 'Parker Construction Co.',
@@ -88,6 +88,32 @@ describe('pdf engine smoke', () => {
         signoff_name: 'Justin Bryan'
       }
     } as any)
+    expectRealPdf(result)
+  })
+
+  it('generateStatement produces a valid PDF', async () => {
+    const result = await generateStatement({
+      company,
+      client: {
+        id: '6f1c9b1e-0000-4000-8000-000000000099',
+        name: 'Jordan Pell',
+        company_name: 'MMC Properties',
+        address: '200 Commerce Dr, Murfreesboro TN',
+        email: 'ap@mmcproperties.com'
+      },
+      lines: [
+        { property: 'Summit Townhomes — sidewalk repair', invoiceLabel: 'Final balance', dateIso: '2026-06-01T00:00:00Z', amount: 1380 },
+        { property: '12 Oak St — driveway', invoiceLabel: 'Deposit', dateIso: '2026-05-20T00:00:00Z', amount: 2500 },
+        { property: 'Maple Court — curb', invoiceLabel: 'Progress draw 2', dateIso: '2026-05-28T00:00:00Z', amount: 900 }
+      ],
+      statementId: '6f1c9b1e-0000-4000-8000-000000000099'
+    } as any)
+    expectRealPdf(result)
+    expect(result.totalDue).toBe(4780)
+  })
+
+  it('generateStatement survives an empty client', async () => {
+    const result = await generateStatement({ company, client: {}, lines: [] } as any)
     expectRealPdf(result)
   })
 

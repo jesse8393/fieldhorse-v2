@@ -870,10 +870,138 @@ export async function generateInvoice({
 }
 
 // ============================================================
-// V3 letterhead PDF helpers — preserved from earlier passes; some
-// remain referenced by the proposal generator below until that's
-// also rewritten in the same restrained style.
+// CLIENT STATEMENT — one document rolling every open invoice across
+// all of a client's properties into a single "here's everything you
+// owe me" sheet. Same restrained letterhead system as the invoice.
+//
+// Args:
+//   company   — companyFromProfile() shape (sender branding)
+//   client    — { id, name, company_name, address, phone, email }
+//   lines     — [{ property, invoiceLabel, dateIso, amount, dueIso }]
+//               one row per open invoice, already filtered to owed.
+//   statementId — seed for the document number (client id)
 // ============================================================
+export async function generateStatement({
+  company = {},
+  client = {},
+  lines = [],
+  statementId
+} = {}) {
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 16
+
+  const number = docInvoiceNumber(company?.name, statementId || client?.id)
+  const logo = company?.logo_url
+    ? await loadLogoForPdf(company.logo_url, { maxDimension: 720 })
+    : null
+  const brandRGB = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
+
+  // 1. Letterhead
+  let cursor = drawDocLetterhead(doc, {
+    pageWidth, margin, docType: 'STATEMENT',
+    number: shortDocNumber(number),
+    issuedAt: new Date(),
+    company, logo, brandRGB
+  })
+
+  // 2. Parties — the client is the recipient. A client's own
+  //    company_name (e.g. "MMC Properties") reads as the recipient
+  //    name when present, with the person's name as a sub-line.
+  const recipientName = client?.company_name || client?.name || 'Client'
+  const recipientSub = client?.company_name && client?.name && client.company_name !== client.name
+    ? client.name
+    : null
+  cursor = drawDocParties(doc, {
+    pageWidth, margin, y: cursor + 2,
+    recipient: {
+      name: recipientName,
+      address: [recipientSub, client?.address].filter(Boolean).join('\n'),
+      phone: client?.phone,
+      email: client?.email
+    },
+    company
+  })
+
+  // 3. Open-invoices table — one row per property/invoice.
+  const totalDue = lines.reduce((s, l) => s + Number(l.amount || 0), 0)
+  autoTable(doc, {
+    startY: cursor + 4,
+    head: [['Property / Project', 'Invoice', 'Date', 'Amount Due']],
+    body: lines.length > 0
+      ? lines.map((l) => [
+          l.property || '—',
+          l.invoiceLabel || '—',
+          shortDate(l.dateIso) || '—',
+          money(Number(l.amount || 0))
+        ])
+      : [['No open invoices', '', '', money(0)]],
+    theme: 'plain',
+    headStyles: {
+      fillColor: brandRGB,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 10,
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+    },
+    bodyStyles: {
+      fontSize: 10,
+      textColor: [40, 38, 35],
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body') {
+        const d = data.doc
+        d.setDrawColor(232, 228, 216)
+      }
+    },
+    didDrawCell: (data) => {
+      if (data.section === 'body') {
+        const { doc: d, cell } = data
+        d.setDrawColor(232, 228, 216)
+        d.setLineWidth(0.15)
+        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
+      }
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto', fontStyle: 'bold' },
+      1: { cellWidth: 38 },
+      2: { cellWidth: 24 },
+      3: { halign: 'right', cellWidth: 30, fontStyle: 'bold' }
+    },
+    margin: { left: margin, right: margin }
+  })
+  cursor = doc.lastAutoTable.finalY
+
+  // 4. Total due block
+  cursor = drawDocTotalsBlock(doc, {
+    startY: cursor + 2,
+    pageWidth, margin,
+    label: 'TOTAL DUE',
+    total: totalDue,
+    rows: [{ label: `${lines.length} open invoice${lines.length === 1 ? '' : 's'}`, value: money(totalDue), muted: true }]
+  })
+
+  // 5. Disclaimer footer on every page
+  const total_pages = doc.internal.getNumberOfPages()
+  for (let p = 1; p <= total_pages; p++) {
+    doc.setPage(p)
+    drawDocDisclaimer(doc, {
+      pageWidth, pageHeight, margin,
+      text: 'Statement of open invoices across all properties. Please remit the total due or contact us with any questions.'
+    })
+  }
+
+  return {
+    doc,
+    filename: `Statement_${number}_${(recipientName || 'client').replace(/\s+/g, '_')}.pdf`,
+    number,
+    totalDue
+  }
+}
+
+
 
 function shortDate(iso) {
   if (!iso) return ''
