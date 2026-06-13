@@ -116,11 +116,11 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
 }) {
   const { contractTotal, paid } = contractTotals({ contact, payments, changeOrders })
   const title = invoice.title?.trim() || `Invoice #${invoice.sequence_number}`
-  // Customer-facing "what is this for". Falls back to the job's
-  // title + property address so repeat clients with several
-  // properties can always tell which one the bill covers.
+  // Customer-facing "what is this for". Falls back to the job title.
+  // No address here — the recipient block already prints it, and in
+  // the table it just wraps into noise.
   const description = (invoice as any).description?.trim()
-    || [contact.job_title, contact.address].filter(Boolean).join(' — ')
+    || contact.job_title
     || 'Construction services'
   return generateInvoice({
     company,
@@ -132,7 +132,11 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
       email: contact.email,
       job_title: `${title} — ${contact.job_title || 'Construction services'}`
     },
-    lineItems: [{ description, qty: 1, rate: invoice.amount, amount: invoice.amount }],
+    // pdf.js maps line-item `description` → the narrow bold
+    // Product/Service column and `notes` → the wide Description column.
+    // Title goes narrow, the human-readable description goes wide so it
+    // only wraps when it actually runs out of room.
+    lineItems: [{ description: title, notes: description, qty: 1, rate: invoice.amount, amount: invoice.amount }],
     notes: invoice.notes || '',
     dueDate: invoice.due_at
       ? new Date(invoice.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
