@@ -102,9 +102,9 @@ describe('pdf engine smoke', () => {
         email: 'ap@mmcproperties.com'
       },
       lines: [
-        { property: 'Summit Townhomes — sidewalk repair', invoiceLabel: 'Final balance', dateIso: '2026-06-01T00:00:00Z', amount: 1380 },
-        { property: '12 Oak St — driveway', invoiceLabel: 'Deposit', dateIso: '2026-05-20T00:00:00Z', amount: 2500 },
-        { property: 'Maple Court — curb', invoiceLabel: 'Progress draw 2', dateIso: '2026-05-28T00:00:00Z', amount: 900 }
+        { property: 'Summit Townhomes — sidewalk repair', contract: 1880, paid: 500, balance: 1380 },
+        { property: '12 Oak St — driveway', contract: 2500, paid: 0, balance: 2500 },
+        { property: 'Maple Court — curb', contract: 1400, paid: 500, balance: 900 }
       ],
       statementId: '6f1c9b1e-0000-4000-8000-000000000099'
     } as any)

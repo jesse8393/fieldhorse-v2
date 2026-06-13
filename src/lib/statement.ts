@@ -1,24 +1,41 @@
 // src/lib/statement.ts
 //
-// Client statement — one rollup of every OPEN invoice across all of a
-// client's properties/jobs. Built for repeat clients (e.g. a property
+// Client statement — one rollup of what a client owes across ALL of
+// their properties/jobs. Built for repeat clients (e.g. a property
 // manager with several buildings) who want a single "here's everything
 // I owe you" document instead of one invoice per job.
 //
-// "Open" = invoice status in (sent, overdue). Drafts aren't real bills
-// yet; paid/void are settled. That mirrors what the customer expects to
-// see — the invoices you've actually issued that aren't yet paid.
+// "Owed" = contract amount − payments, per property. This is the SAME
+// definition used on the Invoices screen and ClientDetail's
+// "outstanding" metric, so the statement always agrees with what the
+// app shows elsewhere (and never comes back empty for a contractor who
+// tracks balances by contract/paid rather than discrete invoice rows).
+//
+// gatherStatement is a PURE function over jobs + payments the caller
+// already has — no DB round-trip, trivially unit-testable.
 
-import { supabase } from './supabase.ts'
 import { generateStatement, downloadPdf } from './pdf.js'
+
+export type StatementJob = {
+  id: string
+  name?: string | null
+  job_title?: string | null
+  address?: string | null
+  amount?: number | string | null
+  stage?: string | null
+}
+
+export type StatementPayment = {
+  contact_id?: string | null
+  amount?: number | string | null
+}
 
 export type StatementLine = {
   contactId: string
   property: string
-  invoiceLabel: string
-  dateIso: string | null
-  dueIso: string | null
-  amount: number
+  contract: number
+  paid: number
+  balance: number
 }
 
 export type StatementData = {
@@ -26,47 +43,43 @@ export type StatementData = {
   totalDue: number
 }
 
-const OPEN_STATUSES = ['sent', 'overdue']
+// Stages that can carry a billable balance. Leads/quotes aren't owed
+// yet; lost is dead. Matches the Invoices screen's job set.
+const BILLING_STAGES = new Set(['job', 'invoice', 'closed'])
 
 /**
- * Gather every open invoice across the client's jobs. `jobs` is the
- * client's contact rows (id + a display name); we look up their
- * invoices in one query and shape them into statement lines.
+ * Roll the client's jobs into statement lines — one row per property
+ * with a positive balance (contract − paid). Pure: no network.
  */
-export async function gatherStatement(
-  userId: string | undefined,
-  jobs: { id: string; name?: string | null; job_title?: string | null; address?: string | null }[]
-): Promise<StatementData> {
-  const empty: StatementData = { lines: [], totalDue: 0 }
-  if (!userId || !jobs?.length) return empty
+export function gatherStatement(
+  jobs: StatementJob[] | null | undefined,
+  payments: StatementPayment[] | null | undefined
+): StatementData {
+  if (!jobs?.length) return { lines: [], totalDue: 0 }
 
-  const jobIds = jobs.map((j) => j.id)
-  const byId = new Map(jobs.map((j) => [j.id, j]))
+  const paidByJob = new Map<string, number>()
+  for (const p of payments || []) {
+    if (!p.contact_id) continue
+    paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
+  }
 
-  const { data, error } = await supabase
-    .from('fh_invoices')
-    .select('id, contact_id, sequence_number, title, description, amount, status, due_at, created_at')
-    .eq('user_id', userId)
-    .in('contact_id', jobIds)
-    .in('status', OPEN_STATUSES)
-    .order('created_at', { ascending: true })
-  if (error || !data) return empty
-
-  const lines: StatementLine[] = (data as any[]).map((inv) => {
-    const job = byId.get(inv.contact_id)
-    const property = job?.job_title || job?.name || job?.address || 'Project'
-    const label = inv.title?.trim() || `Invoice #${inv.sequence_number}`
-    return {
-      contactId: inv.contact_id,
-      property,
-      invoiceLabel: label,
-      dateIso: inv.created_at || null,
-      dueIso: inv.due_at || null,
-      amount: Number(inv.amount) || 0
-    }
-  })
-
-  const totalDue = lines.reduce((s, l) => s + l.amount, 0)
+  const lines: StatementLine[] = []
+  for (const j of jobs) {
+    if (j.stage && !BILLING_STAGES.has(j.stage)) continue
+    const contract = Number(j.amount || 0)
+    const paid = paidByJob.get(j.id) || 0
+    const balance = contract - paid
+    if (balance <= 0.5) continue
+    lines.push({
+      contactId: j.id,
+      property: j.job_title || j.name || j.address || 'Project',
+      contract,
+      paid,
+      balance
+    })
+  }
+  lines.sort((a, b) => b.balance - a.balance)
+  const totalDue = lines.reduce((s, l) => s + l.balance, 0)
   return { lines, totalDue }
 }
 
@@ -114,7 +127,7 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
   const result = await buildStatementPdf({ company, client, data })
   if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
 
-  const { authHeaders } = await import('./supabase.ts')
+  const { supabase, authHeaders } = await import('./supabase.ts')
   const blob = result.doc.output('blob')
   const rowId = crypto.randomUUID()
   const path = `${userId}/statements/${rowId}.pdf`

@@ -924,19 +924,19 @@ export async function generateStatement({
     company
   })
 
-  // 3. Open-invoices table — one row per property/invoice.
-  const totalDue = lines.reduce((s, l) => s + Number(l.amount || 0), 0)
+  // 3. Per-property balance table — Property | Contract | Paid | Balance.
+  const totalDue = lines.reduce((s, l) => s + Number(l.balance || 0), 0)
   autoTable(doc, {
     startY: cursor + 4,
-    head: [['Property / Project', 'Invoice', 'Date', 'Amount Due']],
+    head: [['Property / Project', 'Contract', 'Paid', 'Balance Due']],
     body: lines.length > 0
       ? lines.map((l) => [
           l.property || '—',
-          l.invoiceLabel || '—',
-          shortDate(l.dateIso) || '—',
-          money(Number(l.amount || 0))
+          money(Number(l.contract || 0)),
+          money(Number(l.paid || 0)),
+          money(Number(l.balance || 0))
         ])
-      : [['No open invoices', '', '', money(0)]],
+      : [['No open balances', '', '', money(0)]],
     theme: 'plain',
     headStyles: {
       fillColor: brandRGB,
@@ -950,12 +950,6 @@ export async function generateStatement({
       textColor: [40, 38, 35],
       cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
     },
-    didParseCell: (data) => {
-      if (data.section === 'body') {
-        const d = data.doc
-        d.setDrawColor(232, 228, 216)
-      }
-    },
     didDrawCell: (data) => {
       if (data.section === 'body') {
         const { doc: d, cell } = data
@@ -966,8 +960,8 @@ export async function generateStatement({
     },
     columnStyles: {
       0: { cellWidth: 'auto', fontStyle: 'bold' },
-      1: { cellWidth: 38 },
-      2: { cellWidth: 24 },
+      1: { halign: 'right', cellWidth: 28 },
+      2: { halign: 'right', cellWidth: 26 },
       3: { halign: 'right', cellWidth: 30, fontStyle: 'bold' }
     },
     margin: { left: margin, right: margin }
@@ -980,7 +974,7 @@ export async function generateStatement({
     pageWidth, margin,
     label: 'TOTAL DUE',
     total: totalDue,
-    rows: [{ label: `${lines.length} open invoice${lines.length === 1 ? '' : 's'}`, value: money(totalDue), muted: true }]
+    rows: [{ label: `${lines.length} ${lines.length === 1 ? 'property' : 'properties'}`, value: money(totalDue), muted: true }]
   })
 
   // 5. Disclaimer footer on every page
