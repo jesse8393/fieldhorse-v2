@@ -466,7 +466,7 @@ export function useInvalidatePartners() {
 
 export type ClientJob = Pick<
   Contact,
-  'id' | 'name' | 'stage' | 'job_title' | 'job_type' | 'amount' | 'updated_at'
+  'id' | 'name' | 'stage' | 'job_title' | 'job_type' | 'amount' | 'updated_at' | 'created_at'
 >
 
 export type ClientDetailBundle = {
@@ -478,7 +478,7 @@ export type ClientDetailBundle = {
   files: (Database['public']['Tables']['fh_job_files']['Row'] & {
     fh_contacts: Pick<Contact, 'name'> | null
   })[]
-  payments: Pick<Payment, 'contact_id' | 'amount'>[]
+  payments: Pick<Payment, 'contact_id' | 'amount' | 'paid_on' | 'created_at' | 'method'>[]
 }
 
 const EMPTY_CLIENT_DETAIL: Omit<ClientDetailBundle, 'client'> = {
@@ -497,7 +497,7 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
 
   const { data: jobsData } = await supabase
     .from('fh_contacts')
-    .select('id, name, stage, job_title, job_type, amount, updated_at')
+    .select('id, name, stage, job_title, job_type, amount, updated_at, created_at')
     .eq('user_id', userId)
     .eq('client_id', client.id)
     .order('updated_at', { ascending: false })
@@ -525,7 +525,7 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
       .limit(60),
     supabase
       .from('fh_payments')
-      .select('contact_id, amount')
+      .select('contact_id, amount, paid_on, created_at, method')
       .eq('user_id', userId)
       .in('contact_id', jobIds)
   ])

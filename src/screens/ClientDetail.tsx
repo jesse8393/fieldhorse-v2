@@ -7,7 +7,7 @@ import {
   ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
   Briefcase, Paperclip, Image as ImageIcon, Download,
   Phone, Mail, MapPin, Trash2, MessageSquare, Users,
-  Plus, FileText, Receipt
+  Plus, FileText, Receipt, DollarSign, Clock
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
@@ -20,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
 import StatementSheet from '../components/StatementSheet.tsx'
+import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -39,6 +40,7 @@ function fmtPhone(n: any) {
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
   { id: 'projects', label: 'Projects' },
   { id: 'files',    label: 'Files' },
   { id: 'notes',    label: 'Notes' }
@@ -437,6 +439,9 @@ export default function ClientDetail() {
           isEditing
             ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
             : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
+        )}
+        {tab === 'activity' && (
+          <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'projects' && (
           <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
@@ -1142,6 +1147,87 @@ function relTime(input: any) {
   if (diffDay < 7) return `${diffDay}d`
   if (diffDay < 30) return `${Math.floor(diffDay / 7)}w`
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/* ============================================================
+   ClientTimeline — one chronological feed across all the client's
+   properties: payments, projects, notes, files. Newest first.
+   ============================================================ */
+function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
+  const events = useMemo(
+    () => composeClientTimeline(jobs, payments, notes, files),
+    [jobs, payments, notes, files]
+  )
+
+  if (events.length === 0) {
+    return (
+      <div className="v3-empty" style={{ padding: '28px 16px', textAlign: 'center' }}>
+        <Clock size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>No activity yet</div>
+        <div style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>Payments, notes, and photos across this client's properties will show up here.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '4px 0 20px' }}>
+      {events.map((e: TimelineEvent, i: number) => {
+        const meta = TIMELINE_META[e.kind]
+        const last = i === events.length - 1
+        return (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => { hapticTap(); onOpen?.(e.contactId) }}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%',
+              textAlign: 'left', background: 'none', border: 'none', padding: '4px 0',
+              cursor: e.contactId ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            {/* Rail: dot + connecting line */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 26 }}>
+              <span style={{ width: 26, height: 26, borderRadius: 999, display: 'grid', placeItems: 'center', background: meta.bg, border: `1px solid ${meta.border}`, color: meta.color }}>
+                <meta.Icon size={13} />
+              </span>
+              {!last && <span style={{ flex: 1, width: 1.5, background: 'var(--v3-border)', marginTop: 2, minHeight: 14 }} />}
+            </div>
+            {/* Body */}
+            <div style={{ flex: 1, minWidth: 0, paddingBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 13.5, fontWeight: 700, color: 'var(--v3-text)' }}>{e.title}</span>
+                {e.amount != null && e.amount > 0 && (
+                  <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--v3-success-bright, #4ade80)', fontVariantNumeric: 'tabular-nums' }}>+{money(e.amount)}</span>
+                )}
+              </div>
+              {e.detail && (
+                <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.detail}</div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 3, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <span>{timelineDate(e.atIso)}</span>
+                {e.property && <><span aria-hidden="true">·</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{e.property}</span></>}
+              </div>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const TIMELINE_META: Record<string, { Icon: any; color: string; bg: string; border: string }> = {
+  payment: { Icon: DollarSign, color: 'var(--v3-success-bright, #4ade80)', bg: 'color-mix(in srgb, #4ade80 12%, transparent)', border: 'color-mix(in srgb, #4ade80 35%, transparent)' },
+  job:     { Icon: Briefcase,  color: 'var(--v3-primary)', bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
+  note:    { Icon: MessageSquare, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' },
+  file:    { Icon: ImageIcon, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' }
+}
+
+function timelineDate(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  const sameYear = d.getFullYear() === now.getFullYear()
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
 function ProjectsList({ jobs, payments = [], onOpen }: any) {
