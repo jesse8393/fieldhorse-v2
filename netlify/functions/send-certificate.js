@@ -107,13 +107,13 @@ export default async (request) => {
 
   // 2. Profile branding (company name, reply-to).
   const { data: profile } = await supabase
-    .from('fh_profiles')
-    .select('full_name, company_name, company_email, email')
+    .from('profiles')
+    .select('full_name, company_name, company_email')
     .eq('user_id', sender_user_id)
     .maybeSingle()
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
-  const replyTo = (profile?.company_email || profile?.email || '').trim()
+  const replyTo = (profile?.company_email || authData.user.email || '').trim()
 
   // 3. Download the certificate PDF.
   const { data: fileBlob, error: dlErr } = await supabase.storage

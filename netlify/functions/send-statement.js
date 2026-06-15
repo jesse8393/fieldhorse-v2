@@ -14,6 +14,7 @@
 //   Reply-To: company_email || sender's auth email
 
 import { createClient } from '@supabase/supabase-js'
+import { renderPayBlock } from './lib/email.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -91,13 +92,13 @@ export default async (request) => {
 
   // 2. Branding for From-line + Reply-To.
   const { data: profile } = await supabase
-    .from('fh_profiles')
-    .select('full_name, company_name, company_email, email')
+    .from('profiles')
+    .select('full_name, company_name, company_email, payment_link, payment_instructions')
     .eq('user_id', sender_user_id)
     .maybeSingle()
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
-  const replyTo = (profile?.company_email || profile?.email || '').trim()
+  const replyTo = (profile?.company_email || authData.user.email || '').trim()
 
   // 3. Download the uploaded statement PDF.
   const { data: fileBlob, error: dlErr } = await supabase.storage
@@ -118,18 +119,22 @@ export default async (request) => {
   const safeRecipientName = (recipient_name || client.company_name || client.name || '').trim()
   const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
   const senderLine = companyName || 'Your contractor'
+  const payLink = (profile?.payment_link || '').trim()
+  const payInstructions = (profile?.payment_instructions || '').trim()
 
   const text = [
     greeting,
     '',
     `Attached is your current statement of open invoices across all properties.${amountLabel ? ` Total due: ${amountLabel}.` : ''}`,
+    ...(payLink ? ['', `Pay online: ${payLink}`] : []),
+    ...(payInstructions ? ['', payInstructions] : []),
     '',
     'Reply directly to this email with any questions or to confirm payment.',
     '',
     `— ${senderLine}`
   ].join('\n')
 
-  const html = renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine })
+  const html = renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, payLink, payInstructions })
   const safeFilename = (filename || `statement-${client.id}.pdf`).replace(/[^a-z0-9._-]/gi, '_')
 
   // 5. Send via Resend.
@@ -168,10 +173,11 @@ function formatMoneyLabel(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine }) {
+function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, payLink, payInstructions }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
+  const payRow = renderPayBlock(payLink, payInstructions, amountLabel, safe)
   return `<!doctype html>
 <html lang="en">
 <body style="margin:0;padding:0;background:#f7f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f1f1f;line-height:1.55;">
@@ -181,6 +187,9 @@ function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine })
         <tr><td>
           <p style="margin:0 0 16px;">${safe(greeting)}</p>
           <p style="margin:0 0 16px;">Attached is your current statement of open invoices for <strong>${safe(clientLabel)}</strong> across all properties.${amountLabel ? ` Total due: <strong>${safe(amountLabel)}</strong>.` : ''}</p>
+        </td></tr>
+        ${payRow}
+        <tr><td>
           <p style="margin:0 0 16px;color:#555;">Reply directly to this email with any questions or to confirm payment.</p>
           <p style="margin:24px 0 0;">— ${safe(senderLine)}</p>
         </td></tr>

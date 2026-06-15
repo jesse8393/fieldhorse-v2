@@ -51,6 +51,11 @@ export default function Settings() {
   const [licenseNumber, setLicenseNumber] = useState(profile?.license_number || '')
   const [insuredText, setInsuredText] = useState(profile?.insured_text || '')
   const [warrantyDefault, setWarrantyDefault] = useState(profile?.warranty_default || '')
+  // Bring-your-own pay link (Venmo / Zelle / Square / a Stripe Payment
+  // Link the contractor created themselves) — renders as a "Pay now"
+  // button on invoices, statements, and the customer-facing pages.
+  const [paymentLink, setPaymentLink] = useState((profile as any)?.payment_link || '')
+  const [paymentInstructions, setPaymentInstructions] = useState((profile as any)?.payment_instructions || '')
   // Brand accent hex (validated #RRGGBB by migration 015's CHECK
   // constraint). Drives every gold accent on the customer-visible
   // surfaces — top rule on each PDF, status pills, eyebrows, hero
@@ -119,6 +124,8 @@ export default function Settings() {
     setLicenseNumber(profile?.license_number || '')
     setInsuredText(profile?.insured_text || '')
     setWarrantyDefault(profile?.warranty_default || '')
+    setPaymentLink((profile as any)?.payment_link || '')
+    setPaymentInstructions((profile as any)?.payment_instructions || '')
     setBrandAccentHex(profile?.brand_accent_hex || '')
     setEstimateTemplate((profile as any)?.estimate_template || 'classic')
     setServices(() => {
@@ -150,6 +157,16 @@ export default function Settings() {
       const t = (s || '').trim()
       return t.length === 0 ? null : t
     }
+    // Pay links pasted from an app often drop the scheme ("venmo.com/…").
+    // Prepend https:// so the stored value is a real clickable URL —
+    // unless it's already a deep-link scheme (venmo://, etc.).
+    const normalizePayLink = (s: any) => {
+      const t = (s || '').trim()
+      if (!t) return t
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return t
+      if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return t // scheme without // (mailto:, tel:)
+      return `https://${t}`
+    }
     // Validate brand accent before save. Migration 015's CHECK
     // constraint will reject anything off-format with an opaque
     // Postgres error; catching it here lets us surface a friendly
@@ -177,6 +194,8 @@ export default function Settings() {
       license_number: nullIfBlank(licenseNumber),
       insured_text: nullIfBlank(insuredText),
       warranty_default: nullIfBlank(warrantyDefault),
+      payment_link: nullIfBlank(normalizePayLink(paymentLink)),
+      payment_instructions: nullIfBlank(paymentInstructions),
       brand_accent_hex: safeAccent,
       estimate_template: estimateTemplate || 'classic',
       services
@@ -446,6 +465,41 @@ export default function Settings() {
               <EstimateTemplatePicker value={estimateTemplate} onChange={setEstimateTemplate} />
             </BrandField>
           </div>
+        </div>
+      </Section>
+
+      {/* GETTING PAID — bring-your-own pay link. We don't integrate with
+          any processor; the contractor pastes a link they already have
+          (Venmo / Zelle / Square / PayPal / their own Stripe Payment
+          Link) and it becomes a "Pay now" button everywhere money goes
+          out. Saved with the bottom Save Changes bar. */}
+      <Section
+        variants={item}
+        title={<>Getting <em>paid.</em></>}
+        sub="Paste a payment link you already use — Venmo, Zelle, Square, PayPal, or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <BrandField label="Payment link" optional hint="The page customers land on to pay you. We don't touch the money — it goes straight to your account.">
+            <input
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              value={paymentLink}
+              onChange={(e) => setPaymentLink(e.target.value)}
+              placeholder="venmo.com/u/yourname  ·  buy.stripe.com/…"
+              style={brandInputStyle}
+            />
+          </BrandField>
+
+          <BrandField label="Payment instructions" optional hint="Shown under the button — checks payable to, mailing address, Zelle email/phone, etc.">
+            <textarea
+              rows={3}
+              value={paymentInstructions}
+              onChange={(e) => setPaymentInstructions(e.target.value)}
+              placeholder="Checks payable to Parker Construction Co. · Zelle: pay@parkerconstructioncompany.com"
+              style={{ ...brandInputStyle, resize: 'vertical', lineHeight: 1.45 }}
+            />
+          </BrandField>
         </div>
       </Section>
 

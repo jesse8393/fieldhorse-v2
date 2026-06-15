@@ -36,6 +36,7 @@
 // "Email sender is not configured yet."
 
 import { createClient } from '@supabase/supabase-js'
+import { renderPayBlock as payBlock } from './lib/email.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -128,13 +129,13 @@ export default async (request) => {
 
   // 2. Pull contractor branding for From-line + Reply-To.
   const { data: profile } = await supabase
-    .from('fh_profiles')
-    .select('full_name, company_name, company_email, email')
+    .from('profiles')
+    .select('full_name, company_name, company_email, payment_link, payment_instructions')
     .eq('user_id', sender_user_id)
     .maybeSingle()
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
-  const replyTo = (profile?.company_email || profile?.email || '').trim()
+  const replyTo = (profile?.company_email || authData.user.email || '').trim()
 
   // 3. Download the uploaded invoice PDF.
   const { data: fileBlob, error: dlErr } = await supabase.storage
@@ -165,11 +166,16 @@ export default async (request) => {
   const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
   const senderLine = companyName || 'Your contractor'
   const customMessage = (sender_message || '').trim()
+  // Bring-your-own pay link — rendered as a button when present.
+  const payLink = (profile?.payment_link || '').trim()
+  const payInstructions = (profile?.payment_instructions || '').trim()
 
   const text = [
     greeting,
     '',
     customMessage || `Your invoice for ${jobTitle} is attached.${amountLabel ? ` Balance due: ${amountLabel}.` : ''}`,
+    ...(payLink ? ['', `Pay online: ${payLink}`] : []),
+    ...(payInstructions ? ['', payInstructions] : []),
     '',
     'Reply directly to this email with any questions about the invoice or to confirm payment.',
     '',
@@ -182,7 +188,9 @@ export default async (request) => {
     jobTitle,
     amountLabel,
     senderLine,
-    companyName
+    companyName,
+    payLink,
+    payInstructions
   })
 
   const safeFilename = (filename || `invoice-${contact.id}.pdf`).replace(/[^a-z0-9._-]/gi, '_')
@@ -249,7 +257,7 @@ function formatMoneyLabel(n) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, senderLine, companyName }) {
+function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, senderLine, companyName, payLink, payInstructions }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
@@ -269,6 +277,7 @@ function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, sen
         <tr><td style="padding:8px 32px 16px;">
           <p style="margin:0;font-size:15px;color:#1f1f1f;">${msg}</p>
         </td></tr>
+        ${payBlock(payLink, payInstructions, amountLabel, safe)}
         <tr><td style="padding:8px 32px 24px;">
           <p style="margin:0;font-size:14px;color:#5d5d57;">Reply directly to this email with any questions about the invoice or to confirm payment.</p>
         </td></tr>
@@ -282,6 +291,7 @@ function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, sen
 </body>
 </html>`
 }
+
 
 function isEmail(s) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)

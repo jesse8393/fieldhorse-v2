@@ -347,6 +347,8 @@ function InvoiceView({ data }: any) {
   const contractTotal = Number(contact?.amount || 0)
   const balance = Math.max(0, contractTotal - paid)
   return (
+    <>
+    {balance > 0.5 && <PayNowBar company={company} amount={balance} />}
     <InvoiceTemplate
       company={company}
       contact={contact}
@@ -368,5 +370,56 @@ function InvoiceView({ data }: any) {
       changeOrders={changeOrders}
       photos={photos || []}
     />
+    </>
+  )
+}
+
+/* Customer-facing "Pay now" bar — the contractor's bring-your-own pay
+   link (Venmo / Zelle / Square / Stripe Payment Link) plus any
+   instructions. Renders nothing when the contractor hasn't set a link.
+   Cream-paper aesthetic to match the document, not the app chrome. */
+function PayNowBar({ company, amount }: any) {
+  const link = (company?.payment_link || '').trim()
+  const instructions = (company?.payment_instructions || '').trim()
+  if (!link && !instructions) return null
+  const url = link
+    ? (/^[a-z][a-z0-9+.-]*:/i.test(link) ? link : `https://${link}`)
+    : ''
+  const amountLabel = amount > 0
+    ? Number(amount).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+    : ''
+  return (
+    <div style={{
+      maxWidth: 760, margin: '0 auto 16px',
+      padding: '20px 24px', borderRadius: 6,
+      background: '#fffaf0', border: '1px solid rgba(200, 161, 84, 0.45)',
+      boxShadow: '0 24px 64px -32px rgba(31, 30, 28, 0.25)',
+      fontFamily: "'DM Sans', system-ui, sans-serif", color: '#3A3833',
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A154', marginBottom: 10 }}>
+        Pay your balance
+      </div>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-block', padding: '13px 28px', borderRadius: 6,
+            background: 'linear-gradient(135deg, #d4af37 0%, #b7872d 100%)',
+            color: '#1A1814', fontSize: 15, fontWeight: 700, textDecoration: 'none',
+            letterSpacing: '0.02em', boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
+          }}
+        >
+          Pay{amountLabel ? ` ${amountLabel}` : ''} now
+        </a>
+      )}
+      {instructions && (
+        <p style={{ margin: `${url ? 14 : 0}px 0 0`, fontSize: 13, lineHeight: 1.5, color: '#5d5d57', whiteSpace: 'pre-wrap' }}>
+          {instructions}
+        </p>
+      )}
+    </div>
   )
 }

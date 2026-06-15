@@ -206,15 +206,15 @@ async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail,
   let profile = null
   try {
     const { data } = await supabase
-      .from('fh_profiles')
-      .select('full_name, company_name, company_email, email')
+      .from('profiles')
+      .select('full_name, company_name, company_email')
       .eq('user_id', ownerUserId)
       .maybeSingle()
     profile = data || null
   } catch {}
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
-  const replyTo = (profile?.company_email || profile?.email || '').trim()
+  const replyTo = (profile?.company_email || '').trim()
   // White-label sender policy: the From name is the contractor's brand,
   // never "Contractor via FieldHorse". Falls back to the platform default
   // only when the contractor hasn't filled in their company name yet.

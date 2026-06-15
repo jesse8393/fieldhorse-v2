@@ -133,13 +133,13 @@ export default async (request) => {
 
   // Pull contractor branding for From-line + Reply-To.
   const { data: profile } = await supabase
-    .from('fh_profiles')
-    .select('full_name, company_name, company_email, email')
+    .from('profiles')
+    .select('full_name, company_name, company_email')
     .eq('user_id', sender_user_id)
     .maybeSingle()
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
-  const replyTo = (profile?.company_email || profile?.email || '').trim()
+  const replyTo = (profile?.company_email || authData.user.email || '').trim()
   // White-label From header — the customer's inbox shows ONLY the
   // contractor's company name. The shared sender mailbox (notifications@
   // fieldhorse.io or whichever address SEND_EMAIL_FROM resolves to) is

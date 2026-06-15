@@ -138,7 +138,9 @@ export default async function handler(req) {
     estimate_template: profile.estimate_template || 'classic',
     license_number: profile.license_number || '',
     insured_text: profile.insured_text || '',
-    warranty_default: profile.warranty_default || ''
+    warranty_default: profile.warranty_default || '',
+    payment_link: profile.payment_link || '',
+    payment_instructions: profile.payment_instructions || ''
   } : { name: 'My Company' }
 
   // 4. Bump view counter + maybe write a contractor notification —

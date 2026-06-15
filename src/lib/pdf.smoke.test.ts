@@ -117,6 +117,22 @@ describe('pdf engine smoke', () => {
     expectRealPdf(result)
   })
 
+  it('renders the pay block when a payment link is set (invoice + statement)', async () => {
+    const payCompany = { ...company, payment_link: 'venmo.com/u/parker', payment_instructions: 'Checks payable to Parker Construction Co.' }
+    const inv = await generateInvoice({
+      company: payCompany, contact,
+      lineItems: [{ description: 'Final balance', qty: 1, rate: 1380, amount: 1380 }],
+      invoiceId: contact.id, contractTotal: 1380, previouslyPaid: 0
+    } as any)
+    expectRealPdf(inv)
+    const stmt = await generateStatement({
+      company: payCompany,
+      client: { id: 'x', name: 'MMC', email: 'a@b.com' },
+      lines: [{ property: 'Lot 1', contract: 1000, paid: 0, balance: 1000 }]
+    } as any)
+    expectRealPdf(stmt)
+  })
+
   it('survives empty inputs (defensive defaults)', async () => {
     const result = await generateInvoice({})
     expectRealPdf(result)

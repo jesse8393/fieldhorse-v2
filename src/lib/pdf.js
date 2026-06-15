@@ -546,6 +546,59 @@ function drawDocTotalsBlock(doc, opts) {
   return cursor + boxH + 6
 }
 
+// "How to pay" block — the contractor's bring-your-own pay link +
+// instructions, rendered as a soft-tinted panel with a clickable link.
+// Returns the new cursor Y. No-op (returns startY) when neither set.
+function drawDocPayBlock(doc, opts) {
+  const { startY, margin, pageWidth, pageHeight, brandRGB, company } = opts
+  const link = (company?.payment_link || '').trim()
+  const instructions = (company?.payment_instructions || '').trim()
+  if (!link && !instructions) return startY
+
+  const innerW = pageWidth - margin * 2
+  // Measure: heading + optional link line + wrapped instructions.
+  doc.setFontSize(10)
+  const instrLines = instructions ? doc.splitTextToSize(instructions, innerW - 12) : []
+  const bodyH = 7 + (link ? 6 : 0) + instrLines.length * 4.6
+  const panelH = bodyH + 8
+  let y = startY + 6
+  if (y + panelH > pageHeight - 22) { doc.addPage(); y = 18 }
+
+  // Soft brand-tinted panel
+  const [r, g, b] = brandRGB || FIELD_GOLD
+  doc.setFillColor(Math.round(r * 0.12 + 255 * 0.88), Math.round(g * 0.12 + 255 * 0.88), Math.round(b * 0.12 + 255 * 0.88))
+  doc.setDrawColor(r, g, b)
+  doc.setLineWidth(0.3)
+  doc.roundedRect(margin, y, innerW, panelH, 2, 2, 'FD')
+
+  let ty = y + 7
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(0.6)
+  doc.text('HOW TO PAY', margin + 6, ty)
+  doc.setCharSpace(0)
+  ty += 6
+
+  if (link) {
+    const display = link.replace(/^https?:\/\//i, '')
+    const url = /^[a-z][a-z0-9+.-]*:/i.test(link) ? link : `https://${link}`
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(r, g, b)
+    doc.textWithLink(`Pay online → ${display}`, margin + 6, ty, { url })
+    ty += 6
+  }
+  if (instrLines.length > 0) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(60, 56, 51)
+    doc.text(instrLines, margin + 6, ty)
+    ty += instrLines.length * 4.6
+  }
+  return y + panelH
+}
+
 function drawDocDisclaimer(doc, opts) {
   const { pageWidth, pageHeight, margin, text } = opts
   if (!text) return
@@ -845,6 +898,9 @@ export async function generateInvoice({
     cursor += wrapped.length * 4.5
   }
 
+  // 6a. How to pay — the contractor's bring-your-own pay link.
+  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, pageHeight, brandRGB, company })
+
   // 6b. Project photos — quiet 2-up strip, capped at 4. Invoice tone
   // is "here's the work you paid for", not the proposal's sales pitch.
   if (Array.isArray(photos) && photos.length > 0) {
@@ -976,6 +1032,9 @@ export async function generateStatement({
     total: totalDue,
     rows: [{ label: `${lines.length} ${lines.length === 1 ? 'property' : 'properties'}`, value: money(totalDue), muted: true }]
   })
+
+  // 4b. How to pay — bring-your-own pay link.
+  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, pageHeight, brandRGB, company })
 
   // 5. Disclaimer footer on every page
   const total_pages = doc.internal.getNumberOfPages()

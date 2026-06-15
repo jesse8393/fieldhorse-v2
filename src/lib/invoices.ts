@@ -26,7 +26,9 @@ export function companyFromProfile(profile: any) {
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
     license_number: profile?.license_number || '',
-    insured_text: profile?.insured_text || ''
+    insured_text: profile?.insured_text || '',
+    payment_link: profile?.payment_link || '',
+    payment_instructions: profile?.payment_instructions || ''
   }
 }
 
