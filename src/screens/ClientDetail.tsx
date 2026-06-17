@@ -185,6 +185,9 @@ export default function ClientDetail() {
           ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
           : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
       )}
+      {tab === 'activity' && (
+        <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
+      )}
       {tab === 'projects' && (
         <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
       )}
@@ -193,26 +196,81 @@ export default function ClientDetail() {
     </>
   )
 
-  if (isDesktop) {
-    return (
-      <Suspense fallback={null}><SnowClientDetailBuild
+  // Shared overlays (delete confirm, new-deal chooser, statement sheet).
+  // Mounted in BOTH the desktop and mobile branches — they're portaled,
+  // so they render correctly wherever they sit in the tree. Previously
+  // these lived only in the mobile JSX, so on desktop the Delete / New
+  // deal / Statement buttons set state but nothing ever appeared.
+  const sheets = (
+    <>
+      <ActionSheet
+        open={deleteOpen}
+        title="Delete this client?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deleting ? 'Deleting…' : 'Delete client'}
+        commitBusy={deleting}
+        commitDisabled={deleting}
+        destructive
+        onClose={() => { if (!deleting) setDeleteOpen(false) }}
+        onCommit={confirmDelete}
+      >
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running — they just lose the client link.
+        </p>
+      </ActionSheet>
+
+      <Drawer open={newOpen} onOpenChange={(o: any) => { if (!o && !creating) setNewOpen(false) }}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>New for {client.name}</DrawerTitle>
+            <DrawerDescription>Start a quote, a quick job, or a standalone invoice — all linked to this client.</DrawerDescription>
+          </DrawerHeader>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
+            <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
+            <NewDealOption icon={Briefcase} label="New job" sub="Quick job — skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
+            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc — no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      <StatementSheet
+        open={statementOpen}
+        onClose={() => setStatementOpen(false)}
         client={client}
-        lifetime={lifetime}
-        outstanding={outstanding}
-        activeCount={activeCount}
         jobs={jobs}
         payments={payments}
-        tabs={TABS}
-        activeTab={tab}
-        onTabChange={setTab}
-        onBack={() => navigate('/clients')}
-        onEdit={() => setIsEditing(!isEditing)}
-        onDelete={() => setDeleteOpen(true)}
-        onNewDeal={() => setNewOpen(true)}
-        isEditing={isEditing}
-      >
-        {tabBody}
-      </SnowClientDetailBuild></Suspense>
+        userId={user?.id}
+      />
+    </>
+  )
+
+  if (isDesktop) {
+    return (
+      <Suspense fallback={null}>
+        <SnowClientDetailBuild
+          client={client}
+          lifetime={lifetime}
+          outstanding={outstanding}
+          activeCount={activeCount}
+          jobs={jobs}
+          payments={payments}
+          tabs={TABS}
+          activeTab={tab}
+          onTabChange={setTab}
+          onBack={() => navigate('/clients')}
+          onEdit={() => setIsEditing(!isEditing)}
+          onDelete={() => setDeleteOpen(true)}
+          onNewDeal={() => setNewOpen(true)}
+          onStatement={outstanding > 0 ? () => setStatementOpen(true) : undefined}
+          isEditing={isEditing}
+        >
+          {tabBody}
+        </SnowClientDetailBuild>
+        {sheets}
+      </Suspense>
     )
   }
 
@@ -450,52 +508,7 @@ export default function ClientDetail() {
         {tab === 'notes' && <NotesList notes={notes} />}
       </div>
 
-      {/* Destructive-confirm sheet for delete client. Body preserves the
-          existing nuance from the prior native confirm: jobs keep
-          running but lose the client link. */}
-      <ActionSheet
-        open={deleteOpen}
-        title="Delete this client?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deleting ? 'Deleting…' : 'Delete client'}
-        commitBusy={deleting}
-        commitDisabled={deleting}
-        destructive
-        onClose={() => { if (!deleting) setDeleteOpen(false) }}
-        onCommit={confirmDelete}
-      >
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running — they just lose the client link.
-        </p>
-      </ActionSheet>
-
-      {/* NEW-DEAL CHOOSER — quote / job / invoice, all linked to this client */}
-      <Drawer open={newOpen} onOpenChange={(o: any) => { if (!o && !creating) setNewOpen(false) }}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>New for {client.name}</DrawerTitle>
-            <DrawerDescription>Start a quote, a quick job, or a standalone invoice — all linked to this client.</DrawerDescription>
-          </DrawerHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
-            <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
-            <NewDealOption icon={Briefcase} label="New job" sub="Quick job — skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
-            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc — no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
-          </div>
-        </DrawerContent>
-      </Drawer>
-
-      {/* STATEMENT SHEET — preview + download / email (shared component) */}
-      <StatementSheet
-        open={statementOpen}
-        onClose={() => setStatementOpen(false)}
-        client={client}
-        jobs={jobs}
-        payments={payments}
-        userId={user?.id}
-      />
+      {sheets}
     </motion.div>
   )
 }

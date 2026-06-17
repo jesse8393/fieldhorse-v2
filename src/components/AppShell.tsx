@@ -82,6 +82,7 @@ function layoutForPath(pathname: any) {
   // (the responsive max-width media queries only activate at >=900px),
   // so phones are unaffected by every promotion below.
   if (pathname === '/') return 'responsive'
+  if (pathname === '/leads') return 'responsive'
   if (pathname === '/jobs') return 'responsive'
   if (pathname === '/clients') return 'responsive'
   if (pathname === '/schedule') return 'responsive'

@@ -375,7 +375,7 @@ export default function Leads() {
       )}
 
       {!loading && filtered.length > 0 && (
-        <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+        <motion.div variants={item} className="fh-leads-list" style={{ padding: '0 var(--v3-gutter) 32px' }}>
           <AnimatePresence>
             {filtered.map((c: any) => (
               <LeadCard

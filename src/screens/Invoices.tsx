@@ -438,7 +438,10 @@ export default function Invoices() {
             loading={loading}
             filter={filter as 'outstanding' | 'all'}
             setFilter={(f) => setFilter(f)}
+            clientAR={clientAR}
             onOpenJob={(jobId) => navigate(`/jobs/${jobId}?tab=financials`)}
+            onOpenClient={(clientId) => navigate(`/clients/${clientId}`)}
+            onStatement={(g) => setStatementClient(g)}
             onPayRow={(r) => setPayingRow(r)}
           />
         </Suspense>
@@ -455,6 +458,14 @@ export default function Invoices() {
             </Suspense>
           )}
         </AnimatePresence>
+        <StatementSheet
+          open={!!statementClient}
+          onClose={() => setStatementClient(null)}
+          client={statementClient?.client || null}
+          jobs={statementClient?.jobs || []}
+          payments={payments}
+          userId={user?.id}
+        />
       </>
     )
   }
