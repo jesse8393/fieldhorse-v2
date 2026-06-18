@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { money, moneyFull } from '../../lib/format.ts'
+import DataErrorState from '../DataErrorState.tsx'
 import MiniMetric from '../MiniMetric.tsx'
 
 type Props = {
@@ -52,6 +53,8 @@ type Props = {
   todayOnSite: any[] | null
   topPipeline: any[] | null
   nextActions: any[] | null
+  dashboardError?: string
+  onRetryDashboard?: () => void
   onGoToJobs: (filter?: string) => void
   onGoToLeads?: (filter?: string) => void
   onGoToActivity?: () => void
@@ -134,6 +137,8 @@ export default function SnowHomeBuild(props: Props) {
     onNewLead,
     stageRail,
     jobHealth,
+    dashboardError,
+    onRetryDashboard,
   } = props as any
 
   const dateLabel = now.toLocaleDateString(undefined, {
@@ -218,6 +223,17 @@ export default function SnowHomeBuild(props: Props) {
           New
         </button>
       </header>
+
+      {dashboardError ? (
+        <div style={{ padding: '0 24px 12px' }}>
+          <DataErrorState
+            compact
+            title="Dashboard data couldn't refresh"
+            message={dashboardError}
+            onRetry={onRetryDashboard}
+          />
+        </div>
+      ) : null}
 
       <main className="fh-build-main">
         <section className="fh-build-hero-row">
