@@ -49,6 +49,7 @@ describe('buildHomeDashboardBundle', () => {
       urgencyTone: 'danger',
       urgencyLabel: 'Past due',
       tab: 'financials',
+      intent: 'nudge_invoice',
     })
     expect(action?.title).toBe('Invoice 8d past due')
     expect(action?.detail).toContain('Final draw')
@@ -116,7 +117,13 @@ describe('buildHomeDashboardBundle', () => {
       }],
     }))
 
-    expect(bundle.nextActions.find((row) => row.kind === 'viewed-quiet')?.tab).toBe('quote')
-    expect(bundle.nextActions.find((row) => row.kind === 'co-unsigned')?.tab).toBe('change_orders')
+    expect(bundle.nextActions.find((row) => row.kind === 'viewed-quiet')).toMatchObject({
+      tab: 'quote',
+      intent: 'quote_followup',
+    })
+    expect(bundle.nextActions.find((row) => row.kind === 'co-unsigned')).toMatchObject({
+      tab: 'change_orders',
+      intent: 'change_order_followup',
+    })
   })
 })

@@ -77,10 +77,163 @@ const TOP_TABS = [
 ]
 const VALID_TABS = new Set(TOP_TABS.map((t) => t.id))
 
+type JobActionIntentMeta = {
+  eyebrow: string
+  title: string
+  detail: string
+  primaryLabel: string
+  tab: 'overview' | 'quote' | 'financials' | 'change_orders'
+}
+
+const JOB_ACTION_INTENTS = {
+  follow_up: {
+    eyebrow: 'Next action',
+    title: 'Follow-up due',
+    detail: 'Confirm scope, timing, and the next step before this deal cools off.',
+    primaryLabel: 'Open overview',
+    tab: 'overview',
+  },
+  quote_followup: {
+    eyebrow: 'Quote signal',
+    title: 'Quote follow-up',
+    detail: 'This quote has gone quiet after engagement. Review the proposal before calling or messaging.',
+    primaryLabel: 'Review quote',
+    tab: 'quote',
+  },
+  reschedule: {
+    eyebrow: 'Schedule risk',
+    title: 'Reschedule this job',
+    detail: 'The schedule signal says this job needs a new date. Add the next site event before it slips further.',
+    primaryLabel: 'Schedule event',
+    tab: 'overview',
+  },
+  send_invoice: {
+    eyebrow: 'Billing action',
+    title: 'Send invoice',
+    detail: 'This job is ready for billing. Create or send the invoice while the work is still fresh.',
+    primaryLabel: 'Send invoice',
+    tab: 'financials',
+  },
+  nudge_invoice: {
+    eyebrow: 'Collection risk',
+    title: 'Invoice past due',
+    detail: 'There is an open invoice past its due date. Review the balance and send the customer a reminder.',
+    primaryLabel: 'Open invoice tools',
+    tab: 'financials',
+  },
+  change_order_followup: {
+    eyebrow: 'Scope control',
+    title: 'Unsigned change order',
+    detail: 'A sent change order is still waiting. Review it and follow up before work moves ahead.',
+    primaryLabel: 'Review change orders',
+    tab: 'change_orders',
+  },
+} as const satisfies Record<string, JobActionIntentMeta>
+
+type JobActionIntent = keyof typeof JOB_ACTION_INTENTS
+
+function readJobActionIntent(raw: string | null): JobActionIntent | null {
+  if (!raw) return null
+  return Object.prototype.hasOwnProperty.call(JOB_ACTION_INTENTS, raw)
+    ? (raw as JobActionIntent)
+    : null
+}
+
 function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
     style: 'currency', currency: 'USD', maximumFractionDigits: 0
   })
+}
+
+function ActionIntentBanner({
+  meta,
+  onPrimary,
+  onDismiss,
+}: {
+  meta: JobActionIntentMeta
+  onPrimary: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      role="region"
+      aria-label="Dashboard action cue"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+        marginBottom: 12,
+        padding: '12px 12px 12px 14px',
+        borderRadius: 12,
+        border: '1px solid var(--v3-border-strong)',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.035), transparent 54%), var(--v3-surface-2)',
+        boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
+      }}
+    >
+      <div style={{ minWidth: 0, flex: '1 1 260px', display: 'grid', gap: 3 }}>
+        <span
+          style={{
+            color: 'var(--v3-primary)',
+            fontFamily: 'var(--font-body)',
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {meta.eyebrow}
+        </span>
+        <strong style={{ color: 'var(--v3-text)', fontSize: 14, lineHeight: 1.2 }}>{meta.title}</strong>
+        <span style={{ color: 'var(--v3-text-muted)', fontSize: 12, lineHeight: 1.45 }}>{meta.detail}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
+        <button
+          type="button"
+          onClick={() => { hapticTap(); onPrimary() }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 7,
+            minHeight: 36,
+            padding: '8px 12px',
+            borderRadius: 10,
+            border: '1px solid rgba(215, 181, 109, 0.42)',
+            background: 'rgba(215, 181, 109, 0.13)',
+            color: 'var(--v3-primary)',
+            fontFamily: 'var(--font-body)',
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: 'pointer',
+          }}
+        >
+          {meta.primaryLabel}
+          <ArrowRight size={14} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="Dismiss action cue"
+          onClick={() => { hapticTap(); onDismiss() }}
+          style={{
+            width: 36,
+            height: 36,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 10,
+            border: '1px solid var(--v3-border)',
+            background: 'var(--v3-surface)',
+            color: 'var(--v3-text-muted)',
+            cursor: 'pointer',
+          }}
+        >
+          <XCircle size={15} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -185,6 +338,33 @@ export default function ContactDetail() {
   // Edit mode is a flag the Overview tab + section editors read.
   // Header EDIT button toggles + jumps to overview if currently on another tab.
   const [isEditing, setIsEditing] = useState(false)
+  const actionIntent = readJobActionIntent(searchParams.get('action'))
+  const actionIntentMeta = actionIntent ? JOB_ACTION_INTENTS[actionIntent] : null
+
+  function clearActionIntent(nextTab?: string) {
+    const sp = new URLSearchParams(searchParams)
+    if (nextTab) {
+      if (nextTab === 'overview') sp.delete('tab')
+      else sp.set('tab', nextTab)
+    }
+    sp.delete('action')
+    setSearchParams(sp, { replace: true })
+  }
+
+  function handleActionIntentPrimary() {
+    if (!actionIntent || !actionIntentMeta) return
+    const resolvedTab = resolveTabForStage(contact?.stage, actionIntentMeta.tab)
+    setLocalTab(resolvedTab)
+    clearActionIntent(resolvedTab)
+
+    if (actionIntent === 'reschedule') {
+      setEventOpen(true)
+      return
+    }
+    if (actionIntent === 'send_invoice' || actionIntent === 'nudge_invoice') {
+      setInvoiceOpen(true)
+    }
+  }
 
   async function handleDelete() {
     if (deleting) return
@@ -375,6 +555,13 @@ export default function ContactDetail() {
               paid={paid}
               outstanding={balance}
             >
+              {actionIntentMeta && (
+                <ActionIntentBanner
+                  meta={actionIntentMeta}
+                  onPrimary={handleActionIntentPrimary}
+                  onDismiss={() => clearActionIntent()}
+                />
+              )}
               {tab === 'overview' && (
                 <OverviewTab
                   contact={contact}
@@ -500,6 +687,16 @@ export default function ContactDetail() {
       />
 
       <StageTimeline currentStage={contact.stage ?? undefined} />
+
+      {actionIntentMeta && (
+        <div style={{ padding: '0 20px 8px' }}>
+          <ActionIntentBanner
+            meta={actionIntentMeta}
+            onPrimary={handleActionIntentPrimary}
+            onDismiss={() => clearActionIntent()}
+          />
+        </div>
+      )}
 
       {/* STAGE PRIMARY ACTION — one clear next step per stage */}
       {stageCta && (

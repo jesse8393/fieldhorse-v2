@@ -61,7 +61,7 @@ type Props = {
   onGoToSchedule: () => void
   onGoToInvoices: () => void
   onOpenJob: (id: string) => void
-  onOpenJobAtTab: (id: string, tab?: string) => void
+  onOpenJobAtTab: (id: string, tab?: string, intent?: string) => void
   onNewLead: () => void
   // Optional pass-throughs from Home.tsx — accepted but unused here.
   weatherErr?: any
@@ -594,7 +594,7 @@ function OwnerQueue({ rows, onOpenJobAtTab, onViewAll }: any) {
             // Wait-status string ("Lead waiting 15 days") moves to a
             // tooltip so the table stays clean (Phase 1 §2).
             title={row.tooltip || undefined}
-            onClick={() => row.contactId && onOpenJobAtTab(row.contactId, row.tab)}
+            onClick={() => row.contactId && onOpenJobAtTab(row.contactId, row.tab, row.intent)}
           >
             <span>{index + 1}</span>
             <strong>{row.action}</strong>
@@ -849,6 +849,7 @@ function buildOwnerQueue(nextActions: any[] | null) {
       tooltip: a.detail || '',
       contactId: a.contactId,
       tab: a.tab,
+      intent: a.intent,
     }
   })
 }

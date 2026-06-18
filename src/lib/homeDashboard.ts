@@ -41,6 +41,13 @@ type InvoiceRow = Pick<
 
 export type DashboardTone = 'good' | 'warn' | 'bad' | 'neutral'
 export type HomePriorityTone = 'success' | 'warn' | 'danger'
+export type HomeActionIntent =
+  | 'follow_up'
+  | 'quote_followup'
+  | 'reschedule'
+  | 'send_invoice'
+  | 'nudge_invoice'
+  | 'change_order_followup'
 
 export type HomeNextAction = {
   id: string
@@ -64,6 +71,7 @@ export type HomeNextAction = {
   urgencyTone: HomePriorityTone
   urgency: number
   tab?: 'overview' | 'quote' | 'financials' | 'change_orders'
+  intent: HomeActionIntent
 }
 
 export type HomeTodayOnSite = {
@@ -220,6 +228,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyTone: daysWaiting >= 14 ? 'danger' : 'warn',
       urgency: lastTouchMs,
       tab: contact.stage === 'quote' ? 'quote' : 'overview',
+      intent: contact.stage === 'quote' ? 'quote_followup' : 'follow_up',
     })
   }
 
@@ -239,6 +248,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyTone: 'danger',
       urgency: 0,
       tab: 'overview',
+      intent: 'reschedule',
     })
   }
 
@@ -262,6 +272,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyTone: 'success',
       urgency: updated.getTime(),
       tab: 'financials',
+      intent: 'send_invoice',
     })
   }
 
@@ -286,6 +297,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyTone: overdueDays >= 2 ? 'danger' : 'warn',
       urgency: 1 + Math.max(0, 5 - overdueDays),
       tab: contact.stage === 'quote' ? 'quote' : 'overview',
+      intent: contact.stage === 'quote' ? 'quote_followup' : 'follow_up',
     })
   }
 
@@ -320,6 +332,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyTone: 'warn',
       urgency: 10 + hoursSince / 24,
       tab: 'quote',
+      intent: 'quote_followup',
     })
   }
 
@@ -343,6 +356,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyTone: 'warn',
       urgency: 100 + days,
       tab: 'change_orders',
+      intent: 'change_order_followup',
     })
   }
 
@@ -367,6 +381,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyTone: 'danger',
       urgency: Math.max(1, 100 - daysLate),
       tab: 'financials',
+      intent: 'nudge_invoice',
     })
   }
 

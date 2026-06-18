@@ -219,7 +219,7 @@ export default function Home() {
           onGoToCompose={() => navigate('/compose')}
           onGoToPourWindow={() => navigate('/pour-window')}
           onOpenJob={(id: any) => navigate(`/jobs/${id}`)}
-          onOpenJobAtTab={(id: any, tab: any) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
+          onOpenJobAtTab={(id: any, tab: any, intent: any) => navigate(jobActionPath(id, tab, intent))}
           onNewLead={() => navigate('/leads?new=1')}
         />
       </Suspense>
@@ -1194,10 +1194,18 @@ const NEXT_ACTION_KIND: Record<string, any> = {
   'co-unsigned': { Icon: FileText }
 }
 
+function jobActionPath(contactId: any, tab?: any, intent?: any) {
+  if (!contactId) return '/jobs'
+  const params = new URLSearchParams()
+  if (tab) params.set('tab', String(tab))
+  if (intent) params.set('action', String(intent))
+  const query = params.toString()
+  return `/jobs/${contactId}${query ? `?${query}` : ''}`
+}
+
 function nextActionPath(action: any) {
   if (!action?.contactId) return '/jobs'
-  const tab = action.tab ? `?tab=${encodeURIComponent(action.tab)}` : ''
-  return `/jobs/${action.contactId}${tab}`
+  return jobActionPath(action.contactId, action.tab, action.intent)
 }
 
 // V3-SYSTEM-1B-1: warn no longer uses brand gold (--v3-primary). Stale
