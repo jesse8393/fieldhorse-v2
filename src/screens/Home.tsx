@@ -98,8 +98,9 @@ export default function Home() {
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
   const displayName = displayNameFrom(profile, user)
   const firstName = displayName ? displayName.split(/\s+/)[0] : 'there'
-  const dashboard = useHomeDashboard(user?.id)
-  useHomeDashboardRealtime(user?.id)
+  const membership = useMembership()
+  const dashboard = useHomeDashboard(user?.id, membership.orgId)
+  useHomeDashboardRealtime(user?.id, membership.orgId)
   const dashboardData = dashboard.data
   const pipeline = dashboardData?.pipeline ?? null
   const pipelinePrev = dashboardData?.pipelinePrev ?? null
@@ -162,7 +163,6 @@ export default function Home() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
-  const membership = useMembership()
 
   // Role-based redirect: foreman + crew don't see the owner dashboard
   // (no $ amounts, no AR, no pipeline). Send them straight to /crew,

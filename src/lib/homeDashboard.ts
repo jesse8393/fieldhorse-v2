@@ -144,7 +144,8 @@ export type HomeDashboardSource = {
   openInvoices: InvoiceRow[]
 }
 
-export const homeDashboardKey = (userId: string | undefined) => ['homeDashboard', userId] as const
+export const homeDashboardKey = (userId: string | undefined, orgId?: string | null) =>
+  ['homeDashboard', userId, orgId ?? null] as const
 
 function startOfWeek(now: Date) {
   const d = new Date(now)
@@ -485,7 +486,11 @@ function assertOk(label: string, result: { error: { message?: string } | null })
   }
 }
 
-export async function fetchHomeDashboard(userId: string, now = new Date()): Promise<HomeDashboardBundle> {
+export async function fetchHomeDashboard(
+  userId: string,
+  now = new Date(),
+  orgId?: string | null,
+): Promise<HomeDashboardBundle> {
   const fourteenDaysAgo = new Date(now)
   fourteenDaysAgo.setDate(now.getDate() - 14)
   const weekStart = startOfWeek(now)
@@ -493,6 +498,47 @@ export async function fetchHomeDashboard(userId: string, now = new Date()): Prom
   todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart)
   todayEnd.setDate(todayEnd.getDate() + 1)
+
+  const overdueScheduleQuery = (orgId
+    ? supabase.from('fh_schedule').select('contact_id, end_at, start_at').eq('org_id', orgId)
+    : supabase.from('fh_schedule').select('contact_id, end_at, start_at').eq('user_id', userId)
+  )
+    .lt('end_at', now.toISOString())
+    .gte('end_at', fourteenDaysAgo.toISOString())
+
+  const paymentsQuery = (orgId
+    ? supabase.from('fh_payments').select('contact_id, amount, created_at').eq('org_id', orgId)
+    : supabase.from('fh_payments').select('contact_id, amount, created_at').eq('user_id', userId)
+  )
+    .gte('created_at', weekStart.toISOString())
+
+  const todayScheduleQuery = (orgId
+    ? supabase.from('fh_schedule').select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)').eq('org_id', orgId)
+    : supabase.from('fh_schedule').select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)').eq('user_id', userId)
+  )
+    .gte('start_at', todayStart.toISOString())
+    .lt('start_at', todayEnd.toISOString())
+    .order('start_at', { ascending: true })
+    .limit(6)
+
+  const proposalViewsQuery = (orgId
+    ? supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('org_id', orgId)
+    : supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('user_id', userId)
+  )
+    .eq('kind', 'proposal')
+    .not('last_viewed_at', 'is', null)
+
+  const sentChangeOrdersQuery = (orgId
+    ? supabase.from('fh_change_orders').select('id, contact_id, sequence_number, title, amount, updated_at').eq('org_id', orgId)
+    : supabase.from('fh_change_orders').select('id, contact_id, sequence_number, title, amount, updated_at').eq('user_id', userId)
+  )
+    .eq('status', 'sent')
+
+  const openInvoicesQuery = (orgId
+    ? supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('org_id', orgId)
+    : supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('user_id', userId)
+  )
+    .in('status', ['sent', 'overdue'])
 
   const [
     contactsRes,
@@ -507,42 +553,13 @@ export async function fetchHomeDashboard(userId: string, now = new Date()): Prom
     supabase
       .from('fh_contacts')
       .select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status'),
-    supabase
-      .from('fh_schedule')
-      .select('contact_id, end_at, start_at')
-      .eq('user_id', userId)
-      .lt('end_at', now.toISOString())
-      .gte('end_at', fourteenDaysAgo.toISOString()),
-    supabase
-      .from('fh_payments')
-      .select('contact_id, amount, created_at')
-      .eq('user_id', userId)
-      .gte('created_at', weekStart.toISOString()),
-    supabase
-      .from('fh_schedule')
-      .select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)')
-      .eq('user_id', userId)
-      .gte('start_at', todayStart.toISOString())
-      .lt('start_at', todayEnd.toISOString())
-      .order('start_at', { ascending: true })
-      .limit(6),
+    overdueScheduleQuery,
+    paymentsQuery,
+    todayScheduleQuery,
     fetchCoverPhotosByJob(userId).catch(() => ({} as Record<string, string>)),
-    supabase
-      .from('fh_public_links')
-      .select('contact_id, last_viewed_at')
-      .eq('user_id', userId)
-      .eq('kind', 'proposal')
-      .not('last_viewed_at', 'is', null),
-    supabase
-      .from('fh_change_orders')
-      .select('id, contact_id, sequence_number, title, amount, updated_at')
-      .eq('user_id', userId)
-      .eq('status', 'sent'),
-    supabase
-      .from('fh_invoices')
-      .select('id, contact_id, title, amount, due_at, status')
-      .eq('user_id', userId)
-      .in('status', ['sent', 'overdue']),
+    proposalViewsQuery,
+    sentChangeOrdersQuery,
+    openInvoicesQuery,
   ])
 
   assertOk('contacts', contactsRes)
@@ -566,39 +583,40 @@ export async function fetchHomeDashboard(userId: string, now = new Date()): Prom
   })
 }
 
-export function useHomeDashboard(userId: string | undefined) {
+export function useHomeDashboard(userId: string | undefined, orgId?: string | null) {
   return useQuery({
-    queryKey: homeDashboardKey(userId),
-    queryFn: () => fetchHomeDashboard(userId as string),
+    queryKey: homeDashboardKey(userId, orgId),
+    queryFn: () => fetchHomeDashboard(userId as string, new Date(), orgId),
     enabled: !!userId,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   })
 }
 
-export function useHomeDashboardRealtime(userId: string | undefined) {
+export function useHomeDashboardRealtime(userId: string | undefined, orgId?: string | null) {
   const queryClient = useQueryClient()
 
   useEffect(() => {
     if (!userId) return
 
     const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: homeDashboardKey(userId) })
+      queryClient.invalidateQueries({ queryKey: homeDashboardKey(userId, orgId) })
     }
 
+    const scopeFilter = orgId ? `org_id=eq.${orgId}` : `user_id=eq.${userId}`
     const channel = supabase
-      .channel(`home-dashboard:${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${userId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_schedule', filter: `user_id=eq.${userId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_payments', filter: `user_id=eq.${userId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_public_links', filter: `user_id=eq.${userId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_change_orders', filter: `user_id=eq.${userId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_invoices', filter: `user_id=eq.${userId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_job_files', filter: `user_id=eq.${userId}` }, invalidate)
+      .channel(`home-dashboard:${orgId || userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_contacts', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_schedule', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_payments', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_public_links', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_change_orders', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_invoices', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_job_files', filter: scopeFilter }, invalidate)
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [queryClient, userId])
+  }, [orgId, queryClient, userId])
 }
