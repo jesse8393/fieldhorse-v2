@@ -63,6 +63,7 @@ export type HomeNextAction = {
   urgencyLabel: string
   urgencyTone: HomePriorityTone
   urgency: number
+  tab?: 'overview' | 'quote' | 'financials' | 'change_orders'
 }
 
 export type HomeTodayOnSite = {
@@ -218,6 +219,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyLabel: 'Follow up',
       urgencyTone: daysWaiting >= 14 ? 'danger' : 'warn',
       urgency: lastTouchMs,
+      tab: contact.stage === 'quote' ? 'quote' : 'overview',
     })
   }
 
@@ -236,6 +238,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyLabel: 'Overdue',
       urgencyTone: 'danger',
       urgency: 0,
+      tab: 'overview',
     })
   }
 
@@ -258,6 +261,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyLabel: 'Invoice pending',
       urgencyTone: 'success',
       urgency: updated.getTime(),
+      tab: 'financials',
     })
   }
 
@@ -281,6 +285,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyLabel: overdueDays === 0 ? 'Due today' : 'Overdue',
       urgencyTone: overdueDays >= 2 ? 'danger' : 'warn',
       urgency: 1 + Math.max(0, 5 - overdueDays),
+      tab: contact.stage === 'quote' ? 'quote' : 'overview',
     })
   }
 
@@ -314,6 +319,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyLabel: 'Engaged',
       urgencyTone: 'warn',
       urgency: 10 + hoursSince / 24,
+      tab: 'quote',
     })
   }
 
@@ -336,6 +342,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyLabel: 'Unsigned',
       urgencyTone: 'warn',
       urgency: 100 + days,
+      tab: 'change_orders',
     })
   }
 
@@ -359,6 +366,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       urgencyLabel: 'Past due',
       urgencyTone: 'danger',
       urgency: Math.max(1, 100 - daysLate),
+      tab: 'financials',
     })
   }
 

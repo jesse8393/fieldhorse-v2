@@ -48,6 +48,7 @@ describe('buildHomeDashboardBundle', () => {
       contactAmount: 4500,
       urgencyTone: 'danger',
       urgencyLabel: 'Past due',
+      tab: 'financials',
     })
     expect(action?.title).toBe('Invoice 8d past due')
     expect(action?.detail).toContain('Final draw')
@@ -86,5 +87,36 @@ describe('buildHomeDashboardBundle', () => {
     expect(bundle.pipeline).toBe(10000)
     expect(bundle.stageBreakdown.lead).toBe(1)
     expect(bundle.dealsAtRisk.followUps).toBe(1)
+  })
+
+  it('routes quote and change-order actions to their exact job tabs', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      contacts: [{
+        id: 'quote-1',
+        name: 'Patio quote',
+        amount: 9000,
+        stage: 'quote',
+        created_at: '2026-06-01T12:00:00.000Z',
+        updated_at: '2026-06-17T12:00:00.000Z',
+        completed_at: null,
+        follow_up_on: null,
+        proposal_status: 'viewed',
+      }],
+      proposalViews: [{
+        contact_id: 'quote-1',
+        last_viewed_at: '2026-06-14T12:00:00.000Z',
+      }],
+      sentChangeOrders: [{
+        id: 'co-1',
+        contact_id: 'quote-1',
+        sequence_number: 2,
+        title: 'Drainage add',
+        amount: 1250,
+        updated_at: '2026-06-12T12:00:00.000Z',
+      }],
+    }))
+
+    expect(bundle.nextActions.find((row) => row.kind === 'viewed-quiet')?.tab).toBe('quote')
+    expect(bundle.nextActions.find((row) => row.kind === 'co-unsigned')?.tab).toBe('change_orders')
   })
 })

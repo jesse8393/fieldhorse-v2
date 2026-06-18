@@ -683,10 +683,7 @@ export default function Home() {
                 key={action.id}
                 action={action}
                 photoUrl={action.contactId ? photoUrlByJob[action.contactId] : undefined}
-                onTap={() => action.contactId
-                  ? navigate(`/jobs/${action.contactId}`)
-                  : navigate('/jobs')
-                }
+                onTap={() => navigate(nextActionPath(action))}
               />
             ))}
           </div>
@@ -1189,8 +1186,18 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 // (an old lead can be warn OR danger depending on how cold it's gone).
 const NEXT_ACTION_KIND: Record<string, any> = {
   followup:   { Icon: PhoneCall },
+  'followup-due': { Icon: PhoneCall },
+  'viewed-quiet': { Icon: PhoneCall },
   reschedule: { Icon: CalendarClock },
-  invoice:    { Icon: Receipt }
+  invoice:    { Icon: Receipt },
+  'inv-overdue': { Icon: Receipt },
+  'co-unsigned': { Icon: FileText }
+}
+
+function nextActionPath(action: any) {
+  if (!action?.contactId) return '/jobs'
+  const tab = action.tab ? `?tab=${encodeURIComponent(action.tab)}` : ''
+  return `/jobs/${action.contactId}${tab}`
 }
 
 // V3-SYSTEM-1B-1: warn no longer uses brand gold (--v3-primary). Stale
