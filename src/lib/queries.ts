@@ -65,7 +65,8 @@ async function fetchJobs(): Promise<JobRow[]> {
 export function useJobs() {
   return useQuery({
     queryKey: queryKeys.jobs,
-    queryFn: fetchJobs
+    queryFn: fetchJobs,
+    staleTime: 30_000
   })
 }
 
@@ -267,6 +268,9 @@ async function fetchActivity(userId: string, pageSize: number): Promise<Activity
       .select('id, name, job_title, stage')
       .eq('user_id', userId).order('updated_at', { ascending: false }).limit(pageSize * 2)
   ])
+  for (const result of [transitions, payments, changeOrders, invoices, contacts]) {
+    if (result.error) throw result.error
+  }
   return {
     transitions: (transitions.data ?? []) as ActivityBundle['transitions'],
     payments: (payments.data ?? []) as ActivityBundle['payments'],
@@ -486,21 +490,23 @@ const EMPTY_CLIENT_DETAIL: Omit<ClientDetailBundle, 'client'> = {
 }
 
 async function fetchClientDetail(id: string, userId: string): Promise<ClientDetailBundle> {
-  const { data: client } = await supabase
+  const { data: client, error: clientErr } = await supabase
     .from('fh_clients')
     .select('*')
     .eq('id', id)
     .eq('user_id', userId)
     .maybeSingle()
+  if (clientErr) throw clientErr
 
   if (!client) return { client: null, ...EMPTY_CLIENT_DETAIL }
 
-  const { data: jobsData } = await supabase
+  const { data: jobsData, error: jobsErr } = await supabase
     .from('fh_contacts')
     .select('id, name, stage, job_title, job_type, amount, updated_at')
     .eq('user_id', userId)
     .eq('client_id', client.id)
     .order('updated_at', { ascending: false })
+  if (jobsErr) throw jobsErr
 
   const jobs = (jobsData ?? []) as ClientJob[]
   const jobIds = jobs.map((r) => r.id)
@@ -529,6 +535,9 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
       .eq('user_id', userId)
       .in('contact_id', jobIds)
   ])
+  if (notesRes.error) throw notesRes.error
+  if (filesRes.error) throw filesRes.error
+  if (paymentsRes.error) throw paymentsRes.error
 
   return {
     client: client as Client,
@@ -592,6 +601,9 @@ async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
       .order('transitioned_at', { ascending: true })
       .limit(4000)
   ])
+  for (const result of [c, m, p, inv, co, cli, st]) {
+    if (result.error) throw result.error
+  }
   return {
     contacts: (c.data ?? []) as Contact[],
     mileage: (m.data ?? []) as AnalyticsBundle['mileage'],
@@ -645,6 +657,9 @@ async function fetchInvoiceDetail(id: string): Promise<InvoiceDetailBundle> {
     supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
   ])
   if (cRes.error) throw cRes.error
+  if (psRes.error) throw psRes.error
+  if (insRes.error) throw insRes.error
+  if (coRes.error) throw coRes.error
   if (!cRes.data) throw new Error('Invoice not found')
   return {
     contact: cRes.data as InvoiceContact,
@@ -746,10 +761,11 @@ async function fetchSubDetail(key: string, userId: string): Promise<SubDetailBun
   const ids = Array.from(new Set(subRows.map((r) => r.contact_id).filter(Boolean))) as string[]
   const contacts: Record<string, SubContact> = {}
   if (ids.length > 0) {
-    const { data: cs } = await supabase
+    const { data: cs, error: csErr } = await supabase
       .from('fh_contacts')
       .select('id, name, job_title, stage')
       .in('id', ids)
+    if (csErr) throw csErr
     for (const c of (cs ?? []) as SubContact[]) contacts[c.id] = c
   }
 

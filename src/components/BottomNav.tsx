@@ -84,6 +84,13 @@ export default function BottomNav() {
     return path === '/sub-portal'
   })
 
+  const visiblePrimaryItems = PRIMARY.filter((it) => {
+    const path = it.to.split('?')[0].split('#')[0]
+    if (membershipLoading) return true
+    if (role) return canViewRoute(path)
+    return path === '/sub-portal'
+  })
+
   // Lock body scroll and listen for Escape while drawer is open
   useEffect(() => {
     if (!moreOpen) return
@@ -318,7 +325,7 @@ export default function BottomNav() {
   return (
     <>
       <nav className="fh-nav" aria-label="Primary">
-        {PRIMARY.map((item) => (
+        {visiblePrimaryItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

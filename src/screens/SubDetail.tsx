@@ -3,8 +3,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  ChevronLeft, Phone, Mail, Hammer, FileText, ShieldCheck, CreditCard,
-  Upload, Trash2, ExternalLink, AlertTriangle, CheckCircle2, Plus
+  ChevronLeft, ChevronRight, Phone, Mail, Hammer, FileText, ShieldCheck, CreditCard,
+  Upload, Trash2, ExternalLink, AlertTriangle, CheckCircle2, Plus,
+  Bell, Search, MapPin
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { useSubDetail, subDetailKey } from '../lib/queries.ts'
@@ -15,6 +16,9 @@ import { useFhMotion } from '../lib/motion.ts'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { Eyebrow, StampNumber } from '../components/v3'
 import { toastSuccess, toastError } from '../lib/toast.ts'
+import MiniMetric from '../components/MiniMetric.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
 // SubDetail — vendor profile surface at /subs/:key.
 //
@@ -64,11 +68,19 @@ function daysUntil(dateStr: any) {
   return Math.floor((d.getTime() - Date.now()) / 86400000)
 }
 
+function fmtDate(dateStr: any) {
+  if (!dateStr) return '-'
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return '-'
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 export default function SubDetail() {
   const { key: rawKey } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
 
   const key = useMemo(() => {
     try { return decodeURIComponent(rawKey || '').trim().toLowerCase() }
@@ -134,6 +146,17 @@ export default function SubDetail() {
   }
 
   if (loading) {
+    if (isDesktop) {
+      return (
+        <SubDetailStatePage
+          loading
+          title="Loading vendor profile"
+          message="Pulling profile, compliance, documents, and job history."
+          onBack={() => navigate('/subs')}
+        />
+      )
+    }
+
     return (
       <div style={{ padding: '24px 20px' }}>
         <div className="v3-skeleton" style={{ height: 28, width: 220, borderRadius: 6, marginBottom: 12 }} />
@@ -144,6 +167,16 @@ export default function SubDetail() {
   }
 
   if (error) {
+    if (isDesktop) {
+      return (
+        <SubDetailStatePage
+          title="Could not load vendor profile"
+          message={error}
+          onBack={() => navigate('/subs')}
+        />
+      )
+    }
+
     return (
       <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <BackButton onClick={() => { hapticTap(); navigate('/subs') }} />
@@ -160,6 +193,16 @@ export default function SubDetail() {
   // Nothing matches — neither a profile nor any per-job sub rows.
   // Treat as a clean miss; route them back to the directory.
   if (!profile && subRows.length === 0) {
+    if (isDesktop) {
+      return (
+        <SubDetailStatePage
+          title="Sub not found"
+          message="This vendor is not in the directory yet."
+          onBack={() => navigate('/subs')}
+        />
+      )
+    }
+
     return (
       <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <BackButton onClick={() => { hapticTap(); navigate('/subs') }} />
@@ -171,6 +214,23 @@ export default function SubDetail() {
           <div style={{ fontSize: 12 }}>This sub isn't in the directory yet.</div>
         </div>
       </div>
+    )
+  }
+
+  if (isDesktop) {
+    return (
+      <SubDetailDesktop
+        displayName={displayName}
+        displayPhone={displayPhone}
+        profile={profile}
+        subRows={subRows}
+        contacts={contacts}
+        totals={totals}
+        creating={creating}
+        onCreate={handleCreate}
+        onBack={() => navigate('/subs')}
+        onSaved={(updated: any) => setProfile(updated)}
+      />
     )
   }
 
@@ -391,6 +451,298 @@ export default function SubDetail() {
   )
 }
 
+type SubDetailDesktopProps = {
+  displayName: string
+  displayPhone: string
+  profile: any
+  subRows: any[]
+  contacts: Record<string, any>
+  totals: { billed: number; trades: any[]; lastWorked: any }
+  creating: boolean
+  onCreate: () => void
+  onBack: () => void
+  onSaved: (updated: any) => void
+}
+
+function SubDetailDesktop({
+  displayName,
+  displayPhone,
+  profile,
+  subRows,
+  contacts,
+  totals,
+  creating,
+  onCreate,
+  onBack,
+  onSaved,
+}: SubDetailDesktopProps) {
+  const navigate = useNavigate()
+  const insuranceDays = daysUntil(profile?.insurance_expires_on)
+  const insuranceLabel = !profile
+    ? 'No profile'
+    : insuranceDays === null
+      ? 'Not on file'
+      : insuranceDays < 0
+        ? 'Expired'
+        : insuranceDays <= 30
+          ? 'Expires soon'
+          : 'Current'
+  const insuranceTone: 'warn' | 'bad' | undefined = insuranceDays === null
+    ? undefined
+    : insuranceDays < 0
+      ? 'bad'
+      : insuranceDays <= 30
+        ? 'warn'
+        : undefined
+  const primaryTrade = totals.trades.length > 0 ? String(totals.trades[0]) : 'No trade tagged'
+  const email = profile?.email || ''
+  const address = profile?.address || ''
+
+  return (
+    <div className="fh-build-page fh-subdetail-build" data-build-screen="SubDetail">
+      <header className="fh-build-topbar">
+        <button type="button" className="fh-build-secondary-btn" onClick={onBack}>
+          <ChevronLeft size={15} aria-hidden="true" />
+          Subs
+        </button>
+        <button
+          type="button"
+          className="fh-build-search"
+          onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
+          aria-label="Open command palette"
+        >
+          <Search size={14} />
+          <span>Search vendors, jobs, payments...</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <div className="fh-build-topbar__meta">
+          <span>{subRows.length.toLocaleString()} job links</span>
+          <span className="fh-build-vline" />
+          <span style={{ opacity: 0.6 }}>{primaryTrade}</span>
+        </div>
+        <button
+          className="fh-build-icon-btn"
+          type="button"
+          onClick={() => navigate('/activity')}
+          aria-label="Open activity"
+          title="Activity"
+        >
+          <Bell size={16} />
+        </button>
+      </header>
+
+      <main className="fh-build-main">
+        <section className="fh-build-hero-row fh-build-hero-row--page">
+          <div>
+            <div className="fh-build-good">Vendor profile</div>
+            <h1 className="fh-build-title">{displayName}</h1>
+          </div>
+
+          <div className="fh-build-focus fh-subdetail-contact-card">
+            <div className="fh-build-eyebrow">Contact file</div>
+            <strong>{profile?.company || 'Independent vendor'}</strong>
+            <div className="fh-subdetail-contact-lines">
+              {displayPhone ? (
+                <a href={`tel:${displayPhone}`}>
+                  <Phone size={13} aria-hidden="true" />
+                  {formatPhone(displayPhone)}
+                </a>
+              ) : (
+                <span>No phone on file</span>
+              )}
+              {email && (
+                <a href={`mailto:${email}`}>
+                  <Mail size={13} aria-hidden="true" />
+                  {email}
+                </a>
+              )}
+              {address && (
+                <span>
+                  <MapPin size={13} aria-hidden="true" />
+                  {address}
+                </span>
+              )}
+            </div>
+            {!profile && (
+              <button type="button" className="fh-build-primary-btn" onClick={onCreate} disabled={creating}>
+                <Plus size={14} aria-hidden="true" />
+                {creating ? 'Creating...' : 'Create profile'}
+              </button>
+            )}
+          </div>
+
+          <div className="fh-build-mini-grid">
+            <MiniMetric label="Billed" value={`$${totals.billed.toLocaleString()}`} accent />
+            <MiniMetric label="Job history" value={String(subRows.length)} />
+            <MiniMetric label="Trades" value={String(totals.trades.length || 0)} />
+            <MiniMetric label="Insurance" value={insuranceLabel} tone={insuranceTone} />
+          </div>
+        </section>
+
+        <section className="fh-build-content-grid fh-build-content-grid--jobs">
+          <div className="fh-subdetail-main-stack">
+            <section className="fh-build-card">
+              <header className="fh-build-card-head">
+                <div className="fh-build-eyebrow">Profile summary</div>
+                {profile ? <span className={`fh-build-dot is-${insuranceTone || 'neutral'}`}>{insuranceLabel}</span> : null}
+              </header>
+
+              {!profile ? (
+                <DataErrorState
+                  compact
+                  title="No vendor profile yet"
+                  message="Create a profile to track insurance, documents, payment preferences, and notes."
+                  actionLabel={creating ? 'Creating...' : 'Create profile'}
+                  onRetry={creating ? undefined : onCreate}
+                />
+              ) : (
+                <div className="fh-subdetail-profile-grid">
+                  <DetailRow label="Company" value={profile.company || 'Independent vendor'} />
+                  <DetailRow label="Phone" value={displayPhone ? formatPhone(displayPhone) : 'Not on file'} />
+                  <DetailRow label="Email" value={email || 'Not on file'} />
+                  <DetailRow label="Address" value={address || 'Not on file'} />
+                  <DetailRow label="EIN" value={profile.ein || 'Not on file'} />
+                  <DetailRow label="License" value={profile.license_number || 'Not on file'} />
+                  <DetailRow label="Payment" value={profile.payment_method || 'Not on file'} />
+                  <DetailRow label="Insurance" value={profile.insurance_expires_on ? `Expires ${fmtDate(profile.insurance_expires_on)}` : 'Not on file'} tone={insuranceTone} />
+                </div>
+              )}
+            </section>
+
+            {profile && (
+              <div className="fh-subdetail-editor-shell">
+                <ProfileEditor profile={profile} onSaved={onSaved} />
+              </div>
+            )}
+
+            <section className="fh-build-card fh-build-table">
+              <header className="fh-build-card-head">
+                <div className="fh-build-eyebrow">Job history - {subRows.length.toLocaleString()}</div>
+                <span style={{ color: 'rgba(245,242,234,.55)', fontSize: 12 }}>
+                  {totals.lastWorked ? `Last worked ${fmtRelativeDate(totals.lastWorked)}` : 'No work logged'}
+                </span>
+              </header>
+
+              {subRows.length === 0 ? (
+                <div className="fh-build-table__empty">No job history yet.</div>
+              ) : (
+                <>
+                  <div className="fh-build-table__head is-subdetail-jobs">
+                    <span>Job</span>
+                    <span>Trade</span>
+                    <span>Date</span>
+                    <span>Billed</span>
+                    <span />
+                  </div>
+                  {subRows.slice(0, 80).map((r) => {
+                    const c = contacts[r.contact_id as string]
+                    return (
+                      <Link key={r.id} to={c ? `/jobs/${c.id}` : '#'} className="fh-build-table__row is-subdetail-jobs">
+                        <strong className="fh-build-truncate" title={c?.name || ''}>{c?.name || 'Job not found'}</strong>
+                        <span className="fh-build-rel">{r.trade || '-'}</span>
+                        <span className="fh-build-rel">{r.created_at ? fmtRelativeDate(new Date(r.created_at)) : '-'}</span>
+                        <span className="fh-build-num">{Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '-'}</span>
+                        <ChevronRight size={13} aria-hidden="true" />
+                      </Link>
+                    )
+                  })}
+                  {subRows.length > 80 && (
+                    <div className="fh-build-table__more">Showing the first 80 linked jobs.</div>
+                  )}
+                </>
+              )}
+            </section>
+          </div>
+
+          <aside className="fh-build-rail fh-build-rail--page">
+            <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Compliance</div>
+              <strong style={{ color: insuranceTone === 'bad' ? '#ee4942' : insuranceTone === 'warn' ? '#e0a141' : undefined }}>
+                {insuranceLabel}
+              </strong>
+              <span>
+                {profile?.insurance_expires_on
+                  ? `Insurance ${fmtDate(profile.insurance_expires_on)}`
+                  : 'Collect COI expiry before assigning critical work.'}
+              </span>
+            </section>
+
+            <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Trades</div>
+              <strong>{totals.trades.length || '-'}</strong>
+              <span>{totals.trades.length ? totals.trades.join(', ') : 'No trade tags yet'}</span>
+            </section>
+
+            <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Payments</div>
+              <strong>{profile?.payment_method || 'Not set'}</strong>
+              <span>{profile?.payment_handle || 'Add a safe payment label only.'}</span>
+            </section>
+
+            <section className="fh-build-rail-card">
+              <div className="fh-build-eyebrow">Documents</div>
+              <strong>
+                {profile
+                  ? [profile.w9_path, profile.coi_path, profile.license_path].filter(Boolean).length
+                  : '-'} / 3
+              </strong>
+              <span>W-9, COI, and license tracked in the editor.</span>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+  )
+}
+
+function DetailRow({ label, value, tone }: { label: string; value: string; tone?: 'warn' | 'bad' }) {
+  return (
+    <div className="fh-subdetail-profile-row">
+      <span>{label}</span>
+      <strong className={tone ? `is-${tone}` : undefined}>{value}</strong>
+    </div>
+  )
+}
+
+function SubDetailStatePage({
+  title,
+  message,
+  loading,
+  onBack,
+}: {
+  title: string
+  message: string
+  loading?: boolean
+  onBack: () => void
+}) {
+  return (
+    <div className="fh-build-page fh-subdetail-build" data-build-screen="SubDetailState">
+      <header className="fh-build-topbar fh-build-topbar--no-cta">
+        <button type="button" className="fh-build-secondary-btn" onClick={onBack}>
+          <ChevronLeft size={15} aria-hidden="true" />
+          Subs
+        </button>
+        <div className="fh-build-topbar__meta">
+          <span>Vendor profile</span>
+        </div>
+      </header>
+      <main className="fh-build-main">
+        <section className="fh-build-card">
+          {loading ? (
+            <div className="fh-subdetail-loading-grid" aria-label={title}>
+              <div className="v3-skeleton" />
+              <div className="v3-skeleton" />
+              <div className="v3-skeleton" />
+            </div>
+          ) : (
+            <DataErrorState title={title} message={message} />
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}
+
 /* ============================================================
    ProfileEditor — five sections of editable vendor data.
    Local form state, single Save button, optimistic toast.
@@ -545,7 +897,7 @@ function ProfileEditor({ profile, onSaved }: any) {
       </Section>
 
       {/* STICKY SAVE */}
-      <div style={{
+      <div className="fh-subdetail-savebar" style={{
         position: 'sticky',
         bottom: 80,
         margin: '0 20px',
@@ -755,8 +1107,9 @@ function BackButton({ onClick }: any) {
 }
 
 function Section({ icon, label, children }: any) {
+  void icon
   return (
-    <motion.div className="v3-section" style={{ margin: '0 20px 18px' }}>
+    <motion.div className="v3-section fh-subdetail-section" style={{ margin: '0 20px 18px' }}>
       <SectionHeader label={label} />
       <div style={{
         marginTop: 6,

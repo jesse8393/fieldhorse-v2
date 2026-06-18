@@ -19,7 +19,7 @@ import {
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.tsx'
-import { resolveNextAction } from '../lib/jobNextAction.ts'
+import { resolvePrimaryAction } from '../lib/jobNextAction.ts'
 import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
 
@@ -61,7 +61,8 @@ export default function OverviewTab({
   onOpenInvitePartner,
   onOpenApproveQuote,
   onOpenMarkComplete,
-  onOpenSendInvoice
+  onOpenSendInvoice,
+  onOpenQuote
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
   const confirm = useConfirm() as any
@@ -98,7 +99,7 @@ export default function OverviewTab({
   )
 
   const nextAction = useMemo(
-    () => resolveNextAction({ contact, scheduleItems, todos }),
+    () => resolvePrimaryAction({ contact, scheduleItems, todos }),
     [contact, scheduleItems, todos]
   )
 
@@ -131,7 +132,7 @@ export default function OverviewTab({
           const { error } = await supabase
             .from('fh_job_todos')
             .update({ done: true, completed_at: new Date().toISOString() })
-            .eq('id', nextAction.sourceId)
+            .eq('id', String(nextAction.sourceId || ''))
             .eq('user_id', userId)
           if (error) {
             toastError("Couldn't mark to-do done", error.message)
@@ -147,7 +148,8 @@ export default function OverviewTab({
           // mark job complete). Otherwise fall through to opening the next-
           // event sheet so they can schedule the follow-up.
           if (contact.stage === 'job') {
-            await markComplete(contact)
+            const res: any = await markComplete(contact)
+            if (res?.error) throw res.error
             await fetchAll()
           } else {
             onOpenAddEvent?.()
@@ -183,8 +185,12 @@ export default function OverviewTab({
             // pipeline.ts fires its own commit haptic; this one announces the
             // boundary BEFORE the network call.
             hapticStageChange()
-            await fn(contact)
+            const res: any = await fn(contact)
+            if (res?.error) throw res.error
             await fetchAll()
+            if (nextAction.pipelineFn === 'startQuote') {
+              onOpenQuote?.()
+            }
           } else if (nextAction.pipelineFn === 'logPayment') {
             // Log payment opens the modal in the parent — stays in flight as
             // the operator inputs amount/date/method.

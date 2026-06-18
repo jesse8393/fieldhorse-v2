@@ -33,6 +33,11 @@ export async function approveQuote(contact: Contact) {
   const res = await baseApproveQuote(contact)
   if (!res.error) {
     hapticMedium()
+    const scheduleFailed = 'scheduleError' in res && !!res.scheduleError
+    if (scheduleFailed) {
+      toast('Moved to Job. Schedule manually.', { accent: 'job', heavy: true })
+      return res
+    }
     toast('Moved to Job · Scheduled for tomorrow 9am', { accent: 'job', heavy: true })
   }
   return res

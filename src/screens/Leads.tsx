@@ -10,16 +10,17 @@
 // is the experience: own route, own lifecycle, follow-up dates, and
 // lead-shaped cards instead of job cards.
 
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, Phone as PhoneIcon, MessageSquare as MsgIcon,
-  Sparkles, CalendarClock, FileText, Trophy, XCircle, MoreHorizontal, Eye
+  Sparkles, CalendarClock, FileText, Trophy, XCircle, MoreHorizontal, Eye, ArrowRight
 } from 'lucide-react'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import { FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -28,15 +29,42 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { LEAD_STAGES } from '../lib/stages.ts'
-import { approveQuote, markLost, reopen } from '../lib/pipeline.ts'
+import { startQuote, approveQuote, markLost, reopen } from '../lib/pipeline.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
-import { useJobs, useJobsRealtime, queryKeys } from '../lib/queries.ts'
+import { useJobs, useJobsRealtime, queryKeys, type JobRow } from '../lib/queries.ts'
 
 const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 
-function money(n: any) {
+type LeadFilter = 'open' | 'new' | 'quoted' | 'lost'
+type LeadContact = JobRow
+type ViewIntel = { viewed_at: string | null }
+type LeadStatus = { id: 'lost' | 'sent' | 'quoting' | 'new'; label: string; color: string }
+type FollowUpMeta = { label: string; tone: 'danger' | 'warn' | 'muted' }
+type LeadSummary = {
+  openCount: number
+  pipeline: number
+  dueCount: number
+  quotedValue: number
+}
+type LeadCommand = {
+  focus: LeadContact | null
+  score: number
+  reason: string
+  cta: string
+  dueCount: number
+  hotQuoteCount: number
+  staleCount: number
+  openValue: number
+}
+type LeadTab = {
+  id: LeadFilter
+  label: string
+  match: (contact: LeadContact) => boolean
+}
+
+function money(n: number | string | null | undefined) {
   const v = Number(n || 0)
   if (!v) return null
   if (v >= 1000) return `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K`
@@ -47,7 +75,7 @@ function money(n: any) {
 //   quote sent     → stage 'quote' + proposal_status sent/viewed
 //   quoting        → stage 'quote' (draft quote in progress)
 //   new            → stage 'lead'
-function leadStatus(c: any): { id: string; label: string; color: string } {
+function leadStatus(c: Pick<LeadContact, 'stage' | 'proposal_status'>): LeadStatus {
   if (c.stage === 'lost') return { id: 'lost', label: 'Lost', color: 'var(--v3-text-muted)' }
   if (c.stage === 'quote') {
     if (c.proposal_status === 'sent' || c.proposal_status === 'viewed') {
@@ -58,7 +86,7 @@ function leadStatus(c: any): { id: string; label: string; color: string } {
   return { id: 'new', label: 'New', color: 'var(--v3-success-bright, #4ade80)' }
 }
 
-function followUpMeta(c: any): { label: string; tone: 'danger' | 'warn' | 'muted' } | null {
+function followUpMeta(c: Pick<LeadContact, 'follow_up_on'>): FollowUpMeta | null {
   if (!c.follow_up_on) return null
   const due = new Date(c.follow_up_on + 'T00:00:00')
   if (Number.isNaN(due.getTime())) return null
@@ -91,38 +119,115 @@ function viewedMeta(intel: { viewed_at: string | null } | undefined, statusId: s
   return { label: `Viewed ${ago}`, tone: 'muted' }
 }
 
-const TABS = [
-  { id: 'open',   label: 'Open',       match: (c: any) => LEAD_STAGES.includes(c.stage) },
-  { id: 'new',    label: 'New',        match: (c: any) => c.stage === 'lead' },
-  { id: 'quoted', label: 'Quoting',    match: (c: any) => c.stage === 'quote' },
-  { id: 'lost',   label: 'Lost',       match: (c: any) => c.stage === 'lost' }
+function daysSince(iso: string | null | undefined) {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return null
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
+}
+
+function buildLeadCommand(leads: LeadContact[], viewIntel: Record<string, ViewIntel>): LeadCommand {
+  const open = leads.filter((c) => LEAD_STAGES.includes(c.stage || ''))
+  let focus: LeadContact | null = null
+  let bestScore = -1
+  let bestReason = 'No open leads need attention.'
+  let hotQuoteCount = 0
+  let dueCount = 0
+  let staleCount = 0
+
+  for (const c of open) {
+    const amount = Number(c.amount || 0)
+    const follow = followUpMeta(c)
+    const viewed = viewedMeta(viewIntel[c.id], leadStatus(c).id)
+    const staleDays = daysSince(c.updated_at || c.created_at)
+    let score = Math.min(30, amount / 2500)
+    let reason = amount > 0 ? `${money(amount)} opportunity` : 'Open opportunity'
+
+    if (follow?.tone === 'danger') {
+      score += 55
+      reason = follow.label
+      dueCount++
+    } else if (follow?.tone === 'warn') {
+      score += 42
+      reason = follow.label
+      dueCount++
+    }
+
+    if (viewed?.tone === 'warn') {
+      score += 45
+      reason = viewed.label
+      hotQuoteCount++
+    }
+
+    if (c.stage === 'quote') score += 16
+    if (staleDays != null && staleDays >= 7) {
+      score += Math.min(24, staleDays)
+      staleCount++
+      if (!follow && viewed?.tone !== 'warn') reason = `${staleDays}d since last touch`
+    }
+
+    if (score > bestScore) {
+      focus = c
+      bestScore = score
+      bestReason = reason
+    }
+  }
+
+  return {
+    focus,
+    score: Math.max(0, Math.round(bestScore)),
+    reason: bestReason,
+    cta: focus?.stage === 'quote' ? 'Open quote' : 'Open lead',
+    dueCount,
+    hotQuoteCount,
+    staleCount,
+    openValue: open.reduce((sum, c) => sum + Number(c.amount || 0), 0),
+  }
+}
+
+const TABS: LeadTab[] = [
+  { id: 'open',   label: 'Open',       match: (c) => LEAD_STAGES.includes(c.stage || '') },
+  { id: 'new',    label: 'New',        match: (c) => c.stage === 'lead' },
+  { id: 'quoted', label: 'Quoting',    match: (c) => c.stage === 'quote' },
+  { id: 'lost',   label: 'Lost',       match: (c) => c.stage === 'lost' }
 ]
 
 export default function Leads() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: contacts = [], isLoading: loading } = useJobs()
+  const {
+    data: contacts = [],
+    isLoading: loading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useJobs()
   useJobsRealtime(user?.id, queryClient)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [filter, setFilter] = useState('open')
+  const [filter, setFilter] = useState<LeadFilter>('open')
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
-  const [justAddedId, setJustAddedId] = useState<any>(null)
-  const [busyId, setBusyId] = useState<any>(null)
+  const [justAddedId, setJustAddedId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const loadError = isError
+    ? error instanceof Error ? error.message : 'The lead data request failed.'
+    : ''
 
   // Proposal-link view intel, keyed by contact. Owner-only via RLS.
-  const [viewIntel, setViewIntel] = useState<Record<string, { viewed_at: string | null }>>({})
+  const [viewIntel, setViewIntel] = useState<Record<string, ViewIntel>>({})
   useEffect(() => {
     if (!user?.id) return
     let alive = true
     ;(async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('fh_public_links')
         .select('contact_id, last_viewed_at')
         .eq('kind', 'proposal')
+      if (error) throw error
       if (!alive || !data) return
-      const map: Record<string, { viewed_at: string | null }> = {}
+      const map: Record<string, ViewIntel> = {}
       for (const r of data as any[]) {
         if (!r.contact_id) continue
         const prev = map[r.contact_id]?.viewed_at
@@ -132,7 +237,11 @@ export default function Leads() {
         }
       }
       setViewIntel(map)
-    })()
+    })().catch((e) => {
+      if (!alive) return
+      console.error('[fieldhorse] lead proposal view intel failed', e)
+      setViewIntel({})
+    })
     return () => { alive = false }
   }, [user?.id, contacts.length])
 
@@ -140,13 +249,36 @@ export default function Leads() {
   useEffect(() => {
     if (searchParams.get('new') === '1') {
       setAddOpen(true)
-      searchParams.delete('new')
-      setSearchParams(searchParams, { replace: true })
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('new')
+      setSearchParams(sp, { replace: true })
     }
   }, [searchParams, setSearchParams])
 
+  // Deep links from Command-K, Home pipeline chips, and the Job Desk
+  // redirect land here. Keep the Lead Desk filter honest instead of
+  // dropping every lead-shaped link into the generic Open view.
+  useEffect(() => {
+    const stage = searchParams.get('stage')
+    const view = searchParams.get('view')
+    const requested = stage || view
+    if (!requested) return
+    const next: LeadFilter | null =
+      requested === 'lead' || requested === 'new' ? 'new'
+      : requested === 'quote' || requested === 'quoted' ? 'quoted'
+      : requested === 'lost' ? 'lost'
+      : requested === 'open' || requested === 'leads' ? 'open'
+      : null
+    if (!next) return
+    setFilter(next)
+    const sp = new URLSearchParams(searchParams)
+    sp.delete('stage')
+    sp.delete('view')
+    setSearchParams(sp, { replace: true })
+  }, [searchParams, setSearchParams])
+
   const leads = useMemo(
-    () => contacts.filter((c: any) => LEAD_STAGES.includes(c.stage) || c.stage === 'lost'),
+    () => contacts.filter((c) => LEAD_STAGES.includes(c.stage || '') || c.stage === 'lost'),
     [contacts]
   )
 
@@ -156,14 +288,14 @@ export default function Leads() {
     let rows = leads.filter(activeTab.match)
     const q = search.trim().toLowerCase()
     if (q) {
-      rows = rows.filter((c: any) =>
+      rows = rows.filter((c) =>
         [c.name, c.phone, c.email, c.address, c.referred_by, c.job_type]
           .filter(Boolean)
           .some((s) => String(s).toLowerCase().includes(q))
       )
     }
     // Follow-ups due float to the top; inside each band, newest first.
-    return [...rows].sort((a: any, b: any) => {
+    return [...rows].sort((a, b) => {
       const fa = a.follow_up_on ? new Date(a.follow_up_on).getTime() : Infinity
       const fb = b.follow_up_on ? new Date(b.follow_up_on).getTime() : Infinity
       if (fa !== fb) return fa - fb
@@ -172,28 +304,35 @@ export default function Leads() {
     })
   }, [leads, activeTab, search])
 
-  const tabCounts = useMemo(() => {
-    if (loading) return {} as Record<string, any>
-    const out: Record<string, any> = {}
+  const tabCounts = useMemo<Partial<Record<LeadFilter, number>>>(() => {
+    if (loading) return {}
+    const out: Partial<Record<LeadFilter, number>> = {}
     for (const t of TABS) out[t.id] = leads.filter(t.match).length
     return out
   }, [leads, loading])
 
   const summary = useMemo(() => {
-    const open = leads.filter((c: any) => LEAD_STAGES.includes(c.stage))
-    const pipeline = open.reduce((s: number, c: any) => s + Number(c.amount || 0), 0)
-    const dueCount = open.filter((c: any) => {
+    const open = leads.filter((c) => LEAD_STAGES.includes(c.stage || ''))
+    const quoted = leads.filter((c) => c.stage === 'quote')
+    const pipeline = open.reduce((s, c) => s + Number(c.amount || 0), 0)
+    const quotedValue = quoted.reduce((s, c) => s + Number(c.amount || 0), 0)
+    const dueCount = open.filter((c) => {
       const m = followUpMeta(c)
       return m && (m.tone === 'danger' || m.tone === 'warn')
     }).length
-    return { openCount: open.length, pipeline, dueCount }
+    return { openCount: open.length, pipeline, dueCount, quotedValue } satisfies LeadSummary
   }, [leads])
+
+  const leadCommand = useMemo(
+    () => buildLeadCommand(leads, viewIntel),
+    [leads, viewIntel]
+  )
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
   }
 
-  async function onWon(c: any) {
+  async function onWon(c: LeadContact) {
     if (busyId) return
     setBusyId(c.id)
     try {
@@ -208,7 +347,26 @@ export default function Leads() {
     }
   }
 
-  async function onLost(c: any) {
+  async function onQuote(c: LeadContact) {
+    if (busyId) return
+    if (c.stage === 'quote') {
+      navigate(`/jobs/${c.id}?tab=quote`)
+      return
+    }
+    setBusyId(c.id)
+    try {
+      const res: any = await startQuote(c)
+      if (res?.error) throw res.error
+      await refresh()
+      navigate(`/jobs/${c.id}?tab=quote`)
+    } catch (e: any) {
+      toastError("Couldn't start quote", e?.message || 'Try again')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function onLost(c: LeadContact) {
     if (busyId) return
     setBusyId(c.id)
     try {
@@ -222,7 +380,7 @@ export default function Leads() {
     }
   }
 
-  async function onReopen(c: any) {
+  async function onReopen(c: LeadContact) {
     if (busyId) return
     setBusyId(c.id)
     try {
@@ -236,7 +394,7 @@ export default function Leads() {
     }
   }
 
-  async function setFollowUp(c: any, days: number | null) {
+  async function setFollowUp(c: LeadContact, days: number | null) {
     const value = days === null
       ? null
       : new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
@@ -264,7 +422,7 @@ export default function Leads() {
       style={{ position: 'relative', paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))' }}
     >
       {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
+      <motion.div className="fh-leads__head" variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 className="jobs-title">
             Leads{' '}
@@ -304,13 +462,15 @@ export default function Leads() {
       </motion.div>
 
       {/* SEARCH */}
-      <motion.div variants={item} style={{ padding: '12px 20px 10px' }}>
+      <motion.div className="fh-leads__search" variants={item} style={{ padding: '12px 20px 10px' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={16} style={{ position: 'absolute', left: 14, color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search leads"
+            autoComplete="off"
             placeholder="Search leads, sources, numbers…"
             style={{
               width: '100%', boxSizing: 'border-box',
@@ -324,13 +484,14 @@ export default function Leads() {
       </motion.div>
 
       {/* STATUS TABS */}
-      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist">
+      <motion.div className="fh-leads__tabs" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Lead filters">
           {TABS.map((t) => (
             <FilterPill
               key={t.id}
               active={filter === t.id}
               count={tabCounts[t.id]}
+              ariaLabel={`Show ${t.label.toLowerCase()} leads`}
               onClick={() => { hapticTap(); setFilter(t.id) }}
             >
               {t.label}
@@ -339,15 +500,79 @@ export default function Leads() {
         </div>
       </motion.div>
 
+      <motion.div className="fh-leads__ops-wrap" variants={item}>
+        <LeadOpsPanel
+          loading={loading}
+          summary={summary}
+          tabCounts={tabCounts}
+          onFilter={(next: LeadFilter) => {
+            hapticTap()
+            setFilter(next)
+          }}
+          onNewLead={() => {
+            hapticMedium()
+            setAddOpen(true)
+          }}
+          onJobs={() => navigate('/jobs?view=pipeline')}
+        />
+      </motion.div>
+
+      <motion.div className="fh-leads__conversion-wrap" variants={item}>
+        <LeadConversionPanel
+          command={leadCommand}
+          loading={loading}
+          onOpenFocus={() => {
+            if (!leadCommand.focus?.id) return
+            const tab = leadCommand.focus.stage === 'quote' ? '?tab=quote' : ''
+            navigate(`/jobs/${leadCommand.focus.id}${tab}`)
+          }}
+          onFilterDue={() => {
+            hapticTap()
+            setFilter('open')
+          }}
+          onFilterQuoted={() => {
+            hapticTap()
+            setFilter('quoted')
+          }}
+          onNewLead={() => {
+            hapticMedium()
+            setAddOpen(true)
+          }}
+        />
+      </motion.div>
+
       {/* LIST */}
+      {loadError && filtered.length > 0 && (
+        <motion.div className="fh-leads__list" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+          <DataErrorState
+            compact
+            title="Could not refresh leads"
+            message="Showing the last loaded results."
+            onRetry={() => { void refetch() }}
+            actionLabel={isFetching ? 'Retrying' : 'Retry'}
+          />
+        </motion.div>
+      )}
+
       {loading && (
-        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
+        <motion.div className="fh-leads__list fh-leads__list--loading" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
           <SkeletonList rows={5} />
         </motion.div>
       )}
 
-      {!loading && filtered.length === 0 && (
-        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
+      {!loading && loadError && filtered.length === 0 && (
+        <motion.div className="fh-leads__list fh-leads__list--empty" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
+          <DataErrorState
+            title="Could not load leads"
+            message={loadError}
+            onRetry={() => { void refetch() }}
+            actionLabel={isFetching ? 'Retrying' : 'Retry'}
+          />
+        </motion.div>
+      )}
+
+      {!loading && !loadError && filtered.length === 0 && (
+        <motion.div className="fh-leads__list fh-leads__list--empty" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
           <div className="v3-empty">
             <Sparkles size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
@@ -375,16 +600,16 @@ export default function Leads() {
       )}
 
       {!loading && filtered.length > 0 && (
-        <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+        <motion.div className="fh-leads__list" variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
           <AnimatePresence>
-            {filtered.map((c: any) => (
+            {filtered.map((c) => (
               <LeadCard
                 key={c.id}
                 contact={c}
                 isNew={c.id === justAddedId}
                 busy={busyId === c.id}
                 onOpen={() => navigate(`/jobs/${c.id}`)}
-                onQuote={() => navigate(`/jobs/${c.id}?tab=quote`)}
+                onQuote={() => onQuote(c)}
                 onWon={() => onWon(c)}
                 onLost={() => onLost(c)}
                 onReopen={() => onReopen(c)}
@@ -424,12 +649,149 @@ export default function Leads() {
   )
 }
 
+type LeadOpsPanelProps = {
+  loading: boolean
+  summary: LeadSummary
+  tabCounts: Partial<Record<LeadFilter, number>>
+  onFilter: (next: LeadFilter) => void
+  onNewLead: () => void
+  onJobs: () => void
+}
+
+function LeadOpsPanel({ loading, summary, tabCounts, onFilter, onNewLead, onJobs }: LeadOpsPanelProps) {
+  const newCount = Number(tabCounts.new || 0)
+  const quotedCount = Number(tabCounts.quoted || 0)
+  const dueCount = Number(summary.dueCount || 0)
+  const potential = money(summary.pipeline) || '$0'
+  const quotedValue = money(summary.quotedValue) || '$0'
+  const nextFilter: LeadFilter = dueCount > 0 ? 'open' : newCount > 0 ? 'new' : 'quoted'
+
+  return (
+    <section className="fh-leads-ops" aria-label="Lead Desk operating summary">
+      <button
+        type="button"
+        className="fh-leads-ops__primary"
+        onClick={() => onFilter(nextFilter)}
+      >
+        <span className="fh-leads-ops__eyebrow">Revenue intake</span>
+        <strong>{loading ? 'Syncing...' : dueCount > 0 ? `${dueCount} follow-ups due` : `${newCount} new leads`}</strong>
+        <span>{loading ? 'Refreshing the lead book' : `${potential} open potential`}</span>
+      </button>
+
+      <div className="fh-leads-ops__metrics">
+        <button type="button" onClick={() => onFilter('new')}>
+          <Sparkles size={14} aria-hidden="true" />
+          <span>New</span>
+          <strong>{loading ? '--' : newCount}</strong>
+        </button>
+        <button type="button" onClick={() => onFilter('quoted')}>
+          <FileText size={14} aria-hidden="true" />
+          <span>Quoting</span>
+          <strong>{loading ? '--' : quotedCount}</strong>
+        </button>
+        <button type="button" onClick={() => onFilter('open')}>
+          <CalendarClock size={14} aria-hidden="true" />
+          <span>Due</span>
+          <strong>{loading ? '--' : dueCount}</strong>
+        </button>
+        <button type="button" onClick={() => onFilter('quoted')}>
+          <Trophy size={14} aria-hidden="true" />
+          <span>Quoted $</span>
+          <strong>{loading ? '--' : quotedValue}</strong>
+        </button>
+      </div>
+
+      <div className="fh-leads-ops__actions">
+        <button type="button" className="fh-leads-ops__new" onClick={onNewLead}>
+          <Plus size={15} aria-hidden="true" />
+          <span>New lead</span>
+        </button>
+        <button type="button" className="fh-leads-ops__job" onClick={onJobs}>
+          <Trophy size={15} aria-hidden="true" />
+          <span>Job desk</span>
+        </button>
+      </div>
+    </section>
+  )
+}
+
+type LeadConversionPanelProps = {
+  command: LeadCommand
+  loading: boolean
+  onOpenFocus: () => void
+  onFilterDue: () => void
+  onFilterQuoted: () => void
+  onNewLead: () => void
+}
+
+function LeadConversionPanel({
+  command,
+  loading,
+  onOpenFocus,
+  onFilterDue,
+  onFilterQuoted,
+  onNewLead,
+}: LeadConversionPanelProps) {
+  const focusName = command.focus?.name || command.focus?.job_title || 'No lead selected'
+  const focusAmount = money(command.focus?.amount) || '$0'
+  const hasFocus = !!command.focus
+
+  return (
+    <section className="fh-lead-command" aria-label="Lead conversion command">
+      <button
+        type="button"
+        className="fh-lead-command__focus"
+        onClick={hasFocus ? onOpenFocus : onNewLead}
+      >
+        <span className="fh-lead-command__eyebrow">Next best move</span>
+        <strong>{loading ? 'Ranking opportunities...' : hasFocus ? focusName : 'Create your first live lead'}</strong>
+        <span>{loading ? 'Checking follow-ups, quote views, and deal value.' : hasFocus ? `${command.reason} · ${focusAmount}` : 'Start the board with one real opportunity.'}</span>
+        <em>
+          {hasFocus ? command.cta : 'New lead'}
+          <ArrowRight size={13} aria-hidden="true" />
+        </em>
+      </button>
+
+      <div className="fh-lead-command__signals">
+        <button type="button" onClick={onFilterDue}>
+          <CalendarClock size={15} aria-hidden="true" />
+          <span>Follow-ups</span>
+          <strong>{loading ? '--' : command.dueCount}</strong>
+        </button>
+        <button type="button" onClick={onFilterQuoted}>
+          <Eye size={15} aria-hidden="true" />
+          <span>Hot quotes</span>
+          <strong>{loading ? '--' : command.hotQuoteCount}</strong>
+        </button>
+        <button type="button" onClick={onFilterDue}>
+          <Trophy size={15} aria-hidden="true" />
+          <span>Open value</span>
+          <strong>{loading ? '--' : (money(command.openValue) || '$0')}</strong>
+        </button>
+      </div>
+    </section>
+  )
+}
+
 /* ============================================================
    LeadCard — lead-shaped card: who · source · status · value ·
    follow-up, with the three moves that matter (Quote / Won / Lost)
    right on the card. Swipe for call/text.
    ============================================================ */
-function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onReopen, onFollowUp, viewIntel }: any) {
+type LeadCardProps = {
+  contact: LeadContact
+  isNew: boolean
+  busy: boolean
+  onOpen: () => void
+  onQuote: () => void
+  onWon: () => void
+  onLost: () => void
+  onReopen: () => void
+  onFollowUp: (days: number | null) => void
+  viewIntel?: ViewIntel
+}
+
+function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onReopen, onFollowUp, viewIntel }: LeadCardProps) {
   const status = leadStatus(c)
   const viewed = viewedMeta(viewIntel, status.id)
   const follow = followUpMeta(c)
@@ -437,7 +799,13 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
   const est = money(c.amount)
   const isLost = c.stage === 'lost'
 
-  const swipeActions: any[] = []
+  const swipeActions: Array<{
+    icon: ReactNode
+    label: string
+    color: string
+    fg: string
+    onClick: () => void
+  }> = []
   if (phone) {
     swipeActions.push({
       icon: <PhoneIcon size={18} />,
@@ -458,6 +826,7 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
   return (
     <SwipeableRow actions={swipeActions} disabled={!phone}>
       <motion.article
+        className={`fh-lead-card${isLost ? ' is-lost' : ''}`}
         initial={isNew ? { opacity: 0, scale: 0.97 } : false}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, height: 0, marginBottom: -8 }}
@@ -649,7 +1018,14 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
   )
 }
 
-function LeadAction({ children, onClick, disabled, primary }: any) {
+type LeadActionProps = {
+  children: ReactNode
+  onClick?: () => void
+  disabled?: boolean
+  primary?: boolean
+}
+
+function LeadAction({ children, onClick, disabled, primary }: LeadActionProps) {
   return (
     <button
       type="button"

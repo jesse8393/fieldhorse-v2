@@ -712,7 +712,7 @@ export default function Home() {
           topPipeline={topPipeline}
           nextActions={nextActions}
           onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
-          onGoToLeads={() => navigate('/leads')}
+          onGoToLeads={(filter?: string) => navigate(filter ? `/leads?stage=${filter}` : '/leads')}
           onGoToActivity={() => navigate('/activity')}
           onGoToSchedule={() => navigate('/schedule')}
           onGoToInvoices={() => navigate('/invoices')}
@@ -721,7 +721,7 @@ export default function Home() {
           onGoToPourWindow={() => navigate('/pour-window')}
           onOpenJob={(id: any) => navigate(`/jobs/${id}`)}
           onOpenJobAtTab={(id: any, tab: any) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
-          onNewLead={() => navigate('/jobs?new=1')}
+          onNewLead={() => navigate('/leads?new=1')}
         />
       </Suspense>
     )

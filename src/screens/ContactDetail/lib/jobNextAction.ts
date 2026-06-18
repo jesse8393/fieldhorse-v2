@@ -1,5 +1,17 @@
 import { dueStatus } from '../../../lib/dueDate.ts'
 
+export type JobNextActionKind = 'idle' | 'schedule' | 'milestone' | 'todo' | 'stage'
+
+export type JobNextAction = {
+  kind: JobNextActionKind
+  title: string
+  ctaLabel: string
+  date?: string | null
+  dueAt?: string | null
+  sourceId?: string | number | null
+  pipelineFn?: string
+}
+
 /**
  * Job Next Action — resolve "what should the operator do next?" via priority
  * chain (Q2 decision):
@@ -32,7 +44,7 @@ import { dueStatus } from '../../../lib/dueDate.ts'
  *   - stage     → call pipelineFn(contact)
  *   - idle      → open AddEventSheet
  */
-const STAGE_DEFAULTS: Record<string, { title: string; ctaLabel: string; pipelineFn: string }> = {
+const STAGE_DEFAULTS: Record<string, Pick<JobNextAction, 'title' | 'ctaLabel' | 'pipelineFn'>> = {
   lead:    { title: 'Send a quote.',                   ctaLabel: 'Start quote',     pipelineFn: 'startQuote' },
   quote:   { title: 'Approve the quote and kick off.', ctaLabel: 'Approve quote',   pipelineFn: 'approveQuote' },
   job:     { title: 'Wrap up and invoice.',            ctaLabel: 'Mark complete',   pipelineFn: 'markComplete' },
@@ -44,13 +56,52 @@ const STAGE_DEFAULTS: Record<string, { title: string; ctaLabel: string; pipeline
 
 // Job-stage default, work already marked complete: the next move is
 // collecting the money, not completing again.
-const JOB_COMPLETED_DEFAULT = {
+const JOB_COMPLETED_DEFAULT: Pick<JobNextAction, 'title' | 'ctaLabel' | 'pipelineFn'> = {
   title: 'Work’s done — collect the balance.',
   ctaLabel: 'Send invoice',
   pipelineFn: 'sendInvoice'
 }
 
-export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: { contact?: any; scheduleItems?: any[]; todos?: any[] } = {}) {
+function normalizeStage(stage: any) {
+  return String(stage || 'lead').toLowerCase()
+}
+
+export function resolvePipelineAction(contact: any): JobNextAction | null {
+  if (!contact) return null
+  const stage = normalizeStage(contact.stage)
+  const fallback = (stage === 'job' && contact.completed_at)
+    ? JOB_COMPLETED_DEFAULT
+    : STAGE_DEFAULTS[stage] || STAGE_DEFAULTS.lead
+  return {
+    kind: 'stage',
+    title: fallback.title,
+    ctaLabel: fallback.ctaLabel,
+    pipelineFn: fallback.pipelineFn
+  }
+}
+
+export function resolvePrimaryAction(args: { contact?: any; scheduleItems?: any[]; todos?: any[] } = {}): JobNextAction {
+  const contact = args.contact
+  if (!contact) {
+    return { kind: 'idle', title: 'No next action.', ctaLabel: '+ Schedule next step' }
+  }
+
+  const stage = normalizeStage(contact.stage)
+  const pipelineAction = resolvePipelineAction(contact)
+  const shouldPrioritizePipeline =
+    stage === 'lead'
+    || stage === 'quote'
+    || stage === 'invoice'
+    || stage === 'closed'
+    || stage === 'lost'
+    || (stage === 'job' && !!contact.completed_at)
+
+  return shouldPrioritizePipeline && pipelineAction
+    ? pipelineAction
+    : resolveNextAction(args)
+}
+
+export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: { contact?: any; scheduleItems?: any[]; todos?: any[] } = {}): JobNextAction {
   if (!contact) {
     return { kind: 'idle', title: 'No next action.', ctaLabel: '+ Schedule next step' }
   }
@@ -101,16 +152,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
   }
 
   // 4. STAGE DEFAULT — falls back to a sensible "what does this stage need?"
-  const stage = contact.stage || 'lead'
-  const fallback = (stage === 'job' && contact.completed_at)
-    ? JOB_COMPLETED_DEFAULT
-    : STAGE_DEFAULTS[stage] || STAGE_DEFAULTS.lead
-  return {
-    kind: 'stage',
-    title: fallback.title,
-    ctaLabel: fallback.ctaLabel,
-    pipelineFn: fallback.pipelineFn
-  }
+  return resolvePipelineAction(contact) || { kind: 'idle', title: 'No next action.', ctaLabel: '+ Schedule next step' }
 }
 
 // Bucket undone todos by dueStatus tone, then sort by due_at ascending

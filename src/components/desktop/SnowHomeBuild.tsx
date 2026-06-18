@@ -53,7 +53,7 @@ type Props = {
   topPipeline: any[] | null
   nextActions: any[] | null
   onGoToJobs: (filter?: string) => void
-  onGoToLeads?: () => void
+  onGoToLeads?: (filter?: string) => void
   onGoToActivity?: () => void
   onGoToSchedule: () => void
   onGoToInvoices: () => void
@@ -66,6 +66,18 @@ type Props = {
   onGoToBid?: () => void
   onGoToCompose?: () => void
   onGoToPourWindow?: () => void
+}
+
+type PipelineRoute = 'jobs' | 'leads'
+
+type PipelineRailRow = {
+  key: string
+  label: string
+  amount: string
+  count: number
+  width: string
+  route: PipelineRoute
+  filter?: string
 }
 
 function greetingFor(now: Date) {
@@ -116,6 +128,7 @@ export default function SnowHomeBuild(props: Props) {
     onGoToLeads,
     onGoToActivity,
     onGoToSchedule,
+    onGoToInvoices,
     onOpenJob,
     onOpenJobAtTab,
     onNewLead,
@@ -142,7 +155,7 @@ export default function SnowHomeBuild(props: Props) {
   // visible columns on the stage rail. Audit H2 caught the subtitle
   // saying "24 active opportunities" by counting every row including
   // the 8 closed and 1 lost.
-  const ACTIVE_RAIL_KEYS = new Set(['lead', 'quote', 'active'])
+  const ACTIVE_RAIL_KEYS = new Set(['lead', 'quote', 'job', 'invoice', 'active'])
   const totalOppCount = pipelineRows.reduce(
     (s: number, r: any) => s + (ACTIVE_RAIL_KEYS.has(r.key) ? (r.count || 0) : 0),
     0
@@ -223,6 +236,19 @@ export default function SnowHomeBuild(props: Props) {
           </div>
         </section>
 
+        <RevenueOperatingLayer
+          pipeline={pipeline}
+          rows={pipelineRows}
+          dealsAtRisk={dealsAtRisk}
+          jobsBehind={jobsBehind}
+          invoicingWeek={invoicingWeek}
+          nextActions={nextActions}
+          onGoToJobs={onGoToJobs}
+          onGoToLeads={onGoToLeads}
+          onGoToInvoices={onGoToInvoices}
+          onGoToActivity={onGoToActivity}
+        />
+
         <section className="fh-build-content-grid">
           <PipelineHero
             pipeline={pipeline}
@@ -232,6 +258,7 @@ export default function SnowHomeBuild(props: Props) {
             totalOppCount={totalOppCount}
             activeStageCount={activeStageCount}
             onGoToJobs={onGoToJobs}
+            onGoToLeads={onGoToLeads}
           />
 
           <TodayCard
@@ -270,6 +297,104 @@ export default function SnowHomeBuild(props: Props) {
   )
 }
 
+function RevenueOperatingLayer({
+  pipeline,
+  rows,
+  dealsAtRisk,
+  jobsBehind,
+  invoicingWeek,
+  nextActions,
+  onGoToJobs,
+  onGoToLeads,
+  onGoToInvoices,
+  onGoToActivity,
+}: any) {
+  const risk = normalizeDealsAtRisk(dealsAtRisk)
+  const actionCount = Array.isArray(nextActions) ? nextActions.length : null
+  const firstAction = Array.isArray(nextActions) && nextActions.length > 0 ? nextActions[0] : null
+  const openRows = Array.isArray(rows) ? rows.filter((row: PipelineRailRow) => row.key !== 'closed' && row.key !== 'lost') : []
+  const openCount = openRows.reduce((sum: number, row: any) => sum + Number(row.count || 0), 0)
+  const riskValue = risk?.value || 0
+  const healthCopy = risk == null
+    ? 'Loading revenue signals.'
+    : risk.count > 0
+      ? `${risk.count} customer ${risk.count === 1 ? 'thread needs' : 'threads need'} owner attention before the pipeline gets stale.`
+      : 'No stalled lead or quote signals in the current book.'
+  const primaryAction = firstAction?.verb || firstAction?.title || 'Review owner queue'
+
+  return (
+    <section className="fh-crm-os" aria-label="Revenue operating system">
+      <article className="fh-crm-brief">
+        <div className="fh-build-eyebrow">AI revenue brief</div>
+        <h2>Lead to close, without dropping the thread.</h2>
+        <p>
+          {pipeline == null
+            ? 'Building the live command brief from your jobs, leads, invoices, and activity.'
+            : `${moneyFull(pipeline)} in active pipeline across ${openCount} open opportunities. ${healthCopy}`}
+        </p>
+        <div className="fh-crm-brief__chips">
+          <span>{risk == null ? 'Risk loading' : `${risk.count} at risk`}</span>
+          <span>{jobsBehind == null ? 'Schedule loading' : `${jobsBehind} behind`}</span>
+          <span>{actionCount == null ? 'Actions loading' : `${actionCount} owner actions`}</span>
+        </div>
+        <div className="fh-crm-brief__actions">
+          <button type="button" onClick={() => onGoToActivity?.()}>
+            {primaryAction}
+          </button>
+          <button type="button" onClick={() => onGoToLeads?.()}>
+            Review leads
+          </button>
+        </div>
+      </article>
+
+      <article className="fh-crm-flow">
+        <div className="fh-crm-flow__head">
+          <div>
+            <div className="fh-build-eyebrow">Pipeline workflow</div>
+            <strong>Lead to cash</strong>
+          </div>
+          <span>{invoicingWeek == null ? 'Invoices loading' : `${moneyFull(invoicingWeek)} collected this week`}</span>
+        </div>
+        <div className="fh-crm-flow__stages">
+          {rows.map((row: PipelineRailRow) => (
+            <button
+              key={row.label}
+              type="button"
+              data-stage={row.key}
+              onClick={() => openPipelineRow(row, onGoToJobs, onGoToLeads)}
+            >
+              <span>{row.label}</span>
+              <strong>{row.amount}</strong>
+              <small>{row.count} {Number(row.count) === 1 ? 'deal' : 'deals'}</small>
+            </button>
+          ))}
+        </div>
+      </article>
+
+      <article className="fh-crm-saved">
+        <div className="fh-build-eyebrow">Saved views</div>
+        <button type="button" onClick={() => onGoToLeads?.()}>At-risk leads</button>
+        <button type="button" onClick={() => onGoToJobs?.('active')}>Active jobs</button>
+        <button type="button" onClick={() => onGoToInvoices?.()}>Ready to collect</button>
+        <button type="button" onClick={() => onGoToActivity?.()}>Activity feed</button>
+        {riskValue > 0 && <span>{moneyFull(riskValue)} needs attention</span>}
+      </article>
+    </section>
+  )
+}
+
+function openPipelineRow(
+  row: Pick<PipelineRailRow, 'route' | 'filter' | 'key'>,
+  onGoToJobs?: (filter?: string) => void,
+  onGoToLeads?: (filter?: string) => void,
+) {
+  if (row.route === 'leads') {
+    onGoToLeads?.(row.filter || row.key)
+    return
+  }
+  onGoToJobs?.(row.filter || row.key)
+}
+
 function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
   return (
     <section className="fh-build-focus">
@@ -282,7 +407,7 @@ function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
   )
 }
 
-function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs }: any) {
+function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs, onGoToLeads }: any) {
   // stageCount = active stages that actually have deals (not every
   // rail column). Otherwise the subtitle reads "across 5 stages" on
   // a book that only has work in 3 of them.
@@ -310,14 +435,14 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
       <p className="fh-build-pipeline__copy">{oppLabel}</p>
 
       <div className="fh-build-stage-grid">
-        {rows.map((row: any) => (
+        {rows.map((row: PipelineRailRow) => (
           <button
             key={row.label}
             type="button"
             data-stage={row.key}
             onClick={(e) => {
               e.stopPropagation()
-              onGoToJobs(row.key)
+              openPipelineRow(row, onGoToJobs, onGoToLeads)
             }}
           >
             {/* Stage-key colored dot — sourced from CSS via the
@@ -590,10 +715,14 @@ function FooterLink({ label, onClick }: { label: string; onClick?: () => void })
 // "every stage with $ + count" rail without fabricating stages the
 // data model doesn't have. Lost is dropped from the rail when empty
 // so a healthy book doesn't dedicate a column to zero.
-function buildStageRailRows(stageRail: Array<{ key: string; count: number; total: number }>) {
+function buildStageRailRows(stageRail: Array<{ key: string; count: number; total: number }>): PipelineRailRow[] {
   const LABEL: Record<string, string> = {
-    lead: 'Lead', quote: 'Quote', job: 'Active',
-    closed: 'Complete', lost: 'Lost',
+    lead: 'Lead',
+    quote: 'Quote',
+    job: 'Active',
+    invoice: 'Invoicing',
+    closed: 'Complete',
+    lost: 'Lost',
   }
   // Map rail keys to the /jobs?stage= filter ids used by onGoToJobs.
   // Post-H3 the Jobs screen has distinct 'invoice' and 'closed' chips,
@@ -602,17 +731,22 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
   // 'invoice' key, which never appeared because it was remapped —
   // spot-check caught "16 active across 3 stages" under a $138k
   // headline that spans 17 deals across 4 stages.)
-  const FILTER: Record<string, string> = {
-    lead: 'lead', quote: 'quote', job: 'active',
-    closed: 'closed', lost: 'all',
+  const ROUTE: Record<string, { route: PipelineRoute; filter: string }> = {
+    lead: { route: 'leads', filter: 'new' },
+    quote: { route: 'leads', filter: 'quoted' },
+    job: { route: 'jobs', filter: 'active' },
+    invoice: { route: 'jobs', filter: 'active' },
+    closed: { route: 'jobs', filter: 'closed' },
+    lost: { route: 'leads', filter: 'lost' },
   }
   const rows = stageRail
     .filter((s) => s.key !== 'lost' || s.count > 0)
     .map((s) => ({
-      key: FILTER[s.key] || 'all',
+      key: s.key,
       label: LABEL[s.key] || s.key,
       amount: s.total > 0 ? money(s.total) : '—',
       count: s.count,
+      ...(ROUTE[s.key] || { route: 'jobs' as const, filter: 'all' }),
     }))
   const totalCount = rows.reduce((sum, r) => sum + r.count, 0)
   return rows.map((r) => ({
@@ -629,11 +763,11 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
 function buildPipelineStages(
   topPipeline: any[] | null,
   stageBreakdown: { won?: number; active?: number; lead?: number } | null,
-) {
-  const buckets: Record<string, { key: string; label: string; stages: string[] }> = {
-    lead:   { key: 'lead',   label: 'Lead',     stages: ['lead', 'quote'] },
-    active: { key: 'active', label: 'Active',   stages: ['job', 'invoice'] },
-    won:    { key: 'won',    label: 'Complete', stages: ['closed'] },
+): PipelineRailRow[] {
+  const buckets: Record<string, { key: string; label: string; stages: string[]; route: PipelineRoute; filter: string }> = {
+    lead:   { key: 'lead',   label: 'Lead',     stages: ['lead', 'quote'], route: 'leads', filter: 'open' },
+    active: { key: 'active', label: 'Active',   stages: ['job', 'invoice'], route: 'jobs', filter: 'active' },
+    won:    { key: 'closed', label: 'Complete', stages: ['closed'], route: 'jobs', filter: 'closed' },
   }
   const sums: Record<string, number> = { lead: 0, active: 0, won: 0 }
   for (const deal of topPipeline || []) {
@@ -648,6 +782,8 @@ function buildPipelineStages(
     label: buckets[k].label,
     amount: sums[k] > 0 ? money(sums[k]) : '—',
     count: stageBreakdown?.[k] ?? 0,
+    route: buckets[k].route,
+    filter: buckets[k].filter,
   }))
   const totalCount = rows.reduce((s, r) => s + r.count, 0)
   return rows.map((r) => ({

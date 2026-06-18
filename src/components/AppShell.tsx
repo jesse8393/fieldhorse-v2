@@ -16,6 +16,7 @@ import Toaster from './Toaster.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOutboxSync } from '../lib/outbox.ts'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 
 // Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
@@ -82,6 +83,7 @@ function layoutForPath(pathname: any) {
   // (the responsive max-width media queries only activate at >=900px),
   // so phones are unaffected by every promotion below.
   if (pathname === '/') return 'responsive'
+  if (pathname === '/leads') return 'responsive'
   if (pathname === '/jobs') return 'responsive'
   if (pathname === '/clients') return 'responsive'
   if (pathname === '/schedule') return 'responsive'
@@ -116,10 +118,25 @@ function layoutForPath(pathname: any) {
   return 'mobile-frame'
 }
 
+function permissionRouteForPath(pathname: string) {
+  if (pathname.startsWith('/jobs/')) return '/jobs'
+  if (pathname.startsWith('/clients/')) return '/clients'
+  if (pathname.startsWith('/subs/')) return '/subs'
+  if (pathname.startsWith('/invoices/')) return '/invoices'
+  return pathname
+}
+
+function fallbackRouteForRole(role: string | null) {
+  if (!role) return '/sub-portal'
+  if (role === 'crew' || role === 'foreman') return '/crew'
+  return '/'
+}
+
 export default function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
+  const { canViewRoute, role, loading: membershipLoading } = useMembership()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -128,6 +145,16 @@ export default function AppShell() {
   // Offline outbox: drain queued writes on app start, on regaining
   // network, and whenever the tab becomes visible. See lib/outbox.ts.
   useEffect(() => startOutboxSync(), [])
+
+  useEffect(() => {
+    if (membershipLoading) return
+    const route = permissionRouteForPath(location.pathname)
+    if (route === '/sub-portal') return
+    const allowed = role ? canViewRoute(route) : false
+    if (!allowed) {
+      navigate(fallbackRouteForRole(role), { replace: true })
+    }
+  }, [canViewRoute, location.pathname, membershipLoading, navigate, role])
 
   // Global navigation event so chrome buttons inside Build components
   // (bell, footer links, etc.) can navigate without each component

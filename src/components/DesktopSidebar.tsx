@@ -85,7 +85,7 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    label: 'Settings',
+    label: 'Workspace',
     items: [
       { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
       { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },

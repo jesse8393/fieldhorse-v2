@@ -394,6 +394,7 @@ export default function ContactDetail() {
                   onOpenInvitePartner={() => setInviteOpen(true)}
                   onOpenApproveQuote={() => setApproveOpen(true)}
                   onOpenSendInvoice={() => setInvoiceOpen(true)}
+                  onOpenQuote={() => setTab('quote')}
                 />
               )}
               {tab === 'quote' && (
@@ -555,6 +556,7 @@ export default function ContactDetail() {
             onOpenApproveQuote={() => setApproveOpen(true)}
             onOpenMarkComplete={() => setCompleteOpen(true)}
             onOpenSendInvoice={() => setInvoiceOpen(true)}
+            onOpenQuote={() => setTab('quote')}
           />
         )}
         {tab === 'quote' && (

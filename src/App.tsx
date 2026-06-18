@@ -49,14 +49,14 @@ const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
-  if (loading) return null
+  if (loading) return <AppLoading label="Checking session" />
   if (!session) return <Navigate to="/login" replace />
   return children
 }
 
 function RequireOnboarded({ children }: { children: ReactNode }) {
   const { loading, isOnboarded } = useProfile()
-  if (loading) return null
+  if (loading) return <AppLoading label="Loading workspace" />
   if (!isOnboarded) return <Navigate to="/onboarding" replace />
   return children
 }
@@ -75,7 +75,34 @@ function Gated({ children }: { children: ReactNode }) {
 // own Suspense inside AppShell so the header + nav stay mounted while
 // the inner screen chunk loads.
 function PublicFallback() {
-  return null
+  return <AppLoading label="Loading Fieldhorse" />
+}
+
+function AppLoading({ label }: { label: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        background: 'var(--v3-bg, #0B0907)',
+        color: 'var(--v3-text, #F2EDE4)',
+        fontFamily: 'var(--font-body, system-ui, sans-serif)',
+        padding: 24
+      }}
+    >
+      <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
+        <div style={{ fontFamily: 'var(--font-display, sans-serif)', fontSize: 30, letterSpacing: '0.14em', lineHeight: 1 }}>
+          <span style={{ color: 'var(--v3-primary, #C9963A)' }}>FIELD</span>HORSE
+        </div>
+        <div style={{ color: 'var(--v3-text-muted, rgba(242,237,228,.55))', fontSize: 13 }}>
+          {label}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function App() {

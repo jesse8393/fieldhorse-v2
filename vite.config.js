@@ -111,5 +111,25 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('jspdf-autotable')) return 'vendor-pdf-table'
+          if (id.includes('jspdf')) return 'vendor-jspdf'
+          if (id.includes('html2canvas')) return 'vendor-html2canvas'
+          if (id.includes('dompurify')) return 'vendor-dompurify'
+          if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts'
+          if (id.includes('framer-motion')) return 'vendor-motion'
+          if (id.includes('lucide-react')) return 'vendor-icons'
+          if (id.includes('@supabase')) return 'vendor-supabase'
+          if (id.includes('@radix-ui') || id.includes('cmdk') || id.includes('vaul')) return 'vendor-ui'
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('scheduler')) return 'vendor-react'
+          return undefined
+        }
+      }
+    }
+  },
   server: { port: 5173, host: true }
 })

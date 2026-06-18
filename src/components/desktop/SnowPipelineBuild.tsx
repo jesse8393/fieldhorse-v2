@@ -17,6 +17,7 @@ type Contact = {
   amount?: number | null
   job_title?: string | null
   job_type?: string | null
+  completed_at?: string | null
   updated_at?: string | null
   created_at?: string | null
 }
@@ -32,10 +33,11 @@ type StageDef = { key: string; label: string; tone: 'lead' | 'quote' | 'job' | '
 // Pipeline v2: no Invoicing column — invoicing is per-job fh_invoices
 // rows, not a stage.
 const STAGES: StageDef[] = [
-  { key: 'lead',    label: 'Lead',      tone: 'lead' },
-  { key: 'quote',   label: 'Quote',     tone: 'quote' },
-  { key: 'job',     label: 'Active',    tone: 'job' },
-  { key: 'closed',  label: 'Complete',  tone: 'won' },
+  { key: 'lead',    label: 'Lead',             tone: 'lead' },
+  { key: 'quote',   label: 'Quote',            tone: 'quote' },
+  { key: 'job',     label: 'Active',           tone: 'job' },
+  { key: 'invoice', label: 'Ready to collect', tone: 'invoice' },
+  { key: 'closed',  label: 'Complete',         tone: 'won' },
 ]
 
 function relTime(iso: any) {
@@ -49,10 +51,17 @@ function relTime(iso: any) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+function pipelineBucket(contact: Contact) {
+  const stage = String(contact.stage || '').toLowerCase()
+  if (stage === 'job' && contact.completed_at) return 'invoice'
+  if (stage === 'invoice') return 'invoice'
+  return stage
+}
+
 export default function SnowPipelineBuild({ contacts, onOpenJob, onNewLead }: Props) {
   const grouped = STAGES.map((s) => {
     const items = contacts
-      .filter((c) => String(c.stage || '').toLowerCase() === s.key)
+      .filter((c) => pipelineBucket(c) === s.key)
       .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
     const total = items.reduce((sum, c) => sum + Number(c.amount || 0), 0)
     return { ...s, items, total }

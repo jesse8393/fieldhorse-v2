@@ -22,7 +22,47 @@
 // policy enforced across send-quote / send-invoice / send-message.
 
 import { createClient } from '@supabase/supabase-js'
+import { createHash } from 'node:crypto'
 import { sendPushToUser } from './lib/push.js'
+
+function trimHeader(value, max = 500) {
+  const text = String(value || '').trim()
+  return text ? text.slice(0, max) : null
+}
+
+export function getPublicLinkClientIp(req) {
+  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  return (
+    req.headers.get('x-nf-client-connection-ip') ||
+    forwarded ||
+    req.headers.get('client-ip') ||
+    req.headers.get('x-real-ip') ||
+    ''
+  ).trim()
+}
+
+export function hashPublicLinkIp(ip, salt = process.env.PUBLIC_LINK_AUDIT_SALT || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fieldhorse-public-link') {
+  const clean = String(ip || '').trim()
+  if (!clean) return null
+  return createHash('sha256').update(`${salt}:${clean}`).digest('hex')
+}
+
+export function buildPublicLinkViewEvent(req, link, contact, salt) {
+  return {
+    p_public_link_id: link.id,
+    p_org_id: link.org_id || contact?.org_id || null,
+    p_user_id: link.user_id,
+    p_contact_id: link.contact_id,
+    p_kind: link.kind,
+    p_user_agent: trimHeader(req.headers.get('user-agent')),
+    p_referer: trimHeader(req.headers.get('referer')),
+    p_ip_hash: hashPublicLinkIp(getPublicLinkClientIp(req), salt),
+    p_metadata: {
+      change_order_id: link.change_order_id || null,
+      request_id: trimHeader(req.headers.get('x-nf-request-id'), 120)
+    }
+  }
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -151,32 +191,39 @@ export default async function handler(req) {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
   const shouldNotify = !link.last_viewed_at || new Date(link.last_viewed_at) < oneHourAgo
 
-  supabase
-    .from('fh_public_links')
-    .update({
-      view_count: (link.view_count || 0) + 1,
-      last_viewed_at: new Date().toISOString()
-    })
-    .eq('id', link.id)
-    .then(() => {}, () => {})
+  const sideEffects = [
+    recordPublicLinkView(supabase, req, link, contact)
+  ]
 
   if (shouldNotify) {
     const kindLabel = link.kind === 'invoice' ? 'invoice' : 'proposal'
-    supabase.from('fh_notifications').insert({
+    sideEffects.push(
+      supabase.from('fh_notifications').insert({
       user_id: link.user_id,
+      org_id: link.org_id || contact.org_id || null,
       kind: 'public_link_viewed',
       title: `Customer viewed your ${kindLabel}`,
       body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
       link: `/jobs/${link.contact_id}`
-    }).then(() => {}, () => {})
+      })
+    )
     // Lock screen too — "they're looking at it right now" is the best
     // possible moment to call. Same debounce as the bell row.
-    sendPushToUser(supabase, link.user_id, {
+    sideEffects.push(
+      sendPushToUser(supabase, link.user_id, {
       title: `Customer is viewing your ${kindLabel} 👀`,
       body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : 'Tap to open the job',
       link: `/jobs/${link.contact_id}`,
       tag: `link-viewed-${link.id}`
-    })
+      })
+    )
+  }
+
+  const settled = await Promise.allSettled(sideEffects)
+  for (const result of settled) {
+    if (result.status === 'rejected') {
+      console.warn('[public-link] side effect failed', result.reason)
+    }
   }
 
   return json({
@@ -211,6 +258,45 @@ export default async function handler(req) {
     invoices: invoices || [],
     photos
   })
+}
+
+async function recordPublicLinkView(supabase, req, link, contact) {
+  const params = buildPublicLinkViewEvent(req, link, contact)
+  const { error } = await supabase.rpc('fh_record_public_link_view', params)
+  if (!error) return
+
+  console.warn('[public-link] audit rpc failed; falling back to direct writes', error)
+  const fallbackEvent = publicLinkEventRowFromRpcParams(params)
+  const settled = await Promise.allSettled([
+    supabase
+      .from('fh_public_links')
+      .update({
+        view_count: (link.view_count || 0) + 1,
+        last_viewed_at: new Date().toISOString()
+      })
+      .eq('id', link.id),
+    supabase.from('fh_public_link_events').insert(fallbackEvent)
+  ])
+  for (const result of settled) {
+    if (result.status === 'rejected') {
+      console.warn('[public-link] audit fallback failed', result.reason)
+    }
+  }
+}
+
+function publicLinkEventRowFromRpcParams(params) {
+  return {
+    public_link_id: params.p_public_link_id,
+    org_id: params.p_org_id,
+    user_id: params.p_user_id,
+    contact_id: params.p_contact_id,
+    kind: params.p_kind,
+    event_type: 'view',
+    user_agent: params.p_user_agent,
+    referer: params.p_referer,
+    ip_hash: params.p_ip_hash,
+    metadata: params.p_metadata
+  }
 }
 
 export const config = { path: '/api/public-link' }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CommandDialog,
@@ -7,48 +7,71 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator
+  CommandSeparator,
 } from '@/components/ui/command'
 import {
-  Home, Briefcase, FileText, Calendar, Calculator, MessageSquare,
-  BarChart3, Upload, Settings, Plus, Mic, Users, Image as ImageIcon,
-  Paperclip
+  BarChart3,
+  Briefcase,
+  Calendar,
+  Calculator,
+  ClipboardCheck,
+  FileText,
+  Home,
+  Image as ImageIcon,
+  LineChart,
+  MessageSquare,
+  Mic,
+  Paperclip,
+  Plus,
+  Receipt,
+  Settings,
+  Target,
+  Upload,
+  Users,
+  UsersRound,
 } from 'lucide-react'
 import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 
-// Static nav — shown as the "empty state" when the input is blank.
-// When the user starts typing, the data search results take over.
 const QUICK_ACTIONS = [
-  // `event` actions fire a window event instead of navigating —
-  // Capture opens the global CaptureSheet wherever you already are.
-  { id: 'capture', label: 'Capture anything', hint: 'Voice, text, or receipt — auto-filed (⌘J)', icon: Mic, event: 'fh:open-capture' },
-  { id: 'newLead', label: 'New lead', hint: 'Open the Leads board', icon: Plus, to: '/leads?new=1' }
+  { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, event: 'fh:open-capture' },
+  { id: 'newLead', label: 'New lead', hint: 'Add opportunity to Lead Desk', icon: Plus, to: '/leads?new=1' },
+  { id: 'newJob', label: 'New job', hint: 'Create active work', icon: Briefcase, to: '/jobs?new=1&asStage=job' },
+  { id: 'followups', label: 'Work follow-ups', hint: 'Ranked Lead Desk queue', icon: Target, to: '/leads?stage=open' },
+  { id: 'collect', label: 'Collect money', hint: 'Invoices and balances', icon: Receipt, to: '/invoices' },
+  { id: 'compose', label: 'Draft message', hint: 'AI compose for customers', icon: MessageSquare, to: '/compose' },
 ]
-// Home hint adapts to time of day so the palette doesn't say
-// "Morning brief" at 9 PM.
+
 function homeHint() {
   const h = new Date().getHours()
-  if (h < 12) return 'Morning brief'
-  if (h < 17) return 'Afternoon brief'
-  return 'Evening brief'
+  if (h < 12) return 'Morning revenue brief'
+  if (h < 17) return 'Afternoon command brief'
+  return 'Evening closeout'
 }
+
 const NAV_ITEMS = [
-  { id: 'home', label: 'Home', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'leads', label: 'Leads', hint: 'Follow-ups + quotes', icon: Plus, to: '/leads' },
-  { id: 'jobs', label: 'Jobs', hint: 'Active work', icon: Briefcase, to: '/jobs' },
-  { id: 'clients', label: 'Clients', hint: 'Directory', icon: Users, to: '/clients' },
-  { id: 'notes', label: 'Field notes', hint: 'Capture anything', icon: FileText, to: '/notes' },
-  { id: 'schedule', label: 'Schedule', hint: 'Day / week / month', icon: Calendar, to: '/schedule' }
+  { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
+  { id: 'leads', label: 'Lead Desk', hint: 'Follow-ups, quotes, lead health', icon: Target, to: '/leads' },
+  { id: 'jobs', label: 'Job Desk', hint: 'Active work and delivery', icon: Briefcase, to: '/jobs' },
+  { id: 'pipeline', label: 'Full funnel pipeline', hint: 'Lead, quote, active, collect, complete', icon: BarChart3, to: '/jobs?view=pipeline' },
+  { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },
+  { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
 ]
-const MONEY_ITEMS = [
-  { id: 'bid', label: 'AI Bid Engine', hint: 'Scope to number', icon: Calculator, to: '/bid' },
-  { id: 'compose', label: 'AI Compose', hint: 'Draft a message', icon: MessageSquare, to: '/compose' },
-  { id: 'analytics', label: 'Analytics', hint: 'Pipeline + margin', icon: BarChart3, to: '/analytics' }
+
+const REVENUE_ITEMS = [
+  { id: 'bid', label: 'Estimates', hint: 'Scope to number', icon: Calculator, to: '/bid' },
+  { id: 'invoices', label: 'Invoices', hint: 'Collect and reconcile', icon: Receipt, to: '/invoices' },
+  { id: 'analytics', label: 'Analytics', hint: 'Pipeline and margin', icon: BarChart3, to: '/analytics' },
+  { id: 'forecast', label: 'Forecast', hint: 'Pour window and capacity', icon: LineChart, to: '/pour-window' },
 ]
+
 const SYSTEM_ITEMS = [
-  { id: 'import', label: 'Import data', hint: 'CSV + webhooks', icon: Upload, to: '/import' },
-  { id: 'settings', label: 'Settings', hint: 'Profile + billing', icon: Settings, to: '/settings' }
+  { id: 'notes', label: 'Activity feed', hint: 'Notes and field intelligence', icon: FileText, to: '/notes' },
+  { id: 'tasks', label: 'Tasks', hint: 'Owner queue', icon: ClipboardCheck, to: '/tasks' },
+  { id: 'team', label: 'Team', hint: 'Roles and operators', icon: UsersRound, to: '/team' },
+  { id: 'import', label: 'Import data', hint: 'CSV and webhooks', icon: Upload, to: '/import' },
+  { id: 'settings', label: 'Settings', hint: 'Profile, templates, billing', icon: Settings, to: '/settings' },
 ]
 
 const ICON_FOR_KIND: Record<string, any> = {
@@ -57,7 +80,7 @@ const ICON_FOR_KIND: Record<string, any> = {
   note: FileText,
   event: Calendar,
   file: Paperclip,
-  photo: ImageIcon
+  photo: ImageIcon,
 }
 
 export default function CommandPalette() {
@@ -65,12 +88,11 @@ export default function CommandPalette() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any>({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { canViewRoute, role, loading: membershipLoading } = useMembership()
 
-  // Open with ⌘K / Ctrl+K. Listens at the window level so it works
-  // from anywhere — including focused inputs (preventDefault keeps
-  // the browser's "find" out of the way).
   useEffect(() => {
     function onKey(e: any) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -78,76 +100,80 @@ export default function CommandPalette() {
         setOpen((v) => !v)
       }
     }
-    window.addEventListener('keydown', onKey)
-
-    // Also listen for an in-app event so AppHeader's search button
-    // can open the palette without needing a ref. Desktop-only — at
-    // phone widths MobileSearchOverlay takes the event; the cmdk
-    // popover doesn't render correctly on iOS Safari + Chrome.
     function onOpenEvt() {
-      if (typeof window !== 'undefined' && window.innerWidth >= 900) {
-        setOpen(true)
-      }
+      if (typeof window !== 'undefined' && window.innerWidth >= 900) setOpen(true)
     }
+    window.addEventListener('keydown', onKey)
     window.addEventListener('fh:open-palette', onOpenEvt)
-
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('fh:open-palette', onOpenEvt)
     }
   }, [])
 
-  // Reset state every time the dialog closes so the next open is clean.
   useEffect(() => {
     if (!open) {
       setQuery('')
       setResults({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
       setSearching(false)
+      setSearchError('')
     }
   }, [open])
 
-  // Debounced search. Empty query → no fetch (we'll show static nav).
   useEffect(() => {
     if (!open) return
     const q = query.trim()
     if (!q) {
       setResults({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
       setSearching(false)
+      setSearchError('')
       return
     }
     setSearching(true)
+    setSearchError('')
     let cancelled = false
     const t = setTimeout(async () => {
       try {
         const data = await universalSearch(q, user?.id)
         if (!cancelled) setResults(data)
+      } catch (e: any) {
+        if (!cancelled) {
+          setResults({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
+          setSearchError(e?.message || 'Search is unavailable right now.')
+        }
       } finally {
         if (!cancelled) setSearching(false)
       }
     }, 200)
-    return () => { cancelled = true; clearTimeout(t) }
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
   }, [query, open, user?.id])
 
-  function go(to: any) {
+  function go(to: string) {
     setOpen(false)
     navigate(to)
   }
 
-  const hasQuery = query.trim().length > 0
-  const hasResults = results.total > 0
+  function itemAllowed(it: any) {
+    if (it.event) return true
+    if (!it.to) return true
+    const path = it.to.split('?')[0].split('#')[0]
+    if (membershipLoading) return true
+    if (role) return path === '/sub-portal' || canViewRoute(path)
+    return path === '/sub-portal'
+  }
 
-  function renderEntityGroup(heading: any, items: any, kindFallback?: any) {
+  function renderEntityGroup(heading: string, items: any[], kindFallback?: string) {
     if (!items.length) return null
     return (
       <CommandGroup heading={heading}>
         {items.map((item: any) => {
-          const I = ICON_FOR_KIND[item.kind || kindFallback] || FileText
+          const I = ICON_FOR_KIND[item.kind || kindFallback || 'note'] || FileText
           return (
             <CommandItem
               key={item.id}
-              // value covers what cmdk's internal filter matches against,
-              // but since we hand it pre-filtered server results, we just
-              // make sure each value is unique enough not to collide.
               value={`${item.id} ${item.title} ${item.sub || ''}`}
               onSelect={() => go(item.to)}
               className="ui:gap-3"
@@ -170,7 +196,8 @@ export default function CommandPalette() {
     )
   }
 
-  function renderNavGroup(heading: any, items: any) {
+  function renderNavGroup(heading: string, items: any[]) {
+    if (!items.length) return null
     return (
       <CommandGroup heading={heading}>
         {items.map((it: any) => {
@@ -201,32 +228,30 @@ export default function CommandPalette() {
     )
   }
 
+  const hasQuery = query.trim().length > 0
+  const hasResults = results.total > 0
+  const quickActions = QUICK_ACTIONS.filter(itemAllowed)
+  const navItems = NAV_ITEMS.filter(itemAllowed)
+  const revenueItems = REVENUE_ITEMS.filter(itemAllowed)
+  const systemItems = SYSTEM_ITEMS.filter(itemAllowed)
+
   return (
-    <CommandDialog
-      open={open}
-      onOpenChange={setOpen}
-      // Custom class is the source of truth for positioning — see
-      // mobile-keyboard-fix.css. Tailwind utility overrides (top-[10vh]
-      // etc.) don't reliably dedupe with the ui: prefix, so we go
-      // straight to a stable class with !important rules.
-      className="fh-command-dialog"
-    >
+    <CommandDialog open={open} onOpenChange={setOpen} className="fh-command-dialog">
       <CommandInput
-        placeholder="Search jobs, clients, notes, events, files…"
+        placeholder="Search leads, jobs, clients, notes, events, files..."
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
-        {/* When typing: show search results (or empty/loading); skip nav.
-            When idle: show the static nav lattice. */}
         {hasQuery ? (
           <>
             {searching && !hasResults && (
               <div className="ui:py-6 ui:text-center ui:text-sm ui:text-muted-foreground">
-                Searching…
+                Searching...
               </div>
             )}
-            {!searching && !hasResults && <CommandEmpty>Nothing matched.</CommandEmpty>}
+            {!searching && searchError && <CommandEmpty>{searchError}</CommandEmpty>}
+            {!searching && !searchError && !hasResults && <CommandEmpty>Nothing matched.</CommandEmpty>}
             {renderEntityGroup('Jobs', results.jobs)}
             {results.jobs.length > 0 && (results.clients.length || results.notes.length || results.events.length || results.files.length) > 0 && <CommandSeparator />}
             {renderEntityGroup('Clients', results.clients)}
@@ -240,13 +265,13 @@ export default function CommandPalette() {
         ) : (
           <>
             <CommandEmpty>Type to search across everything.</CommandEmpty>
-            {renderNavGroup('Quick actions', QUICK_ACTIONS)}
+            {renderNavGroup('Quick actions', quickActions)}
             <CommandSeparator />
-            {renderNavGroup('Navigate', NAV_ITEMS)}
+            {renderNavGroup('CRM workspace', navItems)}
             <CommandSeparator />
-            {renderNavGroup('Money tools', MONEY_ITEMS)}
+            {renderNavGroup('Revenue tools', revenueItems)}
             <CommandSeparator />
-            {renderNavGroup('System', SYSTEM_ITEMS)}
+            {renderNavGroup('System', systemItems)}
           </>
         )}
       </CommandList>

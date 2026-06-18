@@ -27,6 +27,7 @@ import {
 import SnowPipelineBuild from './SnowPipelineBuild.tsx'
 import { money, moneyFull } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import DataErrorState from '../DataErrorState.tsx'
 
 // Map the rail's stage-grouping keys to the parent screen's TABS ids
 // so clicking a stage row actually narrows the table.
@@ -38,6 +39,7 @@ function stageKeyToFilter(stageKey: string): string {
 
 type Props = {
   contacts: any[]
+  pipelineContacts?: any[]
   filtered: any[]
   loading: boolean
   filter: string
@@ -47,7 +49,11 @@ type Props = {
   photoUrlByJob?: Record<string, string>
   featuredId?: string | null
   tabCounts: Record<string, number>
+  loadError?: string | null
+  isRefreshing?: boolean
+  onRetry?: () => void
   onOpenJob: (id: string) => void
+  onNewJob: () => void
   onNewLead: () => void
 }
 
@@ -80,9 +86,10 @@ const FILTERS: { key: string; label: string }[] = [
 
 export default function SnowJobsBuild(props: Props) {
   const {
-    contacts, filtered, loading, filter, setFilter, search, setSearch,
-    tabCounts, onOpenJob, onNewLead,
+    contacts, pipelineContacts, filtered, loading, filter, setFilter, search, setSearch,
+    tabCounts, loadError, isRefreshing, onRetry, onOpenJob, onNewJob, onNewLead,
   } = props
+  const funnelContacts = pipelineContacts || contacts
 
   const navigate = useNavigate()
   const location = useLocation()
@@ -93,6 +100,11 @@ export default function SnowJobsBuild(props: Props) {
   const routeView = params.get('view') // 'jobs' | 'pipeline' | null
 
   const [view, setView] = useState<'table' | 'pipeline'>(routeView === 'pipeline' ? 'pipeline' : 'table')
+
+  useEffect(() => {
+    if (routeView === 'pipeline') setView('pipeline')
+    if (routeView === 'doing' || routeView === 'jobs') setView('table')
+  }, [routeView])
 
   // KPI strip — pipeline $, active count, need-eyes count, won YTD $
   const kpi = useMemo(() => {
@@ -122,6 +134,17 @@ export default function SnowJobsBuild(props: Props) {
     return { pipeline, active, needEyes, wonYTD }
   }, [contacts])
 
+  const funnelKpi = useMemo(() => {
+    const openStages = new Set(['lead', 'quote', 'job', 'invoice'])
+    const pipeline = funnelContacts
+      .filter((c) => openStages.has(String(c.stage || '').toLowerCase()))
+      .reduce((sum, c) => sum + Number(c.amount || 0), 0)
+    const leads = funnelContacts.filter((c) => c.stage === 'lead').length
+    const quotes = funnelContacts.filter((c) => c.stage === 'quote').length
+    const readyToCollect = funnelContacts.filter((c) => c.stage === 'invoice' || (c.stage === 'job' && c.completed_at)).length
+    return { pipeline, leads, quotes, readyToCollect }
+  }, [funnelContacts])
+
   // Right rail: stage counts (jobs only — leads have their own desk)
   const stages = useMemo(() => {
     const map: Record<string, { count: number; total: number; label: string }> = {
@@ -142,18 +165,24 @@ export default function SnowJobsBuild(props: Props) {
   return (
     <div className="fh-build-page" data-build-screen="SnowJobsBuild">
       <header className="fh-build-topbar">
-        <div className="fh-build-search">
+        <div className="fh-build-search" role="search">
           <Search size={14} />
           <input
             className="fh-build-search__input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search jobs"
+            autoComplete="off"
             placeholder="Search jobs, clients, invoices, notes..."
           />
           <kbd>⌘K</kbd>
         </div>
         <div className="fh-build-topbar__meta">
-          <span>{contacts.length.toLocaleString()} contacts in book</span>
+          <span>
+            {view === 'pipeline'
+              ? `${funnelContacts.length.toLocaleString()} records in funnel`
+              : `${contacts.length.toLocaleString()} jobs in book`}
+          </span>
           <span className="fh-build-vline" />
           <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
@@ -166,7 +195,7 @@ export default function SnowJobsBuild(props: Props) {
         >
           <Bell size={16} />
         </button>
-        <button className="fh-build-new-btn" type="button" onClick={onNewLead}>
+        <button className="fh-build-new-btn" type="button" onClick={onNewJob}>
           {/* CTA label tracks the active filter so Job Desk ("Doing"
               or "Complete") shows "+ New Job" and Lead Desk ("Lead"
               or "Quote") shows "+ New Lead". "All" stays on the
@@ -186,10 +215,11 @@ export default function SnowJobsBuild(props: Props) {
 
           <div className="fh-build-view-card">
             <div className="fh-build-eyebrow">View</div>
-            <div className="fh-build-view-toggle">
+            <div className="fh-build-view-toggle" role="group" aria-label="Job Desk view">
               <button
                 type="button"
                 className={view === 'table' ? 'is-active' : ''}
+                aria-pressed={view === 'table'}
                 onClick={() => setView('table')}
               >
                 <LayoutList size={13} /> Table
@@ -197,6 +227,7 @@ export default function SnowJobsBuild(props: Props) {
               <button
                 type="button"
                 className={view === 'pipeline' ? 'is-active' : ''}
+                aria-pressed={view === 'pipeline'}
                 onClick={() => setView('pipeline')}
               >
                 <KanbanSquare size={13} /> Pipeline
@@ -205,20 +236,31 @@ export default function SnowJobsBuild(props: Props) {
             <p className="fh-build-view-card__copy">
               {view === 'table'
                 ? `${filtered.length} jobs visible · ${FILTERS.find((f) => f.key === filter)?.label || 'All'}`
-                : `Drag-and-drop coming soon. Read-only kanban for now.`}
+                : `Stage board ranked by value, next step, and owner attention.`}
             </p>
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Active contracts" value={money(kpi.pipeline)} />
-            <MiniMetric label="Active jobs" value={String(kpi.active)} />
-            <MiniMetric label="Need eyes (7d)" value={String(kpi.needEyes)} />
-            <MiniMetric label="Won YTD" value={money(kpi.wonYTD)} />
+            {view === 'pipeline' ? (
+              <>
+                <MiniMetric label="Open pipeline" value={money(funnelKpi.pipeline)} />
+                <MiniMetric label="New leads" value={String(funnelKpi.leads)} />
+                <MiniMetric label="Quotes" value={String(funnelKpi.quotes)} />
+                <MiniMetric label="Ready to collect" value={String(funnelKpi.readyToCollect)} />
+              </>
+            ) : (
+              <>
+                <MiniMetric label="Active contracts" value={money(kpi.pipeline)} />
+                <MiniMetric label="Active jobs" value={String(kpi.active)} />
+                <MiniMetric label="Need eyes (7d)" value={String(kpi.needEyes)} />
+                <MiniMetric label="Won YTD" value={money(kpi.wonYTD)} />
+              </>
+            )}
           </div>
         </section>
 
         {/* Filter pills row */}
-        <div className="fh-build-filterbar">
+        <div className="fh-build-filterbar" role="toolbar" aria-label="Job filters">
           {FILTERS.map((f) => {
             const count = f.key === 'all' ? contacts.length : (tabCounts[f.key] || 0)
             const active = filter === f.key
@@ -227,6 +269,7 @@ export default function SnowJobsBuild(props: Props) {
                 key={f.key}
                 type="button"
                 className={`fh-build-pill${active ? ' is-active' : ''}`}
+                aria-pressed={active}
                 onClick={() => setFilter(f.key)}
               >
                 {f.label}
@@ -237,7 +280,7 @@ export default function SnowJobsBuild(props: Props) {
         </div>
 
         {view === 'pipeline' ? (
-          <SnowPipelineBuild contacts={contacts} onOpenJob={onOpenJob} onNewLead={onNewLead} />
+          <SnowPipelineBuild contacts={funnelContacts} onOpenJob={onOpenJob} onNewLead={onNewLead} />
         ) : (
           <section className="fh-build-content-grid fh-build-content-grid--jobs">
             <section className="fh-build-card fh-build-table fh-build-jobs-table">
@@ -257,11 +300,28 @@ export default function SnowJobsBuild(props: Props) {
                 <span />
               </div>
 
+              {loadError && filtered.length > 0 && (
+                <DataErrorState
+                  compact
+                  title="Could not refresh jobs"
+                  message="Showing the last loaded results."
+                  onRetry={onRetry}
+                  actionLabel={isRefreshing ? 'Retrying' : 'Retry'}
+                />
+              )}
               {loading && (
                 <div className="fh-build-table__empty">Loading jobs…</div>
               )}
-              {!loading && filtered.length === 0 && (
-                <div className="fh-build-table__empty">No jobs match. Adjust the filter or hit <button type="button" className="fh-build-inline-link" onClick={onNewLead}>+ New Job</button>.</div>
+              {!loading && loadError && filtered.length === 0 && (
+                <DataErrorState
+                  title="Could not load jobs"
+                  message={loadError}
+                  onRetry={onRetry}
+                  actionLabel={isRefreshing ? 'Retrying' : 'Retry'}
+                />
+              )}
+              {!loading && !loadError && filtered.length === 0 && (
+                <div className="fh-build-table__empty">No jobs match. Adjust the filter or hit <button type="button" className="fh-build-inline-link" onClick={onNewJob}>+ New Job</button>.</div>
               )}
               {!loading && filtered.slice(0, 50).map((c: any) => (
                 <button
