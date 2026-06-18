@@ -31,6 +31,7 @@ const NAV_ITEMS = [
   { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
   { to: '/leads',       label: 'Leads',               Icon: Sparkles },
   { to: '/quotes',      label: 'Quotes',              Icon: FileText },
+  { to: '/pipeline',    label: 'Pipeline',            Icon: BarChart3 },
   { to: '/jobs',        label: 'Jobs',                Icon: Briefcase },
   { to: '/clients',     label: 'Clients',             Icon: Users },
   { to: '/schedule',    label: 'Schedule',            Icon: Calendar },

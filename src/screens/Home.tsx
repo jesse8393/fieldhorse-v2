@@ -211,6 +211,7 @@ export default function Home() {
           dashboardError={dashboardError}
           onRetryDashboard={() => { dashboard.refetch() }}
           onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
+          onGoToPipeline={() => navigate('/pipeline')}
           onGoToLeads={(filter?: string) => navigate(filter ? `/leads?stage=${filter}` : '/leads')}
           onGoToQuotes={() => navigate('/quotes')}
           onGoToActivity={() => navigate('/activity')}
@@ -822,14 +823,14 @@ export default function Home() {
                 key={deal.id}
                 deal={deal}
                 photoUrl={photoUrlByJob[deal.id]}
-                onTap={() => navigate(`/jobs/${deal.id}`)}
+                onTap={() => navigate(pipelineDetailPath(deal))}
               />
             ))
           )}
         </div>
       </motion.div>
 
-      <ScreenCloser caption="Tap the + on Jobs to add a lead, or open Schedule to plan crew visits." />
+      <ScreenCloser caption="Open Leads to add a lead, or open Schedule to plan crew visits." />
 
     </motion.div>
   )
@@ -1202,6 +1203,14 @@ function jobActionPath(contactId: any, tab?: any, intent?: any) {
   if (intent) params.set('action', String(intent))
   const query = params.toString()
   return `/jobs/${contactId}${query ? `?${query}` : ''}`
+}
+
+function pipelineDetailPath(deal: any) {
+  const stage = String(deal?.stage || '').toLowerCase()
+  if (stage === 'lead' || stage === 'lost') return `/leads/${deal.id}`
+  if (stage === 'quote') return `/quotes/${deal.id}?tab=quote`
+  if (stage === 'invoice' || deal?.completed_at) return `/jobs/${deal.id}?tab=financials`
+  return `/jobs/${deal.id}`
 }
 
 function nextActionPath(action: any) {

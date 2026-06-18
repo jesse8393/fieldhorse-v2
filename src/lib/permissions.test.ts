@@ -17,4 +17,12 @@ describe('canViewRoute', () => {
     expect(canViewRoute('foreman', '/quotes')).toBe(false)
     expect(canViewRoute('crew', '/quotes')).toBe(false)
   })
+
+  it('keeps Pipeline with revenue operators', () => {
+    expect(canViewRoute('owner', '/pipeline')).toBe(true)
+    expect(canViewRoute('admin', '/pipeline')).toBe(true)
+    expect(canViewRoute('manager', '/pipeline')).toBe(true)
+    expect(canViewRoute('foreman', '/pipeline')).toBe(false)
+    expect(canViewRoute('crew', '/pipeline')).toBe(false)
+  })
 })

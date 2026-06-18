@@ -57,7 +57,7 @@ const GROUPS: Group[] = [
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
       { label: 'Lead Desk',      to: '/leads',    Icon: Sparkles,        match: prefix('/leads') },
       { label: 'Quote Desk',     to: '/quotes',   Icon: FileText,        match: prefix('/quotes') },
-      { label: 'Job Desk',       to: '/jobs?view=doing', Icon: Hammer,   match: (p) => p === '/jobs' && typeof window !== 'undefined' && !window.location.search.includes('view=pipeline') },
+      { label: 'Job Desk',       to: '/jobs?view=doing', Icon: Hammer,   match: prefix('/jobs') },
     ],
   },
   {
@@ -75,12 +75,7 @@ const GROUPS: Group[] = [
   {
     label: 'Intelligence',
     items: [
-      // Pipeline deep-links to the Job Desk's pipeline view so the
-      // Intelligence section doesn't have a nav item that's a clone
-      // of Job Desk above. ?view=pipeline is read by Jobs.tsx to
-      // surface the kanban/pipeline tab; falls through to the default
-      // table view if not implemented yet.
-      { label: 'Pipeline',       to: '/jobs?view=pipeline', Icon: BarChart3, match: (p) => p === '/jobs' && typeof window !== 'undefined' && window.location.search.includes('view=pipeline') },
+      { label: 'Pipeline',       to: '/pipeline', Icon: BarChart3, match: prefix('/pipeline') },
       { label: 'Analytics',      to: '/analytics',Icon: TrendingUp,      match: prefix('/analytics') },
       { label: 'Forecast',       to: '/pour-window', Icon: LineChart,    match: prefix('/pour-window') },
     ],

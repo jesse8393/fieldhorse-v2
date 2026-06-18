@@ -56,6 +56,7 @@ type Props = {
   dashboardError?: string
   onRetryDashboard?: () => void
   onGoToJobs: (filter?: string) => void
+  onGoToPipeline?: () => void
   onGoToLeads?: (filter?: string) => void
   onGoToQuotes?: (filter?: string) => void
   onGoToActivity?: () => void
@@ -129,6 +130,7 @@ export default function SnowHomeBuild(props: Props) {
     topPipeline,
     nextActions,
     onGoToJobs,
+    onGoToPipeline,
     onGoToLeads,
     onGoToQuotes,
     onGoToActivity,
@@ -277,6 +279,7 @@ export default function SnowHomeBuild(props: Props) {
             totalOppCount={totalOppCount}
             activeStageCount={activeStageCount}
             onGoToJobs={onGoToJobs}
+            onGoToPipeline={onGoToPipeline}
             onGoToLeads={onGoToLeads}
             onGoToQuotes={onGoToQuotes}
           />
@@ -433,7 +436,7 @@ function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
   )
 }
 
-function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs, onGoToLeads, onGoToQuotes }: any) {
+function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs, onGoToPipeline, onGoToLeads, onGoToQuotes }: any) {
   // stageCount = active stages that actually have deals (not every
   // rail column). Otherwise the subtitle reads "across 5 stages" on
   // a book that only has work in 3 of them.
@@ -443,7 +446,7 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
       ? 'No active opportunities yet'
       : `${totalOppCount} active ${totalOppCount === 1 ? 'opportunity' : 'opportunities'} across ${stageCount} ${stageCount === 1 ? 'stage' : 'stages'}`
   return (
-    <section className="fh-build-card fh-build-pipeline" onClick={() => onGoToJobs()}>
+    <section className="fh-build-card fh-build-pipeline" onClick={() => onGoToPipeline?.()}>
       <div className="fh-build-card__overlay" />
       <div className="fh-build-eyebrow">Active Pipeline · All stages</div>
 
@@ -468,7 +471,7 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
             data-stage={row.key}
             onClick={(e) => {
               e.stopPropagation()
-                  openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)
+              openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)
             }}
           >
             {/* Stage-key colored dot — sourced from CSS via the

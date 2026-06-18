@@ -90,27 +90,35 @@ export default function Jobs() {
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
-      // ?asStage=job|quote|lead seeds the sheet's default stage. The
-      // Jobs screen defaults to 'job' now — lead capture moved to
-      // /leads (pipeline v2).
+      // Jobs creates active work only; old lead/quote creation links
+      // preserve intent by bouncing to their dedicated desks.
       const requested = searchParams.get('asStage')
-      const seed = requested === 'job' || requested === 'quote' || requested === 'lead'
-        ? requested
-        : 'job'
-      setAddInitialStage(seed)
+      if (requested === 'lead') {
+        navigate('/leads?new=1', { replace: true })
+        return
+      }
+      if (requested === 'quote') {
+        navigate('/quotes?new=1', { replace: true })
+        return
+      }
+      setAddInitialStage('job')
       setAddOpen(true)
       const sp = new URLSearchParams(searchParams)
       sp.delete('new')
       sp.delete('asStage')
       setSearchParams(sp, { replace: true })
     }
-  }, [searchParams, setSearchParams])
+  }, [navigate, searchParams, setSearchParams])
 
   // Deep links. Lead/quote-shaped destinations bounce to their own
   // desks since pipeline v2; job-shaped ?stage= params pick the tab.
   useEffect(() => {
     const stage = searchParams.get('stage')
     const view = searchParams.get('view')
+    if (view === 'pipeline') {
+      navigate('/pipeline', { replace: true })
+      return
+    }
     if (stage === 'quote' || view === 'quotes') {
       navigate('/quotes', { replace: true })
       return
@@ -129,8 +137,7 @@ export default function Jobs() {
       setSearchParams(sp, { replace: true })
       return
     }
-    if (view === 'pipeline') setFilter('all')
-    else if (view === 'doing') setFilter('active')
+    if (view === 'doing') setFilter('active')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -274,13 +281,6 @@ export default function Jobs() {
         <Suspense fallback={null}>
           <SnowJobs
             contacts={contacts}
-            pipelineContacts={allContacts.filter((c: any) =>
-              c.stage === 'lead' ||
-              c.stage === 'quote' ||
-              c.stage === 'job' ||
-              c.stage === 'invoice' ||
-              c.stage === 'closed'
-            )}
             filtered={filtered}
             loading={loading}
             filter={filter}
@@ -303,7 +303,6 @@ export default function Jobs() {
               setAddInitialStage('job')
               setAddOpen(true)
             }}
-            onNewLead={() => navigate('/leads?new=1')}
           />
         </Suspense>
         <Drawer open={!!drawerContact} onOpenChange={onDrawerOpenChange}>
@@ -367,7 +366,7 @@ export default function Jobs() {
               const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
               toastSuccess(
                 `New ${noun} added`,
-                created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+                created?.name ? `${created.name} is in Job Desk` : 'In Job Desk'
               )
             }}
           />
@@ -619,7 +618,7 @@ export default function Jobs() {
             const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
             toastSuccess(
               `New ${noun} added`,
-              created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+              created?.name ? `${created.name} is in Job Desk` : 'In Job Desk'
             )
           }}
         />

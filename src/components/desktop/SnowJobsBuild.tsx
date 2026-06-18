@@ -6,13 +6,8 @@
 // shared .fh-build-* CSS already in global.css plus this file's
 // page-specific table grid.
 //
-// Includes a small view toggle (Table | Pipeline) — when Pipeline is
-// selected the page renders SnowPipelineBuild against the same
-// contacts array. This is how the sidebar's "Lead Desk" / "Pipeline"
-// items show up in the dashboard without adding a new route.
-
-import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowUpRight,
   Bell,
@@ -22,9 +17,7 @@ import {
   Plus,
   Search,
   TrendingUp,
-  KanbanSquare,
 } from 'lucide-react'
-import SnowPipelineBuild from './SnowPipelineBuild.tsx'
 import { money, moneyFull } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import DataErrorState from '../DataErrorState.tsx'
@@ -39,7 +32,6 @@ function stageKeyToFilter(stageKey: string): string {
 
 type Props = {
   contacts: any[]
-  pipelineContacts?: any[]
   filtered: any[]
   loading: boolean
   filter: string
@@ -54,7 +46,6 @@ type Props = {
   onRetry?: () => void
   onOpenJob: (id: string) => void
   onNewJob: () => void
-  onNewLead: () => void
 }
 
 // Pipeline v2: this board shows jobs only (leads live on /leads), so
@@ -86,25 +77,11 @@ const FILTERS: { key: string; label: string }[] = [
 
 export default function SnowJobsBuild(props: Props) {
   const {
-    contacts, pipelineContacts, filtered, loading, filter, setFilter, search, setSearch,
-    tabCounts, loadError, isRefreshing, onRetry, onOpenJob, onNewJob, onNewLead,
+    contacts, filtered, loading, filter, setFilter, search, setSearch,
+    tabCounts, loadError, isRefreshing, onRetry, onOpenJob, onNewJob,
   } = props
-  const funnelContacts = pipelineContacts || contacts
 
   const navigate = useNavigate()
-  const location = useLocation()
-
-  // Lead Desk is its own route now (/leads, pipeline v2). This board is
-  // always the Job Desk; ?view=pipeline still flips the kanban on.
-  const params = new URLSearchParams(location.search)
-  const routeView = params.get('view') // 'jobs' | 'pipeline' | null
-
-  const [view, setView] = useState<'table' | 'pipeline'>(routeView === 'pipeline' ? 'pipeline' : 'table')
-
-  useEffect(() => {
-    if (routeView === 'pipeline') setView('pipeline')
-    if (routeView === 'doing' || routeView === 'jobs') setView('table')
-  }, [routeView])
 
   // KPI strip — pipeline $, active count, need-eyes count, won YTD $
   const kpi = useMemo(() => {
@@ -133,17 +110,6 @@ export default function SnowJobsBuild(props: Props) {
       .reduce((s, c) => s + Number(c.amount || 0), 0)
     return { pipeline, active, needEyes, wonYTD }
   }, [contacts])
-
-  const funnelKpi = useMemo(() => {
-    const openStages = new Set(['lead', 'quote', 'job', 'invoice'])
-    const pipeline = funnelContacts
-      .filter((c) => openStages.has(String(c.stage || '').toLowerCase()))
-      .reduce((sum, c) => sum + Number(c.amount || 0), 0)
-    const leads = funnelContacts.filter((c) => c.stage === 'lead').length
-    const quotes = funnelContacts.filter((c) => c.stage === 'quote').length
-    const readyToCollect = funnelContacts.filter((c) => c.stage === 'invoice' || (c.stage === 'job' && c.completed_at)).length
-    return { pipeline, leads, quotes, readyToCollect }
-  }, [funnelContacts])
 
   // Right rail: stage counts (jobs only — leads have their own desk)
   const stages = useMemo(() => {
@@ -178,11 +144,7 @@ export default function SnowJobsBuild(props: Props) {
           <kbd>⌘K</kbd>
         </div>
         <div className="fh-build-topbar__meta">
-          <span>
-            {view === 'pipeline'
-              ? `${funnelContacts.length.toLocaleString()} records in funnel`
-              : `${contacts.length.toLocaleString()} jobs in book`}
-          </span>
+          <span>{contacts.length.toLocaleString()} jobs in book</span>
           <span className="fh-build-vline" />
           <span style={{ opacity: 0.6 }}>Weather not set</span>
         </div>
@@ -214,48 +176,32 @@ export default function SnowJobsBuild(props: Props) {
           </div>
 
           <div className="fh-build-view-card">
-            <div className="fh-build-eyebrow">View</div>
-            <div className="fh-build-view-toggle" role="group" aria-label="Job Desk view">
+            <div className="fh-build-eyebrow">Active work</div>
+            <div className="fh-build-view-toggle" role="group" aria-label="Job Desk shortcuts">
               <button
                 type="button"
-                className={view === 'table' ? 'is-active' : ''}
-                aria-pressed={view === 'table'}
-                onClick={() => setView('table')}
+                className="is-active"
+                aria-pressed="true"
               >
-                <LayoutList size={13} /> Table
+                <LayoutList size={13} /> Jobs
               </button>
               <button
                 type="button"
-                className={view === 'pipeline' ? 'is-active' : ''}
-                aria-pressed={view === 'pipeline'}
-                onClick={() => setView('pipeline')}
+                onClick={() => navigate('/pipeline')}
               >
-                <KanbanSquare size={13} /> Pipeline
+                Pipeline
               </button>
             </div>
             <p className="fh-build-view-card__copy">
-              {view === 'table'
-                ? `${filtered.length} jobs visible · ${FILTERS.find((f) => f.key === filter)?.label || 'All'}`
-                : `Stage board ranked by value, next step, and owner attention.`}
+              {`${filtered.length} jobs visible · ${FILTERS.find((f) => f.key === filter)?.label || 'All'}. Leads and quotes live in their own desks.`}
             </p>
           </div>
 
           <div className="fh-build-mini-grid">
-            {view === 'pipeline' ? (
-              <>
-                <MiniMetric label="Open pipeline" value={money(funnelKpi.pipeline)} />
-                <MiniMetric label="New leads" value={String(funnelKpi.leads)} />
-                <MiniMetric label="Quotes" value={String(funnelKpi.quotes)} />
-                <MiniMetric label="Ready to collect" value={String(funnelKpi.readyToCollect)} />
-              </>
-            ) : (
-              <>
-                <MiniMetric label="Active contracts" value={money(kpi.pipeline)} />
-                <MiniMetric label="Active jobs" value={String(kpi.active)} />
-                <MiniMetric label="Need eyes (7d)" value={String(kpi.needEyes)} />
-                <MiniMetric label="Won YTD" value={money(kpi.wonYTD)} />
-              </>
-            )}
+            <MiniMetric label="Active contracts" value={money(kpi.pipeline)} />
+            <MiniMetric label="Active jobs" value={String(kpi.active)} />
+            <MiniMetric label="Need eyes (7d)" value={String(kpi.needEyes)} />
+            <MiniMetric label="Won YTD" value={money(kpi.wonYTD)} />
           </div>
         </section>
 
@@ -279,10 +225,7 @@ export default function SnowJobsBuild(props: Props) {
           })}
         </div>
 
-        {view === 'pipeline' ? (
-          <SnowPipelineBuild contacts={funnelContacts} onOpenJob={onOpenJob} onNewLead={onNewLead} />
-        ) : (
-          <section className="fh-build-content-grid fh-build-content-grid--jobs">
+        <section className="fh-build-content-grid fh-build-content-grid--jobs">
             <section className="fh-build-card fh-build-table fh-build-jobs-table">
               <header className="fh-build-card-head">
                 <div className="fh-build-eyebrow">
@@ -392,8 +335,7 @@ export default function SnowJobsBuild(props: Props) {
                 </div>
               </section>
             </aside>
-          </section>
-        )}
+        </section>
       </main>
     </div>
   )

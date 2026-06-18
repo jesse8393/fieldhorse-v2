@@ -12,8 +12,8 @@ import { money } from '../../lib/format.ts'
 
 type Contact = {
   id: string
-  name: string
-  stage: string
+  name?: string | null
+  stage?: string | null
   amount?: number | null
   job_title?: string | null
   job_type?: string | null
@@ -24,8 +24,11 @@ type Contact = {
 
 type Props = {
   contacts: Contact[]
-  onOpenJob: (id: string) => void
+  onOpenJob?: (id: string) => void
+  onOpenContact?: (contact: Contact) => void
   onNewLead?: () => void
+  onNewQuote?: () => void
+  onNewJob?: () => void
 }
 
 type StageDef = { key: string; label: string; tone: 'lead' | 'quote' | 'job' | 'invoice' | 'won' }
@@ -58,7 +61,7 @@ function pipelineBucket(contact: Contact) {
   return stage
 }
 
-export default function SnowPipelineBuild({ contacts, onOpenJob, onNewLead }: Props) {
+export default function SnowPipelineBuild({ contacts, onOpenJob, onOpenContact, onNewLead, onNewQuote, onNewJob }: Props) {
   const grouped = STAGES.map((s) => {
     const items = contacts
       .filter((c) => pipelineBucket(c) === s.key)
@@ -86,6 +89,14 @@ export default function SnowPipelineBuild({ contacts, onOpenJob, onNewLead }: Pr
                   <button type="button" className="fh-build-pipeline-col__empty-add" onClick={onNewLead}>
                     <Plus size={13} /> Add lead
                   </button>
+                ) : col.key === 'quote' && onNewQuote ? (
+                  <button type="button" className="fh-build-pipeline-col__empty-add" onClick={onNewQuote}>
+                    <Plus size={13} /> Start quote
+                  </button>
+                ) : col.key === 'job' && onNewJob ? (
+                  <button type="button" className="fh-build-pipeline-col__empty-add" onClick={onNewJob}>
+                    <Plus size={13} /> New job
+                  </button>
                 ) : (
                   <span>No {col.label.toLowerCase()} deals</span>
                 )}
@@ -97,7 +108,7 @@ export default function SnowPipelineBuild({ contacts, onOpenJob, onNewLead }: Pr
                 key={c.id}
                 type="button"
                 className={`fh-build-pipeline-card is-stage-${col.tone}`}
-                onClick={() => onOpenJob(c.id)}
+                onClick={() => onOpenContact ? onOpenContact(c) : onOpenJob?.(c.id)}
               >
                 <div className="fh-build-pipeline-card__top">
                   <span className="fh-build-pipeline-card__name" title={c.name || 'Untitled'}>

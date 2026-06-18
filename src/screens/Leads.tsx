@@ -542,7 +542,7 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
             hapticMedium()
             setAddOpen(true)
           }}
-          onJobs={() => navigate('/jobs?view=pipeline')}
+          onJobs={() => navigate('/pipeline')}
         />
       </motion.div>
 
@@ -765,7 +765,7 @@ function LeadOpsPanel({ loading, summary, tabCounts, surface, onFilter, onNewLea
         </button>
         <button type="button" className="fh-leads-ops__job" onClick={onJobs}>
           <Trophy size={15} aria-hidden="true" />
-          <span>Job desk</span>
+          <span>Pipeline</span>
         </button>
       </div>
     </section>

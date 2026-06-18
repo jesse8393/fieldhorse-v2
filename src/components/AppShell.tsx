@@ -85,6 +85,7 @@ function layoutForPath(pathname: any) {
   if (pathname === '/') return 'responsive'
   if (pathname === '/leads') return 'responsive'
   if (pathname === '/quotes') return 'responsive'
+  if (pathname === '/pipeline') return 'responsive'
   if (pathname === '/jobs') return 'responsive'
   if (pathname === '/clients') return 'responsive'
   if (pathname === '/schedule') return 'responsive'

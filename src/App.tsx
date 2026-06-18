@@ -28,6 +28,7 @@ const Privacy        = lazy(() => import('./screens/Privacy.tsx'))
 const Terms          = lazy(() => import('./screens/Terms.tsx'))
 const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
 const Leads          = lazy(() => import('./screens/Leads.tsx'))
+const Pipeline       = lazy(() => import('./screens/Pipeline.tsx'))
 const ContactDetail  = lazy(() => import('./screens/ContactDetail/index.tsx'))
 const Clients        = lazy(() => import('./screens/Clients.tsx'))
 const ClientDetail   = lazy(() => import('./screens/ClientDetail.tsx'))
@@ -130,6 +131,7 @@ export default function App() {
           <Route path="/leads/:id" element={<ContactDetail />} />
           <Route path="/quotes" element={<Leads surface="quotes" />} />
           <Route path="/quotes/:id" element={<ContactDetail />} />
+          <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:id" element={<ContactDetail />} />
           <Route path="/clients" element={<Clients />} />
