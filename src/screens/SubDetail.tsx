@@ -19,6 +19,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 
 // SubDetail — vendor profile surface at /subs/:key.
 //
@@ -81,6 +82,8 @@ export default function SubDetail() {
   const { user } = useAuth()
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+  const membership = useMembership()
+  const scopeOrgId = membership.loading ? undefined : membership.orgId
 
   const key = useMemo(() => {
     try { return decodeURIComponent(rawKey || '').trim().toLowerCase() }
@@ -88,7 +91,8 @@ export default function SubDetail() {
   }, [rawKey])
 
   const queryClient = useQueryClient()
-  const { data: bundle, isPending: loading, isError, error: queryError } = useSubDetail(key, user?.id)
+  const { data: bundle, isPending: queryPending, isError, error: queryError } = useSubDetail(key, user?.id, scopeOrgId)
+  const loading = membership.loading || queryPending
   const subRows = bundle?.subRows ?? []
   const contacts = bundle?.contacts ?? {}
   const profile = bundle?.profile ?? null
@@ -98,7 +102,7 @@ export default function SubDetail() {
   // Profile create / edit writes straight to the cached bundle so the
   // panel reflects the change without a refetch.
   const setProfile = (next: any) =>
-    queryClient.setQueryData(subDetailKey(key), (prev) =>
+    queryClient.setQueryData(subDetailKey(key, user?.id, scopeOrgId), (prev) =>
       prev ? { ...prev, profile: next } : prev)
 
   // Display name + phone derived from whichever source has data.
@@ -129,6 +133,7 @@ export default function SubDetail() {
       .from('fh_sub_profiles')
       .insert({
         user_id: user.id,
+        org_id: scopeOrgId ?? null,
         name: seedName,
         phone: seedPhone,
         trades: seedTrade

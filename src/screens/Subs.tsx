@@ -15,6 +15,7 @@ import { SkeletonList } from '../components/Skeleton.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import { toastSuccess, toastError } from '../lib/toast.ts'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription
 } from '@/components/ui/drawer'
@@ -54,8 +55,11 @@ function fmtRelativeDate(d: any) {
 
 export default function Subs() {
   const { user } = useAuth()
-  const { data: bundle, isLoading: loading } = useSubsBundle(user?.id)
-  const load = useInvalidateSubs()
+  const membership = useMembership()
+  const scopeOrgId = membership.loading ? undefined : membership.orgId
+  const { data: bundle, isLoading: subsLoading } = useSubsBundle(user?.id, scopeOrgId)
+  const loading = membership.loading || subsLoading
+  const load = useInvalidateSubs(user?.id, scopeOrgId)
   const rows = bundle?.subs ?? []
   const [q, setQ] = useState('')
   const [tradeFilter, setTradeFilter] = useState('')
@@ -170,20 +174,32 @@ export default function Subs() {
 
   if (isDesktop) {
     return (
-      <Suspense fallback={null}>
-        <SnowSubs
-          filtered={filtered}
-          loading={loading}
-          q={q}
-          setQ={setQ}
-          tradeFilter={tradeFilter}
-          setTradeFilter={setTradeFilter}
-          allTrades={allTrades as string[]}
-          screenStats={screenStats}
-          onAddSub={() => setAddOpen(true)}
-          onOpenSub={(key) => navigate(`/subs/${encodeURIComponent(key)}`)}
+      <>
+        <Suspense fallback={null}>
+          <SnowSubs
+            filtered={filtered}
+            loading={loading}
+            q={q}
+            setQ={setQ}
+            tradeFilter={tradeFilter}
+            setTradeFilter={setTradeFilter}
+            allTrades={allTrades as string[]}
+            screenStats={screenStats}
+            onAddSub={() => setAddOpen(true)}
+            onOpenSub={(key) => navigate(`/subs/${encodeURIComponent(key)}`)}
+          />
+        </Suspense>
+        <AddSubDrawer
+          open={addOpen}
+          userId={user?.id}
+          orgId={scopeOrgId ?? null}
+          onClose={() => setAddOpen(false)}
+          onCreated={async () => {
+            setAddOpen(false)
+            await load()
+          }}
         />
-      </Suspense>
+      </>
     )
   }
 
@@ -383,6 +399,7 @@ export default function Subs() {
       <AddSubDrawer
         open={addOpen}
         userId={user?.id}
+        orgId={scopeOrgId ?? null}
         onClose={() => setAddOpen(false)}
         onCreated={async () => {
           setAddOpen(false)
@@ -735,7 +752,7 @@ function SubCard({ g, contacts, isTop }: any) {
    the schema default 'scheduled'. Both are meaningless without
    a job, so they're not surfaced here.
    ============================================================ */
-function AddSubDrawer({ open, userId, onClose, onCreated }: any) {
+function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
   const [form, setForm] = useState({ name: '', trade: '', phone: '' })
   const [saving, setSaving] = useState(false)
 
@@ -752,6 +769,7 @@ function AddSubDrawer({ open, userId, onClose, onCreated }: any) {
     setSaving(true)
     const { error } = await supabase.from('fh_subs').insert({
       user_id: userId,
+      org_id: orgId ?? null,
       contact_id: null,
       name,
       trade: form.trade.trim() || null,

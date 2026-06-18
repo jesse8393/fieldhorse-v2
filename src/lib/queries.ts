@@ -362,17 +362,27 @@ export type SubsBundle = {
   contacts: SubContact[]
 }
 
-async function fetchSubsBundle(userId: string): Promise<SubsBundle> {
+export const subsKey = (userId: string | undefined, orgId?: string | null) =>
+  ['subs', userId, orgId ?? null] as const
+
+async function fetchSubsBundle(userId: string, orgId?: string | null): Promise<SubsBundle> {
+  let subsQuery = supabase
+    .from('fh_subs')
+    .select('*')
+  subsQuery = orgId
+    ? subsQuery.eq('org_id', orgId)
+    : subsQuery.eq('user_id', userId)
+
+  let contactsQuery = supabase
+    .from('fh_contacts')
+    .select('id, name, job_title, stage')
+  contactsQuery = orgId
+    ? contactsQuery.eq('org_id', orgId)
+    : contactsQuery.eq('user_id', userId)
+
   const [subsRes, contactsRes] = await Promise.all([
-    supabase
-      .from('fh_subs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('fh_contacts')
-      .select('id, name, job_title, stage')
-      .eq('user_id', userId)
+    subsQuery.order('created_at', { ascending: false }),
+    contactsQuery,
   ])
   if (subsRes.error) throw subsRes.error
   if (contactsRes.error) throw contactsRes.error
@@ -382,17 +392,17 @@ async function fetchSubsBundle(userId: string): Promise<SubsBundle> {
   }
 }
 
-export function useSubsBundle(userId: string | undefined) {
+export function useSubsBundle(userId: string | undefined, orgId?: string | null) {
   return useQuery({
-    queryKey: ['subs', userId],
-    queryFn: () => fetchSubsBundle(userId as string),
-    enabled: !!userId
+    queryKey: subsKey(userId, orgId),
+    queryFn: () => fetchSubsBundle(userId as string, orgId),
+    enabled: !!userId && orgId !== undefined
   })
 }
 
-export function useInvalidateSubs() {
+export function useInvalidateSubs(userId?: string, orgId?: string | null) {
   const client = useQueryClient()
-  return () => client.invalidateQueries({ queryKey: ['subs'] })
+  return () => client.invalidateQueries({ queryKey: userId ? subsKey(userId, orgId) : ['subs'] })
 }
 
 // ---- Notes ----
@@ -727,17 +737,24 @@ export type SubDetailBundle = {
   profile: Sub_Detail_Profile | null
 }
 
-async function fetchSubDetail(key: string, userId: string): Promise<SubDetailBundle> {
+async function fetchSubDetail(key: string, userId: string, orgId?: string | null): Promise<SubDetailBundle> {
+  let subsQuery = supabase
+    .from('fh_subs')
+    .select('*')
+  subsQuery = orgId
+    ? subsQuery.eq('org_id', orgId)
+    : subsQuery.eq('user_id', userId)
+
+  let profilesQuery = supabase
+    .from('fh_sub_profiles')
+    .select('*')
+  profilesQuery = orgId
+    ? profilesQuery.eq('org_id', orgId)
+    : profilesQuery.eq('user_id', userId)
+
   const [{ data: subs, error: subsErr }, { data: prof, error: profErr }] = await Promise.all([
-    supabase
-      .from('fh_subs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('fh_sub_profiles')
-      .select('*')
-      .eq('user_id', userId)
+    subsQuery.order('created_at', { ascending: false }),
+    profilesQuery,
   ])
   if (subsErr) throw subsErr
   if (profErr && profErr.code !== 'PGRST116') {
@@ -761,10 +778,14 @@ async function fetchSubDetail(key: string, userId: string): Promise<SubDetailBun
   const ids = Array.from(new Set(subRows.map((r) => r.contact_id).filter(Boolean))) as string[]
   const contacts: Record<string, SubContact> = {}
   if (ids.length > 0) {
-    const { data: cs, error: csErr } = await supabase
+    let contactsQuery = supabase
       .from('fh_contacts')
       .select('id, name, job_title, stage')
       .in('id', ids)
+    contactsQuery = orgId
+      ? contactsQuery.eq('org_id', orgId)
+      : contactsQuery.eq('user_id', userId)
+    const { data: cs, error: csErr } = await contactsQuery
     if (csErr) throw csErr
     for (const c of (cs ?? []) as SubContact[]) contacts[c.id] = c
   }
@@ -772,14 +793,14 @@ async function fetchSubDetail(key: string, userId: string): Promise<SubDetailBun
   return { subRows, contacts, profile: matchingProfile }
 }
 
-export function subDetailKey(key: string | undefined) {
-  return ['subDetail', key] as const
+export function subDetailKey(key: string | undefined, userId?: string, orgId?: string | null) {
+  return ['subDetail', key, userId, orgId ?? null] as const
 }
 
-export function useSubDetail(key: string | undefined, userId: string | undefined) {
+export function useSubDetail(key: string | undefined, userId: string | undefined, orgId?: string | null) {
   return useQuery({
-    queryKey: subDetailKey(key),
-    queryFn: () => fetchSubDetail(key as string, userId as string),
-    enabled: !!key && !!userId
+    queryKey: subDetailKey(key, userId, orgId),
+    queryFn: () => fetchSubDetail(key as string, userId as string, orgId),
+    enabled: !!key && !!userId && orgId !== undefined
   })
 }

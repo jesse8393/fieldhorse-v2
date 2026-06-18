@@ -54,6 +54,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
     setSaving(true)
     const { error } = await supabase.from('fh_subs').insert({
       user_id: userId,
+      org_id: contact.org_id ?? null,
       contact_id: contact.id,
       name: form.name,
       trade: form.trade || null,
