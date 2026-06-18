@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound, Sparkles } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound, Sparkles, FileText } from 'lucide-react'
 import Icon from './icons/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
@@ -30,6 +30,7 @@ const PRIMARY = [
 const NAV_ITEMS = [
   { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
   { to: '/leads',       label: 'Leads',               Icon: Sparkles },
+  { to: '/quotes',      label: 'Quotes',              Icon: FileText },
   { to: '/jobs',        label: 'Jobs',                Icon: Briefcase },
   { to: '/clients',     label: 'Clients',             Icon: Users },
   { to: '/schedule',    label: 'Schedule',            Icon: Calendar },

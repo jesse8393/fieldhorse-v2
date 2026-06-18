@@ -141,12 +141,12 @@ export default async (request) => {
       kind: 'new_lead',
       title: `New lead · ${row.name}`,
       body: [row.job_title, row.phone].filter(Boolean).join(' · ') || 'Tap to view',
-      link: newId ? `/jobs/${newId}` : '/leads'
+      link: newId ? `/leads/${newId}` : '/leads'
     })
     await sendPushToUser(supabase, userId, {
       title: `New lead · ${row.name}`,
       body: [row.job_title, row.phone].filter(Boolean).join(' · ') || 'Tap to view',
-      link: newId ? `/jobs/${newId}` : '/leads',
+      link: newId ? `/leads/${newId}` : '/leads',
       tag: `new-lead-${newId || row.name}`
     })
   } catch (e) {

@@ -212,6 +212,7 @@ export default function Home() {
           onRetryDashboard={() => { dashboard.refetch() }}
           onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
           onGoToLeads={(filter?: string) => navigate(filter ? `/leads?stage=${filter}` : '/leads')}
+          onGoToQuotes={() => navigate('/quotes')}
           onGoToActivity={() => navigate('/activity')}
           onGoToSchedule={() => navigate('/schedule')}
           onGoToInvoices={() => navigate('/invoices')}
@@ -727,7 +728,7 @@ export default function Home() {
             value={quoteAttentionCount}
             label="Quotes"
             subline={quoteAttentionCount != null && quoteAttentionCount > 0 ? 'Need follow up' : null}
-            onTap={() => navigate('/jobs?stage=quote')}
+            onTap={() => navigate('/quotes')}
           />
           {/* Tone flips danger→primary only when jobsBehind === 0. A red
               "0 BEHIND" reads as an alarm when it's actually the all-clear

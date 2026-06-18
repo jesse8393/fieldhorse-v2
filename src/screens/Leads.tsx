@@ -38,6 +38,8 @@ import { useJobs, useJobsRealtime, queryKeys, type JobRow } from '../lib/queries
 const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 
 type LeadFilter = 'open' | 'new' | 'quoted' | 'lost'
+type LeadSurface = 'leads' | 'quotes'
+type LeadsProps = { surface?: LeadSurface }
 type LeadContact = JobRow
 type ViewIntel = { viewed_at: string | null }
 type LeadStatus = { id: 'lost' | 'sent' | 'quoting' | 'new'; label: string; color: string }
@@ -185,14 +187,25 @@ function buildLeadCommand(leads: LeadContact[], viewIntel: Record<string, ViewIn
   }
 }
 
-const TABS: LeadTab[] = [
+const LEAD_TABS: LeadTab[] = [
   { id: 'open',   label: 'Open',       match: (c) => LEAD_STAGES.includes(c.stage || '') },
   { id: 'new',    label: 'New',        match: (c) => c.stage === 'lead' },
   { id: 'quoted', label: 'Quoting',    match: (c) => c.stage === 'quote' },
   { id: 'lost',   label: 'Lost',       match: (c) => c.stage === 'lost' }
 ]
 
-export default function Leads() {
+const QUOTE_TABS: LeadTab[] = [
+  { id: 'quoted', label: 'Active quotes', match: (c) => c.stage === 'quote' }
+]
+
+function leadDetailRoute(c: Pick<LeadContact, 'id' | 'stage'>, surface: LeadSurface) {
+  if (surface === 'quotes' || c.stage === 'quote') return `/quotes/${c.id}?tab=quote`
+  return `/leads/${c.id}`
+}
+
+export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
+  const isQuotesSurface = surface === 'quotes'
+  const tabs = isQuotesSurface ? QUOTE_TABS : LEAD_TABS
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -206,7 +219,7 @@ export default function Leads() {
   } = useJobs()
   useJobsRealtime(user?.id, queryClient)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [filter, setFilter] = useState<LeadFilter>('open')
+  const [filter, setFilter] = useState<LeadFilter>(isQuotesSurface ? 'quoted' : 'open')
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [justAddedId, setJustAddedId] = useState<string | null>(null)
@@ -214,6 +227,10 @@ export default function Leads() {
   const loadError = isError
     ? error instanceof Error ? error.message : 'The lead data request failed.'
     : ''
+
+  useEffect(() => {
+    setFilter(isQuotesSurface ? 'quoted' : 'open')
+  }, [isQuotesSurface])
 
   // Proposal-link view intel, keyed by contact. Owner-only via RLS.
   const [viewIntel, setViewIntel] = useState<Record<string, ViewIntel>>({})
@@ -266,8 +283,8 @@ export default function Leads() {
     const next: LeadFilter | null =
       requested === 'lead' || requested === 'new' ? 'new'
       : requested === 'quote' || requested === 'quoted' ? 'quoted'
-      : requested === 'lost' ? 'lost'
-      : requested === 'open' || requested === 'leads' ? 'open'
+      : !isQuotesSurface && requested === 'lost' ? 'lost'
+      : !isQuotesSurface && (requested === 'open' || requested === 'leads') ? 'open'
       : null
     if (!next) return
     setFilter(next)
@@ -275,14 +292,18 @@ export default function Leads() {
     sp.delete('stage')
     sp.delete('view')
     setSearchParams(sp, { replace: true })
-  }, [searchParams, setSearchParams])
+  }, [isQuotesSurface, searchParams, setSearchParams])
 
   const leads = useMemo(
-    () => contacts.filter((c) => LEAD_STAGES.includes(c.stage || '') || c.stage === 'lost'),
-    [contacts]
+    () => contacts.filter((c) => (
+      isQuotesSurface
+        ? c.stage === 'quote'
+        : LEAD_STAGES.includes(c.stage || '') || c.stage === 'lost'
+    )),
+    [contacts, isQuotesSurface]
   )
 
-  const activeTab = TABS.find((t) => t.id === filter) || TABS[0]
+  const activeTab = tabs.find((t) => t.id === filter) || tabs[0]
 
   const filtered = useMemo(() => {
     let rows = leads.filter(activeTab.match)
@@ -307,9 +328,9 @@ export default function Leads() {
   const tabCounts = useMemo<Partial<Record<LeadFilter, number>>>(() => {
     if (loading) return {}
     const out: Partial<Record<LeadFilter, number>> = {}
-    for (const t of TABS) out[t.id] = leads.filter(t.match).length
+    for (const t of tabs) out[t.id] = leads.filter(t.match).length
     return out
-  }, [leads, loading])
+  }, [leads, loading, tabs])
 
   const summary = useMemo(() => {
     const open = leads.filter((c) => LEAD_STAGES.includes(c.stage || ''))
@@ -350,7 +371,7 @@ export default function Leads() {
   async function onQuote(c: LeadContact) {
     if (busyId) return
     if (c.stage === 'quote') {
-      navigate(`/jobs/${c.id}?tab=quote`)
+      navigate(leadDetailRoute(c, 'quotes'))
       return
     }
     setBusyId(c.id)
@@ -358,7 +379,7 @@ export default function Leads() {
       const res: any = await startQuote(c)
       if (res?.error) throw res.error
       await refresh()
-      navigate(`/jobs/${c.id}?tab=quote`)
+      navigate(leadDetailRoute({ id: c.id, stage: 'quote' }, 'quotes'))
     } catch (e: any) {
       toastError("Couldn't start quote", e?.message || 'Try again')
     } finally {
@@ -412,6 +433,13 @@ export default function Leads() {
   }
 
   const { stagger, item } = useFhMotion()
+  const itemNoun = isQuotesSurface ? 'quote' : 'lead'
+  const itemPlural = isQuotesSurface ? 'quotes' : 'leads'
+  const createLabel = isQuotesSurface ? 'New quote' : 'New lead'
+  const baseFilter: LeadFilter = isQuotesSurface ? 'quoted' : 'open'
+  const titleAccent = isQuotesSurface ? '& Proposals' : '& Follow-ups'
+  const searchLabel = isQuotesSurface ? 'Search quotes' : 'Search leads'
+  const searchPlaceholder = isQuotesSurface ? 'Search quotes, customers, numbers...' : 'Search leads, sources, numbers...'
 
   return (
     <motion.div
@@ -425,19 +453,19 @@ export default function Leads() {
       <motion.div className="fh-leads__head" variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 20px 8px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 className="jobs-title">
-            Leads{' '}
-            <span style={{ color: 'var(--v3-primary-bright)' }}>& Follow-ups</span>
+            {isQuotesSurface ? 'Quotes' : 'Leads'}{' '}
+            <span style={{ color: 'var(--v3-primary-bright)' }}>{titleAccent}</span>
           </h1>
           <div className="jobs-stats">
             {loading ? (
               <span style={{ color: 'var(--v3-text-muted)' }}>Loading…</span>
             ) : (
               <>
-                <span><b>{summary.openCount}</b> open</span>
+                <span><b>{summary.openCount}</b> {isQuotesSurface ? 'active' : 'open'}</span>
                 {summary.pipeline > 0 && (
                   <>
                     <span className="dot-sep">·</span>
-                    <span><b>{money(summary.pipeline)}</b> potential</span>
+                    <span><b>{money(summary.pipeline)}</b> {isQuotesSurface ? 'quoted' : 'potential'}</span>
                   </>
                 )}
                 {summary.dueCount > 0 && (
@@ -454,10 +482,10 @@ export default function Leads() {
           type="button"
           className="fh-jobs__action fh-desktop-only-action"
           onClick={() => { hapticMedium(); setAddOpen(true) }}
-          aria-label="New lead"
+          aria-label={createLabel}
         >
           <Plus size={15} strokeWidth={2.4} />
-          <span>New lead</span>
+          <span>{createLabel}</span>
         </button>
       </motion.div>
 
@@ -469,9 +497,9 @@ export default function Leads() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search leads"
+            aria-label={searchLabel}
             autoComplete="off"
-            placeholder="Search leads, sources, numbers…"
+            placeholder={searchPlaceholder}
             style={{
               width: '100%', boxSizing: 'border-box',
               padding: '12px 14px 12px 40px', borderRadius: 12,
@@ -485,13 +513,13 @@ export default function Leads() {
 
       {/* STATUS TABS */}
       <motion.div className="fh-leads__tabs" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Lead filters">
-          {TABS.map((t) => (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label={isQuotesSurface ? 'Quote filters' : 'Lead filters'}>
+          {tabs.map((t) => (
             <FilterPill
               key={t.id}
               active={filter === t.id}
               count={tabCounts[t.id]}
-              ariaLabel={`Show ${t.label.toLowerCase()} leads`}
+              ariaLabel={`Show ${t.label.toLowerCase()} ${itemPlural}`}
               onClick={() => { hapticTap(); setFilter(t.id) }}
             >
               {t.label}
@@ -505,6 +533,7 @@ export default function Leads() {
           loading={loading}
           summary={summary}
           tabCounts={tabCounts}
+          surface={surface}
           onFilter={(next: LeadFilter) => {
             hapticTap()
             setFilter(next)
@@ -521,14 +550,14 @@ export default function Leads() {
         <LeadConversionPanel
           command={leadCommand}
           loading={loading}
+          surface={surface}
           onOpenFocus={() => {
             if (!leadCommand.focus?.id) return
-            const tab = leadCommand.focus.stage === 'quote' ? '?tab=quote' : ''
-            navigate(`/jobs/${leadCommand.focus.id}${tab}`)
+            navigate(leadDetailRoute(leadCommand.focus, surface))
           }}
           onFilterDue={() => {
             hapticTap()
-            setFilter('open')
+            setFilter(baseFilter)
           }}
           onFilterQuoted={() => {
             hapticTap()
@@ -546,7 +575,7 @@ export default function Leads() {
         <motion.div className="fh-leads__list" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
           <DataErrorState
             compact
-            title="Could not refresh leads"
+            title={`Could not refresh ${itemPlural}`}
             message="Showing the last loaded results."
             onRetry={() => { void refetch() }}
             actionLabel={isFetching ? 'Retrying' : 'Retry'}
@@ -563,7 +592,7 @@ export default function Leads() {
       {!loading && loadError && filtered.length === 0 && (
         <motion.div className="fh-leads__list fh-leads__list--empty" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
           <DataErrorState
-            title="Could not load leads"
+            title={`Could not load ${itemPlural}`}
             message={loadError}
             onRetry={() => { void refetch() }}
             actionLabel={isFetching ? 'Retrying' : 'Retry'}
@@ -576,14 +605,16 @@ export default function Leads() {
           <div className="v3-empty">
             <Sparkles size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              {filter !== 'open' || search ? 'No leads match that view.' : 'No leads yet.'}
+              {filter !== baseFilter || search ? `No ${itemPlural} match that view.` : `No ${itemPlural} yet.`}
             </div>
             <div style={{ fontSize: 12, marginBottom: 10 }}>
-              {filter !== 'open' || search
+              {filter !== baseFilter || search
                 ? 'Clear the search or switch views to see more.'
-                : 'Drop the next phone call in here and let it work the pipeline.'}
+                : isQuotesSurface
+                  ? 'Start the proposal once scope is real, then win it into a job.'
+                  : 'Drop the next phone call in here and let it work the pipeline.'}
             </div>
-            {filter === 'open' && !search && (
+            {filter === baseFilter && !search && (
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
@@ -592,7 +623,7 @@ export default function Leads() {
                   color: 'var(--v3-primary)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
                 }}
               >
-                Add first lead →
+                Add first {itemNoun} →
               </button>
             )}
           </div>
@@ -608,7 +639,7 @@ export default function Leads() {
                 contact={c}
                 isNew={c.id === justAddedId}
                 busy={busyId === c.id}
-                onOpen={() => navigate(`/jobs/${c.id}`)}
+                onOpen={() => navigate(leadDetailRoute(c, surface))}
                 onQuote={() => onQuote(c)}
                 onWon={() => onWon(c)}
                 onLost={() => onLost(c)}
@@ -626,25 +657,26 @@ export default function Leads() {
         <NewLeadSheet
           open={addOpen}
           userId={user?.id}
-          initialStage="lead"
+          initialStage={isQuotesSurface ? 'quote' : 'lead'}
+          lockStage
           onClose={() => setAddOpen(false)}
           onCreated={async (created: any) => {
             setAddOpen(false)
             if (created?.id) setJustAddedId(created.id)
             await refresh()
             setTimeout(() => setJustAddedId(null), 1200)
-            toastSuccess('New lead added', created?.name ? `${created.name} is on the board` : 'On the board')
+            toastSuccess(`${createLabel} added`, created?.name ? `${created.name} is on the board` : 'On the board')
           }}
         />
       </Suspense>
 
       <FloatingActionButton
         onClick={() => setAddOpen(true)}
-        ariaLabel="New lead"
+        ariaLabel={createLabel}
         hideOnDesktop
       />
 
-      <ScreenCloser caption={`${filtered.length} ${filtered.length === 1 ? 'lead' : 'leads'} in this view.`} />
+      <ScreenCloser caption={`${filtered.length} ${filtered.length === 1 ? itemNoun : itemPlural} in this view.`} />
     </motion.div>
   )
 }
@@ -653,58 +685,83 @@ type LeadOpsPanelProps = {
   loading: boolean
   summary: LeadSummary
   tabCounts: Partial<Record<LeadFilter, number>>
+  surface: LeadSurface
   onFilter: (next: LeadFilter) => void
   onNewLead: () => void
   onJobs: () => void
 }
 
-function LeadOpsPanel({ loading, summary, tabCounts, onFilter, onNewLead, onJobs }: LeadOpsPanelProps) {
+function LeadOpsPanel({ loading, summary, tabCounts, surface, onFilter, onNewLead, onJobs }: LeadOpsPanelProps) {
+  const isQuotesSurface = surface === 'quotes'
   const newCount = Number(tabCounts.new || 0)
   const quotedCount = Number(tabCounts.quoted || 0)
   const dueCount = Number(summary.dueCount || 0)
   const potential = money(summary.pipeline) || '$0'
   const quotedValue = money(summary.quotedValue) || '$0'
-  const nextFilter: LeadFilter = dueCount > 0 ? 'open' : newCount > 0 ? 'new' : 'quoted'
+  const nextFilter: LeadFilter = isQuotesSurface ? 'quoted' : dueCount > 0 ? 'open' : newCount > 0 ? 'new' : 'quoted'
+  const createLabel = isQuotesSurface ? 'New quote' : 'New lead'
 
   return (
-    <section className="fh-leads-ops" aria-label="Lead Desk operating summary">
+    <section className="fh-leads-ops" aria-label={`${isQuotesSurface ? 'Quote' : 'Lead'} Desk operating summary`}>
       <button
         type="button"
         className="fh-leads-ops__primary"
         onClick={() => onFilter(nextFilter)}
       >
-        <span className="fh-leads-ops__eyebrow">Revenue intake</span>
-        <strong>{loading ? 'Syncing...' : dueCount > 0 ? `${dueCount} follow-ups due` : `${newCount} new leads`}</strong>
-        <span>{loading ? 'Refreshing the lead book' : `${potential} open potential`}</span>
+        <span className="fh-leads-ops__eyebrow">{isQuotesSurface ? 'Proposal desk' : 'Revenue intake'}</span>
+        <strong>{loading ? 'Syncing...' : dueCount > 0 ? `${dueCount} follow-ups due` : isQuotesSurface ? `${quotedCount} active quotes` : `${newCount} new leads`}</strong>
+        <span>{loading ? 'Refreshing the board' : isQuotesSurface ? `${quotedValue} quoted value` : `${potential} open potential`}</span>
       </button>
 
       <div className="fh-leads-ops__metrics">
-        <button type="button" onClick={() => onFilter('new')}>
-          <Sparkles size={14} aria-hidden="true" />
-          <span>New</span>
-          <strong>{loading ? '--' : newCount}</strong>
-        </button>
-        <button type="button" onClick={() => onFilter('quoted')}>
-          <FileText size={14} aria-hidden="true" />
-          <span>Quoting</span>
-          <strong>{loading ? '--' : quotedCount}</strong>
-        </button>
-        <button type="button" onClick={() => onFilter('open')}>
-          <CalendarClock size={14} aria-hidden="true" />
-          <span>Due</span>
-          <strong>{loading ? '--' : dueCount}</strong>
-        </button>
-        <button type="button" onClick={() => onFilter('quoted')}>
-          <Trophy size={14} aria-hidden="true" />
-          <span>Quoted $</span>
-          <strong>{loading ? '--' : quotedValue}</strong>
-        </button>
+        {isQuotesSurface ? (
+          <>
+            <button type="button" onClick={() => onFilter('quoted')}>
+              <FileText size={14} aria-hidden="true" />
+              <span>Active</span>
+              <strong>{loading ? '--' : quotedCount}</strong>
+            </button>
+            <button type="button" onClick={() => onFilter('quoted')}>
+              <CalendarClock size={14} aria-hidden="true" />
+              <span>Due</span>
+              <strong>{loading ? '--' : dueCount}</strong>
+            </button>
+            <button type="button" onClick={() => onFilter('quoted')}>
+              <Trophy size={14} aria-hidden="true" />
+              <span>Quoted $</span>
+              <strong>{loading ? '--' : quotedValue}</strong>
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={() => onFilter('new')}>
+              <Sparkles size={14} aria-hidden="true" />
+              <span>New</span>
+              <strong>{loading ? '--' : newCount}</strong>
+            </button>
+            <button type="button" onClick={() => onFilter('quoted')}>
+              <FileText size={14} aria-hidden="true" />
+              <span>Quoting</span>
+              <strong>{loading ? '--' : quotedCount}</strong>
+            </button>
+            <button type="button" onClick={() => onFilter('open')}>
+              <CalendarClock size={14} aria-hidden="true" />
+              <span>Due</span>
+              <strong>{loading ? '--' : dueCount}</strong>
+            </button>
+            <button type="button" onClick={() => onFilter('quoted')}>
+              <Trophy size={14} aria-hidden="true" />
+              <span>Quoted $</span>
+              <strong>{loading ? '--' : quotedValue}</strong>
+            </button>
+          </>
+        )}
       </div>
 
       <div className="fh-leads-ops__actions">
         <button type="button" className="fh-leads-ops__new" onClick={onNewLead}>
           <Plus size={15} aria-hidden="true" />
-          <span>New lead</span>
+          <span>{createLabel}</span>
         </button>
         <button type="button" className="fh-leads-ops__job" onClick={onJobs}>
           <Trophy size={15} aria-hidden="true" />
@@ -718,6 +775,7 @@ function LeadOpsPanel({ loading, summary, tabCounts, onFilter, onNewLead, onJobs
 type LeadConversionPanelProps = {
   command: LeadCommand
   loading: boolean
+  surface: LeadSurface
   onOpenFocus: () => void
   onFilterDue: () => void
   onFilterQuoted: () => void
@@ -727,27 +785,29 @@ type LeadConversionPanelProps = {
 function LeadConversionPanel({
   command,
   loading,
+  surface,
   onOpenFocus,
   onFilterDue,
   onFilterQuoted,
   onNewLead,
 }: LeadConversionPanelProps) {
-  const focusName = command.focus?.name || command.focus?.job_title || 'No lead selected'
+  const isQuotesSurface = surface === 'quotes'
+  const focusName = command.focus?.name || command.focus?.job_title || `No ${isQuotesSurface ? 'quote' : 'lead'} selected`
   const focusAmount = money(command.focus?.amount) || '$0'
   const hasFocus = !!command.focus
 
   return (
-    <section className="fh-lead-command" aria-label="Lead conversion command">
+    <section className="fh-lead-command" aria-label={`${isQuotesSurface ? 'Quote' : 'Lead'} conversion command`}>
       <button
         type="button"
         className="fh-lead-command__focus"
         onClick={hasFocus ? onOpenFocus : onNewLead}
       >
         <span className="fh-lead-command__eyebrow">Next best move</span>
-        <strong>{loading ? 'Ranking opportunities...' : hasFocus ? focusName : 'Create your first live lead'}</strong>
-        <span>{loading ? 'Checking follow-ups, quote views, and deal value.' : hasFocus ? `${command.reason} · ${focusAmount}` : 'Start the board with one real opportunity.'}</span>
+        <strong>{loading ? 'Ranking opportunities...' : hasFocus ? focusName : `Create your first live ${isQuotesSurface ? 'quote' : 'lead'}`}</strong>
+        <span>{loading ? 'Checking follow-ups, quote views, and deal value.' : hasFocus ? `${command.reason} · ${focusAmount}` : `Start the board with one real ${isQuotesSurface ? 'proposal' : 'opportunity'}.`}</span>
         <em>
-          {hasFocus ? command.cta : 'New lead'}
+          {hasFocus ? command.cta : isQuotesSurface ? 'New quote' : 'New lead'}
           <ArrowRight size={13} aria-hidden="true" />
         </em>
       </button>

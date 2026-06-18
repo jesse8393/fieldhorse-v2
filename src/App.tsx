@@ -127,6 +127,9 @@ export default function App() {
         <Route element={<Gated><AppShell /></Gated>}>
           <Route path="/" element={<Home />} />
           <Route path="/leads" element={<Leads />} />
+          <Route path="/leads/:id" element={<ContactDetail />} />
+          <Route path="/quotes" element={<Leads surface="quotes" />} />
+          <Route path="/quotes/:id" element={<ContactDetail />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:id" element={<ContactDetail />} />
           <Route path="/clients" element={<Clients />} />

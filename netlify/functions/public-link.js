@@ -197,6 +197,9 @@ export default async function handler(req) {
 
   if (shouldNotify) {
     const kindLabel = link.kind === 'invoice' ? 'invoice' : 'proposal'
+    const detailLink = link.kind === 'invoice'
+      ? `/jobs/${link.contact_id}?tab=financials`
+      : `/quotes/${link.contact_id}?tab=quote`
     sideEffects.push(
       supabase.from('fh_notifications').insert({
       user_id: link.user_id,
@@ -204,7 +207,7 @@ export default async function handler(req) {
       kind: 'public_link_viewed',
       title: `Customer viewed your ${kindLabel}`,
       body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
-      link: `/jobs/${link.contact_id}`
+      link: detailLink
       })
     )
     // Lock screen too — "they're looking at it right now" is the best
@@ -212,8 +215,8 @@ export default async function handler(req) {
     sideEffects.push(
       sendPushToUser(supabase, link.user_id, {
       title: `Customer is viewing your ${kindLabel} 👀`,
-      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : 'Tap to open the job',
-      link: `/jobs/${link.contact_id}`,
+      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : `Tap to open the ${kindLabel}`,
+      link: detailLink,
       tag: `link-viewed-${link.id}`
       })
     )

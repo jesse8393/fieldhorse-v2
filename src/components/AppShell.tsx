@@ -84,6 +84,7 @@ function layoutForPath(pathname: any) {
   // so phones are unaffected by every promotion below.
   if (pathname === '/') return 'responsive'
   if (pathname === '/leads') return 'responsive'
+  if (pathname === '/quotes') return 'responsive'
   if (pathname === '/jobs') return 'responsive'
   if (pathname === '/clients') return 'responsive'
   if (pathname === '/schedule') return 'responsive'
@@ -112,6 +113,8 @@ function layoutForPath(pathname: any) {
   // as wide rows rather than a 440px column floating in space. Quote
   // tab itself flips to a true 2-pane workspace via scoped CSS keyed
   // off the .v3-screen--quote-active modifier set in ContactDetail.
+  if (pathname.startsWith('/leads/')) return 'responsive'
+  if (pathname.startsWith('/quotes/')) return 'responsive'
   if (pathname.startsWith('/jobs/')) return 'responsive'
   // Client Detail still mobile-frame — its internal layout needs
   // bespoke desktop work in a follow-up phase.
@@ -119,6 +122,8 @@ function layoutForPath(pathname: any) {
 }
 
 function permissionRouteForPath(pathname: string) {
+  if (pathname.startsWith('/leads/')) return '/leads'
+  if (pathname.startsWith('/quotes/')) return '/quotes'
   if (pathname.startsWith('/jobs/')) return '/jobs'
   if (pathname.startsWith('/clients/')) return '/clients'
   if (pathname.startsWith('/subs/')) return '/subs'

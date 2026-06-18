@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, Phone, MessageSquare, Pencil, MoreHorizontal,
@@ -247,6 +247,7 @@ export default function ContactDetail() {
   const { id } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const data = useJobData(id, user?.id)
@@ -257,6 +258,20 @@ export default function ContactDetail() {
     paid, balance, loading, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
+  const routeHome = location.pathname.startsWith('/leads')
+    ? '/leads'
+    : location.pathname.startsWith('/quotes')
+      ? '/quotes'
+      : '/jobs'
+  const contactStage = String(contact?.stage || '').toLowerCase()
+  const detailHome = routeHome !== '/jobs'
+    ? routeHome
+    : contactStage === 'lead'
+      ? '/leads'
+      : contactStage === 'quote'
+        ? '/quotes'
+        : '/jobs'
+  const detailBackLabel = detailHome === '/quotes' ? 'Quotes' : detailHome === '/leads' ? 'Leads' : 'Jobs'
 
   // Cockpit "Next action" row consumes the same due-aware resolver as
   // the Overview hero so the two never disagree (Phase 2H-5). The row's
@@ -375,7 +390,7 @@ export default function ContactDetail() {
       const { error } = await supabase.from('fh_contacts').delete().eq('id', id as string).eq('user_id', user?.id as string)
       if (error) throw error
       toastSuccess('Deleted', `${deletedName} and cascading rows removed`)
-      navigate('/jobs')
+      navigate(detailHome)
     } catch (e: any) {
       console.error('Delete contact failed:', e)
       setDeleting(false)
@@ -409,13 +424,13 @@ export default function ContactDetail() {
       <div style={{ padding: '40px 20px', minHeight: '100%', background: 'var(--v3-bg)', textAlign: 'center' }}>
         <button
           type="button"
-          onClick={() => navigate('/jobs')}
+          onClick={() => navigate(routeHome)}
           style={{
             background: 'none', border: 'none', color: 'var(--v3-primary)',
             fontWeight: 700, fontSize: 13, cursor: 'pointer', padding: '8px 14px'
           }}
         >
-          ← Back to jobs
+          ← Back to {routeHome === '/quotes' ? 'quotes' : routeHome === '/leads' ? 'leads' : 'jobs'}
         </button>
         <p style={{ color: 'var(--v3-text-muted)', marginTop: 16 }}>Contact not found.</p>
       </div>
@@ -543,7 +558,8 @@ export default function ContactDetail() {
               tabs={visibleTabs}
               activeTab={tab}
               onTabChange={setTab}
-              onBack={() => navigate('/jobs')}
+              onBack={() => navigate(detailHome)}
+              backLabel={detailBackLabel}
               onEdit={handleEditClick}
               onDelete={() => setDeleteOpen(true)}
               onAddEvent={() => setEventOpen(true)}
@@ -673,7 +689,8 @@ export default function ContactDetail() {
         paid={paid}
         balance={balance}
         nextTodo={nextTodo}
-        onBack={() => navigate('/jobs')}
+        onBack={() => navigate(detailHome)}
+        backLabel={detailBackLabel}
         onEdit={handleEditClick}
         onMarkLost={async () => {
           hapticError()
@@ -726,7 +743,7 @@ export default function ContactDetail() {
         value={tab}
         onChange={setTab}
         tabs={visibleTabs}
-        ariaLabel="Job detail tabs"
+        ariaLabel={`${detailBackLabel.slice(0, -1) || 'Job'} detail tabs`}
       />
 
       {/* TAB ROUTER */}
@@ -954,7 +971,7 @@ export default function ContactDetail() {
 function Header({
   contact, clientSummary, viewerUserId, isEditing,
   paid, balance, nextTodo,
-  onBack, onEdit, onMarkLost, onDelete, onClientNav, onTodoDone
+  onBack, backLabel = 'Jobs', onEdit, onMarkLost, onDelete, onClientNav, onTodoDone
 }: any) {
   const isOwnerView = !!viewerUserId && contact.user_id === viewerUserId
   const phoneHref = contact.phone ? `tel:${contact.phone}` : null
@@ -973,7 +990,7 @@ function Header({
     <div style={{ padding: '8px 20px 12px' }}>
       {/* Top row: back · spacer · more */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-        <IconButton onClick={onBack} ariaLabel="Back">
+        <IconButton onClick={onBack} ariaLabel={`Back to ${String(backLabel).toLowerCase()}`}>
           <ChevronLeft size={18} aria-hidden="true" />
         </IconButton>
 

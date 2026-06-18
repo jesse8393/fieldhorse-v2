@@ -14,9 +14,9 @@ import { JOB_TYPES } from '../lib/jobTypes.ts'
 import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.ts'
 
 const STAGE_OPTIONS = [
-  { value: 'lead', label: 'Lead' },
-  { value: 'quote', label: 'Quote' },
-  { value: 'job', label: 'Job' }
+  { value: 'lead', label: 'Lead intake' },
+  { value: 'quote', label: 'Quote draft' },
+  { value: 'job', label: 'Active job' }
 ]
 
 const LAST_JOB_TYPE_KEY = 'fh:lastJobType'
@@ -31,6 +31,15 @@ function writeLastJobType(value: any) {
   try { window.localStorage.setItem(LAST_JOB_TYPE_KEY, value) } catch {}
 }
 
+function dateInputValueFromNow(days: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 function buildEmptyForm(initialStage = 'lead'): Record<string, any> {
   // initialStage seeds the Stage chip when the sheet is opened. Defaults
   // to 'lead' (the original behavior); flips to 'job' when the entry
@@ -42,6 +51,8 @@ function buildEmptyForm(initialStage = 'lead'): Record<string, any> {
   return {
     name: '', phone: '', email: '', address: '', company: '',
     job_title: '', job_type: readLastJobType(), amount: '', notes: '', referred_by: '',
+    scope_text: '',
+    follow_up_on: seedStage === 'lead' ? dateInputValueFromNow(1) : '',
     stage: seedStage
   }
 }
@@ -68,6 +79,7 @@ const FIELD_LIMITS: Record<string, number> = {
   address: 240,
   company: 160,
   job_title: 140,
+  scope_text: 1200,
   notes: 4000,
   referred_by: 160,
   amount: 14
@@ -80,15 +92,17 @@ const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a n
   "email": string or null,
   "address": string or null,
   "job_title": string or null,
+  "scope_text": string or null,
   "job_type": one of [${JOB_TYPES.map(t => `"${t.value}"`).join(', ')}] or null,
   "amount": number or null (dollars, no formatting),
   "stage": one of ["lead", "quote", "job"] or null,
+  "follow_up_on": string or null (YYYY-MM-DD only if a specific date was mentioned),
   "notes": string or null (anything else worth capturing),
   "referred_by": string or null
 }
 Return ONLY the JSON. No prose, no fences.`
 
-export default function NewLeadSheet({ open, userId, initialStage = 'lead', onClose, onCreated }: any) {
+export default function NewLeadSheet({ open, userId, initialStage = 'lead', lockStage = false, onClose, onCreated }: any) {
   const [form, setForm] = useState(() => buildEmptyForm(initialStage))
   const [client, setClient] = useState<any>(null)
   const [saving, setSaving] = useState(false)
@@ -140,7 +154,13 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   // match so the operator doesn't have to retag. Only fires on open —
   // user edits to the chip mid-flow are preserved.
   useEffect(() => {
-    if (open) setForm((f) => ({ ...f, stage: initialStage }))
+    if (open) {
+      setForm((f) => ({
+        ...f,
+        stage: initialStage,
+        follow_up_on: initialStage === 'job' ? '' : (f.follow_up_on || dateInputValueFromNow(1))
+      }))
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialStage])
 
@@ -167,6 +187,14 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
     const limit = FIELD_LIMITS[k]
     const safe = (typeof v === 'string' && limit) ? v.slice(0, limit) : v
     setForm((f) => ({ ...f, [k]: safe }))
+  }
+
+  function setStage(v: string) {
+    setForm((f) => ({
+      ...f,
+      stage: v,
+      follow_up_on: v === 'job' ? '' : (f.follow_up_on || dateInputValueFromNow(1))
+    }))
   }
 
   // Document intelligence — Phase 19/#1. Hands the captured/pasted image
@@ -267,9 +295,11 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
           email: parsed.email || f.email,
           address: parsed.address || f.address,
           job_title: parsed.job_title || f.job_title,
+          scope_text: parsed.scope_text || f.scope_text,
           job_type: parsed.job_type || f.job_type,
           amount: parsed.amount != null ? String(parsed.amount) : f.amount,
           stage: parsed.stage || f.stage,
+          follow_up_on: parsed.follow_up_on || f.follow_up_on,
           notes: parsed.notes || f.notes,
           referred_by: parsed.referred_by || f.referred_by
         }))
@@ -350,6 +380,9 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
       job_title: form.job_title || null,
       job_type: form.job_type || null,
       amount: Number(form.amount) || 0,
+      scope_text: form.scope_text || null,
+      follow_up_on: form.stage === 'job' ? null : (form.follow_up_on || null),
+      last_contact: new Date().toISOString(),
       notes: form.notes || null,
       referred_by: form.referred_by || null,
       stage: form.stage || 'lead',
@@ -437,6 +470,12 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   // language carries through. Quote uses its own noun for the same reason.
   const stageNoun = form.stage === 'job' ? 'job' : form.stage === 'quote' ? 'quote' : 'lead'
   const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
+  const commitVerb = form.stage === 'lead' ? 'CAPTURE' : form.stage === 'quote' ? 'START' : 'CREATE'
+  const drawerDescription = form.stage === 'lead'
+    ? 'Capture the customer, scope, value, and next follow-up once. This record becomes the quote and job later.'
+    : form.stage === 'quote'
+      ? 'Start from customer and scope so the proposal is ready for line items.'
+      : 'Create active work with enough detail to schedule, cost, and invoice.'
 
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
@@ -460,7 +499,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
           <DrawerDescription
             style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
-            Tap the mic for fast capture, scan a doc for vision parsing, or fill the fields below.
+            {drawerDescription}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -592,7 +631,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
           {/* Contact — maxLength on each input matches FIELD_LIMITS so the
               browser blocks typing past the cap. set() also clamps in JS
               so paste flows can't bypass. */}
-          <V3Field label="Name">
+          <V3Field label={form.stage === 'lead' ? 'Customer' : 'Name'}>
             <input
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
@@ -647,12 +686,14 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
             />
           </V3Field>
 
-          <V3ChipRow
-            label="Stage"
-            value={form.stage}
-            options={STAGE_OPTIONS}
-            onChange={(v: any) => set('stage', v)}
-          />
+          {!lockStage && (
+            <V3ChipRow
+              label="Pipeline step"
+              value={form.stage}
+              options={STAGE_OPTIONS}
+              onChange={(v: any) => setStage(v)}
+            />
+          )}
 
           {/* Stage-aware capture (audit §C2): a lead is a CRM record,
               not a job. Lead stage shows Source + estimated value;
@@ -670,34 +711,41 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
             </V3Field>
           )}
 
-          {form.stage !== 'lead' && (
-            <>
-              <V3ChipRow
-                label="Job type"
-                value={form.job_type}
-                options={JOB_TYPES}
-                onChange={(v: any) => set('job_type', v)}
-              />
+          <V3ChipRow
+            label={form.stage === 'lead' ? 'Project type' : 'Job type'}
+            value={form.job_type}
+            options={JOB_TYPES}
+            onChange={(v: any) => set('job_type', v)}
+          />
 
-              {availableTemplates.length > 0 && (
-                <TemplatePickerInline
-                  templates={availableTemplates}
-                  value={templateSlug}
-                  onChange={setTemplateSlug}
-                />
-              )}
-
-              <V3Field label="Job title">
-                <input
-                  value={form.job_title}
-                  onChange={(e) => set('job_title', e.target.value)}
-                  maxLength={FIELD_LIMITS.job_title}
-                  placeholder="Kitchen remodel + island"
-                  style={V3_INPUT}
-                />
-              </V3Field>
-            </>
+          {form.stage !== 'lead' && availableTemplates.length > 0 && (
+            <TemplatePickerInline
+              templates={availableTemplates}
+              value={templateSlug}
+              onChange={setTemplateSlug}
+            />
           )}
+
+          <V3Field label={form.stage === 'lead' ? 'Project / scope' : 'Job title'}>
+            <input
+              value={form.job_title}
+              onChange={(e) => set('job_title', e.target.value)}
+              maxLength={FIELD_LIMITS.job_title}
+              placeholder={form.stage === 'lead' ? 'Kitchen remodel, roof repair, driveway quote' : 'Kitchen remodel + island'}
+              style={V3_INPUT}
+            />
+          </V3Field>
+
+          <V3Field label={form.stage === 'lead' ? 'Scope notes' : 'Quote scope'}>
+            <textarea
+              rows={3}
+              value={form.scope_text}
+              onChange={(e) => set('scope_text', e.target.value)}
+              maxLength={FIELD_LIMITS.scope_text}
+              placeholder="What they want, timing, constraints, measurements, must-haves..."
+              style={{ ...V3_INPUT, resize: 'vertical', minHeight: 84 }}
+            />
+          </V3Field>
 
           <V3Field label={form.stage === 'lead' ? 'Estimated value (optional)' : 'Amount'}>
             <div style={{ position: 'relative' }}>
@@ -717,6 +765,13 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
               />
             </div>
           </V3Field>
+
+          {form.stage !== 'job' && (
+            <FollowUpPicker
+              value={form.follow_up_on}
+              onChange={(next: string) => set('follow_up_on', next)}
+            />
+          )}
 
           <V3Field label="Notes">
             <textarea
@@ -762,7 +817,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
               }}
             >
               <Check size={14} />
-              {saving ? 'COMMITTING…' : committed ? 'CAPTURED' : `COMMIT ${stageNoun.toUpperCase()}`}
+              {saving ? 'COMMITTING…' : committed ? 'CAPTURED' : `${commitVerb} ${stageNoun.toUpperCase()}`}
             </motion.button>
           </div>
         </form>
@@ -775,6 +830,40 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
 // matching template, then if a template is picked shows a small footer
 // with the milestone count + description. Visual matches SheetChipRow
 // so it feels like a 7th field, not an add-on.
+function FollowUpPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const presets = [
+    { label: 'Tomorrow', value: dateInputValueFromNow(1) },
+    { label: '3 days', value: dateInputValueFromNow(3) },
+    { label: '1 week', value: dateInputValueFromNow(7) },
+  ]
+
+  return (
+    <V3Field label="Next follow-up">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {presets.map((preset) => (
+          <TemplateChip
+            key={preset.label}
+            active={value === preset.value}
+            onClick={() => onChange(preset.value)}
+            label={preset.label}
+          />
+        ))}
+        <TemplateChip
+          active={!value}
+          onClick={() => onChange('')}
+          label="No date"
+        />
+      </div>
+      <input
+        type="date"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ ...V3_INPUT, marginTop: 8 }}
+      />
+    </V3Field>
+  )
+}
+
 function TemplatePickerInline({ templates, value, onChange }: any) {
   const picked = templates.find((t: any) => t.slug === value) || null
   return (

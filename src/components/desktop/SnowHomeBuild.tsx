@@ -57,6 +57,7 @@ type Props = {
   onRetryDashboard?: () => void
   onGoToJobs: (filter?: string) => void
   onGoToLeads?: (filter?: string) => void
+  onGoToQuotes?: (filter?: string) => void
   onGoToActivity?: () => void
   onGoToSchedule: () => void
   onGoToInvoices: () => void
@@ -71,7 +72,7 @@ type Props = {
   onGoToPourWindow?: () => void
 }
 
-type PipelineRoute = 'jobs' | 'leads'
+type PipelineRoute = 'jobs' | 'leads' | 'quotes'
 
 type PipelineRailRow = {
   key: string
@@ -129,6 +130,7 @@ export default function SnowHomeBuild(props: Props) {
     nextActions,
     onGoToJobs,
     onGoToLeads,
+    onGoToQuotes,
     onGoToActivity,
     onGoToSchedule,
     onGoToInvoices,
@@ -261,6 +263,7 @@ export default function SnowHomeBuild(props: Props) {
           nextActions={nextActions}
           onGoToJobs={onGoToJobs}
           onGoToLeads={onGoToLeads}
+          onGoToQuotes={onGoToQuotes}
           onGoToInvoices={onGoToInvoices}
           onGoToActivity={onGoToActivity}
         />
@@ -275,6 +278,7 @@ export default function SnowHomeBuild(props: Props) {
             activeStageCount={activeStageCount}
             onGoToJobs={onGoToJobs}
             onGoToLeads={onGoToLeads}
+            onGoToQuotes={onGoToQuotes}
           />
 
           <TodayCard
@@ -322,6 +326,7 @@ function RevenueOperatingLayer({
   nextActions,
   onGoToJobs,
   onGoToLeads,
+  onGoToQuotes,
   onGoToInvoices,
   onGoToActivity,
 }: any) {
@@ -377,7 +382,7 @@ function RevenueOperatingLayer({
               key={row.label}
               type="button"
               data-stage={row.key}
-              onClick={() => openPipelineRow(row, onGoToJobs, onGoToLeads)}
+              onClick={() => openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)}
             >
               <span>{row.label}</span>
               <strong>{row.amount}</strong>
@@ -403,7 +408,12 @@ function openPipelineRow(
   row: Pick<PipelineRailRow, 'route' | 'filter' | 'key'>,
   onGoToJobs?: (filter?: string) => void,
   onGoToLeads?: (filter?: string) => void,
+  onGoToQuotes?: (filter?: string) => void,
 ) {
+  if (row.route === 'quotes') {
+    onGoToQuotes?.(row.filter || row.key)
+    return
+  }
   if (row.route === 'leads') {
     onGoToLeads?.(row.filter || row.key)
     return
@@ -423,7 +433,7 @@ function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
   )
 }
 
-function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs, onGoToLeads }: any) {
+function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs, onGoToLeads, onGoToQuotes }: any) {
   // stageCount = active stages that actually have deals (not every
   // rail column). Otherwise the subtitle reads "across 5 stages" on
   // a book that only has work in 3 of them.
@@ -458,7 +468,7 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
             data-stage={row.key}
             onClick={(e) => {
               e.stopPropagation()
-              openPipelineRow(row, onGoToJobs, onGoToLeads)
+                  openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)
             }}
           >
             {/* Stage-key colored dot — sourced from CSS via the
@@ -749,7 +759,7 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
   // headline that spans 17 deals across 4 stages.)
   const ROUTE: Record<string, { route: PipelineRoute; filter: string }> = {
     lead: { route: 'leads', filter: 'new' },
-    quote: { route: 'leads', filter: 'quoted' },
+    quote: { route: 'quotes', filter: 'quoted' },
     job: { route: 'jobs', filter: 'active' },
     invoice: { route: 'jobs', filter: 'active' },
     closed: { route: 'jobs', filter: 'closed' },

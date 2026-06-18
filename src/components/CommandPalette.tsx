@@ -37,6 +37,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 const QUICK_ACTIONS = [
   { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, event: 'fh:open-capture' },
   { id: 'newLead', label: 'New lead', hint: 'Add opportunity to Lead Desk', icon: Plus, to: '/leads?new=1' },
+  { id: 'newQuote', label: 'New quote', hint: 'Start a proposal with scope', icon: FileText, to: '/quotes?new=1' },
   { id: 'newJob', label: 'New job', hint: 'Create active work', icon: Briefcase, to: '/jobs?new=1&asStage=job' },
   { id: 'followups', label: 'Work follow-ups', hint: 'Ranked Lead Desk queue', icon: Target, to: '/leads?stage=open' },
   { id: 'collect', label: 'Collect money', hint: 'Invoices and balances', icon: Receipt, to: '/invoices' },
@@ -52,7 +53,8 @@ function homeHint() {
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'leads', label: 'Lead Desk', hint: 'Follow-ups, quotes, lead health', icon: Target, to: '/leads' },
+  { id: 'leads', label: 'Lead Desk', hint: 'Intake and follow-ups', icon: Target, to: '/leads' },
+  { id: 'quotes', label: 'Quote Desk', hint: 'Proposals ready to win', icon: FileText, to: '/quotes' },
   { id: 'jobs', label: 'Job Desk', hint: 'Active work and delivery', icon: Briefcase, to: '/jobs' },
   { id: 'pipeline', label: 'Full funnel pipeline', hint: 'Lead, quote, active, collect, complete', icon: BarChart3, to: '/jobs?view=pipeline' },
   { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },

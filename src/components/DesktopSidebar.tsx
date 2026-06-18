@@ -56,6 +56,7 @@ const GROUPS: Group[] = [
       { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
       { label: 'Lead Desk',      to: '/leads',    Icon: Sparkles,        match: prefix('/leads') },
+      { label: 'Quote Desk',     to: '/quotes',   Icon: FileText,        match: prefix('/quotes') },
       { label: 'Job Desk',       to: '/jobs?view=doing', Icon: Hammer,   match: (p) => p === '/jobs' && typeof window !== 'undefined' && !window.location.search.includes('view=pipeline') },
     ],
   },

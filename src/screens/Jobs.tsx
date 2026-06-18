@@ -106,13 +106,17 @@ export default function Jobs() {
     }
   }, [searchParams, setSearchParams])
 
-  // Deep links. Lead-shaped destinations bounce to /leads (their home
-  // since pipeline v2); job-shaped ?stage= params pick the tab.
+  // Deep links. Lead/quote-shaped destinations bounce to their own
+  // desks since pipeline v2; job-shaped ?stage= params pick the tab.
   useEffect(() => {
     const stage = searchParams.get('stage')
     const view = searchParams.get('view')
-    if (view === 'leads' || stage === 'lead' || stage === 'quote') {
-      const leadFilter = stage === 'quote' ? '?stage=quoted' : stage === 'lead' ? '?stage=new' : ''
+    if (stage === 'quote' || view === 'quotes') {
+      navigate('/quotes', { replace: true })
+      return
+    }
+    if (view === 'leads' || stage === 'lead') {
+      const leadFilter = stage === 'lead' ? '?stage=new' : ''
       navigate(`/leads${leadFilter}`, { replace: true })
       return
     }
@@ -353,6 +357,7 @@ export default function Jobs() {
             open={addOpen}
             userId={user?.id}
             initialStage={addInitialStage}
+            lockStage
             onClose={() => setAddOpen(false)}
             onCreated={async (created: any) => {
               setAddOpen(false)
@@ -604,6 +609,7 @@ export default function Jobs() {
           open={addOpen}
           userId={user?.id}
           initialStage={addInitialStage}
+          lockStage
           onClose={() => setAddOpen(false)}
           onCreated={async (created: any) => {
             setAddOpen(false)
