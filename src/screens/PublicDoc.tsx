@@ -24,6 +24,7 @@ import {
   mapItemsToScope
 } from '../components/documents'
 import ApproveProposalBar from '../components/public/ApproveProposalBar.tsx'
+import { safePayUrl } from '../lib/payLink.ts'
 
 export default function PublicDoc() {
   const { token } = useParams()
@@ -382,9 +383,9 @@ function PayNowBar({ company, amount }: any) {
   const link = (company?.payment_link || '').trim()
   const instructions = (company?.payment_instructions || '').trim()
   if (!link && !instructions) return null
-  const url = link
-    ? (/^[a-z][a-z0-9+.-]*:/i.test(link) ? link : `https://${link}`)
-    : ''
+  // Allow-list the scheme so a pasted `javascript:`/`data:` link can
+  // never become an href on this customer-facing page.
+  const url = safePayUrl(link)
   const amountLabel = amount > 0
     ? Number(amount).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
     : ''

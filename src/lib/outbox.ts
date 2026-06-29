@@ -84,16 +84,22 @@ async function allEntries(): Promise<OutboxEntry[]> {
   }
 }
 
-async function putEntry(e: OutboxEntry) {
+// Returns false when the entry could NOT be parked (queue full or IDB
+// unavailable) so callers can report failure instead of a false "saved".
+async function putEntry(e: OutboxEntry): Promise<boolean> {
   try {
     const existing = await allEntries()
-    if (existing.length >= MAX_ITEMS) return
+    if (existing.length >= MAX_ITEMS) return false
     await tx('readwrite', (s) => s.put(e))
     emit()
+    return true
   } catch {
-    /* IDB unavailable (private mode quota etc.) — nothing else to do */
+    /* IDB unavailable (private mode quota etc.) */
+    return false
   }
 }
+
+const QUEUE_FULL = { message: "Offline storage is full — this didn't save. Reconnect to sync your queued work, then try again." }
 
 async function deleteEntry(key: string) {
   try {
@@ -160,10 +166,11 @@ export async function resilientInsert(table: string, row: Record<string, any>): 
     if (!error) return { queued: false, error: null, id }
     if (!isNetworkError(error)) return { queued: false, error, id }
   }
-  await putEntry({
+  const ok = await putEntry({
     key: newId(), kind: 'insert', table, row: withId,
     created_at: new Date().toISOString(), attempts: 0
   })
+  if (!ok) return { queued: false, error: QUEUE_FULL, id }
   return { queued: true, error: null, id }
 }
 
@@ -176,10 +183,11 @@ export async function resilientUpdate(
     if (!error) return { queued: false, error: null, id: String(match.id || '') }
     if (!isNetworkError(error)) return { queued: false, error, id: String(match.id || '') }
   }
-  await putEntry({
+  const ok = await putEntry({
     key: newId(), kind: 'update', table, match, patch,
     created_at: new Date().toISOString(), attempts: 0
   })
+  if (!ok) return { queued: false, error: QUEUE_FULL, id: String(match.id || '') }
   return { queued: true, error: null, id: String(match.id || '') }
 }
 
@@ -193,8 +201,8 @@ export async function queuePhoto(args: {
   blob: Blob
   contentType: string
   row: Record<string, any>
-}): Promise<void> {
-  await putEntry({
+}): Promise<boolean> {
+  return putEntry({
     key: newId(), kind: 'photo',
     bucket: args.bucket, path: args.path, blob: args.blob,
     contentType: args.contentType, row: args.row,

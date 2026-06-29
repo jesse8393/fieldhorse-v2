@@ -14,6 +14,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
+import { safePayUrl } from './payLink.ts'
 import {
   invoiceNumber as docInvoiceNumber,
   proposalNumber as docProposalNumber
@@ -554,12 +555,15 @@ function drawDocPayBlock(doc, opts) {
   const link = (company?.payment_link || '').trim()
   const instructions = (company?.payment_instructions || '').trim()
   if (!link && !instructions) return startY
+  // Allow-list the scheme — never embed a javascript:/data: link in the
+  // PDF annotation. Bare host → https://; dangerous scheme → no link.
+  const url = safePayUrl(link)
 
   const innerW = pageWidth - margin * 2
   // Measure: heading + optional link line + wrapped instructions.
   doc.setFontSize(10)
   const instrLines = instructions ? doc.splitTextToSize(instructions, innerW - 12) : []
-  const bodyH = 7 + (link ? 6 : 0) + instrLines.length * 4.6
+  const bodyH = 7 + (url ? 6 : 0) + instrLines.length * 4.6
   const panelH = bodyH + 8
   let y = startY + 6
   if (y + panelH > pageHeight - 22) { doc.addPage(); y = 18 }
@@ -580,9 +584,8 @@ function drawDocPayBlock(doc, opts) {
   doc.setCharSpace(0)
   ty += 6
 
-  if (link) {
-    const display = link.replace(/^https?:\/\//i, '')
-    const url = /^[a-z][a-z0-9+.-]*:/i.test(link) ? link : `https://${link}`
+  if (url) {
+    const display = url.replace(/^https?:\/\//i, '')
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
     doc.setTextColor(r, g, b)

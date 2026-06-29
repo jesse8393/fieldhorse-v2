@@ -20,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
 import StatementSheet from '../components/StatementSheet.tsx'
+import { gatherStatement } from '../lib/statement.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
 
 function money(n: any) {
@@ -94,6 +95,16 @@ export default function ClientDetail() {
   const activeCount = useMemo(
     () => (jobs || []).filter((j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage as string)).length,
     [jobs]
+  )
+
+  // Statement rollup — the SAME computation the StatementSheet/PDF use,
+  // so the "Statement · $X across N properties" button always agrees
+  // with the document it opens (previously the button showed
+  // `outstanding`/`activeCount`, which use different stage sets and could
+  // disagree with the generated statement).
+  const statementSummary = useMemo(
+    () => gatherStatement(jobs as any, payments as any),
+    [jobs, payments]
   )
 
   // Open the destructive-confirm sheet. The header trash button hits this.
@@ -264,7 +275,7 @@ export default function ClientDetail() {
           onEdit={() => setIsEditing(!isEditing)}
           onDelete={() => setDeleteOpen(true)}
           onNewDeal={() => setNewOpen(true)}
-          onStatement={outstanding > 0 ? () => setStatementOpen(true) : undefined}
+          onStatement={statementSummary.totalDue > 0 ? () => setStatementOpen(true) : undefined}
           isEditing={isEditing}
         >
           {tabBody}
@@ -462,7 +473,7 @@ export default function ClientDetail() {
         {/* STATEMENT — roll every open invoice across all this client's
             properties into one document. Only meaningful when there's a
             balance, so it stays hidden otherwise. */}
-        {outstanding > 0 && (
+        {statementSummary.totalDue > 0 && (
           <motion.button
             type="button"
             whileTap={{ scale: 0.99 }}
@@ -478,7 +489,7 @@ export default function ClientDetail() {
             }}
           >
             <Receipt size={16} strokeWidth={2.2} aria-hidden="true" />
-            Statement · {money(outstanding)} across {activeCount} {activeCount === 1 ? 'property' : 'properties'}
+            Statement · {money(statementSummary.totalDue)} across {statementSummary.lines.length} {statementSummary.lines.length === 1 ? 'property' : 'properties'}
           </motion.button>
         )}
       </div>

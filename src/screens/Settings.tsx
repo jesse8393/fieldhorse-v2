@@ -15,6 +15,7 @@ import { reverseGeocode } from '../lib/weather.ts'
 // import { useTheme } from '../contexts/ThemeContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.ts'
+import { safePayUrl } from '../lib/payLink.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Switch } from '@/components/ui/switch'
@@ -160,13 +161,9 @@ export default function Settings() {
     // Pay links pasted from an app often drop the scheme ("venmo.com/…").
     // Prepend https:// so the stored value is a real clickable URL —
     // unless it's already a deep-link scheme (venmo://, etc.).
-    const normalizePayLink = (s: any) => {
-      const t = (s || '').trim()
-      if (!t) return t
-      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return t
-      if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return t // scheme without // (mailto:, tel:)
-      return `https://${t}`
-    }
+    // safePayUrl (shared) allow-lists the scheme so a dangerous link
+    // (javascript:, data:, …) is never stored and later rendered as an
+    // href on a customer-facing page.
     // Validate brand accent before save. Migration 015's CHECK
     // constraint will reject anything off-format with an opaque
     // Postgres error; catching it here lets us surface a friendly
@@ -194,7 +191,7 @@ export default function Settings() {
       license_number: nullIfBlank(licenseNumber),
       insured_text: nullIfBlank(insuredText),
       warranty_default: nullIfBlank(warrantyDefault),
-      payment_link: nullIfBlank(normalizePayLink(paymentLink)),
+      payment_link: nullIfBlank(safePayUrl(paymentLink)),
       payment_instructions: nullIfBlank(paymentInstructions),
       brand_accent_hex: safeAccent,
       estimate_template: estimateTemplate || 'classic',

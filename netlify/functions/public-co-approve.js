@@ -85,7 +85,12 @@ export default async function handler(req) {
   if (co.status === 'void' || co.status === 'rejected') return json({ error: 'gone' }, 410)
 
   const approvedAt = new Date().toISOString()
-  const { error: upErr } = await supabase
+  // The UPDATE itself is the idempotency guard: `.neq('status','approved')`
+  // means a concurrent double-tap / retried POST that already flipped the
+  // row updates 0 rows here, so we never double-notify or let a stale
+  // signature overwrite a recorded one (the read-based 409 above is just
+  // a fast path; this is the race-safe gate).
+  const { data: updatedRows, error: upErr } = await supabase
     .from('fh_change_orders')
     .update({
       status: 'approved',
@@ -95,7 +100,10 @@ export default async function handler(req) {
     })
     .eq('id', co.id)
     .eq('user_id', link.user_id)
+    .neq('status', 'approved')
+    .select('id')
   if (upErr) return json({ error: 'approve_failed', message: upErr.message }, 500)
+  if (!updatedRows || updatedRows.length === 0) return json({ error: 'already_approved' }, 409)
 
   // 3. Tell the contractor — bell + lock screen. Best effort.
   const { data: contact } = await supabase

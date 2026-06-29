@@ -78,7 +78,7 @@ export default async function handler(req) {
     { data: invoices },
     { data: photoRows }
   ] = await Promise.all([
-    supabase.from('fh_contacts').select('*').eq('id', link.contact_id).maybeSingle(),
+    supabase.from('fh_contacts').select('*').eq('id', link.contact_id).eq('user_id', link.user_id).maybeSingle(),
     supabase.from('profiles').select('*').eq('user_id', link.user_id).maybeSingle(),
     supabase.from('fh_quote_items').select('*').eq('contact_id', link.contact_id).order('sort_order', { ascending: true }),
     supabase.from('fh_payments').select('*').eq('contact_id', link.contact_id).order('paid_on', { ascending: false }),
@@ -122,6 +122,9 @@ export default async function handler(req) {
   }
 
   if (!contact) {
+    // Either the contact was deleted, or the link's contact_id doesn't
+    // belong to the link's owner (scoped by user_id above) — never leak
+    // another tenant's job across a mis-minted token.
     return json({ error: 'gone', message: 'This document is no longer available.' }, 404)
   }
 

@@ -25,11 +25,13 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
       // Focus an existing app window and route it; otherwise open one.
+      // Return the focus→navigate promise so waitUntil keeps the SW alive
+      // until navigation settles — otherwise the worker can be killed
+      // before the route change lands and the tap leaves you on the old
+      // screen, ignoring the notification's link.
       for (const w of wins) {
         if ('focus' in w) {
-          w.focus()
-          if ('navigate' in w) w.navigate(link)
-          return
+          return Promise.resolve(w.focus()).then(() => ('navigate' in w ? w.navigate(link) : undefined))
         }
       }
       return self.clients.openWindow(link)
