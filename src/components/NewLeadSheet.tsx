@@ -439,10 +439,25 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
   const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
 
   return (
-    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
+    <Drawer
+      open={open}
+      onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}
+      // repositionInputs={false}: this sheet is tall (mic + scan + 6
+      // fields) and its first field is an autocomplete that opens on
+      // focus. Vaul's default input-repositioning shrank the drawer
+      // toward the focused field on iOS, collapsing the whole sheet to a
+      // sliver (reported bug). With it off, the drawer keeps the stable
+      // height below and the form scrolls internally; our own
+      // onFocusIn handler (useDrawerKeyboard) scrolls focused fields
+      // into the visible band above the keyboard.
+      repositionInputs={false}
+    >
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={drawerStyle}
+        // Stable height (safe now that Vaul isn't writing height itself):
+        // a definite height is what lets the inner form's overflow:auto
+        // actually scroll instead of the sheet growing/collapsing.
+        style={{ ...drawerStyle, height: '88dvh', maxHeight: '88dvh' }}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
@@ -467,7 +482,11 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', onCl
         <form
           ref={formRef}
           onSubmit={(e) => { e.preventDefault(); commit() }}
-          style={formStyle()}
+          // flex:1 + minHeight:0 so the form fills the floored sheet
+          // height and scrolls INTERNALLY (overflowY:auto) instead of
+          // growing the sheet — that's what lets the keyboard push
+          // without collapsing the drawer.
+          style={formStyle({ flex: 1, minHeight: 0 })}
         >
           {/* Commit error banner */}
           {err && (
