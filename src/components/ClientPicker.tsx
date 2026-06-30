@@ -102,7 +102,7 @@ export default function ClientPicker({ userId, value, onChange }: any) {
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative', zIndex: open ? 60 : 'auto' }}>
       <div style={{ position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
         <input
@@ -118,25 +118,29 @@ export default function ClientPicker({ userId, value, onChange }: any) {
         <div
           role="listbox"
           style={{
-            // Inline (not absolute) — on mobile inside a Vaul drawer,
-            // an absolute dropdown floats over the form siblings and
-            // when iOS scrolls the focused input into view the
-            // overlay + form behind it desync. Inline pushes the
-            // form down and scrolls cleanly as one block.
-            //
-            // Max-height 55vh: when the user is focused on picking a
-            // client, give the picker most of the visible drawer
-            // height instead of a short list with a long empty void
-            // underneath it. Other form fields remain reachable by
-            // scrolling past the dropdown.
-            position: 'relative',
-            marginTop: 4,
-            maxHeight: '55vh',
+            // Absolute overlay anchored to THIS field's own wrapper
+            // (the parent div is position:relative). Critical inside a
+            // Vaul drawer: an INLINE dropdown changes the form's height
+            // the instant it opens, which collides with Vaul's
+            // soft-keyboard repositioning and collapses the whole sheet
+            // to a sliver (the reported "tap the client field and the
+            // form vanishes" bug). Overlaying keeps the form height
+            // constant so the keyboard handling stays stable. Anchored
+            // to the immediate wrapper (not a far ancestor), so it
+            // tracks the input when iOS scrolls it — no desync.
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 60,
+            // Keyboard-safe height: small enough to sit in the visible
+            // area above the soft keyboard, scroll for the rest.
+            maxHeight: 'min(46vh, 280px)',
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
             padding: 4,
             borderRadius: 12,
-            background: 'rgba(20,20,20,0.96)',
+            background: 'rgba(20,20,20,0.98)',
             border: '1px solid var(--rule)',
             backdropFilter: 'blur(14px)',
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
