@@ -622,6 +622,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               onChange={(e) => set('name', e.target.value)}
               maxLength={FIELD_LIMITS.name}
               placeholder="Homeowner or company"
+              autoComplete="name"
               style={V3_INPUT}
             />
           </V3Field>
@@ -631,6 +632,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               <input
                 type="tel"
                 inputMode="tel"
+                autoComplete="tel"
                 value={form.phone}
                 onChange={(e) => set('phone', e.target.value)}
                 maxLength={FIELD_LIMITS.phone}
@@ -642,6 +644,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               <input
                 type="email"
                 inputMode="email"
+                autoComplete="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 maxLength={FIELD_LIMITS.email}
@@ -657,6 +660,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               onChange={(e) => set('address', e.target.value)}
               maxLength={FIELD_LIMITS.address}
               placeholder="1234 Main St · Murfreesboro, TN"
+              autoComplete="street-address"
               style={V3_INPUT}
             />
           </V3Field>

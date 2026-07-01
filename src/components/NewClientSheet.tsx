@@ -75,7 +75,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
   const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
   return (
-    <Drawer open={open} onOpenChange={(v: any) => { if (!v) onClose?.() }}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
         style={drawerStyle}

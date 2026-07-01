@@ -73,7 +73,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
   const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={(v: any) => { if (!(!v && saving)) onOpenChange(v) }}>
       <DrawerContent>
         <DrawerHeader>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
