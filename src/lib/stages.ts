@@ -140,12 +140,21 @@ type LogPaymentOpts = {
   reference?: string | null
   paid_on?: string | null
   invoice_id?: string | null
+  id?: string | null
 }
 
-export async function logPayment(contact: Contact, { amount, method, kind, reference, paid_on, invoice_id }: LogPaymentOpts) {
+export async function logPayment(contact: Contact, { id, amount, method, kind, reference, paid_on, invoice_id }: LogPaymentOpts) {
   const normalizedAmount = Number(amount) || 0
   const normalizedKind = ['deposit','progress','final','retainage','other'].includes(kind ?? '') ? (kind as string) : 'other'
-  const payload = {
+  // Client-minted id makes the write idempotent: if the request commits but
+  // the response is lost and the operator retaps, the sheet passes the SAME
+  // id and the upsert no-ops instead of double-recording the payment (which
+  // would inflate the balance and wrongly auto-close the job). Callers that
+  // don't pass an id get a fresh one — safe, just not retry-dedup'd.
+  const paymentId = id
+    || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined)
+  const payload: Record<string, any> = {
+    ...(paymentId ? { id: paymentId } : {}),
     user_id: contact.user_id,
     contact_id: contact.id,
     amount: normalizedAmount,
@@ -160,7 +169,9 @@ export async function logPayment(contact: Contact, { amount, method, kind, refer
     // (migration 047). Contact-level payments pass nothing.
     invoice_id: invoice_id || null
   }
-  const { error: insErr } = await supabase.from('fh_payments').insert(payload)
+  const { error: insErr } = await supabase
+    .from('fh_payments')
+    .upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
   if (insErr) return { error: insErr }
 
   // Payment against a specific invoice settles that invoice. Best-effort:
@@ -215,7 +226,19 @@ export async function logPayment(contact: Contact, { amount, method, kind, refer
   // paid. Guarding on amount > 0 stops a job with no amount yet (e.g. a
   // freshly created quick invoice before line items set the total) from
   // auto-closing on its first payment — `total >= 0` is otherwise always true.
-  const contractAmount = Number(contact.amount || 0)
+  //
+  // The true contract is the base amount PLUS approved change orders —
+  // matching contractTotals()/statement math. Without the COs, a job with an
+  // approved change order auto-closes on the base amount while CO money is
+  // still owed, silently dropping it from statements and A/R.
+  const { data: cos } = await supabase
+    .from('fh_change_orders')
+    .select('amount, status')
+    .eq('contact_id', contact.id)
+    .eq('user_id', contact.user_id)
+    .eq('status', 'approved')
+  const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
+  const contractAmount = Number(contact.amount || 0) + approvedCO
   if (contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
     await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
   }

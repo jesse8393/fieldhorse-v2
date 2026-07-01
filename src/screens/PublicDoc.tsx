@@ -351,8 +351,14 @@ function ProposalView({ data }: any) {
 function InvoiceView({ data }: any) {
   const { contact, company, payments, changeOrders, insurance, photos } = data
   const paid = (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
+  // Raw contract amount — passed to InvoiceTemplate, which folds in approved
+  // COs itself. The customer-facing balance MUST include approved COs too,
+  // or the link shows "PAID" while change-order money is still owed.
   const contractTotal = Number(contact?.amount || 0)
-  const balance = Math.max(0, contractTotal - paid)
+  const approvedCO = (changeOrders || [])
+    .filter((co: any) => co?.status === 'approved')
+    .reduce((s: any, co: any) => s + Number(co?.amount || 0), 0)
+  const balance = Math.max(0, contractTotal + approvedCO - paid)
   return (
     <>
     {balance > 0.5 && <PayNowBar company={company} amount={balance} />}

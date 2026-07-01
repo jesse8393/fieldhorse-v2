@@ -204,7 +204,7 @@ export default function InvoiceDetail() {
         dueDate: '',
         invoiceId: contact.id,
         payments,
-        contractTotal: totals.amount,
+        contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
         insurance,
         changeOrders
@@ -286,7 +286,7 @@ export default function InvoiceDetail() {
         dueDate: '',
         invoiceId: contact.id,
         payments,
-        contractTotal: totals.amount,
+        contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
         insurance,
         changeOrders
@@ -896,7 +896,7 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
           title: contact.job_title || 'Construction services',
           address: resolved.address
         }}
-        contractTotal={totals.amount}
+        contractTotal={Number(contact?.amount || 0)}
         payments={payments}
         previouslyPaid={totals.paid}
         thisInvoice={totals.balance}
