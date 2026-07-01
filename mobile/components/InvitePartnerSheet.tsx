@@ -9,6 +9,7 @@ import * as Clipboard from 'expo-clipboard'
 import { Copy, Share2, Check } from 'lucide-react-native'
 import type { JobRow } from '../lib/queries'
 import { BottomSheet, SheetField, GoldButton, theme } from './ui'
+import { supabase } from '../lib/supabase'
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
 const ROLES = [
@@ -43,9 +44,15 @@ export function InvitePartnerSheet({ open, onClose, userId, jobs, defaultJobId }
     if (sending) return
     setSending(true); setErr(null); setReadyUrl(null); setSentMsg(null)
     try {
+      // partner-invite now requires a Supabase JWT matching invited_by_user_id.
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess.session?.access_token
       const res = await fetch(`${API_BASE}/api/partner-invite`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           job_id: jobId,
           invited_by_user_id: userId,

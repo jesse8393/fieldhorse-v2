@@ -27,6 +27,10 @@ alter table public.fh_contacts
 -- referenced contact/client lives in the caller's org.
 -------------------------------------------------------------------------------
 drop policy if exists "fh_public_links_own" on public.fh_public_links;
+drop policy if exists "fh_public_links_select_own" on public.fh_public_links;
+drop policy if exists "fh_public_links_insert_own" on public.fh_public_links;
+drop policy if exists "fh_public_links_update_own" on public.fh_public_links;
+drop policy if exists "fh_public_links_delete_own" on public.fh_public_links;
 
 create policy "fh_public_links_select_own" on public.fh_public_links
   for select to authenticated
@@ -93,6 +97,19 @@ begin
     return new;
   end if;
 
+  -- On INSERT there is no prior row: a member creating their own punch must
+  -- not pre-set approval or flag columns (otherwise they could INSERT a row
+  -- already stamped approved, bypassing the UPDATE guard below entirely).
+  if tg_op = 'INSERT' then
+    if new.approved_at is not null
+       or new.approved_by is not null
+       or new.flagged is true
+       or new.flag_reason is not null then
+      raise exception 'time-punch approval/flag fields cannot be set on insert';
+    end if;
+    return new;
+  end if;
+
   if new.approved_at   is distinct from old.approved_at
      or new.approved_by  is distinct from old.approved_by
      or new.flagged      is distinct from old.flagged
@@ -112,7 +129,7 @@ $$;
 
 drop trigger if exists fh_time_punches_guard_approval on public.fh_time_punches;
 create trigger fh_time_punches_guard_approval
-  before update on public.fh_time_punches
+  before insert or update on public.fh_time_punches
   for each row execute function public.fh_guard_time_punch_approval();
 
 revoke execute on function public.fh_guard_time_punch_approval() from public, anon, authenticated;

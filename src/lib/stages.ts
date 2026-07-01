@@ -231,18 +231,27 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // matching contractTotals()/statement math. Without the COs, a job with an
   // approved change order auto-closes on the base amount while CO money is
   // still owed, silently dropping it from statements and A/R.
-  const { data: cos } = await supabase
+  const { data: cos, error: coErr } = await supabase
     .from('fh_change_orders')
     .select('amount, status')
     .eq('contact_id', contact.id)
     .eq('user_id', contact.user_id)
     .eq('status', 'approved')
-  const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
-  const contractAmount = Number(contact.amount || 0) + approvedCO
-  if (contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
-    await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
+  // If the CO fetch fails we can't know the true contract, so fail safe:
+  // skip the auto-close rather than treat a failed fetch as "no COs" and
+  // prematurely close a job that still owes change-order money.
+  let closed = false
+  if (!coErr) {
+    const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
+    const contractAmount = Number(contact.amount || 0) + approvedCO
+    if (contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
+      const { error: closeErr } = await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
+      closed = !closeErr
+    }
+  } else {
+    console.error('[fieldhorse] logPayment approved-CO fetch failed; skipping auto-close', coErr)
   }
-  return { total }
+  return { total, closed }
 }
 
 export async function recalcCost(contactId: string | undefined, userId: string | undefined) {
