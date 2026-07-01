@@ -16,6 +16,7 @@ import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
+import { supabase } from '../lib/supabase.ts'
 import {
   companyFromProfile, contractTotals, suggestNextInvoice,
   fetchInvoicesForContact, createInvoice, sendInvoiceEmail, buildInvoicePdf,
@@ -52,6 +53,10 @@ export default function SendInvoiceSheet({
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<null | 'send' | 'download' | 'draft'>(null)
 
+  // Email resolved from the linked client record (fh_clients) when the
+  // job row itself carries no email — a saved client's email should
+  // never need re-entering to invoice them.
+  const [clientEmail, setClientEmail] = useState('')
   const [kind, setKind] = useState('progress')
   const [customTitle, setCustomTitle] = useState('')
   const [amount, setAmount] = useState('')
@@ -89,6 +94,20 @@ export default function SendInvoiceSheet({
       setNotes('')
       setDescription(contact?.job_title || '')
       setLoading(false)
+      // If the job row has no email but is linked to a client, pull the
+      // client's email so we don't ask the operator to "add a client
+      // email" for someone already in their book.
+      const inlineEmail = (contact?.email || contact?.fh_clients?.email || '').trim()
+      if (!inlineEmail && contact?.client_id) {
+        const { data: cli } = await supabase
+          .from('fh_clients')
+          .select('email')
+          .eq('id', contact.client_id)
+          .maybeSingle()
+        if (alive) setClientEmail((cli?.email || '').trim())
+      } else {
+        setClientEmail('')
+      }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,7 +120,7 @@ export default function SendInvoiceSheet({
     : kind === 'final' ? 'Final balance'
     : `Progress draw ${sequence}`
 
-  const recipientEmail = (contact?.email || contact?.fh_clients?.email || '').trim()
+  const recipientEmail = (contact?.email || contact?.fh_clients?.email || clientEmail || '').trim()
   const amountNum = Number(amount) || 0
 
   function applyPct(pct: number) {
