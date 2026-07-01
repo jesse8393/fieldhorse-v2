@@ -69,6 +69,24 @@ export default async (request) => {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
+  // Authenticate the caller. Without this, anyone who supplies a valid
+  // (job_id, invited_by_user_id) pair could send white-labeled invite
+  // email through the contractor's Resend sender and mint invite tokens
+  // — the same open-relay hole closed on the send-* functions. Verify a
+  // Supabase JWT and require it to match the claimed inviter.
+  const authHeader = request.headers.get('authorization') || ''
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  if (!accessToken) {
+    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+  }
+  const { data: authData, error: authErr } = await supabase.auth.getUser(accessToken)
+  if (authErr || !authData?.user) {
+    return json({ error: 'invalid_token' }, 401)
+  }
+  if (authData.user.id !== invited_by_user_id) {
+    return json({ error: 'forbidden', detail: 'invited_by_user_id must match the signed-in user.' }, 403)
+  }
+
   // 1. Verify the caller owns the job.
   const { data: ownedJob, error: ownErr } = await supabase
     .from('fh_contacts')

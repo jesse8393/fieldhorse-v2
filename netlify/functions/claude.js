@@ -78,7 +78,20 @@ export default async (request) => {
 
   const cappedMaxTokens = Math.min(Math.max(1, Number(max_tokens) || 1024), MAX_TOKENS_CEILING)
 
-  const payload = { model, max_tokens: cappedMaxTokens, messages }
+  // Model allow-list. `model` is caller-supplied; without this a signed-in
+  // user could point the shared API key at any (e.g. more expensive) model.
+  // Anything off-list falls back to the configured default rather than
+  // erroring, so a benign unknown id degrades instead of breaking.
+  const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+  const ALLOWED_MODELS = new Set([
+    'claude-sonnet-4-6',
+    'claude-opus-4-8',
+    'claude-haiku-4-5-20251001',
+    DEFAULT_MODEL
+  ])
+  const safeModel = ALLOWED_MODELS.has(model) ? model : DEFAULT_MODEL
+
+  const payload = { model: safeModel, max_tokens: cappedMaxTokens, messages }
   if (system) payload.system = system
   if (typeof temperature === 'number') payload.temperature = temperature
 

@@ -26,6 +26,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { loadPastPartners, PARTNER_ROLES } from '../lib/partners.ts'
+import { authHeaders } from '../lib/supabase.ts'
 
 function friendlyInviteError(code: any) {
   if (code === 'server_misconfigured') return "Server isn't set up — missing Supabase keys in Netlify env."
@@ -95,7 +96,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     try {
       const res = await fetch('/api/partner-invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           job_id: contactId,
           invited_by_user_id: invitedByUserId,
