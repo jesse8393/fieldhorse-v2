@@ -19,7 +19,7 @@ import {
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.tsx'
-import { resolveNextAction } from '../lib/jobNextAction.ts'
+import { resolvePrimaryAction } from '../lib/jobNextAction.ts'
 import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
 
@@ -61,7 +61,8 @@ export default function OverviewTab({
   onOpenInvitePartner,
   onOpenApproveQuote,
   onOpenMarkComplete,
-  onOpenSendInvoice
+  onOpenSendInvoice,
+  onOpenQuote
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
   const confirm = useConfirm() as any
@@ -98,7 +99,7 @@ export default function OverviewTab({
   )
 
   const nextAction = useMemo(
-    () => resolveNextAction({ contact, scheduleItems, todos }),
+    () => resolvePrimaryAction({ contact, scheduleItems, todos }),
     [contact, scheduleItems, todos]
   )
 
@@ -131,7 +132,7 @@ export default function OverviewTab({
           const { error } = await supabase
             .from('fh_job_todos')
             .update({ done: true, completed_at: new Date().toISOString() })
-            .eq('id', nextAction.sourceId)
+            .eq('id', String(nextAction.sourceId || ''))
             .eq('user_id', userId)
           if (error) {
             toastError("Couldn't mark to-do done", error.message)
@@ -147,7 +148,8 @@ export default function OverviewTab({
           // mark job complete). Otherwise fall through to opening the next-
           // event sheet so they can schedule the follow-up.
           if (contact.stage === 'job') {
-            await markComplete(contact)
+            const res: any = await markComplete(contact)
+            if (res?.error) throw res.error
             await fetchAll()
           } else {
             onOpenAddEvent?.()
@@ -183,8 +185,12 @@ export default function OverviewTab({
             // pipeline.ts fires its own commit haptic; this one announces the
             // boundary BEFORE the network call.
             hapticStageChange()
-            await fn(contact)
+            const res: any = await fn(contact)
+            if (res?.error) throw res.error
             await fetchAll()
+            if (nextAction.pipelineFn === 'startQuote') {
+              onOpenQuote?.()
+            }
           } else if (nextAction.pipelineFn === 'logPayment') {
             // Log payment opens the modal in the parent — stays in flight as
             // the operator inputs amount/date/method.
@@ -544,7 +550,7 @@ function SecondaryAction({ icon: Icon, label, onClick }: any) {
 }
 
 /* ============================================================
-   EditFieldsCard — controlled form for the 9 editable fh_contacts
+   EditFieldsCard — controlled form for the editable fh_contacts
    fields. Save patches only the diff (matches legacy commit() behavior
    so we don't write fields the user didn't touch). Cancel exits edit
    mode without saving.
@@ -559,6 +565,7 @@ const EDITABLE_FIELDS = [
   { key: 'email',       label: 'Email',       kind: 'email',    placeholder: 'name@example.com',  col: 1 },
   { key: 'address',     label: 'Address',     kind: 'text',     placeholder: 'Job site address',  col: 1 },
   { key: 'job_title',   label: 'Job title',   kind: 'text',     placeholder: 'e.g. Bath remodel', col: 1 },
+  { key: 'scope_text',  label: 'Scope notes', kind: 'textarea', placeholder: 'Scope, timing, constraints, must-haves...', col: 1 },
   { key: 'job_type',    label: 'Job type',    kind: 'text',     placeholder: 'e.g. Concrete',     col: 2 },
   { key: 'amount',      label: 'Amount',      kind: 'number',   placeholder: '0',                 col: 1 },
   { key: 'referred_by', label: 'Referred by', kind: 'text',     placeholder: 'Source',            col: 2 },
@@ -568,6 +575,9 @@ const EDITABLE_FIELDS = [
 function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
   const [form, setForm] = useState(() => buildForm(contact))
   const [saving, setSaving] = useState(false)
+  const recordNoun = contact?.stage === 'lead' ? 'lead'
+    : contact?.stage === 'quote' ? 'quote'
+    : 'job'
   // Linked fh_clients row used for the "Pull from client" button. Loaded
   // only when contact has a client_id + caller is the owner (RLS on
   // fh_clients denies partner reads — owner-only by design).
@@ -707,7 +717,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
           color: 'var(--v3-primary)'
         }}>
           <Pencil size={12} aria-hidden="true" />
-          Editing job fields
+          Editing {recordNoun} fields
         </div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           {fieldsToFill.length > 0 && (
@@ -774,7 +784,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
         {EDITABLE_FIELDS.map((f) => (
           <EditField
             key={f.key}
-            label={f.label}
+            label={f.key === 'job_title' && recordNoun !== 'job' ? 'Project / scope' : f.label}
             value={form[f.key]}
             onChange={(v: any) => set(f.key, v)}
             kind={f.kind}

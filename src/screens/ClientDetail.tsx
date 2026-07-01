@@ -158,8 +158,8 @@ export default function ClientDetail() {
     await fetchClient()
     setCreating(false)
     setNewOpen(false)
-    const dest = stage === 'invoice' ? '?tab=financials' : stage === 'quote' ? '?tab=quote' : ''
-    navigate(`/jobs/${data.id}${dest}`)
+    const dest = stage === 'invoice' ? '?tab=financials' : ''
+    navigate(stage === 'quote' ? `/quotes/${data.id}?tab=quote` : `/jobs/${data.id}${dest}`)
   }
 
   // Rules-of-hooks: useIsDesktop must run before any conditional

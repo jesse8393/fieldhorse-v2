@@ -22,6 +22,7 @@ type Props = {
   activeTab: string
   onTabChange: (id: string) => void
   onBack: () => void
+  backLabel?: string
   onEdit?: () => void
   onDelete?: () => void
   onAddEvent?: () => void
@@ -56,7 +57,7 @@ const STAGE_TONE: Record<string, 'lead' | 'quote' | 'job' | 'invoice' | 'won' | 
 export default function SnowJobDetailBuild(props: Props) {
   const {
     contact, client, tabs, activeTab, onTabChange,
-    onBack, onEdit, onDelete, onAddEvent,
+    onBack, backLabel = 'Jobs', onEdit, onDelete, onAddEvent,
     isEditing,
     scheduleStatus, reportsMissing, billingStatus, paid, outstanding, changeOrderTotals,
     children,
@@ -99,8 +100,8 @@ export default function SnowJobDetailBuild(props: Props) {
   return (
     <div className="fh-build-page fh-build-detail" data-build-screen="SnowJobDetailBuild">
       <header className="fh-build-topbar fh-build-topbar--detail">
-        <button type="button" className="fh-build-back" onClick={onBack} aria-label="Back to jobs">
-          <ChevronLeft size={16} /> Jobs
+        <button type="button" className="fh-build-back" onClick={onBack} aria-label={`Back to ${backLabel.toLowerCase()}`}>
+          <ChevronLeft size={16} /> {backLabel}
         </button>
         <button
           type="button"

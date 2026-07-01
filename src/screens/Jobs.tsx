@@ -10,6 +10,7 @@ import {
 const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 import { SkeletonList } from '../components/Skeleton.tsx'
 import SwipeableRow from '../components/SwipeableRow.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import { JobCard, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
 const SnowJobs = lazy(() => import('../components/desktop/SnowJobsBuild.tsx'))
 import { useAuth } from '../contexts/AuthContext.tsx'
@@ -57,7 +58,14 @@ export default function Jobs() {
   // pattern. useJobs caches the contacts list; useJobPhotos signs cover
   // photos separately; useJobsRealtime invalidates on any fh_contacts
   // change so the list stays live without a manual counter.
-  const { data: allContacts = [], isLoading: loading } = useJobs()
+  const {
+    data: allContacts = [],
+    isLoading: loading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useJobs()
   const { data: photoUrlByJob = {} } = useJobPhotos(user?.id)
   useJobsRealtime(user?.id, queryClient)
   // Jobs screen scope: jobs only (pipeline v2). Leads/quotes render on
@@ -76,43 +84,60 @@ export default function Jobs() {
   const [drawerContact, setDrawerContact] = useState<any>(null)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const loadError = isError
+    ? error instanceof Error ? error.message : 'The CRM data request failed.'
+    : ''
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
-      // ?asStage=job|quote|lead seeds the sheet's default stage. The
-      // Jobs screen defaults to 'job' now — lead capture moved to
-      // /leads (pipeline v2).
+      // Jobs creates active work only; old lead/quote creation links
+      // preserve intent by bouncing to their dedicated desks.
       const requested = searchParams.get('asStage')
-      const seed = requested === 'job' || requested === 'quote' || requested === 'lead'
-        ? requested
-        : 'job'
-      setAddInitialStage(seed)
+      if (requested === 'lead') {
+        navigate('/leads?new=1', { replace: true })
+        return
+      }
+      if (requested === 'quote') {
+        navigate('/quotes?new=1', { replace: true })
+        return
+      }
+      setAddInitialStage('job')
       setAddOpen(true)
-      searchParams.delete('new')
-      searchParams.delete('asStage')
-      setSearchParams(searchParams, { replace: true })
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('new')
+      sp.delete('asStage')
+      setSearchParams(sp, { replace: true })
     }
-  }, [searchParams, setSearchParams])
+  }, [navigate, searchParams, setSearchParams])
 
-  // Deep links. Lead-shaped destinations bounce to /leads (their home
-  // since pipeline v2); job-shaped ?stage= params pick the tab.
+  // Deep links. Lead/quote-shaped destinations bounce to their own
+  // desks since pipeline v2; job-shaped ?stage= params pick the tab.
   useEffect(() => {
     const stage = searchParams.get('stage')
     const view = searchParams.get('view')
-    if (view === 'leads' || stage === 'lead' || stage === 'quote') {
-      navigate('/leads', { replace: true })
+    if (view === 'pipeline') {
+      navigate('/pipeline', { replace: true })
+      return
+    }
+    if (stage === 'quote' || view === 'quotes') {
+      navigate('/quotes', { replace: true })
+      return
+    }
+    if (view === 'leads' || stage === 'lead') {
+      const leadFilter = stage === 'lead' ? '?stage=new' : ''
+      navigate(`/leads${leadFilter}`, { replace: true })
       return
     }
     if (stage) {
       const validIds = TABS.map((t) => t.id)
       if (validIds.includes(stage)) setFilter(stage)
       else if (stage === 'invoice' || stage === 'won') setFilter('active')
-      searchParams.delete('stage')
-      setSearchParams(searchParams, { replace: true })
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('stage')
+      setSearchParams(sp, { replace: true })
       return
     }
-    if (view === 'pipeline') setFilter('all')
-    else if (view === 'doing') setFilter('active')
+    if (view === 'doing') setFilter('active')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -265,13 +290,16 @@ export default function Jobs() {
             photoUrlByJob={photoUrlByJob}
             featuredId={featuredId}
             tabCounts={tabCounts}
+            loadError={loadError}
+            isRefreshing={isFetching}
+            onRetry={() => { void refetch() }}
             // Desktop row click + chevron route directly to the job
             // file. The contact bottom-sheet (with Text/Email/Call/Open)
             // is still mounted below and used by the mobile flow; on
             // desktop we skip it so the chevron lives up to its
             // implied affordance.
             onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
-            onNewLead={() => {
+            onNewJob={() => {
               setAddInitialStage('job')
               setAddOpen(true)
             }}
@@ -328,6 +356,7 @@ export default function Jobs() {
             open={addOpen}
             userId={user?.id}
             initialStage={addInitialStage}
+            lockStage
             onClose={() => setAddOpen(false)}
             onCreated={async (created: any) => {
               setAddOpen(false)
@@ -337,7 +366,7 @@ export default function Jobs() {
               const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
               toastSuccess(
                 `New ${noun} added`,
-                created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+                created?.name ? `${created.name} is in Job Desk` : 'In Job Desk'
               )
             }}
           />
@@ -418,6 +447,8 @@ export default function Jobs() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search jobs"
+            autoComplete="off"
             placeholder="Search jobs, contacts, numbers…"
             style={{
               width: '100%',
@@ -437,7 +468,7 @@ export default function Jobs() {
 
       {/* STAGE TABS — horizontal scroll on overflow */}
       <motion.div className="fh-jobs__tabs" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist">
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Job filters">
           {TABS.map((t) => (
             <FilterPill
               key={t.id}
@@ -446,6 +477,7 @@ export default function Jobs() {
               // chip is suppressed entirely (FilterPill renders the
               // chip only when `count != null`).
               count={tabCounts[t.id]}
+              ariaLabel={`Show ${t.label.toLowerCase()} jobs`}
               onClick={() => { hapticTap(); setFilter(t.id) }}
             >
               {t.label}
@@ -458,13 +490,36 @@ export default function Jobs() {
           Net effect: 1 col on phone (≤520), 2 cols on tablet (520-820),
           3 cols on small desktop (820-1080), 4 cols on wide (≥1080).
           Was capping at 3 cols even on wide screens — left empty space. */}
+      {loadError && filtered.length > 0 && (
+        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+          <DataErrorState
+            compact
+            title="Could not refresh jobs"
+            message="Showing the last loaded results."
+            onRetry={() => { void refetch() }}
+            actionLabel={isFetching ? 'Retrying' : 'Retry'}
+          />
+        </motion.div>
+      )}
+
       {loading && (
         <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
           <SkeletonList rows={5} />
         </motion.div>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && loadError && filtered.length === 0 && (
+        <motion.div className="fh-jobs__grid" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
+          <DataErrorState
+            title="Could not load jobs"
+            message={loadError}
+            onRetry={() => { void refetch() }}
+            actionLabel={isFetching ? 'Retrying' : 'Retry'}
+          />
+        </motion.div>
+      )}
+
+      {!loading && !loadError && filtered.length === 0 && (
         <motion.div className="fh-jobs__grid" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
           <EmptyView
             hasFilter={filter !== 'all' || !!search}
@@ -515,20 +570,20 @@ export default function Jobs() {
             <ActionTile
               icon={MessageSquare}
               label="Text"
-              disabled={!drawerContact?.phone}
-              href={drawerContact?.phone ? `sms:${drawerContact.phone}` : undefined}
+              disabled={!peekPhone}
+              href={peekPhone ? `sms:${peekPhone}` : undefined}
             />
             <ActionTile
               icon={Mail}
               label="Email"
-              disabled={!drawerContact?.email}
-              href={drawerContact?.email ? `mailto:${drawerContact.email}` : undefined}
+              disabled={!peekEmail}
+              href={peekEmail ? `mailto:${peekEmail}` : undefined}
             />
             <ActionTile
               icon={Phone}
               label="Call"
-              disabled={!drawerContact?.phone}
-              href={drawerContact?.phone ? `tel:${drawerContact.phone}` : undefined}
+              disabled={!peekPhone}
+              href={peekPhone ? `tel:${peekPhone}` : undefined}
             />
             <ActionTile
               icon={ExternalLink}
@@ -553,6 +608,7 @@ export default function Jobs() {
           open={addOpen}
           userId={user?.id}
           initialStage={addInitialStage}
+          lockStage
           onClose={() => setAddOpen(false)}
           onCreated={async (created: any) => {
             setAddOpen(false)
@@ -562,7 +618,7 @@ export default function Jobs() {
             const noun = created?.stage === 'job' ? 'job' : created?.stage === 'quote' ? 'quote' : 'lead'
             toastSuccess(
               `New ${noun} added`,
-              created?.name ? `${created.name} is in your Pipeline` : 'In your Pipeline'
+              created?.name ? `${created.name} is in Job Desk` : 'In Job Desk'
             )
           }}
         />

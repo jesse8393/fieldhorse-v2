@@ -12,19 +12,23 @@ import { money } from '../../lib/format.ts'
 
 type Contact = {
   id: string
-  name: string
-  stage: string
+  name?: string | null
+  stage?: string | null
   amount?: number | null
   job_title?: string | null
   job_type?: string | null
+  completed_at?: string | null
   updated_at?: string | null
   created_at?: string | null
 }
 
 type Props = {
   contacts: Contact[]
-  onOpenJob: (id: string) => void
+  onOpenJob?: (id: string) => void
+  onOpenContact?: (contact: Contact) => void
   onNewLead?: () => void
+  onNewQuote?: () => void
+  onNewJob?: () => void
 }
 
 type StageDef = { key: string; label: string; tone: 'lead' | 'quote' | 'job' | 'invoice' | 'won' }
@@ -32,10 +36,11 @@ type StageDef = { key: string; label: string; tone: 'lead' | 'quote' | 'job' | '
 // Pipeline v2: no Invoicing column — invoicing is per-job fh_invoices
 // rows, not a stage.
 const STAGES: StageDef[] = [
-  { key: 'lead',    label: 'Lead',      tone: 'lead' },
-  { key: 'quote',   label: 'Quote',     tone: 'quote' },
-  { key: 'job',     label: 'Active',    tone: 'job' },
-  { key: 'closed',  label: 'Complete',  tone: 'won' },
+  { key: 'lead',    label: 'Lead',             tone: 'lead' },
+  { key: 'quote',   label: 'Quote',            tone: 'quote' },
+  { key: 'job',     label: 'Active',           tone: 'job' },
+  { key: 'invoice', label: 'Ready to collect', tone: 'invoice' },
+  { key: 'closed',  label: 'Complete',         tone: 'won' },
 ]
 
 function relTime(iso: any) {
@@ -49,10 +54,17 @@ function relTime(iso: any) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export default function SnowPipelineBuild({ contacts, onOpenJob, onNewLead }: Props) {
+function pipelineBucket(contact: Contact) {
+  const stage = String(contact.stage || '').toLowerCase()
+  if (stage === 'job' && contact.completed_at) return 'invoice'
+  if (stage === 'invoice') return 'invoice'
+  return stage
+}
+
+export default function SnowPipelineBuild({ contacts, onOpenJob, onOpenContact, onNewLead, onNewQuote, onNewJob }: Props) {
   const grouped = STAGES.map((s) => {
     const items = contacts
-      .filter((c) => String(c.stage || '').toLowerCase() === s.key)
+      .filter((c) => pipelineBucket(c) === s.key)
       .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
     const total = items.reduce((sum, c) => sum + Number(c.amount || 0), 0)
     return { ...s, items, total }
@@ -77,6 +89,14 @@ export default function SnowPipelineBuild({ contacts, onOpenJob, onNewLead }: Pr
                   <button type="button" className="fh-build-pipeline-col__empty-add" onClick={onNewLead}>
                     <Plus size={13} /> Add lead
                   </button>
+                ) : col.key === 'quote' && onNewQuote ? (
+                  <button type="button" className="fh-build-pipeline-col__empty-add" onClick={onNewQuote}>
+                    <Plus size={13} /> Start quote
+                  </button>
+                ) : col.key === 'job' && onNewJob ? (
+                  <button type="button" className="fh-build-pipeline-col__empty-add" onClick={onNewJob}>
+                    <Plus size={13} /> New job
+                  </button>
                 ) : (
                   <span>No {col.label.toLowerCase()} deals</span>
                 )}
@@ -88,7 +108,7 @@ export default function SnowPipelineBuild({ contacts, onOpenJob, onNewLead }: Pr
                 key={c.id}
                 type="button"
                 className={`fh-build-pipeline-card is-stage-${col.tone}`}
-                onClick={() => onOpenJob(c.id)}
+                onClick={() => onOpenContact ? onOpenContact(c) : onOpenJob?.(c.id)}
               >
                 <div className="fh-build-pipeline-card__top">
                   <span className="fh-build-pipeline-card__name" title={c.name || 'Untitled'}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveNextAction } from './jobNextAction.ts'
+import { resolveNextAction, resolvePrimaryAction } from './jobNextAction.ts'
 
 const future = (mins: number) => new Date(Date.now() + mins * 60_000).toISOString()
 const past = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString()
@@ -80,5 +80,44 @@ describe('resolveNextAction priority chain', () => {
     const r = resolveNextAction({ contact: { stage: 'banana' } })
     expect(r.kind).toBe('stage')
     expect(r.pipelineFn).toBe('startQuote')
+  })
+})
+
+describe('resolvePrimaryAction pipeline priority', () => {
+  it('keeps lead progression primary even when tasks exist', () => {
+    const r = resolvePrimaryAction({
+      contact: { stage: 'lead', milestones: [{ label: 'Call back', done: false }] },
+      scheduleItems: [{ id: 's1', title: 'Site walk', start_at: future(120) }],
+      todos: [{ id: 't1', text: 'Measure' }]
+    })
+    expect(r.kind).toBe('stage')
+    expect(r.pipelineFn).toBe('startQuote')
+  })
+
+  it('keeps quote approval primary even when todos exist', () => {
+    const r = resolvePrimaryAction({
+      contact: { stage: 'quote' },
+      todos: [{ id: 't1', text: 'Follow up' }]
+    })
+    expect(r.kind).toBe('stage')
+    expect(r.pipelineFn).toBe('approveQuote')
+  })
+
+  it('keeps active job delivery work primary until the job is complete', () => {
+    const r = resolvePrimaryAction({
+      contact: { stage: 'job' },
+      scheduleItems: [{ id: 's1', title: 'Pour', start_at: future(120) }]
+    })
+    expect(r.kind).toBe('schedule')
+    expect(r.sourceId).toBe('s1')
+  })
+
+  it('moves a completed job to invoicing even if todos remain', () => {
+    const r = resolvePrimaryAction({
+      contact: { stage: 'job', completed_at: new Date().toISOString() },
+      todos: [{ id: 't1', text: 'Archive photos' }]
+    })
+    expect(r.kind).toBe('stage')
+    expect(r.pipelineFn).toBe('sendInvoice')
   })
 })

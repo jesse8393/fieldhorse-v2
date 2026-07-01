@@ -19,26 +19,24 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { supabase } from '../lib/supabase.ts'
 import { getWeather, MURFREESBORO } from '../lib/weather.ts'
-import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import CountUp from '../components/fx/CountUp.tsx'
 import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
 import HomeActivityCard from '../components/HomeActivityCard.tsx'
 import { hapticTap } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
-// V3-SYSTEM-1B-3: surface real cover photos on Home rows. Reuses the
-// same batch helper Jobs already uses (one query + one signed-URL
-// batch call, no N+1). Returns { [contactId]: signedUrl }.
-import { fetchCoverPhotosByJob } from '../lib/photos.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import DataErrorState from '../components/DataErrorState.tsx'
+import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
 // Lazy — desktop-only variant. Home itself is an eager route (loaded
 // with the main bundle) so any static import here ships SnowHome to
 // mobile users too even though they never render it. Lazy keeps the
 // main bundle lean; desktop sees a near-instant suspense flash since
 // the chunk fetches in parallel with first paint.
 const SnowHome = lazy(() => import('../components/desktop/SnowHomeBuild.tsx'))
+
+const EMPTY_PHOTO_URLS: Record<string, string> = {}
 
 /* ----------------- helpers ----------------- */
 
@@ -80,13 +78,6 @@ function weatherLabel(code: any) {
   return ''
 }
 
-function startOfWeek(now: any) {
-  const d = new Date(now)
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - d.getDay())
-  return d
-}
-
 /* ----------------- screen ----------------- */
 
 export default function Home() {
@@ -104,40 +95,30 @@ export default function Home() {
   const [weather, setWeather] = useState<any>(null)
   const [weatherErr, setWeatherErr] = useState('')
 
-  // KPIs default to null (loading) so we never flash "0" before the
-  // query lands — the perception bug fix carried over from v2.
-  const [pipeline, setPipeline] = useState<any>(null)
-  const [pipelinePrev, setPipelinePrev] = useState<any>(null)
-  const [dealsAtRisk, setDealsAtRisk] = useState<any>(null) // { count, value }
-  const [jobsBehind, setJobsBehind] = useState<any>(null)
-  const [invoicingWeek, setInvoicingWeek] = useState<any>(null)
-  // Pipeline Preview = top 3 active deals by value (lead/quote/job/invoice).
-  // Renders as a glanceable list at the bottom of Home so the operator sees
-  // their highest-value open work without leaving the screen.
-  const [topPipeline, setTopPipeline] = useState<any>(null)
-  const [jobHealth, setJobHealth] = useState<any>(null)
-  // Stage breakdown for Pipeline card footer (mockup: Won / Active / Lead)
-  const [stageBreakdown, setStageBreakdown] = useState<any>(null)
-  const [stageRailData, setStageRail] = useState<any>(null)
-  // Today on Site = schedule entries that start today (or are happening
-  // now). Read-only fetch, no schema change. Joined with fh_contacts so
-  // each row shows the job name + stage at a glance.
-  const [todayOnSite, setTodayOnSite] = useState<any>(null)
-  // Next Actions = up to 5 actionable items (stale leads, overdue jobs,
-  // unsent invoices) computed from the same contacts/schedule/payments data.
-  // Distinct from KPI tiles (which show counts) — these are per-job CTAs.
-  const [nextActions, setNextActions] = useState<any>(null)
-  // V3-SYSTEM-1B-3: signed cover-photo URLs keyed by contact id. Populated
-  // alongside the rest of the Home data via fetchCoverPhotosByJob (same
-  // pattern Jobs uses). Empty map = every row falls back to a neutral
-  // initial tile. Doesn't gate render — lists paint immediately, photos
-  // pop in when the URL map arrives.
-  const [photoUrlByJob, setPhotoUrlByJob] = useState<any>({})
-  const [refreshTick, setRefreshTick] = useState(0)
-
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
   const displayName = displayNameFrom(profile, user)
   const firstName = displayName ? displayName.split(/\s+/)[0] : 'there'
+  const membership = useMembership()
+  const dashboard = useHomeDashboard(user?.id, membership.orgId)
+  useHomeDashboardRealtime(user?.id, membership.orgId)
+  const dashboardData = dashboard.data
+  const pipeline = dashboardData?.pipeline ?? null
+  const pipelinePrev = dashboardData?.pipelinePrev ?? null
+  const dealsAtRisk = dashboardData?.dealsAtRisk ?? null
+  const jobsBehind = dashboardData?.jobsBehind ?? null
+  const invoicingWeek = dashboardData?.invoicingWeek ?? null
+  const topPipeline = dashboardData?.topPipeline ?? null
+  const jobHealth = dashboardData?.jobHealth ?? null
+  const stageBreakdown = dashboardData?.stageBreakdown ?? null
+  const stageRailData = dashboardData?.stageRail ?? null
+  const todayOnSite = dashboardData?.todayOnSite ?? null
+  const nextActions = dashboardData?.nextActions ?? null
+  const photoUrlByJob = dashboardData?.photoUrlByJob ?? EMPTY_PHOTO_URLS
+  const dashboardError = dashboard.error instanceof Error
+    ? dashboard.error.message
+    : dashboard.error
+      ? 'Dashboard data could not refresh.'
+      : ''
 
   /* ----- Weather ----- */
   useEffect(() => {
@@ -150,492 +131,6 @@ export default function Home() {
       .catch((e) => { if (!cancelled) setWeatherErr(e.message || 'Forecast unavailable') })
     return () => { cancelled = true }
   }, [profile?.location_lat, profile?.location_lon])
-
-  /* ----- KPIs + Live Feed ----- */
-  useEffect(() => {
-    if (!user) return
-    let cancelled = false
-    async function load() {
-      const nowD = new Date()
-      const sevenDaysAgo = new Date(nowD); sevenDaysAgo.setDate(nowD.getDate() - 7)
-      const fourteenDaysAgo = new Date(nowD); fourteenDaysAgo.setDate(nowD.getDate() - 14)
-      const wkStart = startOfWeek(nowD)
-      const todayStart = new Date(nowD); todayStart.setHours(0, 0, 0, 0)
-      const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
-
-      // V3-SYSTEM-1B-3: photo fetch runs in the same Promise.all as the
-      // existing four queries. Failure is non-fatal — empty map → rows
-      // fall back to neutral initial tiles. No N+1: helper does one
-      // fh_job_files query + one batch signed-URL call total.
-      const [contactsRes, overdueSchedRes, paysRes, todaySchedRes, photoMap, linkViewsRes, sentCOsRes, openInvoicesRes] = await Promise.all([
-        // Contacts: stages + amounts + last update for at-risk calc.
-        // updated_at falls back to created_at if missing.
-        // V3-PARTNERS: dropped the .eq('user_id', user!.id) JS-layer filter
-        // so partner-shared jobs flow into Pipeline / Next Actions / Today
-        // on Site / Pipeline Preview. RLS enforces owner+partner access.
-        supabase
-          .from('fh_contacts')
-          .select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status'),
-        // Schedule entries that should already have ended → if linked to a
-        // job-stage contact, that contact is "behind schedule".
-        supabase
-          .from('fh_schedule')
-          .select('contact_id, end_at, start_at')
-          .eq('user_id', user!.id)
-          .lt('end_at', nowD.toISOString())
-          .gte('end_at', fourteenDaysAgo.toISOString()),
-        // Payments collected this week (Sun → today).
-        supabase
-          .from('fh_payments')
-          .select('amount, created_at')
-          .eq('user_id', user!.id)
-          .gte('created_at', wkStart.toISOString()),
-        // Today on Site — schedule entries that start today, joined with
-        // contacts for name+stage. Read-only query, no schema change.
-        supabase
-          .from('fh_schedule')
-          .select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)')
-          .eq('user_id', user!.id)
-          .gte('start_at', todayStart.toISOString())
-          .lt('start_at', todayEnd.toISOString())
-          .order('start_at', { ascending: true })
-          .limit(6),
-        // Cover photos keyed by contact id — same helper Jobs uses.
-        fetchCoverPhotosByJob(user!.id).catch(() => ({})),
-        // Proposal-link views — powers "they looked, then went quiet".
-        supabase
-          .from('fh_public_links')
-          .select('contact_id, last_viewed_at')
-          .eq('kind', 'proposal')
-          .not('last_viewed_at', 'is', null),
-        // Change orders sitting in 'sent' — signature never came back.
-        supabase
-          .from('fh_change_orders')
-          .select('id, contact_id, sequence_number, title, amount, updated_at')
-          .eq('status', 'sent'),
-        // Issued invoices past their due date and still unpaid.
-        supabase
-          .from('fh_invoices')
-          .select('id, contact_id, title, amount, due_date, status')
-          .in('status', ['sent', 'overdue'])
-      ])
-
-      if (cancelled) return
-
-      // Deduplicate by id. The fh_contacts query intentionally omits the
-      // user_id filter so partner-shared jobs flow through (RLS does the
-      // auth), but partner-shared rows can come back twice — once as the
-      // owner's row, once via the partnership join — producing different
-      // totals on every reload. Audit caught $160k / $143k / $130k
-      // bouncing on the same page; this dedup nails the value down.
-      const rawContacts = contactsRes.data || []
-      const contactsById = new Map<string, any>()
-      for (const c of rawContacts) {
-        if (c?.id && !contactsById.has(c.id)) contactsById.set(c.id, c)
-      }
-      const contacts = Array.from(contactsById.values())
-
-      // Pipeline = sum of $ across active stages.
-      const totalPipeline = contacts
-        .filter((c) => ACTIVE_STAGES.includes(c.stage as string))
-        .reduce((s, c) => s + Number(c.amount || 0), 0)
-
-      // Pipeline 7 days ago = active stages whose record predates the window
-      // (i.e. existed back then). Best-effort proxy until snapshot table.
-      const prevPipeline = contacts
-        .filter((c) => {
-          if (!ACTIVE_STAGES.includes(c.stage as string)) return false
-          const created = new Date(c.created_at || nowD)
-          return created < sevenDaysAgo
-        })
-        .reduce((s, c) => s + Number(c.amount || 0), 0)
-
-      // Deals At Risk = lead/quote with no update in 7+ days.
-      const risky = contacts.filter((c) => {
-        if (c.stage !== 'lead' && c.stage !== 'quote') return false
-        const last = new Date(c.updated_at || c.created_at || 0)
-        return last < sevenDaysAgo
-      })
-      const riskValue = risky.reduce((s, c) => s + Number(c.amount || 0), 0)
-
-      // Jobs Behind Schedule = stage=job + has at least one schedule entry
-      // whose end_at is in the past.
-      const overdueContactIds = new Set(
-        (overdueSchedRes.data || []).map((s) => s.contact_id).filter(Boolean)
-      )
-      const behind = contacts.filter((c) => c.stage === 'job' && overdueContactIds.has(c.id))
-
-      // Invoicing this week = sum of payments collected since Sunday.
-      const weekTotal = (paysRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-
-      // Next Actions — compose 3 source streams + sort by urgency (oldest
-      // last-touch wins). Capped at 5 so the section stays scannable.
-      const fiveDaysAgo = new Date(nowD); fiveDaysAgo.setDate(nowD.getDate() - 5)
-      const paidContactIds = new Set(
-        (paysRes.data || []).map((p: any) => p.contact_id).filter(Boolean)
-      )
-      const actions = []
-      // 1. Stale leads/quotes — needs a follow-up call/text. Urgency
-      // escalates to danger at 14+ days; visual tone carries the
-      // severity, so the label stays plain "Follow up" regardless.
-      // Operator-facing copy (no CRM shorthand): subline names the
-      // stage + days waiting in plain English.
-      for (const c of risky) {
-        const lastTouchMs = new Date(c.updated_at || c.created_at || 0).getTime()
-        const daysWaiting = Math.max(1, Math.floor((nowD.getTime() - lastTouchMs) / 86400000))
-        const dayWord = daysWaiting === 1 ? 'day' : 'days'
-        actions.push({
-          id: `followup-${c.id}`,
-          kind: 'followup',
-          contactId: c.id,
-          // Owner Queue Phase 1 §2: split Action / Client / Amount /
-          // Due into discrete fields. `title` keeps the legacy combined
-          // phrase for anything else that reads it; the new fields
-          // (verb / contactName / contactAmount / dueIso) drive the
-          // table columns.
-          verb: 'Follow up',
-          contactName: c.name || 'Unnamed lead',
-          contactAmount: Number(c.amount || 0),
-          // Follow-ups don't have a calendar due date; the "due" cell
-          // shows wait time (e.g. "15d ago") computed from last touch.
-          dueIso: new Date(lastTouchMs).toISOString(),
-          dueKind: 'waited',
-          title: `Follow up with ${c.name || 'lead'}`,
-          detail: `${c.stage === 'lead' ? 'Lead' : 'Quote'} waiting ${daysWaiting} ${dayWord}`,
-          urgencyLabel: 'Follow up',
-          urgencyTone: daysWaiting >= 14 ? 'danger' : 'warn',
-          urgency: lastTouchMs
-        })
-      }
-      // 2. Overdue jobs — needs a reschedule. Urgency = danger (red) —
-      // schedule slipped, crew/customer expectations broken.
-      for (const c of behind) {
-        actions.push({
-          id: `reschedule-${c.id}`,
-          kind: 'reschedule',
-          contactId: c.id,
-          verb: 'Reschedule',
-          contactName: c.name || 'Unnamed job',
-          contactAmount: Number(c.amount || 0),
-          // Reschedules are "due today" — the job is already overdue.
-          dueIso: new Date(nowD).toISOString(),
-          dueKind: 'overdue',
-          title: `Reschedule ${c.name || 'job'}`,
-          detail: 'Job behind schedule',
-          urgencyLabel: 'Overdue',
-          urgencyTone: 'danger',
-          urgency: 0 // top priority — sort first
-        })
-      }
-      // 3. Completed jobs with no payment yet. Urgency = success (green)
-      // — money in motion, action results in cash flowing in. ('invoice'
-      // stage is the legacy alias; v2 jobs flag completion via
-      // completed_at.)
-      for (const c of contacts) {
-        const awaitingPayment = c.stage === 'invoice' || (c.stage === 'job' && c.completed_at)
-        if (!awaitingPayment) continue
-        if (paidContactIds.has(c.id)) continue
-        const updated = new Date(c.updated_at || c.created_at || 0)
-        if (updated > fiveDaysAgo) continue // give it 5 days to land naturally
-        actions.push({
-          id: `invoice-${c.id}`,
-          kind: 'invoice',
-          contactId: c.id,
-          verb: 'Chase invoice',
-          contactName: c.name || 'Unnamed job',
-          contactAmount: Number(c.amount || 0),
-          dueIso: updated.toISOString(),
-          dueKind: 'invoiced',
-          title: `Chase invoice for ${c.name || 'job'}`,
-          detail: Number(c.amount) > 0 ? `$${Number(c.amount).toLocaleString()} owed` : 'Awaiting payment',
-          urgencyLabel: 'Invoice pending',
-          urgencyTone: 'success',
-          urgency: updated.getTime()
-        })
-      }
-      // 4. Follow-up date came due (Pipeline v2 follow_up_on). The
-      // operator set this date on purpose — it outranks every heuristic.
-      const todayYmd = nowD.toISOString().slice(0, 10)
-      for (const c of contacts) {
-        if (!c.follow_up_on || c.follow_up_on > todayYmd) continue
-        if (!['lead', 'quote'].includes(c.stage as string)) continue
-        const overdueDays = Math.max(0, Math.round((nowD.getTime() - new Date(c.follow_up_on + 'T12:00:00').getTime()) / 86400000))
-        actions.push({
-          id: `followup-due-${c.id}`,
-          kind: 'followup-due',
-          contactId: c.id,
-          verb: 'Call',
-          contactName: c.name || 'Unnamed lead',
-          contactAmount: Number(c.amount || 0),
-          dueIso: new Date(c.follow_up_on + 'T12:00:00').toISOString(),
-          dueKind: 'overdue',
-          title: `Call ${c.name || 'lead'}`,
-          detail: overdueDays === 0 ? 'Follow-up due today' : `Follow-up ${overdueDays}d overdue`,
-          urgencyLabel: overdueDays === 0 ? 'Due today' : 'Overdue',
-          urgencyTone: overdueDays >= 2 ? 'danger' : 'warn',
-          urgency: 1 + Math.max(0, 5 - overdueDays) // older = closer to top
-        })
-      }
-
-      // 5. Proposal viewed, then silence ≥48h — they engaged; strike
-      // while it's warm-ish.
-      const latestViewByContact = new Map<string, number>()
-      for (const r of (linkViewsRes?.data || []) as any[]) {
-        const t = new Date(r.last_viewed_at).getTime()
-        if (Number.isNaN(t)) continue
-        const prev = latestViewByContact.get(r.contact_id) || 0
-        if (t > prev) latestViewByContact.set(r.contact_id, t)
-      }
-      for (const c of contacts) {
-        if (c.stage !== 'quote') continue
-        if (!['sent', 'viewed'].includes((c.proposal_status || '').toLowerCase())) continue
-        const viewedAt = latestViewByContact.get(c.id)
-        if (!viewedAt) continue
-        const hoursSince = (nowD.getTime() - viewedAt) / 3600000
-        if (hoursSince < 48) continue
-        if (actions.some((a) => a.contactId === c.id)) continue // one row per job
-        actions.push({
-          id: `viewed-quiet-${c.id}`,
-          kind: 'viewed-quiet',
-          contactId: c.id,
-          verb: 'Follow up',
-          contactName: c.name || 'Unnamed lead',
-          contactAmount: Number(c.amount || 0),
-          dueIso: new Date(viewedAt).toISOString(),
-          dueKind: 'waited',
-          title: `They read your quote — follow up`,
-          detail: `${c.name || 'Customer'} viewed it ${Math.round(hoursSince / 24)}d ago, no answer`,
-          urgencyLabel: 'Engaged',
-          urgencyTone: 'warn',
-          urgency: 10 + hoursSince / 24
-        })
-      }
-
-      // 6. Change order sent ≥3d, signature never came back.
-      for (const co of (sentCOsRes?.data || []) as any[]) {
-        const sentAt = new Date(co.updated_at || 0).getTime()
-        const days = (nowD.getTime() - sentAt) / 86400000
-        if (!(days >= 3)) continue
-        const c = contactsById.get(co.contact_id)
-        actions.push({
-          id: `co-unsigned-${co.id}`,
-          kind: 'co-unsigned',
-          contactId: co.contact_id,
-          verb: 'Re-send',
-          contactName: c?.name || 'Job',
-          contactAmount: Math.abs(Number(co.amount || 0)),
-          dueIso: new Date(sentAt).toISOString(),
-          dueKind: 'waited',
-          title: `CO #${co.sequence_number} unsigned`,
-          detail: `Sent ${Math.round(days)}d ago — nudge ${c?.name || 'the customer'}`,
-          urgencyLabel: 'Unsigned',
-          urgencyTone: 'warn',
-          urgency: 100 + days
-        })
-      }
-
-      // 7. Issued invoice past due — the politest money chase there is.
-      for (const inv of (openInvoicesRes?.data || []) as any[]) {
-        if (!inv.due_date) continue
-        const due = new Date(inv.due_date + (inv.due_date.length <= 10 ? 'T12:00:00' : ''))
-        if (Number.isNaN(due.getTime()) || due > nowD) continue
-        const daysLate = Math.round((nowD.getTime() - due.getTime()) / 86400000)
-        const c = contactsById.get(inv.contact_id)
-        actions.push({
-          id: `inv-overdue-${inv.id}`,
-          kind: 'inv-overdue',
-          contactId: inv.contact_id,
-          verb: 'Nudge',
-          contactName: c?.name || 'Job',
-          contactAmount: Number(inv.amount || 0),
-          dueIso: due.toISOString(),
-          dueKind: 'overdue',
-          title: `Invoice ${daysLate}d past due`,
-          detail: `${inv.title || 'Invoice'} · $${Number(inv.amount || 0).toLocaleString()} — ${c?.name || 'customer'}`,
-          urgencyLabel: 'Past due',
-          urgencyTone: 'danger',
-          // More days late = closer to the top; floor keeps it under
-          // the reschedule slot (0) no matter how ancient.
-          urgency: Math.max(1, 100 - daysLate)
-        })
-      }
-
-      // Sort: lowest urgency value first (overdue=0 wins, then oldest last-touch)
-      actions.sort((a, b) => a.urgency - b.urgency)
-      const topActions = actions.slice(0, 6)
-
-      // Stage breakdown for the Pipeline card footer — 3 chips that
-      // partition the funnel and match the Jobs tab filters one-to-one
-      // so a tap on a chip lands on a tab with the same count.
-      // Pipeline v2 partition:
-      //   Lead     = stage in (lead, quote)        → /leads
-      //   Active   = stage job (+legacy invoice)   → /jobs?stage=active
-      //   Complete = stage closed                  → /jobs?stage=closed
-      const stageCounts = {
-        won:    contacts.filter((c) => c.stage === 'closed').length,
-        active: contacts.filter((c) => c.stage === 'job' || c.stage === 'invoice').length,
-        lead:   contacts.filter((c) => c.stage === 'lead' || c.stage === 'quote').length
-      }
-
-      // Full per-stage rail for the desktop pipeline hero (audit §E:
-      // the mock shows every stage with $ + count on the rail, not 3
-      // collapsed buckets). Computed over the COMPLETE deduped contact
-      // list so amounts are real totals — not the top-deal slice the
-      // old buildPipelineStages approximated from.
-      const stageRail = (['lead', 'quote', 'job', 'closed', 'lost'] as const).map((sid) => {
-        const rows = contacts.filter((c) => c.stage === sid)
-        return {
-          key: sid,
-          count: rows.length,
-          total: rows.reduce((s, c) => s + Number(c.amount || 0), 0)
-        }
-      })
-
-      // Quotes Needing Attention — quotes with no update in 7+ days
-      // (separate KPI from leads needing follow-up; the mockup splits
-      // them into 3 distinct priority signals).
-      const quotesAttention = contacts.filter((c) => {
-        if (c.stage !== 'quote') return false
-        const last = new Date(c.updated_at || c.created_at || 0)
-        return last < sevenDaysAgo
-      }).length
-
-      // Follow-ups — leads (only) with no update in 7+ days.
-      const followUps = contacts.filter((c) => {
-        if (c.stage !== 'lead') return false
-        const last = new Date(c.updated_at || c.created_at || 0)
-        return last < sevenDaysAgo
-      }).length
-
-      // Today on Site — derive the rows. fh_contacts() join may be null
-      // when the schedule entry has no linked contact.
-      const todayRows = (todaySchedRes.data || []).map((s) => ({
-        id: s.id,
-        contactId: s.contact_id,
-        title: s.title || s.fh_contacts?.name || 'Scheduled visit',
-        clientName: s.fh_contacts?.name || null,
-        stage: s.fh_contacts?.stage || null,
-        startAt: s.start_at,
-        endAt: s.end_at
-      }))
-
-      // Top pipeline = highest-value active deals. Used by the Pipeline
-      // Preview section. Capped at 3 to keep the home screen scannable —
-      // operators tap "View all" to drill into the full board.
-      const topActiveDeals = contacts
-        .filter((c) => ACTIVE_STAGES.includes(c.stage as string))
-        .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
-        .slice(0, 3)
-        .map((c) => ({
-          id: c.id,
-          name: c.name || 'Untitled',
-          amount: Number(c.amount || 0),
-          stage: c.stage,
-          updatedAt: c.updated_at || c.created_at || null
-        }))
-
-      // Job Health Preview (Phase 1 §3): the bottom-row table on the
-      // Command Center. Joins each active job (stage=job/invoice) with
-      // the schedule + payment signals we already have in scope so the
-      // card prints real status dots instead of "signals not connected
-      // yet". Sources:
-      //   schedule → overdueSchedRes (entry with end_at in the past)
-      //   billing  → contact.amount vs sum(payments for that contact)
-      //   reports  → not yet tracked → 'unknown'
-      //   risk     → derived from the three signals above
-      //   next     → stage-derived prompt
-      const payByContact = new Map<string, number>()
-      for (const p of (paysRes.data || []) as any[]) {
-        if (!p?.contact_id) continue
-        payByContact.set(p.contact_id, (payByContact.get(p.contact_id) || 0) + Number(p.amount || 0))
-      }
-      const overdueByContact = new Set(overdueContactIds)
-      const jobHealthRows = contacts
-        .filter((c) => c.stage === 'job' || c.stage === 'invoice')
-        .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
-        .slice(0, 6)
-        .map((c) => {
-          const isBehind = overdueByContact.has(c.id)
-          const scheduleTone: 'good' | 'warn' | 'bad' = isBehind ? 'bad' : 'good'
-          const schedule = isBehind ? 'Behind' : 'On track'
-          const amount = Number(c.amount || 0)
-          const paid = payByContact.get(c.id) || 0
-          const outstanding = amount > 0 ? amount - paid : 0
-          const workDone = !!c.completed_at || c.stage === 'invoice'
-          const billingTone: 'good' | 'warn' | 'bad' =
-            workDone && outstanding > 0 ? 'warn'
-            : amount === 0 ? 'warn'
-            : amount > 0 && outstanding <= 0 ? 'good'
-            : 'good'
-          const billing =
-            workDone && outstanding > 0 ? 'Outstanding'
-            : amount === 0 ? 'Not set'
-            : outstanding > 0 ? 'In progress'
-            : 'Paid'
-          // Composite risk = worst of the per-column tones. 'bad' wins.
-          const tones: ('good' | 'warn' | 'bad')[] = [scheduleTone, billingTone]
-          const riskTone: 'good' | 'warn' | 'bad' =
-            tones.includes('bad') ? 'bad' : tones.includes('warn') ? 'warn' : 'good'
-          const risk = riskTone === 'bad' ? 'High' : riskTone === 'warn' ? 'Medium' : 'Low'
-          const next =
-            isBehind ? 'Reschedule + update client'
-            : workDone && outstanding > 0 ? 'Send the final invoice'
-            : workDone ? 'Close out the job'
-            : 'Keep crew moving'
-          return {
-            id: c.id,
-            job: c.name || 'Untitled',
-            stage: workDone && outstanding > 0 ? 'Invoicing' : 'Active',
-            schedule,
-            scheduleTone,
-            report: '—',          // reports cadence not tracked yet
-            reportTone: 'neutral',
-            billing,
-            billingTone,
-            risk,
-            riskTone,
-            next,
-          }
-        })
-
-      setPipeline(totalPipeline)
-      setPipelinePrev(prevPipeline)
-      setDealsAtRisk({ count: risky.length, value: riskValue, followUps, quotesAttention })
-      setJobsBehind(behind.length)
-      setInvoicingWeek(weekTotal)
-      setTopPipeline(topActiveDeals)
-      setJobHealth(jobHealthRows)
-      setStageBreakdown(stageCounts)
-      setStageRail(stageRail)
-      setTodayOnSite(todayRows)
-      setNextActions(topActions)
-      setPhotoUrlByJob(photoMap || {})
-    }
-    load().catch((err) => {
-      if (cancelled) return
-      // Promise.all rejects on the first failed query, leaving the
-      // dashboard in a perpetual loading state with no user-facing
-      // signal. Surface it as a toast so the operator knows to retry
-      // (the realtime subscription + refreshTick will retry on the
-      // next visibility/contact change).
-      console.warn('[home] dashboard load failed', err)
-    })
-    return () => { cancelled = true }
-  }, [user, refreshTick])
-
-  /* ----- Realtime: re-fetch on any contact change for this user ----- */
-  useEffect(() => {
-    if (!user) return
-    const channel = supabase
-      .channel(`fh_contacts:home:${user!.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${user!.id}` },
-        () => setRefreshTick((t) => t + 1)
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [user])
 
   function pinLocation() {
     if (!('geolocation' in navigator)) return setWeatherErr('Geolocation not supported')
@@ -662,10 +157,12 @@ export default function Home() {
     ? `${Math.round(weather.current.temperature_2m)}°`
     : '—'
   const condStr = weatherLabel(weather?.current?.weather_code)
+  const followUpCount = dealsAtRisk?.followUps ?? null
+  const quoteAttentionCount = dealsAtRisk?.quotesAttention ?? null
+  const jobsBehindCount = jobsBehind ?? null
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
-  const membership = useMembership()
 
   // Role-based redirect: foreman + crew don't see the owner dashboard
   // (no $ amounts, no AR, no pipeline). Send them straight to /crew,
@@ -711,8 +208,12 @@ export default function Home() {
           todayOnSite={todayOnSite}
           topPipeline={topPipeline}
           nextActions={nextActions}
+          dashboardError={dashboardError}
+          onRetryDashboard={() => { dashboard.refetch() }}
           onGoToJobs={(filter: any) => navigate(filter ? `/jobs?stage=${filter}` : '/jobs')}
-          onGoToLeads={() => navigate('/leads')}
+          onGoToPipeline={() => navigate('/pipeline')}
+          onGoToLeads={(filter?: string) => navigate(filter ? `/leads?stage=${filter}` : '/leads')}
+          onGoToQuotes={() => navigate('/quotes')}
           onGoToActivity={() => navigate('/activity')}
           onGoToSchedule={() => navigate('/schedule')}
           onGoToInvoices={() => navigate('/invoices')}
@@ -720,8 +221,8 @@ export default function Home() {
           onGoToCompose={() => navigate('/compose')}
           onGoToPourWindow={() => navigate('/pour-window')}
           onOpenJob={(id: any) => navigate(`/jobs/${id}`)}
-          onOpenJobAtTab={(id: any, tab: any) => navigate(`/jobs/${id}${tab ? `?tab=${tab}` : ''}`)}
-          onNewLead={() => navigate('/jobs?new=1')}
+          onOpenJobAtTab={(id: any, tab: any, intent: any) => navigate(jobActionPath(id, tab, intent))}
+          onNewLead={() => navigate('/leads?new=1')}
         />
       </Suspense>
     )
@@ -876,6 +377,16 @@ export default function Home() {
         <div className="v3-caption" style={{ padding: '0 var(--v3-gutter) 12px', color: 'var(--v3-danger)' }}>
           {weatherErr}
         </div>
+      ) : null}
+      {dashboardError ? (
+        <motion.div variants={item} style={{ margin: '0 var(--v3-gutter) 16px' }}>
+          <DataErrorState
+            compact
+            title="Dashboard data couldn't refresh"
+            message={dashboardError}
+            onRetry={() => { dashboard.refetch() }}
+          />
+        </motion.div>
       ) : null}
 
       {/* ─────────── PIPELINE REVENUE CARD — V3-HOME-1D ───────────
@@ -1174,10 +685,7 @@ export default function Home() {
                 key={action.id}
                 action={action}
                 photoUrl={action.contactId ? photoUrlByJob[action.contactId] : undefined}
-                onTap={() => action.contactId
-                  ? navigate(`/jobs/${action.contactId}`)
-                  : navigate('/jobs')
-                }
+                onTap={() => navigate(nextActionPath(action))}
               />
             ))}
           </div>
@@ -1210,29 +718,29 @@ export default function Home() {
           <CompactKpi
             tone="success"
             icon={PhoneCall}
-            value={dealsAtRisk?.followUps}
+            value={followUpCount}
             label="Follow-ups"
-            subline={dealsAtRisk?.followUps > 0 ? 'Calls to leads' : null}
+            subline={followUpCount != null && followUpCount > 0 ? 'Calls to leads' : null}
             onTap={() => navigate('/leads')}
           />
           <CompactKpi
             tone="lead"
             icon={FileText}
-            value={dealsAtRisk?.quotesAttention}
+            value={quoteAttentionCount}
             label="Quotes"
-            subline={dealsAtRisk?.quotesAttention > 0 ? 'Need follow up' : null}
-            onTap={() => navigate('/jobs?stage=quote')}
+            subline={quoteAttentionCount != null && quoteAttentionCount > 0 ? 'Need follow up' : null}
+            onTap={() => navigate('/quotes')}
           />
           {/* Tone flips danger→primary only when jobsBehind === 0. A red
               "0 BEHIND" reads as an alarm when it's actually the all-clear
               state (~audit 5/13). Non-zero stays danger so the operator
               still gets the urgent red read when work has actually slipped. */}
           <CompactKpi
-            tone={jobsBehind > 0 ? 'danger' : 'primary'}
+            tone={jobsBehindCount != null && jobsBehindCount > 0 ? 'danger' : 'primary'}
             icon={CalendarClock}
-            value={jobsBehind}
+            value={jobsBehindCount}
             label="Jobs Behind"
-            subline={jobsBehind > 0 ? 'Reschedule' : 'All on track'}
+            subline={jobsBehindCount != null && jobsBehindCount > 0 ? 'Reschedule' : 'All on track'}
             onTap={() => navigate('/schedule')}
           />
         </div>
@@ -1315,14 +823,14 @@ export default function Home() {
                 key={deal.id}
                 deal={deal}
                 photoUrl={photoUrlByJob[deal.id]}
-                onTap={() => navigate(`/jobs/${deal.id}`)}
+                onTap={() => navigate(pipelineDetailPath(deal))}
               />
             ))
           )}
         </div>
       </motion.div>
 
-      <ScreenCloser caption="Tap the + on Jobs to add a lead, or open Schedule to plan crew visits." />
+      <ScreenCloser caption="Open Leads to add a lead, or open Schedule to plan crew visits." />
 
     </motion.div>
   )
@@ -1680,8 +1188,34 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 // (an old lead can be warn OR danger depending on how cold it's gone).
 const NEXT_ACTION_KIND: Record<string, any> = {
   followup:   { Icon: PhoneCall },
+  'followup-due': { Icon: PhoneCall },
+  'viewed-quiet': { Icon: PhoneCall },
   reschedule: { Icon: CalendarClock },
-  invoice:    { Icon: Receipt }
+  invoice:    { Icon: Receipt },
+  'inv-overdue': { Icon: Receipt },
+  'co-unsigned': { Icon: FileText }
+}
+
+function jobActionPath(contactId: any, tab?: any, intent?: any) {
+  if (!contactId) return '/jobs'
+  const params = new URLSearchParams()
+  if (tab) params.set('tab', String(tab))
+  if (intent) params.set('action', String(intent))
+  const query = params.toString()
+  return `/jobs/${contactId}${query ? `?${query}` : ''}`
+}
+
+function pipelineDetailPath(deal: any) {
+  const stage = String(deal?.stage || '').toLowerCase()
+  if (stage === 'lead' || stage === 'lost') return `/leads/${deal.id}`
+  if (stage === 'quote') return `/quotes/${deal.id}?tab=quote`
+  if (stage === 'invoice' || deal?.completed_at) return `/jobs/${deal.id}?tab=financials`
+  return `/jobs/${deal.id}`
+}
+
+function nextActionPath(action: any) {
+  if (!action?.contactId) return '/jobs'
+  return jobActionPath(action.contactId, action.tab, action.intent)
 }
 
 // V3-SYSTEM-1B-1: warn no longer uses brand gold (--v3-primary). Stale

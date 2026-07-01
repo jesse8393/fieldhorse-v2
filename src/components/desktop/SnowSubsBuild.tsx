@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Hammer,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
@@ -74,6 +75,7 @@ function insuranceStatus(
 }
 
 export default function SnowSubsBuild(props: Props) {
+  const navigate = useNavigate()
   const {
     filtered, loading, q, setQ, tradeFilter, setTradeFilter, allTrades, screenStats,
     onAddSub, onOpenSub,
@@ -106,40 +108,43 @@ export default function SnowSubsBuild(props: Props) {
   return (
     <div className="fh-build-page" data-build-screen="SnowSubsBuild">
       <header className="fh-build-topbar">
-        <div className="fh-build-search">
+        <div className="fh-build-search" role="search">
           <Search size={14} />
           <input
             className="fh-build-search__input"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search teams, trades..."
+            placeholder="Search vendors, trades, phone..."
+            aria-label="Search vendors and trades"
+            autoComplete="off"
           />
           <kbd>⌘K</kbd>
         </div>
         <div className="fh-build-topbar__meta">
-          <span>{filtered.length.toLocaleString()} on the bench</span>
+          <span>{filtered.length.toLocaleString()} vendors in network</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <span style={{ opacity: 0.6 }}>{screenStats.activeRecent} active in 30d</span>
         </div>
-        <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
+        <button className="fh-build-icon-btn" type="button" onClick={() => navigate('/activity')} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onAddSub}>
-          <Plus size={15} /> Add Team
+          <Plus size={15} /> Add Vendor
         </button>
       </header>
 
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Subs</div>
-            <h1 className="fh-build-title">FIELD BENCH.</h1>
+            <div className="fh-build-good">Vendor ops</div>
+            <h1 className="fh-build-title">SUB NETWORK.</h1>
           </div>
 
           <div className="fh-build-focus">
-            <div className="fh-build-eyebrow">Trade</div>
+            <div className="fh-build-eyebrow">Coverage</div>
             <select
               className="fh-build-select"
               value={tradeFilter}
               onChange={(e) => setTradeFilter(e.target.value)}
+              aria-label="Filter vendors by trade"
             >
               <option value="">All trades</option>
               {allTrades.map((t) => (
@@ -153,7 +158,7 @@ export default function SnowSubsBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Active subs" value={String(screenStats.activeRecent)} accent />
+            <MiniMetric label="Active vendors" value={String(screenStats.activeRecent)} accent />
             <MiniMetric
               label={insuranceIsTracked ? 'Insurance expiring' : 'Insurance'}
               value={insuranceIsTracked ? String(insuranceExpiring) : 'Not tracked'}
@@ -167,12 +172,12 @@ export default function SnowSubsBuild(props: Props) {
         <section className="fh-build-content-grid fh-build-content-grid--subs">
           <section className="fh-build-card fh-build-table fh-build-subs-table">
             <header className="fh-build-card-head">
-              <div className="fh-build-eyebrow">Field bench · {filtered.length.toLocaleString()}</div>
-              <button type="button">Export CSV</button>
+              <div className="fh-build-eyebrow">Vendor network - {filtered.length.toLocaleString()}</div>
+              <button type="button" onClick={onAddSub}>Add vendor</button>
             </header>
 
             <div className="fh-build-table__head is-subs">
-              <span>Team / Sub</span>
+              <span>Vendor</span>
               <span>Trade</span>
               <span>Active jobs</span>
               <span>Insurance</span>
@@ -182,10 +187,10 @@ export default function SnowSubsBuild(props: Props) {
             </div>
 
             {loading && (
-              <div className="fh-build-table__empty">Loading subs…</div>
+              <div className="fh-build-table__empty">Loading vendor network...</div>
             )}
             {!loading && filtered.length === 0 && (
-              <div className="fh-build-table__empty">No teams match. <button type="button" className="fh-build-inline-link" onClick={onAddSub}>+ Add Team</button>.</div>
+              <div className="fh-build-table__empty">No vendors match this view. <button type="button" className="fh-build-inline-link" onClick={onAddSub}>Add vendor</button>.</div>
             )}
             {!loading && filtered.slice(0, 60).map((s: any) => {
               const ins = insuranceStatus(s.insuranceTracked, s.insurance_expires_at)
@@ -226,7 +231,7 @@ export default function SnowSubsBuild(props: Props) {
 
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Active subs</div>
+              <div className="fh-build-eyebrow">Active vendors</div>
               <strong>{screenStats.activeRecent}</strong>
               <span>worked in last 30d</span>
             </section>
@@ -256,9 +261,9 @@ export default function SnowSubsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Crew portal</div>
+              <div className="fh-build-eyebrow">Vendor portal</div>
               <strong>Not connected</strong>
-              <span>No employee/crew roster yet</span>
+              <span>Invite flow ready for partner access</span>
             </section>
 
             <section className="fh-build-rail-card">
@@ -285,7 +290,7 @@ export default function SnowSubsBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Trade coverage</div>
               <strong>{tradeCoverage}</strong>
-              <span>distinct trades on bench</span>
+              <span>distinct trades in network</span>
               <div className="fh-build-rail-card__spark">
                 <ShieldCheck size={14} />
                 <span>{tradeCoverage >= 5 ? 'broad' : 'narrow'}</span>

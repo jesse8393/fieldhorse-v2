@@ -53,6 +53,13 @@ function fmtDateTime(iso: string | null | undefined) {
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
 }
 
+function contactRoute(row: any) {
+  const stage = String(row?.stage || '').toLowerCase()
+  if (stage === 'lead' || stage === 'lost') return `/leads/${row.id}`
+  if (stage === 'quote') return `/quotes/${row.id}?tab=quote`
+  return `/jobs/${row.id}`
+}
+
 export async function universalSearch(query: string | null | undefined, userId: string | undefined): Promise<SearchResults> {
   const q = String(query || '').trim()
   if (!q || !userId) return { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
@@ -114,7 +121,7 @@ export async function universalSearch(query: string | null | undefined, userId: 
     kind: 'job',
     title: j.name || 'Untitled',
     sub: [j.job_title || j.job_type, j.stage?.toUpperCase(), j.amount ? `$${Math.round(j.amount).toLocaleString()}` : null].filter(Boolean).join(' · '),
-    to: `/jobs/${j.id}`
+    to: contactRoute(j)
   }))
   const clients: SearchResult[] = asRows(clientsRes.data).map((c) => ({
     id: `client:${c.id}`,

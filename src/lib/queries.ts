@@ -65,7 +65,8 @@ async function fetchJobs(): Promise<JobRow[]> {
 export function useJobs() {
   return useQuery({
     queryKey: queryKeys.jobs,
-    queryFn: fetchJobs
+    queryFn: fetchJobs,
+    staleTime: 30_000
   })
 }
 
@@ -267,6 +268,9 @@ async function fetchActivity(userId: string, pageSize: number): Promise<Activity
       .select('id, name, job_title, stage')
       .eq('user_id', userId).order('updated_at', { ascending: false }).limit(pageSize * 2)
   ])
+  for (const result of [transitions, payments, changeOrders, invoices, contacts]) {
+    if (result.error) throw result.error
+  }
   return {
     transitions: (transitions.data ?? []) as ActivityBundle['transitions'],
     payments: (payments.data ?? []) as ActivityBundle['payments'],
@@ -368,17 +372,27 @@ export type SubsBundle = {
   contacts: SubContact[]
 }
 
-async function fetchSubsBundle(userId: string): Promise<SubsBundle> {
+export const subsKey = (userId: string | undefined, orgId?: string | null) =>
+  ['subs', userId, orgId ?? null] as const
+
+async function fetchSubsBundle(userId: string, orgId?: string | null): Promise<SubsBundle> {
+  let subsQuery = supabase
+    .from('fh_subs')
+    .select('*')
+  subsQuery = orgId
+    ? subsQuery.eq('org_id', orgId)
+    : subsQuery.eq('user_id', userId)
+
+  let contactsQuery = supabase
+    .from('fh_contacts')
+    .select('id, name, job_title, stage')
+  contactsQuery = orgId
+    ? contactsQuery.eq('org_id', orgId)
+    : contactsQuery.eq('user_id', userId)
+
   const [subsRes, contactsRes] = await Promise.all([
-    supabase
-      .from('fh_subs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('fh_contacts')
-      .select('id, name, job_title, stage')
-      .eq('user_id', userId)
+    subsQuery.order('created_at', { ascending: false }),
+    contactsQuery,
   ])
   if (subsRes.error) throw subsRes.error
   if (contactsRes.error) throw contactsRes.error
@@ -388,17 +402,17 @@ async function fetchSubsBundle(userId: string): Promise<SubsBundle> {
   }
 }
 
-export function useSubsBundle(userId: string | undefined) {
+export function useSubsBundle(userId: string | undefined, orgId?: string | null) {
   return useQuery({
-    queryKey: ['subs', userId],
-    queryFn: () => fetchSubsBundle(userId as string),
-    enabled: !!userId
+    queryKey: subsKey(userId, orgId),
+    queryFn: () => fetchSubsBundle(userId as string, orgId),
+    enabled: !!userId && orgId !== undefined
   })
 }
 
-export function useInvalidateSubs() {
+export function useInvalidateSubs(userId?: string, orgId?: string | null) {
   const client = useQueryClient()
-  return () => client.invalidateQueries({ queryKey: ['subs'] })
+  return () => client.invalidateQueries({ queryKey: userId ? subsKey(userId, orgId) : ['subs'] })
 }
 
 // ---- Notes ----
@@ -497,21 +511,23 @@ const EMPTY_CLIENT_DETAIL: Omit<ClientDetailBundle, 'client'> = {
 }
 
 async function fetchClientDetail(id: string, userId: string): Promise<ClientDetailBundle> {
-  const { data: client } = await supabase
+  const { data: client, error: clientErr } = await supabase
     .from('fh_clients')
     .select('*')
     .eq('id', id)
     .eq('user_id', userId)
     .maybeSingle()
+  if (clientErr) throw clientErr
 
   if (!client) return { client: null, ...EMPTY_CLIENT_DETAIL }
 
-  const { data: jobsData } = await supabase
+  const { data: jobsData, error: jobsErr } = await supabase
     .from('fh_contacts')
     .select('id, name, stage, job_title, job_type, amount, updated_at, created_at')
     .eq('user_id', userId)
     .eq('client_id', client.id)
     .order('updated_at', { ascending: false })
+  if (jobsErr) throw jobsErr
 
   const jobs = (jobsData ?? []) as ClientJob[]
   const jobIds = jobs.map((r) => r.id)
@@ -546,6 +562,9 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
       .in('contact_id', jobIds)
       .eq('status', 'approved')
   ])
+  if (notesRes.error) throw notesRes.error
+  if (filesRes.error) throw filesRes.error
+  if (paymentsRes.error) throw paymentsRes.error
 
   return {
     client: client as Client,
@@ -610,6 +629,9 @@ async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
       .order('transitioned_at', { ascending: true })
       .limit(4000)
   ])
+  for (const result of [c, m, p, inv, co, cli, st]) {
+    if (result.error) throw result.error
+  }
   return {
     contacts: (c.data ?? []) as Contact[],
     mileage: (m.data ?? []) as AnalyticsBundle['mileage'],
@@ -663,6 +685,9 @@ async function fetchInvoiceDetail(id: string): Promise<InvoiceDetailBundle> {
     supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
   ])
   if (cRes.error) throw cRes.error
+  if (psRes.error) throw psRes.error
+  if (insRes.error) throw insRes.error
+  if (coRes.error) throw coRes.error
   if (!cRes.data) throw new Error('Invoice not found')
   return {
     contact: cRes.data as InvoiceContact,
@@ -730,17 +755,24 @@ export type SubDetailBundle = {
   profile: Sub_Detail_Profile | null
 }
 
-async function fetchSubDetail(key: string, userId: string): Promise<SubDetailBundle> {
+async function fetchSubDetail(key: string, userId: string, orgId?: string | null): Promise<SubDetailBundle> {
+  let subsQuery = supabase
+    .from('fh_subs')
+    .select('*')
+  subsQuery = orgId
+    ? subsQuery.eq('org_id', orgId)
+    : subsQuery.eq('user_id', userId)
+
+  let profilesQuery = supabase
+    .from('fh_sub_profiles')
+    .select('*')
+  profilesQuery = orgId
+    ? profilesQuery.eq('org_id', orgId)
+    : profilesQuery.eq('user_id', userId)
+
   const [{ data: subs, error: subsErr }, { data: prof, error: profErr }] = await Promise.all([
-    supabase
-      .from('fh_subs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('fh_sub_profiles')
-      .select('*')
-      .eq('user_id', userId)
+    subsQuery.order('created_at', { ascending: false }),
+    profilesQuery,
   ])
   if (subsErr) throw subsErr
   if (profErr && profErr.code !== 'PGRST116') {
@@ -764,24 +796,29 @@ async function fetchSubDetail(key: string, userId: string): Promise<SubDetailBun
   const ids = Array.from(new Set(subRows.map((r) => r.contact_id).filter(Boolean))) as string[]
   const contacts: Record<string, SubContact> = {}
   if (ids.length > 0) {
-    const { data: cs } = await supabase
+    let contactsQuery = supabase
       .from('fh_contacts')
       .select('id, name, job_title, stage')
       .in('id', ids)
+    contactsQuery = orgId
+      ? contactsQuery.eq('org_id', orgId)
+      : contactsQuery.eq('user_id', userId)
+    const { data: cs, error: csErr } = await contactsQuery
+    if (csErr) throw csErr
     for (const c of (cs ?? []) as SubContact[]) contacts[c.id] = c
   }
 
   return { subRows, contacts, profile: matchingProfile }
 }
 
-export function subDetailKey(key: string | undefined) {
-  return ['subDetail', key] as const
+export function subDetailKey(key: string | undefined, userId?: string, orgId?: string | null) {
+  return ['subDetail', key, userId, orgId ?? null] as const
 }
 
-export function useSubDetail(key: string | undefined, userId: string | undefined) {
+export function useSubDetail(key: string | undefined, userId: string | undefined, orgId?: string | null) {
   return useQuery({
-    queryKey: subDetailKey(key),
-    queryFn: () => fetchSubDetail(key as string, userId as string),
-    enabled: !!key && !!userId
+    queryKey: subDetailKey(key, userId, orgId),
+    queryFn: () => fetchSubDetail(key as string, userId as string, orgId),
+    enabled: !!key && !!userId && orgId !== undefined
   })
 }

@@ -150,7 +150,7 @@ export async function commitCapture({ intent, userId, contacts }: {
       })
       if (error) throw error
       return {
-        link: queued ? '/leads' : `/jobs/${id}`,
+        link: queued ? '/leads' : `/leads/${id}`,
         toast: queued ? 'Lead saved — will sync' : 'Lead created'
       }
     }

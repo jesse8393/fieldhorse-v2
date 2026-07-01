@@ -121,7 +121,7 @@ export default function Bid() {
     setPicks((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
   }
 
-  // Push the AI bid into a real job: creates a new fh_contacts row at
+  // Push the AI bid into a real quote: creates a new fh_contacts row at
   // stage='quote' with the recommended price as contact.amount, then
   // inserts one fh_quote_items row per AI line item (rate = high end of
   // the range, so the operator can dial back rather than up — easier
@@ -185,11 +185,11 @@ export default function Bid() {
 
       hapticSuccess()
       toastSuccess(
-        'Pushed to a new job',
+        'Pushed to a new quote',
         `${items.length} line item${items.length === 1 ? '' : 's'} added · ${money(recommendedPrice)}`
       )
       // Land on the Quote tab so the contractor can refine + send.
-      navigate(`/jobs/${contact.id}?tab=quote`)
+      navigate(`/quotes/${contact.id}?tab=quote`)
     } catch (e: any) {
       console.error('[bid] pushToJob failed:', e)
       toastError("Couldn't create job from bid", e?.message || 'Try again.')

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound, Sparkles } from 'lucide-react'
+import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound, Sparkles, FileText } from 'lucide-react'
 import Icon from './icons/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
@@ -30,6 +30,8 @@ const PRIMARY = [
 const NAV_ITEMS = [
   { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
   { to: '/leads',       label: 'Leads',               Icon: Sparkles },
+  { to: '/quotes',      label: 'Quotes',              Icon: FileText },
+  { to: '/pipeline',    label: 'Pipeline',            Icon: BarChart3 },
   { to: '/jobs',        label: 'Jobs',                Icon: Briefcase },
   { to: '/clients',     label: 'Clients',             Icon: Users },
   { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
@@ -78,6 +80,13 @@ export default function BottomNav() {
   //     the Sub Portal so they don't bounce off RLS errors on every
   //     owner screen
   const visibleNavItems = NAV_ITEMS.filter((it) => {
+    const path = it.to.split('?')[0].split('#')[0]
+    if (membershipLoading) return true
+    if (role) return canViewRoute(path)
+    return path === '/sub-portal'
+  })
+
+  const visiblePrimaryItems = PRIMARY.filter((it) => {
     const path = it.to.split('?')[0].split('#')[0]
     if (membershipLoading) return true
     if (role) return canViewRoute(path)
@@ -318,7 +327,7 @@ export default function BottomNav() {
   return (
     <>
       <nav className="fh-nav" aria-label="Primary">
-        {PRIMARY.map((item) => (
+        {visiblePrimaryItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

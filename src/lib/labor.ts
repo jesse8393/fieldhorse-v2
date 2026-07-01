@@ -17,13 +17,7 @@
 // approved them yet — the owner wants margin truth same-day. If
 // approval becomes the gate, filter on approved_at here.
 
-// Lazy client import: punchHours is pure and unit-tested; a top-level
-// supabase import would construct the client (and demand env vars) the
-// moment the test file loads.
-async function db() {
-  const { supabase } = await import('./supabase.ts')
-  return supabase
-}
+import { supabase } from './supabase.ts'
 
 export type CrewLabor = {
   cost: number        // Σ hours × hourly_rate over rated punches
@@ -50,7 +44,6 @@ export async function crewLaborForContact(
 ): Promise<CrewLabor> {
   const empty: CrewLabor = { cost: 0, hours: 0, unratedHours: 0, punches: 0 }
   if (!contactId || !ownerUserId) return empty
-  const supabase = await db()
   const { data, error } = await supabase
     .from('fh_time_punches')
     .select('user_id, punch_in_at, punch_out_at, break_minutes, hourly_rate')

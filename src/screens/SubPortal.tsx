@@ -27,6 +27,7 @@ import {
 } from '../lib/subApi.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -172,7 +173,7 @@ export default function SubPortal() {
         <div className="fh-build-topbar__meta">
           <span>{user?.email || 'Sub portal'}</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <span style={{ opacity: 0.6 }}>Partner workspace</span>
         </div>
         <button
           className="fh-build-icon-btn"
@@ -250,8 +251,12 @@ export default function SubPortal() {
                 </header>
 
                 {!profile ? (
-                  <div className="fh-build-table__empty">
-                    No GC has you on file yet. Once a contractor adds you to a job, your sub profile shows up here so you can edit insurance + tax info.
+                  <div style={{ padding: '8px 22px 22px' }}>
+                    <DataErrorState
+                      compact
+                      title="No contractor profile yet"
+                      message="Once a contractor adds you to a job, your profile appears here for insurance, tax info, and payment details."
+                    />
                   </div>
                 ) : (
                   <div style={{ padding: '8px 22px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -477,7 +482,7 @@ export default function SubPortal() {
 
 function ProfileRow({ label, value, tone, muted }: { label: string; value: string; tone?: 'warn' | 'bad'; muted?: boolean }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 14, alignItems: 'baseline' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 180px) minmax(0, 1fr)', gap: 14, alignItems: 'baseline' }}>
       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'rgba(245,242,234,.55)' }}>
         {label}
       </span>
@@ -596,6 +601,14 @@ function EditProfileDialog({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   function set<K extends keyof SubProfileUpdate>(key: K, value: SubProfileUpdate[K]) {
     setForm((f) => ({ ...f, [key]: value }))
