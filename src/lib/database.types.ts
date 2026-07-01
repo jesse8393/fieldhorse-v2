@@ -1346,7 +1346,9 @@ export type Database = {
       }
       fh_public_links: {
         Row: {
-          contact_id: string
+          change_order_id: string | null
+          client_id: string | null
+          contact_id: string | null
           created_at: string
           expires_at: string | null
           id: string
@@ -1360,7 +1362,9 @@ export type Database = {
           view_count: number
         }
         Insert: {
-          contact_id: string
+          change_order_id?: string | null
+          client_id?: string | null
+          contact_id?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -1374,7 +1378,9 @@ export type Database = {
           view_count?: number
         }
         Update: {
-          contact_id?: string
+          change_order_id?: string | null
+          client_id?: string | null
+          contact_id?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string

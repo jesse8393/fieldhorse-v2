@@ -67,6 +67,12 @@ export default async function handler(req) {
     return json({ error: 'expired', message: 'This link has expired.' }, 404)
   }
 
+  // Statement links are client-scoped (every open job for one client)
+  // rather than job-scoped, so they take a wholly separate load path.
+  if (link.kind === 'statement') {
+    return handleStatement(supabase, link)
+  }
+
   // 2. Load the contact + related data in parallel
   const [
     { data: contact },
@@ -130,21 +136,7 @@ export default async function handler(req) {
 
   // 3. Build the company branding payload (matches what the in-app
   //    surfaces pass to ProposalTemplate / InvoiceTemplate).
-  const company = profile ? {
-    name: profile.company_name || profile.full_name || 'My Company',
-    address: profile.company_address || '',
-    phone: profile.company_phone || '',
-    email: profile.company_email || profile.email || '',
-    website: profile.company_website || '',
-    logo_url: profile.logo_url || null,
-    brand_accent_hex: profile.brand_accent_hex || null,
-    estimate_template: profile.estimate_template || 'classic',
-    license_number: profile.license_number || '',
-    insured_text: profile.insured_text || '',
-    warranty_default: profile.warranty_default || '',
-    payment_link: profile.payment_link || '',
-    payment_instructions: profile.payment_instructions || ''
-  } : { name: 'My Company' }
+  const company = buildCompany(profile)
 
   // 4. Bump view counter + maybe write a contractor notification —
   //    both best-effort, neither blocks the response.
@@ -215,6 +207,108 @@ export default async function handler(req) {
     insurance: insurance || null,
     invoices: invoices || [],
     photos
+  })
+}
+
+// Company branding block shared by every document kind. Mirrors what
+// the in-app surfaces pass to the templates so the customer sees the
+// contractor's brand, never FieldHorse's.
+function buildCompany(profile) {
+  return profile ? {
+    name: profile.company_name || profile.full_name || 'My Company',
+    address: profile.company_address || '',
+    phone: profile.company_phone || '',
+    email: profile.company_email || profile.email || '',
+    website: profile.company_website || '',
+    logo_url: profile.logo_url || null,
+    brand_accent_hex: profile.brand_accent_hex || null,
+    estimate_template: profile.estimate_template || 'classic',
+    license_number: profile.license_number || '',
+    insured_text: profile.insured_text || '',
+    warranty_default: profile.warranty_default || '',
+    payment_link: profile.payment_link || '',
+    payment_instructions: profile.payment_instructions || ''
+  } : { name: 'My Company' }
+}
+
+// Statement path — client-scoped rollup of every open job. Loads the
+// client, all their jobs (scoped by user_id for tenant isolation),
+// and the payments + approved change orders across those jobs, then
+// returns the shape the public StatementView renders.
+async function handleStatement(supabase, link) {
+  const [{ data: client }, { data: profile }, { data: jobs }] = await Promise.all([
+    supabase.from('fh_clients').select('*').eq('id', link.client_id).eq('user_id', link.user_id).maybeSingle(),
+    supabase.from('profiles').select('*').eq('user_id', link.user_id).maybeSingle(),
+    supabase
+      .from('fh_contacts')
+      .select('id, name, job_title, job_type, stage, amount, address, created_at')
+      .eq('client_id', link.client_id)
+      .eq('user_id', link.user_id)
+      .order('created_at', { ascending: true })
+  ])
+
+  if (!client) {
+    return json({ error: 'gone', message: 'This statement is no longer available.' }, 404)
+  }
+
+  const jobRows = Array.isArray(jobs) ? jobs : []
+  const jobIds = jobRows.map((j) => j.id)
+
+  let payments = []
+  let changeOrders = []
+  if (jobIds.length > 0) {
+    const [{ data: pay }, { data: cos }] = await Promise.all([
+      supabase.from('fh_payments').select('*').in('contact_id', jobIds).order('paid_on', { ascending: false }),
+      supabase.from('fh_change_orders').select('*').in('contact_id', jobIds).eq('status', 'approved')
+    ])
+    payments = pay || []
+    changeOrders = cos || []
+  }
+
+  const company = buildCompany(profile)
+
+  // View bump + debounced contractor notification, same policy as the
+  // job-scoped path. Both best-effort; neither blocks the response.
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+  const shouldNotify = !link.last_viewed_at || new Date(link.last_viewed_at) < oneHourAgo
+
+  supabase
+    .from('fh_public_links')
+    .update({ view_count: (link.view_count || 0) + 1, last_viewed_at: new Date().toISOString() })
+    .eq('id', link.id)
+    .then(() => {}, () => {})
+
+  if (shouldNotify) {
+    const who = client.company_name || client.name || 'A customer'
+    supabase.from('fh_notifications').insert({
+      user_id: link.user_id,
+      kind: 'public_link_viewed',
+      title: 'Customer viewed your statement',
+      body: who,
+      link: `/clients/${link.client_id}`
+    }).then(() => {}, () => {})
+    sendPushToUser(supabase, link.user_id, {
+      title: 'Customer is viewing your statement 👀',
+      body: who,
+      link: `/clients/${link.client_id}`,
+      tag: `link-viewed-${link.id}`
+    })
+  }
+
+  return json({
+    ok: true,
+    kind: 'statement',
+    client: {
+      id: client.id,
+      name: client.name,
+      company_name: client.company_name || null,
+      email: client.email || null,
+      address: client.address || null
+    },
+    company,
+    jobs: jobRows,
+    payments,
+    changeOrders
   })
 }
 

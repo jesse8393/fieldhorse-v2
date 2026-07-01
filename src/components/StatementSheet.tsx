@@ -6,11 +6,12 @@
 // ClientDetail and the Invoices A/R-by-client rollup.
 
 import { useMemo, useState } from 'react'
-import { Download, Mail } from 'lucide-react'
+import { Download, Mail, Link2 } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { companyFromProfile } from '../lib/invoices.ts'
 import { gatherStatement, downloadStatement, sendStatementEmail, type StatementJob, type StatementPayment, type StatementChangeOrder } from '../lib/statement.ts'
+import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../lib/publicLink.ts'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 
 function money(n: any) {
@@ -39,7 +40,7 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
   userId: string | undefined
 }) {
   const { profile } = useProfile()
-  const [busy, setBusy] = useState<null | 'download' | 'email'>(null)
+  const [busy, setBusy] = useState<null | 'download' | 'email' | 'link'>(null)
 
   // Pure rollup of (contract + approved COs) − paid per property.
   const data = useMemo(() => gatherStatement(jobs || [], payments || [], changeOrders || []), [jobs, payments, changeOrders])
@@ -76,6 +77,30 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
       } else {
         toast("Couldn't send the statement", { description: res.message || 'Try again' })
       }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // Mint (or reuse) a client-scoped public statement link and copy it.
+  // The customer opens /p/{token} → the same rollup renders as a live
+  // web page with the contractor's branding, no login.
+  async function handleShareLink() {
+    if (busy || !client?.id || !userId) return
+    setBusy('link')
+    try {
+      const existing = await listClientStatementLinks(client.id)
+      const url = existing.length > 0
+        ? buildPublicUrl(existing[0].token)
+        : (await mintPublicLink({ clientId: client.id, userId, kind: 'statement' })).url
+      try {
+        await navigator.clipboard.writeText(url)
+        toastSuccess('Statement link copied', 'Send via text, email, however you like.')
+      } catch {
+        toastSuccess('Statement link ready', url)
+      }
+    } catch (e: any) {
+      toast("Couldn't create the link", { description: e?.message || 'Try again' })
     } finally {
       setBusy(null)
     }
@@ -134,6 +159,15 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
                   <Mail size={15} /> {busy === 'email' ? 'Sending…' : 'Email'}
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={handleShareLink}
+                disabled={!!busy || !client?.id}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, background: 'transparent', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1, WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Link2 size={15} /> {busy === 'link' ? 'Preparing…' : 'Copy share link'}
+              </button>
             </>
           )}
         </div>
