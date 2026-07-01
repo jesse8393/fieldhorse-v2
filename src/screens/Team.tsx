@@ -8,11 +8,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Bell, ChevronRight, Copy, Plus, Search, Trash2, UserCheck, UserPlus, Mail, X,
+  Bell, ChevronRight, Copy, Plus, Search, Trash2, UserPlus, Mail, X,
 } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
-  orgInviteCreate, orgInviteRevoke, orgMembersList,
+  orgInviteCreate, orgInviteRevoke, orgMembersList, orgMemberRemove, orgMemberRole,
   type OrgInvitePending, type OrgMember,
 } from '../lib/orgApi.ts'
 import type { OrgRole } from '../lib/permissions.ts'
@@ -171,7 +171,12 @@ export default function Team() {
                 <span className="fh-build-truncate fh-build-rel" title={m.email || ''}>{m.email || '—'}</span>
                 <span style={{ textTransform: 'capitalize' }}><span className={`fh-build-dot is-${roleTone(m.role)}`}>{m.role}</span></span>
                 <span className="fh-build-rel">{fmtJoined(m.joined_at)}</span>
-                <UserCheck size={13} color="rgba(245,242,234,.30)" />
+                <MemberActions
+                  member={m}
+                  callerRole={role}
+                  canManage={canManageTeam}
+                  onChanged={load}
+                />
               </div>
             ))}
           </section>
@@ -256,6 +261,73 @@ function roleTone(role: OrgRole): 'good' | 'warn' | 'neutral' {
 }
 
 const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, admin: 3, owner: 4 }
+
+/* Per-member management: change role (to a tier below yours) or remove.
+   Only shown when the caller can manage the team AND outranks the member
+   — mirrors the server guards in org-member-role/remove. */
+function MemberActions({ member, callerRole, canManage, onChanged }: any) {
+  const [busy, setBusy] = useState(false)
+  const callerTier = ROLE_TIER[callerRole || ''] ?? 0
+  const targetTier = ROLE_TIER[member.role] ?? 0
+  const manageable = canManage && !member.is_self && targetTier < callerTier
+  if (!manageable) {
+    return <span style={{ color: 'rgba(245,242,234,.20)', fontSize: 11 }}>{member.is_self ? '—' : ''}</span>
+  }
+  const roleOptions = ORG_ROLES.filter((r) => (ROLE_TIER[r] ?? 0) < callerTier)
+
+  async function changeRole(next: OrgRole) {
+    if (busy || next === member.role) return
+    setBusy(true)
+    try {
+      await orgMemberRole(member.user_id, next)
+      toastSuccess('Role updated', `${member.name || member.email || 'Member'} → ${next}`)
+      onChanged?.()
+    } catch (e: any) {
+      toastError("Couldn't change role", e?.message || 'Try again')
+    } finally { setBusy(false) }
+  }
+
+  async function remove() {
+    if (busy) return
+    if (!window.confirm(`Remove ${member.name || member.email || 'this member'} from the team? They lose access immediately.`)) return
+    setBusy(true)
+    try {
+      await orgMemberRemove(member.user_id)
+      toastSuccess('Member removed', member.name || member.email || '')
+      onChanged?.()
+    } catch (e: any) {
+      toastError("Couldn't remove member", e?.message || 'Try again')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <select
+        value={member.role}
+        disabled={busy}
+        onChange={(e) => changeRole(e.target.value as OrgRole)}
+        className="fh-build-select"
+        style={{ fontSize: 11, padding: '3px 6px' }}
+        aria-label="Change role"
+      >
+        <option value={member.role} style={{ textTransform: 'capitalize' }}>{member.role}</option>
+        {roleOptions.filter((r) => r !== member.role).map((r) => (
+          <option key={r} value={r} style={{ textTransform: 'capitalize' }}>{r}</option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={remove}
+        disabled={busy}
+        aria-label="Remove member"
+        title="Remove member"
+        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'rgba(232,90,87,0.8)' }}
+      >
+        <Trash2 size={13} />
+      </button>
+    </span>
+  )
+}
 
 function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | null; onClose: () => void; onSent: () => void }) {
   const [email, setEmail] = useState('')

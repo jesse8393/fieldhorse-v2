@@ -108,6 +108,14 @@ export function orgInviteRevoke(inviteId: string): Promise<{ ok: true }> {
   return callJson('/api/org-invite-revoke', { invite_id: inviteId })
 }
 
+export function orgMemberRemove(memberUserId: string): Promise<{ ok: true }> {
+  return callJson('/api/org-member-remove', { member_user_id: memberUserId })
+}
+
+export function orgMemberRole(memberUserId: string, role: OrgRole): Promise<{ ok: true; role: OrgRole }> {
+  return callJson('/api/org-member-role', { member_user_id: memberUserId, role })
+}
+
 // ────────────────────────────────────────────────────────────
 // Timesheets
 // ────────────────────────────────────────────────────────────
@@ -140,4 +148,12 @@ export function orgPunchApprove(
   punchIds: string[],
 ): Promise<{ ok: true; approved_count: number; approved_ids: string[] }> {
   return callJson('/api/org-punch-approve', { punch_ids: punchIds })
+}
+
+export function orgPunchFlag(
+  punchIds: string[],
+  flagged: boolean,
+  flagReason?: string,
+): Promise<{ ok: true; count: number; ids: string[] }> {
+  return callJson('/api/org-punch-flag', { punch_ids: punchIds, flagged, flag_reason: flagReason })
 }
