@@ -489,7 +489,7 @@ export default function ContactDetail() {
   // the balance is collected the job is ready for its closeout.
   // ('invoice' is the legacy alias of 'job' — same treatment.)
   const stageCta: { label: string; onClick: () => void } | null =
-    contact.stage === 'lead'    ? { label: 'Build quote',    onClick: onBuildQuote }
+    contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
     : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
     : contact.stage === 'job' || contact.stage === 'invoice'
       ? (Number(balance || 0) > 0

@@ -715,7 +715,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           )}
 
-          <V3Field label={form.stage === 'lead' ? 'Project / scope' : 'Job title'}>
+          <V3Field label={form.stage === 'lead' ? 'What do they need?' : 'Job title'}>
             <input
               value={form.job_title}
               onChange={(e) => set('job_title', e.target.value)}
@@ -725,35 +725,43 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           </V3Field>
 
-          <V3Field label={form.stage === 'lead' ? 'Scope notes' : 'Quote scope'}>
-            <textarea
-              rows={3}
-              value={form.scope_text}
-              onChange={(e) => set('scope_text', e.target.value)}
-              maxLength={FIELD_LIMITS.scope_text}
-              placeholder="What they want, timing, constraints, measurements, must-haves..."
-              style={{ ...V3_INPUT, resize: 'vertical', minHeight: 84 }}
-            />
-          </V3Field>
-
-          <V3Field label={form.stage === 'lead' ? 'Estimated value (optional)' : 'Amount'}>
-            <div style={{ position: 'relative' }}>
-              <span aria-hidden="true" style={{
-                position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-                color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 16,
-                pointerEvents: 'none'
-              }}>$</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={form.amount}
-                onChange={(e) => set('amount', e.target.value.replace(/[^\d.]/g, ''))}
-                maxLength={FIELD_LIMITS.amount}
-                placeholder="0"
-                style={{ ...V3_INPUT, paddingLeft: 30, fontVariantNumeric: 'tabular-nums' }}
+          {/* A lead is a simple capture — who they are + what they need.
+              Scope detail and pricing belong on the quote, so those fields
+              only appear from the quote stage onward. Keeps the lead form
+              short (the "a lead should be its own thing" ask). */}
+          {form.stage !== 'lead' && (
+            <V3Field label="Quote scope">
+              <textarea
+                rows={3}
+                value={form.scope_text}
+                onChange={(e) => set('scope_text', e.target.value)}
+                maxLength={FIELD_LIMITS.scope_text}
+                placeholder="What they want, timing, constraints, measurements, must-haves..."
+                style={{ ...V3_INPUT, resize: 'vertical', minHeight: 84 }}
               />
-            </div>
-          </V3Field>
+            </V3Field>
+          )}
+
+          {form.stage !== 'lead' && (
+            <V3Field label="Amount">
+              <div style={{ position: 'relative' }}>
+                <span aria-hidden="true" style={{
+                  position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                  color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 16,
+                  pointerEvents: 'none'
+                }}>$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.amount}
+                  onChange={(e) => set('amount', e.target.value.replace(/[^\d.]/g, ''))}
+                  maxLength={FIELD_LIMITS.amount}
+                  placeholder="0"
+                  style={{ ...V3_INPUT, paddingLeft: 30, fontVariantNumeric: 'tabular-nums' }}
+                />
+              </div>
+            </V3Field>
+          )}
 
           {form.stage !== 'job' && (
             <FollowUpPicker
