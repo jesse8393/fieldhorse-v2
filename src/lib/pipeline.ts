@@ -80,7 +80,7 @@ export async function reopen(contact: Contact) {
   return res
 }
 
-export async function logPayment(contact: Contact, input: { amount?: number | string | null; method?: string | null; kind?: string | null; reference?: string | null; paid_on?: string | null; invoice_id?: string | null }) {
+export async function logPayment(contact: Contact, input: { id?: string | null; amount?: number | string | null; method?: string | null; kind?: string | null; reference?: string | null; paid_on?: string | null; invoice_id?: string | null }) {
   const res = await baseLogPayment(contact, input)
   hapticSuccess()
   const paid = Number(input.amount || 0)
