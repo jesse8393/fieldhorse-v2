@@ -638,6 +638,7 @@ export default function Settings() {
             Sign out
           </motion.button>
         </div>
+        <DeleteAccountRow onDone={handleSignOut} />
       </Section>
 
       {/* DEV · CLEANUP */}
@@ -869,6 +870,76 @@ function PushRow({ userId }: { userId?: string }) {
         <Bell size={14} />
         {busy ? 'Working…' : enabled ? 'Turn off' : 'Enable'}
       </motion.button>
+    </div>
+  )
+}
+
+/* Permanent account deletion — wires the existing /api/delete-account
+   endpoint (previously mobile-only) into web Settings. Type-to-confirm
+   guards the irreversible wipe; on success we sign the user out. */
+function DeleteAccountRow({ onDone }: { onDone: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function doDelete() {
+    if (confirmText.trim().toUpperCase() !== 'DELETE' || busy) return
+    setBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { toastError('Not signed in', 'Please sign in again.'); setBusy(false); return }
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body?.ok) {
+        toastError("Couldn't delete account", body?.message || body?.error || 'Try again.')
+        setBusy(false)
+        return
+      }
+      toastSuccess('Account deleted', 'Signing you out…')
+      onDone()
+    } catch (e: any) {
+      toastError("Couldn't delete account", e?.message || 'Try again.')
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{ marginTop: 10, background: 'none', border: 'none', padding: '4px 2px', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+      >
+        Delete my account
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 10, padding: '12px', borderRadius: 12, background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.35)' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>Permanently delete your account</div>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
+        This erases every contact, job, quote, invoice, payment, photo, and file you own, and closes your login. It can't be undone. Type <strong>DELETE</strong> to confirm.
+      </p>
+      <input
+        type="text"
+        value={confirmText}
+        onChange={(e) => setConfirmText(e.target.value)}
+        placeholder="DELETE"
+        autoCapitalize="characters"
+        disabled={busy}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none', marginBottom: 10 }}
+      />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" onClick={() => { setOpen(false); setConfirmText('') }} disabled={busy} style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+        <button type="button" onClick={doDelete} disabled={busy || confirmText.trim().toUpperCase() !== 'DELETE'} style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'rgba(192,57,43,0.16)', border: '1px solid rgba(192,57,43,0.5)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: busy || confirmText.trim().toUpperCase() !== 'DELETE' ? 0.5 : 1 }}>
+          {busy ? 'Deleting…' : 'Delete forever'}
+        </button>
+      </div>
     </div>
   )
 }

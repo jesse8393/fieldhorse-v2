@@ -73,6 +73,14 @@ export async function startQuote(contact: Contact) {
   return transitionStage(contact, 'quote')
 }
 
+// Direct "Won" from the Leads board: move a lead/quote to Job WITHOUT
+// auto-creating a kickoff schedule event. approveQuote (below) is the
+// formal quote-approval path that also drops a kickoff; a one-tap Won on
+// a raw lead shouldn't silently schedule a job for tomorrow 9am.
+export async function markWon(contact: Contact) {
+  return transitionStage(contact, 'job')
+}
+
 export async function approveQuote(contact: Contact) {
   const { data, error } = await transitionStage(contact, 'job')
   if (error) return { data, error, scheduleError: null }
