@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
 import AddEventSheet from '../components/AddEventSheet.tsx'
@@ -99,6 +99,7 @@ export default function Schedule() {
 
   const [weather, setWeather] = useState<any>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [editEvent, setEditEvent] = useState<any>(null)
   // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
   // event row being deleted (for title display); deletingEvt is the
   // commit-in-flight flag.
@@ -132,6 +133,35 @@ export default function Schedule() {
     // Snapshot before deletion so Undo can re-insert. Strip generated
     // fields and the joined relation; only re-insert the source row.
     const snapshot = (events || []).find((e: any) => e.id === evtId) || (upcoming || []).find((e: any) => e.id === evtId)
+
+    // Recurring series: delete every occurrence sharing the series id
+    // (stored in `recurring`) so we don't orphan the other rows, and
+    // restore the whole series on Undo.
+    const seriesId = (snapshot as any)?.recurring
+    if (seriesId) {
+      const { data: seriesRows } = await supabase
+        .from('fh_schedule').select('*').eq('user_id', user!.id).eq('recurring', seriesId)
+      const { error: serr } = await supabase
+        .from('fh_schedule').delete().eq('user_id', user!.id).eq('recurring', seriesId)
+      if (serr) { toastError("Couldn't delete", serr.message); return }
+      for (const r of (seriesRows || [])) dropScheduleEvent((r as any).id)
+      const n = (seriesRows || []).length || 1
+      toastUndo(`Series deleted · ${n} event${n === 1 ? '' : 's'}`, {
+        description: snapshot?.title || 'Tap Undo to restore',
+        onUndo: async () => {
+          // eslint-disable-next-line no-unused-vars
+          const rows = (seriesRows || []).map(({ fh_contacts, ...row }: any) => row)
+          if (rows.length) {
+            const { error: insErr } = await supabase.from('fh_schedule').insert(rows)
+            if (insErr) { toastError("Couldn't undo", insErr.message); return }
+          }
+          load(); loadUpcoming()
+          toastSuccess('Restored', snapshot?.title || '')
+        }
+      })
+      return
+    }
+
     const { error } = await supabase.from('fh_schedule').delete().eq("id", evtId).eq("user_id", user!.id)
     if (error) {
       toastError("Couldn't delete", error.message)
@@ -461,6 +491,7 @@ export default function Schedule() {
               events={events}
               now={new Date()}
               onClick={(id: any) => navigate(`/jobs/${id}`)}
+              onEdit={(ev: any) => setEditEvent(ev)}
               onDelete={requestDeleteEvent}
               onAdd={() => setAddOpen(true)}
             />
@@ -509,6 +540,15 @@ export default function Schedule() {
         userId={user?.id}
         onClose={() => setAddOpen(false)}
         onSaved={() => { setAddOpen(false); load() }}
+      />
+
+      {/* Edit an existing event (in-place update). */}
+      <AddEventSheet
+        open={!!editEvent}
+        userId={user?.id}
+        event={editEvent}
+        onClose={() => setEditEvent(null)}
+        onSaved={() => { setEditEvent(null); load() }}
       />
 
       {/* Destructive-confirm sheet for delete event. The actual delete
@@ -626,7 +666,7 @@ const chevBtnStyle = {
   WebkitTapHighlightColor: 'transparent'
 }
 
-function DayView({ events, now, onClick, onDelete, onAdd }: any) {
+function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
   // Per-status counts — drive the All/Live/Upcoming/Done toggle badges
   // and let the filter persist even when zero of a bucket exists today.
   const [stateFilter, setStateFilter] = useState('all')
@@ -805,6 +845,7 @@ function DayView({ events, now, onClick, onDelete, onAdd }: any) {
                 status={status}
                 initial={initial}
                 onClick={() => e.contact_id && onClick(e.contact_id)}
+                onEdit={onEdit ? () => onEdit(e) : undefined}
                 onDelete={onDelete ? () => onDelete(e.id) : undefined}
                 isClickable={Boolean(e.contact_id)}
               />
@@ -865,7 +906,7 @@ function splitTime(s: any) {
   return [s.slice(0, idx), s.slice(idx + 1)]
 }
 
-function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onClick, onDelete, isClickable }: any) {
+function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onClick, onEdit, onDelete, isClickable }: any) {
   // 5/17 — full visual port of the v3 design's dispatch-card pattern
   // (replaces the prior glass-row with status spine). Time column on
   // the left as HR/AM stamp, title + sub on the right, state pill at
@@ -922,6 +963,26 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
           </div>
         </div>
       </button>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={(ev) => { ev.stopPropagation(); onEdit() }}
+          aria-label="Edit event"
+          style={{
+            position: 'absolute', bottom: 8, right: 40,
+            width: 28, height: 28, borderRadius: 8,
+            border: 'none', background: 'transparent',
+            color: 'var(--v3-text-muted)',
+            cursor: 'pointer', display: 'grid', placeItems: 'center',
+            opacity: 0.35, WebkitTapHighlightColor: 'transparent',
+            transition: 'opacity 160ms ease, color 160ms ease'
+          }}
+          onMouseEnter={(ev) => { if (!canHover) return; ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-primary)' }}
+          onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.35'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
+        >
+          <Pencil size={12} />
+        </button>
+      )}
       {onDelete && (
         <button
           type="button"

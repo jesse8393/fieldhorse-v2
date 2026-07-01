@@ -18,7 +18,8 @@ import { supabase } from '../lib/supabase.ts'
 import { toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 
-export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '' }: any) {
+export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '', event = null }: any) {
+  const editing = !!event?.id
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [time, setTime] = useState('08:00')
@@ -42,24 +43,51 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
       setRecurDays(7)
       setDate(new Date().toISOString().slice(0, 10))
       setTime('08:00')
+    } else if (event?.id) {
+      // Edit mode: prefill from the row being edited.
+      setTitle(event.title || '')
+      setContactId(event.contact_id || '')
+      setRecurs(false)
+      const start = event.start_at ? new Date(event.start_at) : new Date()
+      setDate(start.toISOString().slice(0, 10))
+      setTime(start.toTimeString().slice(0, 5))
     } else {
       setContactId(defaultContactId)
     }
-  }, [open, defaultContactId])
+  }, [open, defaultContactId, event])
 
   async function save(e: any) {
     e?.preventDefault?.()
     if (!title.trim() || saving) return
     setSaving(true)
     const startMs = new Date(`${date}T${time}:00`).getTime()
+    // EDIT: update the single row in place.
+    if (editing) {
+      const { error } = await supabase.from('fh_schedule').update({
+        title: title.trim(),
+        contact_id: contactId || null,
+        start_at: new Date(startMs).toISOString(),
+        end_at: new Date(startMs + 60 * 60 * 1000).toISOString()
+      }).eq('id', event.id).eq('user_id', userId)
+      setSaving(false)
+      if (error) { toastError("Couldn't update the event", error.message || 'Try again.'); return }
+      onSaved?.()
+      return
+    }
     // Default a 1-hour end_at so deriveStatus / Live / Done filters have
     // a window to work with (they broke on events with a null end_at).
+    // Shared series id (stored in the `recurring` text column) so every
+    // occurrence knows it belongs to one series — the Schedule screen
+    // uses it to offer "delete this / delete the whole series" instead
+    // of orphaning the other 4 rows.
+    const seriesId = recurs ? (crypto.randomUUID?.() || `series-${startMs}`) : null
     const mkRow = (s: number) => ({
       user_id: userId,
       contact_id: contactId || null,
       title: title.trim(),
       start_at: new Date(s).toISOString(),
-      end_at: new Date(s + 60 * 60 * 1000).toISOString()
+      end_at: new Date(s + 60 * 60 * 1000).toISOString(),
+      recurring: seriesId
     })
     const rows = [mkRow(startMs)]
     if (recurs) {
@@ -110,7 +138,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               className="fh-font-serif"
               style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
             >
-              Add an event.
+              {editing ? 'Edit event.' : 'Add an event.'}
             </h2>
           </DrawerTitle>
           <DrawerDescription
@@ -174,6 +202,9 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
             </select>
           </label>
 
+          {/* Recurrence is create-only — editing changes just this one
+              occurrence. */}
+          {!editing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={labelStyle}>Recurrence</span>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -196,8 +227,9 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               })}
             </div>
           </div>
+          )}
 
-          {recurs && (
+          {!editing && recurs && (
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={labelStyle}>Repeat every (days)</span>
               <input
@@ -244,7 +276,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               }}
             >
               <Check size={14} />
-              {saving ? 'SAVING…' : 'SAVE EVENT'}
+              {saving ? 'SAVING…' : editing ? 'SAVE CHANGES' : 'SAVE EVENT'}
             </motion.button>
           </div>
         </form>

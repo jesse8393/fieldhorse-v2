@@ -247,6 +247,10 @@ export async function flushOutbox(): Promise<number> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 0
   flushing = true
   let synced = 0
+  // Contacts whose cost rollup must be recomputed after draining —
+  // an expense/sub that synced from the outbox otherwise leaves
+  // fh_contacts.cost (and margin) stale until an unrelated recalc.
+  const recalcContacts = new Map<string, string>() // contactId → userId
   try {
     const entries = await allEntries()
     for (const e of entries) {
@@ -257,12 +261,24 @@ export async function flushOutbox(): Promise<number> {
         ok = !isNetworkError(err)
       }
       if (!ok) break // still offline — try again on the next trigger
+      if (e.kind === 'insert' && (e.table === 'fh_expenses' || e.table === 'fh_subs') && e.row?.contact_id && e.row?.user_id) {
+        recalcContacts.set(e.row.contact_id, e.row.user_id)
+      }
       await deleteEntry(e.key)
       synced += 1
     }
   } finally {
     flushing = false
     emit()
+  }
+  // Recompute cost/margin for any job whose expense/sub just synced.
+  if (recalcContacts.size > 0) {
+    try {
+      const { recalcCost } = await import('./stages.ts')
+      for (const [contactId, uid] of recalcContacts) {
+        await recalcCost(contactId, uid).catch(() => {})
+      }
+    } catch { /* non-fatal */ }
   }
   if (synced > 0) {
     toastSuccess('Back online', `${synced} offline ${synced === 1 ? 'item' : 'items'} synced`)
