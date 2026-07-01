@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Receipt, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Check, X as XIcon } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
@@ -222,9 +222,13 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   const [editDraft, setEditDraft] = useState(emptyDraft)
   const [editing, setEditing] = useState(false)
 
-  const fetchRows = useCallback(async () => {
+  // `silent` refetches without flashing the whole list to a skeleton —
+  // used after every add/edit/delete so rapid multi-item entry stays
+  // smooth instead of blinking on each write (the "glitchy" complaint).
+  // Only the initial load shows the skeleton.
+  const fetchRows = useCallback(async (opts?: { silent?: boolean }) => {
     if (!jobId || !userId) return
-    setLoading(true)
+    if (!opts?.silent) setLoading(true)
     const { data } = await supabase
       .from('fh_quote_items')
       .select('*')
@@ -237,6 +241,11 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   }, [jobId, userId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
+
+  // Bumped after each successful add so the Add card re-focuses its
+  // description input — you can fire off line items back-to-back without
+  // reaching for the field again.
+  const [addFocusSignal, setAddFocusSignal] = useState(0)
 
   // ============================================================
   // CRUD — all writes user_id-guarded. The migration-011 recalc
@@ -264,7 +273,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       toastError("Couldn't add item", error.message)
       return null
     }
-    await fetchRows()
+    await fetchRows({ silent: true })
     onContactRefresh?.()
     return data
   }
@@ -280,7 +289,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       toastError("Couldn't update item", error.message)
       return false
     }
-    await fetchRows()
+    await fetchRows({ silent: true })
     onContactRefresh?.()
     return true
   }
@@ -297,7 +306,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       .eq('user_id', userId)
     if (error) {
       toastError("Couldn't delete item", error.message)
-      fetchRows()
+      fetchRows({ silent: true })
       return false
     }
     onContactRefresh?.()
@@ -307,7 +316,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_quote_items').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
-        await fetchRows()
+        await fetchRows({ silent: true })
         onContactRefresh?.()
         toastSuccess('Restored')
       }
@@ -337,7 +346,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     ])
     if (r1.error || r2.error) {
       toastError("Couldn't reorder", (r1.error || r2.error)?.message)
-      fetchRows()
+      fetchRows({ silent: true })
       return false
     }
     return true
@@ -422,7 +431,12 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       sort_order: rows.length
     })
     setAdding(false)
-    if (inserted) setDraft(emptyDraft())
+    if (inserted) {
+      setDraft(emptyDraft())
+      // Keep the operator in flow — refocus the description so the next
+      // line item can be typed immediately (rapid multi-item entry).
+      setAddFocusSignal((n) => n + 1)
+    }
   }
 
   function beginEdit(row: any) {
@@ -535,6 +549,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         showCancel={false}
         suggestions={suggestions}
         onPickSuggestion={(s: ItemSuggestion) => applySuggestion(setDraft, s)}
+        autoFocusSignal={addFocusSignal}
       />
 
       {/* Items list */}
@@ -774,23 +789,46 @@ function StatusChip({ label, tone }: any) {
 /* ============================================================
    DraftCard — shared form layout for both Add and Edit.
    ============================================================ */
-function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel, suggestions = [], onPickSuggestion }: any) {
+function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel, suggestions = [], onPickSuggestion, autoFocusSignal }: any) {
   // Suggestion popup state. Closes on blur (after a beat so a tap on a
   // row lands first) and on pick.
   const [descFocused, setDescFocused] = useState(false)
+  const descRef = useRef<HTMLInputElement>(null)
   const matches = descFocused && onPickSuggestion
     ? matchSuggestions(suggestions, draft.description)
     : []
+
+  // Re-focus the description after each successful add so line items can
+  // be entered back-to-back (the Add card stays put; only the signal
+  // changes). Guarded to the Add card via the presence of the signal.
+  useEffect(() => {
+    if (autoFocusSignal == null || autoFocusSignal === 0) return
+    descRef.current?.focus()
+  }, [autoFocusSignal])
+
+  // Enter anywhere in the card submits the line (unless the primary is
+  // disabled or the suggestion popup is open, where Enter picks nothing
+  // and would be surprising). Keeps hands on the keyboard for fast entry.
+  function onCardKeyDown(e: any) {
+    if (e.key !== 'Enter') return
+    if (e.target?.tagName === 'TEXTAREA') return
+    if (matches.length > 0) return
+    if (primaryDisabled) return
+    e.preventDefault()
+    onPrimary?.()
+  }
   return (
-    <div style={{
-      padding: '14px 16px',
-      borderRadius: 14,
-      background: 'var(--v3-surface)',
-      border: '1px solid var(--v3-border)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 10
-    }}>
+    <div
+      onKeyDown={onCardKeyDown}
+      style={{
+        padding: '14px 16px',
+        borderRadius: 14,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10
+      }}>
       <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
         {eyebrow}
       </span>
@@ -799,6 +837,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
       <FormField label="Description" required>
         <div style={{ position: 'relative' }}>
           <input
+            ref={descRef}
             type="text"
             value={draft.description}
             onChange={(e) => onChange('description', e.target.value)}
