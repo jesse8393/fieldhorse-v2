@@ -38,6 +38,12 @@ export type StatementLine = {
   balance: number
 }
 
+export type StatementChangeOrder = {
+  contact_id?: string | null
+  amount?: number | string | null
+  status?: string | null
+}
+
 export type StatementData = {
   lines: StatementLine[]
   totalDue: number
@@ -47,13 +53,29 @@ export type StatementData = {
 // yet; lost is dead. Matches the Invoices screen's job set.
 const BILLING_STAGES = new Set(['job', 'invoice', 'closed'])
 
+/** Sum of APPROVED change orders per contact — the amount that adjusts
+ *  a job's true contract up (or down, for credits). */
+export function approvedCoByContact(
+  changeOrders: StatementChangeOrder[] | null | undefined
+): Map<string, number> {
+  const m = new Map<string, number>()
+  for (const co of changeOrders || []) {
+    if (co?.status !== 'approved' || !co.contact_id) continue
+    m.set(co.contact_id, (m.get(co.contact_id) || 0) + Number(co.amount || 0))
+  }
+  return m
+}
+
 /**
  * Roll the client's jobs into statement lines — one row per property
- * with a positive balance (contract − paid). Pure: no network.
+ * with a positive balance. Contract = job amount + approved change
+ * orders (the same "true contract" the Send-invoice sheet and PDF use),
+ * so a signed change order actually raises what's owed here. Pure.
  */
 export function gatherStatement(
   jobs: StatementJob[] | null | undefined,
-  payments: StatementPayment[] | null | undefined
+  payments: StatementPayment[] | null | undefined,
+  changeOrders: StatementChangeOrder[] | null | undefined = []
 ): StatementData {
   if (!jobs?.length) return { lines: [], totalDue: 0 }
 
@@ -62,11 +84,12 @@ export function gatherStatement(
     if (!p.contact_id) continue
     paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
   }
+  const coByJob = approvedCoByContact(changeOrders)
 
   const lines: StatementLine[] = []
   for (const j of jobs) {
     if (j.stage && !BILLING_STAGES.has(j.stage)) continue
-    const contract = Number(j.amount || 0)
+    const contract = Number(j.amount || 0) + (coByJob.get(j.id) || 0)
     const paid = paidByJob.get(j.id) || 0
     const balance = contract - paid
     if (balance <= 0.5) continue

@@ -240,6 +240,7 @@ export default function Team() {
 
       {inviteOpen && canInviteMembers && (
         <InviteDialog
+          callerRole={role}
           onClose={() => setInviteOpen(false)}
           onSent={() => { setInviteOpen(false); load() }}
         />
@@ -254,9 +255,16 @@ function roleTone(role: OrgRole): 'good' | 'warn' | 'neutral' {
   return 'neutral'
 }
 
-function InviteDialog({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
+const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, admin: 3, owner: 4 }
+
+function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | null; onClose: () => void; onSent: () => void }) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<OrgRole>('crew')
+  // Only roles strictly below the caller's tier are invitable — mirrors
+  // the server guard in org-invite-create.js so an admin can't mint an
+  // owner (or another admin) from the UI.
+  const callerTier = ROLE_TIER[callerRole || ''] ?? 0
+  const invitableRoles = ORG_ROLES.filter((r) => (ROLE_TIER[r] ?? 0) < callerTier)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [acceptUrl, setAcceptUrl] = useState<string | null>(null)
@@ -374,7 +382,7 @@ function InviteDialog({ onClose, onSent }: { onClose: () => void; onSent: () => 
                 className="fh-build-select"
                 style={{ marginTop: 0 }}
               >
-                {ORG_ROLES.map((r) => (
+                {invitableRoles.map((r) => (
                   <option key={r} value={r} style={{ textTransform: 'capitalize' }}>{r}</option>
                 ))}
               </select>

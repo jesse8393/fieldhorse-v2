@@ -28,7 +28,7 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { LEAD_STAGES } from '../lib/stages.ts'
-import { approveQuote, markLost, reopen } from '../lib/pipeline.ts'
+import { approveQuote, markLost, reopen, startQuote } from '../lib/pipeline.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -208,6 +208,18 @@ export default function Leads() {
     }
   }
 
+  // Build quote: transition lead → quote (so it enters the Quoting
+  // stage/count and the card reflects it), then open the Quote tab.
+  // Previously this only navigated, leaving the lead in stage 'lead'.
+  async function onBuildQuote(c: any) {
+    if (c.stage === 'lead') {
+      const res: any = await startQuote(c)
+      if (res?.error) { toastError("Couldn't start the quote", res.error.message || 'Try again'); return }
+      await refresh()
+    }
+    navigate(`/jobs/${c.id}?tab=quote`)
+  }
+
   async function onLost(c: any) {
     if (busyId) return
     setBusyId(c.id)
@@ -384,7 +396,7 @@ export default function Leads() {
                 isNew={c.id === justAddedId}
                 busy={busyId === c.id}
                 onOpen={() => navigate(`/jobs/${c.id}`)}
-                onQuote={() => navigate(`/jobs/${c.id}?tab=quote`)}
+                onQuote={() => onBuildQuote(c)}
                 onWon={() => onWon(c)}
                 onLost={() => onLost(c)}
                 onReopen={() => onReopen(c)}

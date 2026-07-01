@@ -60,6 +60,7 @@ export default function ClientDetail() {
   const notes = bundle?.notes ?? []
   const files = bundle?.files ?? []
   const payments = bundle?.payments ?? []
+  const changeOrders = bundle?.changeOrders ?? []
   const [tab, setTab] = useState('overview')
   const [isEditing, setIsEditing] = useState(false)
   // Destructive-confirm sheet state for delete client.
@@ -103,8 +104,8 @@ export default function ClientDetail() {
   // `outstanding`/`activeCount`, which use different stage sets and could
   // disagree with the generated statement).
   const statementSummary = useMemo(
-    () => gatherStatement(jobs as any, payments as any),
-    [jobs, payments]
+    () => gatherStatement(jobs as any, payments as any, changeOrders as any),
+    [jobs, payments, changeOrders]
   )
 
   // Open the destructive-confirm sheet. The header trash button hits this.
@@ -253,6 +254,7 @@ export default function ClientDetail() {
         client={client}
         jobs={jobs}
         payments={payments}
+        changeOrders={changeOrders}
         userId={user?.id}
       />
     </>

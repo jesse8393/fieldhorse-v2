@@ -173,7 +173,7 @@ export default async (request) => {
   const text = [
     greeting,
     '',
-    customMessage || `Your invoice for ${jobTitle} is attached.${amountLabel ? ` Balance due: ${amountLabel}.` : ''}`,
+    customMessage || `Your invoice for ${jobTitle} is attached.${amountLabel ? ` Amount due: ${amountLabel}.` : ''}`,
     ...(payLink ? ['', `Pay online: ${payLink}`] : []),
     ...(payInstructions ? ['', payInstructions] : []),
     '',
@@ -263,7 +263,7 @@ function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, sen
   }[c]))
   const msg = customMessage
     ? safe(customMessage)
-    : `Your invoice for <strong>${safe(jobTitle)}</strong> is attached.${amountLabel ? ` Balance due: <strong>${safe(amountLabel)}</strong>.` : ''}`
+    : `Your invoice for <strong>${safe(jobTitle)}</strong> is attached.${amountLabel ? ` Amount due: <strong>${safe(amountLabel)}</strong>.` : ''}`
   return `<!doctype html>
 <html lang="en">
 <body style="margin:0;padding:0;background:#f7f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f1f1f;line-height:1.55;">

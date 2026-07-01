@@ -66,6 +66,17 @@ export default async (request) => {
   if (myMember.role !== 'owner' && myMember.role !== 'admin') {
     return json({ error: 'insufficient_role' }, 403)
   }
+  // Privilege-escalation guard: you can only invite a role strictly
+  // BELOW your own tier. Without this an admin could mint an owner
+  // (the caller gate above admits admins, and any VALID_ROLE — owner
+  // included — was accepted). Owner can invite admin/manager/…; admin
+  // can invite manager and below, never another admin or an owner.
+  const ROLE_TIER = { crew: 0, foreman: 1, manager: 2, admin: 3, owner: 4 }
+  const myTier = ROLE_TIER[myMember.role] ?? 0
+  const inviteTier = ROLE_TIER[role] ?? 0
+  if (inviteTier >= myTier) {
+    return json({ error: 'role_exceeds_caller', message: 'You can only invite roles below your own.' }, 403)
+  }
 
   // Generate a fresh token (URL-safe).
   const token = crypto.randomBytes(24).toString('base64url')

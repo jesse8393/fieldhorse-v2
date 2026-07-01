@@ -25,6 +25,7 @@ import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import StatementSheet from '../components/StatementSheet.tsx'
+import { approvedCoByContact } from '../lib/statement.ts'
 import { useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
@@ -77,6 +78,10 @@ export default function Invoices() {
   const jobs = bundle?.jobs ?? []
   const payments = bundle?.payments ?? []
   const invoices = bundle?.invoices ?? []
+  const changeOrders = bundle?.changeOrders ?? []
+  // Approved change orders raise each job's true contract; without this
+  // the balances below understate what a job with signed COs owes.
+  const approvedCoByJob = useMemo(() => approvedCoByContact(changeOrders), [changeOrders])
   const [filter, setFilter] = useState('outstanding') // 'outstanding' | 'all'
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
@@ -113,7 +118,7 @@ export default function Invoices() {
     const out = []
     const now = Date.now()
     for (const j of jobs) {
-      const amount = Number(j.amount || 0)
+      const amount = Number(j.amount || 0) + (approvedCoByJob.get(j.id) || 0)
       const paid = paidByJob.get(j.id) || 0
       const balance = amount - paid
       const ageDays = Math.floor((now - new Date(j.created_at as any).getTime()) / 86400000)
@@ -122,7 +127,7 @@ export default function Invoices() {
       out.push({ job: j, amount, paid, balance, ageDays, bucket, isOutstanding })
     }
     return out.sort((a, b) => b.balance - a.balance)
-  }, [jobs, paidByJob])
+  }, [jobs, paidByJob, approvedCoByJob])
 
   const filtered = filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows
 
@@ -231,7 +236,11 @@ export default function Invoices() {
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
     license_number: profile?.license_number || '',
-    insured_text: profile?.insured_text || ''
+    insured_text: profile?.insured_text || '',
+    // Pay link + instructions so the "How to pay" block renders on PDFs
+    // downloaded/emailed from this screen too (not just the send sheet).
+    payment_link: (profile as any)?.payment_link || '',
+    payment_instructions: (profile as any)?.payment_instructions || ''
   }), [profile])
 
   async function handleGeneratePDF(row: any) {
@@ -464,6 +473,7 @@ export default function Invoices() {
           client={statementClient?.client || null}
           jobs={statementClient?.jobs || []}
           payments={payments}
+          changeOrders={changeOrders}
           userId={user?.id}
         />
       </>
@@ -806,6 +816,7 @@ export default function Invoices() {
         client={statementClient?.client || null}
         jobs={statementClient?.jobs || []}
         payments={payments}
+        changeOrders={changeOrders}
         userId={user?.id}
       />
     </motion.div>

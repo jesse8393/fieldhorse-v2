@@ -15,6 +15,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { Calendar as CalendarIcon, Check, X } from 'lucide-react'
 import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
+import { toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 
 export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '' }: any) {
@@ -50,17 +51,30 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
     e?.preventDefault?.()
     if (!title.trim() || saving) return
     setSaving(true)
-    const starts = new Date(`${date}T${time}:00`).toISOString()
-    const rows = [{ user_id: userId, contact_id: contactId || null, title: title.trim(), start_at: starts }]
+    const startMs = new Date(`${date}T${time}:00`).getTime()
+    // Default a 1-hour end_at so deriveStatus / Live / Done filters have
+    // a window to work with (they broke on events with a null end_at).
+    const mkRow = (s: number) => ({
+      user_id: userId,
+      contact_id: contactId || null,
+      title: title.trim(),
+      start_at: new Date(s).toISOString(),
+      end_at: new Date(s + 60 * 60 * 1000).toISOString()
+    })
+    const rows = [mkRow(startMs)]
     if (recurs) {
       for (let i = 1; i <= 4; i++) {
-        const next = new Date(starts)
-        next.setDate(next.getDate() + recurDays * i)
-        rows.push({ user_id: userId, contact_id: contactId || null, title: title.trim(), start_at: next.toISOString() })
+        rows.push(mkRow(startMs + recurDays * i * 86400000))
       }
     }
-    await supabase.from('fh_schedule').insert(rows)
+    // Capture the error — a silent insert failure previously closed the
+    // sheet as "saved" and lost the event.
+    const { error } = await supabase.from('fh_schedule').insert(rows)
     setSaving(false)
+    if (error) {
+      toastError("Couldn't save the event", error.message || 'Try again.')
+      return
+    }
     onSaved?.()
   }
 

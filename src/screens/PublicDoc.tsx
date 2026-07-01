@@ -93,6 +93,10 @@ export default function PublicDoc() {
       {!loading && data && data.kind === 'change_order' && (
         <ChangeOrderView data={data} token={token} onApproved={load} />
       )}
+      {/* Fallback so an unrecognized link kind never renders a blank page. */}
+      {!loading && data && !['proposal', 'invoice', 'change_order'].includes(data.kind) && (
+        <ErrorState message="This document type can't be displayed here. Please ask the sender for an updated link." />
+      )}
     </div>
   )
 }

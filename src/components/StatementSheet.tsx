@@ -10,7 +10,7 @@ import { Download, Mail } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { companyFromProfile } from '../lib/invoices.ts'
-import { gatherStatement, downloadStatement, sendStatementEmail, type StatementJob, type StatementPayment } from '../lib/statement.ts'
+import { gatherStatement, downloadStatement, sendStatementEmail, type StatementJob, type StatementPayment, type StatementChangeOrder } from '../lib/statement.ts'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 
 function money(n: any) {
@@ -29,19 +29,20 @@ export type StatementSheetClient = {
   address?: string | null
 }
 
-export default function StatementSheet({ open, onClose, client, jobs, payments, userId }: {
+export default function StatementSheet({ open, onClose, client, jobs, payments, changeOrders = [], userId }: {
   open: boolean
   onClose: () => void
   client: StatementSheetClient | null
   jobs: StatementJob[]
   payments: StatementPayment[]
+  changeOrders?: StatementChangeOrder[]
   userId: string | undefined
 }) {
   const { profile } = useProfile()
   const [busy, setBusy] = useState<null | 'download' | 'email'>(null)
 
-  // Pure rollup of contract − paid per property. No loading state needed.
-  const data = useMemo(() => gatherStatement(jobs || [], payments || []), [jobs, payments])
+  // Pure rollup of (contract + approved COs) − paid per property.
+  const data = useMemo(() => gatherStatement(jobs || [], payments || [], changeOrders || []), [jobs, payments, changeOrders])
 
   const company = useMemo(() => companyFromProfile(profile), [profile])
   const recipientEmail = (client?.email || '').trim()

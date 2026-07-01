@@ -43,6 +43,23 @@ describe('gatherStatement', () => {
     expect(gatherStatement(undefined, undefined)).toEqual({ lines: [], totalDue: 0 })
   })
 
+  it('folds APPROVED change orders into the contract (raises what is owed)', () => {
+    const cos = [
+      { contact_id: 'a', amount: 500, status: 'approved' },   // +500 to a
+      { contact_id: 'a', amount: 200, status: 'draft' },      // ignored (not approved)
+      { contact_id: 'c', amount: -100, status: 'approved' }   // credit on c
+    ]
+    const { lines, totalDue } = gatherStatement(jobs, payments, cos)
+    const a = lines.find((l) => l.contactId === 'a')!
+    expect(a.contract).toBe(2380)  // 1880 + 500
+    expect(a.balance).toBe(1880)   // 2380 - 500 paid
+    const c = lines.find((l) => l.contactId === 'c')!
+    expect(c.contract).toBe(1300)  // 1400 - 100 credit
+    expect(c.balance).toBe(800)    // 1300 - 500 paid
+    // b unchanged (no CO): 2500. total = 1880 + 2500 + 800
+    expect(totalDue).toBe(5180)
+  })
+
   it('falls back through job_title → name → address for the property label', () => {
     const { lines } = gatherStatement(
       [{ id: 'x', name: 'Acme', address: '1 Main', stage: 'job', amount: 100 }],

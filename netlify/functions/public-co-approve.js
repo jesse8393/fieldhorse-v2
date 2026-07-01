@@ -47,6 +47,7 @@ export default async function handler(req) {
   try { body = await req.json() } catch { /* tolerate empty body */ }
   const token = String(body?.token || '').trim()
   const signatureName = String(body?.signature_name || '').trim()
+  const customerNote = String(body?.note || '').trim().slice(0, 1000)
   if (!token) return json({ error: 'missing_token' }, 400)
   if (!signatureName) return json({ error: 'missing_signature_name' }, 400)
   if (signatureName.length > 200) return json({ error: 'name_too_long' }, 400)
@@ -119,10 +120,22 @@ export default async function handler(req) {
       user_id: link.user_id,
       kind: 'change_order_signed',
       title,
-      body: `${who} signed CO #${co.sequence_number}${co.title ? ` — ${co.title}` : ''}`,
+      body: `${who} signed CO #${co.sequence_number}${co.title ? ` — ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
       link: `/jobs/${co.contact_id}?tab=quote`
     })
   } catch { /* bell is best-effort */ }
+  // Persist the customer's note as an activity row on the job so it
+  // isn't lost (it's shown on the Activity/Messages log).
+  if (customerNote) {
+    try {
+      await supabase.from('fh_notes').insert({
+        user_id: link.user_id,
+        contact_id: co.contact_id,
+        text: `CO #${co.sequence_number} signed by ${signatureName} — note: ${customerNote}`,
+        category: 'activity'
+      })
+    } catch { /* best-effort */ }
+  }
   await sendPushToUser(supabase, link.user_id, {
     title: `${title} ✍️`,
     body: `${who} signed CO #${co.sequence_number}. It's on the next invoice automatically.`,
