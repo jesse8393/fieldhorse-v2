@@ -7,7 +7,7 @@ import {
   ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
   Briefcase, Paperclip, Image as ImageIcon, Download,
   Phone, Mail, MapPin, Trash2, MessageSquare, Users,
-  Plus, FileText, Receipt
+  Plus, FileText, Receipt, DollarSign, Clock
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
@@ -19,6 +19,9 @@ import { useClientDetail, useInvalidateClientDetail } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
+import StatementSheet from '../components/StatementSheet.tsx'
+import { gatherStatement } from '../lib/statement.ts'
+import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -38,6 +41,7 @@ function fmtPhone(n: any) {
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
   { id: 'projects', label: 'Projects' },
   { id: 'files',    label: 'Files' },
   { id: 'notes',    label: 'Notes' }
@@ -56,6 +60,7 @@ export default function ClientDetail() {
   const notes = bundle?.notes ?? []
   const files = bundle?.files ?? []
   const payments = bundle?.payments ?? []
+  const changeOrders = bundle?.changeOrders ?? []
   const [tab, setTab] = useState('overview')
   const [isEditing, setIsEditing] = useState(false)
   // Destructive-confirm sheet state for delete client.
@@ -64,6 +69,8 @@ export default function ClientDetail() {
   // "New" chooser sheet — spin up a quote / job / invoice under this client.
   const [newOpen, setNewOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  // Statement sheet — roll all open invoices into one document.
+  const [statementOpen, setStatementOpen] = useState(false)
 
   // Derived metrics — computed from jobs[] + payments[].
   // Lifetime: sum of every job amount under this client, all stages.
@@ -89,6 +96,16 @@ export default function ClientDetail() {
   const activeCount = useMemo(
     () => (jobs || []).filter((j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage as string)).length,
     [jobs]
+  )
+
+  // Statement rollup — the SAME computation the StatementSheet/PDF use,
+  // so the "Statement · $X across N properties" button always agrees
+  // with the document it opens (previously the button showed
+  // `outstanding`/`activeCount`, which use different stage sets and could
+  // disagree with the generated statement).
+  const statementSummary = useMemo(
+    () => gatherStatement(jobs as any, payments as any, changeOrders as any),
+    [jobs, payments, changeOrders]
   )
 
   // Open the destructive-confirm sheet. The header trash button hits this.
@@ -180,6 +197,9 @@ export default function ClientDetail() {
           ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
           : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
       )}
+      {tab === 'activity' && (
+        <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
+      )}
       {tab === 'projects' && (
         <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
       )}
@@ -188,26 +208,82 @@ export default function ClientDetail() {
     </>
   )
 
-  if (isDesktop) {
-    return (
-      <Suspense fallback={null}><SnowClientDetailBuild
+  // Shared overlays (delete confirm, new-deal chooser, statement sheet).
+  // Mounted in BOTH the desktop and mobile branches — they're portaled,
+  // so they render correctly wherever they sit in the tree. Previously
+  // these lived only in the mobile JSX, so on desktop the Delete / New
+  // deal / Statement buttons set state but nothing ever appeared.
+  const sheets = (
+    <>
+      <ActionSheet
+        open={deleteOpen}
+        title="Delete this client?"
+        accentWord="Delete"
+        sectionLabel="Destructive"
+        stepCount={1}
+        currentStep={1}
+        commitLabel={deleting ? 'Deleting…' : 'Delete client'}
+        commitBusy={deleting}
+        commitDisabled={deleting}
+        destructive
+        onClose={() => { if (!deleting) setDeleteOpen(false) }}
+        onCommit={confirmDelete}
+      >
+        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
+          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running — they just lose the client link.
+        </p>
+      </ActionSheet>
+
+      <Drawer open={newOpen} onOpenChange={(o: any) => { if (!o && !creating) setNewOpen(false) }}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>New for {client.name}</DrawerTitle>
+            <DrawerDescription>Start a quote, a quick job, or a standalone invoice — all linked to this client.</DrawerDescription>
+          </DrawerHeader>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
+            <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
+            <NewDealOption icon={Briefcase} label="New job" sub="Quick job — skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
+            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc — no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      <StatementSheet
+        open={statementOpen}
+        onClose={() => setStatementOpen(false)}
         client={client}
-        lifetime={lifetime}
-        outstanding={outstanding}
-        activeCount={activeCount}
         jobs={jobs}
         payments={payments}
-        tabs={TABS}
-        activeTab={tab}
-        onTabChange={setTab}
-        onBack={() => navigate('/clients')}
-        onEdit={() => setIsEditing(!isEditing)}
-        onDelete={() => setDeleteOpen(true)}
-        onNewDeal={() => setNewOpen(true)}
-        isEditing={isEditing}
-      >
-        {tabBody}
-      </SnowClientDetailBuild></Suspense>
+        changeOrders={changeOrders}
+        userId={user?.id}
+      />
+    </>
+  )
+
+  if (isDesktop) {
+    return (
+      <Suspense fallback={null}>
+        <SnowClientDetailBuild
+          client={client}
+          lifetime={lifetime}
+          outstanding={outstanding}
+          activeCount={activeCount}
+          jobs={jobs}
+          payments={payments}
+          tabs={TABS}
+          activeTab={tab}
+          onTabChange={setTab}
+          onBack={() => navigate('/clients')}
+          onEdit={() => setIsEditing(!isEditing)}
+          onDelete={() => setDeleteOpen(true)}
+          onNewDeal={() => setNewOpen(true)}
+          onStatement={statementSummary.totalDue > 0 ? () => setStatementOpen(true) : undefined}
+          isEditing={isEditing}
+        >
+          {tabBody}
+        </SnowClientDetailBuild>
+        {sheets}
+      </Suspense>
     )
   }
 
@@ -377,7 +453,7 @@ export default function ClientDetail() {
       </div>
 
       {/* PRIMARY — spin up a new quote / job / invoice for this client */}
-      <div style={{ padding: '0 20px 12px' }}>
+      <div style={{ padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <motion.button
           type="button"
           whileTap={{ scale: 0.99 }}
@@ -395,6 +471,29 @@ export default function ClientDetail() {
           <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
           New quote or invoice
         </motion.button>
+
+        {/* STATEMENT — roll every open invoice across all this client's
+            properties into one document. Only meaningful when there's a
+            balance, so it stays hidden otherwise. */}
+        {statementSummary.totalDue > 0 && (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.99 }}
+            onClick={() => { hapticTap(); setStatementOpen(true) }}
+            style={{
+              width: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '12px 16px', borderRadius: 14,
+              background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)', fontSize: 13.5, fontWeight: 700, letterSpacing: '0.02em',
+              cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Receipt size={16} strokeWidth={2.2} aria-hidden="true" />
+            Statement · {money(statementSummary.totalDue)} across {statementSummary.lines.length} {statementSummary.lines.length === 1 ? 'property' : 'properties'}
+          </motion.button>
+        )}
       </div>
 
       {/* TABS — v3 segmented underline (Overview · Projects · Files · Notes) */}
@@ -412,6 +511,9 @@ export default function ClientDetail() {
             ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
             : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
         )}
+        {tab === 'activity' && (
+          <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
+        )}
         {tab === 'projects' && (
           <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
         )}
@@ -419,42 +521,7 @@ export default function ClientDetail() {
         {tab === 'notes' && <NotesList notes={notes} />}
       </div>
 
-      {/* Destructive-confirm sheet for delete client. Body preserves the
-          existing nuance from the prior native confirm: jobs keep
-          running but lose the client link. */}
-      <ActionSheet
-        open={deleteOpen}
-        title="Delete this client?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deleting ? 'Deleting…' : 'Delete client'}
-        commitBusy={deleting}
-        commitDisabled={deleting}
-        destructive
-        onClose={() => { if (!deleting) setDeleteOpen(false) }}
-        onCommit={confirmDelete}
-      >
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running — they just lose the client link.
-        </p>
-      </ActionSheet>
-
-      {/* NEW-DEAL CHOOSER — quote / job / invoice, all linked to this client */}
-      <Drawer open={newOpen} onOpenChange={(o: any) => { if (!o && !creating) setNewOpen(false) }}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>New for {client.name}</DrawerTitle>
-            <DrawerDescription>Start a quote, a quick job, or a standalone invoice — all linked to this client.</DrawerDescription>
-          </DrawerHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
-            <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
-            <NewDealOption icon={Briefcase} label="New job" sub="Quick job — skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
-            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc — no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
-          </div>
-        </DrawerContent>
-      </Drawer>
+      {sheets}
     </motion.div>
   )
 }
@@ -1106,6 +1173,87 @@ function relTime(input: any) {
   if (diffDay < 7) return `${diffDay}d`
   if (diffDay < 30) return `${Math.floor(diffDay / 7)}w`
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/* ============================================================
+   ClientTimeline — one chronological feed across all the client's
+   properties: payments, projects, notes, files. Newest first.
+   ============================================================ */
+function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
+  const events = useMemo(
+    () => composeClientTimeline(jobs, payments, notes, files),
+    [jobs, payments, notes, files]
+  )
+
+  if (events.length === 0) {
+    return (
+      <div className="v3-empty" style={{ padding: '28px 16px', textAlign: 'center' }}>
+        <Clock size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>No activity yet</div>
+        <div style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>Payments, notes, and photos across this client's properties will show up here.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '4px 0 20px' }}>
+      {events.map((e: TimelineEvent, i: number) => {
+        const meta = TIMELINE_META[e.kind]
+        const last = i === events.length - 1
+        return (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => { hapticTap(); onOpen?.(e.contactId) }}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%',
+              textAlign: 'left', background: 'none', border: 'none', padding: '4px 0',
+              cursor: e.contactId ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            {/* Rail: dot + connecting line */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 26 }}>
+              <span style={{ width: 26, height: 26, borderRadius: 999, display: 'grid', placeItems: 'center', background: meta.bg, border: `1px solid ${meta.border}`, color: meta.color }}>
+                <meta.Icon size={13} />
+              </span>
+              {!last && <span style={{ flex: 1, width: 1.5, background: 'var(--v3-border)', marginTop: 2, minHeight: 14 }} />}
+            </div>
+            {/* Body */}
+            <div style={{ flex: 1, minWidth: 0, paddingBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 13.5, fontWeight: 700, color: 'var(--v3-text)' }}>{e.title}</span>
+                {e.amount != null && e.amount > 0 && (
+                  <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--v3-success-bright, #4ade80)', fontVariantNumeric: 'tabular-nums' }}>+{money(e.amount)}</span>
+                )}
+              </div>
+              {e.detail && (
+                <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.detail}</div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 3, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <span>{timelineDate(e.atIso)}</span>
+                {e.property && <><span aria-hidden="true">·</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{e.property}</span></>}
+              </div>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const TIMELINE_META: Record<string, { Icon: any; color: string; bg: string; border: string }> = {
+  payment: { Icon: DollarSign, color: 'var(--v3-success-bright, #4ade80)', bg: 'color-mix(in srgb, #4ade80 12%, transparent)', border: 'color-mix(in srgb, #4ade80 35%, transparent)' },
+  job:     { Icon: Briefcase,  color: 'var(--v3-primary)', bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
+  note:    { Icon: MessageSquare, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' },
+  file:    { Icon: ImageIcon, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' }
+}
+
+function timelineDate(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  const sameYear = d.getFullYear() === now.getFullYear()
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
 function ProjectsList({ jobs, payments = [], onOpen }: any) {

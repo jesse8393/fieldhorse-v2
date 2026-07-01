@@ -7,6 +7,7 @@ import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import ClientPicker from './ClientPicker.tsx'
 import DocIntakeButton from './DocIntakeButton.tsx'
 import { supabase } from '../lib/supabase.ts'
+import { findOrCreateClient } from '../lib/clients.ts'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { parseLeadFromImage } from '../lib/docIntelligence.ts'
 import { toastSuccess } from '../lib/toast.ts'
@@ -324,52 +325,17 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     // lead created without phone/email seeded a brand-new fh_clients
     // row — that's how the audit found duplicate "MMC Properties" /
     // "Jeff Roy" client entries.
-    let resolvedClientId = client?.id || null
-    if (!resolvedClientId) {
-      try {
-        const phone = (form.phone || '').trim()
-        const email = (form.email || '').trim().toLowerCase()
-        const nm = form.name.trim()
-        let existing = null
-        if (phone) {
-          const { data } = await supabase
-            .from('fh_clients').select('id').eq('user_id', userId).eq('phone', phone).maybeSingle()
-          existing = data
-        }
-        if (!existing && email) {
-          const { data } = await supabase
-            .from('fh_clients').select('id').eq('user_id', userId).ilike('email', email).maybeSingle()
-          existing = data
-        }
-        // Name fallback — case-insensitive exact match, scoped to this
-        // user. ilike with no wildcards = case-insensitive equality in
-        // postgres. Picks the most-recent if there are somehow already
-        // duplicates, to avoid splitting future jobs further.
-        if (!existing && nm) {
-          const { data } = await supabase
-            .from('fh_clients').select('id').eq('user_id', userId).ilike('name', nm)
-            .order('created_at', { ascending: false }).limit(1).maybeSingle()
-          existing = data
-        }
-        if (existing) {
-          resolvedClientId = existing.id
-        } else {
-          const { data: created } = await supabase
-            .from('fh_clients').insert({
-              user_id: userId,
-              name: nm,
-              phone: phone || null,
-              email: email || null,
-              address: form.address || null
-            }).select('id').single()
-          resolvedClientId = created?.id || null
-        }
-      } catch (e: any) {
-        // Non-fatal — log and proceed with null client_id. The job still
-        // saves; the user can link a client later from the job detail.
-        console.warn('[lead] auto-client upsert failed', e)
-      }
-    }
+    // Reuse (or create) a client so the job links one — shared with
+    // Universal Capture via findOrCreateClient. Passing `company` means
+    // a typed company name is preserved on the client (fh_contacts has
+    // no company column, so it was previously dropped).
+    const resolvedClientId = client?.id || await findOrCreateClient(userId, {
+      name: form.name,
+      phone: form.phone,
+      email: form.email,
+      address: form.address,
+      company: form.company
+    })
 
     const payload = {
       user_id: userId,
@@ -478,10 +444,25 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
       : 'Create active work with enough detail to schedule, cost, and invoice.'
 
   return (
-    <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
+    <Drawer
+      open={open}
+      onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}
+      // repositionInputs={false}: this sheet is tall (mic + scan + 6
+      // fields) and its first field is an autocomplete that opens on
+      // focus. Vaul's default input-repositioning shrank the drawer
+      // toward the focused field on iOS, collapsing the whole sheet to a
+      // sliver (reported bug). With it off, the drawer keeps the stable
+      // height below and the form scrolls internally; our own
+      // onFocusIn handler (useDrawerKeyboard) scrolls focused fields
+      // into the visible band above the keyboard.
+      repositionInputs={false}
+    >
       <DrawerContent
         className="ui:max-w-full ui:overflow-x-hidden"
-        style={drawerStyle}
+        // Stable height (safe now that Vaul isn't writing height itself):
+        // a definite height is what lets the inner form's overflow:auto
+        // actually scroll instead of the sheet growing/collapsing.
+        style={{ ...drawerStyle, height: '88dvh', maxHeight: '88dvh' }}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
@@ -506,7 +487,11 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         <form
           ref={formRef}
           onSubmit={(e) => { e.preventDefault(); commit() }}
-          style={formStyle()}
+          // flex:1 + minHeight:0 so the form fills the floored sheet
+          // height and scrolls INTERNALLY (overflowY:auto) instead of
+          // growing the sheet — that's what lets the keyboard push
+          // without collapsing the drawer.
+          style={formStyle({ flex: 1, minHeight: 0 })}
         >
           {/* Commit error banner */}
           {err && (

@@ -29,7 +29,7 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { LEAD_STAGES } from '../lib/stages.ts'
-import { startQuote, approveQuote, markLost, reopen } from '../lib/pipeline.ts'
+import { markWon, markLost, reopen, startQuote } from '../lib/pipeline.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -357,7 +357,7 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
     if (busyId) return
     setBusyId(c.id)
     try {
-      const res: any = await approveQuote(c)
+      const res: any = await markWon(c)
       if (res?.error) throw res.error
       await refresh()
       navigate(`/jobs/${c.id}`)

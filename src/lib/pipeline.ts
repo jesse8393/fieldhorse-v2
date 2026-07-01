@@ -5,6 +5,7 @@ import {
   transitionStage,
   startQuote as baseStartQuote,
   approveQuote as baseApproveQuote,
+  markWon as baseMarkWon,
   completeJob as baseCompleteJob,
   markLost as baseMarkLost,
   logPayment as baseLogPayment,
@@ -39,6 +40,17 @@ export async function approveQuote(contact: Contact) {
       return res
     }
     toast('Moved to Job · Scheduled for tomorrow 9am', { accent: 'job', heavy: true })
+  }
+  return res
+}
+
+// One-tap "Won" from the Leads board — moves to Job with no auto-kickoff
+// event (approveQuote is the formal quote-approval path that schedules).
+export async function markWon(contact: Contact) {
+  const res = await baseMarkWon(contact)
+  if (!res.error) {
+    hapticMedium()
+    toast('Marked won · moved to Job', { accent: 'job', heavy: true })
   }
   return res
 }

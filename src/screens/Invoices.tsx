@@ -24,6 +24,8 @@ import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 // Avoids dragging ~440KB into the initial Invoices route chunk.
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { useConfirm } from '../components/ConfirmSheet.tsx'
+import StatementSheet from '../components/StatementSheet.tsx'
+import { approvedCoByContact } from '../lib/statement.ts'
 import { useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
@@ -76,6 +78,10 @@ export default function Invoices() {
   const jobs = bundle?.jobs ?? []
   const payments = bundle?.payments ?? []
   const invoices = bundle?.invoices ?? []
+  const changeOrders = bundle?.changeOrders ?? []
+  // Approved change orders raise each job's true contract; without this
+  // the balances below understate what a job with signed COs owes.
+  const approvedCoByJob = useMemo(() => approvedCoByContact(changeOrders), [changeOrders])
   const [filter, setFilter] = useState('outstanding') // 'outstanding' | 'all'
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
@@ -112,7 +118,7 @@ export default function Invoices() {
     const out = []
     const now = Date.now()
     for (const j of jobs) {
-      const amount = Number(j.amount || 0)
+      const amount = Number(j.amount || 0) + (approvedCoByJob.get(j.id) || 0)
       const paid = paidByJob.get(j.id) || 0
       const balance = amount - paid
       const ageDays = Math.floor((now - new Date(j.created_at as any).getTime()) / 86400000)
@@ -121,9 +127,48 @@ export default function Invoices() {
       out.push({ job: j, amount, paid, balance, ageDays, bucket, isOutstanding })
     }
     return out.sort((a, b) => b.balance - a.balance)
-  }, [jobs, paidByJob])
+  }, [jobs, paidByJob, approvedCoByJob])
 
   const filtered = filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows
+
+  // BY-CLIENT A/R rollup — group every outstanding job balance under
+  // its linked client so "who owes me, and how overdue" reads at a
+  // glance. Each group carries the client's jobs + the worst aging
+  // bucket among them, and feeds the shared StatementSheet directly.
+  const clientAR = useMemo(() => {
+    const groups = new Map<string, any>()
+    for (const r of rows) {
+      if (!r.isOutstanding) continue
+      const cid = (r.job as any).client_id
+      if (!cid) continue // unlinked jobs stay in the job-balance list only
+      let g = groups.get(cid)
+      if (!g) {
+        const cli = resolveClient(r.job)
+        g = {
+          clientId: cid,
+          client: {
+            id: cid,
+            name: cli.name,
+            company_name: (r.job as any).fh_clients?.company_name || null,
+            email: cli.email,
+            address: cli.address
+          },
+          jobs: [],
+          total: 0,
+          worst: '0-30'
+        }
+        groups.set(cid, g)
+      }
+      g.jobs.push(r.job)
+      g.total += r.balance
+      // Track the most-overdue bucket across the client's jobs.
+      if (r.bucket === '60+') g.worst = '60+'
+      else if (r.bucket === '31-60' && g.worst !== '60+') g.worst = '31-60'
+    }
+    return Array.from(groups.values()).sort((a, b) => b.total - a.total)
+  }, [rows])
+
+  const [statementClient, setStatementClient] = useState<any>(null)
 
   // Issued invoices (first-class fh_invoices rows), enriched with their
   // job + effective status — a 'sent' invoice past its due date reads
@@ -191,7 +236,11 @@ export default function Invoices() {
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
     license_number: profile?.license_number || '',
-    insured_text: profile?.insured_text || ''
+    insured_text: profile?.insured_text || '',
+    // Pay link + instructions so the "How to pay" block renders on PDFs
+    // downloaded/emailed from this screen too (not just the send sheet).
+    payment_link: (profile as any)?.payment_link || '',
+    payment_instructions: (profile as any)?.payment_instructions || ''
   }), [profile])
 
   async function handleGeneratePDF(row: any) {
@@ -398,7 +447,10 @@ export default function Invoices() {
             loading={loading}
             filter={filter as 'outstanding' | 'all'}
             setFilter={(f) => setFilter(f)}
+            clientAR={clientAR}
             onOpenJob={(jobId) => navigate(`/jobs/${jobId}?tab=financials`)}
+            onOpenClient={(clientId) => navigate(`/clients/${clientId}`)}
+            onStatement={(g) => setStatementClient(g)}
             onPayRow={(r) => setPayingRow(r)}
           />
         </Suspense>
@@ -415,6 +467,15 @@ export default function Invoices() {
             </Suspense>
           )}
         </AnimatePresence>
+        <StatementSheet
+          open={!!statementClient}
+          onClose={() => setStatementClient(null)}
+          client={statementClient?.client || null}
+          jobs={statementClient?.jobs || []}
+          payments={payments}
+          changeOrders={changeOrders}
+          userId={user?.id}
+        />
       </>
     )
   }
@@ -612,6 +673,62 @@ export default function Invoices() {
         </motion.div>
       )}
 
+      {/* BY-CLIENT A/R — who owes you, worst-aged first. Outstanding
+          filter only; one tap fires a statement across all their jobs. */}
+      {!loading && filter === 'outstanding' && clientAR.length > 0 && (
+        <motion.div
+          variants={item}
+          className="v3-section"
+          style={{ margin: '0 var(--v3-gutter) 24px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+            <SectionHeader label="Who owes you" />
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+              {clientAR.length}
+            </span>
+          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {clientAR.map((g: any) => {
+              const b = AGING_BUCKETS.find((x) => x.id === g.worst) || AGING_BUCKETS[0]
+              return (
+                <li key={g.clientId}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
+                    <button
+                      type="button"
+                      onClick={() => { hapticTap(); navigate(`/clients/${g.clientId}`) }}
+                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {g.client.company_name || g.client.name || 'Client'}
+                        </span>
+                        <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 999, color: b.color, border: `1px solid ${b.accent}` }}>
+                          {b.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>
+                        {g.jobs.length} {g.jobs.length === 1 ? 'property' : 'properties'}
+                      </div>
+                    </button>
+                    <span style={{ flexShrink: 0, fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 800, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>
+                      {fmtMoney(g.total)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { hapticTap(); setStatementClient(g) }}
+                      aria-label={`Statement for ${g.client.company_name || g.client.name || 'client'}`}
+                      style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 11px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <Receipt size={13} /> Statement
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </motion.div>
+      )}
+
       {/* FILTER + LIST SECTION */}
       <motion.div
         variants={item}
@@ -691,6 +808,17 @@ export default function Invoices() {
           </Suspense>
         )}
       </AnimatePresence>
+
+      {/* Client statement — fired from a "Who owes you" row */}
+      <StatementSheet
+        open={!!statementClient}
+        onClose={() => setStatementClient(null)}
+        client={statementClient?.client || null}
+        jobs={statementClient?.jobs || []}
+        payments={payments}
+        changeOrders={changeOrders}
+        userId={user?.id}
+      />
     </motion.div>
   )
 }

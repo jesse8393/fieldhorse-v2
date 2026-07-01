@@ -7,6 +7,7 @@
 
 import { supabase } from './supabase.ts'
 import { resilientInsert } from './outbox.ts'
+import { findOrCreateClient } from './clients.ts'
 import { logPayment, recalcCost } from './stages.ts'
 import type { CaptureIntent } from './captureIntelligence.ts'
 
@@ -54,10 +55,13 @@ export async function commitCapture({ intent, userId, contacts }: {
       // fh_job_todos requires a job — without one the capture is still
       // worth keeping, so it lands as a note the operator can re-file.
       if (!job) {
+        // Preserve the due date the operator entered in the note text so
+        // it isn't silently dropped when the to-do downgrades to a note.
+        const dueSuffix = intent.due_at ? ` (due ${intent.due_at})` : ''
         const { error } = await resilientInsert('fh_notes', {
           user_id: userId,
           contact_id: null,
-          text: `To-do: ${intent.text}`,
+          text: `To-do: ${intent.text}${dueSuffix}`,
           category: 'note'
         })
         if (error) throw error
@@ -117,17 +121,31 @@ export async function commitCapture({ intent, userId, contacts }: {
     }
 
     case 'lead': {
+      const name = intent.name || intent.title || 'New lead'
+      // Link (or create) the client so a captured lead isn't an orphan
+      // — matches what NewLeadSheet does. Skipped when offline (the
+      // lookups need the network); the lead still saves via the outbox.
+      let clientId: string | null = null
+      if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+        clientId = await findOrCreateClient(userId, {
+          name,
+          phone: intent.phone,
+          email: intent.email,
+          address: intent.address
+        })
+      }
       // resilientInsert mints the id client-side, so the success link
       // works even when the row is still queued for sync.
       const { queued, error, id } = await resilientInsert('fh_contacts', {
         user_id: userId,
-        name: intent.name || intent.title || 'New lead',
+        name,
         phone: intent.phone || null,
         email: intent.email || null,
         address: intent.address || null,
         job_title: intent.title || null,
         amount: intent.amount || null,
         follow_up_on: intent.follow_up_on || null,
+        client_id: clientId,
         stage: 'lead'
       })
       if (error) throw error

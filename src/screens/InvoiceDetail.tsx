@@ -131,7 +131,13 @@ export default function InvoiceDetail() {
   }, [contact])
 
   const totals = useMemo(() => {
-    const amount = Number(contact?.amount || 0)
+    // True contract = job amount + approved change orders (matches the
+    // PDF/InvoiceTemplate); without the COs the on-screen balance,
+    // status pill and % paid disagreed with the document the customer got.
+    const approvedCo = (changeOrders || [])
+      .filter((co: any) => co?.status === 'approved')
+      .reduce((s: number, co: any) => s + Number(co.amount || 0), 0)
+    const amount = Number(contact?.amount || 0) + approvedCo
     const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
     const balance = Math.max(0, amount - paid)
     const ageDays = contact?.created_at
@@ -142,7 +148,7 @@ export default function InvoiceDetail() {
     const isClosed = (contact?.stage || '').toLowerCase() === 'closed'
     const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0
     return { amount, paid, balance, ageDays, bucket, isPaid, isClosed, pctPaid }
-  }, [contact, payments])
+  }, [contact, payments, changeOrders])
 
   const status = useMemo(() => {
     // Computed status — no stored invoice_status column today. The four
@@ -162,7 +168,9 @@ export default function InvoiceDetail() {
     logo_url: profile?.logo_url || null,
     brand_accent_hex: profile?.brand_accent_hex || null,
     license_number: profile?.license_number || '',
-    insured_text: profile?.insured_text || ''
+    insured_text: profile?.insured_text || '',
+    payment_link: (profile as any)?.payment_link || '',
+    payment_instructions: (profile as any)?.payment_instructions || ''
   }), [profile])
 
   async function handleGeneratePDF() {
@@ -449,6 +457,8 @@ export default function InvoiceDetail() {
           totals={totals}
           status={status}
           item={item}
+          insurance={insurance}
+          changeOrders={changeOrders}
         />
       ) : null}
       {viewMode === 'document' ? null : (

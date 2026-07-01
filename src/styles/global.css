@@ -3553,6 +3553,36 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
   }
 }
 
+/* Leads list — single column on phones, a responsive card grid on the
+   desktop canvas so the new Pipeline-v2 Leads screen stops rendering as
+   one over-wide column. Display lives here (not inline) so the media
+   query can switch flex → grid. */
+.fh-leads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+@media (min-width: 900px) {
+  .fh-leads-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+}
+
+/* Single-column mobile screens that don't have a dedicated desktop
+   composition (Activity feed, Importer) shouldn't stretch their content
+   edge-to-edge across the 1600px desktop canvas — cap to a readable,
+   centered column at >=900px. Base-class-agnostic so it composes onto
+   either .v3-screen or .fh-screen. */
+@media (min-width: 900px) {
+  .fh-readable-desktop {
+    max-width: 880px;
+    margin-inline: auto;
+  }
+}
+
 /* AppHeader right-slot icon buttons — steel at rest, gold on hover/active.
    Same visual treatment for both the search and notes shortcuts so they
    read as a coherent pair. */

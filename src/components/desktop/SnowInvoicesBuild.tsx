@@ -31,6 +31,14 @@ type Totals = Record<string, number> & {
   '60+'?: number
 }
 
+type ClientARGroup = {
+  clientId: string
+  client: { id: string; name?: string | null; company_name?: string | null }
+  jobs: any[]
+  total: number
+  worst: string
+}
+
 type Props = {
   rows: Row[]
   filtered: Row[]
@@ -38,9 +46,15 @@ type Props = {
   loading: boolean
   filter: 'outstanding' | 'all'
   setFilter: (f: 'outstanding' | 'all') => void
+  clientAR?: ClientARGroup[]
   onOpenJob: (id: string) => void
+  onOpenClient?: (id: string) => void
+  onStatement?: (g: ClientARGroup) => void
   onPayRow: (row: Row) => void
 }
+
+const AR_TONE: Record<string, 'good' | 'warn' | 'bad'> = { '0-30': 'good', '31-60': 'warn', '60+': 'bad' }
+const AR_LABEL: Record<string, string> = { '0-30': 'Current', '31-60': 'Late', '60+': 'Overdue' }
 
 function ageBucket(days: number): { label: string; tone: 'good' | 'warn' | 'bad' } {
   if (days <= 30) return { label: 'Current',  tone: 'good' }
@@ -49,7 +63,8 @@ function ageBucket(days: number): { label: string; tone: 'good' | 'warn' | 'bad'
 }
 
 export default function SnowInvoicesBuild({
-  rows, filtered, totals, loading, filter, setFilter, onOpenJob, onPayRow,
+  rows, filtered, totals, loading, filter, setFilter,
+  clientAR = [], onOpenJob, onOpenClient, onStatement, onPayRow,
 }: Props) {
   const collectableThisWeek = filtered.filter((r) => r.balance > 0 && r.ageDays <= 14).length
   const overdueCount = filtered.filter((r) => r.ageDays > 60 && r.balance > 0).length
@@ -198,6 +213,47 @@ export default function SnowInvoicesBuild({
           </section>
 
           <aside className="fh-build-rail fh-build-rail--page">
+            {filter === 'outstanding' && clientAR.length > 0 && (
+              <section className="fh-build-rail-card">
+                <div className="fh-build-eyebrow">Who owes you</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                  {clientAR.slice(0, 6).map((g) => {
+                    const tone = AR_TONE[g.worst] || 'good'
+                    return (
+                      <div key={g.clientId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => onOpenClient?.(g.clientId)}
+                          title={g.client.company_name || g.client.name || 'Client'}
+                          style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}
+                        >
+                          <div className="fh-build-truncate" style={{ fontWeight: 700, fontSize: 13 }}>
+                            {g.client.company_name || g.client.name || 'Client'}
+                          </div>
+                          <div style={{ fontSize: 11, opacity: 0.7, display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span className={`fh-build-dot is-${tone}`} style={{ padding: '0 6px', fontSize: 9 }}>{AR_LABEL[g.worst]}</span>
+                            <span>{g.jobs.length} {g.jobs.length === 1 ? 'property' : 'properties'}</span>
+                          </div>
+                        </button>
+                        <span style={{ fontWeight: 800, fontSize: 13, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(g.total)}</span>
+                        {onStatement && (
+                          <button
+                            type="button"
+                            onClick={() => onStatement(g)}
+                            aria-label="Statement"
+                            title="Account statement"
+                            style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'inherit', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
+                          >
+                            <Receipt size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Outstanding total</div>
               <strong>{moneyFull(totals.total)}</strong>

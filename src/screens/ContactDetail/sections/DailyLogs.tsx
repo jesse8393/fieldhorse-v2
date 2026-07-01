@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CloudSun, Trash2, Users, Clock, Sparkles, ImagePlus, X } from 'lucide-react'
+import { CloudSun, Trash2, Users, Clock, Sparkles, ImagePlus, X, Pencil } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
@@ -49,12 +49,15 @@ function fmtTime(iso: string): string {
   } catch { return '' }
 }
 
-type DraftPhoto = { local_id: string; preview_url: string; storage_path: string; size: number; uploading: boolean }
+type DraftPhoto = { local_id: string; preview_url: string; storage_path: string; size: number; uploading: boolean; existing?: boolean }
 
 export default function DailyLogsSection({ jobId, userId }: any) {
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
+  // Non-null when the compose form is editing an existing log rather
+  // than posting a new one. save() branches on this.
+  const [editingId, setEditingId] = useState<string | null>(null)
   // Map of storage_path → signed URL for photos referenced on rendered
   // log cards. Filled lazily as rows arrive.
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
@@ -119,11 +122,37 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     setWeatherText('')
     setCrewCount('')
     setHoursWorked('')
+    setEditingId(null)
     // Revoke any blob: URLs we created for previews so we don't leak.
     for (const p of draftPhotos) {
       if (p.preview_url.startsWith('blob:')) URL.revokeObjectURL(p.preview_url)
     }
     setDraftPhotos([])
+  }
+
+  // Open the compose form pre-filled from an existing row. Existing
+  // photos are loaded as drafts (flagged so cancel/remove doesn't purge
+  // them from storage) using their already-signed URLs for preview.
+  function startEdit(r: LogRow) {
+    hapticTap()
+    setEditingId(r.id)
+    setSummary(r.summary || '')
+    setNextSteps(r.next_steps || '')
+    setWeatherText(r.weather_text || '')
+    setCrewCount(r.crew_count != null ? String(r.crew_count) : '')
+    setHoursWorked(r.hours_worked != null ? String(r.hours_worked) : '')
+    const existing: DraftPhoto[] = (Array.isArray(r.photos) ? r.photos : [])
+      .filter((p: any) => typeof p?.storage_path === 'string')
+      .map((p: any) => ({
+        local_id: p.storage_path,
+        preview_url: photoUrls[p.storage_path] || '',
+        storage_path: p.storage_path,
+        size: Number(p.size) || 0,
+        uploading: false,
+        existing: true,
+      }))
+    setDraftPhotos(existing)
+    setComposing(true)
   }
 
   // Upload one file at a time so failures don't poison the whole batch.
@@ -189,7 +218,10 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     setDraftPhotos((cur) => {
       const removed = cur.find((p) => p.local_id === localId)
       if (removed?.preview_url?.startsWith('blob:')) URL.revokeObjectURL(removed.preview_url)
-      if (removed?.storage_path) {
+      // Only purge objects we uploaded this session. A pre-existing
+      // photo (edit mode) is left in storage until save rewrites the
+      // row's photo list — so a cancel can't destroy a saved photo.
+      if (removed?.storage_path && !removed.existing) {
         // Best-effort cleanup of the just-uploaded object — silent failure.
         supabase.storage.from(PHOTO_BUCKET).remove([removed.storage_path]).catch(() => {})
       }
@@ -202,6 +234,39 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     if (!text) return
     hapticTap()
     setSaving(true)
+    const readyPhotos = draftPhotos
+      .filter((p) => !p.uploading && p.storage_path)
+      .map((p) => ({ storage_path: p.storage_path, size: p.size }))
+
+    if (editingId) {
+      // Update in place. Optional fields are written explicitly (null
+      // when cleared) so editing can remove a value, and photos are
+      // rewritten to whatever survived the edit.
+      const patch: Record<string, any> = {
+        summary: text,
+        next_steps: nextSteps.trim() || null,
+        weather_text: weatherText.trim() || null,
+        crew_count: crewCount && Number.isFinite(Number(crewCount)) ? parseInt(crewCount, 10) : null,
+        hours_worked: hoursWorked && Number.isFinite(Number(hoursWorked)) ? Number(hoursWorked) : null,
+        photos: readyPhotos.length > 0 ? readyPhotos : null,
+      }
+      const { error } = await supabase
+        .from('fh_daily_logs')
+        .update(patch as any)
+        .eq('id', editingId)
+        .eq('user_id', userId)
+      setSaving(false)
+      if (error) {
+        toastError("Couldn't save changes", error.message)
+        return
+      }
+      clearDraft()
+      setComposing(false)
+      toastSuccess('Daily log updated')
+      load()
+      return
+    }
+
     const payload: Record<string, any> = {
       user_id: userId,
       contact_id: jobId,
@@ -211,9 +276,6 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     if (weatherText.trim()) payload.weather_text = weatherText.trim()
     if (crewCount && Number.isFinite(Number(crewCount))) payload.crew_count = parseInt(crewCount, 10)
     if (hoursWorked && Number.isFinite(Number(hoursWorked))) payload.hours_worked = Number(hoursWorked)
-    const readyPhotos = draftPhotos
-      .filter((p) => !p.uploading && p.storage_path)
-      .map((p) => ({ storage_path: p.storage_path, size: p.size }))
     if (readyPhotos.length > 0) payload.photos = readyPhotos
     const { error } = await supabase.from('fh_daily_logs').insert(payload as any)
     setSaving(false)
@@ -415,7 +477,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
               disabled={saving || !summary.trim()}
               style={primaryBtn(saving || !summary.trim())}
             >
-              {saving ? 'Posting…' : 'Post log'}
+              {saving ? (editingId ? 'Saving…' : 'Posting…') : (editingId ? 'Save changes' : 'Post log')}
             </button>
           </div>
         </div>
@@ -467,20 +529,36 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                     </span>
                   </div>
                   {r.user_id === userId && (
-                    <button
-                      type="button"
-                      onClick={() => remove(r.id)}
-                      aria-label="Delete log"
-                      title="Delete"
-                      style={{
-                        width: 28, height: 28, borderRadius: 8,
-                        border: 'none', background: 'transparent',
-                        color: 'var(--v3-text-muted)', cursor: 'pointer',
-                        display: 'grid', placeItems: 'center',
-                      }}
-                    >
-                      <Trash2 size={13} aria-hidden="true" />
-                    </button>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(r)}
+                        aria-label="Edit log"
+                        title="Edit"
+                        style={{
+                          width: 28, height: 28, borderRadius: 8,
+                          border: 'none', background: 'transparent',
+                          color: 'var(--v3-text-muted)', cursor: 'pointer',
+                          display: 'grid', placeItems: 'center',
+                        }}
+                      >
+                        <Pencil size={13} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(r.id)}
+                        aria-label="Delete log"
+                        title="Delete"
+                        style={{
+                          width: 28, height: 28, borderRadius: 8,
+                          border: 'none', background: 'transparent',
+                          color: 'var(--v3-text-muted)', cursor: 'pointer',
+                          display: 'grid', placeItems: 'center',
+                        }}
+                      >
+                        <Trash2 size={13} aria-hidden="true" />
+                      </button>
+                    </div>
                   )}
                 </div>
 

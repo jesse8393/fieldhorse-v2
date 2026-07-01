@@ -24,6 +24,8 @@ import {
   mapItemsToScope
 } from '../components/documents'
 import ApproveProposalBar from '../components/public/ApproveProposalBar.tsx'
+import { safePayUrl } from '../lib/payLink.ts'
+import { gatherStatement } from '../lib/statement.ts'
 
 export default function PublicDoc() {
   const { token } = useParams()
@@ -91,6 +93,11 @@ export default function PublicDoc() {
       {!loading && data && data.kind === 'invoice'  && <InvoiceView  data={data} />}
       {!loading && data && data.kind === 'change_order' && (
         <ChangeOrderView data={data} token={token} onApproved={load} />
+      )}
+      {!loading && data && data.kind === 'statement' && <StatementView data={data} />}
+      {/* Fallback so an unrecognized link kind never renders a blank page. */}
+      {!loading && data && !['proposal', 'invoice', 'change_order', 'statement'].includes(data.kind) && (
+        <ErrorState message="This document type can't be displayed here. Please ask the sender for an updated link." />
       )}
     </div>
   )
@@ -347,6 +354,8 @@ function InvoiceView({ data }: any) {
   const contractTotal = Number(contact?.amount || 0)
   const balance = Math.max(0, contractTotal - paid)
   return (
+    <>
+    {balance > 0.5 && <PayNowBar company={company} amount={balance} />}
     <InvoiceTemplate
       company={company}
       contact={contact}
@@ -368,5 +377,143 @@ function InvoiceView({ data }: any) {
       changeOrders={changeOrders}
       photos={photos || []}
     />
+    </>
+  )
+}
+
+/* Customer-facing statement — one letterhead page rolling up every
+   open job for this client. Uses the same gatherStatement rollup the
+   in-app sheet + emailed PDF use, so the web view always agrees with
+   what the contractor sent. */
+function StatementView({ data }: any) {
+  const { client, company, jobs, payments, changeOrders } = data
+  const rolled = gatherStatement(jobs || [], payments || [], changeOrders || [])
+  const who = client?.company_name || client?.name || 'Customer'
+  const today = new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+
+  return (
+    <>
+      {rolled.totalDue > 0.5 && <PayNowBar company={company} amount={rolled.totalDue} />}
+      <div style={{
+        maxWidth: 760, margin: '0 auto',
+        padding: '32px 28px 28px',
+        borderRadius: 6, background: 'white',
+        boxShadow: '0 24px 64px -32px rgba(31, 30, 28, 0.3)',
+        fontFamily: "'DM Sans', system-ui, sans-serif", color: '#1A1814'
+      }}>
+        {/* Letterhead */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, paddingBottom: 18, borderBottom: '2px solid #1A1814' }}>
+          <div style={{ minWidth: 0 }}>
+            {company?.logo_url && (
+              <img src={company.logo_url} alt="" style={{ height: 34, marginBottom: 8, display: 'block' }} />
+            )}
+            <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, letterSpacing: '0.02em' }}>
+              {company?.name || 'Contractor'}
+            </div>
+            {(company?.phone || company?.email) && (
+              <div style={{ fontSize: 11, color: '#6B6A66', marginTop: 2 }}>
+                {[company.phone, company.email].filter(Boolean).join(' · ')}
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A154' }}>
+              Statement
+            </div>
+            <div style={{ fontSize: 12, color: '#6B6A66', marginTop: 4 }}>{today}</div>
+          </div>
+        </div>
+
+        {/* Billed-to */}
+        <div style={{ padding: '18px 0 4px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6A66' }}>
+            Statement for
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginTop: 3 }}>{who}</div>
+          {client?.address && (
+            <div style={{ fontSize: 12, color: '#6B6A66', marginTop: 2 }}>{client.address}</div>
+          )}
+        </div>
+
+        {/* Per-property lines */}
+        {rolled.lines.length === 0 ? (
+          <div style={{ marginTop: 20, padding: '24px 0', textAlign: 'center', color: '#6B6A66', fontSize: 13.5, borderTop: '1px solid #e8e2d4' }}>
+            Nothing outstanding right now — every project is paid in full. Thank you.
+          </div>
+        ) : (
+          <div style={{ marginTop: 20, borderTop: '1px solid #e8e2d4' }}>
+            {rolled.lines.map((l: any) => (
+              <div key={l.contactId} style={{
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
+                padding: '12px 0', borderBottom: '1px solid #f0ece2'
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1814', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {l.property}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#6B6A66', marginTop: 2 }}>
+                    {moneyFmt(l.paid)} paid of {moneyFmt(l.contract)}
+                  </div>
+                </div>
+                <span style={{ flexShrink: 0, fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 18, fontWeight: 600, color: '#1A1814' }}>
+                  {moneyFmt(l.balance)}
+                </span>
+              </div>
+            ))}
+            <MoneyRow label="Total due" value={moneyFmt(rolled.totalDue)} strong accent="#C8A154" />
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+/* Customer-facing "Pay now" bar — the contractor's bring-your-own pay
+   link (Venmo / Zelle / Square / Stripe Payment Link) plus any
+   instructions. Renders nothing when the contractor hasn't set a link.
+   Cream-paper aesthetic to match the document, not the app chrome. */
+function PayNowBar({ company, amount }: any) {
+  const link = (company?.payment_link || '').trim()
+  const instructions = (company?.payment_instructions || '').trim()
+  if (!link && !instructions) return null
+  // Allow-list the scheme so a pasted `javascript:`/`data:` link can
+  // never become an href on this customer-facing page.
+  const url = safePayUrl(link)
+  const amountLabel = amount > 0
+    ? Number(amount).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+    : ''
+  return (
+    <div style={{
+      maxWidth: 760, margin: '0 auto 16px',
+      padding: '20px 24px', borderRadius: 6,
+      background: '#fffaf0', border: '1px solid rgba(200, 161, 84, 0.45)',
+      boxShadow: '0 24px 64px -32px rgba(31, 30, 28, 0.25)',
+      fontFamily: "'DM Sans', system-ui, sans-serif", color: '#3A3833',
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A154', marginBottom: 10 }}>
+        Pay your balance
+      </div>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-block', padding: '13px 28px', borderRadius: 6,
+            background: 'linear-gradient(135deg, #d4af37 0%, #b7872d 100%)',
+            color: '#1A1814', fontSize: 15, fontWeight: 700, textDecoration: 'none',
+            letterSpacing: '0.02em', boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
+          }}
+        >
+          Pay{amountLabel ? ` ${amountLabel}` : ''} now
+        </a>
+      )}
+      {instructions && (
+        <p style={{ margin: `${url ? 14 : 0}px 0 0`, fontSize: 13, lineHeight: 1.5, color: '#5d5d57', whiteSpace: 'pre-wrap' }}>
+          {instructions}
+        </p>
+      )}
+    </div>
   )
 }

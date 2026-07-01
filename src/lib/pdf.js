@@ -14,6 +14,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
+import { safePayUrl } from './payLink.ts'
 import {
   invoiceNumber as docInvoiceNumber,
   proposalNumber as docProposalNumber
@@ -546,6 +547,61 @@ function drawDocTotalsBlock(doc, opts) {
   return cursor + boxH + 6
 }
 
+// "How to pay" block — the contractor's bring-your-own pay link +
+// instructions, rendered as a soft-tinted panel with a clickable link.
+// Returns the new cursor Y. No-op (returns startY) when neither set.
+function drawDocPayBlock(doc, opts) {
+  const { startY, margin, pageWidth, pageHeight, brandRGB, company } = opts
+  const link = (company?.payment_link || '').trim()
+  const instructions = (company?.payment_instructions || '').trim()
+  if (!link && !instructions) return startY
+  // Allow-list the scheme — never embed a javascript:/data: link in the
+  // PDF annotation. Bare host → https://; dangerous scheme → no link.
+  const url = safePayUrl(link)
+
+  const innerW = pageWidth - margin * 2
+  // Measure: heading + optional link line + wrapped instructions.
+  doc.setFontSize(10)
+  const instrLines = instructions ? doc.splitTextToSize(instructions, innerW - 12) : []
+  const bodyH = 7 + (url ? 6 : 0) + instrLines.length * 4.6
+  const panelH = bodyH + 8
+  let y = startY + 6
+  if (y + panelH > pageHeight - 22) { doc.addPage(); y = 18 }
+
+  // Soft brand-tinted panel
+  const [r, g, b] = brandRGB || FIELD_GOLD
+  doc.setFillColor(Math.round(r * 0.12 + 255 * 0.88), Math.round(g * 0.12 + 255 * 0.88), Math.round(b * 0.12 + 255 * 0.88))
+  doc.setDrawColor(r, g, b)
+  doc.setLineWidth(0.3)
+  doc.roundedRect(margin, y, innerW, panelH, 2, 2, 'FD')
+
+  let ty = y + 7
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(0.6)
+  doc.text('HOW TO PAY', margin + 6, ty)
+  doc.setCharSpace(0)
+  ty += 6
+
+  if (url) {
+    const display = url.replace(/^https?:\/\//i, '')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(r, g, b)
+    doc.textWithLink(`Pay online → ${display}`, margin + 6, ty, { url })
+    ty += 6
+  }
+  if (instrLines.length > 0) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(60, 56, 51)
+    doc.text(instrLines, margin + 6, ty)
+    ty += instrLines.length * 4.6
+  }
+  return y + panelH
+}
+
 function drawDocDisclaimer(doc, opts) {
   const { pageWidth, pageHeight, margin, text } = opts
   if (!text) return
@@ -845,6 +901,9 @@ export async function generateInvoice({
     cursor += wrapped.length * 4.5
   }
 
+  // 6a. How to pay — the contractor's bring-your-own pay link.
+  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, pageHeight, brandRGB, company })
+
   // 6b. Project photos — quiet 2-up strip, capped at 4. Invoice tone
   // is "here's the work you paid for", not the proposal's sales pitch.
   if (Array.isArray(photos) && photos.length > 0) {
@@ -870,10 +929,135 @@ export async function generateInvoice({
 }
 
 // ============================================================
-// V3 letterhead PDF helpers — preserved from earlier passes; some
-// remain referenced by the proposal generator below until that's
-// also rewritten in the same restrained style.
+// CLIENT STATEMENT — one document rolling every open invoice across
+// all of a client's properties into a single "here's everything you
+// owe me" sheet. Same restrained letterhead system as the invoice.
+//
+// Args:
+//   company   — companyFromProfile() shape (sender branding)
+//   client    — { id, name, company_name, address, phone, email }
+//   lines     — [{ property, invoiceLabel, dateIso, amount, dueIso }]
+//               one row per open invoice, already filtered to owed.
+//   statementId — seed for the document number (client id)
 // ============================================================
+export async function generateStatement({
+  company = {},
+  client = {},
+  lines = [],
+  statementId
+} = {}) {
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 16
+
+  const number = docInvoiceNumber(company?.name, statementId || client?.id)
+  const logo = company?.logo_url
+    ? await loadLogoForPdf(company.logo_url, { maxDimension: 720 })
+    : null
+  const brandRGB = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
+
+  // 1. Letterhead
+  let cursor = drawDocLetterhead(doc, {
+    pageWidth, margin, docType: 'STATEMENT',
+    number: shortDocNumber(number),
+    issuedAt: new Date(),
+    company, logo, brandRGB
+  })
+
+  // 2. Parties — the client is the recipient. A client's own
+  //    company_name (e.g. "MMC Properties") reads as the recipient
+  //    name when present, with the person's name as a sub-line.
+  const recipientName = client?.company_name || client?.name || 'Client'
+  const recipientSub = client?.company_name && client?.name && client.company_name !== client.name
+    ? client.name
+    : null
+  cursor = drawDocParties(doc, {
+    pageWidth, margin, y: cursor + 2,
+    recipient: {
+      name: recipientName,
+      address: [recipientSub, client?.address].filter(Boolean).join('\n'),
+      phone: client?.phone,
+      email: client?.email
+    },
+    company
+  })
+
+  // 3. Per-property balance table — Property | Contract | Paid | Balance.
+  const totalDue = lines.reduce((s, l) => s + Number(l.balance || 0), 0)
+  autoTable(doc, {
+    startY: cursor + 4,
+    head: [['Property / Project', 'Contract', 'Paid', 'Balance Due']],
+    body: lines.length > 0
+      ? lines.map((l) => [
+          l.property || '—',
+          money(Number(l.contract || 0)),
+          money(Number(l.paid || 0)),
+          money(Number(l.balance || 0))
+        ])
+      : [['No open balances', '', '', money(0)]],
+    theme: 'plain',
+    headStyles: {
+      fillColor: brandRGB,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 10,
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+    },
+    bodyStyles: {
+      fontSize: 10,
+      textColor: [40, 38, 35],
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+    },
+    didDrawCell: (data) => {
+      if (data.section === 'body') {
+        const { doc: d, cell } = data
+        d.setDrawColor(232, 228, 216)
+        d.setLineWidth(0.15)
+        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
+      }
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto', fontStyle: 'bold' },
+      1: { halign: 'right', cellWidth: 28 },
+      2: { halign: 'right', cellWidth: 26 },
+      3: { halign: 'right', cellWidth: 30, fontStyle: 'bold' }
+    },
+    margin: { left: margin, right: margin }
+  })
+  cursor = doc.lastAutoTable.finalY
+
+  // 4. Total due block
+  cursor = drawDocTotalsBlock(doc, {
+    startY: cursor + 2,
+    pageWidth, margin,
+    label: 'TOTAL DUE',
+    total: totalDue,
+    rows: [{ label: `${lines.length} ${lines.length === 1 ? 'property' : 'properties'}`, value: money(totalDue), muted: true }]
+  })
+
+  // 4b. How to pay — bring-your-own pay link.
+  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, pageHeight, brandRGB, company })
+
+  // 5. Disclaimer footer on every page
+  const total_pages = doc.internal.getNumberOfPages()
+  for (let p = 1; p <= total_pages; p++) {
+    doc.setPage(p)
+    drawDocDisclaimer(doc, {
+      pageWidth, pageHeight, margin,
+      text: 'Statement of open invoices across all properties. Please remit the total due or contact us with any questions.'
+    })
+  }
+
+  return {
+    doc,
+    filename: `Statement_${number}_${(recipientName || 'client').replace(/\s+/g, '_')}.pdf`,
+    number,
+    totalDue
+  }
+}
+
+
 
 function shortDate(iso) {
   if (!iso) return ''

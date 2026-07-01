@@ -147,8 +147,9 @@ export default function PhotosSection({ jobId, userId }: any) {
         // Dead-zone path: park the compressed blob + row in the outbox
         // (IndexedDB) and move on — it uploads when signal returns.
         if (navigator.onLine === false) {
-          await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
-          queuedCount += 1
+          const ok = await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
+          if (ok) queuedCount += 1
+          else toastError("Couldn't save offline", `${file.name}: offline storage is full`)
           continue
         }
         const { error: upErr } = await supabase.storage
@@ -156,8 +157,9 @@ export default function PhotosSection({ jobId, userId }: any) {
           .upload(path, uploadBlob, { upsert: false, contentType: 'image/jpeg' })
         if (upErr) {
           if (isNetworkError(upErr)) {
-            await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
-            queuedCount += 1
+            const ok = await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
+            if (ok) queuedCount += 1
+            else toastError("Couldn't save offline", `${file.name}: offline storage is full`)
             continue
           }
           throw upErr

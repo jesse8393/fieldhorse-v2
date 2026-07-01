@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest'
 // pdf.js is a large untyped legacy module — array params infer as
 // never[], so fixture payloads go through `as any` at the call sites.
-import { generateInvoice, generateQuote, generateCertificate } from './pdf.js'
+import { generateInvoice, generateQuote, generateCertificate, generateStatement } from './pdf.js'
 
 const company = {
   name: 'Parker Construction Co.',
@@ -89,6 +89,48 @@ describe('pdf engine smoke', () => {
       }
     } as any)
     expectRealPdf(result)
+  })
+
+  it('generateStatement produces a valid PDF', async () => {
+    const result = await generateStatement({
+      company,
+      client: {
+        id: '6f1c9b1e-0000-4000-8000-000000000099',
+        name: 'Jordan Pell',
+        company_name: 'MMC Properties',
+        address: '200 Commerce Dr, Murfreesboro TN',
+        email: 'ap@mmcproperties.com'
+      },
+      lines: [
+        { property: 'Summit Townhomes — sidewalk repair', contract: 1880, paid: 500, balance: 1380 },
+        { property: '12 Oak St — driveway', contract: 2500, paid: 0, balance: 2500 },
+        { property: 'Maple Court — curb', contract: 1400, paid: 500, balance: 900 }
+      ],
+      statementId: '6f1c9b1e-0000-4000-8000-000000000099'
+    } as any)
+    expectRealPdf(result)
+    expect(result.totalDue).toBe(4780)
+  })
+
+  it('generateStatement survives an empty client', async () => {
+    const result = await generateStatement({ company, client: {}, lines: [] } as any)
+    expectRealPdf(result)
+  })
+
+  it('renders the pay block when a payment link is set (invoice + statement)', async () => {
+    const payCompany = { ...company, payment_link: 'venmo.com/u/parker', payment_instructions: 'Checks payable to Parker Construction Co.' }
+    const inv = await generateInvoice({
+      company: payCompany, contact,
+      lineItems: [{ description: 'Final balance', qty: 1, rate: 1380, amount: 1380 }],
+      invoiceId: contact.id, contractTotal: 1380, previouslyPaid: 0
+    } as any)
+    expectRealPdf(inv)
+    const stmt = await generateStatement({
+      company: payCompany,
+      client: { id: 'x', name: 'MMC', email: 'a@b.com' },
+      lines: [{ property: 'Lot 1', contract: 1000, paid: 0, balance: 1000 }]
+    } as any)
+    expectRealPdf(stmt)
   })
 
   it('survives empty inputs (defensive defaults)', async () => {

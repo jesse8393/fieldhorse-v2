@@ -84,16 +84,22 @@ async function allEntries(): Promise<OutboxEntry[]> {
   }
 }
 
-async function putEntry(e: OutboxEntry) {
+// Returns false when the entry could NOT be parked (queue full or IDB
+// unavailable) so callers can report failure instead of a false "saved".
+async function putEntry(e: OutboxEntry): Promise<boolean> {
   try {
     const existing = await allEntries()
-    if (existing.length >= MAX_ITEMS) return
+    if (existing.length >= MAX_ITEMS) return false
     await tx('readwrite', (s) => s.put(e))
     emit()
+    return true
   } catch {
-    /* IDB unavailable (private mode quota etc.) — nothing else to do */
+    /* IDB unavailable (private mode quota etc.) */
+    return false
   }
 }
+
+const QUEUE_FULL = { message: "Offline storage is full — this didn't save. Reconnect to sync your queued work, then try again." }
 
 async function deleteEntry(key: string) {
   try {
@@ -160,10 +166,11 @@ export async function resilientInsert(table: string, row: Record<string, any>): 
     if (!error) return { queued: false, error: null, id }
     if (!isNetworkError(error)) return { queued: false, error, id }
   }
-  await putEntry({
+  const ok = await putEntry({
     key: newId(), kind: 'insert', table, row: withId,
     created_at: new Date().toISOString(), attempts: 0
   })
+  if (!ok) return { queued: false, error: QUEUE_FULL, id }
   return { queued: true, error: null, id }
 }
 
@@ -176,10 +183,11 @@ export async function resilientUpdate(
     if (!error) return { queued: false, error: null, id: String(match.id || '') }
     if (!isNetworkError(error)) return { queued: false, error, id: String(match.id || '') }
   }
-  await putEntry({
+  const ok = await putEntry({
     key: newId(), kind: 'update', table, match, patch,
     created_at: new Date().toISOString(), attempts: 0
   })
+  if (!ok) return { queued: false, error: QUEUE_FULL, id: String(match.id || '') }
   return { queued: true, error: null, id: String(match.id || '') }
 }
 
@@ -193,8 +201,8 @@ export async function queuePhoto(args: {
   blob: Blob
   contentType: string
   row: Record<string, any>
-}): Promise<void> {
-  await putEntry({
+}): Promise<boolean> {
+  return putEntry({
     key: newId(), kind: 'photo',
     bucket: args.bucket, path: args.path, blob: args.blob,
     contentType: args.contentType, row: args.row,
@@ -239,6 +247,10 @@ export async function flushOutbox(): Promise<number> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 0
   flushing = true
   let synced = 0
+  // Contacts whose cost rollup must be recomputed after draining —
+  // an expense/sub that synced from the outbox otherwise leaves
+  // fh_contacts.cost (and margin) stale until an unrelated recalc.
+  const recalcContacts = new Map<string, string>() // contactId → userId
   try {
     const entries = await allEntries()
     for (const e of entries) {
@@ -249,12 +261,24 @@ export async function flushOutbox(): Promise<number> {
         ok = !isNetworkError(err)
       }
       if (!ok) break // still offline — try again on the next trigger
+      if (e.kind === 'insert' && (e.table === 'fh_expenses' || e.table === 'fh_subs') && e.row?.contact_id && e.row?.user_id) {
+        recalcContacts.set(e.row.contact_id, e.row.user_id)
+      }
       await deleteEntry(e.key)
       synced += 1
     }
   } finally {
     flushing = false
     emit()
+  }
+  // Recompute cost/margin for any job whose expense/sub just synced.
+  if (recalcContacts.size > 0) {
+    try {
+      const { recalcCost } = await import('./stages.ts')
+      for (const [contactId, uid] of recalcContacts) {
+        await recalcCost(contactId, uid).catch(() => {})
+      }
+    } catch { /* non-fatal */ }
   }
   if (synced > 0) {
     toastSuccess('Back online', `${synced} offline ${synced === 1 ? 'item' : 'items'} synced`)

@@ -165,7 +165,7 @@ export default function Activity() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen fh-readable-desktop"
       variants={stagger}
       initial="hidden"
       animate="show"

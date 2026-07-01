@@ -135,7 +135,9 @@ export async function universalSearch(query: string | null | undefined, userId: 
     kind: 'note',
     title: (n.text || '').slice(0, 80) || 'Untitled note',
     sub: [n.fh_contacts?.name, fmtDateShort(n.created_at)].filter(Boolean).join(' · '),
-    to: '/notes'
+    // Deep-link a note to its job (where it actually lives) instead of
+    // always dumping the user on the generic /notes list.
+    to: n.contact_id ? `/jobs/${n.contact_id}` : '/notes'
   }))
   const events: SearchResult[] = asRows(eventsRes.data).map((e) => ({
     id: `event:${e.id}`,
@@ -149,7 +151,9 @@ export async function universalSearch(query: string | null | undefined, userId: 
     kind: 'file',
     title: f.filename,
     sub: [f.kind === 'photo' ? 'Photo' : 'File', f.fh_contacts?.name].filter(Boolean).join(' · '),
-    to: f.job_id ? `/jobs/${f.job_id}` : '/'
+    // A file lives on a job; an orphan (no job_id) shouldn't dump you on
+    // Home — send it to the Jobs list instead.
+    to: f.job_id ? `/jobs/${f.job_id}` : '/jobs'
   }))
 
   const total = jobs.length + clients.length + notes.length + events.length + files.length

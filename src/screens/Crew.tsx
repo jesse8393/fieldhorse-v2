@@ -76,6 +76,10 @@ export default function Crew() {
   const [tasks, setTasks] = useState<TodoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [punching, setPunching] = useState(false)
+  // Which job the next clock-in attaches to. Defaults to today's first
+  // scheduled job so a punch is never orphaned when there's an obvious
+  // one; '' means "no job" (general shift), which is still valid.
+  const [clockJobId, setClockJobId] = useState<string>('')
   // Re-render the meter every minute so the active-shift timer ticks.
   const [, setNowTick] = useState(0)
 
@@ -127,11 +131,30 @@ export default function Crew() {
 
   useEffect(() => { if (!memLoading) load() }, [memLoading, load])
 
+  // Today's jobs, deduped by contact_id — the pick-list for clock-in.
+  // Schedule rows carry the event title which doubles as a good label.
+  const todayJobs = (() => {
+    const seen = new Map<string, string>()
+    for (const ev of schedule) {
+      if (ev.contact_id && !seen.has(ev.contact_id)) {
+        seen.set(ev.contact_id, ev.title || 'Job')
+      }
+    }
+    return Array.from(seen, ([id, label]) => ({ id, label }))
+  })()
+
+  // Default the clock-in job to today's first scheduled job once loaded,
+  // but never override a choice the user already made.
+  useEffect(() => {
+    if (!clockJobId && todayJobs.length > 0) setClockJobId(todayJobs[0].id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedule])
+
   async function doClockIn() {
     if (!user || punching) return
     setPunching(true)
     try {
-      const p = await punchIn({ userId: user.id })
+      const p = await punchIn({ userId: user.id, contactId: clockJobId || null })
       setActivePunch(p)
       toastSuccess('Clocked in')
     } catch (e: any) {
@@ -228,6 +251,28 @@ export default function Crew() {
               <p style={{ margin: 0, color: 'rgba(245,242,234,.62)', fontSize: 12 }}>
                 {fmtMinutes(workedMinutes(activePunch))} this shift
               </p>
+            )}
+            {!activePunch && todayJobs.length > 0 && (
+              <label style={{ display: 'block', marginTop: 12 }}>
+                <span style={{ display: 'block', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(245,242,234,.5)', marginBottom: 4 }}>
+                  Clock in to
+                </span>
+                <select
+                  value={clockJobId}
+                  onChange={(e) => setClockJobId(e.target.value)}
+                  disabled={punching}
+                  style={{
+                    width: '100%', background: 'rgba(0,0,0,.25)', color: '#f4f1ea',
+                    border: '1px solid rgba(255,255,255,.14)', borderRadius: 8,
+                    padding: '8px 10px', fontSize: 13, fontWeight: 600,
+                  }}
+                >
+                  {todayJobs.map((j) => (
+                    <option key={j.id} value={j.id} style={{ color: '#111' }}>{j.label}</option>
+                  ))}
+                  <option value="" style={{ color: '#111' }}>No specific job</option>
+                </select>
+              </label>
             )}
             <div style={{ marginTop: 12 }}>
               {activePunch ? (

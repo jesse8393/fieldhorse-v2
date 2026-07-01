@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react'
 import {
   Bell, Search, ChevronLeft, ChevronRight, Edit2, Trash2,
-  Phone, Mail, MapPin, AlertTriangle, Plus, ExternalLink,
+  Phone, Mail, MapPin, AlertTriangle, Plus, ExternalLink, Receipt,
 } from 'lucide-react'
 import { money, moneyFull } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
@@ -28,6 +28,7 @@ type Props = {
   onEdit?: () => void
   onDelete?: () => void
   onNewDeal?: () => void
+  onStatement?: () => void
   isEditing?: boolean
   children: ReactNode
 }
@@ -48,7 +49,7 @@ export default function SnowClientDetailBuild(props: Props) {
   const {
     client, lifetime, outstanding, activeCount, jobs = [], payments = [],
     tabs, activeTab, onTabChange,
-    onBack, onEdit, onDelete, onNewDeal, isEditing, children,
+    onBack, onEdit, onDelete, onNewDeal, onStatement, isEditing, children,
   } = props
 
   const status: { label: string; tone: 'good' | 'warn' | 'neutral' } = (() => {
@@ -164,8 +165,13 @@ export default function SnowClientDetailBuild(props: Props) {
                 {t.label}
               </button>
             ))}
+            {onStatement && (
+              <button type="button" className="fh-build-tabs__cta" onClick={onStatement} style={{ marginLeft: 'auto' }}>
+                <Receipt size={13} /> Statement
+              </button>
+            )}
             {onNewDeal && (
-              <button type="button" className="fh-build-tabs__cta" onClick={onNewDeal}>
+              <button type="button" className="fh-build-tabs__cta" onClick={onNewDeal} style={onStatement ? undefined : { marginLeft: 'auto' }}>
                 <Plus size={13} /> New deal
               </button>
             )}

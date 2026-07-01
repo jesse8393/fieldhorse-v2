@@ -306,10 +306,11 @@ export type InvoicesBundle = {
   jobs: InvoiceJob[]
   payments: Payment[]
   invoices: InvoiceRecord[]
+  changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
 }
 
 async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
-  const [jobsRes, paymentsRes, invoicesRes] = await Promise.all([
+  const [jobsRes, paymentsRes, invoicesRes, coRes] = await Promise.all([
     supabase
       .from('fh_contacts')
       .select('*, fh_clients(name, email, phone, address)')
@@ -324,15 +325,24 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
       .from('fh_invoices')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }),
+    // Approved change orders adjust each job's true contract — needed so
+    // "Who owes you" / statements don't understate a job with signed COs.
+    supabase
+      .from('fh_change_orders')
+      .select('contact_id, amount, status')
+      .eq('user_id', userId)
+      .eq('status', 'approved')
   ])
   if (jobsRes.error) throw jobsRes.error
   if (paymentsRes.error) throw paymentsRes.error
   if (invoicesRes.error) throw invoicesRes.error
+  if (coRes.error) throw coRes.error
   return {
     jobs: (jobsRes.data ?? []) as InvoiceJob[],
     payments: (paymentsRes.data ?? []) as Payment[],
-    invoices: (invoicesRes.data ?? []) as InvoiceRecord[]
+    invoices: (invoicesRes.data ?? []) as InvoiceRecord[],
+    changeOrders: (coRes.data ?? []) as InvoicesBundle['changeOrders']
   }
 }
 
@@ -480,7 +490,7 @@ export function useInvalidatePartners() {
 
 export type ClientJob = Pick<
   Contact,
-  'id' | 'name' | 'stage' | 'job_title' | 'job_type' | 'amount' | 'updated_at'
+  'id' | 'name' | 'stage' | 'job_title' | 'job_type' | 'amount' | 'updated_at' | 'created_at'
 >
 
 export type ClientDetailBundle = {
@@ -492,11 +502,12 @@ export type ClientDetailBundle = {
   files: (Database['public']['Tables']['fh_job_files']['Row'] & {
     fh_contacts: Pick<Contact, 'name'> | null
   })[]
-  payments: Pick<Payment, 'contact_id' | 'amount'>[]
+  payments: Pick<Payment, 'contact_id' | 'amount' | 'paid_on' | 'created_at' | 'method'>[]
+  changeOrders: Pick<Database['public']['Tables']['fh_change_orders']['Row'], 'contact_id' | 'amount' | 'status'>[]
 }
 
 const EMPTY_CLIENT_DETAIL: Omit<ClientDetailBundle, 'client'> = {
-  jobs: [], notes: [], files: [], payments: []
+  jobs: [], notes: [], files: [], payments: [], changeOrders: []
 }
 
 async function fetchClientDetail(id: string, userId: string): Promise<ClientDetailBundle> {
@@ -512,7 +523,7 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
 
   const { data: jobsData, error: jobsErr } = await supabase
     .from('fh_contacts')
-    .select('id, name, stage, job_title, job_type, amount, updated_at')
+    .select('id, name, stage, job_title, job_type, amount, updated_at, created_at')
     .eq('user_id', userId)
     .eq('client_id', client.id)
     .order('updated_at', { ascending: false })
@@ -524,7 +535,7 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
     return { client: client as Client, ...EMPTY_CLIENT_DETAIL }
   }
 
-  const [notesRes, filesRes, paymentsRes] = await Promise.all([
+  const [notesRes, filesRes, paymentsRes, coRes] = await Promise.all([
     supabase
       .from('fh_notes')
       .select('*, fh_contacts(name)')
@@ -541,9 +552,15 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
       .limit(60),
     supabase
       .from('fh_payments')
-      .select('contact_id, amount')
+      .select('contact_id, amount, paid_on, created_at, method')
+      .eq('user_id', userId)
+      .in('contact_id', jobIds),
+    supabase
+      .from('fh_change_orders')
+      .select('contact_id, amount, status')
       .eq('user_id', userId)
       .in('contact_id', jobIds)
+      .eq('status', 'approved')
   ])
   if (notesRes.error) throw notesRes.error
   if (filesRes.error) throw filesRes.error
@@ -554,7 +571,8 @@ async function fetchClientDetail(id: string, userId: string): Promise<ClientDeta
     jobs,
     notes: (notesRes.data ?? []) as ClientDetailBundle['notes'],
     files: (filesRes.data ?? []) as ClientDetailBundle['files'],
-    payments: (paymentsRes.data ?? []) as ClientDetailBundle['payments']
+    payments: (paymentsRes.data ?? []) as ClientDetailBundle['payments'],
+    changeOrders: (coRes.data ?? []) as ClientDetailBundle['changeOrders']
   }
 }
 

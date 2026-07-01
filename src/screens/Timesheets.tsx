@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Check, CheckCheck, ChevronRight, Search, AlertTriangle } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
-import { orgPunchApprove, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
+import { orgPunchApprove, orgPunchFlag, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 
@@ -112,6 +112,37 @@ export default function Timesheets() {
         for (const id of ids) delete next[id]
         return next
       })
+    }
+  }
+
+  // Flag / reject a punch — prompts for a reason, marks it flagged (and
+  // clears any approval server-side). Keeps the row visible so it can be
+  // resolved; the "Flagged" KPI now reflects reality.
+  async function flag(id: string) {
+    const reason = window.prompt('Reason for flagging this punch? (e.g. GPS mismatch, wrong rate)')
+    if (reason === null) return
+    setApproving((m) => ({ ...m, [id]: true }))
+    try {
+      await orgPunchFlag([id], true, reason.trim())
+      toastSuccess('Punch flagged')
+      setPunches((cur) => cur.map((p) => p.id === id ? { ...p, flagged: true, flag_reason: reason.trim() || null } : p))
+    } catch (e: any) {
+      toastError('Flag failed', e?.detail || e?.message || '')
+    } finally {
+      setApproving((m) => { const n = { ...m }; delete n[id]; return n })
+    }
+  }
+
+  async function clearFlag(id: string) {
+    setApproving((m) => ({ ...m, [id]: true }))
+    try {
+      await orgPunchFlag([id], false)
+      toastSuccess('Flag cleared')
+      setPunches((cur) => cur.map((p) => p.id === id ? { ...p, flagged: false, flag_reason: null } : p))
+    } catch (e: any) {
+      toastError('Failed', e?.detail || e?.message || '')
+    } finally {
+      setApproving((m) => { const n = { ...m }; delete n[id]; return n })
     }
   }
 
@@ -290,16 +321,29 @@ export default function Timesheets() {
                       <span className="fh-build-dot is-neutral">Pending</span>
                     )}
                   </span>
-                  <button
-                    type="button"
-                    className="fh-build-icon-action"
-                    onClick={() => approve([r.id])}
-                    disabled={!!approving[r.id]}
-                    aria-label="Approve punch"
-                    title="Approve"
-                  >
-                    <Check size={14} />
-                  </button>
+                  <span style={{ display: 'inline-flex', gap: 4 }}>
+                    <button
+                      type="button"
+                      className="fh-build-icon-action"
+                      onClick={() => r.flagged ? clearFlag(r.id) : flag(r.id)}
+                      disabled={!!approving[r.id]}
+                      aria-label={r.flagged ? 'Clear flag' : 'Flag punch'}
+                      title={r.flagged ? 'Clear flag' : 'Flag / reject'}
+                      style={{ color: r.flagged ? 'var(--v3-primary, #c9963a)' : undefined }}
+                    >
+                      <AlertTriangle size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="fh-build-icon-action"
+                      onClick={() => approve([r.id])}
+                      disabled={!!approving[r.id]}
+                      aria-label="Approve punch"
+                      title="Approve"
+                    >
+                      <Check size={14} />
+                    </button>
+                  </span>
                 </div>
               ))}
             </section>

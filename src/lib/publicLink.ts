@@ -21,28 +21,37 @@ function randomToken() {
   return out
 }
 
-export type PublicLinkKind = 'proposal' | 'invoice' | 'change_order'
+export type PublicLinkKind = 'proposal' | 'invoice' | 'change_order' | 'statement'
 
 /**
- * Create a new public link for the given contact. Returns the full
- * row including the token + the public URL ready to share.
+ * Create a new public link. Proposal / invoice / change_order links
+ * hang off a single job (contactId). A statement link is client-scoped
+ * (clientId, no contactId) and rolls up every open job for that client.
+ * Returns the full row including the token + the public URL to share.
  */
-export async function mintPublicLink({ contactId, userId, kind, expiresAt = null, changeOrderId = null }: {
-  contactId: string | undefined
+export async function mintPublicLink({ contactId = null, clientId = null, userId, kind, expiresAt = null, changeOrderId = null }: {
+  contactId?: string | null
+  clientId?: string | null
   userId: string | undefined
   kind: PublicLinkKind
   expiresAt?: Date | null
   changeOrderId?: string | null
 }) {
-  if (!contactId || !userId || !kind) throw new Error('contactId, userId, kind required')
-  if (kind !== 'proposal' && kind !== 'invoice' && kind !== 'change_order') throw new Error(`unknown kind: ${kind}`)
+  if (!userId || !kind) throw new Error('userId, kind required')
+  if (!['proposal', 'invoice', 'change_order', 'statement'].includes(kind)) throw new Error(`unknown kind: ${kind}`)
+  if (kind === 'statement') {
+    if (!clientId) throw new Error('clientId required for statement links')
+  } else if (!contactId) {
+    throw new Error('contactId required')
+  }
   if (kind === 'change_order' && !changeOrderId) throw new Error('changeOrderId required for change_order links')
   const token = randomToken()
   const { data, error } = await supabase
     .from('fh_public_links')
     .insert({
       user_id: userId,
-      contact_id: contactId,
+      contact_id: kind === 'statement' ? null : contactId,
+      client_id: kind === 'statement' ? clientId : null,
       kind,
       token,
       expires_at: expiresAt ? expiresAt.toISOString() : null,
@@ -55,6 +64,23 @@ export async function mintPublicLink({ contactId, userId, kind, expiresAt = null
     ...data,
     url: buildPublicUrl(token)
   }
+}
+
+/**
+ * List active (non-revoked, non-expired) statement links for a client.
+ * Lets the statement sheet reuse an existing share link instead of
+ * minting a fresh token on every open.
+ */
+export async function listClientStatementLinks(clientId: string | undefined) {
+  if (!clientId) return []
+  const { data } = await supabase
+    .from('fh_public_links')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('kind', 'statement')
+    .is('revoked_at', null)
+    .order('created_at', { ascending: false })
+  return (data || []).filter((l: any) => !l.expires_at || new Date(l.expires_at) >= new Date())
 }
 
 /**
