@@ -652,6 +652,16 @@ export default function Invoices() {
         </div>
       </motion.div>
 
+      {/* GLOBAL FILTER — one control governs every section below (issued
+          invoices, who-owes-you, job balances). It lives directly under
+          the cockpit so the toggle sits ABOVE the sections it filters
+          instead of buried in the last section's header, where changing
+          it silently reshaped the sections already scrolled past. */}
+      <motion.div variants={item} style={{ display: 'flex', gap: 6, padding: '0 var(--v3-gutter) 16px' }}>
+        <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
+        <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
+      </motion.div>
+
       {/* ISSUED INVOICES — first-class fh_invoices rows. Every deposit,
           progress draw, and final bill lives here with its own status
           + actions. Created from the job screen's Send Invoice sheet
@@ -759,10 +769,9 @@ export default function Invoices() {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
           <SectionHeader label={filter === 'outstanding' ? 'Job balances' : 'All money jobs'} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
-            <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
-          </div>
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+            {filtered.length}
+          </span>
         </div>
 
         {loading && <SkeletonList rows={3} />}
