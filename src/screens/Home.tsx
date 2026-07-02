@@ -598,18 +598,10 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* ─────────── RECENT ACTIVITY — cross-job feed ───────────
-          Compact 5-row card that surfaces the same data as /activity
-          on the dashboard surface. Auto-hides on a brand-new account
-          with no events. "See all" links through to /activity. */}
-      <motion.div variants={item} style={{ padding: '8px 20px 14px' }}>
-        <HomeActivityCard />
-      </motion.div>
-
       {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
-          V3-HOME-2 de-box: dropped the bordered section wrapper. Section
-          header organizes; the row cards self-frame on the page surface.
-          Pipeline mini-card stays the only bordered anchor on Home. */}
+          Promoted ABOVE Recent Activity: this is the "what do I do right now"
+          list (overdue invoices, follow-ups), so it must come before the
+          passive cross-job feed. V3-HOME-2 de-box: the row cards self-frame. */}
       {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
@@ -666,6 +658,14 @@ export default function Home() {
           </div>
         </motion.div>
       )}
+
+      {/* ─────────── RECENT ACTIVITY — cross-job feed ───────────
+          Now below Next Actions: it's reference, not action. Compact 5-row
+          card that mirrors /activity on the dashboard surface; auto-hides on
+          a brand-new account. "See all" links through to /activity. */}
+      <motion.div variants={item} style={{ padding: '8px 20px 14px' }}>
+        <HomeActivityCard />
+      </motion.div>
 
       {/* ─────────── TODAY'S PRIORITIES — KPI strip ───────────
           V3-HOME-2 un-nest: dropped the bordered wrapper that nested
