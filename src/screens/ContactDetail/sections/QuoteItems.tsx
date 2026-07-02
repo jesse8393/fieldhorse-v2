@@ -216,7 +216,11 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 
   const [draft, setDraft] = useState(emptyDraft)
   const suggestions = useItemSuggestions(userId)
-  const [adding, setAdding] = useState(false)
+
+  // Monotonic next sort_order, seeded from loaded rows and bumped per add.
+  // Keeps rapid optimistic adds in entry order without reading (possibly
+  // stale) rows state between back-to-back adds.
+  const sortRef = useRef(0)
 
   const [editingId, setEditingId] = useState<any>(null)
   const [editDraft, setEditDraft] = useState(emptyDraft)
@@ -236,7 +240,13 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       .eq('user_id', userId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
-    setRows(data || [])
+    const list = data || []
+    setRows(list)
+    // Seed the next sort_order above the current max so optimistic adds
+    // always append in order.
+    sortRef.current = list.length
+      ? Math.max(...list.map((r: any) => Number(r.sort_order) || 0)) + 1
+      : 0
     setLoading(false)
   }, [jobId, userId])
 
@@ -258,22 +268,26 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       toastError("Couldn't add item", 'Description is required')
       return null
     }
-    const payload = {
-      user_id: userId,
-      contact_id: jobId,
-      ...input,
-      sort_order: Number.isFinite(input.sort_order) ? input.sort_order : rows.length
-    }
+    const sortOrder = Number.isFinite(input.sort_order) ? input.sort_order : sortRef.current++
+    const tempId = `temp-${(typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${rows.length}-${sortOrder}`}`
+    const optimisticRow = { id: tempId, user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder, _pending: true }
+    // Show the line immediately — no network wait between entries. This is
+    // what makes rapid multi-item entry feel instant instead of glitchy.
+    setRows((rs) => [...rs, optimisticRow])
+    const payload = { user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder }
     const { data, error } = await supabase
       .from('fh_quote_items')
       .insert(payload)
       .select()
       .single()
     if (error) {
+      // Roll the optimistic row back out and tell the operator.
+      setRows((rs) => rs.filter((r) => r.id !== tempId))
       toastError("Couldn't add item", error.message)
       return null
     }
-    await fetchRows({ silent: true })
+    // Swap the temp row for the persisted one (real id + server defaults).
+    setRows((rs) => rs.map((r) => (r.id === tempId ? data : r)))
     onContactRefresh?.()
     return data
   }
@@ -296,6 +310,9 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 
   async function removeItem(id: any) {
     if (!id || !userId) return false
+    // A still-saving optimistic row has no real id yet — ignore until it
+    // reconciles (its actions are disabled in the UI too).
+    if (String(id).startsWith('temp-')) return false
     hapticTap()
     const snapshot = rows.find((r) => r.id === id)
     setRows((rs) => rs.filter((r) => r.id !== id))
@@ -329,6 +346,8 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     if (idx === -1) return false
     const targetIdx = idx + direction
     if (targetIdx < 0 || targetIdx >= rows.length) return false
+    // Don't reorder across a row that's still saving (no real id yet).
+    if (rows[idx]?._pending || rows[targetIdx]?._pending) return false
     hapticTap()
     const a = rows[idx]
     const b = rows[targetIdx]
@@ -421,25 +440,22 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     })
   }
 
-  async function handleAdd() {
-    if (adding) return
+  function handleAdd() {
     const err = validateDraft(draft)
     if (err) { toastError("Couldn't add item", err); return }
-    setAdding(true)
-    const inserted = await addItem({
-      ...normalizeForDB(draft),
-      sort_order: rows.length
-    })
-    setAdding(false)
-    if (inserted) {
-      setDraft(emptyDraft())
-      // Keep the operator in flow — refocus the description so the next
-      // line item can be typed immediately (rapid multi-item entry).
-      setAddFocusSignal((n) => n + 1)
-    }
+    hapticTap()
+    // Fire the optimistic add (it reconciles in the background) and reset
+    // the form NOW so the next line can be typed with zero latency. Carry
+    // the section forward — quotes are usually entered a section at a time.
+    const carrySection = draft.section
+    void addItem({ ...normalizeForDB(draft) })
+    setDraft({ ...emptyDraft(), section: carrySection })
+    // Refocus the description so line items can be fired back-to-back.
+    setAddFocusSignal((n) => n + 1)
   }
 
   function beginEdit(row: any) {
+    if (row?._pending) return
     setEditingId(row.id)
     setEditDraft(draftFromRow(row))
   }
@@ -543,9 +559,9 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         eyebrow="Add line item"
         draft={draft}
         onChange={(k: any, v: any) => patchDraft(setDraft, k, v)}
-        primaryLabel={adding ? 'Adding…' : 'Add line item'}
+        primaryLabel="Add line item"
         onPrimary={handleAdd}
-        primaryDisabled={!draft.description.trim() || adding}
+        primaryDisabled={!draft.description.trim()}
         showCancel={false}
         suggestions={suggestions}
         onPickSuggestion={(s: ItemSuggestion) => applySuggestion(setDraft, s)}
@@ -598,6 +614,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
               <ItemRow
                 key={r.id}
                 row={r}
+                pending={!!r._pending}
                 isFirst={i === 0}
                 isLast={i === rows.length - 1}
                 onEdit={() => beginEdit(r)}
@@ -616,10 +633,10 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 /* ============================================================
    ItemRow — collapsed view of a single quote item.
    ============================================================ */
-function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown }: any) {
+function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown }: any) {
   const isOptional = !!row.is_optional && !row.is_excluded
   const isExcluded = !!row.is_excluded
-  const dim = isExcluded ? 0.55 : isOptional ? 0.85 : 1
+  const dim = (isExcluded ? 0.55 : isOptional ? 0.85 : 1) * (pending ? 0.6 : 1)
 
   return (
     <motion.li
@@ -704,20 +721,29 @@ function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown 
         </div>
       )}
 
-      {/* Actions — ↑ ↓ edit delete. Each ≥40px tap target. */}
+      {/* Actions — ↑ ↓ edit delete. Each ≥40px tap target. Disabled while
+          the row is still saving (optimistic add not yet reconciled). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-        <RowActionButton ariaLabel="Move up" onClick={onMoveUp} disabled={isFirst}>
+        <RowActionButton ariaLabel="Move up" onClick={onMoveUp} disabled={isFirst || pending}>
           <ChevronUp size={16} />
         </RowActionButton>
-        <RowActionButton ariaLabel="Move down" onClick={onMoveDown} disabled={isLast}>
+        <RowActionButton ariaLabel="Move down" onClick={onMoveDown} disabled={isLast || pending}>
           <ChevronDown size={16} />
         </RowActionButton>
-        <RowActionButton ariaLabel="Edit line item" onClick={onEdit}>
+        <RowActionButton ariaLabel="Edit line item" onClick={onEdit} disabled={pending}>
           <Pencil size={14} />
         </RowActionButton>
-        <RowActionButton ariaLabel="Delete line item" onClick={onDelete} tone="danger">
+        <RowActionButton ariaLabel="Delete line item" onClick={onDelete} tone="danger" disabled={pending}>
           <Trash2 size={14} />
         </RowActionButton>
+        {pending && (
+          <span style={{
+            fontFamily: 'var(--font-body)', fontSize: 11,
+            color: 'var(--v3-text-muted)', marginLeft: 2
+          }}>
+            Saving…
+          </span>
+        )}
       </div>
     </motion.li>
   )
