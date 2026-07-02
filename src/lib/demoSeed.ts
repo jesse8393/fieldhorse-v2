@@ -47,6 +47,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
     .insert([
       {
         user_id: userId,
+        source: 'demo',
         name: 'Henderson Family',
         company_name: null,
         phone: '615-555-0142',
@@ -56,6 +57,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        source: 'demo',
         name: 'McCarthy Construction LLC',
         company_name: 'McCarthy Construction',
         phone: '615-555-0288',
@@ -65,6 +67,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        source: 'demo',
         name: 'Jane Patel',
         company_name: null,
         phone: '615-555-0334',
@@ -88,6 +91,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
     .insert([
       {
         user_id: userId,
+        source: 'demo',
         client_id: henderson.id,
         name: 'Henderson Family',
         phone: '615-555-0142',
@@ -102,6 +106,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        source: 'demo',
         client_id: henderson.id,
         name: 'Henderson Family',
         phone: '615-555-0142',
@@ -116,6 +121,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        source: 'demo',
         client_id: mccarthy.id,
         name: 'McCarthy office build-out',
         phone: '615-555-0288',
@@ -131,6 +137,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        source: 'demo',
         client_id: patel.id,
         name: 'Jane Patel',
         phone: '615-555-0334',
@@ -145,6 +152,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        source: 'demo',
         client_id: null,
         name: 'Davis driveway',
         phone: '615-555-0871',
@@ -159,6 +167,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        source: 'demo',
         client_id: null,
         name: 'Murray garage addition',
         phone: '615-555-0617',

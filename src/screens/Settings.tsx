@@ -22,18 +22,15 @@ import { Switch } from '@/components/ui/switch'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
 
-const CLEANUP_TABLES = [
-  'fh_payments',
-  'fh_inspections',
-  'fh_subs',
+// Child tables the demo seed writes keyed by contact_id — deleted first
+// (scoped to the demo contact ids) before the contacts, in case a child FK
+// isn't ON DELETE CASCADE. Mirrors what seedDemoData() inserts.
+const DEMO_CHILD_TABLES = [
   'fh_expenses',
   'fh_schedule',
   'fh_notes',
-  'fh_mileage',
-  'fh_contacts'
+  'fh_job_todos'
 ]
-
-const DEV_BUILD = typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.DEV
 
 export default function Settings() {
   const { user, signOut } = useAuth()
@@ -87,28 +84,59 @@ export default function Settings() {
   const [confirmWipe, setConfirmWipe] = useState(false)
   const [wipeResult, setWipeResult] = useState('')
 
-  const canWipe = DEV_BUILD || user?.email === 'test@test.com'
+  // Available to everyone (onboarding promises "wipe anytime"). Scoped to
+  // demo-seeded rows only (source = 'demo'), so it can never touch real
+  // work — safe to expose without the old dev-only gate.
+  const canWipe = true
 
   async function wipeTestData() {
     if (!user) return
     setWiping(true)
     setWipeResult('')
     try {
-      const counts: Record<string, number> = {}
-      for (const table of CLEANUP_TABLES) {
-        const { error, count } = await supabase
-          .from(table as any)
+      // Resolve the demo contacts, delete their children explicitly (in case
+      // a child FK isn't ON DELETE CASCADE), then the contacts, then the
+      // demo clients. Everything is scoped to source='demo' + this user.
+      const { data: demoContacts, error: dcErr } = await supabase
+        .from('fh_contacts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('source' as any, 'demo')
+      if (dcErr) throw new Error(dcErr.message)
+      const ids = (demoContacts || []).map((c: any) => c.id)
+
+      let total = 0
+      if (ids.length) {
+        for (const table of DEMO_CHILD_TABLES) {
+          const { count } = await supabase
+            .from(table as any)
+            .delete({ count: 'exact' })
+            .eq('user_id', user.id)
+            .in('contact_id', ids)
+          total += count ?? 0
+        }
+        const { error: cErr, count: cCount } = await supabase
+          .from('fh_contacts')
           .delete({ count: 'exact' })
           .eq('user_id', user.id)
-        if (error) throw new Error(`${table}: ${error.message}`)
-        counts[table] = count ?? 0
+          .in('id', ids)
+        if (cErr) throw new Error(cErr.message)
+        total += cCount ?? 0
       }
-      const total = Object.values(counts).reduce((a: any, b: any) => a + b, 0)
-      setWipeResult(`Cleared ${total} rows across ${CLEANUP_TABLES.length} tables.`)
-      toastSuccess(`Cleared ${total} rows`, 'All test data wiped')
+
+      const { error: clErr, count: clCount } = await supabase
+        .from('fh_clients')
+        .delete({ count: 'exact' })
+        .eq('user_id', user.id)
+        .eq('source' as any, 'demo')
+      if (clErr) throw new Error(clErr.message)
+      total += clCount ?? 0
+
+      setWipeResult(total > 0 ? `Removed ${total} sample rows.` : 'No sample data to remove.')
+      toastSuccess('Sample data removed', total > 0 ? `${total} demo rows cleared` : 'Nothing to remove')
       setConfirmWipe(false)
     } catch (e: any) {
-      setWipeResult(`Wipe failed: ${e.message}`)
+      setWipeResult(`Couldn't remove sample data: ${e.message}`)
     } finally {
       setWiping(false)
       setTimeout(() => setWipeResult(''), 4000)
@@ -645,12 +673,12 @@ export default function Settings() {
       {canWipe && (
         <Section
           variants={item}
-          title={<>Reset <em>everything.</em></>}
-          meta={DEV_BUILD ? 'LOCAL' : 'TEST USER'}
+          title={<>Remove <em>sample data.</em></>}
+          meta="DEMO"
           metaTone="red"
         >
           <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12 }}>
-            Deletes every contact, note, schedule item, sub, expense, inspection, payment, and mileage row owned by this user. RLS-scoped so it can only touch your own data.
+            Clears the example clients, jobs, and activity that were loaded to show you around. Only removes sample data — your own clients and jobs are never touched.
           </p>
           <div style={{ marginTop: 10 }}>
             {!confirmWipe ? (
@@ -662,7 +690,7 @@ export default function Settings() {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
               >
                 <Trash2 size={14} />
-                Clear all my test data
+                Remove sample data
               </motion.button>
             ) : (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -681,12 +709,12 @@ export default function Settings() {
                   disabled={wiping}
                   style={{ padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(135deg, #c0392b, #8b1a0d)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.1em', cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
                 >
-                  {wiping ? 'CLEARING…' : 'YES, DELETE EVERYTHING'}
+                  {wiping ? 'REMOVING…' : 'REMOVE SAMPLE DATA'}
                 </motion.button>
               </div>
             )}
             {wipeResult && (
-              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith('Wipe failed') ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
                 {wipeResult}
               </p>
             )}
