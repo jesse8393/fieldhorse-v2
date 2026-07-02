@@ -16,6 +16,7 @@
 // the next invoice picks it up with no further action.
 
 import { createClient } from '@supabase/supabase-js'
+import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
 
 function corsHeaders() {
@@ -59,6 +60,14 @@ export default async function handler(req) {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   })
+
+  // Per-IP rate limit — binding change-order approval; keep it tight.
+  const allowed = await checkRateLimit(supabase, {
+    scope: 'public-co-approve', identifier: hashIdentifier(clientIp(req)), limit: 20,
+  })
+  if (!allowed) {
+    return json({ error: 'rate_limited', message: 'Too many requests. Please try again in a minute.' }, 429)
+  }
 
   // 1. Resolve + validate the link.
   const { data: link } = await supabase

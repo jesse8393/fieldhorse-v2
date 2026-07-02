@@ -24,6 +24,7 @@
 // so a customer double-tap doesn't double-write a version row.
 
 import { createClient } from '@supabase/supabase-js'
+import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
 
 function json(body, status = 200) {
@@ -76,6 +77,15 @@ export default async function handler(req) {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   })
+
+  // Per-IP rate limit — this is a binding write (records an approval /
+  // signature), so keep it tight to slow signature-spraying.
+  const allowed = await checkRateLimit(supabase, {
+    scope: 'public-link-approve', identifier: hashIdentifier(clientIp(req)), limit: 20,
+  })
+  if (!allowed) {
+    return json({ error: 'rate_limited', message: 'Too many requests. Please try again in a minute.' }, 429)
+  }
 
   // 1. Resolve token → link → contact
   const { data: link } = await supabase
