@@ -542,7 +542,7 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
             hapticMedium()
             setAddOpen(true)
           }}
-          onJobs={() => navigate('/pipeline')}
+          onJobs={() => navigate('/jobs')}
         />
       </motion.div>
 
