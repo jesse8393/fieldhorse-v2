@@ -1120,9 +1120,11 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           gap: 12,
           padding: '14px 14px 14px 22px',
           borderRadius: 14,
-          background: 'var(--v3-surface-glass)',
-          backdropFilter: 'blur(14px) saturate(1.1)',
-          WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+          // Solid surface instead of glass+backdrop-blur: backdrop-filter is
+          // one of the most expensive mobile GPU ops, and this card renders
+          // once per outstanding balance. A solid surface + hairline border
+          // reads the same at card scale for a fraction of the paint cost.
+          background: 'var(--v3-surface-2)',
           border: isOverdue
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border-strong)',

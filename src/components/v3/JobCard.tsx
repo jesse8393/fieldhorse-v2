@@ -133,7 +133,6 @@ const JobCard = memo(function JobCard({
   return (
     <motion.button
       type="button"
-      layout
       className={`fh-job-card${hasPhotoBanner ? ' fh-job-card--with-photo' : ''}${featured ? ' fh-job-card--featured' : ''}`}
       onClick={onOpen ? () => { hapticTap(); onOpen(contact) } : undefined}
       // Card-tap feedback (scale + cursor) only fires when there's an
