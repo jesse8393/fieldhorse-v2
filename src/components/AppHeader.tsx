@@ -105,11 +105,10 @@ export default function AppHeader() {
           files in one query, also bound to ⌘K). The bell shows unread
           count badge + opens the inbox drawer. Notes is a quick jump
           to /notes. */}
-      {/* V3-SYSTEM-1A: trio of header actions demoted from 44×44 / r11 →
-          36×36 / r9 with a 14px icon. Tap target stays comfortable
-          (36 > Apple 28pt minimum + the touch area extends to header
-          padding) and the cluster widths drops from ~140px → ~116px so
-          the centered logo gets back its share of the header. */}
+      {/* Trio of header actions at 44×44 / r11 with a 16px icon — the
+          full Apple/Material minimum touch target. The audit flagged the
+          earlier 34–36px frames as sub-target; restored to 44 so search,
+          notifications, and notes are all comfortably tappable one-handed. */}
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <button
           type="button"
@@ -117,10 +116,10 @@ export default function AppHeader() {
           onClick={() => openSearch()}
           className="fh-header-search-btn"
           style={{
-            width: 34,
-            height: 34,
-            minWidth: 34,
-            borderRadius: 8,
+            width: 44,
+            height: 44,
+            minWidth: 44,
+            borderRadius: 11,
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             backdropFilter: 'blur(8px)',
@@ -133,7 +132,7 @@ export default function AppHeader() {
             transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
           }}
         >
-          <Search size={14} />
+          <Search size={16} />
         </button>
         <NotificationsBell />
         <button
@@ -142,10 +141,10 @@ export default function AppHeader() {
           onClick={() => navigate('/notes')}
           className="fh-header-notes-btn"
           style={{
-            width: 34,
-            height: 34,
-            minWidth: 34,
-            borderRadius: 8,
+            width: 44,
+            height: 44,
+            minWidth: 44,
+            borderRadius: 11,
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             backdropFilter: 'blur(8px)',
@@ -158,7 +157,7 @@ export default function AppHeader() {
             transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
           }}
         >
-          <NotebookPen size={14} />
+          <NotebookPen size={16} />
         </button>
       </div>
     </header>
