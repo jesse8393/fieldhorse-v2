@@ -117,8 +117,11 @@ function layoutForPath(pathname: any) {
   if (pathname.startsWith('/leads/')) return 'responsive'
   if (pathname.startsWith('/quotes/')) return 'responsive'
   if (pathname.startsWith('/jobs/')) return 'responsive'
-  // Client Detail still mobile-frame — its internal layout needs
-  // bespoke desktop work in a follow-up phase.
+  // Client Detail renders the full-width SnowClientDetailBuild on desktop —
+  // it needs the wide canvas too, or it renders crammed inside the 440px
+  // mobile-frame cap (the worst of both). Give it the responsive canvas
+  // like every other detail route.
+  if (pathname.startsWith('/clients/')) return 'responsive'
   return 'mobile-frame'
 }
 
