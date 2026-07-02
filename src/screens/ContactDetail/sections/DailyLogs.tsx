@@ -15,6 +15,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
 
 const SkeletonAny = SkeletonList as any
@@ -52,6 +53,7 @@ function fmtTime(iso: string): string {
 type DraftPhoto = { local_id: string; preview_url: string; storage_path: string; size: number; uploading: boolean; existing?: boolean }
 
 export default function DailyLogsSection({ jobId, userId }: any) {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
@@ -291,7 +293,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
 
   async function remove(id: string) {
     hapticTap()
-    const ok = window.confirm('Delete this daily log? This cannot be undone.')
+    const ok = await confirm({ title: 'Delete this daily log?', body: 'This cannot be undone.', destructive: true })
     if (!ok) return
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_daily_logs').delete().eq('id', id).eq('user_id', userId)

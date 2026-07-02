@@ -21,6 +21,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 const SkeletonAny = SkeletonList as any
 
@@ -87,6 +88,7 @@ function rid(): string {
 }
 
 export default function SelectionsSection({ jobId, userId, clientId }: any) {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<SelectionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
@@ -161,7 +163,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   }
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this selection?')) return
+    if (!(await confirm({ title: 'Delete this selection?', destructive: true }))) return
     hapticTap()
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_selections').delete().eq('id', id)

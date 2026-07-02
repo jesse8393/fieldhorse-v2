@@ -26,6 +26,7 @@ import { useAuth } from '../../../contexts/AuthContext.tsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -55,6 +56,7 @@ function dateInputFromIso(iso: any) {
 }
 
 export default function InvoiceDrawsSection({ contact, payments = [], changeOrders = [], insurance = null, userId }: any) {
+  const confirm = useConfirm()
   const { profile } = useProfile()
   const { user } = useAuth()
   const [draws, setDraws] = useState<any[]>([])
@@ -216,7 +218,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   }
 
   async function handleVoid(draw: any) {
-    if (!window.confirm(`Void Draw #${draw.sequence_number}? It will stop counting toward the unbilled total.`)) return
+    if (!(await confirm({ title: `Void Draw #${draw.sequence_number}?`, body: 'It will stop counting toward the unbilled total.', destructive: true, confirmLabel: 'Void' }))) return
     setBusyId(draw.id)
     try {
       const { error } = await supabase
@@ -234,7 +236,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   }
 
   async function handleDelete(draw: any) {
-    if (!window.confirm(`Delete Draw #${draw.sequence_number}? This cannot be undone.`)) return
+    if (!(await confirm({ title: `Delete Draw #${draw.sequence_number}?`, body: 'This cannot be undone.', destructive: true }))) return
     try {
       const { error } = await supabase
         .from('fh_invoices')

@@ -19,6 +19,7 @@ import type { OrgRole } from '../lib/permissions.ts'
 import { ORG_ROLES } from '../lib/permissions.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
 
 function fmtJoined(iso: string | null): string {
   if (!iso) return '—'
@@ -266,6 +267,7 @@ const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, adm
    Only shown when the caller can manage the team AND outranks the member
    — mirrors the server guards in org-member-role/remove. */
 function MemberActions({ member, callerRole, canManage, onChanged }: any) {
+  const confirm = useConfirm()
   const [busy, setBusy] = useState(false)
   const callerTier = ROLE_TIER[callerRole || ''] ?? 0
   const targetTier = ROLE_TIER[member.role] ?? 0
@@ -289,7 +291,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
 
   async function remove() {
     if (busy) return
-    if (!window.confirm(`Remove ${member.name || member.email || 'this member'} from the team? They lose access immediately.`)) return
+    if (!(await confirm({ title: `Remove ${member.name || member.email || 'this member'} from the team?`, body: 'They lose access immediately.', destructive: true, confirmLabel: 'Remove' }))) return
     setBusy(true)
     try {
       await orgMemberRemove(member.user_id)

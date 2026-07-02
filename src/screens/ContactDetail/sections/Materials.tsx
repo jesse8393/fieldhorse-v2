@@ -25,6 +25,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 const SkeletonAny = SkeletonList as any
 
@@ -101,6 +102,7 @@ function parseBulkLine(raw: string): { qty: number; name: string } | null {
 }
 
 export default function MaterialsSection({ jobId, userId }: any) {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<MaterialRow[]>([])
   const [loading, setLoading] = useState(true)
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -203,7 +205,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
   }
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this material row?')) return
+    if (!(await confirm({ title: 'Delete this material row?', destructive: true }))) return
     hapticTap()
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_materials').delete().eq('id', id)

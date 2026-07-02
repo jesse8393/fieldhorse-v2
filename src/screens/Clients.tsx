@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
@@ -27,7 +28,7 @@ function money(n: any) {
 export default function Clients() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { data: bundle, isLoading: loading } = useClientsBundle(user?.id)
+  const { data: bundle, isLoading: loading, isError } = useClientsBundle(user?.id)
   const rows = bundle?.clients ?? []
   const invalidateClients = useInvalidateClients()
   const [q, setQ] = useState('')
@@ -133,6 +134,20 @@ export default function Clients() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+
+  // A failed load must not fall through to the "No accounts yet" empty state —
+  // that would tell a contractor with a full book of business it's empty.
+  if (isError) {
+    return (
+      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+        <DataErrorState
+          title="Couldn't load clients"
+          message="We couldn't reach your client list. Check your connection and retry — nothing was lost."
+          onRetry={() => invalidateClients()}
+        />
+      </div>
+    )
+  }
 
   // Phase 7 — desktop-first composition. At >=900px DesktopClientsDirectory
   // renders the real KPI strip + list+detail directory using the same

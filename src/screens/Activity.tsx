@@ -24,6 +24,7 @@ import { useActivityFeed } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 
 const PAGE_SIZE = 60
 
@@ -68,7 +69,7 @@ function timeAt(d: any) {
 
 export default function Activity() {
   const { user } = useAuth()
-  const { data: bundle } = useActivityFeed(user?.id, PAGE_SIZE)
+  const { data: bundle, isError, refetch } = useActivityFeed(user?.id, PAGE_SIZE)
   const { stagger, item } = useFhMotion()
 
   // Map the raw datasets into display events. Kept in the component
@@ -162,6 +163,20 @@ export default function Activity() {
 
   const loading = events === null
   const empty = !loading && events.length === 0
+
+  // Without this, a failed fetch leaves events===null forever → an infinite
+  // skeleton that looks like a hang. Show an honest error + retry instead.
+  if (isError) {
+    return (
+      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+        <DataErrorState
+          title="Couldn't load activity"
+          message="We couldn't reach your activity feed. Check your connection and retry."
+          onRetry={() => refetch()}
+        />
+      </div>
+    )
+  }
 
   return (
     <motion.div

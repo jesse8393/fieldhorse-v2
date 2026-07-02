@@ -20,6 +20,7 @@ import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
 const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
@@ -768,6 +769,7 @@ function VoiceButton({ listening, onStart, onStop }: any) {
    subtle hover lift, swipe actions for archive/delete on mobile.
    ============================================================ */
 function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArchive, onDelete }: any) {
+  const confirm = useConfirm()
   const body = note.text || note.body || ''
   const firstLine = (body.split('\n').find((l: any) => l.trim()) || '').trim()
   const title = note.parsed?.summary || firstLine.slice(0, 90) || 'Untitled note'
@@ -920,9 +922,9 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
             {onDelete && (
               <button
                 type="button"
-                onClick={(ev) => {
+                onClick={async (ev) => {
                   ev.stopPropagation()
-                  if (!window.confirm('Delete this note? This cannot be undone.')) return
+                  if (!(await confirm({ title: 'Delete this note?', body: 'This cannot be undone.', destructive: true }))) return
                   onDelete()
                 }}
                 aria-label="Delete note"

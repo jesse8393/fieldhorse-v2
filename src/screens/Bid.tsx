@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill } from '../components/v3'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
 
 // White-label: internal-only tool but no app-attributable phrasing
 // just in case any of the output is shown to a customer downstream.
@@ -33,6 +34,7 @@ function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) 
 
 export default function Bid() {
   const { user } = useAuth()
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const [scope, setScope] = useState('')
   const [marginPct, setMarginPct] = useState(25)
@@ -250,7 +252,7 @@ export default function Bid() {
 
   async function deleteTemplate(t: any) {
     if (!t?.id) return
-    if (!window.confirm(`Delete "${t.name}" from your templates?`)) return
+    if (!(await confirm({ title: `Delete "${t.name}" from your templates?`, destructive: true }))) return
     try {
       const { error } = await supabase.from('fh_estimate_templates').delete().eq('id', t.id)
       if (error) throw error

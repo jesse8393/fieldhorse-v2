@@ -524,36 +524,11 @@ export default function Home() {
           )}
         </div>
 
-        {/* Gold sparkline — synthesized ascending wave that anchors the
-            pipeline number visually. Ports the design's pipeline-hero__spark
-            (screens-home.jsx). 14-point ascending curve so the trend reads
-            as "going up and to the right" without requiring real time-series
-            data to be wired through yet. */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 320 60"
-          preserveAspectRatio="none"
-          style={{ display: 'block', width: '100%', height: 48, marginTop: 10 }}
-        >
-          <defs>
-            <linearGradient id="fh-pipeline-sparkfill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#E4BE6F" stopOpacity="0.32" />
-              <stop offset="100%" stopColor="#E4BE6F" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M0,46 L26,42 L52,38 L78,30 L104,34 L130,28 L156,32 L182,22 L208,28 L234,18 L260,22 L286,12 L320,8 L320,60 L0,60 Z"
-            fill="url(#fh-pipeline-sparkfill)"
-          />
-          <path
-            d="M0,46 L26,42 L52,38 L78,30 L104,34 L130,28 L156,32 L182,22 L208,28 L234,18 L260,22 L286,12 L320,8"
-            fill="none"
-            stroke="#E4BE6F"
-            strokeWidth="1.5"
-          />
-          <circle cx="320" cy="8" r="3" fill="#E4BE6F" />
-          <circle cx="320" cy="8" r="6" fill="#E4BE6F" opacity="0.18" />
-        </svg>
+        {/* NOTE: a synthesized always-ascending sparkline used to sit here.
+            It rendered "up and to the right" regardless of the real number —
+            it could sweep upward next to a negative trend chip. Removed: the
+            honest trend chip above and the real Won/Active/Lead breakdown
+            below carry the pipeline story with actual data. */}
 
         {/* Won / Active / Lead breakdown — ports the design's pipeline-hero__breakdown.
             Three cells, colored dot + label + stamp amount + count. Each cell

@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { Shield, Save as SaveIcon, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 const FIELDS = [
   { key: 'claim_number',     label: 'Claim number',     type: 'text',  placeholder: 'CL-2026-04812' },
@@ -48,6 +49,7 @@ function hydrate(insurance: any) {
 }
 
 export default function InsuranceSection({ contact, userId, insurance, onChange }: any) {
+  const confirm = useConfirm()
   const isOwner = contact && contact.user_id === userId
   const [editing, setEditing] = useState(!insurance)
   const [form, setForm] = useState(() => hydrate(insurance))
@@ -131,7 +133,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
 
   async function handleDelete() {
     if (!insurance?.id) return
-    if (!window.confirm('Remove insurance claim from this job? This cannot be undone.')) return
+    if (!(await confirm({ title: 'Remove insurance claim from this job?', body: 'This cannot be undone.', destructive: true, confirmLabel: 'Remove' }))) return
     setDeleting(true)
     try {
       const { error } = await supabase

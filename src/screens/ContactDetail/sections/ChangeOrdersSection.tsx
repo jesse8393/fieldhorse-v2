@@ -17,6 +17,7 @@ import { Plus, FileEdit, Check, X, Trash2, FileText, Share2 } from 'lucide-react
 import { supabase } from '../../../lib/supabase.ts'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -34,6 +35,7 @@ function shortDate(iso: any) {
 }
 
 export default function ChangeOrdersSection({ contact, userId, changeOrders = [], onChange }: any) {
+  const confirm = useConfirm()
   const isOwner = contact && contact.user_id === userId
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
@@ -167,12 +169,12 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
   }
 
   async function handleVoid(co: any) {
-    if (!window.confirm(`Void CO #${co.sequence_number}? It will stop counting toward the contract total.`)) return
+    if (!(await confirm({ title: `Void CO #${co.sequence_number}?`, body: 'It will stop counting toward the contract total.', destructive: true, confirmLabel: 'Void' }))) return
     await handleSave({ ...co, status: 'void' })
   }
 
   async function handleDelete(co: any) {
-    if (!window.confirm(`Delete CO #${co.sequence_number}? This cannot be undone.`)) return
+    if (!(await confirm({ title: `Delete CO #${co.sequence_number}?`, body: 'This cannot be undone.', destructive: true }))) return
     try {
       const { error } = await supabase
         .from('fh_change_orders')

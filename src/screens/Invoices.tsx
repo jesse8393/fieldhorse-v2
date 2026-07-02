@@ -18,6 +18,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 // V3PaymentSheet is lazy — only loads when an operator taps "Mark Paid".
@@ -73,7 +74,7 @@ function fmtMoney(n: any) {
 export default function Invoices() {
   const { user } = useAuth()
   const { profile } = useProfile()
-  const { data: bundle, isLoading: loading } = useInvoicesBundle(user?.id)
+  const { data: bundle, isLoading: loading, isError } = useInvoicesBundle(user?.id)
   const refresh = useInvalidateInvoices()
   const jobs = bundle?.jobs ?? []
   const payments = bundle?.payments ?? []
@@ -435,6 +436,21 @@ export default function Invoices() {
   const allCaughtUp = !loading && totals.count === 0
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
+
+  // Never render financial totals from a failed load — a fetch error would
+  // otherwise fall through to "$0 · all caught up", telling a contractor
+  // they're owed nothing when the data simply didn't arrive.
+  if (isError) {
+    return (
+      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+        <DataErrorState
+          title="Couldn't load invoices & payments"
+          message="We couldn't reach your billing data. Check your connection and retry — your numbers are safe."
+          onRetry={() => refresh()}
+        />
+      </div>
+    )
+  }
 
   if (isDesktop) {
     return (
