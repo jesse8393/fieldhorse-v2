@@ -312,6 +312,52 @@ export default function OverviewTab({
         />
       )}
 
+      {/* DAILY ACTIONS — the highest-frequency job actions live here, directly
+          under the status/next-action so they're reachable without scrolling
+          past the activity feed. Money actions come first, then time clock,
+          then the lower-frequency schedule/partner actions. */}
+      {(contact?.stage === 'job' || contact?.stage === 'invoice') && (
+        <TimeClockCard
+          contact={contact}
+          userId={userId}
+          onLogged={fetchAll}
+        />
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {(contact?.stage === 'invoice' || contact?.stage === 'job') && (
+          <SecondaryAction
+            icon={Receipt}
+            label="Send invoice"
+            onClick={() => { hapticTap(); onOpenSendInvoice?.() }}
+          />
+        )}
+        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
+          <SecondaryAction
+            icon={Plus}
+            label="Log payment"
+            onClick={() => { hapticTap(); onOpenLogPayment?.() }}
+          />
+        )}
+        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
+          <SecondaryAction
+            icon={ShieldCheck}
+            label={contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
+            onClick={() => { hapticTap(); onOpenMarkComplete?.() }}
+          />
+        )}
+        <SecondaryAction
+          icon={Plus}
+          label="Schedule event"
+          onClick={() => { hapticTap(); onOpenAddEvent?.() }}
+        />
+        <SecondaryAction
+          icon={Plus}
+          label="Invite partner"
+          onClick={() => { hapticTap(); onOpenInvitePartner?.() }}
+        />
+      </div>
+
       {/* RECENT ACTIVITY */}
       <div className="v3-section">
         <SectionHeader {...({ title: "Recent Activity" } as any)} />
@@ -344,54 +390,6 @@ export default function OverviewTab({
             ))
           )}
         </div>
-      </div>
-
-      {/* TIME CLOCK — preserved from legacy. Only shows when stage in {job, invoice}.
-          TimeClockCard internally gates on stage; we mount it always and let it
-          decide whether to render. */}
-      {(contact?.stage === 'job' || contact?.stage === 'invoice') && (
-        <TimeClockCard
-          contact={contact}
-          userId={userId}
-          onLogged={fetchAll}
-        />
-      )}
-
-      {/* QUICK ACTIONS row — secondary actions. + Event opens AddEventSheet,
-          Log Payment opens PaymentModal (only when stage allows it),
-          Invite Partner opens InvitePartnerSheet. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <SecondaryAction
-          icon={Plus}
-          label="Schedule event"
-          onClick={() => { hapticTap(); onOpenAddEvent?.() }}
-        />
-        {(contact?.stage === 'invoice' || contact?.stage === 'job') && (
-          <SecondaryAction
-            icon={Receipt}
-            label="Send invoice"
-            onClick={() => { hapticTap(); onOpenSendInvoice?.() }}
-          />
-        )}
-        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
-          <SecondaryAction
-            icon={Plus}
-            label="Log payment"
-            onClick={() => { hapticTap(); onOpenLogPayment?.() }}
-          />
-        )}
-        <SecondaryAction
-          icon={Plus}
-          label="Invite partner"
-          onClick={() => { hapticTap(); onOpenInvitePartner?.() }}
-        />
-        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
-          <SecondaryAction
-            icon={ShieldCheck}
-            label={contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
-            onClick={() => { hapticTap(); onOpenMarkComplete?.() }}
-          />
-        )}
       </div>
 
       {/* ACTIVITY LOG — chronological feed synthesized from existing
@@ -530,20 +528,22 @@ function SecondaryAction({ icon: Icon, label, onClick }: any) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '9px 14px',
-        borderRadius: 10,
+        justifyContent: 'center',
+        gap: 7,
+        minHeight: 44,
+        padding: '11px 16px',
+        borderRadius: 12,
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border)',
         color: 'var(--v3-text)',
         fontFamily: 'var(--font-body)',
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 600,
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent'
       }}
     >
-      <Icon size={13} aria-hidden="true" />
+      <Icon size={15} aria-hidden="true" />
       {label}
     </motion.button>
   )
