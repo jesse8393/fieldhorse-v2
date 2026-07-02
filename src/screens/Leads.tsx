@@ -537,24 +537,6 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
         </div>
       </motion.div>
 
-      <motion.div className="fh-leads__ops-wrap" variants={item}>
-        <LeadOpsPanel
-          loading={loading}
-          summary={summary}
-          tabCounts={tabCounts}
-          surface={surface}
-          onFilter={(next: LeadFilter) => {
-            hapticTap()
-            setFilter(next)
-          }}
-          onNewLead={() => {
-            hapticMedium()
-            setAddOpen(true)
-          }}
-          onJobs={() => navigate('/jobs')}
-        />
-      </motion.div>
-
       <motion.div className="fh-leads__conversion-wrap" variants={item}>
         <LeadConversionPanel
           command={leadCommand}
@@ -709,97 +691,6 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
 
       <ScreenCloser caption={`${filtered.length} ${filtered.length === 1 ? itemNoun : itemPlural} in this view.`} />
     </motion.div>
-  )
-}
-
-type LeadOpsPanelProps = {
-  loading: boolean
-  summary: LeadSummary
-  tabCounts: Partial<Record<LeadFilter, number>>
-  surface: LeadSurface
-  onFilter: (next: LeadFilter) => void
-  onNewLead: () => void
-  onJobs: () => void
-}
-
-function LeadOpsPanel({ loading, summary, tabCounts, surface, onFilter, onNewLead, onJobs }: LeadOpsPanelProps) {
-  const isQuotesSurface = surface === 'quotes'
-  const newCount = Number(tabCounts.new || 0)
-  const quotedCount = Number(tabCounts.quoted || 0)
-  const dueCount = Number(summary.dueCount || 0)
-  const potential = money(summary.pipeline) || '$0'
-  const quotedValue = money(summary.quotedValue) || '$0'
-  const nextFilter: LeadFilter = isQuotesSurface ? 'quoted' : dueCount > 0 ? 'open' : newCount > 0 ? 'new' : 'quoted'
-  const createLabel = isQuotesSurface ? 'New quote' : 'New lead'
-
-  return (
-    <section className="fh-leads-ops" aria-label={`${isQuotesSurface ? 'Quote' : 'Lead'} Desk operating summary`}>
-      <button
-        type="button"
-        className="fh-leads-ops__primary"
-        onClick={() => onFilter(nextFilter)}
-      >
-        <span className="fh-leads-ops__eyebrow">{isQuotesSurface ? 'Proposal desk' : 'Revenue intake'}</span>
-        <strong>{loading ? 'Syncing...' : dueCount > 0 ? `${dueCount} follow-ups due` : isQuotesSurface ? `${quotedCount} active quotes` : `${newCount} new leads`}</strong>
-        <span>{loading ? 'Refreshing the board' : isQuotesSurface ? `${quotedValue} quoted value` : `${potential} open potential`}</span>
-      </button>
-
-      <div className="fh-leads-ops__metrics">
-        {isQuotesSurface ? (
-          <>
-            <button type="button" onClick={() => onFilter('quoted')}>
-              <FileText size={14} aria-hidden="true" />
-              <span>Active</span>
-              <strong>{loading ? '--' : quotedCount}</strong>
-            </button>
-            <button type="button" onClick={() => onFilter('quoted')}>
-              <CalendarClock size={14} aria-hidden="true" />
-              <span>Due</span>
-              <strong>{loading ? '--' : dueCount}</strong>
-            </button>
-            <button type="button" onClick={() => onFilter('quoted')}>
-              <Trophy size={14} aria-hidden="true" />
-              <span>Quoted $</span>
-              <strong>{loading ? '--' : quotedValue}</strong>
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={() => onFilter('new')}>
-              <Sparkles size={14} aria-hidden="true" />
-              <span>New</span>
-              <strong>{loading ? '--' : newCount}</strong>
-            </button>
-            <button type="button" onClick={() => onFilter('quoted')}>
-              <FileText size={14} aria-hidden="true" />
-              <span>Quoting</span>
-              <strong>{loading ? '--' : quotedCount}</strong>
-            </button>
-            <button type="button" onClick={() => onFilter('open')}>
-              <CalendarClock size={14} aria-hidden="true" />
-              <span>Due</span>
-              <strong>{loading ? '--' : dueCount}</strong>
-            </button>
-            <button type="button" onClick={() => onFilter('quoted')}>
-              <Trophy size={14} aria-hidden="true" />
-              <span>Quoted $</span>
-              <strong>{loading ? '--' : quotedValue}</strong>
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className="fh-leads-ops__actions">
-        <button type="button" className="fh-leads-ops__new" onClick={onNewLead}>
-          <Plus size={15} aria-hidden="true" />
-          <span>{createLabel}</span>
-        </button>
-        <button type="button" className="fh-leads-ops__job" onClick={onJobs}>
-          <Trophy size={15} aria-hidden="true" />
-          <span>Pipeline</span>
-        </button>
-      </div>
-    </section>
   )
 }
 

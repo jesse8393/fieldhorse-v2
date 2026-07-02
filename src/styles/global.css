@@ -10713,141 +10713,6 @@ select {
    Keeps the existing mobile-first lead cards and promotes the desktop
    screen into the same command-center family as Jobs, Clients, and Home.
    ========================================================================= */
-.fh-leads__ops-wrap {
-  padding: 0 var(--v3-gutter) 14px;
-}
-
-.fh-leads-ops {
-  display: grid;
-  gap: 10px;
-}
-
-.fh-leads-ops button {
-  min-width: 0;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
-}
-
-.fh-leads-ops button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(201, 150, 58, 0.34);
-}
-
-.fh-leads-ops__primary,
-.fh-leads-ops__metrics button,
-.fh-leads-ops__new,
-.fh-leads-ops__job {
-  border: 1px solid rgba(255, 240, 210, 0.10);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
-    rgba(20, 17, 16, 0.78);
-  color: var(--ink-strong, #f4f1ea);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 240, 210, 0.052),
-    0 14px 34px rgba(0, 0, 0, 0.22);
-}
-
-.fh-leads-ops__primary {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 6px;
-  min-height: 112px;
-  padding: 16px;
-  border-radius: 14px;
-  text-align: left;
-}
-
-.fh-leads-ops__eyebrow,
-.fh-leads-ops__metrics span {
-  color: rgba(245, 242, 234, 0.56);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.fh-leads-ops__primary strong {
-  color: var(--ink-strong, #f4f1ea);
-  font-size: 22px;
-  line-height: 1.08;
-  letter-spacing: 0;
-}
-
-.fh-leads-ops__primary > span:last-child {
-  color: rgba(245, 242, 234, 0.64);
-  font-size: 12px;
-}
-
-.fh-leads-ops__metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.fh-leads-ops__metrics button {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas:
-    "icon label"
-    "icon value";
-  align-items: center;
-  column-gap: 9px;
-  min-height: 72px;
-  padding: 12px;
-  border-radius: 12px;
-  text-align: left;
-}
-
-.fh-leads-ops__metrics svg {
-  grid-area: icon;
-  color: var(--field-gold-bright, #e8b04c);
-}
-
-.fh-leads-ops__metrics span {
-  grid-area: label;
-}
-
-.fh-leads-ops__metrics strong {
-  grid-area: value;
-  color: var(--ink-strong, #f4f1ea);
-  font-size: 18px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.fh-leads-ops__actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.fh-leads-ops__new,
-.fh-leads-ops__job {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 40px;
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.fh-leads-ops__new {
-  background: linear-gradient(180deg, #e4be6f 0%, #c9963a 100%);
-  border-color: rgba(140, 111, 48, 0.72);
-  color: #0b0907;
-  box-shadow: 0 10px 26px rgba(201, 150, 58, 0.22);
-}
-
-.fh-leads-ops__job {
-  color: rgba(245, 242, 234, 0.86);
-}
-
 .fh-leads__conversion-wrap {
   padding: 0 var(--v3-gutter) 14px;
 }
@@ -10995,7 +10860,6 @@ select {
     grid-template-columns: minmax(280px, 1fr) minmax(240px, 380px) minmax(0, auto);
     grid-template-areas:
       "head search tabs"
-      "ops ops ops"
       "conversion conversion conversion"
       "list list list";
     column-gap: 16px;
@@ -11026,32 +10890,14 @@ select {
     flex-wrap: nowrap;
   }
 
-  .v3-screen--leads > .fh-leads__ops-wrap {
-    grid-area: ops;
-    padding: 0 !important;
-  }
-
   .v3-screen--leads > .fh-leads__conversion-wrap {
     grid-area: conversion;
     padding: 0 !important;
   }
 
-  .fh-leads-ops {
-    grid-template-columns: minmax(300px, 0.78fr) minmax(440px, 1.32fr) minmax(180px, 0.42fr);
-    align-items: stretch;
-  }
-
   .fh-lead-command {
     grid-template-columns: minmax(360px, 0.82fr) minmax(520px, 1.18fr);
     align-items: stretch;
-  }
-
-  .fh-leads-ops__metrics {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .fh-leads-ops__actions {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .v3-screen--leads > .fh-leads__list {
@@ -11071,12 +10917,6 @@ select {
   .v3-screen--leads .fh-lead-card {
     height: 100%;
     min-height: 176px;
-  }
-}
-
-@media (max-width: 899px) {
-  .fh-leads-ops__primary {
-    min-height: 96px;
   }
 }
 
