@@ -87,15 +87,22 @@ export function useJobPhotos(userId: string | undefined) {
 export function useJobsRealtime(userId: string | undefined, client: QueryClient) {
   useEffect(() => {
     if (!userId) return
+    // Debounce: a bulk stage change or import can fire many contact events
+    // in a row; coalesce them into one refetch instead of one per row.
+    let debounce: ReturnType<typeof setTimeout> | null = null
+    const invalidate = () => {
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => client.invalidateQueries({ queryKey: queryKeys.jobs }), 1200)
+    }
     const channel = supabase
       .channel(`fh_contacts:jobs:${userId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${userId}` },
-        () => client.invalidateQueries({ queryKey: queryKeys.jobs })
+        invalidate
       )
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { if (debounce) clearTimeout(debounce); supabase.removeChannel(channel) }
   }, [userId, client])
 }
 

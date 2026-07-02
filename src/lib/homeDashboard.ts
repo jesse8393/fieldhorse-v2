@@ -573,9 +573,14 @@ export async function fetchHomeDashboard(
     sentChangeOrdersRes,
     openInvoicesRes,
   ] = await Promise.all([
-    supabase
-      .from('fh_contacts')
-      .select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status'),
+    // Scope contacts the same way as every sibling query (org, else user).
+    // Left unscoped this pulled the whole RLS-visible table to the phone AND
+    // mixed in partner-shared rows the other signals exclude — inflating the
+    // pipeline total and not scaling.
+    (orgId
+      ? supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status').eq('org_id', orgId)
+      : supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status').eq('user_id', userId)
+    ),
     overdueScheduleQuery,
     paymentsQuery,
     todayScheduleQuery,
@@ -622,8 +627,16 @@ export function useHomeDashboardRealtime(userId: string | undefined, orgId?: str
   useEffect(() => {
     if (!userId) return
 
+    // Coalesce bursts. The dashboard listens to 7 tables; a single busy
+    // moment (log a payment → contact, payment, invoice, schedule all fire)
+    // would otherwise trigger several full 8-query refetches back-to-back.
+    // A trailing debounce collapses the burst into one refetch.
+    let debounce: ReturnType<typeof setTimeout> | null = null
     const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: homeDashboardKey(userId, orgId) })
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: homeDashboardKey(userId, orgId) })
+      }, 1500)
     }
 
     const scopeFilter = orgId ? `org_id=eq.${orgId}` : `user_id=eq.${userId}`
@@ -639,6 +652,7 @@ export function useHomeDashboardRealtime(userId: string | undefined, orgId?: str
       .subscribe()
 
     return () => {
+      if (debounce) clearTimeout(debounce)
       supabase.removeChannel(channel)
     }
   }, [orgId, queryClient, userId])
