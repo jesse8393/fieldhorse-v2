@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
-  orgInviteCreate, orgInviteRevoke, orgMembersList, orgMemberRemove, orgMemberRole,
+  orgInviteCreate, orgInviteRevoke, orgMembersList, orgMemberRemove, orgMemberRole, orgMemberRate,
   type OrgInvitePending, type OrgMember,
 } from '../lib/orgApi.ts'
 import type { OrgRole } from '../lib/permissions.ts'
@@ -269,6 +269,28 @@ const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, adm
 function MemberActions({ member, callerRole, canManage, onChanged }: any) {
   const confirm = useConfirm()
   const [busy, setBusy] = useState(false)
+  const [rate, setRate] = useState(member.default_hourly_rate != null ? String(member.default_hourly_rate) : '')
+
+  async function saveRate() {
+    const trimmed = rate.trim()
+    const next = trimmed === '' ? null : Number(trimmed)
+    // No-op if unchanged.
+    const current = member.default_hourly_rate ?? null
+    if ((next ?? null) === current) return
+    if (next != null && (!Number.isFinite(next) || next < 0)) {
+      toastError('Invalid rate', 'Enter a number ≥ 0, or clear it.')
+      setRate(current != null ? String(current) : '')
+      return
+    }
+    setBusy(true)
+    try {
+      await orgMemberRate(member.user_id, next)
+      toastSuccess('Rate saved', `${member.name || member.email || 'Member'} · ${next != null ? '$' + next + '/hr' : 'cleared'}`)
+      onChanged?.()
+    } catch (e: any) {
+      toastError("Couldn't save rate", e?.message || 'Try again')
+    } finally { setBusy(false) }
+  }
   const callerTier = ROLE_TIER[callerRole || ''] ?? 0
   const targetTier = ROLE_TIER[member.role] ?? 0
   const manageable = canManage && !member.is_self && targetTier < callerTier
@@ -304,6 +326,25 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }} title="Crew hourly rate — feeds job labor cost">
+        <span style={{ color: 'var(--v3-text-muted, rgba(245,242,234,.5))', fontSize: 11 }}>$</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={rate}
+          disabled={busy}
+          onChange={(e) => setRate(e.target.value)}
+          onBlur={saveRate}
+          onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
+          placeholder="—"
+          aria-label={`Hourly rate for ${member.name || member.email || 'member'}`}
+          className="fh-build-select"
+          style={{ width: 56, fontSize: 11, padding: '3px 6px' }}
+        />
+        <span style={{ color: 'var(--v3-text-muted, rgba(245,242,234,.5))', fontSize: 10 }}>/hr</span>
+      </span>
       <select
         value={member.role}
         disabled={busy}

@@ -51,14 +51,38 @@ export async function crewLaborForContact(
     .not('punch_out_at', 'is', null)
     .neq('user_id', ownerUserId)
   if (error || !data) return empty
+
+  // Resolve owner-set per-member rates for punches that carry no snapshot
+  // rate of their own. This is what turns crew labor from $0 into real cost:
+  // the crew clock writes no rate, so we fall back to the member's configured
+  // default_hourly_rate (org_members). A punch's own hourly_rate still wins
+  // when present (it's the rate as of that shift).
+  const needRateFor = Array.from(new Set(
+    (data as any[])
+      .filter((p) => !(Number(p.hourly_rate) > 0))
+      .map((p) => p.user_id)
+      .filter(Boolean)
+  ))
+  const memberRate: Record<string, number> = {}
+  if (needRateFor.length) {
+    const { data: members } = await (supabase.from('org_members') as any)
+      .select('user_id, default_hourly_rate')
+      .in('user_id', needRateFor)
+    for (const m of (members || []) as any[]) {
+      const r = Number(m.default_hourly_rate)
+      if (Number.isFinite(r) && r > 0) memberRate[m.user_id] = r
+    }
+  }
+
   const out = { ...empty }
   for (const p of data as any[]) {
     const hrs = punchHours(p)
     if (hrs <= 0) continue
     out.punches += 1
     out.hours += hrs
-    const rate = Number(p.hourly_rate)
-    if (Number.isFinite(rate) && rate > 0) out.cost += hrs * rate
+    let rate = Number(p.hourly_rate)
+    if (!(Number.isFinite(rate) && rate > 0)) rate = memberRate[p.user_id] || 0
+    if (rate > 0) out.cost += hrs * rate
     else out.unratedHours += hrs
   }
   out.cost = Math.round(out.cost * 100) / 100

@@ -25,6 +25,7 @@ export type OrgMember = {
   joined_at: string
   invited_by: string | null
   is_self: boolean
+  default_hourly_rate: number | null
   name: string | null
   company_name: string | null
   email: string | null
@@ -114,6 +115,10 @@ export function orgMemberRemove(memberUserId: string): Promise<{ ok: true }> {
 
 export function orgMemberRole(memberUserId: string, role: OrgRole): Promise<{ ok: true; role: OrgRole }> {
   return callJson('/api/org-member-role', { member_user_id: memberUserId, role })
+}
+
+export function orgMemberRate(memberUserId: string, rate: number | null): Promise<{ ok: true; rate: number | null }> {
+  return callJson('/api/org-member-rate', { member_user_id: memberUserId, rate })
 }
 
 // ────────────────────────────────────────────────────────────
