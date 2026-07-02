@@ -65,7 +65,7 @@ export default async (request) => {
   // Load the invite.
   const { data: invite, error: invErr } = await admin
     .from('fh_job_partners')
-    .select('id, job_id, partner_email, status, user_id')
+    .select('id, job_id, partner_email, status, invited_by_user_id')
     .eq('invite_token', token)
     .maybeSingle()
 
@@ -97,7 +97,7 @@ export default async (request) => {
 
   // Lock-screen ping to the inviting contractor (bell row already
   // exists via the fh_notifications trigger path). Best effort.
-  await sendPushToUser(admin, invite.user_id, {
+  await sendPushToUser(admin, invite.invited_by_user_id, {
     title: 'Partner joined your job',
     body: `${invite.partner_email} accepted the invite`,
     link: `/jobs/${invite.job_id}?tab=partners`,

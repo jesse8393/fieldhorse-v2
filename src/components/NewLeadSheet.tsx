@@ -587,7 +587,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
       {/* Section divider — flips the surface from "voice capture" mode
           to "edit fields" mode. Mirrors section-lbl from styles-refine. */}
       <div className="fh-vsection">
-        <span>Lead details</span>
+        <span>{NounCap} details</span>
         <span className="fh-vsection__hint">tap any field to edit</span>
       </div>
 
@@ -622,6 +622,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               onChange={(e) => set('name', e.target.value)}
               maxLength={FIELD_LIMITS.name}
               placeholder="Homeowner or company"
+              autoComplete="name"
               style={V3_INPUT}
             />
           </V3Field>
@@ -631,6 +632,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               <input
                 type="tel"
                 inputMode="tel"
+                autoComplete="tel"
                 value={form.phone}
                 onChange={(e) => set('phone', e.target.value)}
                 maxLength={FIELD_LIMITS.phone}
@@ -642,6 +644,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               <input
                 type="email"
                 inputMode="email"
+                autoComplete="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 maxLength={FIELD_LIMITS.email}
@@ -657,6 +660,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               onChange={(e) => set('address', e.target.value)}
               maxLength={FIELD_LIMITS.address}
               placeholder="1234 Main St · Murfreesboro, TN"
+              autoComplete="street-address"
               style={V3_INPUT}
             />
           </V3Field>
@@ -711,7 +715,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           )}
 
-          <V3Field label={form.stage === 'lead' ? 'Project / scope' : 'Job title'}>
+          <V3Field label={form.stage === 'lead' ? 'What do they need?' : 'Job title'}>
             <input
               value={form.job_title}
               onChange={(e) => set('job_title', e.target.value)}
@@ -721,35 +725,47 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           </V3Field>
 
-          <V3Field label={form.stage === 'lead' ? 'Scope notes' : 'Quote scope'}>
-            <textarea
-              rows={3}
-              value={form.scope_text}
-              onChange={(e) => set('scope_text', e.target.value)}
-              maxLength={FIELD_LIMITS.scope_text}
-              placeholder="What they want, timing, constraints, measurements, must-haves..."
-              style={{ ...V3_INPUT, resize: 'vertical', minHeight: 84 }}
-            />
-          </V3Field>
-
-          <V3Field label={form.stage === 'lead' ? 'Estimated value (optional)' : 'Amount'}>
-            <div style={{ position: 'relative' }}>
-              <span aria-hidden="true" style={{
-                position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-                color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 16,
-                pointerEvents: 'none'
-              }}>$</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={form.amount}
-                onChange={(e) => set('amount', e.target.value.replace(/[^\d.]/g, ''))}
-                maxLength={FIELD_LIMITS.amount}
-                placeholder="0"
-                style={{ ...V3_INPUT, paddingLeft: 30, fontVariantNumeric: 'tabular-nums' }}
+          {/* A lead is a simple capture — who they are + what they need.
+              Scope detail and pricing belong on the quote, so those fields
+              only appear from the quote stage onward. Keeps the lead form
+              short (the "a lead should be its own thing" ask). */}
+          {form.stage !== 'lead' && (
+            <V3Field label="Quote scope">
+              <textarea
+                rows={3}
+                value={form.scope_text}
+                onChange={(e) => set('scope_text', e.target.value)}
+                maxLength={FIELD_LIMITS.scope_text}
+                placeholder="What they want, timing, constraints, measurements, must-haves..."
+                style={{ ...V3_INPUT, resize: 'vertical', minHeight: 84 }}
               />
-            </div>
-          </V3Field>
+            </V3Field>
+          )}
+
+          {/* Amount is only entered directly on a quick JOB. A quote's total
+              is driven by the line items you build (the recalc trigger sets
+              fh_contacts.amount), so typing an amount here would just get
+              overwritten — we omit it and send you to the line-item builder. */}
+          {form.stage === 'job' && (
+            <V3Field label="Amount">
+              <div style={{ position: 'relative' }}>
+                <span aria-hidden="true" style={{
+                  position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                  color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 16,
+                  pointerEvents: 'none'
+                }}>$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.amount}
+                  onChange={(e) => set('amount', e.target.value.replace(/[^\d.]/g, ''))}
+                  maxLength={FIELD_LIMITS.amount}
+                  placeholder="0"
+                  style={{ ...V3_INPUT, paddingLeft: 30, fontVariantNumeric: 'tabular-nums' }}
+                />
+              </div>
+            </V3Field>
+          )}
 
           {form.stage !== 'job' && (
             <FollowUpPicker

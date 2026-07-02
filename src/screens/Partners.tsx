@@ -24,6 +24,7 @@ import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
+import { authHeaders } from '../lib/supabase.ts'
 import { usePartnerDirectory, useInvalidatePartners } from '../lib/queries.ts'
 import { revokePartnerRow } from '../lib/partners.ts'
 import { stageColor } from '../lib/stages.ts'
@@ -87,7 +88,7 @@ export default function Partners() {
     try {
       const res = await fetch('/api/partner-invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           job_id: job.id,
           invited_by_user_id: user.id,

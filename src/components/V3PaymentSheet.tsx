@@ -63,6 +63,12 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
   // mount via AnimatePresence. The local open=true keeps Vaul happy.
   const [open, setOpen] = useState(true)
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
+  // Stable idempotency key for this payment intent. If the insert commits
+  // but the response is lost and the operator retaps, the same id upserts
+  // to a no-op instead of double-recording. Regenerated only after success.
+  const paymentIdRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
+  )
 
   async function submit(e: any) {
     e?.preventDefault()
@@ -74,7 +80,10 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
     }
     setSaving(true)
     try {
-      await logPayment(contact, { amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: invoice?.id || null })
+      const res = await logPayment(contact, { id: paymentIdRef.current, amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: invoice?.id || null })
+      // logPayment returns { error } instead of throwing on a DB failure —
+      // surface it, or the sheet would falsely report success.
+      if (res && (res as any).error) throw new Error((res as any).error.message || 'save failed')
       hapticTap()
       setSuccess(true)
       toastSuccess('Payment recorded', `${money(numeric)} · ${methodLabel(method)}`)

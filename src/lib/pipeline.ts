@@ -80,17 +80,22 @@ export async function reopen(contact: Contact) {
   return res
 }
 
-export async function logPayment(contact: Contact, input: { amount?: number | string | null; method?: string | null; kind?: string | null; reference?: string | null; paid_on?: string | null; invoice_id?: string | null }) {
+export async function logPayment(contact: Contact, input: { id?: string | null; amount?: number | string | null; method?: string | null; kind?: string | null; reference?: string | null; paid_on?: string | null; invoice_id?: string | null }) {
   const res = await baseLogPayment(contact, input)
+  // Don't fire success UI when the write failed — the caller surfaces the
+  // error (V3PaymentSheet throws on res.error). Firing a success haptic +
+  // "Payment logged" toast here would contradict the caller's error toast.
+  if (res && 'error' in res && (res as any).error) {
+    return res
+  }
   hapticSuccess()
   const paid = Number(input.amount || 0)
-  const total = res && 'total' in res ? res.total : undefined
-  // Mirror the guard in stages.ts logPayment: only call this "paid in
-  // full" when there's a real contract amount that's now covered.
-  // Otherwise (amount=0, e.g. a freshly created quick invoice) total >= 0
-  // is always true and the toast lies.
-  const contractAmount = Number(contact.amount || 0)
-  if (total !== undefined && contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
+  // Gate the "Paid in full · moved to Closed" toast on whether stages.ts
+  // ACTUALLY auto-closed. Recomputing a base-only contract here would lie
+  // when the base is paid but approved change-order money is still owed
+  // (stages.ts closes on base + approved COs).
+  const closed = !!(res && 'closed' in res && (res as any).closed)
+  if (closed) {
     toast(`Paid in full · moved to Closed`, { accent: 'closed', heavy: true })
   } else {
     toast(`Payment logged · $${paid.toLocaleString()}`, { accent: 'gold' })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Receipt, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Check, X as XIcon } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
@@ -216,15 +216,23 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 
   const [draft, setDraft] = useState(emptyDraft)
   const suggestions = useItemSuggestions(userId)
-  const [adding, setAdding] = useState(false)
+
+  // Monotonic next sort_order, seeded from loaded rows and bumped per add.
+  // Keeps rapid optimistic adds in entry order without reading (possibly
+  // stale) rows state between back-to-back adds.
+  const sortRef = useRef(0)
 
   const [editingId, setEditingId] = useState<any>(null)
   const [editDraft, setEditDraft] = useState(emptyDraft)
   const [editing, setEditing] = useState(false)
 
-  const fetchRows = useCallback(async () => {
+  // `silent` refetches without flashing the whole list to a skeleton —
+  // used after every add/edit/delete so rapid multi-item entry stays
+  // smooth instead of blinking on each write (the "glitchy" complaint).
+  // Only the initial load shows the skeleton.
+  const fetchRows = useCallback(async (opts?: { silent?: boolean }) => {
     if (!jobId || !userId) return
-    setLoading(true)
+    if (!opts?.silent) setLoading(true)
     const { data } = await supabase
       .from('fh_quote_items')
       .select('*')
@@ -232,11 +240,22 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       .eq('user_id', userId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
-    setRows(data || [])
+    const list = data || []
+    setRows(list)
+    // Seed the next sort_order above the current max so optimistic adds
+    // always append in order.
+    sortRef.current = list.length
+      ? Math.max(...list.map((r: any) => Number(r.sort_order) || 0)) + 1
+      : 0
     setLoading(false)
   }, [jobId, userId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
+
+  // Bumped after each successful add so the Add card re-focuses its
+  // description input — you can fire off line items back-to-back without
+  // reaching for the field again.
+  const [addFocusSignal, setAddFocusSignal] = useState(0)
 
   // ============================================================
   // CRUD — all writes user_id-guarded. The migration-011 recalc
@@ -249,22 +268,26 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       toastError("Couldn't add item", 'Description is required')
       return null
     }
-    const payload = {
-      user_id: userId,
-      contact_id: jobId,
-      ...input,
-      sort_order: Number.isFinite(input.sort_order) ? input.sort_order : rows.length
-    }
+    const sortOrder = Number.isFinite(input.sort_order) ? input.sort_order : sortRef.current++
+    const tempId = `temp-${(typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${rows.length}-${sortOrder}`}`
+    const optimisticRow = { id: tempId, user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder, _pending: true }
+    // Show the line immediately — no network wait between entries. This is
+    // what makes rapid multi-item entry feel instant instead of glitchy.
+    setRows((rs) => [...rs, optimisticRow])
+    const payload = { user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder }
     const { data, error } = await supabase
       .from('fh_quote_items')
       .insert(payload)
       .select()
       .single()
     if (error) {
+      // Roll the optimistic row back out and tell the operator.
+      setRows((rs) => rs.filter((r) => r.id !== tempId))
       toastError("Couldn't add item", error.message)
       return null
     }
-    await fetchRows()
+    // Swap the temp row for the persisted one (real id + server defaults).
+    setRows((rs) => rs.map((r) => (r.id === tempId ? data : r)))
     onContactRefresh?.()
     return data
   }
@@ -280,13 +303,16 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       toastError("Couldn't update item", error.message)
       return false
     }
-    await fetchRows()
+    await fetchRows({ silent: true })
     onContactRefresh?.()
     return true
   }
 
   async function removeItem(id: any) {
     if (!id || !userId) return false
+    // A still-saving optimistic row has no real id yet — ignore until it
+    // reconciles (its actions are disabled in the UI too).
+    if (String(id).startsWith('temp-')) return false
     hapticTap()
     const snapshot = rows.find((r) => r.id === id)
     setRows((rs) => rs.filter((r) => r.id !== id))
@@ -297,7 +323,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       .eq('user_id', userId)
     if (error) {
       toastError("Couldn't delete item", error.message)
-      fetchRows()
+      fetchRows({ silent: true })
       return false
     }
     onContactRefresh?.()
@@ -307,7 +333,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_quote_items').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
-        await fetchRows()
+        await fetchRows({ silent: true })
         onContactRefresh?.()
         toastSuccess('Restored')
       }
@@ -320,6 +346,8 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     if (idx === -1) return false
     const targetIdx = idx + direction
     if (targetIdx < 0 || targetIdx >= rows.length) return false
+    // Don't reorder across a row that's still saving (no real id yet).
+    if (rows[idx]?._pending || rows[targetIdx]?._pending) return false
     hapticTap()
     const a = rows[idx]
     const b = rows[targetIdx]
@@ -337,7 +365,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     ])
     if (r1.error || r2.error) {
       toastError("Couldn't reorder", (r1.error || r2.error)?.message)
-      fetchRows()
+      fetchRows({ silent: true })
       return false
     }
     return true
@@ -412,20 +440,22 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     })
   }
 
-  async function handleAdd() {
-    if (adding) return
+  function handleAdd() {
     const err = validateDraft(draft)
     if (err) { toastError("Couldn't add item", err); return }
-    setAdding(true)
-    const inserted = await addItem({
-      ...normalizeForDB(draft),
-      sort_order: rows.length
-    })
-    setAdding(false)
-    if (inserted) setDraft(emptyDraft())
+    hapticTap()
+    // Fire the optimistic add (it reconciles in the background) and reset
+    // the form NOW so the next line can be typed with zero latency. Carry
+    // the section forward — quotes are usually entered a section at a time.
+    const carrySection = draft.section
+    void addItem({ ...normalizeForDB(draft) })
+    setDraft({ ...emptyDraft(), section: carrySection })
+    // Refocus the description so line items can be fired back-to-back.
+    setAddFocusSignal((n) => n + 1)
   }
 
   function beginEdit(row: any) {
+    if (row?._pending) return
     setEditingId(row.id)
     setEditDraft(draftFromRow(row))
   }
@@ -529,12 +559,13 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         eyebrow="Add line item"
         draft={draft}
         onChange={(k: any, v: any) => patchDraft(setDraft, k, v)}
-        primaryLabel={adding ? 'Adding…' : 'Add line item'}
+        primaryLabel="Add line item"
         onPrimary={handleAdd}
-        primaryDisabled={!draft.description.trim() || adding}
+        primaryDisabled={!draft.description.trim()}
         showCancel={false}
         suggestions={suggestions}
         onPickSuggestion={(s: ItemSuggestion) => applySuggestion(setDraft, s)}
+        autoFocusSignal={addFocusSignal}
       />
 
       {/* Items list */}
@@ -583,6 +614,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
               <ItemRow
                 key={r.id}
                 row={r}
+                pending={!!r._pending}
                 isFirst={i === 0}
                 isLast={i === rows.length - 1}
                 onEdit={() => beginEdit(r)}
@@ -601,10 +633,10 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 /* ============================================================
    ItemRow — collapsed view of a single quote item.
    ============================================================ */
-function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown }: any) {
+function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown }: any) {
   const isOptional = !!row.is_optional && !row.is_excluded
   const isExcluded = !!row.is_excluded
-  const dim = isExcluded ? 0.55 : isOptional ? 0.85 : 1
+  const dim = (isExcluded ? 0.55 : isOptional ? 0.85 : 1) * (pending ? 0.6 : 1)
 
   return (
     <motion.li
@@ -689,20 +721,29 @@ function ItemRow({ row, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown 
         </div>
       )}
 
-      {/* Actions — ↑ ↓ edit delete. Each ≥40px tap target. */}
+      {/* Actions — ↑ ↓ edit delete. Each ≥40px tap target. Disabled while
+          the row is still saving (optimistic add not yet reconciled). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-        <RowActionButton ariaLabel="Move up" onClick={onMoveUp} disabled={isFirst}>
+        <RowActionButton ariaLabel="Move up" onClick={onMoveUp} disabled={isFirst || pending}>
           <ChevronUp size={16} />
         </RowActionButton>
-        <RowActionButton ariaLabel="Move down" onClick={onMoveDown} disabled={isLast}>
+        <RowActionButton ariaLabel="Move down" onClick={onMoveDown} disabled={isLast || pending}>
           <ChevronDown size={16} />
         </RowActionButton>
-        <RowActionButton ariaLabel="Edit line item" onClick={onEdit}>
+        <RowActionButton ariaLabel="Edit line item" onClick={onEdit} disabled={pending}>
           <Pencil size={14} />
         </RowActionButton>
-        <RowActionButton ariaLabel="Delete line item" onClick={onDelete} tone="danger">
+        <RowActionButton ariaLabel="Delete line item" onClick={onDelete} tone="danger" disabled={pending}>
           <Trash2 size={14} />
         </RowActionButton>
+        {pending && (
+          <span style={{
+            fontFamily: 'var(--font-body)', fontSize: 11,
+            color: 'var(--v3-text-muted)', marginLeft: 2
+          }}>
+            Saving…
+          </span>
+        )}
       </div>
     </motion.li>
   )
@@ -774,23 +815,46 @@ function StatusChip({ label, tone }: any) {
 /* ============================================================
    DraftCard — shared form layout for both Add and Edit.
    ============================================================ */
-function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel, suggestions = [], onPickSuggestion }: any) {
+function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel, suggestions = [], onPickSuggestion, autoFocusSignal }: any) {
   // Suggestion popup state. Closes on blur (after a beat so a tap on a
   // row lands first) and on pick.
   const [descFocused, setDescFocused] = useState(false)
+  const descRef = useRef<HTMLInputElement>(null)
   const matches = descFocused && onPickSuggestion
     ? matchSuggestions(suggestions, draft.description)
     : []
+
+  // Re-focus the description after each successful add so line items can
+  // be entered back-to-back (the Add card stays put; only the signal
+  // changes). Guarded to the Add card via the presence of the signal.
+  useEffect(() => {
+    if (autoFocusSignal == null || autoFocusSignal === 0) return
+    descRef.current?.focus()
+  }, [autoFocusSignal])
+
+  // Enter anywhere in the card submits the line (unless the primary is
+  // disabled or the suggestion popup is open, where Enter picks nothing
+  // and would be surprising). Keeps hands on the keyboard for fast entry.
+  function onCardKeyDown(e: any) {
+    if (e.key !== 'Enter') return
+    if (e.target?.tagName === 'TEXTAREA') return
+    if (matches.length > 0) return
+    if (primaryDisabled) return
+    e.preventDefault()
+    onPrimary?.()
+  }
   return (
-    <div style={{
-      padding: '14px 16px',
-      borderRadius: 14,
-      background: 'var(--v3-surface)',
-      border: '1px solid var(--v3-border)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 10
-    }}>
+    <div
+      onKeyDown={onCardKeyDown}
+      style={{
+        padding: '14px 16px',
+        borderRadius: 14,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10
+      }}>
       <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
         {eyebrow}
       </span>
@@ -799,6 +863,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
       <FormField label="Description" required>
         <div style={{ position: 'relative' }}>
           <input
+            ref={descRef}
             type="text"
             value={draft.description}
             onChange={(e) => onChange('description', e.target.value)}

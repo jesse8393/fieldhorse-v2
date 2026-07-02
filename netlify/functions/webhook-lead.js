@@ -117,7 +117,7 @@ export default async (request) => {
     address: payload.address ? String(payload.address).trim().slice(0, 400) : null,
     job_title: payload.job_title ? String(payload.job_title).trim().slice(0, 240) : null,
     job_type: payload.job_type ? String(payload.job_type).trim().slice(0, 120) : null,
-    amount: Number.isFinite(Number(payload.amount)) ? Number(payload.amount) : 0,
+    amount: Number.isFinite(Number(payload.amount)) ? Math.max(0, Number(payload.amount)) : 0,
     notes: payload.notes ? String(payload.notes).slice(0, 2000) : null,
     stage: 'lead',
     source: payload.source ? String(payload.source).slice(0, 80) : 'webhook'

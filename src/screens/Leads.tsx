@@ -36,6 +36,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useJobs, useJobsRealtime, queryKeys, type JobRow } from '../lib/queries.ts'
 
 const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
+const NewQuoteSheet = lazy(() => import('../components/NewQuoteSheet.tsx'))
 
 type LeadFilter = 'open' | 'new' | 'quoted' | 'lost'
 type LeadSurface = 'leads' | 'quotes'
@@ -542,7 +543,7 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
             hapticMedium()
             setAddOpen(true)
           }}
-          onJobs={() => navigate('/pipeline')}
+          onJobs={() => navigate('/jobs')}
         />
       </motion.div>
 
@@ -652,22 +653,43 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
         </motion.div>
       )}
 
-      {/* NEW LEAD SHEET */}
+      {/* CREATE SHEET — quotes get the minimal "who's it for → build" flow;
+          leads get the full capture form. One way to start each. */}
       <Suspense fallback={null}>
-        <NewLeadSheet
-          open={addOpen}
-          userId={user?.id}
-          initialStage={isQuotesSurface ? 'quote' : 'lead'}
-          lockStage
-          onClose={() => setAddOpen(false)}
-          onCreated={async (created: any) => {
-            setAddOpen(false)
-            if (created?.id) setJustAddedId(created.id)
-            await refresh()
-            setTimeout(() => setJustAddedId(null), 1200)
-            toastSuccess(`${createLabel} added`, created?.name ? `${created.name} is on the board` : 'On the board')
-          }}
-        />
+        {isQuotesSurface ? (
+          <NewQuoteSheet
+            open={addOpen}
+            userId={user?.id}
+            onClose={() => setAddOpen(false)}
+            onStarted={(created: any) => {
+              setAddOpen(false)
+              // Straight into the line-item builder — that's the whole point.
+              if (created?.id) navigate(`/quotes/${created.id}?tab=quote`)
+            }}
+          />
+        ) : (
+          <NewLeadSheet
+            open={addOpen}
+            userId={user?.id}
+            initialStage="lead"
+            lockStage
+            onClose={() => setAddOpen(false)}
+            onCreated={async (created: any) => {
+              setAddOpen(false)
+              // Converting a lead into a quote later lands in the builder; a
+              // brand-new quote here would too, but leads stay on the board
+              // so you can capture several in a row.
+              if (created?.id && created.stage === 'quote') {
+                navigate(`/quotes/${created.id}?tab=quote`)
+                return
+              }
+              if (created?.id) setJustAddedId(created.id)
+              await refresh()
+              setTimeout(() => setJustAddedId(null), 1200)
+              toastSuccess(`${createLabel} added`, created?.name ? `${created.name} is on the board` : 'On the board')
+            }}
+          />
+        )}
       </Suspense>
 
       <FloatingActionButton

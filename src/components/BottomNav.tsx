@@ -29,15 +29,18 @@ const PRIMARY = [
    sidebar uses. */
 const NAV_ITEMS = [
   { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
+  // The pipeline, in order — Leads -> Quotes -> Jobs -> Invoices. One deal
+  // moves down this list as it progresses, Jobber-style. The old separate
+  // "Pipeline" aggregate board is dropped from mobile: it duplicated these
+  // stage lists and carried desktop-only chrome (Ctrl-K, "records visible").
   { to: '/leads',       label: 'Leads',               Icon: Sparkles },
   { to: '/quotes',      label: 'Quotes',              Icon: FileText },
-  { to: '/pipeline',    label: 'Pipeline',            Icon: BarChart3 },
   { to: '/jobs',        label: 'Jobs',                Icon: Briefcase },
+  { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
   { to: '/clients',     label: 'Clients',             Icon: Users },
   { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
   { to: '/activity',    label: 'Activity',            Icon: ActivityIcon },
   { to: '/bid',         label: 'Estimates',           Icon: Calculator },
-  { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
   { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 },
   // Org / crew block — new on mobile. Order + icons match the desktop
   // sidebar's EXECUTION + INTELLIGENCE groups.

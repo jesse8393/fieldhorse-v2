@@ -116,7 +116,11 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
   changeOrders?: any[]
   insurance?: any
 }) {
-  const { contractTotal, paid } = contractTotals({ contact, payments, changeOrders })
+  // generateInvoice folds approved COs into the balance summary itself
+  // (it receives `changeOrders`), so pass the RAW contract amount here —
+  // passing the CO-inclusive contractTotals().contractTotal double-counts.
+  const { paid } = contractTotals({ contact, payments, changeOrders })
+  const contractTotal = Number(contact?.amount || 0)
   const title = invoice.title?.trim() || `Invoice #${invoice.sequence_number}`
   // Customer-facing "what is this for". Falls back to the job title.
   // No address here — the recipient block already prints it, and in

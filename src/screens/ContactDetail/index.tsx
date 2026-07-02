@@ -317,16 +317,23 @@ export default function ContactDetail() {
   const tabParam = searchParams.get('tab')
   const stageTabs = tabsForStage(contact?.stage)
   const visibleTabs = TOP_TABS.filter((t) => stageTabs.includes(t.id as any))
+  // Jobber-style: a quote IS the quote. Opening a quote-stage deal lands
+  // straight in the quote document instead of the Overview cockpit, so you
+  // don't "open a deal, then go build a quote." Every other stage keeps
+  // Overview as its home. `defaultTab` is also the param we omit from the
+  // URL, so navigating to Overview on a quote sets ?tab=overview (and
+  // doesn't bounce straight back to the quote).
+  const defaultTab = String(contact?.stage || '').toLowerCase() === 'quote' ? 'quote' : 'overview'
   const urlTab = (tabParam && VALID_TABS.has(tabParam))
     ? resolveTabForStage(contact?.stage, tabParam)
-    : 'overview'
+    : defaultTab
   const [localTab, setLocalTab] = useState<string | null>(null)
   const tab = localTab ?? urlTab
   function setTab(next: any) {
     if (next === tab) return
     setLocalTab(next)
     const sp = new URLSearchParams(searchParams)
-    if (next === 'overview') sp.delete('tab')
+    if (next === defaultTab) sp.delete('tab')
     else sp.set('tab', next)
     setSearchParams(sp, { replace: true })
   }
@@ -482,7 +489,7 @@ export default function ContactDetail() {
   // the balance is collected the job is ready for its closeout.
   // ('invoice' is the legacy alias of 'job' — same treatment.)
   const stageCta: { label: string; onClick: () => void } | null =
-    contact.stage === 'lead'    ? { label: 'Build quote',    onClick: onBuildQuote }
+    contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
     : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
     : contact.stage === 'job' || contact.stage === 'invoice'
       ? (Number(balance || 0) > 0
