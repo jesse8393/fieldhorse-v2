@@ -13,7 +13,7 @@
 // No new schema. Uses indexes already in place (everything is
 // scoped by user_id via RLS).
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -69,7 +69,8 @@ function timeAt(d: any) {
 
 export default function Activity() {
   const { user } = useAuth()
-  const { data: bundle, isError, refetch } = useActivityFeed(user?.id, PAGE_SIZE)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE)
+  const { data: bundle, isError, refetch, isFetching } = useActivityFeed(user?.id, pageSize)
   const { stagger, item } = useFhMotion()
 
   // Map the raw datasets into display events. Kept in the component
@@ -254,6 +255,28 @@ export default function Activity() {
             </ul>
           </section>
         ))}
+
+        {/* Load older — the feed is capped per source table; when we're at the
+            cap there's likely more history. Bump the page size (capped) so the
+            timeline isn't silently truncated at the most-recent events. */}
+        {!loading && !empty && events && events.length >= pageSize && pageSize < 480 && (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 6 }}>
+            <button
+              type="button"
+              onClick={() => setPageSize((p) => Math.min(p + 60, 480))}
+              disabled={isFetching}
+              style={{
+                minHeight: 44, padding: '11px 20px', borderRadius: 12,
+                background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
+                color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
+                fontSize: 13, fontWeight: 600, cursor: isFetching ? 'wait' : 'pointer',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              {isFetching ? 'Loading…' : 'Load older activity'}
+            </button>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   )
