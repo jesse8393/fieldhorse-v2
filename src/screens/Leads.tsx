@@ -662,6 +662,13 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
           onClose={() => setAddOpen(false)}
           onCreated={async (created: any) => {
             setAddOpen(false)
+            // A brand-new quote drops you straight into the line-item builder
+            // (Jobber-style) instead of back on the list to hunt for it. Leads
+            // stay on the board so you can capture several in a row.
+            if (created?.id && (isQuotesSurface || created.stage === 'quote')) {
+              navigate(`/quotes/${created.id}?tab=quote`)
+              return
+            }
             if (created?.id) setJustAddedId(created.id)
             await refresh()
             setTimeout(() => setJustAddedId(null), 1200)

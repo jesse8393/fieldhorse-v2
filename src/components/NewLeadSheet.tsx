@@ -587,7 +587,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
       {/* Section divider — flips the surface from "voice capture" mode
           to "edit fields" mode. Mirrors section-lbl from styles-refine. */}
       <div className="fh-vsection">
-        <span>Lead details</span>
+        <span>{NounCap} details</span>
         <span className="fh-vsection__hint">tap any field to edit</span>
       </div>
 
@@ -742,7 +742,11 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             </V3Field>
           )}
 
-          {form.stage !== 'lead' && (
+          {/* Amount is only entered directly on a quick JOB. A quote's total
+              is driven by the line items you build (the recalc trigger sets
+              fh_contacts.amount), so typing an amount here would just get
+              overwritten — we omit it and send you to the line-item builder. */}
+          {form.stage === 'job' && (
             <V3Field label="Amount">
               <div style={{ position: 'relative' }}>
                 <span aria-hidden="true" style={{
