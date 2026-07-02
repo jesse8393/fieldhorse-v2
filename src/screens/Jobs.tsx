@@ -19,6 +19,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { useJobs, useJobPhotos, useJobsRealtime, queryKeys } from '../lib/queries.ts'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 
@@ -212,6 +213,14 @@ export default function Jobs() {
       .map((g) => ({ id: g.id, label: g.label, items: filtered.filter(g.match) }))
       .filter((g) => g.items.length > 0)
   }, [filter, filtered])
+
+  // Flat single-stage tabs (Leads/Quotes/Jobs/Invoices) can hold thousands
+  // of rows; cap the mounted window and grow it on scroll. The grouped "All"
+  // view is naturally split per stage, so it keeps its own render.
+  const { visible: visibleFlat, sentinelRef, hasMore: flatHasMore } = useInfiniteRender(
+    filtered,
+    `${filter}|${search}`
+  )
 
   function openDrawer(contact: any) {
     setDrawerContact(contact)
@@ -545,13 +554,17 @@ export default function Jobs() {
         </motion.div>
       )}
 
-      {/* FLAT — single-stage tab is already one stage, so no headers. */}
+      {/* FLAT — single-stage tab is already one stage, so no headers.
+          Renders a bounded window that grows as the sentinel scrolls in. */}
       {!loading && filtered.length > 0 && !groups && (
-        <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
-          <AnimatePresence>
-            {filtered.map((c, i) => renderCard(c, i))}
-          </AnimatePresence>
-        </motion.div>
+        <>
+          <motion.div className="fh-jobs__grid" variants={item} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', alignItems: 'stretch', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
+            <AnimatePresence>
+              {visibleFlat.map((c, i) => renderCard(c, i))}
+            </AnimatePresence>
+          </motion.div>
+          {flatHasMore && <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />}
+        </>
       )}
 
       {/* VAUL DRAWER — quick actions */}

@@ -30,6 +30,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { LEAD_STAGES } from '../lib/stages.ts'
 import { markWon, markLost, reopen, startQuote } from '../lib/pipeline.ts'
+import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -325,6 +326,13 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
         - new Date(a.updated_at || a.created_at || 0).getTime()
     })
   }, [leads, activeTab, search])
+
+  // Bounded render window that grows on scroll — keeps the DOM small at
+  // thousands of leads/quotes without changing the card or swipe behavior.
+  const { visible: visibleLeads, sentinelRef: leadsSentinelRef, hasMore: leadsHasMore } = useInfiniteRender(
+    filtered,
+    `${filter}|${search}`
+  )
 
   const tabCounts = useMemo<Partial<Record<LeadFilter, number>>>(() => {
     if (loading) return {}
@@ -634,7 +642,7 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
       {!loading && filtered.length > 0 && (
         <motion.div className="fh-leads__list" variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
           <AnimatePresence>
-            {filtered.map((c) => (
+            {visibleLeads.map((c) => (
               <LeadCard
                 key={c.id}
                 contact={c}
@@ -650,6 +658,7 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
               />
             ))}
           </AnimatePresence>
+          {leadsHasMore && <div ref={leadsSentinelRef} aria-hidden="true" style={{ height: 1 }} />}
         </motion.div>
       )}
 

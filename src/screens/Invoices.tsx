@@ -19,6 +19,7 @@ import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 // V3PaymentSheet is lazy — only loads when an operator taps "Mark Paid".
@@ -131,6 +132,11 @@ export default function Invoices() {
   }, [jobs, paidByJob, approvedCoByJob])
 
   const filtered = filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows
+  // Bounded render window that grows on scroll — the A/R list can be long.
+  const { visible: visibleBalances, sentinelRef: balancesSentinelRef, hasMore: balancesHasMore } = useInfiniteRender(
+    filtered,
+    filter
+  )
 
   // BY-CLIENT A/R rollup — group every outstanding job balance under
   // its linked client so "who owes me, and how overdue" reads at a
@@ -777,7 +783,7 @@ export default function Invoices() {
 
         {!loading && filtered.length > 0 && (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filtered.map((r) => (
+            {visibleBalances.map((r) => (
               <PaymentCard
                 key={r.job.id}
                 row={r}
@@ -803,6 +809,7 @@ export default function Invoices() {
                 }}
               />
             ))}
+            {balancesHasMore && <li ref={balancesSentinelRef as any} aria-hidden="true" style={{ height: 1 }} />}
           </ul>
         )}
       </motion.div>

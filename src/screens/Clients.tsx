@@ -5,6 +5,7 @@ import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-rea
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
@@ -80,6 +81,13 @@ export default function Clients() {
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, q, filter, rollupMap])
+
+  // Bounded render window that grows on scroll — the client book can run to
+  // thousands of rows; keep the DOM small without changing the row design.
+  const { visible: visibleClients, sentinelRef: clientsSentinelRef, hasMore: clientsHasMore } = useInfiniteRender(
+    filtered,
+    `${filter}|${q}`
+  )
 
   const totalLifetime = useMemo(() => {
     let total = 0
@@ -474,7 +482,7 @@ export default function Clients() {
               overflow: 'hidden'
             }}
           >
-            {filtered.map((c, i) => {
+            {visibleClients.map((c, i) => {
               const r = rollupFor(c.id)
               const lastActivity = c.last_activity_at ? new Date(c.last_activity_at) : null
               const lastActivityRel = lastActivity ? formatRelative(lastActivity) : null
@@ -486,11 +494,12 @@ export default function Clients() {
                   lastActivityRel={lastActivityRel}
                   index={i}
                   isTop={c.id === topClientId}
-                  isLast={i === filtered.length - 1}
+                  isLast={i === visibleClients.length - 1}
                   onOpen={() => navigate(`/clients/${c.id}`)}
                 />
               )
             })}
+            {clientsHasMore && <div ref={clientsSentinelRef} aria-hidden="true" style={{ height: 1 }} />}
           </div>
         )}
       </motion.div>
