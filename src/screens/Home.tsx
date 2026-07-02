@@ -14,8 +14,7 @@ import {
   PhoneCall,
   CalendarClock,
   ChevronRight,
-  Zap,
-  Mic
+  Zap
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -568,13 +567,15 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
-          V3-HOME-2 de-box: header + 5 tile launcher row on page surface.
-          Each QuickAction tile self-frames; wrapper was redundant chrome.
-          Position: relocated here from the bottom so the primary launcher
-          tiles (Add Lead / New Job / Schedule / Invoice / Voice Note) sit
-          inside the first thumb-reach zone on mobile, right after the
-          revenue moment. Desktop uses DesktopHomeCommandCenter and is
-          unaffected. */}
+          Header + 4-tile launcher row on the page surface. Trimmed from
+          five to four so each tile gets real width (~83px on a 390px
+          phone vs ~59px at 5-up, which cramped the two-word "Voice Note"
+          label). The four are the pipeline-money actions — Add Lead,
+          New Job, Schedule, Invoice — sitting in the first thumb-reach
+          zone right after the revenue moment. Voice capture wasn't lost:
+          it lives on the Notes screen (mic button + ?voice=1), reachable
+          from the header Notes shortcut. Desktop uses
+          DesktopHomeCommandCenter and is unaffected. */}
       <motion.div
         variants={item}
         style={{
@@ -585,8 +586,8 @@ export default function Home() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
-            gap: 8,
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 10,
             marginTop: 4
           }}
         >
@@ -594,7 +595,6 @@ export default function Home() {
           <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1&asStage=job')} />
           <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
           <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
-          <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
         </div>
       </motion.div>
 
