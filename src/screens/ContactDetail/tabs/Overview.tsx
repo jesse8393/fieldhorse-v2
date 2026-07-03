@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import {
   startQuote, approveQuote, markComplete, reopen
 } from '../../../lib/pipeline.ts'
@@ -11,10 +10,7 @@ import { hapticTap, hapticStageChange } from '../../../lib/haptics.ts'
 import {
   NextActionCard,
   HealthDonut,
-  ProgressMeter,
-  FeedRow,
-  SectionHeader,
-  PostedByChip
+  ProgressMeter
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
@@ -65,33 +61,6 @@ export default function OverviewTab({
   onOpenQuote
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
-  const confirm = useConfirm() as any
-
-  // Delete a logged payment row. Used by the trash icon on payment
-  // rows in the Recent Activity list. We confirm because payments are
-  // financial records and an accidental delete here would silently
-  // change the job's paid/balance numbers.
-  async function deletePayment(paymentId: any, amount: any) {
-    if (!paymentId || !userId) return
-    const ok = await confirm({
-      title: 'Delete this payment?',
-      body: `Removes a ${fmtMoney(amount)} payment from this job. This can't be undone — re-log it if you delete by mistake.`,
-      destructive: true,
-      confirmLabel: 'Delete payment'
-    })
-    if (!ok) return
-    const { error } = await supabase
-      .from('fh_payments')
-      .delete()
-      .eq('id', paymentId)
-      .eq('user_id', userId)
-    if (error) {
-      toastError("Couldn't delete payment", error.message)
-      return
-    }
-    toastSuccess('Payment deleted', `${fmtMoney(amount)} removed`)
-    await fetchAll?.()
-  }
 
   const health = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
@@ -110,11 +79,6 @@ export default function OverviewTab({
   const milestonePct = milestones.length
     ? Math.round((milestones.filter((m: any) => m.done).length / milestones.length) * 100)
     : 0
-
-  const activityRows = useMemo(
-    () => buildActivityRows({ notes, payments, scheduleItems }).slice(0, 6),
-    [notes, payments, scheduleItems]
-  )
 
   async function handleNextActionComplete() {
     if (actionLoading) return
@@ -358,43 +322,13 @@ export default function OverviewTab({
         />
       </div>
 
-      {/* RECENT ACTIVITY */}
-      <div className="v3-section">
-        <SectionHeader {...({ title: "Recent Activity" } as any)} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-          {activityRows.length === 0 ? (
-            <div className="v3-empty">
-              Nothing logged yet. Crew check-ins, payments, and schedule changes appear here.
-            </div>
-          ) : (
-            activityRows.map((row) => (
-              <div key={row.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <FeedRow
-                  type={row.type}
-                  title={row.title}
-                  detail={row.detail}
-                  timestamp={row.timestamp}
-                  pillTone={row.pillTone}
-                  pillLabel={row.pillLabel}
-                  onDelete={row.paymentId ? () => deletePayment(row.paymentId, row.paymentAmount) : undefined}
-                  deleteLabel="Delete payment"
-                />
-                {row.userId && (
-                  <PostedByChip
-                    userId={row.userId}
-                    verb={(row.verb || 'posted') as any}
-                    style={{ paddingLeft: 14 }}
-                  />
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* ACTIVITY LOG — chronological feed synthesized from existing
-          arrays (notes, payments, schedule, change orders, contact
-          metadata). Auto-hides on a brand-new job with no events. */}
+      {/* ACTIVITY — single chronological timeline synthesized from existing
+          arrays (notes, payments, schedule, change orders, stage history,
+          contact metadata). This is the one activity feed on the Overview;
+          the old compact "Recent Activity" list above it duplicated these
+          same events. Payment deletion moved to the Financials → Invoice
+          payment-history list, its natural home. Auto-hides on a brand-new
+          job with no events. */}
       <ActivityLog
         contact={contact}
         notes={notes}
@@ -429,94 +363,6 @@ const STAGE_FN_MAP: Record<string, any> = {
   approveQuote,
   markComplete,
   reopen
-}
-
-function fmtMoney(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
-}
-
-/**
- * Merge notes + payments + scheduleItems into a unified activity stream
- * sorted by recency (newest first). Returns FeedRow-shaped objects.
- *
- * Each source maps to a FeedRow type for icon+color treatment:
- *   payment  → 'invoice'  (gold)
- *   note     → 'note'     (muted)
- *   schedule → 'crew-on-site' (green) — schedule entries are crew work
- */
-function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }: any) {
-  const rows = []
-
-  for (const p of payments) {
-    rows.push({
-      key: `pay-${p.id}`,
-      type: 'invoice',
-      title: `Payment received · ${fmtMoney(p.amount)}`,
-      detail: p.method ? `via ${p.method}` : null,
-      timestamp: p.paid_on || p.created_at,
-      pillTone: 'success',
-      pillLabel: 'PAID',
-      userId: p.user_id || null,
-      verb: 'posted',
-      paymentId: p.id,
-      paymentAmount: p.amount
-    })
-  }
-
-  for (const n of notes) {
-    rows.push({
-      key: `note-${n.id}`,
-      type: 'note',
-      title: n.text || 'Note',
-      detail: n.category && n.category !== 'note' ? n.category : null,
-      timestamp: n.created_at,
-      userId: n.user_id || null,
-      verb: 'posted'
-    })
-  }
-
-  for (const s of scheduleItems) {
-    rows.push({
-      key: `sch-${s.id}`,
-      type: 'crew-on-site',
-      title: s.title || 'Scheduled work',
-      detail: s.description || null,
-      timestamp: s.start_at,
-      userId: s.user_id || null,
-      verb: 'added'
-    })
-  }
-
-  const sorted = rows.sort((a, b) => {
-    const da = a.timestamp ? new Date(a.timestamp).getTime() : 0
-    const db = b.timestamp ? new Date(b.timestamp).getTime() : 0
-    return db - da
-  })
-
-  // 5/17 — collapse duplicate activity rows that come from the same
-  // logical event written multiple times. The 5/13 audit flagged
-  // "Roof-Deck-Chimney · Approved quote for Jeff Roy" appearing 4×
-  // on the feed; root cause is upstream (approveQuote() in lib/stages.ts
-  // and possibly fn_approve_quote_version trigger both insert into
-  // fh_schedule on the same approval, doubling per re-approval). Fixing
-  // the write path is invasive — a content-key dedupe at display time
-  // is the safe fix that addresses the visible symptom.
-  //
-  // Dedupe key = (type | title | detail | day-bucket). Notes stay
-  // unique because their `key` already encodes the unique row id and
-  // we don't strip per-row; payments stay unique because each payment
-  // amount/date combo is rarely identical. Only schedule rows with
-  // truly-identical content on the same day collapse.
-  const seen = new Set()
-  return sorted.filter((r) => {
-    const dayBucket = r.timestamp ? String(r.timestamp).slice(0, 10) : 'no-date'
-    const content = `${r.type}|${(r.title || '').trim()}|${(r.detail || '').trim()}|${dayBucket}`
-    if (seen.has(content)) return false
-    seen.add(content)
-    return true
-  })
 }
 
 function SecondaryAction({ icon: Icon, label, onClick }: any) {

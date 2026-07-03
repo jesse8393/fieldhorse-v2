@@ -1,6 +1,9 @@
 import { motion } from 'framer-motion'
-import { DollarSign, Plus } from 'lucide-react'
+import { DollarSign, Plus, Trash2 } from 'lucide-react'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { supabase } from '../../../lib/supabase.ts'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { toastSuccess, toastError } from '../../../lib/toast.ts'
 
 function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -12,11 +15,39 @@ function money(n: any) {
  * Invoice section — surfaces balance + payment history. The actual "Log
  * Payment" sheet lives in the parent shell (V3PaymentSheet) and is opened
  * via onOpenLogPayment. This section is read-mostly + one CTA.
+ *
+ * Payment deletion lives here (not on the Overview activity feed anymore)
+ * — the payment-history list is where a mislogged payment naturally gets
+ * corrected. Each row confirms before deleting since payments drive the
+ * job's paid/balance numbers.
  */
-export default function InvoiceSection({ contact, payments = [], paid = 0, balance = 0, onOpenLogPayment }: any) {
+export default function InvoiceSection({ contact, payments = [], paid = 0, balance = 0, onOpenLogPayment, userId, fetchAll }: any) {
   const amount = Number(contact?.amount || 0)
   const pct = amount > 0 ? Math.min(100, Math.round((paid / amount) * 100)) : 0
   const isClosed = balance <= 0.5 && amount > 0
+  const confirm = useConfirm() as any
+
+  async function deletePayment(paymentId: any, paymentAmount: any) {
+    if (!paymentId || !userId) return
+    const ok = await confirm({
+      title: 'Delete this payment?',
+      body: `Removes a ${money(paymentAmount)} payment from this job. This can't be undone — re-log it if you delete by mistake.`,
+      destructive: true,
+      confirmLabel: 'Delete payment'
+    })
+    if (!ok) return
+    const { error } = await supabase
+      .from('fh_payments')
+      .delete()
+      .eq('id', paymentId)
+      .eq('user_id', userId)
+    if (error) {
+      toastError("Couldn't delete payment", error.message)
+      return
+    }
+    toastSuccess('Payment deleted', `${money(paymentAmount)} removed`)
+    await fetchAll?.()
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
@@ -171,6 +202,22 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
                 }}>
                   {p.paid_on}
                 </span>
+                {userId && (
+                  <button
+                    type="button"
+                    onClick={() => { hapticTap(); deletePayment(p.id, p.amount) }}
+                    aria-label={`Delete ${money(p.amount)} payment`}
+                    style={{
+                      flexShrink: 0, width: 30, height: 30, borderRadius: 8,
+                      display: 'grid', placeItems: 'center',
+                      background: 'transparent', border: '1px solid var(--v3-border)',
+                      color: 'var(--v3-text-muted)', cursor: 'pointer',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    <Trash2 size={13} aria-hidden="true" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
