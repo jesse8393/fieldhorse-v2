@@ -29,7 +29,7 @@ const ICONS: Record<string, any> = {
 }
 
 const TONE_COLORS: Record<string, any> = {
-  neutral: { fg: 'var(--v3-text-muted)', bg: 'rgba(255,255,255,0.06)', dot: 'var(--v3-text-muted)' },
+  neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', dot: 'var(--v3-text-muted)' },
   gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', dot: 'var(--v3-primary)' },
   green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74, 222, 128, 0.10)', dot: 'var(--v3-success-bright, #4ade80)' },
   red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232, 90, 87, 0.10)', dot: 'var(--v3-danger-bright, #f5a294)' }

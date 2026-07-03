@@ -10741,6 +10741,20 @@ select {
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
     rgba(20, 17, 16, 0.78);
   color: var(--ink-strong, #f4f1ea);
+}
+
+/* Daylight parity — the black-glass panels above are dark literals by
+   design (layered white-wash gradients over near-black). In light theme
+   they flip to plain paper cards on the token ladder. */
+[data-theme='light'] .fh-lead-command__focus,
+[data-theme='light'] .fh-lead-command__signals button,
+[data-theme='light'] .fh-crm-brief,
+[data-theme='light'] .fh-crm-flow,
+[data-theme='light'] .fh-crm-saved {
+  border: 1px solid var(--v3-border);
+  background: var(--v3-surface);
+  box-shadow: var(--v3-shadow);
+  color: var(--v3-text);
   box-shadow:
     inset 0 1px 0 rgba(255, 240, 210, 0.052),
     0 14px 34px rgba(0, 0, 0, 0.22);

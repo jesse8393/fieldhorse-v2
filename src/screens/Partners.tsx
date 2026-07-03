@@ -264,7 +264,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
         borderRadius: 16,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.22)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.22)',
         overflow: 'hidden'
       }}>
         {/* Header */}
@@ -428,7 +428,7 @@ function StatusBadge({ status }: any) {
   const palette = status === 'accepted'
     ? { bg: 'rgba(72, 130, 95, 0.14)', border: 'rgba(72, 130, 95, 0.45)', color: 'var(--v3-good, #6FB387)' }
     : status === 'revoked'
-      ? { bg: 'rgba(255,255,255,0.04)', border: 'var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
+      ? { bg: 'var(--v3-glass-tint)', border: 'var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
       : { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)', color: 'var(--v3-primary-bright)' }
   return (
     <span style={{

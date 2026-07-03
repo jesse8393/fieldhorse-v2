@@ -204,7 +204,7 @@ export default function HomeActivityCard() {
 function Row({ event, isLast }: any) {
   const Icon = event.icon
   const palette = ({
-    neutral: { bg: 'rgba(255,255,255,0.06)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' },
+    neutral: { bg: 'var(--v3-glass-tint-2)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
     gold:    { bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', fg: 'var(--v3-primary-bright)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
     green:   { bg: 'rgba(74,222,128,0.10)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74,222,128,0.30)' },
     red:     { bg: 'rgba(232,90,87,0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232,90,87,0.30)' }

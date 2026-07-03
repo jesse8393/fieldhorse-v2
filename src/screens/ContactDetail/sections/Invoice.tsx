@@ -97,7 +97,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
         {/* Progress bar */}
         <div style={{
           position: 'relative', height: 6, borderRadius: 999,
-          background: 'rgba(255, 255, 255, 0.06)', overflow: 'hidden'
+          background: 'var(--v3-glass-tint-2)', overflow: 'hidden'
         }}>
           <span style={{
             position: 'absolute', inset: 0, width: `${pct}%`,

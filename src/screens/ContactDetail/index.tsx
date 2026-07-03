@@ -57,7 +57,7 @@ import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 function TabFallback() {
   return (
     <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 10 }} aria-busy="true" aria-label="Loading">
-      <span style={{ width: '60%', maxWidth: 240, height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.07)' }} />
+      <span style={{ width: '60%', maxWidth: 240, height: 12, borderRadius: 4, background: 'var(--v3-glass-tint-2)' }} />
       <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
       <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.32 }} />
     </div>
@@ -168,7 +168,7 @@ function ActionIntentBanner({
         padding: '12px 12px 12px 14px',
         borderRadius: 12,
         border: '1px solid var(--v3-border-strong)',
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.035), transparent 54%), var(--v3-surface-2)',
+        background: 'linear-gradient(180deg, var(--v3-glass-tint), transparent 54%), var(--v3-surface-2)',
         boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
       }}
     >
@@ -1056,7 +1056,7 @@ function Header({
       <div style={{
         padding: '12px 14px',
         borderRadius: 16,
-        background: 'linear-gradient(180deg, #1b1816 0%, #121010 72%)',
+        background: 'linear-gradient(180deg, #1b1816 0%, var(--v3-surface) 72%)',
         border: '1px solid var(--v3-border)',
         boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
       }}>

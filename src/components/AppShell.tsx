@@ -30,8 +30,8 @@ function RouteFallback() {
   return (
     <div style={{ padding: '20px 20px 80px' }}>
       <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <span style={{ width: 100, height: 11, borderRadius: 4, background: 'rgba(255,255,255,0.06)' }} />
-        <span style={{ width: '60%', maxWidth: 280, height: 28, borderRadius: 6, background: 'rgba(255,255,255,0.07)', marginBottom: 6 }} />
+        <span style={{ width: 100, height: 11, borderRadius: 4, background: 'var(--v3-glass-tint-2)' }} />
+        <span style={{ width: '60%', maxWidth: 280, height: 28, borderRadius: 6, background: 'var(--v3-glass-tint-2)', marginBottom: 6 }} />
         <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
         <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.4 }} />
         <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.28 }} />
@@ -262,7 +262,7 @@ export default function AppShell() {
           style: {
             width: '100%',
             maxWidth: 'calc(100vw - 32px)',
-            background: 'rgba(20, 20, 20, 0.95)',
+            background: 'var(--v3-surface-glass)',
             color: 'var(--ink-strong)',
             border: '1px solid rgba(201, 150, 58, 0.35)',
             fontFamily: 'var(--font-body)',

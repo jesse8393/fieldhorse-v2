@@ -465,7 +465,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         style={{ ...drawerStyle, height: '88dvh', maxHeight: '88dvh' }}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
             <Sparkles size={12} />
             New {stageNoun}
           </div>
@@ -885,7 +885,7 @@ function TemplatePickerInline({ templates, value, onChange }: any) {
         ))}
       </div>
       {picked && (
-        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.22)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 10, letterSpacing: '0.14em', color: 'var(--ink-strong)' }}>
             +{picked.todos.length}
           </span>
@@ -949,10 +949,10 @@ function V3ChipRow({ label, value, options, onChange }: any) {
                 padding: '7px 12px',
                 borderRadius: 999,
                 border: active
-                  ? '1px solid rgba(255,255,255,0.22)'
+                  ? '1px solid var(--v3-border-strong)'
                   : '1px solid var(--rule)',
                 background: active
-                  ? 'rgba(255,255,255,0.06)'
+                  ? 'var(--v3-glass-tint-2)'
                   : 'var(--surface-2)',
                 color: active
                   ? 'var(--ink-strong)'
@@ -980,8 +980,8 @@ function TemplateChip({ active, onClick, label }: any) {
       style={{
         padding: '7px 12px',
         borderRadius: 999,
-        border: active ? '1px solid rgba(255,255,255,0.22)' : '1px solid var(--rule)',
-        background: active ? 'rgba(255,255,255,0.06)' : 'var(--surface-2)',
+        border: active ? '1px solid var(--v3-border-strong)' : '1px solid var(--rule)',
+        background: active ? 'var(--v3-glass-tint-2)' : 'var(--surface-2)',
         color: active ? 'var(--ink-strong)' : 'var(--ink-strong)',
         fontFamily: 'var(--font-body)',
         fontSize: 12,

@@ -339,7 +339,7 @@ function SelectionCard({
                     : '1px solid var(--v3-border)',
                   background: isPicked
                     ? 'color-mix(in srgb, var(--v3-success-bright, #73c982) 10%, transparent)'
-                    : 'rgba(255,255,255,.02)',
+                    : 'var(--v3-glass-tint)',
                   display: 'flex', flexDirection: 'column', gap: 6,
                 }}
               >
@@ -351,7 +351,7 @@ function SelectionCard({
                   {o.image_url ? (
                     <img loading="lazy"src={o.image_url} alt={o.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <ImageIcon size={20} aria-hidden="true" color="rgba(245,242,234,.30)" />
+                    <ImageIcon size={20} aria-hidden="true" color="var(--v3-text-faint)" />
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
@@ -497,7 +497,7 @@ function SelectionComposer({
         style={{ ...inputStyle, resize: 'vertical', minHeight: 56 }}
       />
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 10, marginTop: 4 }}>
+      <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 10, marginTop: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>Options</span>
           <button type="button" onClick={addOpt} style={chipBtnGhost}><Plus size={11} /> Add option</button>

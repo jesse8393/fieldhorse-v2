@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell } from 'lucide-react'
+import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, SunMedium } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
@@ -10,9 +10,7 @@ import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { reverseGeocode } from '../lib/weather.ts'
-// useTheme import removed 5/17 with APPEARANCE section — restore alongside
-// the toggle when full light-theme parity ships.
-// import { useTheme } from '../contexts/ThemeContext.tsx'
+import { useTheme } from '../contexts/ThemeContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.ts'
 import { safePayUrl } from '../lib/payLink.ts'
@@ -35,7 +33,7 @@ const DEMO_CHILD_TABLES = [
 export default function Settings() {
   const { user, signOut } = useAuth()
   const { profile, upsertProfile, refresh } = useProfile()
-  // const { theme, toggleTheme } = useTheme() // ← restore with APPEARANCE section
+  const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
@@ -628,16 +626,45 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* APPEARANCE section hidden 5/17 — light-theme parity is incomplete
-          (only repaints cards, leaves sidebar + canvas dark per the 5/13
-          audit). Audit recommendation was "either ship full light-mode
-          support or hide the toggle until parity exists." Restoring this
-          section is the right move once full parity ships. Original block:
-            <Section title={<>Light or <em>dark.</em></>}>
-              <Switch checked={theme === 'dark'} onCheckedChange={toggleTheme}/>
-              ...
-            </Section>
-       */}
+      {/* APPEARANCE — daylight mode. Restored after the light-theme
+          parity pass (theme_parity token sweep + chrome veil tokens).
+          Framed as a field feature: high-contrast warm paper for direct
+          sunlight. Desktop pins to dark until the fh-build screens get
+          their own parity wave (ThemeContext gates ≥900px). */}
+      <Section
+        variants={item}
+        title={<>Built for <em>daylight.</em></>}
+        sub="High-contrast light theme for reading the app in direct sun."
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '4px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span aria-hidden="true" style={{
+              flexShrink: 0, width: 34, height: 34, borderRadius: 10,
+              display: 'grid', placeItems: 'center',
+              background: theme === 'light' ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
+              border: theme === 'light'
+                ? '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)'
+                : '1px solid var(--v3-border-strong)',
+              color: theme === 'light' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+            }}>
+              <SunMedium size={16} />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--v3-text)' }}>
+                Daylight mode
+              </div>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
+                Applies on phone. Desktop stays dark for now.
+              </div>
+            </div>
+          </div>
+          <Switch
+            checked={theme === 'light'}
+            onCheckedChange={(on: boolean) => { hapticMedium(); setTheme(on ? 'light' : 'dark') }}
+            aria-label="Toggle daylight mode"
+          />
+        </div>
+      </Section>
 
       {/* ACCOUNT */}
       <Section
@@ -795,7 +822,7 @@ export default function Settings() {
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '10px 20px 14px' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
           Profile
         </span>
         <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
@@ -1171,7 +1198,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
             border: '1px solid var(--rule)',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+            boxShadow: 'inset 0 1px 0 var(--v3-border-mid)'
           }}
         >
           <input

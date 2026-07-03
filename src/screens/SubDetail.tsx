@@ -623,7 +623,7 @@ function SubDetailDesktop({
             <section className="fh-build-card fh-build-table">
               <header className="fh-build-card-head">
                 <div className="fh-build-eyebrow">Job history - {subRows.length.toLocaleString()}</div>
-                <span style={{ color: 'rgba(245,242,234,.55)', fontSize: 12 }}>
+                <span style={{ color: 'var(--v3-text-muted)', fontSize: 12 }}>
                   {totals.lastWorked ? `Last worked ${fmtRelativeDate(totals.lastWorked)}` : 'No work logged'}
                 </span>
               </header>

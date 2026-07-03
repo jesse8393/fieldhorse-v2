@@ -234,7 +234,7 @@ function FieldHorseMark() {
           height="68"
           rx="16"
           fill="#101317"
-          stroke="rgba(255,255,255,.10)"
+          stroke="var(--v3-border-mid)"
         />
 
         {/* F — white. Stem + top bar + middle bar, no overlap with H. */}

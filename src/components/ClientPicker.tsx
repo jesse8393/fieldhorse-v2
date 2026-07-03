@@ -140,7 +140,7 @@ export default function ClientPicker({ userId, value, onChange }: any) {
             WebkitOverflowScrolling: 'touch',
             padding: 4,
             borderRadius: 12,
-            background: 'rgba(20,20,20,0.98)',
+            background: 'var(--v3-surface-2)',
             border: '1px solid var(--rule)',
             backdropFilter: 'blur(14px)',
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)'

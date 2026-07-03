@@ -341,7 +341,7 @@ export default function Notes() {
               : 'var(--v3-section-border)',
           transition: 'border-color 200ms ease, box-shadow 200ms ease',
           boxShadow: focused
-            ? '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.30), 0 6px 20px rgba(0, 0, 0, 0.35)'
+            ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 1px 2px rgba(0, 0, 0, 0.30), 0 6px 20px rgba(0, 0, 0, 0.35)'
             : 'var(--v3-section-shadow)'
         }}
       >
@@ -751,7 +751,7 @@ function VoiceButton({ listening, onStart, onStop }: any) {
         WebkitTapHighlightColor: 'transparent',
         boxShadow: listening
           ? '0 0 0 4px color-mix(in srgb, var(--v3-danger) 12%, transparent)'
-          : '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 12px rgba(0, 0, 0, 0.20)'
+          : '0 1px 0 var(--v3-glass-tint) inset, 0 4px 12px rgba(0, 0, 0, 0.20)'
       }}
     >
       {listening ? <MicOff size={16} /> : <Mic size={16} />}
@@ -791,7 +791,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
     ? 'linear-gradient(180deg, var(--v3-danger), color-mix(in srgb, var(--v3-danger) 40%, transparent))'
     : hasParsed
       ? 'linear-gradient(180deg, var(--v3-primary), color-mix(in srgb, var(--v3-primary) 35%, transparent))'
-      : 'linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04))'
+      : 'linear-gradient(180deg, var(--v3-border-strong), var(--v3-glass-tint))'
 
   const swipeActions = [
     {
@@ -829,14 +829,14 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           borderRadius: 14,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
           cursor: onTap ? 'pointer' : 'default',
           WebkitTapHighlightColor: 'transparent',
           transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
         }}
         onMouseEnter={(e) => {
           if (!canHover) return
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
+          e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
           e.currentTarget.style.background = 'var(--v3-surface-3)'
         }}
         onMouseLeave={(e) => {

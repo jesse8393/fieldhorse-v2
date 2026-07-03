@@ -285,7 +285,7 @@ export default function Activity() {
 function EventRow({ event }: any) {
   const Icon = event.icon || ActivityIcon
   const tone = ({
-    neutral: { fg: 'var(--v3-text-muted)', bg: 'rgba(255,255,255,0.06)', br: 'rgba(255,255,255,0.10)' },
+    neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', br: 'var(--v3-border-mid)' },
     gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
     green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74,222,128,0.10)', br: 'rgba(74,222,128,0.30)' },
     red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232,90,87,0.10)', br: 'rgba(232,90,87,0.30)' }

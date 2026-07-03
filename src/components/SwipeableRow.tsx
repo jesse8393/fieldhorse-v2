@@ -99,7 +99,7 @@ export default function SwipeableRow({ children, actions = [], openOffset = -120
               height: 44,
               borderRadius: 10,
               background: a.color || 'rgba(199, 164, 90, 0.18)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              border: '1px solid var(--v3-border-mid)',
               color: a.fg || 'var(--ink-strong)',
               cursor: 'pointer'
             }}

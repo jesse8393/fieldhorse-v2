@@ -580,7 +580,7 @@ export default function Analytics() {
                     letterSpacing: '0.04em',
                     cursor: 'pointer',
                     WebkitTapHighlightColor: 'transparent',
-                    boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                    boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 var(--v3-border-strong) inset'
                   }}
                 >
                   <Plus size={12} />
@@ -682,7 +682,7 @@ export default function Analytics() {
                             {money(c.amount)}
                           </span>
                         </div>
-                        <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                        <div style={{ height: 4, borderRadius: 99, background: 'var(--v3-glass-tint-2)', overflow: 'hidden' }}>
                           <div style={{
                             width: `${(c.amount / maxTopClient) * 100}%`,
                             height: '100%',
@@ -772,7 +772,7 @@ function RevenueBars({ data, maxValue }: any) {
               height: `${Math.max(2, heightPct)}%`,
               background: b.total > 0
                 ? 'linear-gradient(180deg, var(--v3-primary-bright), var(--v3-primary))'
-                : 'rgba(255,255,255,0.06)',
+                : 'var(--v3-glass-tint-2)',
               borderRadius: 4,
               minHeight: 2
             }} />
@@ -846,8 +846,8 @@ function KPI({ label, to, format, Icon, gold, note }: any) {
           ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, var(--v3-border-strong))'
           : '1px solid var(--v3-border-strong)',
         boxShadow: gold
-          ? '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(229, 193, 88, 0.10)'
-          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.26)',
+          ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(229, 193, 88, 0.10)'
+          : '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(0, 0, 0, 0.26)',
         minHeight: 92
       }}
     >

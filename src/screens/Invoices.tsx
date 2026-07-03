@@ -43,7 +43,7 @@ const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.
 // balance instead of firing an untracked ad-hoc PDF.
 
 const AGING_BUCKETS = [
-  { id: '0-30',  label: 'Current',  short: '0–30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'rgba(255, 255, 255, 0.18)' },
+  { id: '0-30',  label: 'Current',  short: '0–30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
   { id: '31-60', label: 'Late',     short: '31–60 d', max: 60,        color: 'var(--v3-primary)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
   { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-bright)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
@@ -533,7 +533,7 @@ export default function Invoices() {
           backdropFilter: 'blur(14px) saturate(1.1)',
           WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
           overflow: 'hidden'
         }}>
           {/* Gold radial sweep behind the hero number — ported from
@@ -1144,7 +1144,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           border: isOverdue
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
           overflow: 'hidden'
         }}
       >
@@ -1203,7 +1203,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               lineHeight: 1,
               color: balance > 0 ? 'var(--v3-text)' : 'var(--v3-success-bright)',
               fontVariantNumeric: 'tabular-nums',
-              textShadow: balance > 0 ? '0 1px 0 rgba(255, 255, 255, 0.06)' : 'none'
+              textShadow: balance > 0 ? '0 1px 0 var(--v3-glass-tint-2)' : 'none'
             }}>
               {balance > 0 ? fmtMoney(balance) : 'PAID'}
             </div>
@@ -1348,7 +1348,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
                 letterSpacing: '0.04em',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 var(--v3-border-strong) inset'
               }}
             >
               <DollarSign size={13} /> Mark Paid

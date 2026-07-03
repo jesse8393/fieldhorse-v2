@@ -596,7 +596,7 @@ export default function Bid() {
               cursor: !scope.trim() || generating ? 'default' : 'pointer',
               boxShadow: !scope.trim() || generating
                 ? 'none'
-                : '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
+                : '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 var(--v3-border-strong) inset',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',

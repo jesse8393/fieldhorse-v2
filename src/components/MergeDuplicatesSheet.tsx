@@ -115,8 +115,8 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span aria-hidden="true" style={{
               width: 32, height: 32, borderRadius: 10,
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.18)',
+              background: 'var(--v3-glass-tint-2)',
+              border: '1px solid var(--v3-border-strong)',
               color: 'var(--ink-strong)',
               display: 'grid', placeItems: 'center'
             }}>
@@ -194,7 +194,7 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
       borderRadius: 16,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border-strong)',
-      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.25)',
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.25)',
       overflow: 'hidden'
     }}>
       <header style={{

@@ -321,7 +321,7 @@ export default function ClientDetail() {
         <div style={{
           padding: '12px 14px',
           borderRadius: 16,
-          background: 'linear-gradient(180deg, #1b1816 0%, #121010 72%)',
+          background: 'linear-gradient(180deg, #1b1816 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
         }}>
@@ -373,7 +373,7 @@ export default function ClientDetail() {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5,
                     padding: '2px 8px', borderRadius: 999,
-                    background: 'rgba(255, 255, 255, 0.04)',
+                    background: 'var(--v3-glass-tint)',
                     border: '1px solid var(--v3-border-strong)',
                     color: 'var(--v3-text-muted)',
                     fontFamily: 'var(--font-body)',
@@ -625,7 +625,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
     gap: 4,
     padding: '10px 4px',
     borderRadius: 12,
-    background: enabled ? 'var(--v3-surface-2)' : 'rgba(255, 255, 255, 0.02)',
+    background: enabled ? 'var(--v3-surface-2)' : 'var(--v3-glass-tint)',
     border: `1px solid ${enabled ? 'var(--v3-border)' : 'var(--v3-border)'}`,
     color: enabled ? 'var(--v3-text)' : 'var(--v3-text-muted)',
     textDecoration: 'none',
@@ -701,7 +701,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
         borderRadius: 16,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)',
         overflow: 'hidden'
       }}>
         <div style={{ padding: '14px 18px 8px' }}>
@@ -725,7 +725,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
           overflow: 'hidden',
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
         }}>
           <a
             href={`https://maps.apple.com/?address=${encodeURIComponent(client.address)}`}
@@ -738,8 +738,8 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
               height: 160,
               background: `
                 linear-gradient(180deg, transparent 0%, transparent 60%, rgba(7, 7, 10, 0.7) 100%),
-                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
-                repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
+                repeating-linear-gradient(45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
+                repeating-linear-gradient(-45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
                 var(--v3-surface-2)
               `,
               color: 'var(--v3-text)',
@@ -809,7 +809,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
           borderRadius: 14,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
         }}>
           <div style={{
             fontFamily: 'var(--font-body)',
@@ -852,7 +852,7 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
       <span aria-hidden="true" style={{
         flexShrink: 0,
         width: 36, height: 36, borderRadius: 10,
-        background: hasValue ? 'var(--v3-primary-soft)' : 'rgba(255, 255, 255, 0.04)',
+        background: hasValue ? 'var(--v3-primary-soft)' : 'var(--v3-glass-tint)',
         border: hasValue
           ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)'
           : '1px solid var(--v3-border)',
@@ -949,7 +949,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
       borderRadius: 16,
       background: 'var(--v3-surface)',
       border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.25)',
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 4px 12px rgba(0, 0, 0, 0.25)',
       display: 'flex', flexDirection: 'column', gap: 12,
       margin: '12px 0 24px'
     }}>
@@ -1043,7 +1043,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
       border: '1px solid var(--v3-border-strong)',
       borderRadius: 16,
       overflow: 'hidden',
-      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
     }}>
       <header style={{
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
@@ -1107,7 +1107,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
                   <div style={{
                     marginTop: 4,
                     height: 4, borderRadius: 999,
-                    background: 'rgba(255,255,255,0.05)',
+                    background: 'var(--v3-glass-tint-2)',
                     overflow: 'hidden'
                   }}>
                     <div style={{
@@ -1287,7 +1287,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
         borderRadius: 999,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint)'
       }}>
         {PROJECT_FILTERS.map((f) => {
           const active = filter === f.id
@@ -1349,7 +1349,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                     borderRadius: 14,
                     background: '#171511',
                     border: '1px solid var(--v3-border-strong)',
-                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+                    boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)',
                     textAlign: 'left',
                     cursor: 'pointer',
                     color: 'var(--v3-text)',
@@ -1417,7 +1417,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                     <div>
                       <div style={{
                         height: 4, borderRadius: 999,
-                        background: 'rgba(255,255,255,0.05)',
+                        background: 'var(--v3-glass-tint-2)',
                         overflow: 'hidden'
                       }}>
                         <div style={{
@@ -1488,7 +1488,7 @@ function NotesList({ notes }: any) {
               borderRadius: 14,
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border-strong)',
-              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+              boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)',
               overflow: 'hidden'
             }}>
               <span aria-hidden="true" style={{
@@ -1585,7 +1585,7 @@ function FilesList({ rows }: any) {
             borderRadius: 12,
             background: 'var(--v3-surface)',
             border: '1px solid var(--v3-border-strong)',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)'
+            boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)'
           }}>
             <span aria-hidden="true" style={{
               flexShrink: 0,

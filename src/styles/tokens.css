@@ -141,6 +141,14 @@
   --v3-border-strong: rgba(255, 240, 210, 0.18);
   --v3-border-gold:   rgba(201, 150, 58, 0.28);  /* 5/17 restore to design spec --hair-gold (was 0.10 from Phase 1A-3 softening) */
   --v3-glass-tint:    rgba(255, 240, 210, 0.04); /* warm-tinted now */
+  --v3-glass-tint-2:  rgba(255, 240, 210, 0.07); /* stronger wash — inset top-lights, tracks */
+
+  /* ---------- Chrome veil — AppHeader scrim gradient stops ----------
+     Referenced by the header's inline gradient so the top chrome can
+     re-theme. Dark: near-black fade; light: warm-paper fade. */
+  --fh-chrome-veil-1: rgba(20, 20, 20, 0.88);
+  --fh-chrome-veil-2: rgba(20, 20, 20, 0.72);
+  --fh-chrome-veil-0: rgba(20, 20, 20, 0);
 
   /* ---------- Brand gold — cooled to canonical ---------- */
   --v3-primary:        #C9963A;
@@ -315,7 +323,12 @@
   --v3-track: rgba(20, 20, 18, 0.06);
   --v3-track-strong: rgba(20, 20, 18, 0.10);
   --v3-glass-tint: rgba(255, 255, 255, 0.50);
+  --v3-glass-tint-2: rgba(255, 255, 255, 0.65);
   --v3-surface-glass: rgba(255, 255, 255, 0.78);
+  /* Chrome veil — warm paper fade for the light header */
+  --fh-chrome-veil-1: rgba(248, 245, 238, 0.92);
+  --fh-chrome-veil-2: rgba(248, 245, 238, 0.78);
+  --fh-chrome-veil-0: rgba(248, 245, 238, 0);
 
   /* Legacy aliases — warm warm warm */
   --surface-0: var(--v3-bg);

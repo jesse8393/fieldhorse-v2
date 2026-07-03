@@ -680,6 +680,6 @@ const metaChip: React.CSSProperties = {
   gap: 5,
   padding: '3px 8px',
   borderRadius: 999,
-  background: 'rgba(255,255,255,.04)',
+  background: 'var(--v3-glass-tint)',
   border: '1px solid var(--v3-border)',
 }

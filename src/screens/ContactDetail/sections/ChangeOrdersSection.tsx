@@ -512,11 +512,11 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
 
 function Tag({ tone, children }: any) {
   const palette = ({
-    muted: { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' },
+    muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
     green: { bg: 'rgba(74, 222, 128, 0.12)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74, 222, 128, 0.30)' },
     gold:  { bg: 'rgba(228, 190, 111, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(228, 190, 111, 0.30)' },
     red:   { bg: 'rgba(232, 90, 87, 0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232, 90, 87, 0.30)' }
-  } as Record<string, any>)[tone] || { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' }
+  } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',

@@ -406,7 +406,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
             <ShieldCheck size={12} />
             Approve
           </div>
@@ -502,8 +502,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
             padding: '10px 12px', borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.22)'
+            background: 'var(--v3-glass-tint-2)',
+            border: '1px solid var(--v3-border-strong)'
           }}>
             <Lock size={14} aria-hidden="true" style={{ color: 'var(--ink-strong)', marginTop: 2, flexShrink: 0 }} />
             <span style={{

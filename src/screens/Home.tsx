@@ -433,7 +433,7 @@ export default function Home() {
           // highlight + inset bottom shadow + crisp outline + soft halo.
           border: '1px solid var(--v3-border-strong)',
           boxShadow: [
-            'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+            'inset 0 1px 0 var(--v3-glass-tint-2)',
             'inset 0 -1px 0 rgba(0, 0, 0, 0.18)',
             '0 1px 2px rgba(0, 0, 0, 0.40)',
             '0 12px 28px rgba(0, 0, 0, 0.30)'
@@ -847,7 +847,7 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset'
+        boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset'
       }}
     >
       {/* Time slot — start–end range when both are known */}
@@ -943,7 +943,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+        boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
         transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
       }}
       onMouseEnter={(e) => {
@@ -951,14 +951,14 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         // Hover stays neutral — black/charcoal/white. Stage color
         // shows on the spine + label only (functional). No ambient
         // blue/purple bleed onto the card's halo.
-        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
+        e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
         e.currentTarget.style.background = 'var(--v3-surface-3)'
-        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.40)'
+        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 8px 24px rgba(0, 0, 0, 0.40)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
         e.currentTarget.style.background = 'var(--v3-surface)'
-        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
+        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
       }}
     >
       {/* Stage spine — V3-HOME-1B: thinned 5→3px and shortened 36→20px
@@ -1008,7 +1008,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         color: 'var(--v3-text)',
         fontVariantNumeric: 'tabular-nums',
         lineHeight: 1,
-        textShadow: '0 1px 0 rgba(255, 255, 255, 0.06)'
+        textShadow: '0 1px 0 var(--v3-glass-tint-2)'
       }}>
         ${deal.amount >= 1000
           ? `${(deal.amount / 1000).toFixed(deal.amount >= 10000 ? 0 : 1)}K`
@@ -1064,7 +1064,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
         // Lifted-panel treatment: top-lit gradient + layered shadow so
         // the KPI tiles match the Jobs/Home card depth pass instead of
         // reading as flat squares.
-        background: 'linear-gradient(180deg, #1a1715 0%, #121010 70%)',
+        background: 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 70%)',
         border: '1px solid var(--v3-border)',
         boxShadow: '0 1px 0 rgba(255, 240, 210, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.36), 0 6px 16px rgba(0, 0, 0, 0.30)',
         color: 'var(--v3-text)',
@@ -1237,11 +1237,11 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
         // Subtle linear top-light overlay + slightly raised surface mix
         // so each row reads as a metal plate, not a list item.
         background: `
-          linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 40%),
+          linear-gradient(180deg, var(--v3-glass-tint), transparent 40%),
           var(--v3-surface)
         `,
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint-2), 0 1px 2px rgba(0, 0, 0, 0.25)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         width: '100%',

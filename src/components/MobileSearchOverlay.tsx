@@ -178,8 +178,8 @@ export default function MobileSearchOverlay() {
                 aria-label="Close search"
                 style={{
                   width: 38, height: 38, borderRadius: 10,
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.10)',
+                  background: 'var(--v3-glass-tint-2)',
+                  border: '1px solid var(--v3-border-mid)',
                   display: 'grid', placeItems: 'center',
                   color: 'var(--v3-text)', cursor: 'pointer', padding: 0
                 }}

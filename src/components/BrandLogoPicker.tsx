@@ -137,7 +137,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
         style={{
           padding: '14px 16px',
           borderRadius: 14,
-          background: 'linear-gradient(180deg, rgba(20,20,20,0.95), rgba(14,14,14,0.95))',
+          background: 'var(--v3-surface-2)',
           border: '1px solid var(--rule)',
           display: 'flex',
           alignItems: 'center',

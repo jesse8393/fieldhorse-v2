@@ -198,26 +198,26 @@ const titleStyle: React.CSSProperties = {
   fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)',
   fontSize: 32,
   letterSpacing: '.005em',
-  color: '#f4f1ea',
+  color: 'var(--v3-text)',
   lineHeight: 1.1,
 }
 
 const pStyle: React.CSSProperties = {
   margin: 0,
-  color: 'rgba(245,242,234,.78)',
+  color: 'var(--v3-text-secondary)',
   fontSize: 14,
   lineHeight: 1.55,
 }
 
-const hiStyle: React.CSSProperties = { color: '#f4f1ea', fontWeight: 700 }
+const hiStyle: React.CSSProperties = { color: 'var(--v3-text)', fontWeight: 700 }
 
 const secondaryBtnStyle: React.CSSProperties = {
   display: 'block', width: '100%', marginTop: 8,
   padding: '10px 16px',
   borderRadius: 8,
   background: 'transparent',
-  color: 'rgba(245,242,234,.55)',
-  border: '1px solid rgba(255,255,255,.12)',
+  color: 'var(--v3-text-muted)',
+  border: '1px solid var(--v3-border-mid)',
   fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)',
   fontWeight: 700,
   fontSize: 13,

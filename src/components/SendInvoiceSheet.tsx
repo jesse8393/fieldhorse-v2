@@ -244,7 +244,7 @@ export default function SendInvoiceSheet({
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !busy) onClose?.() }}>
       <DrawerContent className="ui:max-w-full ui:overflow-x-hidden" style={drawerStyle}>
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
             <Receipt size={12} />
             Invoice
           </div>
@@ -472,8 +472,8 @@ function chipStyle(active: boolean, disabled: boolean): import('react').CSSPrope
   return {
     padding: '7px 12px',
     borderRadius: 999,
-    border: active ? '1px solid rgba(255,255,255,0.22)' : '1px solid var(--rule)',
-    background: active ? 'rgba(255,255,255,0.06)' : 'var(--surface-2)',
+    border: active ? '1px solid var(--v3-border-strong)' : '1px solid var(--rule)',
+    background: active ? 'var(--v3-glass-tint-2)' : 'var(--surface-2)',
     color: active ? 'var(--ink-strong)' : 'var(--ink-muted)',
     fontFamily: 'var(--font-body)',
     fontSize: 12,
@@ -487,7 +487,7 @@ function ghostBtnStyle(busy: boolean): import('react').CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
     padding: '11px 12px', borderRadius: 12,
-    background: 'var(--surface-2)', border: '1px solid rgba(255, 255, 255, 0.18)',
+    background: 'var(--surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
     letterSpacing: '0.06em', textTransform: 'uppercase',

@@ -50,7 +50,7 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
           placeItems: 'center',
           background: primary
             ? 'color-mix(in srgb, var(--v3-primary) 14%, transparent)'
-            : 'rgba(255,255,255,0.04)',
+            : 'var(--v3-glass-tint)',
           border: `1px solid ${primary
             ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
             : 'var(--v3-border)'}`,

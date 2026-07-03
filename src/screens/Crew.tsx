@@ -242,19 +242,19 @@ export default function Crew() {
             <div className="fh-build-eyebrow">
               {activePunch ? 'On the clock' : 'Not clocked in'}
             </div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#f4f1ea', margin: '8px 0 4px' }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
               {activePunch
                 ? `Since ${fmtTime(activePunch.punch_in_at)}`
                 : 'Ready when you are.'}
             </p>
             {activePunch && (
-              <p style={{ margin: 0, color: 'rgba(245,242,234,.62)', fontSize: 12 }}>
+              <p style={{ margin: 0, color: 'var(--v3-text-muted)', fontSize: 12 }}>
                 {fmtMinutes(workedMinutes(activePunch))} this shift
               </p>
             )}
             {!activePunch && todayJobs.length > 0 && (
               <label style={{ display: 'block', marginTop: 12 }}>
-                <span style={{ display: 'block', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(245,242,234,.5)', marginBottom: 4 }}>
+                <span style={{ display: 'block', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--v3-text-muted)', marginBottom: 4 }}>
                   Clock in to
                 </span>
                 <select
@@ -262,8 +262,8 @@ export default function Crew() {
                   onChange={(e) => setClockJobId(e.target.value)}
                   disabled={punching}
                   style={{
-                    width: '100%', background: 'rgba(0,0,0,.25)', color: '#f4f1ea',
-                    border: '1px solid rgba(255,255,255,.14)', borderRadius: 8,
+                    width: '100%', background: 'rgba(0,0,0,.25)', color: 'var(--v3-text)',
+                    border: '1px solid var(--v3-border-mid)', borderRadius: 8,
                     padding: '8px 10px', fontSize: 13, fontWeight: 600,
                   }}
                 >
@@ -337,7 +337,7 @@ export default function Crew() {
                         gridTemplateColumns: '120px 1fr auto',
                         gap: 16,
                         padding: '14px 22px',
-                        borderTop: '1px solid rgba(255,255,255,.06)',
+                        borderTop: '1px solid var(--v3-glass-tint-2)',
                         alignItems: 'center',
                       }}
                     >
@@ -345,19 +345,19 @@ export default function Crew() {
                         <Clock size={11} style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
                         {fmtTime(ev.start_at)}{ev.end_at ? ` – ${fmtTime(ev.end_at)}` : ''}
                       </span>
-                      <strong style={{ color: '#f4f1ea', fontSize: 13, fontWeight: 700 }}>
+                      <strong style={{ color: 'var(--v3-text)', fontSize: 13, fontWeight: 700 }}>
                         {ev.title || 'Untitled event'}
                       </strong>
                       {ev.contact_id ? (
                         <button
                           type="button"
                           onClick={() => navigate(`/jobs/${ev.contact_id}`)}
-                          style={{ background: 'transparent', border: 'none', color: 'rgba(245,242,234,.55)', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
                           <MapPin size={11} /> Job <ChevronRight size={11} />
                         </button>
                       ) : (
-                        <span style={{ color: 'rgba(245,242,234,.30)', fontSize: 11 }}>—</span>
+                        <span style={{ color: 'var(--v3-text-faint)', fontSize: 11 }}>—</span>
                       )}
                     </li>
                   ))}
@@ -389,15 +389,15 @@ export default function Crew() {
                           gridTemplateColumns: '130px 110px 1fr 90px',
                           gap: 14,
                           padding: '12px 22px',
-                          borderTop: '1px solid rgba(255,255,255,.06)',
+                          borderTop: '1px solid var(--v3-glass-tint-2)',
                           alignItems: 'center',
                           fontSize: 12,
                         }}
                       >
-                        <span style={{ color: '#f4f1ea', fontWeight: 600 }}>
+                        <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>
                           {day ? day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '—'}
                         </span>
-                        <span style={{ color: 'rgba(245,242,234,.55)' }}>
+                        <span style={{ color: 'var(--v3-text-muted)' }}>
                           {fmtTime(p.punch_in_at)} – {p.punch_out_at ? fmtTime(p.punch_out_at) : 'now'}
                         </span>
                         <span>
@@ -411,7 +411,7 @@ export default function Crew() {
                             <span className="fh-build-dot is-good">Active</span>
                           )}
                         </span>
-                        <span style={{ textAlign: 'right', color: '#f4f1ea', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                        <span style={{ textAlign: 'right', color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
                           {fmtMinutes(workedMinutes(p))}
                         </span>
                       </li>

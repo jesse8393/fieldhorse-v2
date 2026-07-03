@@ -265,13 +265,13 @@ export default function Timesheets() {
                 <div>
                   <div className="fh-build-eyebrow">{g.name}</div>
                   {g.email && (
-                    <div style={{ fontSize: 11, color: 'rgba(245,242,234,.55)', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>
                       {g.email}
                     </div>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'rgba(245,242,234,.72)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--v3-text-secondary)' }}>
                     {g.rows.length} punch{g.rows.length === 1 ? '' : 'es'} ·
                     {' '}{fmtMinutes(groupMinutes)}
                     {groupCost > 0 ? ` · ${fmtMoney(groupCost)}` : ''}
@@ -304,7 +304,7 @@ export default function Timesheets() {
                     <button
                       type="button"
                       onClick={() => navigate(`/jobs/${r.contact_id}`)}
-                      style={{ background: 'transparent', border: 'none', color: '#f4f1ea', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--v3-text)', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     >
                       {r.contact_name || 'Open job'} <ChevronRight size={11} />
                     </button>

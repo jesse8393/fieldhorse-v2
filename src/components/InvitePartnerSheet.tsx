@@ -216,7 +216,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
             <Users size={12} />
             Partner
           </div>
@@ -311,10 +311,10 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                         padding: '7px 12px',
                         borderRadius: 999,
                         border: active
-                          ? '1px solid rgba(255,255,255,0.22)'
+                          ? '1px solid var(--v3-border-strong)'
                           : '1px solid var(--rule)',
                         background: active
-                          ? 'rgba(255,255,255,0.06)'
+                          ? 'var(--v3-glass-tint-2)'
                           : 'var(--surface-2)',
                         color: active
                           ? 'var(--ink-strong)'
@@ -419,7 +419,7 @@ function RecentPartnersStrip({ partners, onPick }: any) {
           >
             <span aria-hidden="true" style={{
               width: 22, height: 22, borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.06)',
+              background: 'var(--v3-glass-tint-2)',
               color: 'var(--ink-strong)',
               display: 'grid', placeItems: 'center',
               fontFamily: 'var(--font-display)',
@@ -471,8 +471,8 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
           style={{
             padding: '10px 12px',
             borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.18)',
+            background: 'var(--v3-glass-tint-2)',
+            border: '1px solid var(--v3-border-strong)',
             color: 'var(--ink-strong)',
             fontFamily: 'var(--font-body)',
             fontSize: 12, lineHeight: 1.45

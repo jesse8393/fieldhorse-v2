@@ -176,7 +176,7 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
                   cursor: 'pointer',
                   boxShadow: state.destructive
                     ? '0 4px 12px rgba(192, 57, 43, 0.32)'
-                    : '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
+                    : '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 var(--v3-border-strong) inset',
                   WebkitTapHighlightColor: 'transparent',
                   touchAction: 'manipulation'
                 }}

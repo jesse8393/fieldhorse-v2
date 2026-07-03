@@ -550,7 +550,7 @@ function NotesPullDialog({ jobId, onClose, onAdd }: {
               <li key={it.note_id + idx} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 10px', borderRadius: 8,
-                background: 'rgba(255,255,255,.025)', border: '1px solid var(--v3-border)',
+                background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border)',
               }}>
                 <input
                   type="checkbox"
@@ -602,7 +602,7 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
           padding: 22,
           borderRadius: 12,
           background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
-          border: '1px solid rgba(255,255,255,.10)',
+          border: '1px solid var(--v3-border-mid)',
           boxShadow: '0 22px 60px rgba(0,0,0,.50)',
         }}
       >
@@ -610,10 +610,10 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
           <div>
             <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>{title}</div>
             {subtitle && (
-              <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'rgba(245,242,234,.62)' }}>{subtitle}</p>
+              <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--v3-text-muted)' }}>{subtitle}</p>
             )}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'rgba(245,242,234,.55)', cursor: 'pointer' }}>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
             <X size={18} />
           </button>
         </div>

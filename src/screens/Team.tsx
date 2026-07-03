@@ -112,7 +112,7 @@ export default function Team() {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Your role</div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#f4f1ea', margin: '8px 0 4px', textTransform: 'capitalize' }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', textTransform: 'capitalize' }}>
               {role || 'No membership'}
             </p>
             {canInviteMembers && (
@@ -295,7 +295,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
   const targetTier = ROLE_TIER[member.role] ?? 0
   const manageable = canManage && !member.is_self && targetTier < callerTier
   if (!manageable) {
-    return <span style={{ color: 'rgba(245,242,234,.20)', fontSize: 11 }}>{member.is_self ? '—' : ''}</span>
+    return <span style={{ color: 'var(--v3-text-faint)', fontSize: 11 }}>{member.is_self ? '—' : ''}</span>
   }
   const roleOptions = ORG_ROLES.filter((r) => (ROLE_TIER[r] ?? 0) < callerTier)
 
@@ -427,19 +427,19 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
           padding: 24,
           borderRadius: 12,
           background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
-          border: '1px solid rgba(255,255,255,.10)',
+          border: '1px solid var(--v3-border-mid)',
           boxShadow: '0 22px 60px rgba(0,0,0,.50)',
         }}
       >
         <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>Invite teammate</div>
-        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: '#f4f1ea' }}>
+        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: 'var(--v3-text)' }}>
           Add someone to the field.
         </h2>
 
         {acceptUrl ? (
           <div>
-            <p style={{ margin: 0, fontSize: 14, color: 'rgba(245,242,234,.78)', lineHeight: 1.5 }}>
-              Invite created. Share this link with <strong style={{ color: '#f4f1ea' }}>{email}</strong>:
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--v3-text-secondary)', lineHeight: 1.5 }}>
+              Invite created. Share this link with <strong style={{ color: 'var(--v3-text)' }}>{email}</strong>:
             </p>
             <div style={{
               marginTop: 12,
@@ -449,7 +449,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
               border: '1px solid rgba(201,150,58,.30)',
               fontSize: 12,
               fontFamily: 'var(--font-body)',
-              color: '#f4f1ea',
+              color: 'var(--v3-text)',
               wordBreak: 'break-all',
             }}>
               {acceptUrl}
@@ -468,7 +468,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
             <label style={{ display: 'block', marginBottom: 14 }}>
               <span className="fh-build-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Email</span>
               <div style={{ position: 'relative' }}>
-                <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(245,242,234,.45)' }} />
+                <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)' }} />
                 <input
                   type="email"
                   required
@@ -480,8 +480,8 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
                     padding: '10px 12px 10px 34px',
                     borderRadius: 6,
                     background: 'rgba(0,0,0,.30)',
-                    border: '1px solid rgba(255,255,255,.10)',
-                    color: '#f4f1ea',
+                    border: '1px solid var(--v3-border-mid)',
+                    color: 'var(--v3-text)',
                     fontFamily: 'var(--font-body)',
                     fontSize: 14,
                   }}

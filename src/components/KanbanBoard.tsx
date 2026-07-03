@@ -58,7 +58,7 @@ function KanbanCard({ contact, dragging, onOpen }: any) {
         position: 'relative',
         padding: '11px 12px',
         borderRadius: 12,
-        background: 'rgba(255, 255, 255, 0.04)',
+        background: 'var(--v3-glass-tint)',
         border: '1px solid var(--rule)',
         boxShadow: dragging
           ? '0 18px 44px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3)'
@@ -112,7 +112,7 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }: any) {
         padding: 12,
         borderRadius: 16,
         minHeight: 220,
-        background: isOver ? 'rgba(199, 164, 90, 0.06)' : 'rgba(255, 255, 255, 0.025)',
+        background: isOver ? 'rgba(199, 164, 90, 0.06)' : 'var(--v3-glass-tint)',
         border: isOver ? '1px solid rgba(199, 164, 90, 0.45)' : '1px solid var(--rule)',
         transition: 'background 120ms cubic-bezier(0.5, 0, 0.2, 1), border-color 120ms'
       }}

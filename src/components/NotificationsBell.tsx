@@ -110,8 +110,8 @@ export default function NotificationsBell() {
           height: 44,
           minWidth: 44,
           borderRadius: 11,
-          background: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'var(--v3-glass-tint)',
+          border: '1px solid var(--v3-border-mid)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
           display: 'grid',
@@ -159,7 +159,7 @@ export default function NotificationsBell() {
           <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
                   <Inbox size={12} />
                   Inbox
                 </div>
@@ -226,9 +226,9 @@ export default function NotificationsBell() {
                           // adequately. Now uses a neutral lift instead
                           // of gold gradient.
                           background: isUnread
-                            ? 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))'
+                            ? 'linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint))'
                             : 'var(--surface-2)',
-                          border: isUnread ? '1px solid rgba(255,255,255,0.12)' : '1px solid var(--rule)',
+                          border: isUnread ? '1px solid var(--v3-border-mid)' : '1px solid var(--rule)',
                           cursor: 'pointer',
                           color: 'var(--ink-strong)',
                           position: 'relative',
