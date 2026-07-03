@@ -96,8 +96,8 @@ export default defineConfig({
         name: 'Fieldhorse',
         short_name: 'Fieldhorse',
         description: 'Contractor field operations',
-        theme_color: '#141414',
-        background_color: '#141414',
+        theme_color: '#0B0907',
+        background_color: '#0B0907',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

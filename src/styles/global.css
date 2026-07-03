@@ -1942,11 +1942,11 @@ a {
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: var(--fh-onyx-2, #141414);
-  border: 1px solid var(--fh-line, rgba(242, 239, 229, 0.08));
+  background: var(--v3-surface-2);
+  border: 1px solid var(--v3-border-mid);
   border-radius: 10px;
   cursor: pointer;
-  color: var(--fh-ink-dim, rgba(242, 239, 229, 0.55));
+  color: var(--v3-text-muted);
   transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
   overflow: hidden;
 }
@@ -2743,12 +2743,17 @@ a {
    their existing warm-onyx tokens; the contrast against a neutral
    near-black page floor is intentional and reads as crisp. */
 .fh-app {
-  background: #070708;
+  background: var(--fh-canvas);
 }
+/* !important is load-bearing: it beats the per-screen inline
+   `background: var(--v3-bg)` styles so the canvas stays one flat floor.
+   The literal #070708 it used to carry also beat every THEME override —
+   the 7/3 daylight screenshot showed light cards floating on a black
+   canvas. Routing through --fh-canvas keeps the scrub AND re-themes. */
 .fh-screen,
 .v3-screen {
   background-image: none !important;
-  background-color: #070708 !important;
+  background-color: var(--fh-canvas) !important;
 }
 
 /* =========================================================================
