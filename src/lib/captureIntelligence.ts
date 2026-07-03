@@ -121,7 +121,7 @@ export async function routeCapture({ text, roster, now = new Date() }: { text: s
   const res = await claudeMessage({
     // Intent routing is correctness-sensitive (it writes money rows) —
     // run it on the strongest model rather than the app-wide default.
-    model: 'claude-opus-4-8',
+    model: 'claude-fable-5',
     system: CAPTURE_SYSTEM,
     messages: [{
       role: 'user',

@@ -4,7 +4,7 @@
 
 import { authHeaders } from './supabase.ts'
 
-const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-sonnet-5'
 
 // Hard ceiling so a stuck /api/claude call never leaves the UI in an
 // indefinite "parsing…" or "drafting…" state. 15s is comfortably above

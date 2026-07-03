@@ -8,7 +8,7 @@
 //
 // ENV required: ANTHROPIC_API_KEY (set in Netlify dashboard)
 //               SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (token check)
-// Optional: ANTHROPIC_MODEL (defaults to claude-sonnet-4-6)
+// Optional: ANTHROPIC_MODEL (defaults to claude-sonnet-5)
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -62,7 +62,7 @@ export default async (request) => {
   }
 
   const {
-    model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+    model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
     system,
     messages,
     max_tokens = 1024,
@@ -82,10 +82,10 @@ export default async (request) => {
   // user could point the shared API key at any (e.g. more expensive) model.
   // Anything off-list falls back to the configured default rather than
   // erroring, so a benign unknown id degrades instead of breaking.
-  const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+  const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5'
   const ALLOWED_MODELS = new Set([
-    'claude-sonnet-4-6',
-    'claude-opus-4-8',
+    'claude-sonnet-5',
+    'claude-fable-5',
     'claude-haiku-4-5-20251001',
     DEFAULT_MODEL
   ])
