@@ -10746,6 +10746,9 @@ select {
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
     rgba(20, 17, 16, 0.78);
   color: var(--ink-strong, #f4f1ea);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 210, 0.052),
+    0 14px 34px rgba(0, 0, 0, 0.22);
 }
 
 /* Daylight parity — the black-glass panels above are dark literals by
@@ -10760,9 +10763,39 @@ select {
   background: var(--v3-surface);
   box-shadow: var(--v3-shadow);
   color: var(--v3-text);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 240, 210, 0.052),
-    0 14px 34px rgba(0, 0, 0, 0.22);
+}
+
+/* Their child text carries literal linen rgba()s (7/3 field screenshot:
+   "NEXT BEST MOVE" eyebrow + stat labels washed out white-on-white).
+   Re-point every linen literal at the text ladder in light. */
+[data-theme='light'] .fh-lead-command__eyebrow,
+[data-theme='light'] .fh-lead-command__signals span {
+  color: var(--v3-text-muted);
+}
+[data-theme='light'] .fh-lead-command__focus > span:not(.fh-lead-command__eyebrow) {
+  color: var(--v3-text-secondary);
+}
+[data-theme='light'] .fh-crm-brief p,
+[data-theme='light'] .fh-crm-brief__chips span {
+  color: var(--v3-text-secondary);
+}
+[data-theme='light'] .fh-crm-flow__head > span,
+[data-theme='light'] .fh-crm-flow__stages span,
+[data-theme='light'] .fh-crm-flow__stages small {
+  color: var(--v3-text-muted);
+}
+[data-theme='light'] .fh-command-dialog [cmdk-group-heading] {
+  color: var(--v3-text-muted) !important;
+}
+[data-theme='light'] .fh-command-dialog [data-slot='command-item'] {
+  color: var(--v3-text-secondary) !important;
+}
+
+/* Uploaded brand logos are usually white lettering on transparent —
+   made for the dark header. On paper they vanish. A soft dark halo
+   keeps white glyphs legible without assuming the logo's color. */
+[data-theme='light'] .fh-app-header__brand img {
+  filter: drop-shadow(0 0 1px rgba(20, 18, 14, 0.55)) drop-shadow(0 1px 5px rgba(20, 18, 14, 0.35));
 }
 
 .fh-lead-command__focus {

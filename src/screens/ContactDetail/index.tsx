@@ -1056,7 +1056,9 @@ function Header({
       <div style={{
         padding: '12px 14px',
         borderRadius: 16,
-        background: 'linear-gradient(180deg, #1b1816 0%, var(--v3-surface) 72%)',
+        // Top-tint rides the surface ladder (was literal #1b1816 — in
+        // daylight it smeared a dark gradient across the paper card).
+        background: 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 72%)',
         border: '1px solid var(--v3-border)',
         boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
       }}>
