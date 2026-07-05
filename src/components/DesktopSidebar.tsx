@@ -48,44 +48,55 @@ type Group = { label: string; items: Item[] }
 const exact = (target: string) => (p: string) => p === target
 const prefix = (target: string) => (p: string) => p === target || p.startsWith(target + '/')
 
+// IA collapse (redesign W2): groups renamed from software-speak
+// (Command / Execution / Intelligence / Workspace) to the contractor's
+// verbs — Sell / Work / Get paid / Office. A deal reads top-to-bottom:
+// you sell it, you work it, you collect on it. Same routes, same role
+// gates; only the grouping and a few labels changed (Lead Desk → Leads,
+// Command Center → Home).
 const GROUPS: Group[] = [
   {
-    label: 'Command',
+    label: 'Today',
     items: [
-      { label: 'Command Center', to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
-      { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
-      { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
-      { label: 'Lead Desk',      to: '/leads',    Icon: Sparkles,        match: prefix('/leads') },
-      { label: 'Quote Desk',     to: '/quotes',   Icon: FileText,        match: prefix('/quotes') },
-      { label: 'Job Desk',       to: '/jobs?view=doing', Icon: Hammer,   match: prefix('/jobs') },
+      { label: 'Home',           to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
     ],
   },
   {
-    label: 'Execution',
+    label: 'Sell',
     items: [
-      { label: 'Schedule',       to: '/schedule', Icon: Calendar,        match: prefix('/schedule') },
+      { label: 'Leads',          to: '/leads',    Icon: Sparkles,        match: prefix('/leads') },
+      { label: 'Quotes',         to: '/quotes',   Icon: FileText,        match: prefix('/quotes') },
+      { label: 'Pipeline',       to: '/pipeline', Icon: BarChart3,       match: prefix('/pipeline') },
       { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
-      { label: 'Invoices',       to: '/invoices', Icon: Receipt,         match: prefix('/invoices') },
-      { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
-      { label: 'Sub Portal',     to: '/sub-portal', Icon: Briefcase,     match: prefix('/sub-portal') },
+    ],
+  },
+  {
+    label: 'Work',
+    items: [
+      { label: 'Jobs',           to: '/jobs?view=doing', Icon: Hammer,   match: prefix('/jobs') },
+      { label: 'Schedule',       to: '/schedule', Icon: Calendar,        match: prefix('/schedule') },
+      { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
       { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
       { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },
-    ],
-  },
-  {
-    label: 'Intelligence',
-    items: [
-      { label: 'Pipeline',       to: '/pipeline', Icon: BarChart3, match: prefix('/pipeline') },
-      { label: 'Analytics',      to: '/analytics',Icon: TrendingUp,      match: prefix('/analytics') },
       { label: 'Forecast',       to: '/pour-window', Icon: LineChart,    match: prefix('/pour-window') },
     ],
   },
   {
-    label: 'Workspace',
+    label: 'Get paid',
+    items: [
+      { label: 'Invoices',       to: '/invoices', Icon: Receipt,         match: prefix('/invoices') },
+      { label: 'Analytics',      to: '/analytics',Icon: TrendingUp,      match: prefix('/analytics') },
+    ],
+  },
+  {
+    label: 'Office',
     items: [
       { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
       { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },
       { label: 'Subs',           to: '/subs',     Icon: Hammer,          match: prefix('/subs') },
+      { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
+      { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
+      { label: 'Sub Portal',     to: '/sub-portal', Icon: Briefcase,     match: prefix('/sub-portal') },
       { label: 'Templates',      to: '/settings#templates', Icon: FileText,        match: (p) => p === '/settings' && typeof window !== 'undefined' && window.location.hash === '#templates' },
       // Settings is the parent — when hash points at #templates, the
       // Templates row above owns the active state; otherwise Settings
