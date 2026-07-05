@@ -21,7 +21,7 @@ import {
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
-import { FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
+import { Button, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
@@ -936,19 +936,19 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
         {/* Action row */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {isLost ? (
-            <LeadAction onClick={onReopen} disabled={busy}>
+            <Button size="sm" variant="secondary" onClick={() => { hapticTap(); onReopen() }} disabled={busy}>
               Reopen
-            </LeadAction>
+            </Button>
           ) : (
             <>
-              <LeadAction onClick={onQuote} disabled={busy}>
+              <Button size="sm" variant="secondary" onClick={() => { hapticTap(); onQuote() }} disabled={busy}>
                 <FileText size={12} aria-hidden="true" />
                 {c.stage === 'quote' ? 'Open quote' : 'Build quote'}
-              </LeadAction>
-              <LeadAction onClick={onWon} disabled={busy} primary>
+              </Button>
+              <Button size="sm" variant="primary" onClick={() => { hapticTap(); onWon() }} disabled={busy}>
                 <Trophy size={12} aria-hidden="true" />
                 {busy ? 'Working…' : 'Won'}
-              </LeadAction>
+              </Button>
             </>
           )}
           <div style={{ marginLeft: 'auto' }}>
@@ -1000,38 +1000,3 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
   )
 }
 
-type LeadActionProps = {
-  children: ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  primary?: boolean
-}
-
-function LeadAction({ children, onClick, disabled, primary }: LeadActionProps) {
-  return (
-    <button
-      type="button"
-      onClick={() => { hapticTap(); onClick?.() }}
-      disabled={disabled}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '9px 13px', minHeight: 36, borderRadius: 9,
-        border: primary
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)'
-          : '1px solid var(--v3-border-strong)',
-        background: primary
-          ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-          : 'var(--v3-surface-2)',
-        color: primary ? 'var(--v3-on-primary)' : 'var(--v3-text)',
-        fontFamily: 'var(--font-body)', fontSize: 12,
-        fontWeight: primary ? 700 : 600,
-        letterSpacing: primary ? '0.03em' : 0,
-        cursor: disabled ? 'wait' : 'pointer',
-        opacity: disabled ? 0.6 : 1,
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      {children}
-    </button>
-  )
-}

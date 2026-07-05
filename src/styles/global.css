@@ -11418,3 +11418,91 @@ select {
     color: rgba(245, 242, 234, 0.45);
   }
 }
+
+/* =========================================================================
+   .v3-btn — THE action button (kit wave 1, redesign W3).
+
+   The Button primitive shipped as a stub with these classes never
+   written; four screens hand-rolled the same control inline instead.
+   This family is now the single source of truth. Every color is a
+   token, so both themes come free. Focus-visible ring is defined with
+   the app-wide rule near line 9880.
+   ========================================================================= */
+.v3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--v3-border-strong);
+  background: var(--v3-surface-2);
+  color: var(--v3-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+.v3-btn:active { transform: scale(0.97); }
+.v3-btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+@media (hover: hover) {
+  .v3-btn:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--v3-primary) 36%, var(--v3-border-strong));
+    background: var(--v3-surface-3);
+  }
+}
+
+.v3-btn--primary {
+  border-color: color-mix(in srgb, var(--v3-primary) 60%, transparent);
+  background: linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%);
+  color: var(--v3-on-primary);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: var(--v3-gold-glow-sm);
+}
+@media (hover: hover) {
+  .v3-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary-hot) 100%);
+    border-color: color-mix(in srgb, var(--v3-primary) 75%, transparent);
+  }
+}
+
+.v3-btn--ghost {
+  border-color: var(--v3-border);
+  background: transparent;
+  color: var(--v3-text-muted);
+}
+
+.v3-btn--danger {
+  border-color: color-mix(in srgb, var(--v3-danger) 40%, transparent);
+  background: var(--v3-danger-soft);
+  color: var(--v3-danger-bright);
+}
+
+.v3-btn--success {
+  border-color: color-mix(in srgb, var(--v3-success) 55%, transparent);
+  background: linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%);
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.v3-btn--sm {
+  min-height: 36px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+.v3-btn--lg {
+  min-height: 52px;
+  padding: 14px 20px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+.v3-btn--full { width: 100%; }
+.v3-btn--icon-only { width: 44px; padding: 0; }
+.v3-btn--sm.v3-btn--icon-only { width: 36px; }

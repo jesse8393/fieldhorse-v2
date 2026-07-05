@@ -21,7 +21,7 @@ import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
-import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
+import { Button, FilterPill, Eyebrow, StampNumber } from '../components/v3'
 // V3PaymentSheet is lazy — only loads when an operator taps "Mark Paid".
 // Avoids dragging ~440KB into the initial Invoices route chunk.
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
@@ -1056,54 +1056,23 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
         </div>
         {!settled && (
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <InvoiceAction onClick={onSend} disabled={isSending} success={isSent}>
+            <Button size="sm" variant={isSent ? 'success' : 'secondary'} onClick={onSend} disabled={isSending}>
               {isSent ? <CheckCircle2 size={12} /> : <Send size={12} />}
               {isSent ? 'Sent' : isSending ? 'Sending…' : effStatus === 'draft' ? 'Send' : 'Resend'}
-            </InvoiceAction>
-            <InvoiceAction onClick={onDownload}>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onDownload}>
               <FileDown size={12} /> PDF
-            </InvoiceAction>
-            <InvoiceAction onClick={onMarkPaid} primary>
+            </Button>
+            <Button size="sm" variant="primary" onClick={onMarkPaid}>
               <DollarSign size={12} /> Mark paid
-            </InvoiceAction>
-            <InvoiceAction onClick={onVoid}>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onVoid}>
               Void
-            </InvoiceAction>
+            </Button>
           </div>
         )}
       </article>
     </li>
-  )
-}
-
-function InvoiceAction({ children, onClick, disabled, primary, success }: any) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '8px 11px', minHeight: 34, borderRadius: 8,
-        border: success
-          ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
-          : primary
-            ? '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)'
-            : '1px solid var(--v3-border-strong)',
-        background: success
-          ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
-          : primary
-            ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-            : 'var(--v3-surface-2)',
-        color: success ? '#0a0a0a' : primary ? 'var(--v3-on-primary)' : 'var(--v3-text)',
-        fontFamily: 'var(--font-body)', fontSize: 11,
-        fontWeight: primary ? 700 : 600,
-        cursor: disabled ? 'wait' : 'pointer',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -1277,82 +1246,21 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
             {/* Email — primary send action. Mirrors the Send button on
                 InvoiceDetail. User shouldn't have to dive into the detail
                 page just to email the client. */}
-            <button
-              type="button"
+            <Button
+              variant={isSent ? 'success' : 'secondary'}
               onClick={onEmail}
               disabled={isSending}
               title={!resolveClient(row.job).email ? 'Add a client email first on the linked client' : 'Email the invoice to the client'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 14px',
-                minHeight: 40,
-                borderRadius: 10,
-                border: isSent
-                  ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
-                  : '1px solid var(--v3-border-strong)',
-                background: isSent
-                  ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
-                  : 'var(--v3-surface-2)',
-                color: isSent ? '#0a0a0a' : (isSending ? 'var(--v3-text-muted)' : 'var(--v3-text)'),
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: isSending ? 'wait' : 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
-              }}
             >
               {isSent ? <CheckCircle2 size={13} /> : <Send size={13} />}
               {isSent ? 'Sent' : isSending ? 'Sending…' : 'Email'}
-            </button>
-            <button
-              type="button"
-              onClick={onPDF}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 14px',
-                minHeight: 40,
-                borderRadius: 10,
-                border: '1px solid var(--v3-border-strong)',
-                background: 'var(--v3-surface-2)',
-                color: 'var(--v3-text)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
+            </Button>
+            <Button variant="secondary" onClick={onPDF}>
               <FileDown size={13} /> Download
-            </button>
-            <button
-              type="button"
-              onClick={onPaid}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 14px',
-                minHeight: 40,
-                borderRadius: 10,
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
-                background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 var(--v3-border-strong) inset'
-              }}
-            >
+            </Button>
+            <Button variant="primary" onClick={onPaid}>
               <DollarSign size={13} /> Mark Paid
-            </button>
+            </Button>
           </div>
         )}
       </motion.article>

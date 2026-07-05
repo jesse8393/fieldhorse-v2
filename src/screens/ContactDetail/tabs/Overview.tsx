@@ -10,7 +10,8 @@ import { hapticTap, hapticStageChange } from '../../../lib/haptics.ts'
 import {
   NextActionCard,
   HealthDonut,
-  ProgressMeter
+  ProgressMeter,
+  Button
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
@@ -290,36 +291,26 @@ export default function OverviewTab({
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {(contact?.stage === 'invoice' || contact?.stage === 'job') && (
-          <SecondaryAction
-            icon={Receipt}
-            label="Send invoice"
-            onClick={() => { hapticTap(); onOpenSendInvoice?.() }}
-          />
+          <Button variant="secondary" leftIcon={Receipt} onClick={() => { hapticTap(); onOpenSendInvoice?.() }}>
+            Send invoice
+          </Button>
         )}
         {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
-          <SecondaryAction
-            icon={Plus}
-            label="Log payment"
-            onClick={() => { hapticTap(); onOpenLogPayment?.() }}
-          />
+          <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenLogPayment?.() }}>
+            Log payment
+          </Button>
         )}
         {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
-          <SecondaryAction
-            icon={ShieldCheck}
-            label={contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
-            onClick={() => { hapticTap(); onOpenMarkComplete?.() }}
-          />
+          <Button variant="secondary" leftIcon={ShieldCheck} onClick={() => { hapticTap(); onOpenMarkComplete?.() }}>
+            {contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
+          </Button>
         )}
-        <SecondaryAction
-          icon={Plus}
-          label="Schedule event"
-          onClick={() => { hapticTap(); onOpenAddEvent?.() }}
-        />
-        <SecondaryAction
-          icon={Plus}
-          label="Invite partner"
-          onClick={() => { hapticTap(); onOpenInvitePartner?.() }}
-        />
+        <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenAddEvent?.() }}>
+          Schedule event
+        </Button>
+        <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenInvitePartner?.() }}>
+          Invite partner
+        </Button>
       </div>
 
       {/* ACTIVITY — single chronological timeline synthesized from existing
@@ -363,36 +354,6 @@ const STAGE_FN_MAP: Record<string, any> = {
   approveQuote,
   markComplete,
   reopen
-}
-
-function SecondaryAction({ icon: Icon, label, onClick }: any) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.97 }}
-      onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 7,
-        minHeight: 44,
-        padding: '11px 16px',
-        borderRadius: 12,
-        background: 'var(--v3-surface-2)',
-        border: '1px solid var(--v3-border)',
-        color: 'var(--v3-text)',
-        fontFamily: 'var(--font-body)',
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      <Icon size={15} aria-hidden="true" />
-      {label}
-    </motion.button>
-  )
 }
 
 /* ============================================================
