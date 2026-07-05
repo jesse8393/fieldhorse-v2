@@ -21,7 +21,7 @@ import { useProfile } from '../contexts/ProfileContext.tsx'
 import { getWeather, MURFREESBORO } from '../lib/weather.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import CountUp from '../components/fx/CountUp.tsx'
-import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
+import { Eyebrow, QuickAction, SectionHeader, ScreenCloser, StatusPill } from '../components/v3'
 import HomeActivityCard from '../components/HomeActivityCard.tsx'
 import { hapticTap } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
@@ -270,23 +270,14 @@ export default function Home() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            // Polish pass: date eyebrow demoted from gold to muted ink
-            // so the gold accent on the operator's first name (a few
-            // lines below) carries the brand moment alone. Two gold
-            // hits on the same row read as gaudy; one reads as
-            // intentional.
-            color: 'var(--v3-text-muted)'
-          }}>
+          {/* Date eyebrow stays muted ink (not gold) so the gold accent
+              on the operator's first name below carries the brand moment
+              alone. Kit wave 3: rides the Eyebrow primitive. */}
+          <Eyebrow>
             {now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
             {' · '}
             {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-          </span>
+          </Eyebrow>
           {/* Hero greeting — ports the design's "Good morning, *Jesse.*" pattern
               with the italic gold accent on the first name. font-display so the
               greeting reads as a screen title, not a caption. */}
@@ -889,17 +880,9 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
           {row.title}
         </div>
         {stage && (
-          <div style={{
-            marginTop: 3,
-            fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.10em',
-            textTransform: 'uppercase',
-            color: stage.color
-          }}>
+          <Eyebrow as="div" style={{ marginTop: 3, color: stage.color }}>
             {stage.label}
-          </div>
+          </Eyebrow>
         )}
       </div>
       <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
@@ -989,17 +972,9 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         }}>
           {deal.name}
         </div>
-        <div style={{
-          marginTop: 4,
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          color: stage.color
-        }}>
+        <Eyebrow as="div" style={{ marginTop: 4, color: stage.color }}>
           {stage.label}
-        </div>
+        </Eyebrow>
       </div>
       <div style={{
         flexShrink: 0,
@@ -1335,30 +1310,11 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
       {/* Urgency chip — short label that names the urgency in plain words.
           Color matches the spine. */}
       {action.urgencyLabel && (
-        <span style={{
-          flexShrink: 0,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '3px 7px',
-          borderRadius: 999,
-          background: `color-mix(in srgb, ${tone.color} 14%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${tone.color} 35%, transparent)`,
-          color: tone.color,
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1.2
-        }}>
-          <span aria-hidden="true" style={{
-            width: 5, height: 5, borderRadius: '50%',
-            background: tone.color
-          }} />
-          {action.urgencyLabel}
-        </span>
+        <StatusPill
+          color={tone.color}
+          label={action.urgencyLabel}
+          style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
+        />
       )}
 
       <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -1471,24 +1427,14 @@ function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
         minWidth: 0
       }}
     >
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        fontFamily: 'var(--font-body)',
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow as="div">
         <span aria-hidden="true" style={{
           width: 8, height: 8, borderRadius: '50%',
           background: dotColor,
           boxShadow: `0 0 8px ${dotColor}`
         }} />
         {label}
-      </div>
+      </Eyebrow>
       <div style={{
         fontFamily: 'var(--font-display)',
         fontSize: 20,

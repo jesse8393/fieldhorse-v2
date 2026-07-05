@@ -4,6 +4,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { supabase } from '../../../lib/supabase.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
+import { Eyebrow } from '../../../components/v3'
 
 function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -66,14 +67,9 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
         position: 'relative',
         overflow: 'hidden'
       }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          color: isClosed ? 'var(--v3-success-bright)' : 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow tone={isClosed ? 'success' : 'default'}>
           {isClosed ? 'Paid in full' : 'Balance due'}
-        </span>
+        </Eyebrow>
         <div>
           <div style={{
             fontFamily: 'var(--font-display)',
@@ -136,13 +132,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: 8, gap: 8
         }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-            textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-          }}>
-            Payments
-          </span>
+          <Eyebrow>Payments</Eyebrow>
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 11,
             color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'

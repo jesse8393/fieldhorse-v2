@@ -11,7 +11,8 @@ import {
   NextActionCard,
   HealthDonut,
   ProgressMeter,
-  Button
+  Button,
+  Eyebrow
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
@@ -517,15 +518,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
       display: 'flex', flexDirection: 'column', gap: 14
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--v3-primary)'
-        }}>
+        <Eyebrow as="div" tone="gold">
           <Pencil size={12} aria-hidden="true" />
           Editing {recordNoun} fields
-        </div>
+        </Eyebrow>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           {fieldsToFill.length > 0 && (
             <button
@@ -567,13 +563,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
           and commit the new client_id alongside the regular field
           diff. Clearing the picker queues an unlink. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-          letterSpacing: '0.14em', color: 'var(--v3-text-muted)',
-          textTransform: 'uppercase'
-        }}>
-          Linked client
-        </span>
+        <Eyebrow>Linked client</Eyebrow>
         <ClientPicker
           userId={userId}
           value={linkedClient || (contact?.client_id ? { id: contact.client_id, name: '' } : null)}
@@ -674,13 +664,7 @@ function EditField({ label, value, onChange, kind, placeholder, spanFull }: any)
   }
   return (
     <label className={className} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
-        {label}
-      </span>
+      <Eyebrow>{label}</Eyebrow>
       {kind === 'textarea' ? (
         <textarea
           value={value}

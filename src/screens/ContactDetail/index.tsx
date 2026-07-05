@@ -173,18 +173,7 @@ function ActionIntentBanner({
       }}
     >
       <div style={{ minWidth: 0, flex: '1 1 260px', display: 'grid', gap: 3 }}>
-        <span
-          style={{
-            color: 'var(--v3-primary)',
-            fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {meta.eyebrow}
-        </span>
+        <Eyebrow tone="gold">{meta.eyebrow}</Eyebrow>
         <strong style={{ color: 'var(--v3-text)', fontSize: 14, lineHeight: 1.2 }}>{meta.title}</strong>
         <span style={{ color: 'var(--v3-text-muted)', fontSize: 12, lineHeight: 1.45 }}>{meta.detail}</span>
       </div>
@@ -960,12 +949,9 @@ export default function ContactDetail() {
           <DeleteCascadeRow label="Schedule items" count={scheduleCount} />
           <DeleteCascadeRow label="Notes" count={notes.length} detail="detached + archived" />
         </ul>
-        <p style={{
-          margin: 0, color: 'var(--v3-danger-bright)', fontFamily: 'var(--font-body)',
-          fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', fontWeight: 700
-        }}>
+        <Eyebrow as="p" tone="alert" style={{ margin: 0, fontSize: 11 }}>
           This cannot be undone.
-        </p>
+        </Eyebrow>
       </ActionSheet>
     </div>
   )
@@ -1067,25 +1053,18 @@ function Header({
             type="button"
             onClick={() => onClientNav(contact.client_id)}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
               padding: '4px 6px',
               marginLeft: -6,
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)',
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <Users size={10} aria-hidden="true" />
-            {clientLabel}
+            <Eyebrow as="span">
+              <Users size={10} aria-hidden="true" />
+              {clientLabel}
+            </Eyebrow>
           </button>
         ) : (
           <Eyebrow as="span" aria-label="Shared job — client visible only to owner">
