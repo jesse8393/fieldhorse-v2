@@ -21,7 +21,7 @@ import {
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
-import { Button, FilterPill, FloatingActionButton, ScreenCloser } from '../components/v3'
+import { Button, FilterPill, FloatingActionButton, ScreenCloser, StatusPill } from '../components/v3'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
@@ -867,69 +867,33 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
                 {est}
               </span>
             )}
-            <span style={{
-              display: 'inline-flex', alignItems: 'center',
-              padding: '2px 8px', borderRadius: 999,
-              background: `color-mix(in srgb, ${status.color} 12%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${status.color} 35%, transparent)`,
-              color: status.color,
-              fontSize: 9, fontWeight: 700, letterSpacing: '0.14em',
-              textTransform: 'uppercase', lineHeight: 1.4
-            }}>
-              {status.label}
-            </span>
+            <StatusPill color={status.color} label={status.label} />
           </div>
         </button>
 
         {/* Viewed-intel chip — only on quote-sent leads */}
         {viewed && !isLost && (
           <div>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '3px 9px', borderRadius: 999,
-              background: viewed.tone === 'warn'
-                ? 'var(--v3-primary-soft, rgba(228,190,111,0.12))'
-                : 'var(--v3-surface-2)',
-              border: viewed.tone === 'warn'
-                ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
-                : '1px solid var(--v3-border)',
-              color: viewed.tone === 'warn' ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.4
-            }}>
-              <Eye size={10} aria-hidden="true" />
-              {viewed.label}
-            </span>
+            <StatusPill
+              color={viewed.tone === 'warn' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'}
+              icon={Eye}
+              label={viewed.label}
+            />
           </div>
         )}
 
         {/* Follow-up chip */}
         {follow && !isLost && (
           <div>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '3px 9px', borderRadius: 999,
-              background: follow.tone === 'danger'
-                ? 'var(--v3-danger-soft, rgba(232,90,87,0.12))'
-                : follow.tone === 'warn'
-                  ? 'var(--v3-primary-soft, rgba(228,190,111,0.12))'
-                  : 'var(--v3-surface-2)',
-              border: follow.tone === 'danger'
-                ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
-                : follow.tone === 'warn'
-                  ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)'
-                  : '1px solid var(--v3-border)',
-              color: follow.tone === 'danger'
+            <StatusPill
+              color={follow.tone === 'danger'
                 ? 'var(--v3-danger-bright)'
                 : follow.tone === 'warn'
                   ? 'var(--v3-primary)'
-                  : 'var(--v3-text-muted)',
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.4
-            }}>
-              <CalendarClock size={10} aria-hidden="true" />
-              {follow.label}
-            </span>
+                  : 'var(--v3-text-muted)'}
+              icon={CalendarClock}
+              label={follow.label}
+            />
           </div>
         )}
 

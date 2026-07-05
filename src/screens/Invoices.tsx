@@ -21,7 +21,7 @@ import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
-import { Button, FilterPill, Eyebrow, StampNumber } from '../components/v3'
+import { Button, FilterPill, Eyebrow, StampNumber, StatusPill } from '../components/v3'
 // V3PaymentSheet is lazy — only loads when an operator taps "Mark Paid".
 // Avoids dragging ~440KB into the initial Invoices route chunk.
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
@@ -734,9 +734,7 @@ export default function Invoices() {
                         <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {g.client.company_name || g.client.name || 'Client'}
                         </span>
-                        <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 999, color: b.color, border: `1px solid ${b.accent}` }}>
-                          {b.label}
-                        </span>
+                        <StatusPill color={b.color} label={b.label} style={{ flexShrink: 0 }} />
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>
                         {g.jobs.length} {g.jobs.length === 1 ? 'property' : 'properties'}
@@ -864,61 +862,15 @@ export default function Invoices() {
      - overdue: danger-tinted "Overdue · N" (60+ exists)
    ============================================================ */
 function BalanceStateChip({ totals }: any) {
-  const overdueCount = totals['60+'] > 0 ? totals.count : 0
-  // Variant selection — overdue beats collect beats none.
-  let variant
-  if (totals.count === 0) variant = 'none'
-  else if (totals['60+'] > 0) variant = 'overdue'
-  else variant = 'collect'
-
-  const styles = ({
-    none: {
-      bg: 'var(--v3-surface-2)',
-      border: 'var(--v3-border-strong)',
-      color: 'var(--v3-text-muted)'
-    },
-    collect: {
-      bg: 'var(--v3-primary-soft)',
-      border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-      color: 'var(--v3-primary)'
-    },
-    overdue: {
-      bg: 'var(--v3-danger-soft)',
-      border: 'color-mix(in srgb, var(--v3-danger) 38%, transparent)',
-      color: 'var(--v3-danger-bright)'
-    }
-  } as Record<string, any>)[variant]
-
-  const label = variant === 'none'
-    ? 'All caught up'
-    : variant === 'overdue'
-      ? `Overdue · ${overdueCount}`
-      : `Collect · ${totals.count}`
-
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 5,
-        padding: '3px 9px',
-        borderRadius: 999,
-        background: styles.bg,
-        border: `1px solid ${styles.border}`,
-        color: styles.color,
-        fontFamily: 'var(--font-body)',
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        lineHeight: 1,
-        fontVariantNumeric: 'tabular-nums'
-      }}
-    >
-      {variant === 'none' && <Check size={10} aria-hidden="true" strokeWidth={2.4} />}
-      {label}
-    </span>
-  )
+  // Variant selection — overdue beats collect beats none. Renders via
+  // the kit's StatusPill (wave 2) instead of a hand-rolled twin.
+  if (totals.count === 0) {
+    return <StatusPill color="var(--v3-text-muted)" icon={Check} label="All caught up" />
+  }
+  if (totals['60+'] > 0) {
+    return <StatusPill color="var(--v3-danger-bright)" label={`Overdue · ${totals.count}`} />
+  }
+  return <StatusPill color="var(--v3-primary)" label={`Collect · ${totals.count}`} />
 }
 
 /* ============================================================
@@ -1040,18 +992,7 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
             }}>
               {fmtMoney(invoice.amount)}
             </div>
-            <span style={{
-              marginTop: 4,
-              display: 'inline-flex', alignItems: 'center',
-              padding: '2px 8px', borderRadius: 999,
-              background: `color-mix(in srgb, ${meta.color} 12%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${meta.color} 35%, transparent)`,
-              color: meta.color,
-              fontSize: 9, fontWeight: 700, letterSpacing: '0.14em',
-              textTransform: 'uppercase', lineHeight: 1.4
-            }}>
-              {meta.label}
-            </span>
+            <StatusPill color={meta.color} label={meta.label} style={{ marginTop: 4 }} />
           </div>
         </div>
         {!settled && (
@@ -1177,23 +1118,11 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               {balance > 0 ? fmtMoney(balance) : 'PAID'}
             </div>
             {isOutstanding && (
-              <div style={{
-                marginTop: 4,
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '2px 8px',
-                borderRadius: 999,
-                background: `color-mix(in srgb, ${bucketMeta.color} 12%, transparent)`,
-                border: `1px solid ${bucketMeta.accent}`,
-                color: bucketMeta.color,
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                lineHeight: 1.4
-              }}>
-                {ageDays} d · {bucketMeta.label}
-              </div>
+              <StatusPill
+                color={bucketMeta.color}
+                label={`${ageDays} d · ${bucketMeta.label}`}
+                style={{ marginTop: 4 }}
+              />
             )}
           </div>
         </div>
