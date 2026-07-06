@@ -296,9 +296,14 @@
   --v3-surface: #FFFFFF;
   --v3-surface-2: #F4EFE6;
   --v3-surface-3: #EDE7DA;
-  /* v3 text */
+  /* v3 text — secondary + faint were missing here until the 7/4 theme
+     harness caught fh-build mini-card labels rendering linen-on-paper.
+     Every tier needs a light value or consumers silently keep the dark
+     linen and vanish. */
   --v3-text: #1A1814;
+  --v3-text-secondary: rgba(26, 24, 20, 0.78);
   --v3-text-muted: #6B6A66;
+  --v3-text-faint: rgba(26, 24, 20, 0.48);
   --v3-on-primary: #1A1814;
   /* v3 borders — warm rules */
   --v3-border: rgba(20, 20, 18, 0.10);

@@ -10604,7 +10604,7 @@ select {
   .fh-build-topbar {
     background:
       linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint)),
-      rgba(15, 13, 12, 0.74);
+      var(--v3-surface-glass);
     border-color: var(--v3-border-mid);
     box-shadow:
       inset 0 1px 0 var(--v3-glass-tint),
@@ -10676,7 +10676,7 @@ select {
   border: 1px solid var(--v3-border-mid) !important;
   background:
     linear-gradient(180deg, var(--v3-glass-tint-2), var(--v3-glass-tint)),
-    rgba(14, 12, 11, 0.96) !important;
+    var(--v3-surface-glass) !important;
   color: var(--ink-strong, #f4f1ea) !important;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.48) !important;
   backdrop-filter: blur(24px);
