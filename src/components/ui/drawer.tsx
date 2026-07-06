@@ -33,12 +33,12 @@ const DrawerContent = React.forwardRef<any, any>(({ className, children, ...prop
     <VaulDrawer.Content
       ref={ref}
       className={cn(
-        'ui:fixed ui:inset-x-0 ui:bottom-0 ui:z-50 ui:mt-24 ui:flex ui:h-auto ui:flex-col ui:rounded-t-[22px] ui:border ui:border-white/10 ui:bg-fh-onyx ui:shadow-2xl',
+        'ui:fixed ui:inset-x-0 ui:bottom-0 ui:z-50 ui:mt-24 ui:flex ui:h-auto ui:flex-col ui:rounded-t-[22px] ui:border ui:border-[var(--v3-border-strong)] ui:bg-[var(--v3-surface)] ui:shadow-2xl',
         className
       )}
       {...props}
     >
-      <div className="ui:mx-auto ui:mt-3 ui:h-1 ui:w-9 ui:rounded-full ui:bg-white/20" />
+      <div className="ui:mx-auto ui:mt-3 ui:h-1 ui:w-9 ui:rounded-full ui:bg-[var(--v3-border-strong)]" />
       {children}
     </VaulDrawer.Content>
   </DrawerPortal>
