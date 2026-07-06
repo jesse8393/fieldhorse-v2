@@ -74,11 +74,24 @@ const TABLES = {
   fh_documents: [], fh_files: []
 }
 
+function applyFilters(rows, url) {
+  // Honor PostgREST eq./is.null query filters so .eq('id', x).maybeSingle()
+  // resolves the right row instead of erroring on a multi-row response.
+  const params = new URL(url).searchParams
+  let out = rows
+  for (const [k, v] of params) {
+    if (['select', 'order', 'limit', 'offset', 'on_conflict'].includes(k)) continue
+    if (v.startsWith('eq.')) out = out.filter((r) => String(r[k]) === v.slice(3))
+    else if (v === 'is.null') out = out.filter((r) => r[k] == null)
+  }
+  return out
+}
+
 function restResponse(url, headers) {
   const path = new URL(url).pathname
   const table = path.split('/rest/v1/')[1]?.split('?')[0] || ''
   if (path.includes('/rpc/')) return { status: 200, body: JSON.stringify([]) }
-  const rows = TABLES[table] ?? []
+  const rows = applyFilters(TABLES[table] ?? [], url)
   const wantsObject = (headers['accept'] || '').includes('vnd.pgrst.object')
   if (wantsObject) {
     if (rows.length === 0) return { status: 406, body: JSON.stringify({ message: 'no rows' }) }
@@ -140,6 +153,8 @@ async function tour(viewport, themeName, tag) {
 
 const LEGS = process.env.QA_LEG === 'one'
   ? [['phone', { width: 390, height: 844 }, ['dark']]]
+  : process.env.QA_LEG === 'desktop'
+  ? [['desktop', { width: 1440, height: 900 }, ['dark', 'light']]]
   : [['phone', { width: 390, height: 844 }, ['dark', 'light']], ['desktop', { width: 1440, height: 900 }, ['dark', 'light']]]
 for (const [tag, viewport, themes] of LEGS) {
   for (const theme of themes) {
