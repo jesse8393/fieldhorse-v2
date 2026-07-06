@@ -53,10 +53,7 @@ function homeHint() {
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'leads', label: 'Lead Desk', hint: 'Intake and follow-ups', icon: Target, to: '/leads' },
-  { id: 'quotes', label: 'Quote Desk', hint: 'Proposals ready to win', icon: FileText, to: '/quotes' },
-  { id: 'jobs', label: 'Job Desk', hint: 'Active work and delivery', icon: Briefcase, to: '/jobs' },
-  { id: 'pipeline', label: 'Full funnel pipeline', hint: 'Lead, quote, active, collect, complete', icon: BarChart3, to: '/pipeline' },
+  { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/work' },
   { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },
   { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
 ]

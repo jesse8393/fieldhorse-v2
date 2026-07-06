@@ -63,19 +63,14 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    label: 'Sell',
-    items: [
-      { label: 'Leads',          to: '/leads',    Icon: Sparkles,        match: prefix('/leads') },
-      { label: 'Quotes',         to: '/quotes',   Icon: FileText,        match: prefix('/quotes') },
-      { label: 'Pipeline',       to: '/pipeline', Icon: BarChart3,       match: prefix('/pipeline') },
-      { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
-    ],
-  },
-  {
     label: 'Work',
     items: [
-      { label: 'Jobs',           to: '/jobs?view=doing', Icon: Hammer,   match: prefix('/jobs') },
+      // One list for the whole deal lifecycle — the detail routes
+      // (/leads/:id, /quotes/:id, /jobs/:id) still exist, so Work
+      // stays lit while any deal is open.
+      { label: 'Work & Deals',   to: '/work',     Icon: Hammer,          match: (p) => p === '/work' || p.startsWith('/leads') || p.startsWith('/quotes') || p.startsWith('/jobs') },
       { label: 'Schedule',       to: '/schedule', Icon: Calendar,        match: prefix('/schedule') },
+      { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
       { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
       { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
       { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },

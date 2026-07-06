@@ -17,8 +17,12 @@ import { canHover } from '../lib/hover.ts'
 // tile, and Today-on-site's "View schedule" link.
 const PRIMARY = [
   { to: '/', label: 'Home', icon: 'home', end: true },
-  { to: '/leads', label: 'Leads', icon: 'lead' },
-  { to: '/jobs', label: 'Jobs', icon: 'jobs' },
+  // IA round 2: Leads + Jobs (and the Quotes/Pipeline boards behind
+  // them) collapsed into ONE Work list — which frees a bar slot, so
+  // Schedule comes back. Four verbs, five thumbs: Home, Work,
+  // Schedule, Money.
+  { to: '/work', label: 'Work', icon: 'jobs' },
+  { to: '/schedule', label: 'Schedule', icon: 'schedule' },
   { to: '/invoices', label: 'Money', icon: 'dollar' }
 ]
 
@@ -41,18 +45,11 @@ const NAV_GROUPS: DrawerGroup[] = [
     ]
   },
   {
-    label: 'Sell',
-    items: [
-      { to: '/leads',       label: 'Leads',               Icon: Sparkles },
-      { to: '/quotes',      label: 'Quotes',              Icon: FileText },
-      { to: '/bid',         label: 'Estimates',           Icon: Calculator }
-    ]
-  },
-  {
     label: 'Work',
     items: [
-      { to: '/jobs',        label: 'Jobs',                Icon: Briefcase },
+      { to: '/work',        label: 'Work & Deals',        Icon: Briefcase },
       { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
+      { to: '/bid',         label: 'Estimates',           Icon: Calculator },
       { to: '/crew',        label: 'Crew Home',           Icon: PlayCircle },
       { to: '/tasks',       label: 'Tasks',               Icon: ClipboardCheck },
       { to: '/timesheets',  label: 'Timesheets',          Icon: Clock },

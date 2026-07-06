@@ -11524,3 +11524,57 @@ select {
 .v3-btn--full { width: 100%; }
 .v3-btn--icon-only { width: 44px; padding: 0; }
 .v3-btn--sm.v3-btn--icon-only { width: 36px; }
+
+/* =========================================================================
+   WORK — the single deal list (IA round 2). Desktop composition mirrors
+   the old Lead Desk grid: header + search + chips on one row, then a
+   responsive card grid. No cockpit panels — the list IS the screen.
+   ========================================================================= */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .v3-screen--work {
+    max-width: 1280px !important;
+    margin-left: auto;
+    margin-right: auto;
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(240px, 380px) minmax(0, auto);
+    grid-template-areas:
+      "head search chips"
+      "list list list";
+    column-gap: 16px;
+    row-gap: 14px;
+    align-items: center;
+    padding: 4px 0 48px !important;
+  }
+  .v3-screen--work > .fh-work__head {
+    grid-area: head;
+    padding: 0 !important;
+  }
+  .v3-screen--work > .fh-work__search {
+    grid-area: search;
+    padding: 0 !important;
+  }
+  .v3-screen--work > .fh-work__chips {
+    grid-area: chips;
+    padding: 0 !important;
+  }
+  .v3-screen--work > .fh-work__chips > div {
+    overflow-x: visible !important;
+    padding-bottom: 0 !important;
+    flex-wrap: nowrap;
+  }
+  .v3-screen--work > .fh-work__list {
+    grid-area: list;
+    padding: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 12px !important;
+    align-items: stretch;
+  }
+  .v3-screen--work > .fh-work__list--empty,
+  .v3-screen--work > .fh-work__list--loading {
+    display: block !important;
+  }
+  .v3-screen--work .fh-deal-card {
+    height: 100%;
+  }
+}
