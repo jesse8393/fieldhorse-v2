@@ -2,15 +2,31 @@
 //
 // Drop-in for SnowClients at >=900px. Same props, same handlers.
 // Treats clients as a relationship desk, not a contact list.
+//
+// Table logic runs on TanStack Table (headless): sortable columns +
+// a real CSV export of the current view. Search/filter stay upstream
+// in the parent screen (the topbar input drives `filtered`).
 
+import { useMemo, useState } from 'react'
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   ArrowUpRight,
   Bell,
   ChevronRight,
+  FileDown,
   Search,
   Plus,
   AlertTriangle,
 } from 'lucide-react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  createColumnHelper,
+} from '@tanstack/react-table'
+import type { SortingState } from '@tanstack/react-table'
 import { money, moneyFull } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
@@ -59,6 +75,47 @@ const FILTERS: { key: string; label: string }[] = [
   { key: 'recent', label: 'Recent' },
 ]
 
+// One enriched row per client — rollup + status derived once so the
+// sort accessors and the render read the same values.
+type ClientRow = {
+  client: any
+  status: { label: string; tone: string; rank: number }
+  lastTouch: number
+  outstanding: number
+  activeCount: number
+  nextAction: string
+}
+
+const columnHelper = createColumnHelper<ClientRow>()
+
+const COLUMNS = [
+  columnHelper.accessor((r) => r.client.name || 'Unnamed', { id: 'name', header: 'Client' }),
+  columnHelper.accessor((r) => r.status.rank, { id: 'status', header: 'Status' }),
+  columnHelper.accessor((r) => r.lastTouch, { id: 'last', header: 'Last touch' }),
+  columnHelper.accessor((r) => r.outstanding, { id: 'outstanding', header: 'Open value' }),
+  columnHelper.accessor((r) => r.activeCount, { id: 'active', header: 'Active jobs' }),
+  columnHelper.accessor((r) => r.nextAction, { id: 'next', header: 'Next action' }),
+]
+
+function toCsv(rows: ClientRow[]): string {
+  const esc = (v: unknown) => {
+    const s = String(v ?? '')
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const head = 'Client,Status,Last activity,Outstanding,Active jobs,Next action,Phone,Email'
+  const body = rows.map((r) => [
+    esc(r.client.name || 'Unnamed'),
+    r.status.label,
+    r.client.last_activity_at ? new Date(r.client.last_activity_at).toISOString().slice(0, 10) : '',
+    r.outstanding.toFixed(2),
+    r.activeCount,
+    esc(r.nextAction),
+    esc(r.client.phone || ''),
+    esc(r.client.email || ''),
+  ].join(','))
+  return [head, ...body].join('\n')
+}
+
 export default function SnowClientsBuild(props: Props) {
   const {
     rows, filtered, loading, q, setQ, filter, setFilter, filterCounts,
@@ -77,6 +134,45 @@ export default function SnowClientsBuild(props: Props) {
     if (!Number.isFinite(last)) return false
     return Date.now() - last > 30 * 24 * 60 * 60 * 1000 && rollupFor(r.id).activeCount > 0
   }).length
+
+  // Enrich once per (filtered|rollup) change; TanStack sorts over this.
+  const enriched: ClientRow[] = useMemo(() => filtered.map((r: any) => {
+    const ro = rollupFor(r.id)
+    const last = new Date(r.last_activity_at || 0).getTime()
+    const lastTouch = Number.isFinite(last) ? last : 0
+    const stale = lastTouch > 0 && Date.now() - lastTouch > 30 * 24 * 60 * 60 * 1000
+    const isActive = ro.activeCount > 0
+    const status = !isActive
+      ? { label: 'Dormant', tone: 'neutral', rank: 0 }
+      : stale
+        ? { label: 'Cooling', tone: 'warn', rank: 1 }
+        : { label: 'Active', tone: 'good', rank: 2 }
+    const nextAction = ro.outstanding > 0 ? 'Chase invoice' : stale && isActive ? 'Follow up' : isActive ? 'On track' : 'Re-engage'
+    return { client: r, status, lastTouch, outstanding: ro.outstanding, activeCount: ro.activeCount, nextAction }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [filtered, rollupFor])
+
+  const [sorting, setSorting] = useState<SortingState>([])
+  const table = useReactTable({
+    data: enriched,
+    columns: COLUMNS,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+  const viewRows = table.getRowModel().rows
+
+  function exportCsv() {
+    const csv = toCsv(viewRows.map((r) => r.original))
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'fieldhorse-clients.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="fh-build-page" data-build-screen="SnowClientsBuild">
@@ -167,32 +263,39 @@ export default function SnowClientsBuild(props: Props) {
           <section className="fh-build-card fh-build-table fh-build-clients-table">
             <header className="fh-build-card-head">
               <div className="fh-build-eyebrow">All relationships · {filtered.length.toLocaleString()}</div>
-              <button type="button">Export CSV</button>
+              <button type="button" onClick={exportCsv} disabled={loading || viewRows.length === 0}>
+                <FileDown size={12} aria-hidden="true" /> Export CSV
+              </button>
             </header>
 
             <div className="fh-build-table__head is-clients">
-              <span>Client</span>
-              <span>Status</span>
-              <span>Last touch</span>
-              <span>Open value</span>
-              <span>Active jobs</span>
-              <span>Next action</span>
+              {table.getFlatHeaders().map((header) => {
+                const dir = header.column.getIsSorted()
+                return (
+                  <button
+                    key={header.id}
+                    type="button"
+                    className={`fh-build-sort${dir ? ' is-sorted' : ''}`}
+                    onClick={header.column.getToggleSortingHandler()}
+                    aria-label={`Sort by ${String(header.column.columnDef.header)}`}
+                    aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : undefined}
+                  >
+                    {String(header.column.columnDef.header)}
+                    {dir === 'asc' ? <ArrowUp size={10} /> : dir === 'desc' ? <ArrowDown size={10} /> : <ArrowUpDown size={10} className="fh-build-sort__hint" />}
+                  </button>
+                )
+              })}
               <span />
             </div>
 
             {loading && (
               <div className="fh-build-table__empty">Loading clients…</div>
             )}
-            {!loading && filtered.length === 0 && (
+            {!loading && viewRows.length === 0 && (
               <div className="fh-build-table__empty">No clients match. <button type="button" className="fh-build-inline-link" onClick={onNewClient}>+ New Client</button>.</div>
             )}
-            {!loading && filtered.slice(0, 60).map((r: any) => {
-              const ro = rollupFor(r.id)
-              const last = new Date(r.last_activity_at || 0).getTime()
-              const stale = Number.isFinite(last) && Date.now() - last > 30 * 24 * 60 * 60 * 1000
-              const isActive = ro.activeCount > 0
-              const status = !isActive ? { label: 'Dormant', tone: 'neutral' } : stale ? { label: 'Cooling', tone: 'warn' } : { label: 'Active', tone: 'good' }
-              const nextAction = ro.outstanding > 0 ? 'Chase invoice' : stale && isActive ? 'Follow up' : isActive ? 'On track' : 'Re-engage'
+            {!loading && viewRows.slice(0, 60).map((tr) => {
+              const { client: r, status, outstanding, activeCount, nextAction } = tr.original
               return (
                 <button
                   key={r.id}
@@ -203,19 +306,19 @@ export default function SnowClientsBuild(props: Props) {
                   <strong className="fh-build-truncate" title={r.name}>{r.name || 'Unnamed'}</strong>
                   <span className={`fh-build-dot is-${status.tone}`}>{status.label}</span>
                   <span className="fh-build-rel">{relTime(r.last_activity_at)}</span>
-                  <span className="fh-build-num" style={{ color: ro.outstanding > 0 ? 'var(--v3-primary, #c9963a)' : undefined, fontWeight: ro.outstanding > 0 ? 700 : 500 }}>
-                    {ro.outstanding > 0 ? moneyFull(ro.outstanding) : '—'}
+                  <span className="fh-build-num" style={{ color: outstanding > 0 ? 'var(--v3-primary, #c9963a)' : undefined, fontWeight: outstanding > 0 ? 700 : 500 }}>
+                    {outstanding > 0 ? moneyFull(outstanding) : '—'}
                   </span>
-                  <span className="fh-build-num">{ro.activeCount}</span>
+                  <span className="fh-build-num">{activeCount}</span>
                   <span className="fh-build-truncate fh-build-rel">{nextAction}</span>
                   <ChevronRight size={13} />
                 </button>
               )
             })}
 
-            {!loading && filtered.length > 60 && (
+            {!loading && viewRows.length > 60 && (
               <div className="fh-build-table__more">
-                Showing first 60 of {filtered.length.toLocaleString()}.
+                Showing first 60 of {viewRows.length.toLocaleString()}. Sort or search to surface the rest, or Export CSV for everything.
               </div>
             )}
           </section>

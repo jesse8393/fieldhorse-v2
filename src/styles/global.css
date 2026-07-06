@@ -11578,3 +11578,54 @@ select {
     height: 100%;
   }
 }
+
+/* ── Build table: TanStack-powered head (sort buttons + filter box) ──
+   The invoices table head cells are now real buttons that toggle
+   sorting. They inherit the head's uppercase micro-type; the arrow
+   hint appears on hover, the active sort locks gold. */
+.fh-build-table__head .fh-build-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fh-build-table__head .fh-build-sort:hover { color: var(--v3-text); }
+.fh-build-table__head .fh-build-sort.is-sorted { color: var(--v3-primary); }
+.fh-build-table__head .fh-build-sort .fh-build-sort__hint { opacity: 0; transition: opacity 120ms ease; }
+.fh-build-table__head .fh-build-sort:hover .fh-build-sort__hint { opacity: 0.65; }
+
+.fh-build-table-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.fh-build-table-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--v3-border-mid);
+  border-radius: 4px;
+  background: var(--v3-glass-tint-2);
+  color: var(--v3-text-muted);
+}
+.fh-build-table-filter input {
+  width: 160px;
+  border: none;
+  background: transparent;
+  color: var(--v3-text);
+  font-size: 12px;
+  outline: none;
+}
+.fh-build-table-filter input::placeholder { color: var(--v3-text-faint); }
+.fh-build-table-filter:focus-within {
+  border-color: color-mix(in srgb, var(--v3-primary) 55%, transparent);
+}

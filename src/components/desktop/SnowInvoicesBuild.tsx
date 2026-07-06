@@ -3,8 +3,23 @@
 // Drop-in for SnowInvoices at >=900px. Same props, same handlers.
 // Aging buckets in the hero, full-width invoices table, right rail
 // with collection signals. Onyx surface, gold accents.
+//
+// The table runs on TanStack Table (headless) — click a column head
+// to sort, type in the filter box to search client/job, Export CSV
+// downloads exactly what's on screen (current filter + sort). The
+// visual layer stays the fh-build grid rows; TanStack only owns the
+// sorting/filtering state, so the Build aesthetic is untouched.
 
-import { Bell, ChevronRight, Receipt, Search } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Bell, ChevronRight, FileDown, Receipt, Search } from 'lucide-react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  createColumnHelper,
+} from '@tanstack/react-table'
+import type { SortingState } from '@tanstack/react-table'
 import { money, moneyFull } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
@@ -62,12 +77,81 @@ function ageBucket(days: number): { label: string; tone: 'good' | 'warn' | 'bad'
   return { label: 'Overdue', tone: 'bad' }
 }
 
+const columnHelper = createColumnHelper<Row>()
+
+// Column defs are pure config — header labels + accessor + sort rules.
+// Rendering stays hand-rolled in the grid rows below.
+const COLUMNS = [
+  columnHelper.accessor((r) => r.job.name || 'Untitled', { id: 'name', header: 'Client / Job' }),
+  columnHelper.accessor((r) => r.ageDays, { id: 'status', header: 'Status' }),
+  columnHelper.accessor((r) => r.ageDays, { id: 'age', header: 'Age' }),
+  columnHelper.accessor((r) => r.amount, { id: 'amount', header: 'Contract' }),
+  columnHelper.accessor((r) => r.paid, { id: 'paid', header: 'Paid' }),
+  columnHelper.accessor((r) => r.balance, { id: 'balance', header: 'Balance' }),
+]
+
+// Search matches client name, job title, and job type.
+function rowMatches(row: { original: Row }, _columnId: string, needle: string) {
+  const j = row.original.job
+  const hay = `${j.name || ''} ${j.job_title || ''} ${j.job_type || ''}`.toLowerCase()
+  return hay.includes(needle.toLowerCase())
+}
+
+function toCsv(rows: Row[]): string {
+  const esc = (v: unknown) => {
+    const s = String(v ?? '')
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const head = 'Client,Job,Status,Age (days),Contract,Paid,Balance'
+  const body = rows.map((r) => [
+    esc(r.job.name || 'Untitled'),
+    esc(r.job.job_title || r.job.job_type || ''),
+    ageBucket(r.ageDays).label,
+    r.ageDays,
+    r.amount.toFixed(2),
+    r.paid.toFixed(2),
+    r.balance.toFixed(2),
+  ].join(','))
+  return [head, ...body].join('\n')
+}
+
 export default function SnowInvoicesBuild({
   rows, filtered, totals, loading, filter, setFilter,
   clientAR = [], onOpenJob, onOpenClient, onStatement, onPayRow,
 }: Props) {
   const collectableThisWeek = filtered.filter((r) => r.balance > 0 && r.ageDays <= 14).length
   const overdueCount = filtered.filter((r) => r.ageDays > 60 && r.balance > 0).length
+
+  // Default sort: biggest balance first — the money you'd chase first.
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'balance', desc: true }])
+  const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  const table = useReactTable({
+    data: filtered,
+    columns: COLUMNS,
+    state: { sorting, globalFilter: search },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setSearch,
+    globalFilterFn: rowMatches,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  })
+
+  const viewRows = table.getRowModel().rows
+  const visibleRows = useMemo(() => viewRows.slice(0, 80), [viewRows])
+
+  function exportCsv() {
+    const csv = toCsv(viewRows.map((r) => r.original))
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `fieldhorse-invoices-${filter}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="fh-build-page" data-build-screen="SnowInvoicesBuild">
@@ -133,32 +217,61 @@ export default function SnowInvoicesBuild({
           <section className="fh-build-card fh-build-table fh-build-invoices-table">
             <header className="fh-build-card-head">
               <div className="fh-build-eyebrow">
-                {filter === 'outstanding' ? 'Outstanding invoices' : 'All invoices'} · {filtered.length.toLocaleString()}
+                {filter === 'outstanding' ? 'Outstanding invoices' : 'All invoices'} · {viewRows.length.toLocaleString()}
+                {search && ` of ${filtered.length.toLocaleString()}`}
               </div>
-              <button type="button">Export CSV</button>
+              <div className="fh-build-table-tools">
+                <label className="fh-build-table-filter">
+                  <Search size={12} aria-hidden="true" />
+                  <input
+                    ref={searchRef}
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Filter client or job…"
+                    aria-label="Filter invoices"
+                  />
+                </label>
+                <button type="button" onClick={exportCsv} disabled={loading || viewRows.length === 0}>
+                  <FileDown size={12} aria-hidden="true" /> Export CSV
+                </button>
+              </div>
             </header>
 
             <div className="fh-build-table__head is-invoices">
-              <span>Client / Job</span>
-              <span>Status</span>
-              <span>Age</span>
-              <span>Contract</span>
-              <span>Paid</span>
-              <span>Balance</span>
+              {table.getFlatHeaders().map((header) => {
+                const dir = header.column.getIsSorted()
+                return (
+                  <button
+                    key={header.id}
+                    type="button"
+                    className={`fh-build-sort${dir ? ' is-sorted' : ''}`}
+                    onClick={header.column.getToggleSortingHandler()}
+                    aria-label={`Sort by ${String(header.column.columnDef.header)}`}
+                    aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : undefined}
+                  >
+                    {String(header.column.columnDef.header)}
+                    {dir === 'asc' ? <ArrowUp size={10} /> : dir === 'desc' ? <ArrowDown size={10} /> : <ArrowUpDown size={10} className="fh-build-sort__hint" />}
+                  </button>
+                )
+              })}
               <span />
             </div>
 
             {loading && (
               <div className="fh-build-table__empty">Loading invoices…</div>
             )}
-            {!loading && filtered.length === 0 && (
+            {!loading && viewRows.length === 0 && (
               <div className="fh-build-table__empty">
-                {filter === 'outstanding'
-                  ? 'Nothing outstanding. You’re paid up.'
-                  : 'No invoices yet.'}
+                {search
+                  ? `Nothing matches “${search}”.`
+                  : filter === 'outstanding'
+                    ? 'Nothing outstanding. You’re paid up.'
+                    : 'No invoices yet.'}
               </div>
             )}
-            {!loading && filtered.slice(0, 80).map((r) => {
+            {!loading && visibleRows.map((tr) => {
+              const r = tr.original
               const bucket = ageBucket(r.ageDays)
               return (
                 <div
@@ -205,9 +318,9 @@ export default function SnowInvoicesBuild({
               )
             })}
 
-            {!loading && filtered.length > 80 && (
+            {!loading && viewRows.length > 80 && (
               <div className="fh-build-table__more">
-                Showing first 80 of {filtered.length.toLocaleString()}.
+                Showing first 80 of {viewRows.length.toLocaleString()}. Use the filter to narrow, or Export CSV for the full set.
               </div>
             )}
           </section>
@@ -287,4 +400,3 @@ export default function SnowInvoicesBuild({
     </div>
   )
 }
-

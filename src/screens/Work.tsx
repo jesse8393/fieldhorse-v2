@@ -25,7 +25,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Phone as PhoneIcon, MessageSquare as MsgIcon, Sparkles,
-  CalendarClock, Trophy, XCircle, MoreHorizontal, RotateCcw
+  CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw
 } from 'lucide-react'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
@@ -35,6 +35,8 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { markWon, markLost, reopen } from '../lib/pipeline.ts'
@@ -201,10 +203,16 @@ export default function Work() {
     }
   }
 
-  async function setFollowUp(c: JobRow, days: number | null) {
-    const value = days === null
+  // Accepts a preset offset in days, an exact Date from the calendar
+  // picker, or null to clear.
+  async function setFollowUp(c: JobRow, when: number | Date | null) {
+    const value = when === null
       ? null
-      : new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
+      : when instanceof Date
+        // Local date, not toISOString — UTC would shift the picked day
+        // for anyone west of Greenwich.
+        ? `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`
+        : new Date(Date.now() + when * 86400000).toISOString().slice(0, 10)
     patchJobsCache(c.id, { follow_up_on: value } as Partial<JobRow>)
     toastSuccess(value ? 'Follow-up set' : 'Follow-up cleared', value ? `${c.name || 'Deal'} · ${followUpMeta({ follow_up_on: value })?.label || value}` : '')
     const { error } = await supabase
@@ -370,7 +378,7 @@ export default function Work() {
                 onWon={() => run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`))}
                 onLost={() => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost")}
                 onReopen={() => run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen")}
-                onFollowUp={(days: number | null) => setFollowUp(c, days)}
+                onFollowUp={(when: number | Date | null) => setFollowUp(c, when)}
               />
             ))}
           </AnimatePresence>
@@ -429,10 +437,13 @@ type DealCardProps = {
   onWon: () => void
   onLost: () => void
   onReopen: () => void
-  onFollowUp: (days: number | null) => void
+  onFollowUp: (when: number | Date | null) => void
 }
 
 function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
+  // Calendar popover for "Pick a date…" — anchored to the ⋯ button so
+  // it opens exactly where the menu just closed.
+  const [dateOpen, setDateOpen] = useState(false)
   const meta = STAGE_META[c.stage || 'lead'] || STAGE_META.lead
   const follow = followUpMeta(c)
   const phone = c.phone || c.fh_clients?.phone || ''
@@ -539,9 +550,18 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
           )}
         </button>
 
-        {/* ⋯ — the only control on the card */}
+        {/* ⋯ — the only control on the card. The calendar Popover
+            anchors to an invisible marker pinned over this button
+            (the ui/ wrappers aren't forwardRef, so asChild ref
+            plumbing through the DropdownMenuTrigger never reaches
+            the DOM node and Radix popper gets no anchor rect). */}
+        <Popover open={dateOpen} onOpenChange={setDateOpen}>
+        <PopoverAnchor
+          aria-hidden="true"
+          style={{ position: 'absolute', right: 12, top: '50%', width: 36, height: 1, pointerEvents: 'none' }}
+        />
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild>
             <button
               type="button"
               aria-label="Deal actions"
@@ -556,7 +576,7 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
             >
               <MoreHorizontal size={15} aria-hidden="true" />
             </button>
-          </DropdownMenuTrigger>
+            </DropdownMenuTrigger>
           <DropdownMenuContent side="bottom" align="end" sideOffset={6} collisionPadding={20}>
             {!isTerminal && (
               <>
@@ -568,6 +588,13 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => onFollowUp(7)}>
                   <CalendarClock size={13} /> Follow up next week
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => {
+                  // Let the menu finish closing before the popover
+                  // grabs focus, or the menu's focus-restore wins.
+                  setTimeout(() => setDateOpen(true), 0)
+                }}>
+                  <CalendarDays size={13} /> Pick a date…
                 </DropdownMenuItem>
                 {c.follow_up_on && (
                   <DropdownMenuItem onSelect={() => onFollowUp(null)}>
@@ -594,6 +621,18 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+        <PopoverContent side="bottom" align="end" sideOffset={6} collisionPadding={12} className="ui:w-auto ui:p-0">
+          <Calendar
+            mode="single"
+            selected={c.follow_up_on ? new Date(c.follow_up_on + 'T00:00:00') : undefined}
+            disabled={{ before: new Date() }}
+            onSelect={(d: Date | undefined) => {
+              if (d) onFollowUp(d)
+              setDateOpen(false)
+            }}
+          />
+        </PopoverContent>
+        </Popover>
       </motion.article>
     </SwipeableRow>
   )
