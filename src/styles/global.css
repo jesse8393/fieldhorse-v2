@@ -2677,7 +2677,8 @@ a {
      daylight. (The 7/4 desktop-parity sweep converted them to
      var(--v3-text*) and the QA tour caught the whole rail going
      invisible in light — do not re-tokenize this block.) */
-  [data-theme='light'] .fh-desktop-sidebar__co {
+  [data-theme='light'] .fh-desktop-sidebar__co,
+  [data-theme='light'] .fh-desktop-sidebar__brand-name {
     color: #F2EDE4;
   }
   [data-theme='light'] .fh-desktop-sidebar__tag,
@@ -9287,7 +9288,20 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   /* Adds a back button on the left of the search.
      5-column grid: back | search | meta | bell | (edit | delete) */
   .fh-build-topbar--detail {
-    grid-template-columns: auto minmax(220px, 480px) 1fr auto auto auto;
+    grid-template-columns: auto minmax(120px, 480px) minmax(0, 1fr) auto auto auto;
+  }
+  /* Master-detail rail (>=1200px) narrows this bar by ~292px; the
+     nowrap meta spans were overflowing left INTO the search column
+     (QA tour, 7/4: "invoiCes,motes...levue" collision). Let the meta
+     column shrink-to-zero and its items truncate instead of overlap. */
+  .fh-build-topbar--detail .fh-build-topbar__meta {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .fh-build-topbar--detail .fh-build-topbar__meta > * {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .fh-build-back {
