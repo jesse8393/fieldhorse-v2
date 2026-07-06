@@ -10,8 +10,10 @@
 import { supabase } from './supabase'
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
-const MODEL = (process.env.EXPO_PUBLIC_ANTHROPIC_MODEL as string) || 'claude-sonnet-5'
-const REQUEST_TIMEOUT_MS = 20000
+const MODEL = (process.env.EXPO_PUBLIC_ANTHROPIC_MODEL as string) || 'claude-fable-5'
+// Fable 5 always runs adaptive thinking, so turns run longer than the old
+// Sonnet path; the proxy pins these calls to low effort to stay in budget.
+const REQUEST_TIMEOUT_MS = 35000
 
 type ClaudeMessage = { role: string; content: unknown }
 

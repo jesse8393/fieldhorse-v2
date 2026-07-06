@@ -4,13 +4,15 @@
 
 import { authHeaders } from './supabase.ts'
 
-const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-sonnet-5'
+const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-fable-5'
 
 // Hard ceiling so a stuck /api/claude call never leaves the UI in an
-// indefinite "parsing…" or "drafting…" state. 15s is comfortably above
-// typical Sonnet response time for our Notes / Compose / Bid / Vision
-// payload sizes; tune via this constant if real usage exceeds it.
-const REQUEST_TIMEOUT_MS = 15000
+// indefinite "parsing…" or "drafting…" state. Fable 5 runs adaptive
+// thinking on every turn (it can't be disabled), so a turn takes longer
+// than the old Sonnet path — 30s gives it room without letting a truly
+// stuck call hang the UI. The proxy pins these utility calls to LOW
+// effort so they stay well inside this budget.
+const REQUEST_TIMEOUT_MS = 30000
 
 type ClaudeMessage = { role: string; content: unknown }
 
