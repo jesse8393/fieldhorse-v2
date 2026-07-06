@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess } from '../../../lib/toast.ts'
 import type { Database } from '../../../lib/database.types.ts'
@@ -83,6 +83,25 @@ async function fetchJobDetail(id: string, userId: string | undefined) {
     changeOrders: co.data || [],
     stageTransitions: st.data || []
   }
+}
+
+/**
+ * prefetchJobDetail — speed pass: warm the detail cache on hover intent.
+ *
+ * Called from list rows (desktop rail, lead cards) on mouseenter/focus so
+ * by the time the click lands, the 11 parallel fetches are already in
+ * flight or done — the detail paints instantly from cache. staleTime
+ * keeps repeat hovers within 30s from refiring the whole batch; the
+ * detail's own mount query still revalidates in the background per its
+ * defaults, so freshness is unchanged.
+ */
+export function prefetchJobDetail(queryClient: QueryClient, id: string | undefined, userId: string | undefined) {
+  if (!id || !userId) return
+  queryClient.prefetchQuery({
+    queryKey: ['jobDetail', id],
+    queryFn: () => fetchJobDetail(id, userId),
+    staleTime: 30_000
+  })
 }
 
 export function useJobData(id: string | undefined, userId: string | undefined) {

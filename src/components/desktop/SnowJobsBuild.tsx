@@ -45,6 +45,8 @@ type Props = {
   isRefreshing?: boolean
   onRetry?: () => void
   onOpenJob: (id: string) => void
+  /** Speed pass: hover intent — parent warms the job-detail cache. */
+  onHoverJob?: (id: string) => void
   onNewJob: () => void
 }
 
@@ -78,7 +80,7 @@ const FILTERS: { key: string; label: string }[] = [
 export default function SnowJobsBuild(props: Props) {
   const {
     contacts, filtered, loading, filter, setFilter, search, setSearch,
-    tabCounts, loadError, isRefreshing, onRetry, onOpenJob, onNewJob,
+    tabCounts, loadError, isRefreshing, onRetry, onOpenJob, onHoverJob, onNewJob,
   } = props
 
   const navigate = useNavigate()
@@ -272,6 +274,8 @@ export default function SnowJobsBuild(props: Props) {
                   type="button"
                   className="fh-build-table__row is-jobs"
                   onClick={() => onOpenJob(c.id)}
+                  onMouseEnter={() => onHoverJob?.(c.id)}
+                  onFocus={() => onHoverJob?.(c.id)}
                 >
                   <strong className="fh-build-truncate" title={c.name}>{c.name || 'Untitled'}</strong>
                   <span className="fh-build-truncate">

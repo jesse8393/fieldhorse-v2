@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useJobs, useJobsRealtime } from '../../lib/queries.ts'
 import { useInfiniteRender } from '../../lib/useInfiniteRender.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { prefetchJobDetail } from '../../screens/ContactDetail/hooks/useJobData.ts'
 
 const STAGE_META: Record<string, { label: string; color: string }> = {
   lead:    { label: 'Lead',     color: 'var(--v3-stage-lead, #6B7CA8)' },
@@ -128,6 +129,11 @@ export default function DetailListRail() {
                 type="button"
                 className={`fh-detail-rail__row${isActive ? ' is-active' : ''}`}
                 onClick={() => open(c)}
+                // Speed pass: warm the detail cache on hover/focus intent
+                // so the click paints instantly. The rail is desktop-only,
+                // so hover is a real signal here.
+                onMouseEnter={() => prefetchJobDetail(queryClient, c.id, user?.id)}
+                onFocus={() => prefetchJobDetail(queryClient, c.id, user?.id)}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <span className="fh-detail-rail__dot" style={{ background: meta.color }} aria-hidden="true" />

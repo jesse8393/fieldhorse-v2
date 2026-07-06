@@ -30,6 +30,8 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { LEAD_STAGES } from '../lib/stages.ts'
 import { markWon, markLost, reopen, startQuote } from '../lib/pipeline.ts'
+import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
+import { canHover } from '../lib/hover.ts'
 import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
@@ -631,6 +633,7 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
                 isNew={c.id === justAddedId}
                 busy={busyId === c.id}
                 onOpen={() => navigate(leadDetailRoute(c, surface))}
+                onHover={() => prefetchJobDetail(queryClient, c.id, user?.id)}
                 onQuote={() => onQuote(c)}
                 onWon={() => onWon(c)}
                 onLost={() => onLost(c)}
@@ -765,6 +768,7 @@ type LeadCardProps = {
   isNew: boolean
   busy: boolean
   onOpen: () => void
+  onHover?: () => void
   onQuote: () => void
   onWon: () => void
   onLost: () => void
@@ -773,7 +777,7 @@ type LeadCardProps = {
   viewIntel?: ViewIntel
 }
 
-function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onReopen, onFollowUp, viewIntel }: LeadCardProps) {
+function LeadCard({ contact: c, isNew, busy, onOpen, onHover, onQuote, onWon, onLost, onReopen, onFollowUp, viewIntel }: LeadCardProps) {
   const status = leadStatus(c)
   const viewed = viewedMeta(viewIntel, status.id)
   const follow = followUpMeta(c)
@@ -812,6 +816,9 @@ function LeadCard({ contact: c, isNew, busy, onOpen, onQuote, onWon, onLost, onR
         initial={isNew ? { opacity: 0, scale: 0.97 } : false}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, height: 0, marginBottom: -8 }}
+        // Speed pass: hover intent warms the detail cache (desktop grid
+        // only — canHover gates so phones don't burn data on scroll-taps).
+        onMouseEnter={() => { if (canHover) onHover?.() }}
         style={{
           position: 'relative',
           display: 'flex', flexDirection: 'column', gap: 10,

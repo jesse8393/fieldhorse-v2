@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, MessageSquare, Mail, Phone, ExternalLink,
@@ -308,6 +309,7 @@ export default function Jobs() {
             // desktop we skip it so the chevron lives up to its
             // implied affordance.
             onOpenJob={(id: any) => { if (id) navigate(`/jobs/${id}`) }}
+            onHoverJob={(id: string) => prefetchJobDetail(queryClient, id, user?.id)}
             onNewJob={() => {
               setAddInitialStage('job')
               setAddOpen(true)

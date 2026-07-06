@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import { prefetchRoute } from '../lib/routePrefetch.ts'
 
 type Item = {
   label: string
@@ -165,6 +166,10 @@ export default function DesktopSidebar() {
                     <button
                       type="button"
                       className={`fh-desktop-sidebar__link${active ? ' is-active' : ''}`}
+                      // Speed pass: hover intent warms the lazy route chunk
+                      // so first navigation skips the download+parse wait.
+                      onMouseEnter={() => prefetchRoute(it.to)}
+                      onFocus={() => prefetchRoute(it.to)}
                       onClick={() => {
                         // Split path/search/hash so React Router treats
                         // each portion explicitly. Passing the raw
