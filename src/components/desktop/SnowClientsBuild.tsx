@@ -123,17 +123,22 @@ export default function SnowClientsBuild(props: Props) {
     duplicateCount, onOpenClient, onNewClient, onReviewDuplicates,
   } = props
 
-  // Derived right-rail metrics
-  const cutoff30 = Date.now() - 30 * 24 * 60 * 60 * 1000
-  const newThisMonth = rows.filter((r) => {
-    const t = new Date(r.created_at || 0).getTime()
-    return Number.isFinite(t) && t >= cutoff30
-  }).length
-  const needsFollowUp = rows.filter((r) => {
-    const last = new Date(r.last_activity_at || 0).getTime()
-    if (!Number.isFinite(last)) return false
-    return Date.now() - last > 30 * 24 * 60 * 60 * 1000 && rollupFor(r.id).activeCount > 0
-  }).length
+  // Derived right-rail metrics — memoized so they don't re-scan the whole
+  // roster (with a Date parse per row) on every unrelated re-render.
+  const { newThisMonth, needsFollowUp } = useMemo(() => {
+    const now = Date.now()
+    const cutoff30 = now - 30 * 24 * 60 * 60 * 1000
+    let fresh = 0
+    let cooling = 0
+    for (const r of rows) {
+      const created = new Date(r.created_at || 0).getTime()
+      if (Number.isFinite(created) && created >= cutoff30) fresh += 1
+      const last = new Date(r.last_activity_at || 0).getTime()
+      if (Number.isFinite(last) && now - last > 30 * 24 * 60 * 60 * 1000 && rollupFor(r.id).activeCount > 0) cooling += 1
+    }
+    return { newThisMonth: fresh, needsFollowUp: cooling }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, rollupFor])
 
   // Enrich once per (filtered|rollup) change; TanStack sorts over this.
   const enriched: ClientRow[] = useMemo(() => filtered.map((r: any) => {

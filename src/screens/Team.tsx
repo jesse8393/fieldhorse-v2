@@ -289,6 +289,10 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
       onChanged?.()
     } catch (e: any) {
       toastError("Couldn't save rate", e?.message || 'Try again')
+      // The server rejected it (e.g. rate ≥ 10000) — snap the field back
+      // to the member's real rate so the screen doesn't read as if the
+      // rejected value was saved.
+      setRate(current != null ? String(current) : '')
     } finally { setBusy(false) }
   }
   const callerTier = ROLE_TIER[callerRole || ''] ?? 0

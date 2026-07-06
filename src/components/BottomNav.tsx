@@ -15,13 +15,17 @@ import { canHover } from '../lib/hover.ts'
 // and previously had NO fast path (buried in More). Schedule stays one
 // tap away — top of the Work group in the drawer, the Home quick-action
 // tile, and Today-on-site's "View schedule" link.
-const PRIMARY = [
+// `match` keeps a tab lit on routes other than its own `to` — the Work
+// tab stays active while any deal detail (/leads/:id, /quotes/:id,
+// /jobs/:id) is open, mirroring the desktop sidebar. Without it the
+// bottom bar goes dark the moment you open a deal.
+const PRIMARY: { to: string; label: string; icon: string; end?: boolean; match?: (p: string) => boolean }[] = [
   { to: '/', label: 'Home', icon: 'home', end: true },
   // IA round 2: Leads + Jobs (and the Quotes/Pipeline boards behind
   // them) collapsed into ONE Work list — which frees a bar slot, so
   // Schedule comes back. Four verbs, five thumbs: Home, Work,
   // Schedule, Money.
-  { to: '/work', label: 'Work', icon: 'jobs' },
+  { to: '/work', label: 'Work', icon: 'jobs', match: (p) => p === '/work' || p.startsWith('/leads') || p.startsWith('/quotes') || p.startsWith('/jobs') },
   { to: '/schedule', label: 'Schedule', icon: 'schedule' },
   { to: '/invoices', label: 'Money', icon: 'dollar' }
 ]
@@ -375,9 +379,11 @@ export default function BottomNav() {
             key={item.to}
             to={item.to}
             end={item.end}
-            className={({ isActive }: any) => `fh-nav__item${isActive ? ' is-active' : ''}`}
+            className={({ isActive }: any) => `fh-nav__item${(item.match ? item.match(location.pathname) : isActive) ? ' is-active' : ''}`}
           >
-            {({ isActive }: any) => (
+            {({ isActive: navActive }: any) => {
+              const isActive = item.match ? item.match(location.pathname) : navActive
+              return (
               <>
                 <span className="fh-nav__icon">
                   <Icon name={item.icon} size={20} />
@@ -391,7 +397,8 @@ export default function BottomNav() {
                   />
                 )}
               </>
-            )}
+              )
+            }}
           </NavLink>
         ))}
         <button

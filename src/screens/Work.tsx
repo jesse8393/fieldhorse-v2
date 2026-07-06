@@ -36,8 +36,12 @@ import {
   DropdownMenuItem, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
-import { Calendar } from '@/components/ui/calendar'
+// Lazy — react-day-picker (~tens of KB) only loads when someone opens the
+// follow-up date picker. Work is the hot list route (its chunk is warmed
+// on sidebar hover for 5 paths), so keep the calendar off the critical path.
+const Calendar = lazy(() => import('@/components/ui/calendar').then((m) => ({ default: m.Calendar })))
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { markWon, markLost, reopen } from '../lib/pipeline.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
@@ -105,11 +109,20 @@ export default function Work() {
   const queryClient = useQueryClient()
   const { data: contacts = [], isLoading: loading, isError, error, refetch, isFetching } = useJobs()
   useJobsRealtime(user?.id, queryClient)
+  // Role gate: the revenue stages (leads, quotes) and the sell actions
+  // (Mark won/lost) belong to the money roles. Crew/foreman previously
+  // couldn't reach /leads or /quotes at all; now that everything funnels
+  // through /work, gate those surfaces in-view instead — they see only
+  // the active/done work they're actually on, with no deal $ or pipeline
+  // moves. (membershipLoading → treat as full-access so first paint
+  // doesn't flash a stripped list for an owner.)
+  const { canCreateFinancialDocs, loading: membershipLoading } = useMembership()
+  const isMoneyRole = membershipLoading || canCreateFinancialDocs
   const [searchParams, setSearchParams] = useSearchParams()
   const [chip, setChip] = useState<ChipId>('all')
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
-  const [addStage, setAddStage] = useState<'lead' | 'job'>('lead')
+  const [addStage, setAddStage] = useState<'lead' | 'quote' | 'job'>('lead')
   const [justAddedId, setJustAddedId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const loadError = isError
@@ -125,7 +138,7 @@ export default function Work() {
     if (!requested && !wantsNew) return
     if (requested && CHIPS.some((c) => c.id === requested)) setChip(requested as ChipId)
     if (wantsNew) {
-      setAddStage(asStage === 'job' ? 'job' : 'lead')
+      setAddStage(asStage === 'job' ? 'job' : asStage === 'quote' ? 'quote' : 'lead')
       setAddOpen(true)
     }
     const sp = new URLSearchParams(searchParams)
@@ -133,7 +146,21 @@ export default function Work() {
     setSearchParams(sp, { replace: true })
   }, [searchParams, setSearchParams])
 
-  const activeChip = CHIPS.find((c) => c.id === chip) || CHIPS[0]
+  // Money roles see the full lifecycle; field roles see only the work
+  // they're on (Active/Done). 'all' stays for both but, for field roles,
+  // its match excludes leads/quotes below.
+  const visibleChips = useMemo(
+    () => isMoneyRole ? CHIPS : CHIPS.filter((c) => c.id === 'all' || c.id === 'active' || c.id === 'done'),
+    [isMoneyRole]
+  )
+  // For a field role, if the URL/deep-link left them on a now-hidden chip,
+  // fall back to 'all'.
+  const effectiveChip: ChipId = visibleChips.some((c) => c.id === chip) ? chip : 'all'
+  const baseChip = CHIPS.find((c) => c.id === effectiveChip) || CHIPS[0]
+  // Field roles never see lead/quote rows, even under the All chip.
+  const activeChip = isMoneyRole
+    ? baseChip
+    : { ...baseChip, match: (c: JobRow) => baseChip.match(c) && c.stage !== 'lead' && c.stage !== 'quote' }
 
   const filtered = useMemo(() => {
     let rows = contacts.filter(activeChip.match)
@@ -146,33 +173,43 @@ export default function Work() {
       )
     }
     // Follow-ups due float to the top; inside each band, newest first.
-    return [...rows].sort((a, b) => {
-      const fa = a.follow_up_on ? new Date(a.follow_up_on).getTime() : Infinity
-      const fb = b.follow_up_on ? new Date(b.follow_up_on).getTime() : Infinity
-      if (fa !== fb) return fa - fb
-      return new Date(b.updated_at || b.created_at || 0).getTime()
-        - new Date(a.updated_at || a.created_at || 0).getTime()
-    })
+    // Decorate-sort-undecorate: parse each row's dates ONCE (O(n)) instead
+    // of up to 4× per comparison (O(n log n) parses) — matters on long lists.
+    const decorated = rows.map((c) => ({
+      c,
+      fu: c.follow_up_on ? new Date(c.follow_up_on).getTime() : Infinity,
+      up: new Date(c.updated_at || c.created_at || 0).getTime()
+    }))
+    decorated.sort((a, b) => (a.fu !== b.fu ? a.fu - b.fu : b.up - a.up))
+    return decorated.map((d) => d.c)
   }, [contacts, activeChip, search])
 
-  const { visible, sentinelRef, hasMore } = useInfiniteRender(filtered, `${chip}|${search}`)
+  const { visible, sentinelRef, hasMore } = useInfiniteRender(filtered, `${effectiveChip}|${search}`)
 
   const chipCounts = useMemo<Partial<Record<ChipId, number>>>(() => {
     if (loading) return {}
     const out: Partial<Record<ChipId, number>> = {}
-    for (const c of CHIPS) out[c.id] = contacts.filter(c.match).length
+    for (const c of visibleChips) {
+      // Field roles never count lead/quote rows, even under 'all'.
+      out[c.id] = contacts.filter((row) =>
+        c.match(row) && (isMoneyRole || (row.stage !== 'lead' && row.stage !== 'quote'))
+      ).length
+    }
     return out
-  }, [contacts, loading])
+  }, [contacts, loading, visibleChips, isMoneyRole])
 
   const summary = useMemo(() => {
-    const open = contacts.filter((c) => ['lead', 'quote', 'job', 'invoice'].includes(c.stage || ''))
-    const inPlay = open.reduce((s, c) => s + Number(c.amount || 0), 0)
+    // Field roles: count only the active work they can see, and never
+    // surface deal dollar amounts.
+    const openStages = isMoneyRole ? ['lead', 'quote', 'job', 'invoice'] : ['job', 'invoice']
+    const open = contacts.filter((c) => openStages.includes(c.stage || ''))
+    const inPlay = isMoneyRole ? open.reduce((s, c) => s + Number(c.amount || 0), 0) : 0
     const due = open.filter((c) => {
       const m = followUpMeta(c)
       return m && (m.tone === 'danger' || m.tone === 'warn')
     }).length
     return { open: open.length, inPlay, due }
-  }, [contacts])
+  }, [contacts, isMoneyRole])
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -206,13 +243,24 @@ export default function Work() {
   // Accepts a preset offset in days, an exact Date from the calendar
   // picker, or null to clear.
   async function setFollowUp(c: JobRow, when: number | Date | null) {
-    const value = when === null
-      ? null
-      : when instanceof Date
-        // Local date, not toISOString — UTC would shift the picked day
-        // for anyone west of Greenwich.
-        ? `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`
-        : new Date(Date.now() + when * 86400000).toISOString().slice(0, 10)
+    // Format a Date to a LOCAL YYYY-MM-DD. toISOString would render the
+    // UTC day, shifting the stored date for anyone not on UTC — which
+    // made "Follow up tomorrow" land two days out for evening US users.
+    const localYmd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    let value: string | null
+    if (when === null) {
+      value = null
+    } else if (when instanceof Date) {
+      value = localYmd(when)
+    } else {
+      // Preset offset: add the days to LOCAL midnight, then format local —
+      // so the result is always exactly `when` calendar days from today.
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      d.setDate(d.getDate() + when)
+      value = localYmd(d)
+    }
     patchJobsCache(c.id, { follow_up_on: value } as Partial<JobRow>)
     toastSuccess(value ? 'Follow-up set' : 'Follow-up cleared', value ? `${c.name || 'Deal'} · ${followUpMeta({ follow_up_on: value })?.label || value}` : '')
     const { error } = await supabase
@@ -292,10 +340,10 @@ export default function Work() {
       {/* STAGE CHIPS — the whole pipeline in one row. */}
       <motion.div className="fh-work__chips" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Stage filters">
-          {CHIPS.filter((c) => c.id !== 'lost' || lostCount > 0).map((c) => (
+          {visibleChips.filter((c) => c.id !== 'lost' || lostCount > 0).map((c) => (
             <FilterPill
               key={c.id}
-              active={chip === c.id}
+              active={effectiveChip === c.id}
               count={chipCounts[c.id]}
               ariaLabel={`Show ${c.label.toLowerCase()}`}
               onClick={() => { hapticTap(); setChip(c.id) }}
@@ -373,6 +421,7 @@ export default function Work() {
                 contact={c}
                 isNew={c.id === justAddedId}
                 busy={busyId === c.id}
+                canSell={isMoneyRole}
                 onOpen={() => navigate(detailRoute(c))}
                 onHover={() => { if (canHover) prefetchJobDetail(queryClient, c.id, user?.id) }}
                 onWon={() => run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`))}
@@ -432,6 +481,9 @@ type DealCardProps = {
   contact: JobRow
   isNew: boolean
   busy: boolean
+  // Whether this role may move the deal through the pipeline (Mark
+  // won/lost). Field roles get follow-up actions but no stage moves.
+  canSell: boolean
   onOpen: () => void
   onHover: () => void
   onWon: () => void
@@ -440,7 +492,7 @@ type DealCardProps = {
   onFollowUp: (when: number | Date | null) => void
 }
 
-function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
+function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
   // Calendar popover for "Pick a date…" — anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)
@@ -449,7 +501,14 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
   const phone = c.phone || c.fh_clients?.phone || ''
   const est = money(c.amount)
   const isTerminal = c.stage === 'lost' || c.stage === 'closed'
-  const canSell = c.stage === 'lead' || c.stage === 'quote'
+  // Sell actions require both a sellable stage AND a money role.
+  const canSell = mayMoveStage && (c.stage === 'lead' || c.stage === 'quote')
+  // Reopen also moves a stage — money roles only.
+  const canReopen = mayMoveStage && isTerminal
+  // Follow-up actions show on any non-terminal deal (all roles). If a
+  // terminal deal offers no reopen (field role), the ⋯ menu is empty —
+  // hide the trigger entirely rather than open an empty sheet.
+  const hasActions = !isTerminal || canReopen
   const pillLabel = c.stage === 'quote' && (c.proposal_status === 'sent' || c.proposal_status === 'viewed')
     ? 'Quote sent'
     : meta.label
@@ -565,7 +624,8 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
             <button
               type="button"
               aria-label="Deal actions"
-              disabled={busy}
+              hidden={!hasActions}
+              disabled={busy || !hasActions}
               style={{
                 flexShrink: 0, width: 36, height: 36, borderRadius: 9,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -614,7 +674,7 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
                 </DropdownMenuItem>
               </>
             )}
-            {isTerminal && (
+            {canReopen && (
               <DropdownMenuItem onSelect={onReopen}>
                 <RotateCcw size={13} /> Reopen
               </DropdownMenuItem>
@@ -622,6 +682,7 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
           </DropdownMenuContent>
         </DropdownMenu>
         <PopoverContent side="bottom" align="end" sideOffset={6} collisionPadding={12} className="ui:w-auto ui:p-0">
+          <Suspense fallback={<div style={{ width: 250, height: 293 }} />}>
           <Calendar
             mode="single"
             selected={c.follow_up_on ? new Date(c.follow_up_on + 'T00:00:00') : undefined}
@@ -631,6 +692,7 @@ function DealCard({ contact: c, isNew, busy, onOpen, onHover, onWon, onLost, onR
               setDateOpen(false)
             }}
           />
+          </Suspense>
         </PopoverContent>
         </Popover>
       </motion.article>

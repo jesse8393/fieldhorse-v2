@@ -23,11 +23,16 @@ const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'H
 // Child tables the demo seed writes keyed by contact_id — deleted first
 // (scoped to the demo contact ids) before the contacts, in case a child FK
 // isn't ON DELETE CASCADE. Mirrors what seedDemoData() inserts.
-const DEMO_CHILD_TABLES = [
-  'fh_expenses',
-  'fh_schedule',
-  'fh_notes',
-  'fh_job_todos'
+// Each child table plus the column that foreign-keys back to the demo
+// contact. Most use `contact_id`; fh_job_todos keys on `job_id` (its FK
+// column name — see migration 006). Using the wrong column silently
+// deletes nothing and, since we only read { count }, swallows the
+// "column does not exist" error.
+const DEMO_CHILD_TABLES: { table: string; fk: string }[] = [
+  { table: 'fh_expenses',  fk: 'contact_id' },
+  { table: 'fh_schedule',  fk: 'contact_id' },
+  { table: 'fh_notes',     fk: 'contact_id' },
+  { table: 'fh_job_todos', fk: 'job_id' }
 ]
 
 export default function Settings() {
@@ -105,12 +110,14 @@ export default function Settings() {
 
       let total = 0
       if (ids.length) {
-        for (const table of DEMO_CHILD_TABLES) {
-          const { count } = await supabase
+        for (const { table, fk } of DEMO_CHILD_TABLES) {
+          const { error: childErr, count } = await supabase
             .from(table as any)
             .delete({ count: 'exact' })
             .eq('user_id', user.id)
-            .in('contact_id', ids)
+            .in(fk, ids)
+          // Surface a real failure instead of quietly under-counting.
+          if (childErr) throw new Error(`${table}: ${childErr.message}`)
           total += count ?? 0
         }
         const { error: cErr, count: cCount } = await supabase

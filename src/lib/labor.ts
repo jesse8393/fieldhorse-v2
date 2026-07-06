@@ -46,11 +46,16 @@ export async function crewLaborForContact(
   if (!contactId || !ownerUserId) return empty
   const { data, error } = await supabase
     .from('fh_time_punches')
-    .select('user_id, punch_in_at, punch_out_at, break_minutes, hourly_rate')
+    .select('user_id, org_id, punch_in_at, punch_out_at, break_minutes, hourly_rate')
     .eq('contact_id', contactId)
     .not('punch_out_at', 'is', null)
     .neq('user_id', ownerUserId)
   if (error || !data) return empty
+
+  // The punches all belong to one org (the contact's). Scope the rate
+  // lookup to that org so a member who also belongs to another org
+  // can't have their other-org rate bleed in.
+  const punchOrgId = (data as any[]).find((p) => p.org_id)?.org_id || null
 
   // Resolve owner-set per-member rates for punches that carry no snapshot
   // rate of their own. This is what turns crew labor from $0 into real cost:
@@ -65,12 +70,21 @@ export async function crewLaborForContact(
   ))
   const memberRate: Record<string, number> = {}
   if (needRateFor.length) {
-    const { data: members } = await (supabase.from('org_members') as any)
+    let q = (supabase.from('org_members') as any)
       .select('user_id, default_hourly_rate')
       .in('user_id', needRateFor)
+      // Skip revoked memberships — a stale rate from a since-removed
+      // membership row must not overwrite the active one.
+      .is('revoked_at', null)
+    if (punchOrgId) q = q.eq('org_id', punchOrgId)
+    const { data: members } = await q
     for (const m of (members || []) as any[]) {
       const r = Number(m.default_hourly_rate)
-      if (Number.isFinite(r) && r > 0) memberRate[m.user_id] = r
+      // Deterministic when >1 row still matches: keep the highest active
+      // rate rather than whichever row arrived last.
+      if (Number.isFinite(r) && r > 0 && r > (memberRate[m.user_id] || 0)) {
+        memberRate[m.user_id] = r
+      }
     }
   }
 

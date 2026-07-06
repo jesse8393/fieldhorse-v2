@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
@@ -60,9 +60,11 @@ export default function Clients() {
     [duplicateClusters]
   )
 
-  function rollupFor(clientId: any) {
+  // Stable identity (keyed on rollupMap) so it can be a dependency of the
+  // desktop table's `enriched` useMemo without busting it every render.
+  const rollupFor = useCallback((clientId: any) => {
     return rollupMap.get(clientId) || { lifetime: 0, outstanding: 0, activeCount: 0, wonCount: 0, paidTotal: 0 }
-  }
+  }, [rollupMap])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()

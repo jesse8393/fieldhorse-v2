@@ -48,9 +48,12 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }: { sy
   }
 }
 
-// Pull the first text block out of a Claude messages response.
+// Pull the first text block out of a Claude messages response. Claude 5
+// responses can lead with thinking blocks, so find the text block rather
+// than assuming it sits at index 0.
 export function claudeText(res: any): string {
-  return res?.content?.[0]?.text || ''
+  const blocks = Array.isArray(res?.content) ? res.content : []
+  return blocks.find((b: any) => b?.type === 'text')?.text || ''
 }
 
 // Vision call: send one base64 image + a prompt. Accepts a data-URL or raw

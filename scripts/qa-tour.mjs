@@ -43,8 +43,9 @@ async function tour(viewport, themeName, tag) {
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 
   const routes = [
-    ['home', '/'], ['leads', '/leads'], ['lead-detail', '/leads/c-lead1'],
-    ['jobs', '/jobs'], ['job-detail', '/jobs/c-job1'], ['invoices', '/invoices'],
+    ['home', '/'], ['work', '/work'], ['work-leads', '/work?stage=leads'],
+    ['lead-detail', '/leads/c-lead1'], ['work-active', '/work?stage=active'],
+    ['job-detail', '/jobs/c-job1'], ['invoices', '/invoices'],
     ['schedule', '/schedule'], ['settings', '/settings']
   ]
   for (const [name, path] of routes) {

@@ -127,7 +127,11 @@ export async function routeCapture({ text, roster, now = new Date() }: { text: s
       role: 'user',
       content: `TODAY: ${today} (${weekday})\n${rosterBlock(roster)}\n\nINPUT: ${text}`
     }],
-    maxTokens: 600
+    // fable-5 thinking is always on and shares the max_tokens budget —
+    // 600 risked truncating the JSON mid-object. Low effort keeps the
+    // simple intent-routing fast enough for the capture UX.
+    maxTokens: 1500,
+    effort: 'low'
   })
   const body = res?.content?.[0]?.text
   const raw = extractJson(body)

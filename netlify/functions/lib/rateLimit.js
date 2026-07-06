@@ -16,12 +16,17 @@
 import crypto from 'node:crypto'
 
 export function clientIp(req) {
-  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  // Prefer Netlify's platform-set client IP. x-forwarded-for is
+  // client-controllable — its FIRST token is whatever the caller sent
+  // (proxies append, they don't prepend), so trusting it lets an
+  // attacker rotate a fresh identifier per request and never trip the
+  // fixed-window limit. Only fall back to XFF when the platform header
+  // is absent (non-Netlify runtime / local dev).
   return (
-    forwarded ||
     req.headers.get('x-nf-client-connection-ip') ||
-    req.headers.get('client-ip') ||
     req.headers.get('x-real-ip') ||
+    req.headers.get('client-ip') ||
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
   )
 }

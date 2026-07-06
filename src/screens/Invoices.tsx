@@ -131,7 +131,13 @@ export default function Invoices() {
     return out.sort((a, b) => b.balance - a.balance)
   }, [jobs, paidByJob, approvedCoByJob])
 
-  const filtered = filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows
+  // Memoized so `filtered` keeps a stable identity across unrelated
+  // re-renders — it feeds TanStack Table (SnowInvoicesBuild) as `data`,
+  // and a fresh array every render forces a full row-model rebuild.
+  const filtered = useMemo(
+    () => filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows,
+    [rows, filter]
+  )
   // Bounded render window that grows on scroll — the A/R list can be long.
   const { visible: visibleBalances, sentinelRef: balancesSentinelRef, hasMore: balancesHasMore } = useInfiniteRender(
     filtered,

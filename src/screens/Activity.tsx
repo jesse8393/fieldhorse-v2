@@ -256,10 +256,10 @@ export default function Activity() {
           </section>
         ))}
 
-        {/* Load older — the feed is capped per source table; when we're at the
-            cap there's likely more history. Bump the page size (capped) so the
-            timeline isn't silently truncated at the most-recent events. */}
-        {!loading && !empty && events && events.length >= pageSize && pageSize < 480 && (
+        {/* Load older — show only when a source actually filled its page
+            (bundle.hasMore), not when the merged feed happens to exceed
+            pageSize (4 sources can sum past it while all are exhausted). */}
+        {!loading && !empty && bundle?.hasMore && pageSize < 480 && (
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 6 }}>
             <button
               type="button"

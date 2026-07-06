@@ -39,7 +39,9 @@ const notesRows = [
 
 const TABLES = {
   profiles: [{ user_id: USER.id, full_name: 'Jesse Parker', company_name: 'Parker Construction Company', onboarded_at: iso(now - 90 * day), logo_url: null, location_lat: 35.84, location_lon: -86.36, services: ['Concrete'], company_email: 'office@parker.co', brand_accent_hex: null }],
-  org_members: [{ id: 'm1', org_id: 'org-1', user_id: USER.id, role: 'owner', revoked_at: null, joined_at: iso(now - 90 * day), default_hourly_rate: null, status: 'active' }],
+  // Role is env-overridable so QA can exercise the in-view permission
+  // gates (e.g. QA_ROLE=crew to verify Work hides leads/quotes/$).
+  org_members: [{ id: 'm1', org_id: 'org-1', user_id: USER.id, role: process.env.QA_ROLE || 'owner', revoked_at: null, joined_at: iso(now - 90 * day), default_hourly_rate: null, status: 'active' }],
   organizations: [{ id: 'org-1', name: 'Parker Construction', created_at: iso(now - 90 * day) }],
   fh_contacts: contacts,
   fh_clients: [{ ...CLIENT, user_id: USER.id, company_name: null, address: '412 Burkitt Station Rd', created_at: iso(now - 60 * day) }],

@@ -11543,6 +11543,9 @@ select {
     column-gap: 16px;
     row-gap: 14px;
     align-items: center;
+    /* The screen has a viewport min-height; without this the two auto
+       rows stretch to fill it and the deal list starts mid-page. */
+    align-content: start;
     padding: 4px 0 48px !important;
   }
   .v3-screen--work > .fh-work__head {
@@ -11560,7 +11563,10 @@ select {
   .v3-screen--work > .fh-work__chips > div {
     overflow-x: visible !important;
     padding-bottom: 0 !important;
-    flex-wrap: nowrap;
+    /* Wrap instead of clipping at the grid edge — with Done + Lost
+       visible the row is wider than its column. */
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
   .v3-screen--work > .fh-work__list {
     grid-area: list;

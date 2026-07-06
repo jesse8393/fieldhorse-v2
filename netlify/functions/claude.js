@@ -66,7 +66,8 @@ export default async (request) => {
     system,
     messages,
     max_tokens = 1024,
-    temperature
+    temperature,
+    effort
   } = body || {}
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -93,7 +94,24 @@ export default async (request) => {
 
   const payload = { model: safeModel, max_tokens: cappedMaxTokens, messages }
   if (system) payload.system = system
-  if (typeof temperature === 'number') payload.temperature = temperature
+
+  // Claude 5 family API differences (vs the 4.x models this proxy was
+  // written for):
+  //   - sonnet-5 / fable-5 reject non-default sampling params with a 400
+  //     → never forward temperature to them.
+  //   - sonnet-5 runs ADAPTIVE thinking when `thinking` is omitted. Our
+  //     callers are short utility calls (drafts, JSON parses) with small
+  //     max_tokens and 15-20s client timeouts; thinking would eat the
+  //     token budget and blow the timeout → explicitly disable.
+  //   - fable-5 thinking is always on and cannot be disabled; depth is
+  //     controlled via output_config.effort → forward a validated effort.
+  const isClaude5 = safeModel === 'claude-sonnet-5' || safeModel === 'claude-fable-5'
+  if (typeof temperature === 'number' && !isClaude5) payload.temperature = temperature
+  if (safeModel === 'claude-sonnet-5') payload.thinking = { type: 'disabled' }
+  const EFFORTS = new Set(['low', 'medium', 'high'])
+  if (safeModel === 'claude-fable-5' && EFFORTS.has(effort)) {
+    payload.output_config = { effort }
+  }
 
   try {
     const upstream = await fetch(ANTHROPIC_URL, {

@@ -255,6 +255,11 @@ export type ActivityBundle = {
   changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
   invoices: Database['public']['Tables']['fh_invoices']['Row'][]
   contacts: Pick<Contact, 'id' | 'name' | 'job_title' | 'stage'>[]
+  // True when at least one event source returned a full page — i.e. there
+  // may be older rows a larger page would surface. The merged feed length
+  // can exceed pageSize even when every source is exhausted (4 sources ×
+  // pageSize), so the merged count is NOT a valid "has more" signal.
+  hasMore: boolean
 }
 
 async function fetchActivity(userId: string, pageSize: number): Promise<ActivityBundle> {
@@ -278,12 +283,17 @@ async function fetchActivity(userId: string, pageSize: number): Promise<Activity
   for (const result of [transitions, payments, changeOrders, invoices, contacts]) {
     if (result.error) throw result.error
   }
+  // "More to load" iff one of the four event sources filled its page.
+  // (contacts is a lookup table, not an event source — exclude it.)
+  const hasMore = [transitions, payments, changeOrders, invoices]
+    .some((r) => (r.data?.length ?? 0) >= pageSize)
   return {
     transitions: (transitions.data ?? []) as ActivityBundle['transitions'],
     payments: (payments.data ?? []) as ActivityBundle['payments'],
     changeOrders: (changeOrders.data ?? []) as ActivityBundle['changeOrders'],
     invoices: (invoices.data ?? []) as ActivityBundle['invoices'],
-    contacts: (contacts.data ?? []) as ActivityBundle['contacts']
+    contacts: (contacts.data ?? []) as ActivityBundle['contacts'],
+    hasMore
   }
 }
 
