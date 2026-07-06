@@ -28,8 +28,19 @@ export type Contact = Database['public']['Tables']['fh_contacts']['Row']
 export type Client = Database['public']['Tables']['fh_clients']['Row']
 export type Payment = Database['public']['Tables']['fh_payments']['Row']
 
-// A job row with the embedded client contact info the Jobs list needs.
-export type JobRow = Contact & {
+// The columns the Work list (and desktop rail) actually render. Keeping
+// this a projection instead of `*` cuts each row to a fraction of its
+// full width — fh_contacts carries big text fields (notes, scope,
+// proposal HTML) that the list never shows.
+export const JOB_LIST_COLUMNS =
+  'id, user_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, updated_at, created_at'
+
+export type JobRow = Pick<
+  Contact,
+  | 'id' | 'user_id' | 'client_id' | 'name' | 'phone' | 'email' | 'address'
+  | 'stage' | 'amount' | 'job_title' | 'job_type' | 'referred_by'
+  | 'proposal_status' | 'follow_up_on' | 'updated_at' | 'created_at'
+> & {
   fh_clients: Pick<Client, 'name' | 'phone' | 'email'> | null
 }
 
@@ -51,8 +62,13 @@ async function fetchJobs(): Promise<JobRow[]> {
   // pipeline dedupe in screens/Home.tsx.
   const { data, error } = await supabase
     .from('fh_contacts')
-    .select('*, fh_clients(name, phone, email)')
+    .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
     .order('updated_at', { ascending: false })
+    // Sanity ceiling: 2000 most-recently-touched deals is far beyond what
+    // the list UX can present; without it one giant book turns every
+    // refetch into a multi-MB payload. Older rows stay reachable via
+    // search-by-detail routes and the client roster.
+    .limit(2000)
   if (error) throw error
   const rows = (data ?? []) as JobRow[]
   const byId = new Map<string, JobRow>()

@@ -3,7 +3,13 @@ import { supabase } from './supabase.ts'
 import { crewLaborForContact } from './labor.ts'
 import type { Database } from './database.types.ts'
 
-type Contact = Database['public']['Tables']['fh_contacts']['Row']
+// Only the fields the stage helpers actually read — declared narrowly so
+// projected list rows (queries.ts JobRow) are valid inputs; a full
+// fh_contacts Row remains assignable.
+type Contact = Pick<
+  Database['public']['Tables']['fh_contacts']['Row'],
+  'id' | 'user_id' | 'stage' | 'name' | 'job_title' | 'address' | 'amount'
+>
 
 // Pipeline v2 (migration 047): the 'invoice' stage is retired. A record
 // in lead/quote is a Lead; job/closed is a Job (every job is a won
@@ -279,7 +285,7 @@ export async function recalcCost(contactId: string | undefined, userId: string |
   return cost
 }
 
-export function margin(contact: Pick<Contact, 'amount' | 'cost'> | null | undefined) {
+export function margin(contact: { amount?: number | null; cost?: number | null } | null | undefined) {
   const amt = Number(contact?.amount || 0)
   const cost = Number(contact?.cost || 0)
   if (!amt) return 0
