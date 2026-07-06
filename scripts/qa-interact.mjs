@@ -76,6 +76,6 @@ async function leg(themeName) {
   await ctx.close()
 }
 
-for (const theme of ['light', 'dark']) await leg(theme)
+for (const theme of (process.env.QA_THEMES || 'light,dark').split(',')) await leg(theme)
 await browser.close()
 console.log('interact complete')
