@@ -185,7 +185,7 @@ export default function SnowInvoicesBuild({
                   <span className="fh-build-num fh-build-rel">{r.paid > 0 ? moneyFull(r.paid) : '—'}</span>
                   <span
                     className="fh-build-num"
-                    style={{ color: r.balance > 0 ? 'var(--v3-primary, #c9963a)' : '#73c982', fontWeight: 700 }}
+                    style={{ color: r.balance > 0 ? 'var(--v3-primary, #c9963a)' : 'var(--v3-success-bright)', fontWeight: 700 }}
                   >
                     {r.balance > 0 ? moneyFull(r.balance) : 'Paid'}
                   </span>
@@ -242,7 +242,7 @@ export default function SnowInvoicesBuild({
                             onClick={() => onStatement(g)}
                             aria-label="Statement"
                             title="Account statement"
-                            style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'inherit', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
+                            style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 8, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-mid)', color: 'inherit', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
                           >
                             <Receipt size={12} />
                           </button>
@@ -263,7 +263,7 @@ export default function SnowInvoicesBuild({
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Overdue 60+ d</div>
-              <strong style={{ color: overdueCount > 0 ? '#ee4942' : undefined }}>
+              <strong style={{ color: overdueCount > 0 ? 'var(--v3-danger-bright)' : undefined }}>
                 {moneyFull(totals['60+'])}
               </strong>
               <span>{overdueCount} {overdueCount === 1 ? 'invoice' : 'invoices'}</span>

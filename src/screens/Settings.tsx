@@ -627,10 +627,10 @@ export default function Settings() {
       </Section>
 
       {/* APPEARANCE — daylight mode. Restored after the light-theme
-          parity pass (theme_parity token sweep + chrome veil tokens).
-          Framed as a field feature: high-contrast warm paper for direct
-          sunlight. Desktop pins to dark until the fh-build screens get
-          their own parity wave (ThemeContext gates ≥900px). */}
+          parity pass (theme_parity token sweep + chrome veil tokens);
+          desktop joined after the fh-build sweep (desktop_parity), so
+          the toggle now applies on every viewport. Framed as a field
+          feature: high-contrast warm paper for direct sunlight. */}
       <Section
         variants={item}
         title={<>Built for <em>daylight.</em></>}
@@ -654,7 +654,7 @@ export default function Settings() {
                 Daylight mode
               </div>
               <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
-                Applies on phone. Desktop stays dark for now.
+                Warm paper, readable in direct sun. Applies everywhere.
               </div>
             </div>
           </div>

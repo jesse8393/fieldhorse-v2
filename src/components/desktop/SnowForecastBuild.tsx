@@ -156,7 +156,7 @@ export default function SnowForecastBuild(props: Props) {
 
           <div className={`fh-build-focus fh-build-window-card is-${windowTone}`}>
             <div className="fh-build-eyebrow">Current work window</div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#f4f1ea', margin: '8px 0 4px' }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
               {windowLabel}
             </p>
             {currentWindow?.reasons && currentWindow.reasons.length > 0 && (
@@ -165,7 +165,7 @@ export default function SnowForecastBuild(props: Props) {
               </p>
             )}
             {!hasCoords && (
-              <p style={{ marginTop: 8, color: '#e0a141' }}>
+              <p style={{ marginTop: 8, color: 'var(--v3-primary-bright)' }}>
                 Pin a location for accurate work-window signals.
               </p>
             )}
@@ -271,7 +271,7 @@ export default function SnowForecastBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Rain risk</div>
-              <strong style={{ color: rainRiskDays > 0 ? '#e0a141' : '#73c982' }}>{rainRiskDays}</strong>
+              <strong style={{ color: rainRiskDays > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-success-bright)' }}>{rainRiskDays}</strong>
               <span>days ≥ 50% chance</span>
               {rainRiskDays > 0 && <div className="fh-build-spark is-gold" />}
             </section>

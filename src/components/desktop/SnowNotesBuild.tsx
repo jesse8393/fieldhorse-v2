@@ -124,7 +124,7 @@ export default function SnowNotesBuild(props: Props) {
               {' '}{cockpitStats.parsedCount} parsed by AI
             </p>
             {cockpitStats.riskCount > 0 && (
-              <p style={{ color: '#e0a141', marginTop: 6 }}>
+              <p style={{ color: 'var(--v3-primary-bright)', marginTop: 6 }}>
                 <AlertTriangle size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 {cockpitStats.riskCount} open risk{cockpitStats.riskCount === 1 ? '' : 's'} flagged
               </p>
@@ -287,7 +287,7 @@ export default function SnowNotesBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Open risks</div>
-              <strong style={{ color: cockpitStats.riskCount > 0 ? '#ee4942' : undefined }}>
+              <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-bright)' : undefined }}>
                 {cockpitStats.riskCount}
               </strong>
               <span>{cockpitStats.riskCount > 0 ? 'Needs triage' : 'All clear'}</span>
@@ -296,7 +296,7 @@ export default function SnowNotesBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Missing job links</div>
-              <strong style={{ color: unlinkedCount > 0 ? '#e0a141' : undefined }}>{unlinkedCount}</strong>
+              <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-bright)' : undefined }}>{unlinkedCount}</strong>
               <span>{unlinkedCount > 0 ? 'Tie reports to jobs' : 'All linked'}</span>
             </section>
 

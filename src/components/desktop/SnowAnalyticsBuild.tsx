@@ -206,11 +206,11 @@ export default function SnowAnalyticsBuild(props: Props) {
                 <div className="fh-build-eyebrow">Revenue trend · last {revenueByMonth.length}</div>
                 <span className="fh-build-rel">
                   {monthOverMonth > 0 ? (
-                    <span style={{ color: '#73c982', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color: 'var(--v3-success-bright)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <TrendingUp size={12} /> {money(monthOverMonth)} MoM
                     </span>
                   ) : monthOverMonth < 0 ? (
-                    <span style={{ color: '#ee4942', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color: 'var(--v3-danger-bright)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <TrendingDown size={12} /> {money(Math.abs(monthOverMonth))} MoM
                     </span>
                   ) : '—'}
@@ -271,7 +271,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Weakest stage</div>
-              <strong style={{ color: weakestStage ? '#e0a141' : undefined }}>
+              <strong style={{ color: weakestStage ? 'var(--v3-primary-bright)' : undefined }}>
                 {weakestStage ? (weakestStage.label || weakestStage.id) : 'All active'}
               </strong>
               <span>{weakestStage ? 'No movement' : 'Every stage moving'}</span>
@@ -284,7 +284,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <strong style={{
                     color: collectionRate == null
                       ? undefined
-                      : Number(stats.invoiced) > Number(stats.collected) ? '#ee4942' : '#73c982',
+                      : Number(stats.invoiced) > Number(stats.collected) ? 'var(--v3-danger-bright)' : 'var(--v3-success-bright)',
                   }}>
                     {collectionRate != null ? pct(ratioToPct(collectionRate)) : '—'}
                   </strong>
@@ -328,7 +328,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 function KpiCell({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="fh-build-kpi-cell">
-      <strong style={muted ? { color: 'rgba(245,242,234,.42)', fontSize: 14, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' } : undefined}>
+      <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' } : undefined}>
         {value}
       </strong>
       <span>{label}</span>

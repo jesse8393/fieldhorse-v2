@@ -235,7 +235,7 @@ export default function SnowClientsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Needs follow-up</div>
-              <strong style={{ color: needsFollowUp > 0 ? '#e0a141' : undefined }}>{needsFollowUp}</strong>
+              <strong style={{ color: needsFollowUp > 0 ? 'var(--v3-primary-bright)' : undefined }}>{needsFollowUp}</strong>
               <span>cooled 30+ days</span>
               {needsFollowUp > 0 && <div className="fh-build-spark is-gold" />}
             </section>
