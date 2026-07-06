@@ -364,6 +364,16 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
     await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
   }
 
+  // Speed pass: optimistic cache write for single-column moves (lost /
+  // reopen / follow-up). The card responds the instant the thumb lifts —
+  // no round-trip wait on a job-site connection. Server truth arrives via
+  // refresh(); on error the same refresh() rolls the cache back.
+  function patchJobsCache(id: string, patch: Partial<JobRow>) {
+    queryClient.setQueryData(queryKeys.jobs, (prev: unknown) =>
+      Array.isArray(prev) ? prev.map((r: any) => (r.id === id ? { ...r, ...patch } : r)) : prev
+    )
+  }
+
   async function onWon(c: LeadContact) {
     if (busyId) return
     setBusyId(c.id)
@@ -401,12 +411,14 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
   async function onLost(c: LeadContact) {
     if (busyId) return
     setBusyId(c.id)
+    patchJobsCache(c.id, { stage: 'lost' } as Partial<JobRow>)
     try {
       const res: any = await markLost(c)
       if (res?.error) throw res.error
       await refresh()
     } catch (e: any) {
       toastError("Couldn't mark lost", e?.message || 'Try again')
+      await refresh() // roll the optimistic flip back to server truth
     } finally {
       setBusyId(null)
     }
@@ -415,12 +427,15 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
   async function onReopen(c: LeadContact) {
     if (busyId) return
     setBusyId(c.id)
+    // Mirrors pipeline.reopen(): closed → job, lost → lead.
+    patchJobsCache(c.id, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>)
     try {
       const res: any = await reopen(c)
       if (res?.error) throw res.error
       await refresh()
     } catch (e: any) {
       toastError("Couldn't reopen", e?.message || 'Try again')
+      await refresh()
     } finally {
       setBusyId(null)
     }
@@ -430,6 +445,8 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
     const value = days === null
       ? null
       : new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
+    patchJobsCache(c.id, { follow_up_on: value } as Partial<JobRow>)
+    toastSuccess(value ? 'Follow-up set' : 'Follow-up cleared', value ? `${c.name || 'Lead'} · ${followUpMeta({ follow_up_on: value })?.label || value}` : '')
     const { error } = await supabase
       .from('fh_contacts')
       .update({ follow_up_on: value })
@@ -437,9 +454,9 @@ export default function Leads({ surface = 'leads' }: LeadsProps = {}) {
       .eq('user_id', c.user_id)
     if (error) {
       toastError("Couldn't set follow-up", error.message)
+      await refresh() // roll back
       return
     }
-    toastSuccess(value ? 'Follow-up set' : 'Follow-up cleared', value ? `${c.name || 'Lead'} · ${followUpMeta({ follow_up_on: value })?.label || value}` : '')
     await refresh()
   }
 

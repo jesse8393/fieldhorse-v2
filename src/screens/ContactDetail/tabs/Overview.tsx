@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
@@ -63,6 +64,7 @@ export default function OverviewTab({
   onOpenQuote
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
+  const queryClient = useQueryClient()
 
   const health = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
@@ -95,13 +97,23 @@ export default function OverviewTab({
           break
         }
         case 'todo': {
+          // Speed pass: flip the todo in the detail cache immediately so
+          // the NextActionCard advances the instant the thumb lifts; the
+          // fetchAll/rollback below reconciles with server truth.
+          const todoId = String(nextAction.sourceId || '')
+          queryClient.setQueryData(['jobDetail', contact?.id], (prev: any) =>
+            prev
+              ? { ...prev, todos: (prev.todos || []).map((t: any) => t.id === todoId ? { ...t, done: true } : t) }
+              : prev
+          )
           const { error } = await supabase
             .from('fh_job_todos')
             .update({ done: true, completed_at: new Date().toISOString() })
-            .eq('id', String(nextAction.sourceId || ''))
+            .eq('id', todoId)
             .eq('user_id', userId)
           if (error) {
             toastError("Couldn't mark to-do done", error.message)
+            await fetchAll() // roll the optimistic flip back
           } else {
             toastSuccess('To-do complete')
             await fetchAll()
