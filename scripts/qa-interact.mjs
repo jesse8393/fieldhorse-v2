@@ -51,7 +51,9 @@ async function leg(themeName) {
 
   // 4. New Lead sheet (Leads FAB)
   await page.goto('http://localhost:5199/leads'); await ready()
-  await page.click('[aria-label="New lead"]').catch(() => {})
+  // Two buttons share this label (hidden desktop header + mobile FAB) —
+  // click the visible one or the sheet never opens.
+  await page.locator('[aria-label="New lead"]:visible').last().click().catch(() => {})
   await snap(page, 'new-lead-sheet', themeName)
 
   // 5. Lead card overflow menu (follow-up actions)
