@@ -27,3 +27,12 @@ export function money(n: number | null | undefined): string {
 export function moneyFull(n: number | null | undefined): string {
   return `$${Math.round(Number(n || 0)).toLocaleString()}`
 }
+
+// Compact K-notation for list cards ($24.4K / $135K / $840). Extracted
+// from Work + DetailListRail (audit: third hand-rolled copy).
+export function moneyK(n: number | string | null | undefined): string | null {
+  const v = Number(n || 0)
+  if (!v) return null
+  if (v >= 1000) return `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K`
+  return `$${Math.round(v).toLocaleString()}`
+}

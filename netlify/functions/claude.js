@@ -8,7 +8,7 @@
 //
 // ENV required: ANTHROPIC_API_KEY (set in Netlify dashboard)
 //               SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (token check)
-// Optional: ANTHROPIC_MODEL (defaults to claude-sonnet-4-6)
+// Optional: ANTHROPIC_MODEL (defaults to claude-fable-5)
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -62,11 +62,12 @@ export default async (request) => {
   }
 
   const {
-    model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+    model = process.env.ANTHROPIC_MODEL || 'claude-fable-5',
     system,
     messages,
     max_tokens = 1024,
-    temperature
+    temperature,
+    effort
   } = body || {}
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -76,24 +77,51 @@ export default async (request) => {
     return json({ error: 'too_many_messages', limit: 50 }, 400)
   }
 
-  const cappedMaxTokens = Math.min(Math.max(1, Number(max_tokens) || 1024), MAX_TOKENS_CEILING)
-
   // Model allow-list. `model` is caller-supplied; without this a signed-in
   // user could point the shared API key at any (e.g. more expensive) model.
   // Anything off-list falls back to the configured default rather than
   // erroring, so a benign unknown id degrades instead of breaking.
-  const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+  const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-fable-5'
   const ALLOWED_MODELS = new Set([
-    'claude-sonnet-4-6',
-    'claude-opus-4-8',
+    'claude-fable-5',
+    'claude-sonnet-5',
     'claude-haiku-4-5-20251001',
     DEFAULT_MODEL
   ])
   const safeModel = ALLOWED_MODELS.has(model) ? model : DEFAULT_MODEL
 
+  // Fable 5 runs adaptive thinking on EVERY turn, and thinking tokens share
+  // the max_tokens budget. Our callers ask for small caps (some as low as
+  // 120) sized for a no-thinking model — on Fable that starves the actual
+  // answer and truncates the JSON. Floor the budget so thinking + output
+  // both have room. (Still bounded by MAX_TOKENS_CEILING.)
+  const FABLE_MIN_TOKENS = 1200
+  const requested = Math.max(1, Number(max_tokens) || 1024)
+  const floored = safeModel === 'claude-fable-5' ? Math.max(requested, FABLE_MIN_TOKENS) : requested
+  const cappedMaxTokens = Math.min(floored, MAX_TOKENS_CEILING)
+
   const payload = { model: safeModel, max_tokens: cappedMaxTokens, messages }
   if (system) payload.system = system
-  if (typeof temperature === 'number') payload.temperature = temperature
+
+  // Claude 5 family API differences (vs the 4.x models this proxy was
+  // written for):
+  //   - sonnet-5 / fable-5 reject non-default sampling params with a 400
+  //     → never forward temperature to them.
+  //   - fable-5 thinking is always on and cannot be disabled; depth (and
+  //     therefore latency + token spend) is controlled via
+  //     output_config.effort. These are short, latency-sensitive utility
+  //     calls, so default to LOW effort unless the caller asks otherwise —
+  //     low-effort Fable still beats prior models and keeps us inside the
+  //     client timeout.
+  //   - sonnet-5 (allowlisted fallback) runs adaptive thinking when
+  //     `thinking` is omitted; disable it there for the same latency reason.
+  const isClaude5 = safeModel === 'claude-sonnet-5' || safeModel === 'claude-fable-5'
+  if (typeof temperature === 'number' && !isClaude5) payload.temperature = temperature
+  if (safeModel === 'claude-sonnet-5') payload.thinking = { type: 'disabled' }
+  const EFFORTS = new Set(['low', 'medium', 'high'])
+  if (safeModel === 'claude-fable-5') {
+    payload.output_config = { effort: EFFORTS.has(effort) ? effort : 'low' }
+  }
 
   try {
     const upstream = await fetch(ANTHROPIC_URL, {

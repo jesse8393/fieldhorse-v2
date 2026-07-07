@@ -121,13 +121,17 @@ export async function routeCapture({ text, roster, now = new Date() }: { text: s
   const res = await claudeMessage({
     // Intent routing is correctness-sensitive (it writes money rows) —
     // run it on the strongest model rather than the app-wide default.
-    model: 'claude-opus-4-8',
+    model: 'claude-fable-5',
     system: CAPTURE_SYSTEM,
     messages: [{
       role: 'user',
       content: `TODAY: ${today} (${weekday})\n${rosterBlock(roster)}\n\nINPUT: ${text}`
     }],
-    maxTokens: 600
+    // fable-5 thinking is always on and shares the max_tokens budget —
+    // 600 risked truncating the JSON mid-object. Low effort keeps the
+    // simple intent-routing fast enough for the capture UX.
+    maxTokens: 1500,
+    effort: 'low'
   })
   const body = res?.content?.[0]?.text
   const raw = extractJson(body)

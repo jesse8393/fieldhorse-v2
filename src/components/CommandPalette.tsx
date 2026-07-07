@@ -34,12 +34,15 @@ import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 
+// Target /work directly (the collapsed deal list) rather than the legacy
+// board paths, so these don't round-trip through LegacyBoardRedirect and
+// its stage-synonym table. asStage seeds the New-deal sheet's stage.
 const QUICK_ACTIONS = [
   { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, event: 'fh:open-capture' },
-  { id: 'newLead', label: 'New lead', hint: 'Add opportunity to Lead Desk', icon: Plus, to: '/leads?new=1' },
-  { id: 'newQuote', label: 'New quote', hint: 'Start a proposal with scope', icon: FileText, to: '/quotes?new=1' },
-  { id: 'newJob', label: 'New job', hint: 'Create active work', icon: Briefcase, to: '/jobs?new=1&asStage=job' },
-  { id: 'followups', label: 'Work follow-ups', hint: 'Ranked Lead Desk queue', icon: Target, to: '/leads?stage=open' },
+  { id: 'newLead', label: 'New lead', hint: 'Add an opportunity', icon: Plus, to: '/work?new=1' },
+  { id: 'newQuote', label: 'New quote', hint: 'Start a proposal with scope', icon: FileText, to: '/work?new=1&asStage=quote' },
+  { id: 'newJob', label: 'New job', hint: 'Create active work', icon: Briefcase, to: '/work?new=1&asStage=job' },
+  { id: 'followups', label: 'Work follow-ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/work?stage=leads' },
   { id: 'collect', label: 'Collect money', hint: 'Invoices and balances', icon: Receipt, to: '/invoices' },
   { id: 'compose', label: 'Draft message', hint: 'AI compose for customers', icon: MessageSquare, to: '/compose' },
 ]
@@ -53,10 +56,7 @@ function homeHint() {
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'leads', label: 'Lead Desk', hint: 'Intake and follow-ups', icon: Target, to: '/leads' },
-  { id: 'quotes', label: 'Quote Desk', hint: 'Proposals ready to win', icon: FileText, to: '/quotes' },
-  { id: 'jobs', label: 'Job Desk', hint: 'Active work and delivery', icon: Briefcase, to: '/jobs' },
-  { id: 'pipeline', label: 'Full funnel pipeline', hint: 'Lead, quote, active, collect, complete', icon: BarChart3, to: '/pipeline' },
+  { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/work' },
   { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },
   { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
 ]

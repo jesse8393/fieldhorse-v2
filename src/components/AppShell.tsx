@@ -30,8 +30,8 @@ function RouteFallback() {
   return (
     <div style={{ padding: '20px 20px 80px' }}>
       <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <span style={{ width: 100, height: 11, borderRadius: 4, background: 'rgba(255,255,255,0.06)' }} />
-        <span style={{ width: '60%', maxWidth: 280, height: 28, borderRadius: 6, background: 'rgba(255,255,255,0.07)', marginBottom: 6 }} />
+        <span style={{ width: 100, height: 11, borderRadius: 4, background: 'var(--v3-glass-tint-2)' }} />
+        <span style={{ width: '60%', maxWidth: 280, height: 28, borderRadius: 6, background: 'var(--v3-glass-tint-2)', marginBottom: 6 }} />
         <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
         <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.4 }} />
         <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.28 }} />
@@ -83,6 +83,7 @@ function layoutForPath(pathname: any) {
   // (the responsive max-width media queries only activate at >=900px),
   // so phones are unaffected by every promotion below.
   if (pathname === '/') return 'responsive'
+  if (pathname === '/work') return 'responsive'
   if (pathname === '/leads') return 'responsive'
   if (pathname === '/quotes') return 'responsive'
   if (pathname === '/pipeline') return 'responsive'
@@ -117,8 +118,11 @@ function layoutForPath(pathname: any) {
   if (pathname.startsWith('/leads/')) return 'responsive'
   if (pathname.startsWith('/quotes/')) return 'responsive'
   if (pathname.startsWith('/jobs/')) return 'responsive'
-  // Client Detail still mobile-frame — its internal layout needs
-  // bespoke desktop work in a follow-up phase.
+  // Client Detail renders the full-width SnowClientDetailBuild on desktop —
+  // it needs the wide canvas too, or it renders crammed inside the 440px
+  // mobile-frame cap (the worst of both). Give it the responsive canvas
+  // like every other detail route.
+  if (pathname.startsWith('/clients/')) return 'responsive'
   return 'mobile-frame'
 }
 
@@ -259,7 +263,7 @@ export default function AppShell() {
           style: {
             width: '100%',
             maxWidth: 'calc(100vw - 32px)',
-            background: 'rgba(20, 20, 20, 0.95)',
+            background: 'var(--v3-surface-glass)',
             color: 'var(--ink-strong)',
             border: '1px solid rgba(201, 150, 58, 0.35)',
             fontFamily: 'var(--font-body)',

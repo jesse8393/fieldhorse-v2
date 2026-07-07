@@ -115,11 +115,24 @@ export async function getActivePunchForContact(
 }
 
 /** Punch in. Inserts a new row with punch_in_at = now(). org_id is
- *  filled in by the BEFORE INSERT trigger from migration 035. */
+ *  filled in by the BEFORE INSERT trigger from migration 035.
+ *
+ *  Open-punch guard: if the caller already has an un-clocked-out punch
+ *  on the SAME job (double-tap, second tab, stale UI), return THAT
+ *  punch instead of inserting a second one — two open punches later
+ *  double-count labor hours in job cost. An open punch on a DIFFERENT
+ *  job must NOT be returned (ultrareview x5: doing so mis-attributed
+ *  Job A's hours to Job B's cost) — fall through to the insert and let
+ *  the one-active-per-user unique index reject it, which drives the
+ *  callers' existing "Already on the clock" error paths. */
 export async function punchIn(opts: {
   userId: string
   contactId?: string | null
 }): Promise<TimePunch> {
+  const existing = await getActivePunch(opts.userId)
+  if (existing && (existing.contact_id ?? null) === (opts.contactId ?? null)) {
+    return existing
+  }
   const { lat, lon, acc } = await tryGeolocate()
   const { data, error } = await supabase
     .from('fh_time_punches')

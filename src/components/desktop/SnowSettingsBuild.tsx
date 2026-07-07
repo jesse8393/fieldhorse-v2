@@ -60,7 +60,7 @@ export default function SnowSettingsBuild(props: Props) {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Setup readiness</div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#f4f1ea', margin: '8px 0 4px' }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
               {profileCompletePct >= 90 ? 'Looking sharp' : profileCompletePct >= 60 ? 'Almost there' : 'Needs setup'}
             </p>
             <div className="fh-build-progress">
@@ -103,14 +103,14 @@ export default function SnowSettingsBuild(props: Props) {
               {allClear ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                    <CheckCircle2 size={16} color="#73c982" />
-                    <strong style={{ fontSize: 20, color: '#73c982' }}>All set</strong>
+                    <CheckCircle2 size={16} color="var(--v3-success-bright)" />
+                    <strong style={{ fontSize: 20, color: 'var(--v3-success-bright)' }}>All set</strong>
                   </div>
                   <span>Profile and brand fully configured.</span>
                 </>
               ) : (
                 <>
-                  <strong style={{ color: '#e0a141' }}>{missingItems.length}</strong>
+                  <strong style={{ color: 'var(--v3-primary-bright)' }}>{missingItems.length}</strong>
                   <span>field{missingItems.length === 1 ? '' : 's'} to fill</span>
                   <ul className="fh-build-rail-list" style={{ marginTop: 12 }}>
                     {missingItems.slice(0, 4).map((m, i) => (

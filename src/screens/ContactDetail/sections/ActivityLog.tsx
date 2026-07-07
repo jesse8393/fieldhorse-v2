@@ -17,6 +17,7 @@
 import { useMemo, useState } from 'react'
 import { Activity, FileText, DollarSign, Calendar, FileEdit, Check, Sparkles } from 'lucide-react'
 import { composeActivityEvents } from './composeActivityEvents.ts'
+import { Eyebrow } from '../../../components/v3'
 
 const ICONS: Record<string, any> = {
   created: Sparkles,
@@ -29,7 +30,7 @@ const ICONS: Record<string, any> = {
 }
 
 const TONE_COLORS: Record<string, any> = {
-  neutral: { fg: 'var(--v3-text-muted)', bg: 'rgba(255,255,255,0.06)', dot: 'var(--v3-text-muted)' },
+  neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', dot: 'var(--v3-text-muted)' },
   gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', dot: 'var(--v3-primary)' },
   green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74, 222, 128, 0.10)', dot: 'var(--v3-success-bright, #4ade80)' },
   red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232, 90, 87, 0.10)', dot: 'var(--v3-danger-bright, #f5a294)' }
@@ -94,16 +95,12 @@ export default function ActivityLog({
         background: 'var(--v3-surface-2)'
       }}>
         <Activity size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
-        <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-          letterSpacing: '0.16em', color: 'var(--v3-primary-bright)',
-          textTransform: 'uppercase'
-        }}>
+        <Eyebrow tone="gold">
           Activity
           <span style={{ marginLeft: 8, color: 'var(--v3-text-muted)' }}>
             · {events.length}
           </span>
-        </span>
+        </Eyebrow>
       </header>
 
       <ol style={{

@@ -10,8 +10,10 @@
 import { supabase } from './supabase'
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
-const MODEL = (process.env.EXPO_PUBLIC_ANTHROPIC_MODEL as string) || 'claude-sonnet-4-6'
-const REQUEST_TIMEOUT_MS = 20000
+const MODEL = (process.env.EXPO_PUBLIC_ANTHROPIC_MODEL as string) || 'claude-fable-5'
+// Fable 5 always runs adaptive thinking, so turns run longer than the old
+// Sonnet path; the proxy pins these calls to low effort to stay in budget.
+const REQUEST_TIMEOUT_MS = 35000
 
 type ClaudeMessage = { role: string; content: unknown }
 
@@ -48,9 +50,12 @@ export async function claudeMessage({ system, messages, maxTokens = 1024 }: { sy
   }
 }
 
-// Pull the first text block out of a Claude messages response.
+// Pull the first text block out of a Claude messages response. Claude 5
+// responses can lead with thinking blocks, so find the text block rather
+// than assuming it sits at index 0.
 export function claudeText(res: any): string {
-  return res?.content?.[0]?.text || ''
+  const blocks = Array.isArray(res?.content) ? res.content : []
+  return blocks.find((b: any) => b?.type === 'text')?.text || ''
 }
 
 // Vision call: send one base64 image + a prompt. Accepts a data-URL or raw

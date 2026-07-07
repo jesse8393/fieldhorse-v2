@@ -47,7 +47,7 @@ import { InvoiceTemplate } from '../components/documents'
  */
 
 const AGING_BUCKETS = [
-  { id: '0-30',  label: 'Current',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'rgba(255, 255, 255, 0.18)' },
+  { id: '0-30',  label: 'Current',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
   { id: '31-60', label: 'Late',     max: 60,        color: 'var(--v3-primary)',        accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
   { id: '60+',   label: 'Overdue',  max: Infinity,  color: 'var(--v3-danger-bright)',  accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
@@ -476,7 +476,7 @@ export default function InvoiceDetail() {
           border: status.tone === 'danger'
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
           display: 'flex', flexDirection: 'column', gap: 12
         }}>
           {/* Status pill + age */}
@@ -827,7 +827,7 @@ export default function InvoiceDetail() {
             cursor: (totals.isPaid && totals.balance < 0.5) ? 'not-allowed' : 'pointer',
             boxShadow: (totals.isPaid && totals.balance < 0.5)
               ? 'none'
-              : '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
+              : '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 var(--v3-border-strong) inset',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
@@ -970,13 +970,9 @@ function SectionTitle({ children }: any) {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       gap: 8, padding: '8px 2px 0'
     }}>
-      <span style={{
-        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow>
         {children}
-      </span>
+      </Eyebrow>
     </div>
   )
 }
@@ -1011,16 +1007,8 @@ function StatusPill({ status }: any) {
     }
   })()
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '5px 12px', borderRadius: 999,
-      background: palette.bg, border: `1px solid ${palette.border}`,
-      color: palette.color,
-      fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-      letterSpacing: '0.14em', textTransform: 'uppercase',
-      lineHeight: 1
-    }}>
+    <Eyebrow style={{ padding: '5px 12px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       Invoice · {status.label}
-    </span>
+    </Eyebrow>
   )
 }

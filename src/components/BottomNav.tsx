@@ -9,52 +9,78 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
 import { canHover } from '../lib/hover.ts'
 
-// Pipeline v2: Leads earned the thumb-bar slot — chasing new work is
-// daily, Clients is reference material (lives in the More drawer).
-const PRIMARY = [
+// IA collapse (redesign W2): the thumb bar is the contractor's verbs —
+// Home, Sell (Leads), Work (Jobs), Get Paid (Money). Money replaced
+// Schedule in the bar: "who owes me" is the owner's #1 daily anxiety
+// and previously had NO fast path (buried in More). Schedule stays one
+// tap away — top of the Work group in the drawer, the Home quick-action
+// tile, and Today-on-site's "View schedule" link.
+// `match` keeps a tab lit on routes other than its own `to` — the Work
+// tab stays active while any deal detail (/leads/:id, /quotes/:id,
+// /jobs/:id) is open, mirroring the desktop sidebar. Without it the
+// bottom bar goes dark the moment you open a deal.
+const PRIMARY: { to: string; label: string; icon: string; end?: boolean; match?: (p: string) => boolean }[] = [
   { to: '/', label: 'Home', icon: 'home', end: true },
-  { to: '/leads', label: 'Leads', icon: 'lead' },
-  { to: '/jobs', label: 'Jobs', icon: 'jobs' },
-  { to: '/schedule', label: 'Schedule', icon: 'schedule' }
+  // IA round 2: Leads + Jobs (and the Quotes/Pipeline boards behind
+  // them) collapsed into ONE Work list — which frees a bar slot, so
+  // Schedule comes back. Four verbs, five thumbs: Home, Work,
+  // Schedule, Money.
+  { to: '/work', label: 'Work', icon: 'jobs', match: (p) => p === '/work' || p.startsWith('/leads') || p.startsWith('/quotes') || p.startsWith('/jobs') },
+  { to: '/schedule', label: 'Schedule', icon: 'schedule' },
+  { to: '/invoices', label: 'Money', icon: 'dollar' }
 ]
 
-/* Flat navigation list — mirrors the routes available in the desktop
-   sidebar (DesktopSidebar.tsx) so the phone app has the same reach.
-   Crew / Sub Portal / Tasks / Timesheets / Team were missing from the
-   mobile drawer even though their routes shipped with the org/role
-   foundation work — adding them here closes the gap.
+/* More-drawer navigation, grouped by what a contractor DOES — Sell /
+   Work / Get paid / Office — instead of one flat 21-row list. Mirrors
+   the desktop sidebar's groups so the mental model is identical on
+   both form factors.
 
    Role gating happens at render time (see drawer body below) via
    useMembership().canViewRoute(path), same pattern the desktop
-   sidebar uses. */
-const NAV_ITEMS = [
-  { to: '/',            label: 'Dashboard',           Icon: HomeIcon },
-  // The pipeline, in order — Leads -> Quotes -> Jobs -> Invoices. One deal
-  // moves down this list as it progresses, Jobber-style. The old separate
-  // "Pipeline" aggregate board is dropped from mobile: it duplicated these
-  // stage lists and carried desktop-only chrome (Ctrl-K, "records visible").
-  { to: '/leads',       label: 'Leads',               Icon: Sparkles },
-  { to: '/quotes',      label: 'Quotes',              Icon: FileText },
-  { to: '/jobs',        label: 'Jobs',                Icon: Briefcase },
-  { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
-  { to: '/clients',     label: 'Clients',             Icon: Users },
-  { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
-  { to: '/activity',    label: 'Activity',            Icon: ActivityIcon },
-  { to: '/bid',         label: 'Estimates',           Icon: Calculator },
-  { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 },
-  // Org / crew block — new on mobile. Order + icons match the desktop
-  // sidebar's EXECUTION + INTELLIGENCE groups.
-  { to: '/crew',        label: 'Crew Home',           Icon: PlayCircle },
-  { to: '/sub-portal',  label: 'Sub Portal',          Icon: Briefcase },
-  { to: '/tasks',       label: 'Tasks',               Icon: ClipboardCheck },
-  { to: '/timesheets',  label: 'Timesheets',          Icon: Clock },
-  { to: '/team',        label: 'Team',                Icon: UsersRound },
-  { to: '/subs',        label: 'Sub Directory',       Icon: Hammer },
-  { to: '/partners',    label: 'Partners',            Icon: Users },
-  { to: '/compose',     label: 'AI Compose',          Icon: MessageSquare },
-  { to: '/import',      label: 'Import Data',         Icon: Upload },
-  { to: '/pour-window', label: 'Forecast',            Icon: CloudSun },
-  { to: '/settings',    label: 'Settings',            Icon: SettingsIcon }
+   sidebar uses. Groups with zero visible items disappear. */
+type DrawerItem = { to: string; label: string; Icon: any }
+type DrawerGroup = { label: string; items: DrawerItem[] }
+
+const NAV_GROUPS: DrawerGroup[] = [
+  {
+    label: '',
+    items: [
+      { to: '/',            label: 'Dashboard',           Icon: HomeIcon }
+    ]
+  },
+  {
+    label: 'Work',
+    items: [
+      { to: '/work',        label: 'Work & Deals',        Icon: Briefcase },
+      { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
+      { to: '/bid',         label: 'Estimates',           Icon: Calculator },
+      { to: '/crew',        label: 'Crew Home',           Icon: PlayCircle },
+      { to: '/tasks',       label: 'Tasks',               Icon: ClipboardCheck },
+      { to: '/timesheets',  label: 'Timesheets',          Icon: Clock },
+      { to: '/pour-window', label: 'Forecast',            Icon: CloudSun }
+    ]
+  },
+  {
+    label: 'Get paid',
+    items: [
+      { to: '/invoices',    label: 'Invoices & Payments', Icon: Receipt },
+      { to: '/analytics',   label: 'Reports & Insights',  Icon: BarChart3 }
+    ]
+  },
+  {
+    label: 'Office',
+    items: [
+      { to: '/clients',     label: 'Clients',             Icon: Users },
+      { to: '/team',        label: 'Team',                Icon: UsersRound },
+      { to: '/subs',        label: 'Sub Directory',       Icon: Hammer },
+      { to: '/partners',    label: 'Partners',            Icon: Users },
+      { to: '/sub-portal',  label: 'Sub Portal',          Icon: Briefcase },
+      { to: '/activity',    label: 'Activity',            Icon: ActivityIcon },
+      { to: '/compose',     label: 'AI Compose',          Icon: MessageSquare },
+      { to: '/import',      label: 'Import Data',         Icon: Upload },
+      { to: '/settings',    label: 'Settings',            Icon: SettingsIcon }
+    ]
+  }
 ]
 
 export default function BottomNav() {
@@ -74,7 +100,7 @@ export default function BottomNav() {
   const { canViewRoute, role, loading: membershipLoading } = useMembership()
   const userEmail = user?.email || ''
 
-  // Filter the More-drawer nav list by the caller's role. Mirrors the
+  // Filter the More-drawer groups by the caller's role. Mirrors the
   // desktop sidebar pattern:
   //   • membership still loading → show everything so the first paint
   //     doesn't strip owner nav
@@ -82,12 +108,15 @@ export default function BottomNav() {
   //   • settled with NO role (sub-only / pre-onboarding) → only show
   //     the Sub Portal so they don't bounce off RLS errors on every
   //     owner screen
-  const visibleNavItems = NAV_ITEMS.filter((it) => {
-    const path = it.to.split('?')[0].split('#')[0]
+  const canSee = (to: string) => {
+    const path = to.split('?')[0].split('#')[0]
     if (membershipLoading) return true
     if (role) return canViewRoute(path)
     return path === '/sub-portal'
-  })
+  }
+  const visibleGroups = NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((it) => canSee(it.to)) }))
+    .filter((g) => g.items.length > 0)
 
   const visiblePrimaryItems = PRIMARY.filter((it) => {
     const path = it.to.split('?')[0].split('#')[0]
@@ -217,8 +246,23 @@ export default function BottomNav() {
               }}
               aria-label="Navigation"
             >
-              {visibleNavItems.map((it) => (
-                <NavRow key={it.to} item={it} onTap={() => go(it.to)} />
+              {visibleGroups.map((g, gi) => (
+                <div key={g.label || 'top'} style={{ display: 'flex', flexDirection: 'column' }}>
+                  {g.label && (
+                    <span
+                      className="v3-eyebrow"
+                      style={{
+                        color: 'var(--v3-text-muted)',
+                        padding: gi === 0 ? '2px 10px 4px' : '14px 10px 4px'
+                      }}
+                    >
+                      {g.label}
+                    </span>
+                  )}
+                  {g.items.map((it) => (
+                    <NavRow key={it.to} item={it} onTap={() => go(it.to)} />
+                  ))}
+                </div>
               ))}
             </nav>
 
@@ -335,9 +379,11 @@ export default function BottomNav() {
             key={item.to}
             to={item.to}
             end={item.end}
-            className={({ isActive }: any) => `fh-nav__item${isActive ? ' is-active' : ''}`}
+            className={({ isActive }: any) => `fh-nav__item${(item.match ? item.match(location.pathname) : isActive) ? ' is-active' : ''}`}
           >
-            {({ isActive }: any) => (
+            {({ isActive: navActive }: any) => {
+              const isActive = item.match ? item.match(location.pathname) : navActive
+              return (
               <>
                 <span className="fh-nav__icon">
                   <Icon name={item.icon} size={20} />
@@ -351,7 +397,8 @@ export default function BottomNav() {
                   />
                 )}
               </>
-            )}
+              )
+            }}
           </NavLink>
         ))}
         <button

@@ -385,7 +385,7 @@ export default function Tasks() {
                       type="button"
                       onClick={() => navigate(`/jobs/${t.job_id}`)}
                       className="fh-build-truncate"
-                      style={{ background: 'transparent', border: 'none', color: '#f4f1ea', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--v3-text)', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     >
                       {jobNames[t.job_id] || 'Open job'} <ChevronRight size={11} />
                     </button>
@@ -466,7 +466,7 @@ function TaskComposer({ jobs, members, onCancel, onCreate }: any) {
     setBusy(false)
   }
 
-  const field: import('react').CSSProperties = { padding: '9px 11px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', color: '#f4f1ea', fontFamily: 'inherit', fontSize: 13, outline: 'none' }
+  const field: import('react').CSSProperties = { padding: '9px 11px', borderRadius: 10, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-mid)', color: 'var(--v3-text)', fontFamily: 'inherit', fontSize: 13, outline: 'none' }
   return (
     <div className="fh-build-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="What needs doing?" style={field} autoFocus />

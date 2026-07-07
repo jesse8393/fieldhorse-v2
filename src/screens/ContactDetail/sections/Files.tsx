@@ -6,6 +6,7 @@ import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 const BUCKET = 'job-files'
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB per file
@@ -127,13 +128,9 @@ export default function FilesSection({ jobId, userId }: any) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           {rows.length} {rows.length === 1 ? 'file' : 'files'}
-        </span>
+        </Eyebrow>
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}

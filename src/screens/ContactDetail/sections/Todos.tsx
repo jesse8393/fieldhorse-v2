@@ -8,6 +8,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.ts'
 import { orgMembersList, type OrgMember } from '../../../lib/orgApi.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * To-dos section — backed by fh_job_todos. Owns its own fetch (independent of
@@ -162,16 +163,9 @@ export default function TodosSection({ jobId, userId }: any) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           To-dos
-        </span>
+        </Eyebrow>
         {rows.length > 0 && (
           <span style={{
             fontFamily: 'var(--font-body)',
@@ -389,29 +383,7 @@ function DueChipButton({ iso, done, onChange }: any) {
   })()
 
   return (
-    <label
-      style={{
-        position: 'relative',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        gap: 4,
-        flexShrink: 0,
-        minWidth: 40, minHeight: 28,
-        padding: status ? '0 9px' : 0,
-        borderRadius: 999,
-        background: palette.bg,
-        border: status ? `1px solid ${palette.border}` : `1px solid transparent`,
-        color: palette.color,
-        fontFamily: 'var(--font-body)',
-        fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        whiteSpace: 'nowrap',
-        opacity: done ? 0.5 : 1,
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-      aria-label={status ? `Due ${status.label}` : 'Set due date'}
-    >
+    <Eyebrow as="label" style={{ position: 'relative', justifyContent: 'center', gap: 4, flexShrink: 0, minWidth: 40, minHeight: 28, padding: status ? '0 9px' : 0, borderRadius: 999, background: palette.bg, border: status ? `1px solid ${palette.border}` : `1px solid transparent`, color: palette.color, whiteSpace: 'nowrap', opacity: done ? 0.5 : 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label={status ? `Due ${status.label}` : 'Set due date'}>
       <input
         type="date"
         value={dateStr}
@@ -424,7 +396,7 @@ function DueChipButton({ iso, done, onChange }: any) {
         }}
       />
       {status ? <span>{status.label}</span> : <Calendar size={12} aria-hidden="true" />}
-    </label>
+    </Eyebrow>
   )
 }
 

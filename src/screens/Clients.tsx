@@ -1,9 +1,11 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
+import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
@@ -27,7 +29,7 @@ function money(n: any) {
 export default function Clients() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { data: bundle, isLoading: loading } = useClientsBundle(user?.id)
+  const { data: bundle, isLoading: loading, isError } = useClientsBundle(user?.id)
   const rows = bundle?.clients ?? []
   const invalidateClients = useInvalidateClients()
   const [q, setQ] = useState('')
@@ -58,9 +60,11 @@ export default function Clients() {
     [duplicateClusters]
   )
 
-  function rollupFor(clientId: any) {
+  // Stable identity (keyed on rollupMap) so it can be a dependency of the
+  // desktop table's `enriched` useMemo without busting it every render.
+  const rollupFor = useCallback((clientId: any) => {
     return rollupMap.get(clientId) || { lifetime: 0, outstanding: 0, activeCount: 0, wonCount: 0, paidTotal: 0 }
-  }
+  }, [rollupMap])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -79,6 +83,13 @@ export default function Clients() {
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, q, filter, rollupMap])
+
+  // Bounded render window that grows on scroll — the client book can run to
+  // thousands of rows; keep the DOM small without changing the row design.
+  const { visible: visibleClients, sentinelRef: clientsSentinelRef, hasMore: clientsHasMore } = useInfiniteRender(
+    filtered,
+    `${filter}|${q}`
+  )
 
   const totalLifetime = useMemo(() => {
     let total = 0
@@ -133,6 +144,20 @@ export default function Clients() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+
+  // A failed load must not fall through to the "No accounts yet" empty state —
+  // that would tell a contractor with a full book of business it's empty.
+  if (isError) {
+    return (
+      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+        <DataErrorState
+          title="Couldn't load clients"
+          message="We couldn't reach your client list. Check your connection and retry — nothing was lost."
+          onRetry={() => invalidateClients()}
+        />
+      </div>
+    )
+  }
 
   // Phase 7 — desktop-first composition. At >=900px DesktopClientsDirectory
   // renders the real KPI strip + list+detail directory using the same
@@ -193,7 +218,7 @@ export default function Clients() {
         <div style={{
           padding: '14px 16px',
           borderRadius: 16,
-          background: 'linear-gradient(180deg, #1b1816 0%, #121010 72%)',
+          background: 'linear-gradient(180deg, #1b1816 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
         }}>
@@ -323,13 +348,9 @@ export default function Clients() {
                 {duplicateClusters.length} {duplicateClusters.length === 1 ? 'cluster' : 'clusters'} sharing a phone or email
               </div>
             </div>
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: 'var(--v3-primary)'
-            }}>
+            <Eyebrow tone="gold">
               Review →
-            </span>
+            </Eyebrow>
           </button>
         </motion.div>
       )}
@@ -455,11 +476,11 @@ export default function Clients() {
               backdropFilter: 'blur(14px) saturate(1.1)',
               WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
               border: '1px solid var(--v3-border)',
-              boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+              boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
               overflow: 'hidden'
             }}
           >
-            {filtered.map((c, i) => {
+            {visibleClients.map((c, i) => {
               const r = rollupFor(c.id)
               const lastActivity = c.last_activity_at ? new Date(c.last_activity_at) : null
               const lastActivityRel = lastActivity ? formatRelative(lastActivity) : null
@@ -471,11 +492,12 @@ export default function Clients() {
                   lastActivityRel={lastActivityRel}
                   index={i}
                   isTop={c.id === topClientId}
-                  isLast={i === filtered.length - 1}
+                  isLast={i === visibleClients.length - 1}
                   onOpen={() => navigate(`/clients/${c.id}`)}
                 />
               )
             })}
+            {clientsHasMore && <div ref={clientsSentinelRef} aria-hidden="true" style={{ height: 1 }} />}
           </div>
         )}
       </motion.div>
@@ -709,23 +731,8 @@ function ClientsStateChip({ stats, totalAccounts }: any) {
     label = `${totalAccounts} ${totalAccounts === 1 ? 'account' : 'accounts'}`
   }
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '3px 9px',
-      borderRadius: 999,
-      background: bg,
-      border: `1px solid ${border}`,
-      color,
-      fontFamily: 'var(--font-body)',
-      fontSize: 10,
-      fontWeight: 700,
-      letterSpacing: '0.16em',
-      textTransform: 'uppercase',
-      lineHeight: 1,
-      fontVariantNumeric: 'tabular-nums'
-    }}>
+    <Eyebrow style={{ padding: '3px 9px', borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
       {label}
-    </span>
+    </Eyebrow>
   )
 }

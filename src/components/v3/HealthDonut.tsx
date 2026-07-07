@@ -71,7 +71,7 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="rgba(255, 255, 255, 0.06)"
+            stroke="var(--v3-glass-tint-2)"
             strokeWidth={stroke}
           />
           {/* Progress */}

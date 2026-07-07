@@ -28,6 +28,7 @@ import {
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import { Eyebrow } from '../components/v3'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -195,7 +196,7 @@ export default function SubPortal() {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Signed in as</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: '#f4f1ea', margin: '8px 0 4px', wordBreak: 'break-all' }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', wordBreak: 'break-all' }}>
               {user?.email || '—'}
             </p>
             <p>
@@ -283,7 +284,7 @@ export default function SubPortal() {
                     <ProfileRow label="Payment method" value={profile.payment_method || '—'} />
                     <ProfileRow label="Payment handle" value={profile.payment_handle || '—'} />
 
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 14, marginTop: 4 }}>
+                    <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 14, marginTop: 4 }}>
                       <div className="fh-build-eyebrow" style={{ marginBottom: 10 }}>Documents</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
                         <DocSlot
@@ -323,7 +324,7 @@ export default function SubPortal() {
                 </header>
 
                 {partners.length === 0 ? (
-                  <div className="fh-build-table__empty">No accepted invites yet. When a GC invites you, the link goes to <strong style={{ color: '#f4f1ea' }}>{user?.email || 'your email'}</strong>.</div>
+                  <div className="fh-build-table__empty">No accepted invites yet. When a GC invites you, the link goes to <strong style={{ color: 'var(--v3-text)' }}>{user?.email || 'your email'}</strong>.</div>
                 ) : (
                   <>
                     <div className="fh-build-table__head is-subportal">
@@ -356,7 +357,7 @@ export default function SubPortal() {
                             </span>
                           </span>
                           <span className="fh-build-rel">{fmtDate(p.accepted_at)}</span>
-                          <ChevronRight size={13} color="rgba(245,242,234,.30)" />
+                          <ChevronRight size={13} color="var(--v3-text-faint)" />
                         </button>
                       )
                     })}
@@ -370,7 +371,7 @@ export default function SubPortal() {
                   <div className="fh-build-eyebrow">
                     Payments · {payments.length}
                   </div>
-                  <span style={{ fontSize: 12, color: 'rgba(245,242,234,.62)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>
                     YTD {fmtMoney(ytdPaid)}
                   </span>
                 </header>
@@ -483,12 +484,12 @@ export default function SubPortal() {
 function ProfileRow({ label, value, tone, muted }: { label: string; value: string; tone?: 'warn' | 'bad'; muted?: boolean }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 180px) minmax(0, 1fr)', gap: 14, alignItems: 'baseline' }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'rgba(245,242,234,.55)' }}>
+      <Eyebrow>
         {label}
-      </span>
+      </Eyebrow>
       <span style={{
         fontSize: 14,
-        color: muted ? 'rgba(245,242,234,.62)' : tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : '#f4f1ea',
+        color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : 'var(--v3-text)',
         wordBreak: 'break-word',
       }}>
         {value}
@@ -527,22 +528,22 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
         borderRadius: 8,
         background: path
           ? 'color-mix(in srgb, var(--v3-primary, #c9963a) 8%, transparent)'
-          : 'rgba(255,255,255,.025)',
+          : 'var(--v3-glass-tint)',
         border: path
           ? '1px solid color-mix(in srgb, var(--v3-primary, #c9963a) 28%, transparent)'
-          : '1px solid rgba(255,255,255,.10)',
+          : '1px solid var(--v3-border-mid)',
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary, #c9963a)' : 'rgba(245,242,234,.45)' }} />
-        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#f4f1ea' }}>
+        <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary, #c9963a)' : 'var(--v3-text-muted)' }} />
+        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--v3-text)' }}>
           {label}
         </strong>
       </div>
-      <div style={{ fontSize: 12, color: path ? '#73c982' : 'rgba(245,242,234,.55)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 12, color: path ? '#73c982' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         {path ? <><Check size={12} aria-hidden="true" /> On file</> : 'Not uploaded'}
       </div>
       <input
@@ -650,23 +651,23 @@ function EditProfileDialog({
           padding: 24,
           borderRadius: 12,
           background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
-          border: '1px solid rgba(255,255,255,.10)',
+          border: '1px solid var(--v3-border-mid)',
           boxShadow: '0 22px 60px rgba(0,0,0,.50)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>Edit profile</div>
-            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: '#f4f1ea' }}>
+            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: 'var(--v3-text)' }}>
               Keep your details current.
             </h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'rgba(245,242,234,.55)', cursor: 'pointer' }}>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
             <X size={18} />
           </button>
         </div>
 
-        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'rgba(245,242,234,.55)' }}>
+        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--v3-text-muted)' }}>
           Updates apply to every contractor that has you on file. They can't change
           your name, company, or email — those stay under each GC's control.
         </p>
@@ -679,7 +680,7 @@ function EditProfileDialog({
             <Field label="License #" value={form.license_number ?? ''} onChange={(v) => set('license_number', v)} />
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12, marginTop: 6 }}>
+          <div style={{ borderTop: '1px solid var(--v3-border-mid)', paddingTop: 12, marginTop: 6 }}>
             <div className="fh-build-eyebrow" style={{ marginBottom: 8 }}>Insurance</div>
             <div style={{ display: 'grid', gap: 12 }}>
               <Field label="Carrier" value={form.insurance_carrier ?? ''} onChange={(v) => set('insurance_carrier', v)} />
@@ -690,7 +691,7 @@ function EditProfileDialog({
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12, marginTop: 6 }}>
+          <div style={{ borderTop: '1px solid var(--v3-border-mid)', paddingTop: 12, marginTop: 6 }}>
             <div className="fh-build-eyebrow" style={{ marginBottom: 8 }}>Payments</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Method" value={form.payment_method ?? ''} onChange={(v) => set('payment_method', v)} placeholder="ACH / Check / Zelle / Venmo…" />
@@ -739,8 +740,8 @@ function Field({
           padding: '10px 12px',
           borderRadius: 6,
           background: 'rgba(0,0,0,.30)',
-          border: '1px solid rgba(255,255,255,.10)',
-          color: '#f4f1ea',
+          border: '1px solid var(--v3-border-mid)',
+          color: 'var(--v3-text)',
           fontFamily: 'var(--font-body)',
           fontSize: 14,
           outline: 'none',

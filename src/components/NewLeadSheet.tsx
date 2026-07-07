@@ -13,6 +13,7 @@ import { parseLeadFromImage } from '../lib/docIntelligence.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { JOB_TYPES } from '../lib/jobTypes.ts'
 import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.ts'
+import { Eyebrow } from './v3'
 
 const STAGE_OPTIONS = [
   { value: 'lead', label: 'Lead intake' },
@@ -21,6 +22,45 @@ const STAGE_OPTIONS = [
 ]
 
 const LAST_JOB_TYPE_KEY = 'fh:lastJobType'
+
+// Field-draft persistence: a half-typed lead survives the sheet closing
+// (pocket tap, dead battery, app kill). Saved while typing, restored on
+// the next open, cleared the moment a save commits. 24h TTL so a stale
+// draft from last week doesn't ambush a fresh capture.
+const DRAFT_KEY = 'fh:leadDraft'
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000
+
+function draftHasContent(f: Record<string, any>) {
+  return ['name', 'phone', 'email', 'address', 'company', 'job_title', 'notes', 'amount']
+    .some((k) => String(f?.[k] ?? '').trim() !== '')
+}
+
+function readDraft(): Record<string, any> | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed?.form || Date.now() - (parsed.savedAt || 0) > DRAFT_TTL_MS) return null
+    return draftHasContent(parsed.form) ? parsed.form : null
+  } catch { return null }
+}
+
+function writeDraft(form: Record<string, any>) {
+  if (typeof window === 'undefined') return
+  try {
+    if (draftHasContent(form)) {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, savedAt: Date.now() }))
+    } else {
+      window.localStorage.removeItem(DRAFT_KEY)
+    }
+  } catch { /* quota/private-mode — drafts are best-effort */ }
+}
+
+function clearDraft() {
+  if (typeof window === 'undefined') return
+  try { window.localStorage.removeItem(DRAFT_KEY) } catch {}
+}
 
 function readLastJobType() {
   if (typeof window === 'undefined') return ''
@@ -164,6 +204,32 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialStage])
+
+  // Restore a surviving draft on open. Declared AFTER the stage-bump
+  // effect so the restored form (including its stage) wins the open
+  // race; lockStage still pins the stage to the caller's intent.
+  useEffect(() => {
+    if (!open) return
+    const draft = readDraft()
+    if (!draft) return
+    setForm((f) => ({
+      ...f,
+      ...draft,
+      stage: lockStage ? initialStage : (draft.stage || f.stage)
+    }))
+    toastSuccess('Draft restored', 'Picked up where you left off')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Persist while typing (best-effort), debounced — JSON.stringify +
+  // synchronous localStorage.setItem per keystroke is main-thread work
+  // the field device doesn't need. writeDraft self-clears when the form
+  // empties, so backspacing everything also discards the draft.
+  useEffect(() => {
+    if (!open || committed) return
+    const t = setTimeout(() => writeDraft(form), 400)
+    return () => clearTimeout(t)
+  }, [open, committed, form])
 
   // When the trade changes, drop any template that no longer applies.
   // Avoids the user picking "Roof tear-off" then switching to Kitchen
@@ -376,6 +442,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         }
       }
       // Success: flash "Captured." + step 03/03 briefly, then close.
+      clearDraft()
       setCommitted(true)
       setSaving(false)
       setTimeout(() => onCreated?.(data), 600)
@@ -465,10 +532,10 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         style={{ ...drawerStyle, height: '88dvh', maxHeight: '88dvh' }}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+          <Eyebrow as="div">
             <Sparkles size={12} />
             New {stageNoun}
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
@@ -885,7 +952,7 @@ function TemplatePickerInline({ templates, value, onChange }: any) {
         ))}
       </div>
       {picked && (
-        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.22)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 10, letterSpacing: '0.14em', color: 'var(--ink-strong)' }}>
             +{picked.todos.length}
           </span>
@@ -949,10 +1016,10 @@ function V3ChipRow({ label, value, options, onChange }: any) {
                 padding: '7px 12px',
                 borderRadius: 999,
                 border: active
-                  ? '1px solid rgba(255,255,255,0.22)'
+                  ? '1px solid var(--v3-border-strong)'
                   : '1px solid var(--rule)',
                 background: active
-                  ? 'rgba(255,255,255,0.06)'
+                  ? 'var(--v3-glass-tint-2)'
                   : 'var(--surface-2)',
                 color: active
                   ? 'var(--ink-strong)'
@@ -980,8 +1047,8 @@ function TemplateChip({ active, onClick, label }: any) {
       style={{
         padding: '7px 12px',
         borderRadius: 999,
-        border: active ? '1px solid rgba(255,255,255,0.22)' : '1px solid var(--rule)',
-        background: active ? 'rgba(255,255,255,0.06)' : 'var(--surface-2)',
+        border: active ? '1px solid var(--v3-border-strong)' : '1px solid var(--rule)',
+        background: active ? 'var(--v3-glass-tint-2)' : 'var(--surface-2)',
         color: active ? 'var(--ink-strong)' : 'var(--ink-strong)',
         fontFamily: 'var(--font-body)',
         fontSize: 12,

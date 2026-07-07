@@ -57,7 +57,7 @@ import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 function TabFallback() {
   return (
     <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 10 }} aria-busy="true" aria-label="Loading">
-      <span style={{ width: '60%', maxWidth: 240, height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.07)' }} />
+      <span style={{ width: '60%', maxWidth: 240, height: 12, borderRadius: 4, background: 'var(--v3-glass-tint-2)' }} />
       <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
       <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.32 }} />
     </div>
@@ -168,23 +168,12 @@ function ActionIntentBanner({
         padding: '12px 12px 12px 14px',
         borderRadius: 12,
         border: '1px solid var(--v3-border-strong)',
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.035), transparent 54%), var(--v3-surface-2)',
+        background: 'linear-gradient(180deg, var(--v3-glass-tint), transparent 54%), var(--v3-surface-2)',
         boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
       }}
     >
       <div style={{ minWidth: 0, flex: '1 1 260px', display: 'grid', gap: 3 }}>
-        <span
-          style={{
-            color: 'var(--v3-primary)',
-            fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {meta.eyebrow}
-        </span>
+        <Eyebrow tone="gold">{meta.eyebrow}</Eyebrow>
         <strong style={{ color: 'var(--v3-text)', fontSize: 14, lineHeight: 1.2 }}>{meta.title}</strong>
         <span style={{ color: 'var(--v3-text-muted)', fontSize: 12, lineHeight: 1.45 }}>{meta.detail}</span>
       </div>
@@ -960,12 +949,9 @@ export default function ContactDetail() {
           <DeleteCascadeRow label="Schedule items" count={scheduleCount} />
           <DeleteCascadeRow label="Notes" count={notes.length} detail="detached + archived" />
         </ul>
-        <p style={{
-          margin: 0, color: 'var(--v3-danger-bright)', fontFamily: 'var(--font-body)',
-          fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', fontWeight: 700
-        }}>
+        <Eyebrow as="p" tone="alert" style={{ margin: 0, fontSize: 11 }}>
           This cannot be undone.
-        </p>
+        </Eyebrow>
       </ActionSheet>
     </div>
   )
@@ -1056,7 +1042,9 @@ function Header({
       <div style={{
         padding: '12px 14px',
         borderRadius: 16,
-        background: 'linear-gradient(180deg, #1b1816 0%, #121010 72%)',
+        // Top-tint rides the surface ladder (was literal #1b1816 — in
+        // daylight it smeared a dark gradient across the paper card).
+        background: 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 72%)',
         border: '1px solid var(--v3-border)',
         boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
       }}>
@@ -1065,25 +1053,18 @@ function Header({
             type="button"
             onClick={() => onClientNav(contact.client_id)}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
               padding: '4px 6px',
               marginLeft: -6,
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)',
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <Users size={10} aria-hidden="true" />
-            {clientLabel}
+            <Eyebrow as="span">
+              <Users size={10} aria-hidden="true" />
+              {clientLabel}
+            </Eyebrow>
           </button>
         ) : (
           <Eyebrow as="span" aria-label="Shared job — client visible only to owner">
@@ -1244,25 +1225,9 @@ function NextTodoDueChip({ iso }: any) {
           color: 'var(--v3-text-muted)'
         }
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      marginTop: 4,
-      padding: '2px 8px',
-      borderRadius: 999,
-      background: palette.bg,
-      border: `1px solid ${palette.border}`,
-      color: palette.color,
-      fontFamily: 'var(--font-body)',
-      fontSize: 9,
-      fontWeight: 700,
-      letterSpacing: '0.06em',
-      textTransform: 'uppercase',
-      lineHeight: 1.4,
-      whiteSpace: 'nowrap'
-    }}>
+    <Eyebrow style={{ marginTop: 4, padding: '2px 8px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color, whiteSpace: 'nowrap' }}>
       Due · {status.label}
-    </span>
+    </Eyebrow>
   )
 }
 
@@ -1343,16 +1308,9 @@ function DeleteCascadeRow({ label, count, detail = 'deleted' }: any) {
       border: '1px solid var(--v3-border)',
       borderRadius: 8
     }}>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 11,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)',
-        fontWeight: 700
-      }}>
+      <Eyebrow>
         {label}
-      </span>
+      </Eyebrow>
       <span style={{
         fontFamily: 'var(--font-body)',
         fontSize: 13,

@@ -2,8 +2,8 @@
 // Scales from 16 → 1024. Gold on onyx with subtle radial glow.
 
 export default function Monogram({ size = 48, variant = 'dark', glow = true }: any) {
-  const bg = variant === 'dark' ? '#0B0B0B' : '#F2EDE4'
-  const ink = variant === 'dark' ? '#F2EDE4' : '#0B0B0B'
+  const bg = variant === 'dark' ? '#0B0B0B' : 'var(--v3-text)'
+  const ink = variant === 'dark' ? 'var(--v3-text)' : '#0B0B0B'
   const gold = '#C7A45A'
   return (
     <svg

@@ -18,8 +18,10 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
+import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
-import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
+import { Button, FilterPill, Eyebrow, StampNumber, StatusPill } from '../components/v3'
 // V3PaymentSheet is lazy — only loads when an operator taps "Mark Paid".
 // Avoids dragging ~440KB into the initial Invoices route chunk.
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
@@ -41,7 +43,7 @@ const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.
 // balance instead of firing an untracked ad-hoc PDF.
 
 const AGING_BUCKETS = [
-  { id: '0-30',  label: 'Current',  short: '0–30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'rgba(255, 255, 255, 0.18)' },
+  { id: '0-30',  label: 'Current',  short: '0–30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
   { id: '31-60', label: 'Late',     short: '31–60 d', max: 60,        color: 'var(--v3-primary)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
   { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-bright)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
@@ -73,7 +75,7 @@ function fmtMoney(n: any) {
 export default function Invoices() {
   const { user } = useAuth()
   const { profile } = useProfile()
-  const { data: bundle, isLoading: loading } = useInvoicesBundle(user?.id)
+  const { data: bundle, isLoading: loading, isError } = useInvoicesBundle(user?.id)
   const refresh = useInvalidateInvoices()
   const jobs = bundle?.jobs ?? []
   const payments = bundle?.payments ?? []
@@ -129,7 +131,18 @@ export default function Invoices() {
     return out.sort((a, b) => b.balance - a.balance)
   }, [jobs, paidByJob, approvedCoByJob])
 
-  const filtered = filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows
+  // Memoized so `filtered` keeps a stable identity across unrelated
+  // re-renders — it feeds TanStack Table (SnowInvoicesBuild) as `data`,
+  // and a fresh array every render forces a full row-model rebuild.
+  const filtered = useMemo(
+    () => filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows,
+    [rows, filter]
+  )
+  // Bounded render window that grows on scroll — the A/R list can be long.
+  const { visible: visibleBalances, sentinelRef: balancesSentinelRef, hasMore: balancesHasMore } = useInfiniteRender(
+    filtered,
+    filter
+  )
 
   // BY-CLIENT A/R rollup — group every outstanding job balance under
   // its linked client so "who owes me, and how overdue" reads at a
@@ -436,6 +449,21 @@ export default function Invoices() {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
 
+  // Never render financial totals from a failed load — a fetch error would
+  // otherwise fall through to "$0 · all caught up", telling a contractor
+  // they're owed nothing when the data simply didn't arrive.
+  if (isError) {
+    return (
+      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+        <DataErrorState
+          title="Couldn't load invoices & payments"
+          message="We couldn't reach your billing data. Check your connection and retry — your numbers are safe."
+          onRetry={() => refresh()}
+        />
+      </div>
+    )
+  }
+
   if (isDesktop) {
     return (
       <>
@@ -511,7 +539,7 @@ export default function Invoices() {
           backdropFilter: 'blur(14px) saturate(1.1)',
           WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
           overflow: 'hidden'
         }}>
           {/* Gold radial sweep behind the hero number — ported from
@@ -574,12 +602,7 @@ export default function Invoices() {
                       <StampNumber size="md" tone={tone}>{fmtMoney(value)}</StampNumber>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                         <Eyebrow style={{ whiteSpace: 'nowrap' }}>{b.label}</Eyebrow>
-                        <span style={{
-                          fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 600,
-                          letterSpacing: '0.08em', textTransform: 'uppercase',
-                          color: 'var(--v3-text-faint, color-mix(in srgb, var(--v3-text-muted) 70%, transparent))',
-                          whiteSpace: 'nowrap'
-                        }}>{b.short}</span>
+                        <Eyebrow style={{ color: 'var(--v3-text-faint, color-mix(in srgb, var(--v3-text-muted) 70%, transparent))', whiteSpace: 'nowrap' }}>{b.short}</Eyebrow>
                       </div>
                     </div>
                   )
@@ -628,6 +651,16 @@ export default function Invoices() {
             </div>
           )}
         </div>
+      </motion.div>
+
+      {/* GLOBAL FILTER — one control governs every section below (issued
+          invoices, who-owes-you, job balances). It lives directly under
+          the cockpit so the toggle sits ABOVE the sections it filters
+          instead of buried in the last section's header, where changing
+          it silently reshaped the sections already scrolled past. */}
+      <motion.div variants={item} style={{ display: 'flex', gap: 6, padding: '0 var(--v3-gutter) 16px' }}>
+        <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
+        <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
       </motion.div>
 
       {/* ISSUED INVOICES — first-class fh_invoices rows. Every deposit,
@@ -702,9 +735,7 @@ export default function Invoices() {
                         <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {g.client.company_name || g.client.name || 'Client'}
                         </span>
-                        <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 999, color: b.color, border: `1px solid ${b.accent}` }}>
-                          {b.label}
-                        </span>
+                        <StatusPill color={b.color} label={b.label} style={{ flexShrink: 0 }} />
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>
                         {g.jobs.length} {g.jobs.length === 1 ? 'property' : 'properties'}
@@ -737,10 +768,9 @@ export default function Invoices() {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
           <SectionHeader label={filter === 'outstanding' ? 'Job balances' : 'All money jobs'} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
-            <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
-          </div>
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+            {filtered.length}
+          </span>
         </div>
 
         {loading && <SkeletonList rows={3} />}
@@ -761,7 +791,7 @@ export default function Invoices() {
 
         {!loading && filtered.length > 0 && (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filtered.map((r) => (
+            {visibleBalances.map((r) => (
               <PaymentCard
                 key={r.job.id}
                 row={r}
@@ -787,6 +817,7 @@ export default function Invoices() {
                 }}
               />
             ))}
+            {balancesHasMore && <li ref={balancesSentinelRef as any} aria-hidden="true" style={{ height: 1 }} />}
           </ul>
         )}
       </motion.div>
@@ -832,61 +863,15 @@ export default function Invoices() {
      - overdue: danger-tinted "Overdue · N" (60+ exists)
    ============================================================ */
 function BalanceStateChip({ totals }: any) {
-  const overdueCount = totals['60+'] > 0 ? totals.count : 0
-  // Variant selection — overdue beats collect beats none.
-  let variant
-  if (totals.count === 0) variant = 'none'
-  else if (totals['60+'] > 0) variant = 'overdue'
-  else variant = 'collect'
-
-  const styles = ({
-    none: {
-      bg: 'var(--v3-surface-2)',
-      border: 'var(--v3-border-strong)',
-      color: 'var(--v3-text-muted)'
-    },
-    collect: {
-      bg: 'var(--v3-primary-soft)',
-      border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-      color: 'var(--v3-primary)'
-    },
-    overdue: {
-      bg: 'var(--v3-danger-soft)',
-      border: 'color-mix(in srgb, var(--v3-danger) 38%, transparent)',
-      color: 'var(--v3-danger-bright)'
-    }
-  } as Record<string, any>)[variant]
-
-  const label = variant === 'none'
-    ? 'All caught up'
-    : variant === 'overdue'
-      ? `Overdue · ${overdueCount}`
-      : `Collect · ${totals.count}`
-
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 5,
-        padding: '3px 9px',
-        borderRadius: 999,
-        background: styles.bg,
-        border: `1px solid ${styles.border}`,
-        color: styles.color,
-        fontFamily: 'var(--font-body)',
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        lineHeight: 1,
-        fontVariantNumeric: 'tabular-nums'
-      }}
-    >
-      {variant === 'none' && <Check size={10} aria-hidden="true" strokeWidth={2.4} />}
-      {label}
-    </span>
-  )
+  // Variant selection — overdue beats collect beats none. Renders via
+  // the kit's StatusPill (wave 2) instead of a hand-rolled twin.
+  if (totals.count === 0) {
+    return <StatusPill color="var(--v3-text-muted)" icon={Check} label="All caught up" />
+  }
+  if (totals['60+'] > 0) {
+    return <StatusPill color="var(--v3-danger-bright)" label={`Overdue · ${totals.count}`} />
+  }
+  return <StatusPill color="var(--v3-primary)" label={`Collect · ${totals.count}`} />
 }
 
 /* ============================================================
@@ -1008,70 +993,28 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
             }}>
               {fmtMoney(invoice.amount)}
             </div>
-            <span style={{
-              marginTop: 4,
-              display: 'inline-flex', alignItems: 'center',
-              padding: '2px 8px', borderRadius: 999,
-              background: `color-mix(in srgb, ${meta.color} 12%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${meta.color} 35%, transparent)`,
-              color: meta.color,
-              fontSize: 9, fontWeight: 700, letterSpacing: '0.14em',
-              textTransform: 'uppercase', lineHeight: 1.4
-            }}>
-              {meta.label}
-            </span>
+            <StatusPill color={meta.color} label={meta.label} style={{ marginTop: 4 }} />
           </div>
         </div>
         {!settled && (
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <InvoiceAction onClick={onSend} disabled={isSending} success={isSent}>
+            <Button size="sm" variant={isSent ? 'success' : 'secondary'} onClick={onSend} disabled={isSending}>
               {isSent ? <CheckCircle2 size={12} /> : <Send size={12} />}
               {isSent ? 'Sent' : isSending ? 'Sending…' : effStatus === 'draft' ? 'Send' : 'Resend'}
-            </InvoiceAction>
-            <InvoiceAction onClick={onDownload}>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onDownload}>
               <FileDown size={12} /> PDF
-            </InvoiceAction>
-            <InvoiceAction onClick={onMarkPaid} primary>
+            </Button>
+            <Button size="sm" variant="primary" onClick={onMarkPaid}>
               <DollarSign size={12} /> Mark paid
-            </InvoiceAction>
-            <InvoiceAction onClick={onVoid}>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onVoid}>
               Void
-            </InvoiceAction>
+            </Button>
           </div>
         )}
       </article>
     </li>
-  )
-}
-
-function InvoiceAction({ children, onClick, disabled, primary, success }: any) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '8px 11px', minHeight: 34, borderRadius: 8,
-        border: success
-          ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
-          : primary
-            ? '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)'
-            : '1px solid var(--v3-border-strong)',
-        background: success
-          ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
-          : primary
-            ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-            : 'var(--v3-surface-2)',
-        color: success ? '#0a0a0a' : primary ? 'var(--v3-on-primary)' : 'var(--v3-text)',
-        fontFamily: 'var(--font-body)', fontSize: 11,
-        fontWeight: primary ? 700 : 600,
-        cursor: disabled ? 'wait' : 'pointer',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -1104,13 +1047,15 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           gap: 12,
           padding: '14px 14px 14px 22px',
           borderRadius: 14,
-          background: 'var(--v3-surface-glass)',
-          backdropFilter: 'blur(14px) saturate(1.1)',
-          WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+          // Solid surface instead of glass+backdrop-blur: backdrop-filter is
+          // one of the most expensive mobile GPU ops, and this card renders
+          // once per outstanding balance. A solid surface + hairline border
+          // reads the same at card scale for a fraction of the paint cost.
+          background: 'var(--v3-surface-2)',
           border: isOverdue
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
           overflow: 'hidden'
         }}
       >
@@ -1169,28 +1114,16 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               lineHeight: 1,
               color: balance > 0 ? 'var(--v3-text)' : 'var(--v3-success-bright)',
               fontVariantNumeric: 'tabular-nums',
-              textShadow: balance > 0 ? '0 1px 0 rgba(255, 255, 255, 0.06)' : 'none'
+              textShadow: balance > 0 ? '0 1px 0 var(--v3-glass-tint-2)' : 'none'
             }}>
               {balance > 0 ? fmtMoney(balance) : 'PAID'}
             </div>
             {isOutstanding && (
-              <div style={{
-                marginTop: 4,
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '2px 8px',
-                borderRadius: 999,
-                background: `color-mix(in srgb, ${bucketMeta.color} 12%, transparent)`,
-                border: `1px solid ${bucketMeta.accent}`,
-                color: bucketMeta.color,
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                lineHeight: 1.4
-              }}>
-                {ageDays} d · {bucketMeta.label}
-              </div>
+              <StatusPill
+                color={bucketMeta.color}
+                label={`${ageDays} d · ${bucketMeta.label}`}
+                style={{ marginTop: 4 }}
+              />
             )}
           </div>
         </div>
@@ -1243,82 +1176,21 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
             {/* Email — primary send action. Mirrors the Send button on
                 InvoiceDetail. User shouldn't have to dive into the detail
                 page just to email the client. */}
-            <button
-              type="button"
+            <Button
+              variant={isSent ? 'success' : 'secondary'}
               onClick={onEmail}
               disabled={isSending}
               title={!resolveClient(row.job).email ? 'Add a client email first on the linked client' : 'Email the invoice to the client'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 14px',
-                minHeight: 40,
-                borderRadius: 10,
-                border: isSent
-                  ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
-                  : '1px solid var(--v3-border-strong)',
-                background: isSent
-                  ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
-                  : 'var(--v3-surface-2)',
-                color: isSent ? '#0a0a0a' : (isSending ? 'var(--v3-text-muted)' : 'var(--v3-text)'),
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: isSending ? 'wait' : 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
-              }}
             >
               {isSent ? <CheckCircle2 size={13} /> : <Send size={13} />}
               {isSent ? 'Sent' : isSending ? 'Sending…' : 'Email'}
-            </button>
-            <button
-              type="button"
-              onClick={onPDF}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 14px',
-                minHeight: 40,
-                borderRadius: 10,
-                border: '1px solid var(--v3-border-strong)',
-                background: 'var(--v3-surface-2)',
-                color: 'var(--v3-text)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
+            </Button>
+            <Button variant="secondary" onClick={onPDF}>
               <FileDown size={13} /> Download
-            </button>
-            <button
-              type="button"
-              onClick={onPaid}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 14px',
-                minHeight: 40,
-                borderRadius: 10,
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
-                background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
-              }}
-            >
+            </Button>
+            <Button variant="primary" onClick={onPaid}>
               <DollarSign size={13} /> Mark Paid
-            </button>
+            </Button>
           </div>
         )}
       </motion.article>

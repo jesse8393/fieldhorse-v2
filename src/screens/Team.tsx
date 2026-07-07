@@ -12,13 +12,15 @@ import {
 } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
-  orgInviteCreate, orgInviteRevoke, orgMembersList, orgMemberRemove, orgMemberRole,
+  orgInviteCreate, orgInviteRevoke, orgMembersList, orgMemberRemove, orgMemberRole, orgMemberRate,
   type OrgInvitePending, type OrgMember,
 } from '../lib/orgApi.ts'
 import type { OrgRole } from '../lib/permissions.ts'
 import { ORG_ROLES } from '../lib/permissions.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../components/v3'
 
 function fmtJoined(iso: string | null): string {
   if (!iso) return '—'
@@ -111,7 +113,7 @@ export default function Team() {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Your role</div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#f4f1ea', margin: '8px 0 4px', textTransform: 'capitalize' }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', textTransform: 'capitalize' }}>
               {role || 'No membership'}
             </p>
             {canInviteMembers && (
@@ -166,7 +168,7 @@ export default function Team() {
               <div key={m.id} className="fh-build-table__row is-team">
                 <strong className="fh-build-truncate" title={m.name || ''}>
                   {m.name || (m.is_self ? 'You' : '—')}
-                  {m.is_self && <span style={{ color: 'var(--v3-primary, #c9963a)', marginLeft: 8, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}>You</span>}
+                  {m.is_self && <Eyebrow tone="gold" style={{ marginLeft: 8 }}>You</Eyebrow>}
                 </strong>
                 <span className="fh-build-truncate fh-build-rel" title={m.email || ''}>{m.email || '—'}</span>
                 <span style={{ textTransform: 'capitalize' }}><span className={`fh-build-dot is-${roleTone(m.role)}`}>{m.role}</span></span>
@@ -266,12 +268,39 @@ const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, adm
    Only shown when the caller can manage the team AND outranks the member
    — mirrors the server guards in org-member-role/remove. */
 function MemberActions({ member, callerRole, canManage, onChanged }: any) {
+  const confirm = useConfirm()
   const [busy, setBusy] = useState(false)
+  const [rate, setRate] = useState(member.default_hourly_rate != null ? String(member.default_hourly_rate) : '')
+
+  async function saveRate() {
+    const trimmed = rate.trim()
+    const next = trimmed === '' ? null : Number(trimmed)
+    // No-op if unchanged.
+    const current = member.default_hourly_rate ?? null
+    if ((next ?? null) === current) return
+    if (next != null && (!Number.isFinite(next) || next < 0)) {
+      toastError('Invalid rate', 'Enter a number ≥ 0, or clear it.')
+      setRate(current != null ? String(current) : '')
+      return
+    }
+    setBusy(true)
+    try {
+      await orgMemberRate(member.user_id, next)
+      toastSuccess('Rate saved', `${member.name || member.email || 'Member'} · ${next != null ? '$' + next + '/hr' : 'cleared'}`)
+      onChanged?.()
+    } catch (e: any) {
+      toastError("Couldn't save rate", e?.message || 'Try again')
+      // The server rejected it (e.g. rate ≥ 10000) — snap the field back
+      // to the member's real rate so the screen doesn't read as if the
+      // rejected value was saved.
+      setRate(current != null ? String(current) : '')
+    } finally { setBusy(false) }
+  }
   const callerTier = ROLE_TIER[callerRole || ''] ?? 0
   const targetTier = ROLE_TIER[member.role] ?? 0
   const manageable = canManage && !member.is_self && targetTier < callerTier
   if (!manageable) {
-    return <span style={{ color: 'rgba(245,242,234,.20)', fontSize: 11 }}>{member.is_self ? '—' : ''}</span>
+    return <span style={{ color: 'var(--v3-text-faint)', fontSize: 11 }}>{member.is_self ? '—' : ''}</span>
   }
   const roleOptions = ORG_ROLES.filter((r) => (ROLE_TIER[r] ?? 0) < callerTier)
 
@@ -289,7 +318,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
 
   async function remove() {
     if (busy) return
-    if (!window.confirm(`Remove ${member.name || member.email || 'this member'} from the team? They lose access immediately.`)) return
+    if (!(await confirm({ title: `Remove ${member.name || member.email || 'this member'} from the team?`, body: 'They lose access immediately.', destructive: true, confirmLabel: 'Remove' }))) return
     setBusy(true)
     try {
       await orgMemberRemove(member.user_id)
@@ -302,6 +331,25 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }} title="Crew hourly rate — feeds job labor cost">
+        <span style={{ color: 'var(--v3-text-muted, rgba(245,242,234,.5))', fontSize: 11 }}>$</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={rate}
+          disabled={busy}
+          onChange={(e) => setRate(e.target.value)}
+          onBlur={saveRate}
+          onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
+          placeholder="—"
+          aria-label={`Hourly rate for ${member.name || member.email || 'member'}`}
+          className="fh-build-select"
+          style={{ width: 56, fontSize: 11, padding: '3px 6px' }}
+        />
+        <span style={{ color: 'var(--v3-text-muted, rgba(245,242,234,.5))', fontSize: 10 }}>/hr</span>
+      </span>
       <select
         value={member.role}
         disabled={busy}
@@ -384,19 +432,19 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
           padding: 24,
           borderRadius: 12,
           background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
-          border: '1px solid rgba(255,255,255,.10)',
+          border: '1px solid var(--v3-border-mid)',
           boxShadow: '0 22px 60px rgba(0,0,0,.50)',
         }}
       >
         <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>Invite teammate</div>
-        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: '#f4f1ea' }}>
+        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: 'var(--v3-text)' }}>
           Add someone to the field.
         </h2>
 
         {acceptUrl ? (
           <div>
-            <p style={{ margin: 0, fontSize: 14, color: 'rgba(245,242,234,.78)', lineHeight: 1.5 }}>
-              Invite created. Share this link with <strong style={{ color: '#f4f1ea' }}>{email}</strong>:
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--v3-text-secondary)', lineHeight: 1.5 }}>
+              Invite created. Share this link with <strong style={{ color: 'var(--v3-text)' }}>{email}</strong>:
             </p>
             <div style={{
               marginTop: 12,
@@ -406,7 +454,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
               border: '1px solid rgba(201,150,58,.30)',
               fontSize: 12,
               fontFamily: 'var(--font-body)',
-              color: '#f4f1ea',
+              color: 'var(--v3-text)',
               wordBreak: 'break-all',
             }}>
               {acceptUrl}
@@ -425,7 +473,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
             <label style={{ display: 'block', marginBottom: 14 }}>
               <span className="fh-build-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Email</span>
               <div style={{ position: 'relative' }}>
-                <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(245,242,234,.45)' }} />
+                <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)' }} />
                 <input
                   type="email"
                   required
@@ -437,8 +485,8 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
                     padding: '10px 12px 10px 34px',
                     borderRadius: 6,
                     background: 'rgba(0,0,0,.30)',
-                    border: '1px solid rgba(255,255,255,.10)',
-                    color: '#f4f1ea',
+                    border: '1px solid var(--v3-border-mid)',
+                    color: 'var(--v3-text)',
                     fontFamily: 'var(--font-body)',
                     fontSize: 14,
                   }}

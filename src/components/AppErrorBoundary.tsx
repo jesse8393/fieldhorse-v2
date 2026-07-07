@@ -38,7 +38,7 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
           display: 'grid',
           placeItems: 'center',
           background: '#141414',
-          color: '#f4f1ea',
+          color: 'var(--v3-text)',
           fontFamily: 'DM Sans, system-ui, sans-serif'
         }}
       >

@@ -73,7 +73,7 @@ export default function ProgressMeter({
           position: 'relative',
           height,
           borderRadius: 999,
-          background: 'rgba(255, 255, 255, 0.06)',
+          background: 'var(--v3-glass-tint-2)',
           overflow: 'hidden'
         }}
       >

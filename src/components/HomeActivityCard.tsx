@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 import { Activity as ActivityIcon, DollarSign, FileEdit, Check, Briefcase, Receipt, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { Eyebrow } from './v3'
 
 const PER_SOURCE = 8
 
@@ -173,15 +174,10 @@ export default function HomeActivityCard() {
         borderBottom: '1px solid var(--v3-border)',
         background: 'var(--v3-surface-2)'
       }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: 'var(--v3-primary-bright)'
-        }}>
+        <Eyebrow tone="gold">
           <ActivityIcon size={12} aria-hidden="true" />
           Recent activity
-        </span>
+        </Eyebrow>
         <Link
           to="/activity"
           style={{
@@ -204,7 +200,7 @@ export default function HomeActivityCard() {
 function Row({ event, isLast }: any) {
   const Icon = event.icon
   const palette = ({
-    neutral: { bg: 'rgba(255,255,255,0.06)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' },
+    neutral: { bg: 'var(--v3-glass-tint-2)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
     gold:    { bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', fg: 'var(--v3-primary-bright)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
     green:   { bg: 'rgba(74,222,128,0.10)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74,222,128,0.30)' },
     red:     { bg: 'rgba(232,90,87,0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232,90,87,0.30)' }

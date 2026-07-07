@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { Eraser } from 'lucide-react'
+import { Eyebrow } from './v3'
 
 /**
  * SignaturePad — drawn-signature capture (Phase 4C-4a).
@@ -214,13 +215,9 @@ export default function SignaturePad({
       style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
     >
       {label && (
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)',
-          fontFamily: 'var(--font-body)'
-        }}>
+        <Eyebrow>
           {label}
-        </span>
+        </Eyebrow>
       )}
       <div
         style={{

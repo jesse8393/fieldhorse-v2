@@ -19,3 +19,4 @@ lerna-debug.log*
 .claude/
 _reference/
 test_out/
+qa-shots/

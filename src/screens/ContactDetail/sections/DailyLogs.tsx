@@ -15,7 +15,9 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
+import { Eyebrow } from '../../../components/v3'
 
 const SkeletonAny = SkeletonList as any
 const PHOTO_BUCKET = 'job-photos'
@@ -52,6 +54,7 @@ function fmtTime(iso: string): string {
 type DraftPhoto = { local_id: string; preview_url: string; storage_path: string; size: number; uploading: boolean; existing?: boolean }
 
 export default function DailyLogsSection({ jobId, userId }: any) {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
@@ -291,7 +294,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
 
   async function remove(id: string) {
     hapticTap()
-    const ok = window.confirm('Delete this daily log? This cannot be undone.')
+    const ok = await confirm({ title: 'Delete this daily log?', body: 'This cannot be undone.', destructive: true })
     if (!ok) return
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_daily_logs').delete().eq('id', id).eq('user_id', userId)
@@ -304,9 +307,9 @@ export default function DailyLogsSection({ jobId, userId }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+        <Eyebrow>
           Daily logs
-        </span>
+        </Eyebrow>
         {!composing && (
           <button
             type="button"
@@ -576,9 +579,9 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                     color: 'var(--v3-text)',
                     whiteSpace: 'pre-wrap',
                   }}>
-                    <strong style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--v3-primary)', display: 'block', marginBottom: 4 }}>
+                    <Eyebrow as="strong" tone="gold" style={{ display: 'block', marginBottom: 4 }}>
                       Next
-                    </strong>
+                    </Eyebrow>
                     {r.next_steps}
                   </div>
                 )}
@@ -678,6 +681,6 @@ const metaChip: React.CSSProperties = {
   gap: 5,
   padding: '3px 8px',
   borderRadius: 999,
-  background: 'rgba(255,255,255,.04)',
+  background: 'var(--v3-glass-tint)',
   border: '1px solid var(--v3-border)',
 }

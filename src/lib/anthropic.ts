@@ -4,28 +4,41 @@
 
 import { authHeaders } from './supabase.ts'
 
-const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-fable-5'
 
 // Hard ceiling so a stuck /api/claude call never leaves the UI in an
-// indefinite "parsing…" or "drafting…" state. 15s is comfortably above
-// typical Sonnet response time for our Notes / Compose / Bid / Vision
-// payload sizes; tune via this constant if real usage exceeds it.
-const REQUEST_TIMEOUT_MS = 15000
+// indefinite "parsing…" or "drafting…" state. Fable 5 runs adaptive
+// thinking on every turn (it can't be disabled), so a turn takes longer
+// than the old Sonnet path — 30s gives it room without letting a truly
+// stuck call hang the UI. The proxy pins these utility calls to LOW
+// effort so they stay well inside this budget.
+const REQUEST_TIMEOUT_MS = 30000
 
 type ClaudeMessage = { role: string; content: unknown }
 
-export async function claudeMessage({ system, messages, maxTokens = 1024, model }: { system?: string; messages: ClaudeMessage[]; maxTokens?: number; model?: string }) {
+// Claude 5 responses can lead with thinking blocks before the text block,
+// so `content[0].text` — the read every consumer does — comes back
+// undefined. Normalize here (drop non-text blocks) so consumers keep
+// their simple `content[0].text` reads and heal in one place.
+function normalizeResponse(data: any) {
+  if (Array.isArray(data?.content)) {
+    data.content = data.content.filter((b: any) => b?.type === 'text')
+  }
+  return data
+}
+
+export async function claudeMessage({ system, messages, maxTokens = 1024, model, effort }: { system?: string; messages: ClaudeMessage[]; maxTokens?: number; model?: string; effort?: 'low' | 'medium' | 'high' }) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ model: model || MODEL, system, messages, max_tokens: maxTokens }),
+      body: JSON.stringify({ model: model || MODEL, system, messages, max_tokens: maxTokens, effort }),
       signal: controller.signal
     })
     if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)
-    return await res.json()
+    return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
       throw new Error('Claude request timed out (15s)')
@@ -79,7 +92,7 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
       signal: controller.signal
     })
     if (!res.ok) throw new Error(`Claude vision request failed: ${res.status}`)
-    return await res.json()
+    return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
       throw new Error('Claude vision request timed out (15s)')

@@ -20,6 +20,8 @@ import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../components/v3'
 const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
@@ -340,7 +342,7 @@ export default function Notes() {
               : 'var(--v3-section-border)',
           transition: 'border-color 200ms ease, box-shadow 200ms ease',
           boxShadow: focused
-            ? '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.30), 0 6px 20px rgba(0, 0, 0, 0.35)'
+            ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 1px 2px rgba(0, 0, 0, 0.30), 0 6px 20px rgba(0, 0, 0, 0.35)'
             : 'var(--v3-section-shadow)'
         }}
       >
@@ -601,12 +603,9 @@ export default function Notes() {
                     <span style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {g.name}
                     </span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase',
-                      color: 'var(--v3-text-muted)', flexShrink: 0
-                    }}>
+                    <Eyebrow style={{ flexShrink: 0 }}>
                       {g.items.length} {g.items.length === 1 ? 'note' : 'notes'}
-                    </span>
+                    </Eyebrow>
                   </span>
                   <ChevronRight size={16} color="var(--v3-text-muted)" />
                 </button>
@@ -750,7 +749,7 @@ function VoiceButton({ listening, onStart, onStop }: any) {
         WebkitTapHighlightColor: 'transparent',
         boxShadow: listening
           ? '0 0 0 4px color-mix(in srgb, var(--v3-danger) 12%, transparent)'
-          : '0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 12px rgba(0, 0, 0, 0.20)'
+          : '0 1px 0 var(--v3-glass-tint) inset, 0 4px 12px rgba(0, 0, 0, 0.20)'
       }}
     >
       {listening ? <MicOff size={16} /> : <Mic size={16} />}
@@ -768,6 +767,7 @@ function VoiceButton({ listening, onStart, onStop }: any) {
    subtle hover lift, swipe actions for archive/delete on mobile.
    ============================================================ */
 function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArchive, onDelete }: any) {
+  const confirm = useConfirm()
   const body = note.text || note.body || ''
   const firstLine = (body.split('\n').find((l: any) => l.trim()) || '').trim()
   const title = note.parsed?.summary || firstLine.slice(0, 90) || 'Untitled note'
@@ -789,7 +789,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
     ? 'linear-gradient(180deg, var(--v3-danger), color-mix(in srgb, var(--v3-danger) 40%, transparent))'
     : hasParsed
       ? 'linear-gradient(180deg, var(--v3-primary), color-mix(in srgb, var(--v3-primary) 35%, transparent))'
-      : 'linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04))'
+      : 'linear-gradient(180deg, var(--v3-border-strong), var(--v3-glass-tint))'
 
   const swipeActions = [
     {
@@ -827,14 +827,14 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           borderRadius: 14,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
           cursor: onTap ? 'pointer' : 'default',
           WebkitTapHighlightColor: 'transparent',
           transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
         }}
         onMouseEnter={(e) => {
           if (!canHover) return
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
+          e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
           e.currentTarget.style.background = 'var(--v3-surface-3)'
         }}
         onMouseLeave={(e) => {
@@ -920,9 +920,9 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
             {onDelete && (
               <button
                 type="button"
-                onClick={(ev) => {
+                onClick={async (ev) => {
                   ev.stopPropagation()
-                  if (!window.confirm('Delete this note? This cannot be undone.')) return
+                  if (!(await confirm({ title: 'Delete this note?', body: 'This cannot be undone.', destructive: true }))) return
                   onDelete()
                 }}
                 aria-label="Delete note"
@@ -978,44 +978,16 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
         {(!hideJobChip && contact?.name) || actionCount > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {!hideJobChip && contact?.name && (
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '3px 9px',
-                borderRadius: 999,
-                background: 'var(--v3-surface-2)',
-                border: '1px solid var(--v3-border-strong)',
-                color: 'var(--v3-text-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase'
-              }}>
+              <Eyebrow style={{ gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)' }}>
                 <Briefcase size={10} color="var(--v3-primary)" />
                 {contact.name}
-              </span>
+              </Eyebrow>
             )}
             {actionCount > 0 && (
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '3px 9px',
-                borderRadius: 999,
-                background: 'var(--v3-success-soft)',
-                border: '1px solid color-mix(in srgb, var(--v3-success) 30%, transparent)',
-                color: 'var(--v3-success-bright)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase'
-              }}>
+              <Eyebrow tone="success" style={{ gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-success-soft)', border: '1px solid color-mix(in srgb, var(--v3-success) 30%, transparent)' }}>
                 <ClipboardCheck size={10} />
                 {actionCount} {actionCount === 1 ? 'action' : 'actions'}
-              </span>
+              </Eyebrow>
             )}
           </div>
         ) : null}
@@ -1037,20 +1009,10 @@ function ParsedList({ title, items, Icon, tone }: any) {
       : 'var(--v3-text-muted)'
   return (
     <div style={{ marginTop: 10 }}>
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 6,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.10em',
-        textTransform: 'uppercase',
-        color
-      }}>
+      <Eyebrow as="div" style={{ marginBottom: 6, color }}>
         {Icon ? <Icon size={11} /> : null}
         {title}
-      </div>
+      </Eyebrow>
       <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
         {items.map((it: any, i: any) => <li key={i} style={{ marginBottom: 2 }}>{it}</li>)}
       </ul>

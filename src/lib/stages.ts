@@ -3,7 +3,13 @@ import { supabase } from './supabase.ts'
 import { crewLaborForContact } from './labor.ts'
 import type { Database } from './database.types.ts'
 
-type Contact = Database['public']['Tables']['fh_contacts']['Row']
+// Only the fields the stage helpers actually read — declared narrowly so
+// projected list rows (queries.ts JobRow) are valid inputs; a full
+// fh_contacts Row remains assignable.
+type Contact = Pick<
+  Database['public']['Tables']['fh_contacts']['Row'],
+  'id' | 'user_id' | 'stage' | 'name' | 'job_title' | 'address' | 'amount'
+>
 
 // Pipeline v2 (migration 047): the 'invoice' stage is retired. A record
 // in lead/quote is a Lead; job/closed is a Job (every job is a won
@@ -279,7 +285,7 @@ export async function recalcCost(contactId: string | undefined, userId: string |
   return cost
 }
 
-export function margin(contact: Pick<Contact, 'amount' | 'cost'> | null | undefined) {
+export function margin(contact: { amount?: number | null; cost?: number | null } | null | undefined) {
   const amt = Number(contact?.amount || 0)
   const cost = Number(contact?.cost || 0)
   if (!amt) return 0
@@ -290,4 +296,33 @@ export function marginTier(pct: number) {
   if (pct >= 30) return 'good'
   if (pct >= 15) return 'warn'
   return 'thin'
+}
+
+// ─── detail routing ─────────────────────────────────────────────
+// THE stage → detail-URL mapping. Work, the desktop rail, Home's
+// pipeline, and universal search all consume this one function —
+// the audit found five drifting inline copies of it.
+//   opts.financials: land on the money tab (opt-in — Home's pipeline
+//   uses it for invoice-age rows; list surfaces open the overview).
+export function detailRoute(
+  c: { id: string; stage?: string | null },
+  opts?: { financials?: boolean }
+) {
+  const stage = String(c?.stage || '').toLowerCase()
+  if (stage === 'lead' || stage === 'lost') return `/leads/${c.id}`
+  if (stage === 'quote') return `/quotes/${c.id}?tab=quote`
+  return opts?.financials ? `/jobs/${c.id}?tab=financials` : `/jobs/${c.id}`
+}
+
+// ─── list-card display vocabulary ───────────────────────────────
+// Friendlier than the formal pipeline labels (job→Active, closed→Done)
+// — used by every unified deal card (Work list, desktop rail). One map,
+// or the rail and the card drift ("Complete" vs "Done", audit finding).
+export const LIST_STAGE_META: Record<string, { label: string; color: string }> = {
+  lead:    { label: 'Lead',   color: 'var(--v3-stage-lead)' },
+  quote:   { label: 'Quote',  color: 'var(--v3-stage-quote)' },
+  job:     { label: 'Active', color: 'var(--v3-stage-active)' },
+  invoice: { label: 'Active', color: 'var(--v3-stage-active)' },
+  closed:  { label: 'Done',   color: 'var(--v3-success-bright)' },
+  lost:    { label: 'Lost',   color: 'var(--v3-text-muted)' }
 }

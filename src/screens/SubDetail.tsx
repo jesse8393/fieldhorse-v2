@@ -623,7 +623,7 @@ function SubDetailDesktop({
             <section className="fh-build-card fh-build-table">
               <header className="fh-build-card-head">
                 <div className="fh-build-eyebrow">Job history - {subRows.length.toLocaleString()}</div>
-                <span style={{ color: 'rgba(245,242,234,.55)', fontSize: 12 }}>
+                <span style={{ color: 'var(--v3-text-muted)', fontSize: 12 }}>
                   {totals.lastWorked ? `Last worked ${fmtRelativeDate(totals.lastWorked)}` : 'No work logged'}
                 </span>
               </header>
@@ -1133,14 +1133,9 @@ function Section({ icon, label, children }: any) {
 function Field({ label, value, onChange, type = 'text', inputMode, placeholder, hint, required }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow>
         {label}{required && <span style={{ color: 'var(--v3-primary)', marginLeft: 3 }}>*</span>}
-      </span>
+      </Eyebrow>
       <input
         type={type}
         inputMode={inputMode}
@@ -1167,14 +1162,9 @@ function Field({ label, value, onChange, type = 'text', inputMode, placeholder, 
 function SelectField({ label, value, onChange, options }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow>
         {label}
-      </span>
+      </Eyebrow>
       <select
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
@@ -1214,42 +1204,24 @@ function ExpiryNote({ days }: any) {
     )
   }
   return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '6px 10px', borderRadius: 8,
-      background: expired
+    <Eyebrow as="div" style={{ padding: '6px 10px', borderRadius: 8, background: expired
         ? 'color-mix(in srgb, var(--v3-danger, #c84a4a) 16%, transparent)'
-        : 'var(--v3-primary-soft)',
-      border: `1px solid ${expired
+        : 'var(--v3-primary-soft)', border: `1px solid ${expired
         ? 'color-mix(in srgb, var(--v3-danger, #c84a4a) 50%, transparent)'
-        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`,
-      color: expired ? 'var(--v3-danger-bright, #ff8b8b)' : 'var(--v3-primary)',
-      fontSize: 11, fontWeight: 700,
-      letterSpacing: '0.08em', textTransform: 'uppercase',
-      fontFamily: 'var(--font-body)'
-    }}>
+        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`, color: expired ? 'var(--v3-danger-bright, #ff8b8b)' : 'var(--v3-primary)' }}>
       <AlertTriangle size={12} />
       {expired ? `Expired ${Math.abs(days)}d ago` : `Expires in ${days}d`}
-    </div>
+    </Eyebrow>
   )
 }
 
 function StatusPill({ onFile }: any) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '2px 7px', borderRadius: 999,
-      background: onFile ? 'var(--v3-primary-soft)' : 'var(--v3-surface)',
-      border: `1px solid ${onFile
+    <Eyebrow style={{ padding: '2px 7px', borderRadius: 999, background: onFile ? 'var(--v3-primary-soft)' : 'var(--v3-surface)', border: `1px solid ${onFile
         ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
-        : 'var(--v3-border)'}`,
-      color: onFile ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
-      fontFamily: 'var(--font-body)',
-      fontSize: 9, fontWeight: 700,
-      letterSpacing: '0.16em', textTransform: 'uppercase'
-    }}>
+        : 'var(--v3-border)'}`, color: onFile ? 'var(--v3-primary)' : 'var(--v3-text-muted)' }}>
       {onFile ? 'On file' : 'Missing'}
-    </span>
+    </Eyebrow>
   )
 }
 

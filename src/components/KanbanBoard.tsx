@@ -12,6 +12,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { motion } from 'framer-motion'
 import { GripVertical } from 'lucide-react'
 import { hapticStageChange, hapticTap } from '../lib/haptics.ts'
+import { Eyebrow } from './v3'
 
 // Stage columns shown left-to-right. "lost" lives off-board (URL-only).
 // Pipeline v2: the Invoice column is gone — invoicing is fh_invoices
@@ -58,7 +59,7 @@ function KanbanCard({ contact, dragging, onOpen }: any) {
         position: 'relative',
         padding: '11px 12px',
         borderRadius: 12,
-        background: 'rgba(255, 255, 255, 0.04)',
+        background: 'var(--v3-glass-tint)',
         border: '1px solid var(--rule)',
         boxShadow: dragging
           ? '0 18px 44px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3)'
@@ -91,9 +92,9 @@ function KanbanCard({ contact, dragging, onOpen }: any) {
         <span className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 16, lineHeight: 1, opacity: Number(contact.amount || 0) > 0 ? 1 : 0.4 }}>
           {money(contact.amount)}
         </span>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+        <Eyebrow style={{ color: 'var(--ink-faint)' }}>
           #{String(contact.id).slice(0, 6)}
-        </span>
+        </Eyebrow>
       </div>
     </div>
   )
@@ -112,7 +113,7 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }: any) {
         padding: 12,
         borderRadius: 16,
         minHeight: 220,
-        background: isOver ? 'rgba(199, 164, 90, 0.06)' : 'rgba(255, 255, 255, 0.025)',
+        background: isOver ? 'rgba(199, 164, 90, 0.06)' : 'var(--v3-glass-tint)',
         border: isOver ? '1px solid rgba(199, 164, 90, 0.45)' : '1px solid var(--rule)',
         transition: 'background 120ms cubic-bezier(0.5, 0, 0.2, 1), border-color 120ms'
       }}
@@ -121,9 +122,9 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }: any) {
         <span className={`fh-stage-pill fh-stage-pill--${id}`}>
           {label.toUpperCase()}
         </span>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+        <Eyebrow style={{ color: 'var(--ink-muted)' }}>
           {contacts.length} · {money(total)}
-        </span>
+        </Eyebrow>
       </header>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {contacts.map((c: any) => (

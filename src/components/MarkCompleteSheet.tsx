@@ -27,6 +27,7 @@ import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals
 } from '../lib/closeout.ts'
+import { Eyebrow } from './v3'
 
 function moneyFmt(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -271,10 +272,10 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
         style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+          <Eyebrow as="div">
             <ShieldCheck size={12} />
             Complete
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
@@ -540,7 +541,7 @@ function certificateBtnStyle(variant: any, busy: any) {
   return {
     ...base,
     background: 'var(--surface-2)',
-    border: '1px solid rgba(255, 255, 255, 0.18)',
+    border: '1px solid var(--v3-border-strong)',
     color: 'var(--ink-strong)'
   }
 }
@@ -550,10 +551,10 @@ function chipStyle(active: any, disabled: any) {
     padding: '7px 12px',
     borderRadius: 999,
     border: active
-      ? '1px solid rgba(255,255,255,0.22)'
+      ? '1px solid var(--v3-border-strong)'
       : '1px solid var(--rule)',
     background: active
-      ? 'rgba(255,255,255,0.06)'
+      ? 'var(--v3-glass-tint-2)'
       : 'var(--surface-2)',
     color: active
       ? 'var(--ink-strong)'
@@ -574,13 +575,9 @@ function Stat({ label, value, tone = 'default' }: any) {
       : 'var(--ink-strong)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 9, fontWeight: 700, letterSpacing: '0.16em',
-        textTransform: 'uppercase', color: 'var(--ink-muted)'
-      }}>
+      <Eyebrow style={{ color: 'var(--ink-muted)' }}>
         {label}
-      </span>
+      </Eyebrow>
       <span style={{
         fontFamily: 'var(--font-display)',
         fontSize: 16, lineHeight: 1, color,

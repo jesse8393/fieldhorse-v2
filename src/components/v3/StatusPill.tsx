@@ -41,12 +41,18 @@ const TONE: Record<StatusTone, { color: string; label: string; Icon?: ComponentT
 
 type StatusPillProps = HTMLAttributes<HTMLSpanElement> & {
   tone?: StatusTone
+  /** Arbitrary token color (kit wave 2) — overrides the tone's color so
+      screens with computed status colors (lead status, invoice status,
+      AR aging buckets) can ride this pill instead of hand-rolling the
+      same chip. Pass `label` alongside it. */
+  color?: string
   label?: import('react').ReactNode
   icon?: ComponentType<any>
 }
 
 export default function StatusPill({
   tone = 'lead',
+  color,
   label,
   icon: IconOverride,
   className,
@@ -54,6 +60,7 @@ export default function StatusPill({
   ...rest
 }: StatusPillProps) {
   const cfg = TONE[tone] || TONE.lead
+  const chipColor = color || cfg.color
   const text = label || cfg.label
   const IconCmp = IconOverride || cfg.Icon
 
@@ -66,9 +73,12 @@ export default function StatusPill({
         gap: IconCmp ? 5 : 0,
         padding: '3px 9px',
         borderRadius: 999,
-        background: `color-mix(in srgb, ${cfg.color} 12%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${cfg.color} 35%, transparent)`,
-        color: `color-mix(in srgb, ${cfg.color} 80%, white 20%)`,
+        background: `color-mix(in srgb, ${chipColor} 12%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${chipColor} 35%, transparent)`,
+        // Mix toward the theme's text color, NOT white: in dark the text
+        // is linen (same lightening as before); in daylight it darkens
+        // the chip text for contrast on paper instead of washing it out.
+        color: `color-mix(in srgb, ${chipColor} 80%, var(--v3-text) 20%)`,
         fontFamily: 'var(--font-body)',
         fontSize: 10,
         fontWeight: 700,

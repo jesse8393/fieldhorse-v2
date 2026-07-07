@@ -6,6 +6,7 @@
 // Never leak the invited_by_user_id, job_id, or any other internals.
 
 import { createClient } from '@supabase/supabase-js'
+import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -28,6 +29,15 @@ export default async (request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
+
+  // Unauthenticated token lookup — rate-limit per client IP so invite
+  // tokens can't be brute-forced (30/min is far above any human flow).
+  const rlOk = await checkRateLimit(supabase, {
+    scope: 'partner-invite-info',
+    identifier: hashIdentifier(clientIp(request)),
+    limit: 30,
+  })
+  if (!rlOk) return json({ error: 'rate_limited' }, 429)
 
   const { data: invite, error } = await supabase
     .from('fh_job_partners')

@@ -4,6 +4,7 @@ import { Users, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import Aurora from '../components/fx/Aurora.tsx'
 import GridPattern from '../components/fx/GridPattern.tsx'
+import { Eyebrow } from '../components/v3'
 
 function friendlyError(code: any) {
   if (!code) return ''
@@ -177,27 +178,10 @@ export default function PartnerInvite() {
             <span style={{ color: 'var(--field-gold, #c9963a)' }}>FIELD</span>
             <span style={{ color: 'var(--ink-strong, #f4f1ea)' }}>HORSE</span>
           </div>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              marginTop: 20,
-              padding: '3px 10px',
-              borderRadius: 999,
-              background: 'rgba(201,150,58,0.12)',
-              border: '1px solid rgba(201,150,58,0.3)',
-              color: 'var(--field-gold-bright, #e8b04c)',
-              fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase'
-            }}
-          >
+          <Eyebrow as="div" style={{ marginTop: 20, padding: '3px 10px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright, #e8b04c)' }}>
             <Users size={11} />
             Partner invite
-          </div>
+          </Eyebrow>
           <h1
             className="fh-font-serif"
             style={{ fontSize: 'clamp(24px, 6.5vw, 32px)', lineHeight: 1.15, letterSpacing: '-0.02em', marginTop: 14, marginBottom: 6, fontWeight: 400, color: 'var(--ink-strong, #f4f1ea)' }}

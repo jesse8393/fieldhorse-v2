@@ -15,7 +15,8 @@ import { useEstimateTemplates, useInvalidateEstimateTemplates } from '../lib/que
 import { useAuth } from '../contexts/AuthContext.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
-import { FilterPill } from '../components/v3'
+import { FilterPill, Eyebrow } from '../components/v3'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
 
 // White-label: internal-only tool but no app-attributable phrasing
 // just in case any of the output is shown to a customer downstream.
@@ -33,6 +34,7 @@ function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) 
 
 export default function Bid() {
   const { user } = useAuth()
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const [scope, setScope] = useState('')
   const [marginPct, setMarginPct] = useState(25)
@@ -250,7 +252,7 @@ export default function Bid() {
 
   async function deleteTemplate(t: any) {
     if (!t?.id) return
-    if (!window.confirm(`Delete "${t.name}" from your templates?`)) return
+    if (!(await confirm({ title: `Delete "${t.name}" from your templates?`, destructive: true }))) return
     try {
       const { error } = await supabase.from('fh_estimate_templates').delete().eq('id', t.id)
       if (error) throw error
@@ -352,16 +354,12 @@ export default function Bid() {
           style={{ padding: '0 var(--v3-gutter) 10px' }}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)'
-            }}>
+            <Eyebrow>
               Your templates
               <span style={{ marginLeft: 6, color: 'var(--v3-text-faint, var(--v3-text-muted))' }}>
                 · {templates.length}
               </span>
-            </span>
+            </Eyebrow>
             <button
               type="button"
               onClick={() => setPickerOpen((v) => !v)}
@@ -594,7 +592,7 @@ export default function Bid() {
               cursor: !scope.trim() || generating ? 'default' : 'pointer',
               boxShadow: !scope.trim() || generating
                 ? 'none'
-                : '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
+                : '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 var(--v3-border-strong) inset',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',

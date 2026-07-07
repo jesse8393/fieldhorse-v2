@@ -14,15 +14,15 @@ import {
   PhoneCall,
   CalendarClock,
   ChevronRight,
-  Zap,
-  Mic
+  Zap
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
+import { detailRoute } from '../lib/stages.ts'
 import { getWeather, MURFREESBORO } from '../lib/weather.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import CountUp from '../components/fx/CountUp.tsx'
-import { QuickAction, SectionHeader, ScreenCloser } from '../components/v3'
+import { Eyebrow, QuickAction, SectionHeader, ScreenCloser, StatusPill } from '../components/v3'
 import HomeActivityCard from '../components/HomeActivityCard.tsx'
 import { hapticTap } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
@@ -271,23 +271,14 @@ export default function Home() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            // Polish pass: date eyebrow demoted from gold to muted ink
-            // so the gold accent on the operator's first name (a few
-            // lines below) carries the brand moment alone. Two gold
-            // hits on the same row read as gaudy; one reads as
-            // intentional.
-            color: 'var(--v3-text-muted)'
-          }}>
+          {/* Date eyebrow stays muted ink (not gold) so the gold accent
+              on the operator's first name below carries the brand moment
+              alone. Kit wave 3: rides the Eyebrow primitive. */}
+          <Eyebrow>
             {now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
             {' · '}
             {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-          </span>
+          </Eyebrow>
           {/* Hero greeting — ports the design's "Good morning, *Jesse.*" pattern
               with the italic gold accent on the first name. font-display so the
               greeting reads as a screen title, not a caption. */}
@@ -434,7 +425,7 @@ export default function Home() {
           // highlight + inset bottom shadow + crisp outline + soft halo.
           border: '1px solid var(--v3-border-strong)',
           boxShadow: [
-            'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+            'inset 0 1px 0 var(--v3-glass-tint-2)',
             'inset 0 -1px 0 rgba(0, 0, 0, 0.18)',
             '0 1px 2px rgba(0, 0, 0, 0.40)',
             '0 12px 28px rgba(0, 0, 0, 0.30)'
@@ -524,36 +515,11 @@ export default function Home() {
           )}
         </div>
 
-        {/* Gold sparkline — synthesized ascending wave that anchors the
-            pipeline number visually. Ports the design's pipeline-hero__spark
-            (screens-home.jsx). 14-point ascending curve so the trend reads
-            as "going up and to the right" without requiring real time-series
-            data to be wired through yet. */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 320 60"
-          preserveAspectRatio="none"
-          style={{ display: 'block', width: '100%', height: 48, marginTop: 10 }}
-        >
-          <defs>
-            <linearGradient id="fh-pipeline-sparkfill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#E4BE6F" stopOpacity="0.32" />
-              <stop offset="100%" stopColor="#E4BE6F" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M0,46 L26,42 L52,38 L78,30 L104,34 L130,28 L156,32 L182,22 L208,28 L234,18 L260,22 L286,12 L320,8 L320,60 L0,60 Z"
-            fill="url(#fh-pipeline-sparkfill)"
-          />
-          <path
-            d="M0,46 L26,42 L52,38 L78,30 L104,34 L130,28 L156,32 L182,22 L208,28 L234,18 L260,22 L286,12 L320,8"
-            fill="none"
-            stroke="#E4BE6F"
-            strokeWidth="1.5"
-          />
-          <circle cx="320" cy="8" r="3" fill="#E4BE6F" />
-          <circle cx="320" cy="8" r="6" fill="#E4BE6F" opacity="0.18" />
-        </svg>
+        {/* NOTE: a synthesized always-ascending sparkline used to sit here.
+            It rendered "up and to the right" regardless of the real number —
+            it could sweep upward next to a negative trend chip. Removed: the
+            honest trend chip above and the real Won/Active/Lead breakdown
+            below carry the pipeline story with actual data. */}
 
         {/* Won / Active / Lead breakdown — ports the design's pipeline-hero__breakdown.
             Three cells, colored dot + label + stamp amount + count. Each cell
@@ -593,13 +559,15 @@ export default function Home() {
       </motion.div>
 
       {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
-          V3-HOME-2 de-box: header + 5 tile launcher row on page surface.
-          Each QuickAction tile self-frames; wrapper was redundant chrome.
-          Position: relocated here from the bottom so the primary launcher
-          tiles (Add Lead / New Job / Schedule / Invoice / Voice Note) sit
-          inside the first thumb-reach zone on mobile, right after the
-          revenue moment. Desktop uses DesktopHomeCommandCenter and is
-          unaffected. */}
+          Header + 4-tile launcher row on the page surface. Trimmed from
+          five to four so each tile gets real width (~83px on a 390px
+          phone vs ~59px at 5-up, which cramped the two-word "Voice Note"
+          label). The four are the pipeline-money actions — Add Lead,
+          New Job, Schedule, Invoice — sitting in the first thumb-reach
+          zone right after the revenue moment. Voice capture wasn't lost:
+          it lives on the Notes screen (mic button + ?voice=1), reachable
+          from the header Notes shortcut. Desktop uses
+          DesktopHomeCommandCenter and is unaffected. */}
       <motion.div
         variants={item}
         style={{
@@ -610,8 +578,8 @@ export default function Home() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
-            gap: 8,
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 10,
             marginTop: 4
           }}
         >
@@ -619,22 +587,13 @@ export default function Home() {
           <QuickAction icon={FileText} label="New Job" onTap={() => navigate('/jobs?new=1&asStage=job')} />
           <QuickAction icon={CalendarRange} label="Schedule" onTap={() => navigate('/schedule')} />
           <QuickAction icon={Receipt} label="Invoice" onTap={() => navigate('/invoices')} />
-          <QuickAction icon={Mic} label="Voice Note" onTap={() => navigate('/notes?voice=1')} />
         </div>
       </motion.div>
 
-      {/* ─────────── RECENT ACTIVITY — cross-job feed ───────────
-          Compact 5-row card that surfaces the same data as /activity
-          on the dashboard surface. Auto-hides on a brand-new account
-          with no events. "See all" links through to /activity. */}
-      <motion.div variants={item} style={{ padding: '8px 20px 14px' }}>
-        <HomeActivityCard />
-      </motion.div>
-
       {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
-          V3-HOME-2 de-box: dropped the bordered section wrapper. Section
-          header organizes; the row cards self-frame on the page surface.
-          Pipeline mini-card stays the only bordered anchor on Home. */}
+          Promoted ABOVE Recent Activity: this is the "what do I do right now"
+          list (overdue invoices, follow-ups), so it must come before the
+          passive cross-job feed. V3-HOME-2 de-box: the row cards self-frame. */}
       {nextActions != null && nextActions.length > 0 && (
         <motion.div
           variants={item}
@@ -691,6 +650,14 @@ export default function Home() {
           </div>
         </motion.div>
       )}
+
+      {/* ─────────── RECENT ACTIVITY — cross-job feed ───────────
+          Now below Next Actions: it's reference, not action. Compact 5-row
+          card that mirrors /activity on the dashboard surface; auto-hides on
+          a brand-new account. "See all" links through to /activity. */}
+      <motion.div variants={item} style={{ padding: '8px 20px 14px' }}>
+        <HomeActivityCard />
+      </motion.div>
 
       {/* ─────────── TODAY'S PRIORITIES — KPI strip ───────────
           V3-HOME-2 un-nest: dropped the bordered wrapper that nested
@@ -872,7 +839,7 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset'
+        boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset'
       }}
     >
       {/* Time slot — start–end range when both are known */}
@@ -914,17 +881,9 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
           {row.title}
         </div>
         {stage && (
-          <div style={{
-            marginTop: 3,
-            fontFamily: 'var(--font-body)',
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.10em',
-            textTransform: 'uppercase',
-            color: stage.color
-          }}>
+          <Eyebrow as="div" style={{ marginTop: 3, color: stage.color }}>
             {stage.label}
-          </div>
+          </Eyebrow>
         )}
       </div>
       <ChevronRight size={16} color="var(--v3-text-muted)" style={{ flexShrink: 0 }} />
@@ -968,7 +927,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+        boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
         transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
       }}
       onMouseEnter={(e) => {
@@ -976,14 +935,14 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         // Hover stays neutral — black/charcoal/white. Stage color
         // shows on the spine + label only (functional). No ambient
         // blue/purple bleed onto the card's halo.
-        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)'
+        e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
         e.currentTarget.style.background = 'var(--v3-surface-3)'
-        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.40)'
+        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 8px 24px rgba(0, 0, 0, 0.40)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
         e.currentTarget.style.background = 'var(--v3-surface)'
-        e.currentTarget.style.boxShadow = '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
+        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
       }}
     >
       {/* Stage spine — V3-HOME-1B: thinned 5→3px and shortened 36→20px
@@ -1014,17 +973,9 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         }}>
           {deal.name}
         </div>
-        <div style={{
-          marginTop: 4,
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          color: stage.color
-        }}>
+        <Eyebrow as="div" style={{ marginTop: 4, color: stage.color }}>
           {stage.label}
-        </div>
+        </Eyebrow>
       </div>
       <div style={{
         flexShrink: 0,
@@ -1033,7 +984,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         color: 'var(--v3-text)',
         fontVariantNumeric: 'tabular-nums',
         lineHeight: 1,
-        textShadow: '0 1px 0 rgba(255, 255, 255, 0.06)'
+        textShadow: '0 1px 0 var(--v3-glass-tint-2)'
       }}>
         ${deal.amount >= 1000
           ? `${(deal.amount / 1000).toFixed(deal.amount >= 10000 ? 0 : 1)}K`
@@ -1089,7 +1040,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
         // Lifted-panel treatment: top-lit gradient + layered shadow so
         // the KPI tiles match the Jobs/Home card depth pass instead of
         // reading as flat squares.
-        background: 'linear-gradient(180deg, #1a1715 0%, #121010 70%)',
+        background: 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 70%)',
         border: '1px solid var(--v3-border)',
         boxShadow: '0 1px 0 rgba(255, 240, 210, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.36), 0 6px 16px rgba(0, 0, 0, 0.30)',
         color: 'var(--v3-text)',
@@ -1206,11 +1157,10 @@ function jobActionPath(contactId: any, tab?: any, intent?: any) {
 }
 
 function pipelineDetailPath(deal: any) {
+  // Canonical mapping in stages.ts; Home opts collectable rows
+  // (invoice-stage / work-complete) onto the financials tab.
   const stage = String(deal?.stage || '').toLowerCase()
-  if (stage === 'lead' || stage === 'lost') return `/leads/${deal.id}`
-  if (stage === 'quote') return `/quotes/${deal.id}?tab=quote`
-  if (stage === 'invoice' || deal?.completed_at) return `/jobs/${deal.id}?tab=financials`
-  return `/jobs/${deal.id}`
+  return detailRoute(deal, { financials: stage === 'invoice' || !!deal?.completed_at })
 }
 
 function nextActionPath(action: any) {
@@ -1262,11 +1212,11 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
         // Subtle linear top-light overlay + slightly raised surface mix
         // so each row reads as a metal plate, not a list item.
         background: `
-          linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 40%),
+          linear-gradient(180deg, var(--v3-glass-tint), transparent 40%),
           var(--v3-surface)
         `,
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint-2), 0 1px 2px rgba(0, 0, 0, 0.25)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         width: '100%',
@@ -1360,30 +1310,11 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
       {/* Urgency chip — short label that names the urgency in plain words.
           Color matches the spine. */}
       {action.urgencyLabel && (
-        <span style={{
-          flexShrink: 0,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '3px 7px',
-          borderRadius: 999,
-          background: `color-mix(in srgb, ${tone.color} 14%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${tone.color} 35%, transparent)`,
-          color: tone.color,
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1.2
-        }}>
-          <span aria-hidden="true" style={{
-            width: 5, height: 5, borderRadius: '50%',
-            background: tone.color
-          }} />
-          {action.urgencyLabel}
-        </span>
+        <StatusPill
+          color={tone.color}
+          label={action.urgencyLabel}
+          style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
+        />
       )}
 
       <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -1496,24 +1427,14 @@ function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
         minWidth: 0
       }}
     >
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        fontFamily: 'var(--font-body)',
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow as="div">
         <span aria-hidden="true" style={{
           width: 8, height: 8, borderRadius: '50%',
           background: dotColor,
           boxShadow: `0 0 8px ${dotColor}`
         }} />
         {label}
-      </div>
+      </Eyebrow>
       <div style={{
         fontFamily: 'var(--font-display)',
         fontSize: 20,

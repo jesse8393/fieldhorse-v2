@@ -321,7 +321,7 @@ export default function ClientDetail() {
         <div style={{
           padding: '12px 14px',
           borderRadius: 16,
-          background: 'linear-gradient(180deg, #1b1816 0%, #121010 72%)',
+          background: 'linear-gradient(180deg, #1b1816 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
         }}>
@@ -355,33 +355,14 @@ export default function ClientDetail() {
               </h1>
               <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {activeCount > 0 ? (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '2px 8px', borderRadius: 999,
-                    background: 'var(--v3-success-soft)',
-                    border: '1px solid rgba(79, 140, 94, 0.40)',
-                    color: 'var(--v3-success-bright)',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.1em', textTransform: 'uppercase',
-                    fontVariantNumeric: 'tabular-nums'
-                  }}>
+                  <Eyebrow tone="success" style={{ gap: 5, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-success-soft)', border: '1px solid rgba(79, 140, 94, 0.40)', fontVariantNumeric: 'tabular-nums' }}>
                     <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-success-bright)' }} />
                     Active
-                  </span>
+                  </Eyebrow>
                 ) : (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '2px 8px', borderRadius: 999,
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid var(--v3-border-strong)',
-                    color: 'var(--v3-text-muted)',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.1em', textTransform: 'uppercase'
-                  }}>
+                  <Eyebrow style={{ gap: 5, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-strong)' }}>
                     Inactive
-                  </span>
+                  </Eyebrow>
                 )}
                 {client.company_name && (
                   <span style={{
@@ -625,7 +606,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
     gap: 4,
     padding: '10px 4px',
     borderRadius: 12,
-    background: enabled ? 'var(--v3-surface-2)' : 'rgba(255, 255, 255, 0.02)',
+    background: enabled ? 'var(--v3-surface-2)' : 'var(--v3-glass-tint)',
     border: `1px solid ${enabled ? 'var(--v3-border)' : 'var(--v3-border)'}`,
     color: enabled ? 'var(--v3-text)' : 'var(--v3-text-muted)',
     textDecoration: 'none',
@@ -639,7 +620,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
     return (
       <div aria-disabled="true" style={baseStyle}>
         <Icon size={18} aria-hidden="true" />
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
+        <Eyebrow>{label}</Eyebrow>
       </div>
     )
   }
@@ -662,7 +643,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
       style={baseStyle}
     >
       <Icon size={20} aria-hidden="true" />
-      <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
+      <Eyebrow>{label}</Eyebrow>
     </a>
   )
 }
@@ -701,17 +682,13 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
         borderRadius: 16,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)',
         overflow: 'hidden'
       }}>
         <div style={{ padding: '14px 18px 8px' }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-          }}>
+          <Eyebrow>
             Contact info
-          </span>
+          </Eyebrow>
         </div>
         <ContactRow icon={Phone} label="Phone" value={fmtPhone(client.phone)} href={client.phone ? `tel:${client.phone}` : null} />
         <ContactRow icon={Mail} label="Email" value={client.email} href={client.email ? `mailto:${client.email}` : null} />
@@ -725,7 +702,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
           overflow: 'hidden',
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
         }}>
           <a
             href={`https://maps.apple.com/?address=${encodeURIComponent(client.address)}`}
@@ -738,8 +715,8 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
               height: 160,
               background: `
                 linear-gradient(180deg, transparent 0%, transparent 60%, rgba(7, 7, 10, 0.7) 100%),
-                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
-                repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 0 16px, transparent 16px 32px),
+                repeating-linear-gradient(45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
+                repeating-linear-gradient(-45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
                 var(--v3-surface-2)
               `,
               color: 'var(--v3-text)',
@@ -788,15 +765,9 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
               }}>
                 {client.address}
               </span>
-              <span style={{
-                flexShrink: 0,
-                fontFamily: 'var(--font-body)',
-                fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.14em', textTransform: 'uppercase',
-                color: 'var(--v3-primary)'
-              }}>
+              <Eyebrow tone="gold" style={{ flexShrink: 0 }}>
                 Open in Maps →
-              </span>
+              </Eyebrow>
             </div>
           </a>
         </div>
@@ -809,16 +780,11 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
           borderRadius: 14,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
         }}>
-          <div style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: 'var(--v3-text-muted)',
-            marginBottom: 8
-          }}>
+          <Eyebrow as="div" style={{ marginBottom: 8 }}>
             Internal Notes
-          </div>
+          </Eyebrow>
           <div style={{
             fontFamily: 'var(--font-body)',
             fontSize: 14, lineHeight: 1.5,
@@ -852,7 +818,7 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
       <span aria-hidden="true" style={{
         flexShrink: 0,
         width: 36, height: 36, borderRadius: 10,
-        background: hasValue ? 'var(--v3-primary-soft)' : 'rgba(255, 255, 255, 0.04)',
+        background: hasValue ? 'var(--v3-primary-soft)' : 'var(--v3-glass-tint)',
         border: hasValue
           ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)'
           : '1px solid var(--v3-border)',
@@ -862,17 +828,9 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
         <Icon size={15} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          color: 'var(--v3-text-muted)',
-          marginBottom: 4
-        }}>
+        <Eyebrow as="div" style={{ marginBottom: 4 }}>
           {label}
-        </div>
+        </Eyebrow>
         <div style={{
           fontFamily: 'var(--font-body)',
           fontSize: 15,
@@ -949,7 +907,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
       borderRadius: 16,
       background: 'var(--v3-surface)',
       border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.25)',
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 4px 12px rgba(0, 0, 0, 0.25)',
       display: 'flex', flexDirection: 'column', gap: 12,
       margin: '12px 0 24px'
     }}>
@@ -1043,27 +1001,19 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
       border: '1px solid var(--v3-border-strong)',
       borderRadius: 16,
       overflow: 'hidden',
-      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.2)'
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
     }}>
       <header style={{
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
         gap: 8, padding: '14px 18px 8px'
       }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Pipeline
-        </span>
+        </Eyebrow>
         {totalRevenue > 0 && (
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.14em', textTransform: 'uppercase',
-            color: 'var(--v3-success-bright, #4ade80)'
-          }}>
+          <Eyebrow tone="success">
             {money(totalRevenue)} collected
-          </span>
+          </Eyebrow>
         )}
       </header>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -1107,7 +1057,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
                   <div style={{
                     marginTop: 4,
                     height: 4, borderRadius: 999,
-                    background: 'rgba(255,255,255,0.05)',
+                    background: 'var(--v3-glass-tint-2)',
                     overflow: 'hidden'
                   }}>
                     <div style={{
@@ -1287,7 +1237,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
         borderRadius: 999,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint)'
       }}>
         {PROJECT_FILTERS.map((f) => {
           const active = filter === f.id
@@ -1349,7 +1299,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                     borderRadius: 14,
                     background: '#171511',
                     border: '1px solid var(--v3-border-strong)',
-                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+                    boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)',
                     textAlign: 'left',
                     cursor: 'pointer',
                     color: 'var(--v3-text)',
@@ -1399,16 +1349,9 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                       }}>
                         {money(amount)}
                       </div>
-                      <div style={{
-                        marginTop: 4,
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: '0.16em', textTransform: 'uppercase',
-                        color: c
-                      }}>
+                      <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
                         {j.stage}
-                      </div>
+                      </Eyebrow>
                     </div>
                   </div>
 
@@ -1417,7 +1360,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                     <div>
                       <div style={{
                         height: 4, borderRadius: 999,
-                        background: 'rgba(255,255,255,0.05)',
+                        background: 'var(--v3-glass-tint-2)',
                         overflow: 'hidden'
                       }}>
                         <div style={{
@@ -1449,15 +1392,9 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
 
                   {/* Row 3 — last-touch stamp */}
                   {stamp && (
-                    <div style={{
-                      fontFamily: 'var(--font-body)',
-                      fontSize: 10, fontWeight: 600,
-                      letterSpacing: '0.08em', textTransform: 'uppercase',
-                      color: 'var(--v3-text-faint, var(--v3-text-muted))',
-                      fontVariantNumeric: 'tabular-nums'
-                    }}>
+                    <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
                       Updated {stamp} ago
-                    </div>
+                    </Eyebrow>
                   )}
                 </motion.button>
               </li>
@@ -1488,7 +1425,7 @@ function NotesList({ notes }: any) {
               borderRadius: 14,
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border-strong)',
-              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)',
+              boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)',
               overflow: 'hidden'
             }}>
               <span aria-hidden="true" style={{
@@ -1530,21 +1467,10 @@ function NotesList({ notes }: any) {
                 }}>{body}</p>
               )}
               {n.fh_contacts?.name && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  marginTop: 8,
-                  padding: '3px 9px',
-                  borderRadius: 999,
-                  background: 'var(--v3-primary-soft)',
-                  border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-                  color: 'var(--v3-primary)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 10, fontWeight: 700,
-                  letterSpacing: '0.08em', textTransform: 'uppercase'
-                }}>
+                <Eyebrow tone="gold" style={{ gap: 4, marginTop: 8, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)' }}>
                   <Briefcase size={10} />
                   {n.fh_contacts.name}
-                </span>
+                </Eyebrow>
               )}
             </li>
           )
@@ -1585,7 +1511,7 @@ function FilesList({ rows }: any) {
             borderRadius: 12,
             background: 'var(--v3-surface)',
             border: '1px solid var(--v3-border-strong)',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.22)'
+            boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)'
           }}>
             <span aria-hidden="true" style={{
               flexShrink: 0,

@@ -16,11 +16,11 @@ function DropdownMenuPortal({
   return (<DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />);
 }
 
-function DropdownMenuTrigger({
-  ...props
-}: any) {
-  return (<DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />);
-}
+// forwardRef (React 18) — see popover.tsx: required for asChild chains
+// to reach the underlying DOM node.
+const DropdownMenuTrigger = React.forwardRef<any, any>(function DropdownMenuTrigger(props, ref) {
+  return (<DropdownMenuPrimitive.Trigger ref={ref} data-slot="dropdown-menu-trigger" {...props} />);
+})
 
 function DropdownMenuContent({
   className,

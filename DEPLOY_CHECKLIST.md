@@ -42,7 +42,7 @@ If `_redirects` is ever missing from a future build, re-run `npm run build` afte
 
 After setting: **Deploys tab → Trigger deploy → Deploy site** (so the new vars bake into the next build; drag-and-drop deploys skip the build step, so variables set after a drag-and-drop deploy only take effect on the NEXT deploy).
 
-Optional: if Jesse wants to surface a non-default Claude model on the client side, set `VITE_ANTHROPIC_MODEL` (currently defaults to `claude-sonnet-4-20250514`).
+Optional: if Jesse wants to surface a non-default Claude model on the client side, set `VITE_ANTHROPIC_MODEL` (currently defaults to `claude-sonnet-5`).
 
 ---
 

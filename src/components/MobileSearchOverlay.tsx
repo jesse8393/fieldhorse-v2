@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { Eyebrow } from './v3'
 
 // Mobile-native search overlay — replaces CommandPalette on phone widths
 // (the cmdk popover renders clipped on iOS Safari + Chrome behind the
@@ -178,8 +179,8 @@ export default function MobileSearchOverlay() {
                 aria-label="Close search"
                 style={{
                   width: 38, height: 38, borderRadius: 10,
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.10)',
+                  background: 'var(--v3-glass-tint-2)',
+                  border: '1px solid var(--v3-border-mid)',
                   display: 'grid', placeItems: 'center',
                   color: 'var(--v3-text)', cursor: 'pointer', padding: 0
                 }}
@@ -288,19 +289,9 @@ function ResultsList({ results, onGo }: any) {
         const meta = KIND_META[GROUP_TO_KIND[groupKey]]
         return (
           <section key={groupKey}>
-            <div
-              style={{
-                padding: '0 6px 6px',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: '0.16em',
-                color: 'var(--v3-text-muted)',
-                textTransform: 'uppercase'
-              }}
-            >
+            <Eyebrow as="div" style={{ padding: '0 6px 6px' }}>
               {meta.heading}
-            </div>
+            </Eyebrow>
             <ul
               role="list"
               style={{

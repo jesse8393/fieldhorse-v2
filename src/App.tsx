@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext.tsx'
 import { useProfile } from './contexts/ProfileContext.tsx'
+import { useMediaQuery } from './lib/useMediaQuery.ts'
 import AppShell from './components/AppShell.tsx'
 
 // Eager — must be in main bundle
@@ -26,10 +27,9 @@ const Tasks          = lazy(() => import('./screens/Tasks.tsx'))
 const SubPortal      = lazy(() => import('./screens/SubPortal.tsx'))
 const Privacy        = lazy(() => import('./screens/Privacy.tsx'))
 const Terms          = lazy(() => import('./screens/Terms.tsx'))
-const Jobs           = lazy(() => import('./screens/Jobs.tsx'))
-const Leads          = lazy(() => import('./screens/Leads.tsx'))
-const Pipeline       = lazy(() => import('./screens/Pipeline.tsx'))
+const Work           = lazy(() => import('./screens/Work.tsx'))
 const ContactDetail  = lazy(() => import('./screens/ContactDetail/index.tsx'))
+const DetailListRail = lazy(() => import('./components/desktop/DetailListRail.tsx'))
 const Clients        = lazy(() => import('./screens/Clients.tsx'))
 const ClientDetail   = lazy(() => import('./screens/ClientDetail.tsx'))
 const Notes          = lazy(() => import('./screens/Notes.tsx'))
@@ -106,6 +106,67 @@ function AppLoading({ label }: { label: string }) {
   )
 }
 
+/**
+ * ContactDetailRoute — master-detail shell for /leads/:id, /quotes/:id,
+ * /jobs/:id.
+ *
+ * ≥1200px: a persistent list rail renders beside the detail so the
+ * operator flips between records without bouncing back to the board.
+ * The rail lives OUTSIDE the keyed ContactDetail, so its scroll +
+ * search survive record switches. Below 1200px nothing changes — the
+ * detail renders full-width exactly as before (the rail isn't even
+ * mounted, so phones/tablets pay zero cost).
+ *
+ * key={id} gives every record a clean ContactDetail remount. This also
+ * fixes a latent stale-state bug: navigating detail→detail (command
+ * palette, rail) used to keep the previous record's tab/isEditing/modal
+ * state because React kept the instance alive across param changes.
+ */
+/**
+ * LegacyBoardRedirect — /leads, /quotes, /jobs, /pipeline collapsed
+ * into the single /work screen (IA round 2: "jobs leads quotes
+ * invoices… it all sucks and is too complicated"). Old links, nav
+ * habits, and deep links keep working: the stage/view intent maps to
+ * the matching Work chip and every other query param rides along
+ * (?new=1, ?asStage=job from Home's New Job tile, etc).
+ */
+function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
+  const [params] = useSearchParams()
+  const sp = new URLSearchParams(params)
+  const requested = sp.get('stage') || sp.get('view') || defaultStage
+  sp.delete('view')
+  const mapped =
+    requested === 'lead' || requested === 'new' || requested === 'leads' ? 'leads'
+    : requested === 'quote' || requested === 'quoted' || requested === 'quotes' ? 'quotes'
+    : requested === 'job' || requested === 'active' || requested === 'doing' || requested === 'invoice' || requested === 'won' ? 'active'
+    : requested === 'closed' || requested === 'complete' || requested === 'done' ? 'done'
+    : requested === 'lost' ? 'lost'
+    : undefined
+  if (mapped) sp.set('stage', mapped)
+  else sp.delete('stage')
+  const search = sp.toString()
+  return <Navigate to={{ pathname: '/work', search: search ? `?${search}` : '' }} replace />
+}
+
+function ContactDetailRoute() {
+  const { id } = useParams()
+  const isWide = useMediaQuery('(min-width: 1200px)')
+  return (
+    <div className="fh-detail-split">
+      {isWide && (
+        <aside className="fh-detail-split__rail">
+          <Suspense fallback={null}>
+            <DetailListRail />
+          </Suspense>
+        </aside>
+      )}
+      <div className="fh-detail-split__main">
+        <ContactDetail key={id} />
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <Suspense fallback={<PublicFallback />}>
@@ -127,13 +188,14 @@ export default function App() {
         />
         <Route element={<Gated><AppShell /></Gated>}>
           <Route path="/" element={<Home />} />
-          <Route path="/leads" element={<Leads />} />
-          <Route path="/leads/:id" element={<ContactDetail />} />
-          <Route path="/quotes" element={<Leads surface="quotes" />} />
-          <Route path="/quotes/:id" element={<ContactDetail />} />
-          <Route path="/pipeline" element={<Pipeline />} />
-          <Route path="/jobs" element={<Jobs />} />
-          <Route path="/jobs/:id" element={<ContactDetail />} />
+          <Route path="/work" element={<Work />} />
+          <Route path="/leads" element={<LegacyBoardRedirect defaultStage="leads" />} />
+          <Route path="/leads/:id" element={<ContactDetailRoute />} />
+          <Route path="/quotes" element={<LegacyBoardRedirect defaultStage="quotes" />} />
+          <Route path="/quotes/:id" element={<ContactDetailRoute />} />
+          <Route path="/pipeline" element={<LegacyBoardRedirect />} />
+          <Route path="/jobs" element={<LegacyBoardRedirect defaultStage="active" />} />
+          <Route path="/jobs/:id" element={<ContactDetailRoute />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/clients/:id" element={<ClientDetail />} />
           <Route path="/notes" element={<Notes />} />

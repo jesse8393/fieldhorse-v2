@@ -5,8 +5,8 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 const BG = '#0B0907'
-const INK = '#F2EDE4'
-const MUTED = 'rgba(242,237,228,0.62)'
+const INK = 'var(--v3-text)'
+const MUTED = 'var(--v3-text-muted)'
 const GOLD = '#E8B865'
 
 export default function LegalLayout({ title, updated, children }: { title: string; updated: string; children: ReactNode }) {
@@ -30,12 +30,12 @@ export function H2({ children }: { children: ReactNode }) {
 }
 
 export function P({ children }: { children: ReactNode }) {
-  return <p style={{ color: 'rgba(242,237,228,0.85)', marginTop: 0, marginBottom: 12 }}>{children}</p>
+  return <p style={{ color: 'var(--v3-text)', marginTop: 0, marginBottom: 12 }}>{children}</p>
 }
 
 export function UL({ items }: { items: string[] }) {
   return (
-    <ul style={{ color: 'rgba(242,237,228,0.85)', marginTop: 0, marginBottom: 12, paddingLeft: 20 }}>
+    <ul style={{ color: 'var(--v3-text)', marginTop: 0, marginBottom: 12, paddingLeft: 20 }}>
       {items.map((it, i) => <li key={i} style={{ marginBottom: 6 }}>{it}</li>)}
     </ul>
   )

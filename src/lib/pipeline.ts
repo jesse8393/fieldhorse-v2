@@ -15,7 +15,13 @@ import {
 import { toast, hapticMedium, hapticSuccess } from './toast.ts'
 import type { Database } from './database.types.ts'
 
-type Contact = Database['public']['Tables']['fh_contacts']['Row']
+// The stage helpers only read identity + display fields, never the full
+// row — declare exactly that so projected list rows (JobRow) are valid
+// inputs. A full fh_contacts Row remains assignable (superset).
+type Contact = Pick<
+  Database['public']['Tables']['fh_contacts']['Row'],
+  'id' | 'user_id' | 'stage' | 'name' | 'job_title' | 'address' | 'amount'
+>
 
 function notify(stageId: string, verb = 'Moved to') {
   const s = STAGE_MAP[stageId]

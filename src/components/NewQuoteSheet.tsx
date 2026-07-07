@@ -7,6 +7,7 @@ import { toastError } from '../lib/toast.ts'
 import { hapticMedium } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import ClientPicker from './ClientPicker.tsx'
+import { Eyebrow } from './v3'
 
 /**
  * NewQuoteSheet — the ONE way to start a quote.
@@ -63,10 +64,10 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !starting) onClose?.() }}>
       <DrawerContent className="ui:max-w-full ui:overflow-x-hidden" style={drawerStyle}>
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+          <Eyebrow as="div">
             <FileText size={12} />
             New quote
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2 className="fh-font-serif" style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
               Who's it for?

@@ -4,6 +4,7 @@ import { Camera, Upload, Sparkles, X, Loader2 } from 'lucide-react'
 import { compressImageToDataUrl, imageFromClipboardEvent } from '../lib/docIntelligence.ts'
 import { hapticTap, hapticSuccess } from './../lib/haptics.ts'
 import { toastError } from '../lib/toast.ts'
+import { Eyebrow } from './v3'
 
 /**
  * DocIntakeButton — the entry surface for document-intelligence flows.
@@ -91,8 +92,8 @@ export default function DocIntakeButton({
           gap: 6,
           padding: '8px 12px',
           borderRadius: 10,
-          background: 'rgba(255, 255, 255, 0.06)',
-          border: '1px solid rgba(255, 255, 255, 0.22)',
+          background: 'var(--v3-glass-tint-2)',
+          border: '1px solid var(--v3-border-strong)',
           color: 'var(--ink-strong)',
           fontFamily: 'var(--font-display)',
           fontSize: 11,
@@ -118,7 +119,7 @@ export default function DocIntakeButton({
               padding: 14,
               borderRadius: 14,
               background: 'linear-gradient(180deg, rgba(30,20,10,0.5), rgba(20,15,10,0.3))',
-              border: '1px solid rgba(255, 255, 255, 0.22)',
+              border: '1px solid var(--v3-border-strong)',
               position: 'relative',
               overflow: 'hidden'
             }}
@@ -133,10 +134,10 @@ export default function DocIntakeButton({
               <X size={14} />
             </button>
 
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+            <Eyebrow as="div">
               <Sparkles size={12} />
               AI doc parse
-            </div>
+            </Eyebrow>
             <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
               {description}
             </p>
@@ -151,7 +152,7 @@ export default function DocIntakeButton({
             )}
 
             {busy ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.22)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.12em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.12em' }}>
                 <Loader2 size={14} style={{ animation: 'fh-spin 700ms linear infinite' }} />
                 READING DOC…
               </div>
@@ -177,9 +178,9 @@ export default function DocIntakeButton({
             )}
 
             {!busy && (
-              <p style={{ margin: '10px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', textAlign: 'center' }}>
+              <Eyebrow as="p" style={{ margin: '10px 0 0', color: 'var(--ink-faint)', display: 'flex', justifyContent: 'center' }}>
                 or paste an image · ⌘V
-              </p>
+              </Eyebrow>
             )}
 
             <input

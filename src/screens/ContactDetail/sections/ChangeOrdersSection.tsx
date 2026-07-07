@@ -17,6 +17,8 @@ import { Plus, FileEdit, Check, X, Trash2, FileText, Share2 } from 'lucide-react
 import { supabase } from '../../../lib/supabase.ts'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -34,6 +36,7 @@ function shortDate(iso: any) {
 }
 
 export default function ChangeOrdersSection({ contact, userId, changeOrders = [], onChange }: any) {
+  const confirm = useConfirm()
   const isOwner = contact && contact.user_id === userId
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
@@ -167,12 +170,12 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
   }
 
   async function handleVoid(co: any) {
-    if (!window.confirm(`Void CO #${co.sequence_number}? It will stop counting toward the contract total.`)) return
+    if (!(await confirm({ title: `Void CO #${co.sequence_number}?`, body: 'It will stop counting toward the contract total.', destructive: true, confirmLabel: 'Void' }))) return
     await handleSave({ ...co, status: 'void' })
   }
 
   async function handleDelete(co: any) {
-    if (!window.confirm(`Delete CO #${co.sequence_number}? This cannot be undone.`)) return
+    if (!(await confirm({ title: `Delete CO #${co.sequence_number}?`, body: 'This cannot be undone.', destructive: true }))) return
     try {
       const { error } = await supabase
         .from('fh_change_orders')
@@ -240,18 +243,14 @@ function SectionHeader({ count, canAdd, onAdd }: any) {
       background: 'var(--v3-surface-2)'
     }}>
       <FileEdit size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
-      <span style={{
-        fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-        letterSpacing: '0.16em', color: 'var(--v3-primary-bright)',
-        textTransform: 'uppercase'
-      }}>
+      <Eyebrow tone="gold">
         Change orders
         {count > 0 && (
           <span style={{ marginLeft: 8, color: 'var(--v3-text-muted)' }}>
             · {count}
           </span>
         )}
-      </span>
+      </Eyebrow>
       {canAdd && (
         <button
           type="button"
@@ -510,21 +509,15 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
 
 function Tag({ tone, children }: any) {
   const palette = ({
-    muted: { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' },
+    muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
     green: { bg: 'rgba(74, 222, 128, 0.12)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74, 222, 128, 0.30)' },
     gold:  { bg: 'rgba(228, 190, 111, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(228, 190, 111, 0.30)' },
     red:   { bg: 'rgba(232, 90, 87, 0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232, 90, 87, 0.30)' }
-  } as Record<string, any>)[tone] || { bg: 'rgba(255,255,255,0.04)', fg: 'var(--v3-text-muted)', br: 'rgba(255,255,255,0.10)' }
+  } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '3px 7px', borderRadius: 999,
-      background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg,
-      fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-      letterSpacing: '0.16em', textTransform: 'uppercase'
-    }}>
+    <Eyebrow style={{ padding: '3px 7px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
       {children}
-    </span>
+    </Eyebrow>
   )
 }
 

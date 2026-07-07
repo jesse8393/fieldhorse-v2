@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import {
   startQuote, approveQuote, markComplete, reopen
 } from '../../../lib/pipeline.ts'
@@ -12,9 +12,8 @@ import {
   NextActionCard,
   HealthDonut,
   ProgressMeter,
-  FeedRow,
-  SectionHeader,
-  PostedByChip
+  Button,
+  Eyebrow
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
@@ -65,33 +64,7 @@ export default function OverviewTab({
   onOpenQuote
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
-  const confirm = useConfirm() as any
-
-  // Delete a logged payment row. Used by the trash icon on payment
-  // rows in the Recent Activity list. We confirm because payments are
-  // financial records and an accidental delete here would silently
-  // change the job's paid/balance numbers.
-  async function deletePayment(paymentId: any, amount: any) {
-    if (!paymentId || !userId) return
-    const ok = await confirm({
-      title: 'Delete this payment?',
-      body: `Removes a ${fmtMoney(amount)} payment from this job. This can't be undone — re-log it if you delete by mistake.`,
-      destructive: true,
-      confirmLabel: 'Delete payment'
-    })
-    if (!ok) return
-    const { error } = await supabase
-      .from('fh_payments')
-      .delete()
-      .eq('id', paymentId)
-      .eq('user_id', userId)
-    if (error) {
-      toastError("Couldn't delete payment", error.message)
-      return
-    }
-    toastSuccess('Payment deleted', `${fmtMoney(amount)} removed`)
-    await fetchAll?.()
-  }
+  const queryClient = useQueryClient()
 
   const health = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
@@ -111,11 +84,6 @@ export default function OverviewTab({
     ? Math.round((milestones.filter((m: any) => m.done).length / milestones.length) * 100)
     : 0
 
-  const activityRows = useMemo(
-    () => buildActivityRows({ notes, payments, scheduleItems }).slice(0, 6),
-    [notes, payments, scheduleItems]
-  )
-
   async function handleNextActionComplete() {
     if (actionLoading) return
     setActionLoading(true)
@@ -129,13 +97,23 @@ export default function OverviewTab({
           break
         }
         case 'todo': {
+          // Speed pass: flip the todo in the detail cache immediately so
+          // the NextActionCard advances the instant the thumb lifts; the
+          // fetchAll/rollback below reconciles with server truth.
+          const todoId = String(nextAction.sourceId || '')
+          queryClient.setQueryData(['jobDetail', contact?.id], (prev: any) =>
+            prev
+              ? { ...prev, todos: (prev.todos || []).map((t: any) => t.id === todoId ? { ...t, done: true } : t) }
+              : prev
+          )
           const { error } = await supabase
             .from('fh_job_todos')
             .update({ done: true, completed_at: new Date().toISOString() })
-            .eq('id', String(nextAction.sourceId || ''))
+            .eq('id', todoId)
             .eq('user_id', userId)
           if (error) {
             toastError("Couldn't mark to-do done", error.message)
+            await fetchAll() // roll the optimistic flip back
           } else {
             toastSuccess('To-do complete')
             await fetchAll()
@@ -312,43 +290,10 @@ export default function OverviewTab({
         />
       )}
 
-      {/* RECENT ACTIVITY */}
-      <div className="v3-section">
-        <SectionHeader {...({ title: "Recent Activity" } as any)} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-          {activityRows.length === 0 ? (
-            <div className="v3-empty">
-              Nothing logged yet. Crew check-ins, payments, and schedule changes appear here.
-            </div>
-          ) : (
-            activityRows.map((row) => (
-              <div key={row.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <FeedRow
-                  type={row.type}
-                  title={row.title}
-                  detail={row.detail}
-                  timestamp={row.timestamp}
-                  pillTone={row.pillTone}
-                  pillLabel={row.pillLabel}
-                  onDelete={row.paymentId ? () => deletePayment(row.paymentId, row.paymentAmount) : undefined}
-                  deleteLabel="Delete payment"
-                />
-                {row.userId && (
-                  <PostedByChip
-                    userId={row.userId}
-                    verb={(row.verb || 'posted') as any}
-                    style={{ paddingLeft: 14 }}
-                  />
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* TIME CLOCK — preserved from legacy. Only shows when stage in {job, invoice}.
-          TimeClockCard internally gates on stage; we mount it always and let it
-          decide whether to render. */}
+      {/* DAILY ACTIONS — the highest-frequency job actions live here, directly
+          under the status/next-action so they're reachable without scrolling
+          past the activity feed. Money actions come first, then time clock,
+          then the lower-frequency schedule/partner actions. */}
       {(contact?.stage === 'job' || contact?.stage === 'invoice') && (
         <TimeClockCard
           contact={contact}
@@ -357,46 +302,37 @@ export default function OverviewTab({
         />
       )}
 
-      {/* QUICK ACTIONS row — secondary actions. + Event opens AddEventSheet,
-          Log Payment opens PaymentModal (only when stage allows it),
-          Invite Partner opens InvitePartnerSheet. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <SecondaryAction
-          icon={Plus}
-          label="Schedule event"
-          onClick={() => { hapticTap(); onOpenAddEvent?.() }}
-        />
         {(contact?.stage === 'invoice' || contact?.stage === 'job') && (
-          <SecondaryAction
-            icon={Receipt}
-            label="Send invoice"
-            onClick={() => { hapticTap(); onOpenSendInvoice?.() }}
-          />
+          <Button variant="secondary" leftIcon={Receipt} onClick={() => { hapticTap(); onOpenSendInvoice?.() }}>
+            Send invoice
+          </Button>
         )}
         {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
-          <SecondaryAction
-            icon={Plus}
-            label="Log payment"
-            onClick={() => { hapticTap(); onOpenLogPayment?.() }}
-          />
+          <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenLogPayment?.() }}>
+            Log payment
+          </Button>
         )}
-        <SecondaryAction
-          icon={Plus}
-          label="Invite partner"
-          onClick={() => { hapticTap(); onOpenInvitePartner?.() }}
-        />
         {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
-          <SecondaryAction
-            icon={ShieldCheck}
-            label={contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
-            onClick={() => { hapticTap(); onOpenMarkComplete?.() }}
-          />
+          <Button variant="secondary" leftIcon={ShieldCheck} onClick={() => { hapticTap(); onOpenMarkComplete?.() }}>
+            {contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
+          </Button>
         )}
+        <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenAddEvent?.() }}>
+          Schedule event
+        </Button>
+        <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenInvitePartner?.() }}>
+          Invite partner
+        </Button>
       </div>
 
-      {/* ACTIVITY LOG — chronological feed synthesized from existing
-          arrays (notes, payments, schedule, change orders, contact
-          metadata). Auto-hides on a brand-new job with no events. */}
+      {/* ACTIVITY — single chronological timeline synthesized from existing
+          arrays (notes, payments, schedule, change orders, stage history,
+          contact metadata). This is the one activity feed on the Overview;
+          the old compact "Recent Activity" list above it duplicated these
+          same events. Payment deletion moved to the Financials → Invoice
+          payment-history list, its natural home. Auto-hides on a brand-new
+          job with no events. */}
       <ActivityLog
         contact={contact}
         notes={notes}
@@ -431,122 +367,6 @@ const STAGE_FN_MAP: Record<string, any> = {
   approveQuote,
   markComplete,
   reopen
-}
-
-function fmtMoney(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
-}
-
-/**
- * Merge notes + payments + scheduleItems into a unified activity stream
- * sorted by recency (newest first). Returns FeedRow-shaped objects.
- *
- * Each source maps to a FeedRow type for icon+color treatment:
- *   payment  → 'invoice'  (gold)
- *   note     → 'note'     (muted)
- *   schedule → 'crew-on-site' (green) — schedule entries are crew work
- */
-function buildActivityRows({ notes = [], payments = [], scheduleItems = [] }: any) {
-  const rows = []
-
-  for (const p of payments) {
-    rows.push({
-      key: `pay-${p.id}`,
-      type: 'invoice',
-      title: `Payment received · ${fmtMoney(p.amount)}`,
-      detail: p.method ? `via ${p.method}` : null,
-      timestamp: p.paid_on || p.created_at,
-      pillTone: 'success',
-      pillLabel: 'PAID',
-      userId: p.user_id || null,
-      verb: 'posted',
-      paymentId: p.id,
-      paymentAmount: p.amount
-    })
-  }
-
-  for (const n of notes) {
-    rows.push({
-      key: `note-${n.id}`,
-      type: 'note',
-      title: n.text || 'Note',
-      detail: n.category && n.category !== 'note' ? n.category : null,
-      timestamp: n.created_at,
-      userId: n.user_id || null,
-      verb: 'posted'
-    })
-  }
-
-  for (const s of scheduleItems) {
-    rows.push({
-      key: `sch-${s.id}`,
-      type: 'crew-on-site',
-      title: s.title || 'Scheduled work',
-      detail: s.description || null,
-      timestamp: s.start_at,
-      userId: s.user_id || null,
-      verb: 'added'
-    })
-  }
-
-  const sorted = rows.sort((a, b) => {
-    const da = a.timestamp ? new Date(a.timestamp).getTime() : 0
-    const db = b.timestamp ? new Date(b.timestamp).getTime() : 0
-    return db - da
-  })
-
-  // 5/17 — collapse duplicate activity rows that come from the same
-  // logical event written multiple times. The 5/13 audit flagged
-  // "Roof-Deck-Chimney · Approved quote for Jeff Roy" appearing 4×
-  // on the feed; root cause is upstream (approveQuote() in lib/stages.ts
-  // and possibly fn_approve_quote_version trigger both insert into
-  // fh_schedule on the same approval, doubling per re-approval). Fixing
-  // the write path is invasive — a content-key dedupe at display time
-  // is the safe fix that addresses the visible symptom.
-  //
-  // Dedupe key = (type | title | detail | day-bucket). Notes stay
-  // unique because their `key` already encodes the unique row id and
-  // we don't strip per-row; payments stay unique because each payment
-  // amount/date combo is rarely identical. Only schedule rows with
-  // truly-identical content on the same day collapse.
-  const seen = new Set()
-  return sorted.filter((r) => {
-    const dayBucket = r.timestamp ? String(r.timestamp).slice(0, 10) : 'no-date'
-    const content = `${r.type}|${(r.title || '').trim()}|${(r.detail || '').trim()}|${dayBucket}`
-    if (seen.has(content)) return false
-    seen.add(content)
-    return true
-  })
-}
-
-function SecondaryAction({ icon: Icon, label, onClick }: any) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.97 }}
-      onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '9px 14px',
-        borderRadius: 10,
-        background: 'var(--v3-surface-2)',
-        border: '1px solid var(--v3-border)',
-        color: 'var(--v3-text)',
-        fontFamily: 'var(--font-body)',
-        fontSize: 12,
-        fontWeight: 600,
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      <Icon size={13} aria-hidden="true" />
-      {label}
-    </motion.button>
-  )
 }
 
 /* ============================================================
@@ -710,15 +530,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
       display: 'flex', flexDirection: 'column', gap: 14
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--v3-primary)'
-        }}>
+        <Eyebrow as="div" tone="gold">
           <Pencil size={12} aria-hidden="true" />
           Editing {recordNoun} fields
-        </div>
+        </Eyebrow>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           {fieldsToFill.length > 0 && (
             <button
@@ -760,13 +575,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
           and commit the new client_id alongside the regular field
           diff. Clearing the picker queues an unlink. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-          letterSpacing: '0.14em', color: 'var(--v3-text-muted)',
-          textTransform: 'uppercase'
-        }}>
-          Linked client
-        </span>
+        <Eyebrow>Linked client</Eyebrow>
         <ClientPicker
           userId={userId}
           value={linkedClient || (contact?.client_id ? { id: contact.client_id, name: '' } : null)}
@@ -867,13 +676,7 @@ function EditField({ label, value, onChange, kind, placeholder, spanFull }: any)
   }
   return (
     <label className={className} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
-        {label}
-      </span>
+      <Eyebrow>{label}</Eyebrow>
       {kind === 'textarea' ? (
         <textarea
           value={value}

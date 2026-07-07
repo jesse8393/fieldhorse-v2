@@ -13,7 +13,7 @@
 // No new schema. Uses indexes already in place (everything is
 // scoped by user_id via RLS).
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -24,6 +24,8 @@ import { useActivityFeed } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
+import { Eyebrow } from '../components/v3'
 
 const PAGE_SIZE = 60
 
@@ -68,7 +70,8 @@ function timeAt(d: any) {
 
 export default function Activity() {
   const { user } = useAuth()
-  const { data: bundle } = useActivityFeed(user?.id, PAGE_SIZE)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE)
+  const { data: bundle, isError, refetch, isFetching } = useActivityFeed(user?.id, pageSize)
   const { stagger, item } = useFhMotion()
 
   // Map the raw datasets into display events. Kept in the component
@@ -163,6 +166,20 @@ export default function Activity() {
   const loading = events === null
   const empty = !loading && events.length === 0
 
+  // Without this, a failed fetch leaves events===null forever → an infinite
+  // skeleton that looks like a hang. Show an honest error + retry instead.
+  if (isError) {
+    return (
+      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+        <DataErrorState
+          title="Couldn't load activity"
+          message="We couldn't reach your activity feed. Check your connection and retry."
+          onRetry={() => refetch()}
+        />
+      </div>
+    )
+  }
+
   return (
     <motion.div
       className="v3-screen fh-readable-desktop"
@@ -175,16 +192,10 @@ export default function Activity() {
       }}
     >
       <motion.div variants={item} style={{ padding: '12px 20px 8px' }}>
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: 'var(--v3-primary)',
-          display: 'inline-flex', alignItems: 'center', gap: 6
-        }}>
+        <Eyebrow as="div" tone="gold">
           <ActivityIcon size={11} aria-hidden="true" />
           Recent
-        </div>
+        </Eyebrow>
         <h1 style={{
           fontFamily: 'var(--font-display)',
           fontSize: 'clamp(28px, 7vw, 38px)',
@@ -222,23 +233,39 @@ export default function Activity() {
         )}
         {grouped && grouped.map(([label, items]) => (
           <section key={label} style={{ marginBottom: 22 }}>
-            <div style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)',
-              marginBottom: 10
-            }}>
+            <Eyebrow as="div" style={{ marginBottom: 10 }}>
               {label}
               <span style={{ marginLeft: 8, color: 'var(--v3-text-faint, var(--v3-text-muted))' }}>
                 · {items.length}
               </span>
-            </div>
+            </Eyebrow>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {items.map((e: any) => <EventRow key={e.id} event={e} />)}
             </ul>
           </section>
         ))}
+
+        {/* Load older — show only when a source actually filled its page
+            (bundle.hasMore), not when the merged feed happens to exceed
+            pageSize (4 sources can sum past it while all are exhausted). */}
+        {!loading && !empty && bundle?.hasMore && pageSize < 480 && (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 6 }}>
+            <button
+              type="button"
+              onClick={() => setPageSize((p) => Math.min(p + 60, 480))}
+              disabled={isFetching}
+              style={{
+                minHeight: 44, padding: '11px 20px', borderRadius: 12,
+                background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
+                color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
+                fontSize: 13, fontWeight: 600, cursor: isFetching ? 'wait' : 'pointer',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              {isFetching ? 'Loading…' : 'Load older activity'}
+            </button>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   )
@@ -247,7 +274,7 @@ export default function Activity() {
 function EventRow({ event }: any) {
   const Icon = event.icon || ActivityIcon
   const tone = ({
-    neutral: { fg: 'var(--v3-text-muted)', bg: 'rgba(255,255,255,0.06)', br: 'rgba(255,255,255,0.10)' },
+    neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', br: 'var(--v3-border-mid)' },
     gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
     green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74,222,128,0.10)', br: 'rgba(74,222,128,0.30)' },
     red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232,90,87,0.10)', br: 'rgba(232,90,87,0.30)' }

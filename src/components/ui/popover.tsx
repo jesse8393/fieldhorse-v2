@@ -9,11 +9,13 @@ function Popover({
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
-function PopoverTrigger({
-  ...props
-}: any) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
-}
+// forwardRef (React 18): the stock shadcn wrappers assume React 19's
+// ref-as-prop. Without it, asChild composition (e.g. PopoverAnchor
+// around a DropdownMenuTrigger) never delivers a DOM node to Radix
+// popper and the popover renders off-screen at translate(0,-200%).
+const PopoverTrigger = React.forwardRef<any, any>(function PopoverTrigger(props, ref) {
+  return <PopoverPrimitive.Trigger ref={ref} data-slot="popover-trigger" {...props} />;
+})
 
 function PopoverContent({
   className,
@@ -36,11 +38,9 @@ function PopoverContent({
   );
 }
 
-function PopoverAnchor({
-  ...props
-}: any) {
-  return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />;
-}
+const PopoverAnchor = React.forwardRef<any, any>(function PopoverAnchor(props, ref) {
+  return <PopoverPrimitive.Anchor ref={ref} data-slot="popover-anchor" {...props} />;
+})
 
 function PopoverHeader({
   className,

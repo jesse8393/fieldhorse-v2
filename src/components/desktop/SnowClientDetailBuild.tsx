@@ -186,7 +186,7 @@ export default function SnowClientDetailBuild(props: Props) {
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Next action</div>
-              <strong style={{ color: nextAction.tone === 'warn' ? '#e0a141' : nextAction.tone === 'good' ? '#73c982' : undefined }}>
+              <strong style={{ color: nextAction.tone === 'warn' ? 'var(--v3-primary-bright)' : nextAction.tone === 'good' ? 'var(--v3-success-bright)' : undefined }}>
                 {nextAction.label}
               </strong>
               <span>derived from open work + AR</span>
@@ -210,14 +210,14 @@ export default function SnowClientDetailBuild(props: Props) {
                 </>
               ) : status.tone === 'warn' ? (
                 <>
-                  <strong style={{ color: '#e0a141', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <strong style={{ color: 'var(--v3-primary-bright)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <AlertTriangle size={14} /> Cooling
                   </strong>
                   <span>30+ days since last touch</span>
                 </>
               ) : (
                 <>
-                  <strong style={{ color: '#73c982' }}>None</strong>
+                  <strong style={{ color: 'var(--v3-success-bright)' }}>None</strong>
                   <span>Relationship healthy</span>
                 </>
               )}

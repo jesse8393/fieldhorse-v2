@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare, Eye, ShieldCheck, FileEdit } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
+import { Eyebrow } from './v3'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.ts'
@@ -103,15 +104,15 @@ export default function NotificationsBell() {
         onClick={() => { hapticTap(); setOpen(true) }}
         className="fh-header-search-btn"
         style={{
-          // V3-HOME-2: matches the search + notes trio in AppHeader at
-          // 34/r8/13. Unread dot stays 14×14 and still fits the smaller
-          // frame; positioned at 3/3 from corners.
-          width: 34,
-          height: 34,
-          minWidth: 34,
-          borderRadius: 8,
-          background: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          // Matches the search + notes trio in AppHeader at 44/r11/16 —
+          // the full minimum touch target. Unread dot stays 14×14 and
+          // sits 3px in from the top-right corner.
+          width: 44,
+          height: 44,
+          minWidth: 44,
+          borderRadius: 11,
+          background: 'var(--v3-glass-tint)',
+          border: '1px solid var(--v3-border-mid)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
           display: 'grid',
@@ -123,7 +124,7 @@ export default function NotificationsBell() {
           transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
         }}
       >
-        <Bell size={14} />
+        <Bell size={16} />
         {unread > 0 && (
           <span
             aria-hidden="true"
@@ -159,10 +160,10 @@ export default function NotificationsBell() {
           <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+                <Eyebrow as="div">
                   <Inbox size={12} />
                   Inbox
-                </div>
+                </Eyebrow>
                 <DrawerTitle asChild>
                   <h2
                     className="fh-font-serif"
@@ -226,9 +227,9 @@ export default function NotificationsBell() {
                           // adequately. Now uses a neutral lift instead
                           // of gold gradient.
                           background: isUnread
-                            ? 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))'
+                            ? 'linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint))'
                             : 'var(--surface-2)',
-                          border: isUnread ? '1px solid rgba(255,255,255,0.12)' : '1px solid var(--rule)',
+                          border: isUnread ? '1px solid var(--v3-border-mid)' : '1px solid var(--rule)',
                           cursor: 'pointer',
                           color: 'var(--ink-strong)',
                           position: 'relative',

@@ -25,6 +25,8 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 const SkeletonAny = SkeletonList as any
 
@@ -101,6 +103,7 @@ function parseBulkLine(raw: string): { qty: number; name: string } | null {
 }
 
 export default function MaterialsSection({ jobId, userId }: any) {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<MaterialRow[]>([])
   const [loading, setLoading] = useState(true)
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -203,7 +206,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
   }
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this material row?')) return
+    if (!(await confirm({ title: 'Delete this material row?', destructive: true }))) return
     hapticTap()
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_materials').delete().eq('id', id)
@@ -220,14 +223,14 @@ export default function MaterialsSection({ jobId, userId }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+        <Eyebrow>
           Materials
           {counts.total > 0 && (
             <span style={{ marginLeft: 12, color: 'var(--v3-text)' }}>
               {counts.installed}/{counts.total} installed · {counts.needed} to order
             </span>
           )}
-        </span>
+        </Eyebrow>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" onClick={() => setNotesPromptOpen(true)} style={chipBtnGhost}>
             <Sparkles size={11} /> Pull from notes
@@ -548,7 +551,7 @@ function NotesPullDialog({ jobId, onClose, onAdd }: {
               <li key={it.note_id + idx} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 10px', borderRadius: 8,
-                background: 'rgba(255,255,255,.025)', border: '1px solid var(--v3-border)',
+                background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border)',
               }}>
                 <input
                   type="checkbox"
@@ -600,7 +603,7 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
           padding: 22,
           borderRadius: 12,
           background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
-          border: '1px solid rgba(255,255,255,.10)',
+          border: '1px solid var(--v3-border-mid)',
           boxShadow: '0 22px 60px rgba(0,0,0,.50)',
         }}
       >
@@ -608,10 +611,10 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
           <div>
             <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>{title}</div>
             {subtitle && (
-              <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'rgba(245,242,234,.62)' }}>{subtitle}</p>
+              <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--v3-text-muted)' }}>{subtitle}</p>
             )}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'rgba(245,242,234,.55)', cursor: 'pointer' }}>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
             <X size={18} />
           </button>
         </div>

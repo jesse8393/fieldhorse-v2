@@ -7,6 +7,7 @@ import { crewLaborForContact, type CrewLabor } from '../../../lib/labor.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_, SheetMoneyField as SheetMoneyField_ } from '../../../components/ActionSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 const SheetField = SheetField_ as any
 const SheetChipRow = SheetChipRow_ as any
 const SheetMoneyField = SheetMoneyField_ as any
@@ -110,13 +111,9 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Expenses
-        </span>
+        </Eyebrow>
         <span style={{
           fontFamily: 'var(--font-body)', fontSize: 11,
           color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'

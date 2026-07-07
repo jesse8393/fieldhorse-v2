@@ -253,9 +253,9 @@ export default function SnowJobDetailBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Job health</div>
               <strong style={{
-                color: health.tone === 'bad' ? '#ee4942'
-                     : health.tone === 'warn' ? '#e0a141'
-                     : health.tone === 'good' ? '#73c982'
+                color: health.tone === 'bad' ? 'var(--v3-danger-bright)'
+                     : health.tone === 'warn' ? 'var(--v3-primary-bright)'
+                     : health.tone === 'good' ? 'var(--v3-success-bright)'
                      : undefined,
               }}>
                 {health.label}
@@ -272,9 +272,9 @@ export default function SnowJobDetailBuild(props: Props) {
               {scheduleStatus ? (
                 <>
                   <strong style={{
-                    color: scheduleStatus.tone === 'bad' ? '#ee4942'
-                         : scheduleStatus.tone === 'warn' ? '#e0a141'
-                         : '#73c982',
+                    color: scheduleStatus.tone === 'bad' ? 'var(--v3-danger-bright)'
+                         : scheduleStatus.tone === 'warn' ? 'var(--v3-primary-bright)'
+                         : 'var(--v3-success-bright)',
                   }}>
                     {scheduleStatus.label}
                   </strong>
@@ -297,7 +297,7 @@ export default function SnowJobDetailBuild(props: Props) {
               <div className="fh-build-eyebrow">Reports</div>
               {reportsMissing != null ? (
                 <>
-                  <strong style={{ color: reportsMissing > 0 ? '#e0a141' : '#73c982', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <strong style={{ color: reportsMissing > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-success-bright)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {reportsMissing > 0 ? <AlertTriangle size={14} /> : <ClipboardCheck size={14} />}
                     {reportsMissing > 0 ? `${reportsMissing} missing` : 'Up to date'}
                   </strong>
@@ -316,9 +316,9 @@ export default function SnowJobDetailBuild(props: Props) {
               {billingStatus ? (
                 <>
                   <strong style={{
-                    color: billingStatus.tone === 'bad' ? '#ee4942'
-                         : billingStatus.tone === 'warn' ? '#e0a141'
-                         : billingStatus.tone === 'good' ? '#73c982'
+                    color: billingStatus.tone === 'bad' ? 'var(--v3-danger-bright)'
+                         : billingStatus.tone === 'warn' ? 'var(--v3-primary-bright)'
+                         : billingStatus.tone === 'good' ? 'var(--v3-success-bright)'
                          : undefined,
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                   }}>
@@ -349,19 +349,19 @@ export default function SnowJobDetailBuild(props: Props) {
               ) : (
                 <>
                   <strong style={{
-                    color: changeOrderTotals.total < 0 ? '#ee4942' : undefined,
+                    color: changeOrderTotals.total < 0 ? 'var(--v3-danger-bright)' : undefined,
                   }}>
                     {moneyFull(changeOrderTotals.total)}
                   </strong>
                   <span>
                     {changeOrderTotals.count} CO{changeOrderTotals.count === 1 ? '' : 's'}
                     {changeOrderTotals.pending !== 0 && (
-                      <> · <span style={{ color: '#e0a141' }}>
+                      <> · <span style={{ color: 'var(--v3-primary-bright)' }}>
                         {moneyFull(changeOrderTotals.pending)} pending
                       </span></>
                     )}
                     {changeOrderTotals.approved !== 0 && (
-                      <> · <span style={{ color: '#73c982' }}>
+                      <> · <span style={{ color: 'var(--v3-success-bright)' }}>
                         {moneyFull(changeOrderTotals.approved)} approved
                       </span></>
                     )}

@@ -264,7 +264,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
         borderRadius: 16,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(0, 0, 0, 0.22)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.22)',
         overflow: 'hidden'
       }}>
         {/* Header */}
@@ -306,12 +306,9 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
               {partner.role && (
                 <>
                   <span style={dotStyle} aria-hidden="true" />
-                  <span style={{
-                    fontWeight: 700, color: 'var(--v3-primary-bright)',
-                    letterSpacing: '0.08em', textTransform: 'uppercase', fontSize: 10
-                  }}>
+                  <Eyebrow tone="gold">
                     {partner.role}
-                  </span>
+                  </Eyebrow>
                 </>
               )}
             </div>
@@ -355,16 +352,11 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
                     {j.name || j.jobTitle || 'Untitled job'}
                   </span>
                 </Link>
-                <span style={{
-                  fontFamily: 'var(--font-body)', fontSize: 9,
-                  fontWeight: 700, letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: j.status === 'accepted' ? 'var(--v3-good, #6FB387)'
+                <Eyebrow style={{ color: j.status === 'accepted' ? 'var(--v3-good, #6FB387)'
                     : j.status === 'revoked' ? 'var(--v3-text-muted)'
-                    : 'var(--v3-primary-bright)'
-                }}>
+                    : 'var(--v3-primary-bright)' }}>
                   {j.status}
-                </span>
+                </Eyebrow>
                 {j.status !== 'revoked' && (
                   <button
                     type="button"
@@ -428,20 +420,12 @@ function StatusBadge({ status }: any) {
   const palette = status === 'accepted'
     ? { bg: 'rgba(72, 130, 95, 0.14)', border: 'rgba(72, 130, 95, 0.45)', color: 'var(--v3-good, #6FB387)' }
     : status === 'revoked'
-      ? { bg: 'rgba(255,255,255,0.04)', border: 'var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
+      ? { bg: 'var(--v3-glass-tint)', border: 'var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
       : { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)', color: 'var(--v3-primary-bright)' }
   return (
-    <span style={{
-      flexShrink: 0,
-      padding: '3px 9px', borderRadius: 999,
-      background: palette.bg,
-      border: `1px solid ${palette.border}`,
-      color: palette.color,
-      fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-      letterSpacing: '0.14em', textTransform: 'uppercase'
-    }}>
+    <Eyebrow style={{ flexShrink: 0, padding: '3px 9px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       {status}
-    </span>
+    </Eyebrow>
   )
 }
 

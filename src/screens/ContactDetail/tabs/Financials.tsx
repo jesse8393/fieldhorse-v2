@@ -70,6 +70,8 @@ export default function FinancialsTab({
             paid={paid}
             balance={balance}
             onOpenLogPayment={onOpenLogPayment}
+            userId={userId}
+            fetchAll={fetchAll}
           />
         )}
         {sub === 'draws' && (

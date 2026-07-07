@@ -11,6 +11,7 @@ import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
 import { queuePhoto, isNetworkError } from '../../../lib/outbox.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 const BUCKET = 'job-photos'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per photo
@@ -330,13 +331,9 @@ export default function PhotosSection({ jobId, userId }: any) {
 
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           {rows.length} {rows.length === 1 ? 'photo' : 'photos'}
-        </span>
+        </Eyebrow>
         <div style={{ display: 'inline-flex', gap: 6 }}>
           {rows.length >= 2 && (
             <motion.button
@@ -495,21 +492,9 @@ export default function PhotosSection({ jobId, userId }: any) {
                     operator scan the grid and see which photos still
                     need to be tagged to a scope section. */}
                 {r.section_tag && !captioning && (
-                  <div style={{
-                    position: 'absolute', bottom: 4, right: 4,
-                    padding: '3px 7px', borderRadius: 6,
-                    background: 'color-mix(in srgb, var(--v3-primary) 80%, transparent)',
-                    color: 'var(--v3-on-primary, #1a1208)',
-                    fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    maxWidth: 'calc(100% - 12px)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
+                  <Eyebrow as="div" style={{ position: 'absolute', bottom: 4, right: 4, padding: '3px 7px', borderRadius: 6, background: 'color-mix(in srgb, var(--v3-primary) 80%, transparent)', color: 'var(--v3-on-primary, #1a1208)', maxWidth: 'calc(100% - 12px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {r.section_tag}
-                  </div>
+                  </Eyebrow>
                 )}
               </motion.button>
             )
@@ -635,7 +620,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             aria-label="Close"
             style={{
               width: 40, height: 40, borderRadius: 12,
-              background: 'rgba(255, 255, 255, 0.08)', border: 'none',
+              background: 'var(--v3-border-mid)', border: 'none',
               color: '#fff', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
             }}
@@ -692,7 +677,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
                 width: 44, height: 44, borderRadius: 999,
-                background: 'rgba(255, 255, 255, 0.12)', border: 'none',
+                background: 'var(--v3-border-mid)', border: 'none',
                 color: '#fff', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
@@ -708,7 +693,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                 width: 44, height: 44, borderRadius: 999,
-                background: 'rgba(255, 255, 255, 0.12)', border: 'none',
+                background: 'var(--v3-border-mid)', border: 'none',
                 color: '#fff', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
@@ -722,13 +707,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             attaches to on the proposal. Auto-saves on pick. */}
         <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: 'var(--v3-primary)'
-            }}>
+            <Eyebrow tone="gold">
               Scope section
-            </span>
+            </Eyebrow>
             {sectionTag && (
               <button
                 type="button"
@@ -756,10 +737,10 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
                     padding: '6px 11px', borderRadius: 999,
                     background: on
                       ? 'color-mix(in srgb, var(--v3-primary) 22%, transparent)'
-                      : 'rgba(255, 255, 255, 0.06)',
+                      : 'var(--v3-glass-tint-2)',
                     border: on
                       ? '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)'
-                      : '1px solid rgba(255, 255, 255, 0.12)',
+                      : '1px solid var(--v3-border-mid)',
                     color: on ? 'var(--v3-primary-bright, #E8B865)' : 'rgba(255, 255, 255, 0.78)',
                     fontFamily: 'var(--font-body)', fontSize: 11,
                     fontWeight: on ? 700 : 500,
@@ -775,8 +756,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               onClick={() => pickSection('__custom__')}
               style={{
                 padding: '6px 11px', borderRadius: 999,
-                background: showCustom ? 'rgba(255, 255, 255, 0.10)' : 'transparent',
-                border: '1px dashed rgba(255, 255, 255, 0.22)',
+                background: showCustom ? 'var(--v3-border-mid)' : 'transparent',
+                border: '1px dashed var(--v3-border-strong)',
                 color: 'rgba(255, 255, 255, 0.78)',
                 fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 500,
                 cursor: 'pointer'
@@ -795,7 +776,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               placeholder="Type a section name (e.g. Stairs)"
               style={{
                 width: '100%', padding: '9px 12px', borderRadius: 10,
-                background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
                 color: '#fff', fontFamily: 'var(--font-body)',
                 fontSize: 13, outline: 'none'
               }}
@@ -805,13 +786,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
 
         {/* Caption editor */}
         <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
-            color: 'var(--v3-primary)'
-          }}>
+          <Eyebrow tone="gold">
             Caption
-          </span>
+          </Eyebrow>
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
@@ -820,7 +797,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             placeholder="What's in this photo?"
             style={{
               width: '100%', padding: '10px 12px', borderRadius: 10,
-              background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
               color: '#fff', fontFamily: 'var(--font-body)',
               fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 50
             }}

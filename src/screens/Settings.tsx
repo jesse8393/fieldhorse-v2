@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell } from 'lucide-react'
+import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, SunMedium } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
@@ -10,35 +10,36 @@ import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { reverseGeocode } from '../lib/weather.ts'
-// useTheme import removed 5/17 with APPEARANCE section — restore alongside
-// the toggle when full light-theme parity ships.
-// import { useTheme } from '../contexts/ThemeContext.tsx'
+import { useTheme } from '../contexts/ThemeContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.ts'
 import { safePayUrl } from '../lib/payLink.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Switch } from '@/components/ui/switch'
+import { Eyebrow } from '../components/v3'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
 
-const CLEANUP_TABLES = [
-  'fh_payments',
-  'fh_inspections',
-  'fh_subs',
-  'fh_expenses',
-  'fh_schedule',
-  'fh_notes',
-  'fh_mileage',
-  'fh_contacts'
+// Child tables the demo seed writes keyed by contact_id — deleted first
+// (scoped to the demo contact ids) before the contacts, in case a child FK
+// isn't ON DELETE CASCADE. Mirrors what seedDemoData() inserts.
+// Each child table plus the column that foreign-keys back to the demo
+// contact. Most use `contact_id`; fh_job_todos keys on `job_id` (its FK
+// column name — see migration 006). Using the wrong column silently
+// deletes nothing and, since we only read { count }, swallows the
+// "column does not exist" error.
+const DEMO_CHILD_TABLES: { table: string; fk: string }[] = [
+  { table: 'fh_expenses',  fk: 'contact_id' },
+  { table: 'fh_schedule',  fk: 'contact_id' },
+  { table: 'fh_notes',     fk: 'contact_id' },
+  { table: 'fh_job_todos', fk: 'job_id' }
 ]
-
-const DEV_BUILD = typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.DEV
 
 export default function Settings() {
   const { user, signOut } = useAuth()
   const { profile, upsertProfile, refresh } = useProfile()
-  // const { theme, toggleTheme } = useTheme() // ← restore with APPEARANCE section
+  const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
@@ -87,28 +88,61 @@ export default function Settings() {
   const [confirmWipe, setConfirmWipe] = useState(false)
   const [wipeResult, setWipeResult] = useState('')
 
-  const canWipe = DEV_BUILD || user?.email === 'test@test.com'
+  // Available to everyone (onboarding promises "wipe anytime"). Scoped to
+  // demo-seeded rows only (source = 'demo'), so it can never touch real
+  // work — safe to expose without the old dev-only gate.
+  const canWipe = true
 
   async function wipeTestData() {
     if (!user) return
     setWiping(true)
     setWipeResult('')
     try {
-      const counts: Record<string, number> = {}
-      for (const table of CLEANUP_TABLES) {
-        const { error, count } = await supabase
-          .from(table as any)
+      // Resolve the demo contacts, delete their children explicitly (in case
+      // a child FK isn't ON DELETE CASCADE), then the contacts, then the
+      // demo clients. Everything is scoped to source='demo' + this user.
+      const { data: demoContacts, error: dcErr } = await supabase
+        .from('fh_contacts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('source' as any, 'demo')
+      if (dcErr) throw new Error(dcErr.message)
+      const ids = (demoContacts || []).map((c: any) => c.id)
+
+      let total = 0
+      if (ids.length) {
+        for (const { table, fk } of DEMO_CHILD_TABLES) {
+          const { error: childErr, count } = await supabase
+            .from(table as any)
+            .delete({ count: 'exact' })
+            .eq('user_id', user.id)
+            .in(fk, ids)
+          // Surface a real failure instead of quietly under-counting.
+          if (childErr) throw new Error(`${table}: ${childErr.message}`)
+          total += count ?? 0
+        }
+        const { error: cErr, count: cCount } = await supabase
+          .from('fh_contacts')
           .delete({ count: 'exact' })
           .eq('user_id', user.id)
-        if (error) throw new Error(`${table}: ${error.message}`)
-        counts[table] = count ?? 0
+          .in('id', ids)
+        if (cErr) throw new Error(cErr.message)
+        total += cCount ?? 0
       }
-      const total = Object.values(counts).reduce((a: any, b: any) => a + b, 0)
-      setWipeResult(`Cleared ${total} rows across ${CLEANUP_TABLES.length} tables.`)
-      toastSuccess(`Cleared ${total} rows`, 'All test data wiped')
+
+      const { error: clErr, count: clCount } = await supabase
+        .from('fh_clients')
+        .delete({ count: 'exact' })
+        .eq('user_id', user.id)
+        .eq('source' as any, 'demo')
+      if (clErr) throw new Error(clErr.message)
+      total += clCount ?? 0
+
+      setWipeResult(total > 0 ? `Removed ${total} sample rows.` : 'No sample data to remove.')
+      toastSuccess('Sample data removed', total > 0 ? `${total} demo rows cleared` : 'Nothing to remove')
       setConfirmWipe(false)
     } catch (e: any) {
-      setWipeResult(`Wipe failed: ${e.message}`)
+      setWipeResult(`Couldn't remove sample data: ${e.message}`)
     } finally {
       setWiping(false)
       setTimeout(() => setWipeResult(''), 4000)
@@ -318,7 +352,7 @@ export default function Settings() {
       <Section variants={item} title={<>Your <em>brand.</em></>} sub="Make Fieldhorse feel like your app.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Display name</span>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>Display name</Eyebrow>
             <input
               type="text"
               value={displayName}
@@ -331,7 +365,7 @@ export default function Settings() {
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Company name</span>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>Company name</Eyebrow>
             <input
               type="text"
               value={companyName}
@@ -555,16 +589,9 @@ export default function Settings() {
             background: 'var(--surface-2)',
             border: '1px solid var(--rule)'
           }}>
-            <span style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-muted)'
-            }}>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>
               Service area
-            </span>
+            </Eyebrow>
             <span style={{
               fontFamily: 'var(--font-body)',
               fontSize: 15,
@@ -600,16 +627,45 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* APPEARANCE section hidden 5/17 — light-theme parity is incomplete
-          (only repaints cards, leaves sidebar + canvas dark per the 5/13
-          audit). Audit recommendation was "either ship full light-mode
-          support or hide the toggle until parity exists." Restoring this
-          section is the right move once full parity ships. Original block:
-            <Section title={<>Light or <em>dark.</em></>}>
-              <Switch checked={theme === 'dark'} onCheckedChange={toggleTheme}/>
-              ...
-            </Section>
-       */}
+      {/* APPEARANCE — daylight mode. Restored after the light-theme
+          parity pass (theme_parity token sweep + chrome veil tokens);
+          desktop joined after the fh-build sweep (desktop_parity), so
+          the toggle now applies on every viewport. Framed as a field
+          feature: high-contrast warm paper for direct sunlight. */}
+      <Section
+        variants={item}
+        title={<>Built for <em>daylight.</em></>}
+        sub="High-contrast light theme for reading the app in direct sun."
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '4px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span aria-hidden="true" style={{
+              flexShrink: 0, width: 34, height: 34, borderRadius: 10,
+              display: 'grid', placeItems: 'center',
+              background: theme === 'light' ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
+              border: theme === 'light'
+                ? '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)'
+                : '1px solid var(--v3-border-strong)',
+              color: theme === 'light' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+            }}>
+              <SunMedium size={16} />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--v3-text)' }}>
+                Daylight mode
+              </div>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
+                Warm paper, readable in direct sun. Applies everywhere.
+              </div>
+            </div>
+          </div>
+          <Switch
+            checked={theme === 'light'}
+            onCheckedChange={(on: boolean) => { hapticMedium(); setTheme(on ? 'light' : 'dark') }}
+            aria-label="Toggle daylight mode"
+          />
+        </div>
+      </Section>
 
       {/* ACCOUNT */}
       <Section
@@ -645,12 +701,12 @@ export default function Settings() {
       {canWipe && (
         <Section
           variants={item}
-          title={<>Reset <em>everything.</em></>}
-          meta={DEV_BUILD ? 'LOCAL' : 'TEST USER'}
+          title={<>Remove <em>sample data.</em></>}
+          meta="DEMO"
           metaTone="red"
         >
           <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12 }}>
-            Deletes every contact, note, schedule item, sub, expense, inspection, payment, and mileage row owned by this user. RLS-scoped so it can only touch your own data.
+            Clears the example clients, jobs, and activity that were loaded to show you around. Only removes sample data — your own clients and jobs are never touched.
           </p>
           <div style={{ marginTop: 10 }}>
             {!confirmWipe ? (
@@ -662,7 +718,7 @@ export default function Settings() {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
               >
                 <Trash2 size={14} />
-                Clear all my test data
+                Remove sample data
               </motion.button>
             ) : (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -681,12 +737,12 @@ export default function Settings() {
                   disabled={wiping}
                   style={{ padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(135deg, #c0392b, #8b1a0d)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.1em', cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
                 >
-                  {wiping ? 'CLEARING…' : 'YES, DELETE EVERYTHING'}
+                  {wiping ? 'REMOVING…' : 'REMOVE SAMPLE DATA'}
                 </motion.button>
               </div>
             )}
             {wipeResult && (
-              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith('Wipe failed') ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
                 {wipeResult}
               </p>
             )}
@@ -767,9 +823,9 @@ export default function Settings() {
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '10px 20px 14px' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245, 242, 234, 0.62)' }}>
+        <Eyebrow>
           Profile
-        </span>
+        </Eyebrow>
         <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
           Your business,{' '}
           organized.
@@ -1006,7 +1062,7 @@ function renderSectionTitle(node: any) {
 function Meta({ label, value }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', minWidth: 80 }}>
-      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</span>
+      <Eyebrow style={{ color: 'var(--ink-muted)' }}>{label}</Eyebrow>
       <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{value}</span>
     </div>
   )
@@ -1016,23 +1072,13 @@ function BrandField({ label, hint, optional, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
-          textTransform: 'uppercase', color: 'var(--ink-muted)'
-        }}>
+        <Eyebrow style={{ color: 'var(--ink-muted)' }}>
           {label}
-        </span>
+        </Eyebrow>
         {optional && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '1px 7px', borderRadius: 999,
-            background: 'var(--surface-2)', border: '1px solid var(--rule)',
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.12em',
-            textTransform: 'uppercase', color: 'var(--ink-faint, var(--ink-muted))',
-            fontFamily: 'var(--font-body)'
-          }}>
+          <Eyebrow style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint, var(--ink-muted))' }}>
             Optional
-          </span>
+          </Eyebrow>
         )}
       </span>
       {children}
@@ -1143,7 +1189,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
             border: '1px solid var(--rule)',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+            boxShadow: 'inset 0 1px 0 var(--v3-border-mid)'
           }}
         >
           <input
@@ -1223,12 +1269,9 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
         {/* Eyebrow + hero number row */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
           <div>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-              letterSpacing: '0.18em', color: previewColor, textTransform: 'uppercase'
-            }}>
+            <Eyebrow as="div" style={{ color: previewColor }}>
               Invoice
-            </div>
+            </Eyebrow>
             <div style={{
               fontFamily: 'var(--font-display)',
               fontSize: 20, fontWeight: 600,
@@ -1240,17 +1283,9 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
             </div>
           </div>
           {/* Status pill */}
-          <span style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '4px 9px', borderRadius: 999,
-            background: `color-mix(in srgb, ${previewColor} 16%, white)`,
-            border: `1px solid ${previewColor}`,
-            color: previewColor,
-            fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-            letterSpacing: '0.18em', textTransform: 'uppercase'
-          }}>
+          <Eyebrow style={{ padding: '4px 9px', borderRadius: 999, background: `color-mix(in srgb, ${previewColor} 16%, white)`, border: `1px solid ${previewColor}`, color: previewColor }}>
             Sample
-          </span>
+          </Eyebrow>
         </div>
         {/* Hero money */}
         <div style={{

@@ -2,7 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
 import App from './App.tsx'
 import AppErrorBoundary from './components/AppErrorBoundary.tsx'
 import { ConfirmProvider } from './components/ConfirmSheet.tsx'
@@ -71,14 +72,28 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   }
 }
 
-// Offline reads: persist the TanStack Query cache to localStorage so a
-// cold open with no signal still shows jobs / leads / schedule from the
-// last sync instead of blank screens. The outbox (lib/outbox.ts) covers
-// the write side. `buster` ties the cache to the deployed build so a
-// schema-shaped change never rehydrates stale rows into new code.
-const queryPersister = createSyncStoragePersister({
-  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-  key: 'fh-query-cache'
+// Offline reads: persist the TanStack Query cache so a cold open with no
+// signal still shows jobs / leads / schedule from the last sync instead
+// of blank screens. The outbox (lib/outbox.ts) covers the write side.
+// `buster` ties the cache to the deployed build so a schema-shaped change
+// never rehydrates stale rows into new code.
+//
+// IndexedDB, not localStorage (scaling pass): localStorage caps at ~5MB
+// and serializes the WHOLE cache synchronously on the main thread every
+// write — visible jank once the book has thousands of rows. idb-keyval is
+// async and effectively unbounded. One-time cleanup drops the old
+// localStorage blob so it stops eating the quota.
+try { localStorage.removeItem('fh-query-cache') } catch { /* non-fatal */ }
+const queryPersister = createAsyncStoragePersister({
+  storage: {
+    getItem: (key: string) => idbGet(key).then((v) => v ?? null),
+    setItem: (key: string, value: string) => idbSet(key, value),
+    removeItem: (key: string) => idbDel(key)
+  },
+  key: 'fh-query-cache',
+  // Coalesce rapid cache updates (realtime bursts, optimistic patches)
+  // into one IDB write instead of one per update.
+  throttleTime: 2000
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -97,7 +112,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           persistOptions={{
             persister: queryPersister,
             maxAge: 7 * 24 * 60 * 60 * 1000,
-            buster: typeof __FH_BUILD_SHA__ === 'string' ? __FH_BUILD_SHA__ : 'dev'
+            buster: typeof __FH_BUILD_SHA__ === 'string' ? __FH_BUILD_SHA__ : 'dev',
+            dehydrateOptions: {
+              // Don't persist per-keystroke search results — every
+              // ['jobSearch', pattern] entry carries up to 100 rows and
+              // there's one per pattern typed; they'd bloat the blob and
+              // are worthless offline (the cached list already covers
+              // recent rows). Persist only settled, successful queries.
+              shouldDehydrateQuery: (q) =>
+                q.state.status === 'success' && q.queryKey[0] !== 'jobSearch'
+            }
           }}
         >
           <ThemeProvider>

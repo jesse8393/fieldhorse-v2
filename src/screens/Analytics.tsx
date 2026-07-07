@@ -15,6 +15,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowAnalytics = lazy(() => import('../components/desktop/SnowAnalyticsBuild.tsx'))
 import SectionHeader from '../components/v3/SectionHeader.tsx'
+import { Eyebrow } from '../components/v3'
 
 function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 // Compact currency — matches Home hero pattern. Skips compaction under $1k
@@ -547,20 +548,9 @@ export default function Analytics() {
                 Mileage Log
               </span>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  padding: '3px 9px',
-                  borderRadius: 999,
-                  background: 'var(--v3-primary-soft)',
-                  border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-                  color: 'var(--v3-primary)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.10em',
-                  textTransform: 'uppercase'
-                }}>
+                <Eyebrow tone="gold" style={{ padding: '3px 9px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)' }}>
                   IRS 2026 · $0.67/mi
-                </span>
+                </Eyebrow>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.97 }}
@@ -580,7 +570,7 @@ export default function Analytics() {
                     letterSpacing: '0.04em',
                     cursor: 'pointer',
                     WebkitTapHighlightColor: 'transparent',
-                    boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                    boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.14), 0 4px 10px rgba(229, 193, 88, 0.28), 0 1px 0 var(--v3-border-strong) inset'
                   }}
                 >
                   <Plus size={12} />
@@ -682,7 +672,7 @@ export default function Analytics() {
                             {money(c.amount)}
                           </span>
                         </div>
-                        <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                        <div style={{ height: 4, borderRadius: 99, background: 'var(--v3-glass-tint-2)', overflow: 'hidden' }}>
                           <div style={{
                             width: `${(c.amount / maxTopClient) * 100}%`,
                             height: '100%',
@@ -699,9 +689,9 @@ export default function Analytics() {
               <InsightCard title="Cash collection telemetry">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
-                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                    <Eyebrow as="div">
                       Retainage held
-                    </div>
+                    </Eyebrow>
                     <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 26, color: retainageOutstanding > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-text-muted)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                       {money(retainageOutstanding)}
                     </div>
@@ -710,9 +700,9 @@ export default function Analytics() {
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+                    <Eyebrow as="div">
                       Avg deposit lag
-                    </div>
+                    </Eyebrow>
                     <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--v3-text)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                       {avgDepositLagDays ? `${avgDepositLagDays.avg}d` : '—'}
                     </div>
@@ -748,13 +738,9 @@ function InsightCard({ title, children }: any) {
       borderRadius: 14,
       display: 'flex', flexDirection: 'column', gap: 12
     }}>
-      <div style={{
-        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-primary-bright)'
-      }}>
+      <Eyebrow as="div" tone="gold">
         {title}
-      </div>
+      </Eyebrow>
       {children}
     </div>
   )
@@ -772,17 +758,13 @@ function RevenueBars({ data, maxValue }: any) {
               height: `${Math.max(2, heightPct)}%`,
               background: b.total > 0
                 ? 'linear-gradient(180deg, var(--v3-primary-bright), var(--v3-primary))'
-                : 'rgba(255,255,255,0.06)',
+                : 'var(--v3-glass-tint-2)',
               borderRadius: 4,
               minHeight: 2
             }} />
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 600,
-              color: 'var(--v3-text-muted)', letterSpacing: '0.04em',
-              textTransform: 'uppercase'
-            }}>
+            <Eyebrow as="div">
               {b.label}
-            </div>
+            </Eyebrow>
           </div>
         )
       })}
@@ -801,13 +783,9 @@ function FunnelBar({ label, count, max, note, gold, danger }: any) {
       : 'var(--v3-text-muted)'
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{
-        width: 76, flexShrink: 0,
-        fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
-        color: 'var(--v3-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em'
-      }}>
+      <Eyebrow style={{ width: 76, flexShrink: 0 }}>
         {label}
-      </span>
+      </Eyebrow>
       <div style={{ flex: 1, height: 22, borderRadius: 7, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', overflow: 'hidden' }}>
         <div style={{
           width: `${pct}%`, height: '100%',
@@ -846,8 +824,8 @@ function KPI({ label, to, format, Icon, gold, note }: any) {
           ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, var(--v3-border-strong))'
           : '1px solid var(--v3-border-strong)',
         boxShadow: gold
-          ? '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(229, 193, 88, 0.10)'
-          : '0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px rgba(0, 0, 0, 0.26)',
+          ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(229, 193, 88, 0.10)'
+          : '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(0, 0, 0, 0.26)',
         minHeight: 92
       }}
     >

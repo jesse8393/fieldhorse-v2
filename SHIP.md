@@ -50,7 +50,7 @@ If re-running on an existing project, migration is idempotent (uses `create tabl
 ```
 VITE_SUPABASE_URL=https://pnmhblvslftdzfcdezbw.supabase.co
 VITE_SUPABASE_ANON_KEY=<your anon key from Supabase → Settings → API>
-VITE_ANTHROPIC_MODEL=claude-sonnet-4-20250514
+VITE_ANTHROPIC_MODEL=claude-sonnet-5
 ```
 
 ### Netlify dashboard → Site settings → Environment variables

@@ -28,8 +28,19 @@ export type Contact = Database['public']['Tables']['fh_contacts']['Row']
 export type Client = Database['public']['Tables']['fh_clients']['Row']
 export type Payment = Database['public']['Tables']['fh_payments']['Row']
 
-// A job row with the embedded client contact info the Jobs list needs.
-export type JobRow = Contact & {
+// The columns the Work list (and desktop rail) actually render. Keeping
+// this a projection instead of `*` cuts each row to a fraction of its
+// full width — fh_contacts carries big text fields (notes, scope,
+// proposal HTML) that the list never shows.
+export const JOB_LIST_COLUMNS =
+  'id, user_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, updated_at, created_at'
+
+export type JobRow = Pick<
+  Contact,
+  | 'id' | 'user_id' | 'client_id' | 'name' | 'phone' | 'email' | 'address'
+  | 'stage' | 'amount' | 'job_title' | 'job_type' | 'referred_by'
+  | 'proposal_status' | 'follow_up_on' | 'updated_at' | 'created_at'
+> & {
   fh_clients: Pick<Client, 'name' | 'phone' | 'email'> | null
 }
 
@@ -51,8 +62,13 @@ async function fetchJobs(): Promise<JobRow[]> {
   // pipeline dedupe in screens/Home.tsx.
   const { data, error } = await supabase
     .from('fh_contacts')
-    .select('*, fh_clients(name, phone, email)')
+    .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
     .order('updated_at', { ascending: false })
+    // Sanity ceiling: 2000 most-recently-touched deals is far beyond what
+    // the list UX can present; without it one giant book turns every
+    // refetch into a multi-MB payload. Older rows stay reachable via
+    // search-by-detail routes and the client roster.
+    .limit(2000)
   if (error) throw error
   const rows = (data ?? []) as JobRow[]
   const byId = new Map<string, JobRow>()
@@ -87,16 +103,64 @@ export function useJobPhotos(userId: string | undefined) {
 export function useJobsRealtime(userId: string | undefined, client: QueryClient) {
   useEffect(() => {
     if (!userId) return
+    // Debounce: a bulk stage change or import can fire many contact events
+    // in a row; coalesce them into one refetch instead of one per row.
+    let debounce: ReturnType<typeof setTimeout> | null = null
+    const invalidate = () => {
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => client.invalidateQueries({ queryKey: queryKeys.jobs }), 1200)
+    }
     const channel = supabase
       .channel(`fh_contacts:jobs:${userId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${userId}` },
-        () => client.invalidateQueries({ queryKey: queryKeys.jobs })
+        invalidate
       )
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { if (debounce) clearTimeout(debounce); supabase.removeChannel(channel) }
   }, [userId, client])
+}
+
+// ---- Server-side deal search ----
+// The list query is capped at the 2000 most-recently-touched rows; this
+// hook lets the Work search box reach the WHOLE book. Runs a projected
+// ilike across the fields the operator actually types (name, phone,
+// email, address, title, type, source), newest first, capped at 100 hits.
+// The screen merges these with the cached list (dedupe by id), so recent
+// rows stay instant and older rows stream in behind them.
+export function useJobSearch(term: string) {
+  // PostgREST or() syntax delimits with commas/parens, and % _ \ are
+  // ilike metacharacters — but simply STRIPPING them broke real
+  // searches (ultrareview x5: "(615) 555-1234" became "615  555-1234",
+  // which matches nothing). Instead, collapse every run of punctuation
+  // or whitespace into a single % wildcard: the pattern
+  // %615%555%1234% matches the stored "(615) 555-1234" regardless of
+  // formatting, and "john_doe@x" still finds john_doe@x. Still
+  // injection-safe: no commas/parens survive into the or() expression.
+  const q = term.trim()
+  const pattern = '%' + q.replace(/[,()%_\\\s]+/g, '%') + '%'
+  return useQuery({
+    queryKey: ['jobSearch', pattern],
+    queryFn: async (): Promise<JobRow[]> => {
+      const like = pattern
+      const orExpr = ['name', 'phone', 'email', 'address', 'job_title', 'job_type', 'referred_by']
+        .map((c) => `${c}.ilike.${like}`)
+        .join(',')
+      const { data, error } = await supabase
+        .from('fh_contacts')
+        .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+        .or(orExpr)
+        .order('updated_at', { ascending: false })
+        .limit(100)
+      if (error) throw error
+      return (data ?? []) as JobRow[]
+    },
+    enabled: q.length >= 2,
+    staleTime: 30_000,
+    // Keep prior hits on screen while the next keystroke's query runs.
+    placeholderData: keepPreviousData
+  })
 }
 
 // Convenience: invalidate jobs from anywhere (e.g. after a mutation).
@@ -248,6 +312,11 @@ export type ActivityBundle = {
   changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
   invoices: Database['public']['Tables']['fh_invoices']['Row'][]
   contacts: Pick<Contact, 'id' | 'name' | 'job_title' | 'stage'>[]
+  // True when at least one event source returned a full page — i.e. there
+  // may be older rows a larger page would surface. The merged feed length
+  // can exceed pageSize even when every source is exhausted (4 sources ×
+  // pageSize), so the merged count is NOT a valid "has more" signal.
+  hasMore: boolean
 }
 
 async function fetchActivity(userId: string, pageSize: number): Promise<ActivityBundle> {
@@ -271,12 +340,17 @@ async function fetchActivity(userId: string, pageSize: number): Promise<Activity
   for (const result of [transitions, payments, changeOrders, invoices, contacts]) {
     if (result.error) throw result.error
   }
+  // "More to load" iff one of the four event sources filled its page.
+  // (contacts is a lookup table, not an event source — exclude it.)
+  const hasMore = [transitions, payments, changeOrders, invoices]
+    .some((r) => (r.data?.length ?? 0) >= pageSize)
   return {
     transitions: (transitions.data ?? []) as ActivityBundle['transitions'],
     payments: (payments.data ?? []) as ActivityBundle['payments'],
     changeOrders: (changeOrders.data ?? []) as ActivityBundle['changeOrders'],
     invoices: (invoices.data ?? []) as ActivityBundle['invoices'],
-    contacts: (contacts.data ?? []) as ActivityBundle['contacts']
+    contacts: (contacts.data ?? []) as ActivityBundle['contacts'],
+    hasMore
   }
 }
 
@@ -296,7 +370,18 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
 // invoices, not just per-job balances. Bundled so the screen keeps a
 // single loading flag, matching its prior behavior.
 
-export type InvoiceJob = Contact & {
+// Projected — the AR screen renders identity/billing fields only; the
+// wide text columns on fh_contacts (scope, notes, proposal bodies) never
+// appear on this surface.
+export const INVOICE_JOB_COLUMNS =
+  'id, user_id, client_id, name, email, phone, address, stage, amount, job_title, job_type, completed_at, created_at, updated_at'
+
+export type InvoiceJob = Pick<
+  Contact,
+  | 'id' | 'user_id' | 'client_id' | 'name' | 'email' | 'phone' | 'address'
+  | 'stage' | 'amount' | 'job_title' | 'job_type' | 'completed_at'
+  | 'created_at' | 'updated_at'
+> & {
   fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
 }
 
@@ -313,10 +398,15 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
   const [jobsRes, paymentsRes, invoicesRes, coRes] = await Promise.all([
     supabase
       .from('fh_contacts')
-      .select('*, fh_clients(name, email, phone, address)')
+      .select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`)
       .eq('user_id', userId)
       .in('stage', ['job', 'invoice', 'closed'])
       .order('created_at', { ascending: false }),
+      // Deliberately UNCAPPED (ultrareview x3): a recency cap here
+      // silently drops the oldest rows — exactly the most-overdue
+      // receivables — understating outstanding totals and the 60+
+      // aging bucket. The column projection above already carries the
+      // payload win; A/R math must see every row.
     supabase
       .from('fh_payments')
       .select('*')

@@ -63,7 +63,7 @@ export default async (request) => {
   // 2. List members of this org.
   const { data: memberRows, error: memErr } = await admin
     .from('org_members')
-    .select('id, user_id, role, joined_at, revoked_at, invited_by')
+    .select('id, user_id, role, joined_at, revoked_at, invited_by, default_hourly_rate')
     .eq('org_id', orgId)
     .is('revoked_at', null)
     .order('joined_at', { ascending: true })
@@ -101,6 +101,7 @@ export default async (request) => {
     joined_at: m.joined_at,
     invited_by: m.invited_by,
     is_self: m.user_id === authUserId,
+    default_hourly_rate: m.default_hourly_rate ?? null,
     name: profilesById[m.user_id]?.full_name || null,
     company_name: profilesById[m.user_id]?.company_name || null,
     email: emailsById[m.user_id] || null,

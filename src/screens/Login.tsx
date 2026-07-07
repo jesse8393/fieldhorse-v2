@@ -168,7 +168,7 @@ export default function Login() {
             borderRadius: 18,
             background: 'var(--v3-surface)',
             border: '1px solid var(--v3-border-strong)',
-            boxShadow: '0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 4px 14px rgba(0, 0, 0, 0.30), 0 16px 40px rgba(0, 0, 0, 0.32)',
+            boxShadow: '0 1px 0 var(--v3-border-mid) inset, 0 4px 14px rgba(0, 0, 0, 0.30), 0 16px 40px rgba(0, 0, 0, 0.32)',
             overflow: 'hidden'
           }}
         >
@@ -192,7 +192,7 @@ export default function Login() {
           )}
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className="v3-eyebrow fh-auth-label" style={{ color: '#f4f1ea', opacity: 1 }}>Email</span>
+            <span className="v3-eyebrow fh-auth-label" style={{ color: 'var(--v3-text)', opacity: 1 }}>Email</span>
             <div style={{ position: 'relative' }}>
               <Mail size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
               <input
@@ -211,7 +211,7 @@ export default function Login() {
                   borderRadius: 12,
                   background: '#1c1814',
                   border: '1px solid var(--v3-border-strong)',
-                  color: '#f4f1ea',
+                  color: 'var(--v3-text)',
                   fontSize: 14,
                   fontFamily: 'var(--font-body)',
                   outline: 'none',
@@ -222,7 +222,7 @@ export default function Login() {
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className="v3-eyebrow fh-auth-label" style={{ color: '#f4f1ea', opacity: 1 }}>Password</span>
+            <span className="v3-eyebrow fh-auth-label" style={{ color: 'var(--v3-text)', opacity: 1 }}>Password</span>
             <div style={{ position: 'relative' }}>
               <Lock size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
               <input
@@ -241,7 +241,7 @@ export default function Login() {
                   borderRadius: 12,
                   background: '#1c1814',
                   border: '1px solid var(--v3-border-strong)',
-                  color: '#f4f1ea',
+                  color: 'var(--v3-text)',
                   fontSize: 14,
                   fontFamily: 'var(--font-body)',
                   outline: 'none',
@@ -278,7 +278,7 @@ export default function Login() {
               letterSpacing: '0.04em',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
               cursor: submitDisabled ? 'default' : 'pointer',
-              boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 rgba(255, 255, 255, 0.30) inset',
+              boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 var(--v3-border-strong) inset',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -303,7 +303,7 @@ export default function Login() {
               setMode(isSignIn ? 'signup' : 'signin')
             }}
             disabled={controlsDisabled}
-            style={{ background: 'none', border: 'none', padding: 0, marginTop: 6, fontSize: 12, color: '#f4f1ea', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center', opacity: 1 }}
+            style={{ background: 'none', border: 'none', padding: 0, marginTop: 6, fontSize: 12, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center', opacity: 1 }}
           >
             {isSignIn ? 'New to Fieldhorse? Create an account' : 'Already have an account? Sign in'}
           </button>
@@ -314,7 +314,7 @@ export default function Login() {
               className="fh-auth-link-btn"
               onClick={handleForgotPassword}
               disabled={controlsDisabled}
-              style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: '#f4f1ea', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center', opacity: 1 }}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center', opacity: 1 }}
             >
               Forgot password?
             </button>

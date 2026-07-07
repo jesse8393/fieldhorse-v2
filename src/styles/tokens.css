@@ -141,6 +141,21 @@
   --v3-border-strong: rgba(255, 240, 210, 0.18);
   --v3-border-gold:   rgba(201, 150, 58, 0.28);  /* 5/17 restore to design spec --hair-gold (was 0.10 from Phase 1A-3 softening) */
   --v3-glass-tint:    rgba(255, 240, 210, 0.04); /* warm-tinted now */
+  --v3-glass-tint-2:  rgba(255, 240, 210, 0.07); /* stronger wash — inset top-lights, tracks */
+
+  /* ---------- Chrome veil — AppHeader scrim gradient stops ----------
+     Referenced by the header's inline gradient so the top chrome can
+     re-theme. Dark: near-black fade; light: warm-paper fade. */
+  --fh-chrome-veil-1: rgba(20, 20, 20, 0.88);
+  --fh-chrome-veil-2: rgba(20, 20, 20, 0.72);
+  --fh-chrome-veil-0: rgba(20, 20, 20, 0);
+
+  /* ---------- Page canvas — the floor behind every screen ----------
+     Deliberately COOLER than --v3-bg in dark (neutral near-black vs
+     warm onyx) so warm cards pop against it. The .fh-app / .v3-screen
+     floor rules reference this instead of a literal so daylight mode
+     can lift the whole canvas. */
+  --fh-canvas: #070708;
 
   /* ---------- Brand gold — cooled to canonical ---------- */
   --v3-primary:        #C9963A;
@@ -281,9 +296,14 @@
   --v3-surface: #FFFFFF;
   --v3-surface-2: #F4EFE6;
   --v3-surface-3: #EDE7DA;
-  /* v3 text */
+  /* v3 text — secondary + faint were missing here until the 7/4 theme
+     harness caught fh-build mini-card labels rendering linen-on-paper.
+     Every tier needs a light value or consumers silently keep the dark
+     linen and vanish. */
   --v3-text: #1A1814;
+  --v3-text-secondary: rgba(26, 24, 20, 0.78);
   --v3-text-muted: #6B6A66;
+  --v3-text-faint: rgba(26, 24, 20, 0.48);
   --v3-on-primary: #1A1814;
   /* v3 borders — warm rules */
   --v3-border: rgba(20, 20, 18, 0.10);
@@ -315,7 +335,14 @@
   --v3-track: rgba(20, 20, 18, 0.06);
   --v3-track-strong: rgba(20, 20, 18, 0.10);
   --v3-glass-tint: rgba(255, 255, 255, 0.50);
+  --v3-glass-tint-2: rgba(255, 255, 255, 0.65);
   --v3-surface-glass: rgba(255, 255, 255, 0.78);
+  /* Chrome veil — warm paper fade for the light header */
+  --fh-chrome-veil-1: rgba(248, 245, 238, 0.92);
+  --fh-chrome-veil-2: rgba(248, 245, 238, 0.78);
+  --fh-chrome-veil-0: rgba(248, 245, 238, 0);
+  /* Page canvas — warm paper floor */
+  --fh-canvas: #F8F5EE;
 
   /* Legacy aliases — warm warm warm */
   --surface-0: var(--v3-bg);
@@ -342,6 +369,15 @@
   --shadow-card: 0 1px 2px rgba(60, 50, 30, 0.06), 0 14px 40px rgba(60, 50, 30, 0.08);
   --shadow-pop: 0 18px 50px rgba(60, 50, 30, 0.12), 0 2px 8px rgba(60, 50, 30, 0.08);
   --shadow-raised: var(--v3-shadow);
+}
+
+/* Client cards — the dark-tinted top gradient + espresso avatar chip
+   don't translate to paper. Flat surface + soft gold chip in light. */
+[data-theme='light'] .cl-card {
+  background: var(--v3-surface);
+}
+[data-theme='light'] .cl-card__avatar {
+  background: var(--v3-primary-soft);
 }
 
 /* Light-theme overrides for atmospheric primitives — kill dark-only

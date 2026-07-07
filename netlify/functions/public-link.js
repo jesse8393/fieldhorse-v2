@@ -24,6 +24,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
 import { sendPushToUser } from './lib/push.js'
+import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 
 function trimHeader(value, max = 500) {
   const text = String(value || '').trim()
@@ -90,6 +91,16 @@ export default async function handler(req) {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   })
+
+  // Per-IP rate limit before any service-role work — an unauthenticated
+  // link view triggers several queries + signed-URL generation, so this
+  // caps the amplification of a refresh flood / token spray.
+  const allowed = await checkRateLimit(supabase, {
+    scope: 'public-link', identifier: hashIdentifier(clientIp(req)), limit: 90,
+  })
+  if (!allowed) {
+    return json({ error: 'rate_limited', message: 'Too many requests. Please try again in a minute.' }, 429)
+  }
 
   // 1. Resolve token
   const { data: link, error: linkErr } = await supabase

@@ -127,7 +127,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
                 fontWeight: 700,
                 letterSpacing: '0.04em',
                 cursor: 'pointer',
-                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 4px 12px rgba(229, 193, 88, 0.30), 0 1px 0 rgba(255, 255, 255, 0.30) inset'
+                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 4px 12px rgba(229, 193, 88, 0.30), 0 1px 0 var(--v3-border-strong) inset'
               }}
             >
               Go Home

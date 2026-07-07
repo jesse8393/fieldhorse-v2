@@ -17,6 +17,7 @@ import ChangeOrdersSection from '../sections/ChangeOrdersSection.tsx'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * QUOTE tab — the formal sellable scope. Lead → Quote → Approved Job
@@ -1329,16 +1330,9 @@ function StatusPill({ status }: any) {
       display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
       padding: '0 2px'
     }}>
-      <span style={{
-        display: 'inline-flex', alignItems: 'center',
-        padding: '5px 12px', borderRadius: 999,
-        background: palette.bg, border: `1px solid ${palette.border}`,
-        color: palette.color,
-        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.12em', textTransform: 'uppercase'
-      }}>
+      <Eyebrow style={{ padding: '5px 12px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
         Quote · {status.label}
-      </span>
+      </Eyebrow>
       {status.sub && (
         <span style={{
           fontFamily: 'var(--font-body)',

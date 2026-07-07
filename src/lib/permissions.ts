@@ -89,6 +89,7 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/':
     case '/home':           return true                            // home redirects foreman/crew to /crew (handled in screen)
     case '/crew':           return canDoFieldWork(role)            // everyone with a role; crew/foreman LAND here
+    case '/work':           return true                            // one deal list; money-stage moves gate in-view
     case '/pipeline':       return canCreateFinancialDocs(role)    // full revenue sequence: leads, quotes, jobs, collect
     case '/leads':          return canCreateFinancialDocs(role)    // revenue intake + quote workflow
     case '/quotes':         return canCreateFinancialDocs(role)    // proposal workflow, same revenue gate as leads

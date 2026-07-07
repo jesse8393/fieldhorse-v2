@@ -9,6 +9,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import Spotlight from '../components/fx/Spotlight.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
+import { Eyebrow } from '../components/v3'
 const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.tsx'))
 
 // Status token → brand palette mapping used across the whole screen.
@@ -241,9 +242,9 @@ useEffect(() => {
         <Spotlight style={{ animationDelay: '-1.5s' }} />
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+            <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
               Today · {weatherLabel(currentCode)}
-            </div>
+            </Eyebrow>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 10 }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 72, letterSpacing: '0.01em', lineHeight: 0.9, color: 'var(--ink-strong)' }}>
                 {loading || currentTemp == null ? '—' : Math.round(currentTemp)}
@@ -278,9 +279,9 @@ useEffect(() => {
             style={{ width: 10, height: 10, borderRadius: '50%', background: tone.fg, boxShadow: `0 0 12px ${tone.fg}99` }}
           />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: tone.fg }}>
+            <Eyebrow as="div" style={{ color: tone.fg }}>
               {currentWindow.label || tone.label}
-            </div>
+            </Eyebrow>
             {currentWindow.reasons?.length > 0 && (
               <div style={{ marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
                 {currentWindow.reasons.slice(0, 3).join(' · ')}
@@ -301,9 +302,9 @@ useEffect(() => {
       {strip.length > 0 && (
         <motion.section variants={item} style={{ padding: '0 0 18px' }}>
           <header style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 20px 10px' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>
               Next 24 hours
-            </span>
+            </Eyebrow>
             <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-faint)' }}>· swipe</span>
           </header>
           <div
@@ -380,9 +381,9 @@ useEffect(() => {
       {daily.length > 0 && (
         <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
           <header style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>
               Forecast
-            </span>
+            </Eyebrow>
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {daily.map((d: any, i: any) => {
@@ -424,24 +425,9 @@ useEffect(() => {
                           <Wind size={11} />
                           {Math.round(d.windMax)} mph
                         </span>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '2px 8px',
-                            borderRadius: 999,
-                            background: t.bg,
-                            border: `1px solid ${t.border}`,
-                            color: t.fg,
-                            fontSize: 9,
-                            fontWeight: 700,
-                            letterSpacing: '0.14em',
-                            textTransform: 'uppercase'
-                          }}
-                        >
+                        <Eyebrow style={{ gap: 4, padding: '2px 8px', borderRadius: 999, background: t.bg, border: `1px solid ${t.border}`, color: t.fg }}>
                           {dayStatus === 'go' ? 'GO' : dayStatus === 'warn' ? 'TIGHT' : 'STOP'}
-                        </span>
+                        </Eyebrow>
                       </div>
                     </div>
                     <div style={{ flexShrink: 0, textAlign: 'right' }}>
@@ -463,9 +449,9 @@ useEffect(() => {
       {/* PER-TRADE BREAKDOWN */}
       <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+          <Eyebrow style={{ color: 'var(--ink-muted)' }}>
             Trades on your list · today
-          </span>
+          </Eyebrow>
         </header>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {tradeRows.length === 0 && (
@@ -509,23 +495,9 @@ useEffect(() => {
                     </div>
                   )}
                 </div>
-                <span
-                  style={{
-                    flexShrink: 0,
-                    padding: '3px 9px',
-                    borderRadius: 999,
-                    background: t.bg,
-                    border: `1px solid ${t.border}`,
-                    color: t.fg,
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    fontFamily: 'var(--font-display)'
-                  }}
-                >
+                <Eyebrow style={{ flexShrink: 0, padding: '3px 9px', borderRadius: 999, background: t.bg, border: `1px solid ${t.border}`, color: t.fg }}>
                   {r.status === 'go' ? 'GO' : r.status === 'warn' ? 'TIGHT' : 'STOP'}
-                </span>
+                </Eyebrow>
               </div>
             )
           })}
@@ -573,10 +545,10 @@ function Metric({ Icon, label, value, unit }: any) {
         gap: 6
       }}
     >
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+      <Eyebrow style={{ gap: 4, color: 'var(--ink-muted)' }}>
         {Icon && <Icon size={10} />}
         {label}
-      </span>
+      </Eyebrow>
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, letterSpacing: '0.02em', lineHeight: 1, color: 'var(--ink-strong)' }}>
           {value}

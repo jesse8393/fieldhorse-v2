@@ -21,6 +21,8 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 const SkeletonAny = SkeletonList as any
 
@@ -87,6 +89,7 @@ function rid(): string {
 }
 
 export default function SelectionsSection({ jobId, userId, clientId }: any) {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<SelectionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
@@ -161,7 +164,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   }
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this selection?')) return
+    if (!(await confirm({ title: 'Delete this selection?', destructive: true }))) return
     hapticTap()
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_selections').delete().eq('id', id)
@@ -177,14 +180,14 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+        <Eyebrow>
           Selections
           {rows.length > 0 && (
             <span style={{ marginLeft: 10, color: 'var(--v3-text)' }}>
               {approvedCount}/{rows.length} approved
             </span>
           )}
-        </span>
+        </Eyebrow>
         {!composing && (
           <button
             type="button"
@@ -289,9 +292,9 @@ function SelectionCard({
               <span style={{ fontSize: 11, color: 'var(--v3-text-muted)' }}>· {row.room}</span>
             )}
             {row.category && (
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+              <Eyebrow>
                 · {row.category}
-              </span>
+              </Eyebrow>
             )}
           </div>
           {row.description && (
@@ -337,7 +340,7 @@ function SelectionCard({
                     : '1px solid var(--v3-border)',
                   background: isPicked
                     ? 'color-mix(in srgb, var(--v3-success-bright, #73c982) 10%, transparent)'
-                    : 'rgba(255,255,255,.02)',
+                    : 'var(--v3-glass-tint)',
                   display: 'flex', flexDirection: 'column', gap: 6,
                 }}
               >
@@ -349,7 +352,7 @@ function SelectionCard({
                   {o.image_url ? (
                     <img loading="lazy"src={o.image_url} alt={o.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <ImageIcon size={20} aria-hidden="true" color="rgba(245,242,234,.30)" />
+                    <ImageIcon size={20} aria-hidden="true" color="var(--v3-text-faint)" />
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
@@ -495,7 +498,7 @@ function SelectionComposer({
         style={{ ...inputStyle, resize: 'vertical', minHeight: 56 }}
       />
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 10, marginTop: 4 }}>
+      <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 10, marginTop: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>Options</span>
           <button type="button" onClick={addOpt} style={chipBtnGhost}><Plus size={11} /> Add option</button>

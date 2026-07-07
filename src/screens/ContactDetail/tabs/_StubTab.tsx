@@ -1,4 +1,5 @@
 import { Construction } from 'lucide-react'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * Temporary v3 placeholder for tab content scheduled for Drops 3.1–3.3.
@@ -39,17 +40,9 @@ export default function StubTab({ name, upcoming = [] }: any) {
         <Construction size={22} aria-hidden="true" />
       </div>
       <div>
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.2em',
-          textTransform: 'uppercase',
-          color: 'var(--v3-primary)',
-          marginBottom: 6
-        }}>
+        <Eyebrow as="div" tone="gold" style={{ marginBottom: 6 }}>
           {name} — v3 in progress
-        </div>
+        </Eyebrow>
         <h3 style={{
           margin: 0,
           fontFamily: 'var(--font-serif)',
