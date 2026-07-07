@@ -58,9 +58,6 @@ export default function DocumentShell({
   footer
 }: any) {
   const brand = resolveBrandGold(company)
-  const credentials = [company?.license_number ? `License ${company.license_number}` : '', company?.insured_text || '']
-    .filter(Boolean)
-    .join(' · ')
   const contactLine = [company?.phone, company?.email, company?.website].filter(Boolean).join('  ·  ')
 
   return (
@@ -103,7 +100,7 @@ export default function DocumentShell({
           }}
         >
           <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: 460 }}>
-            <CompanyIdentity company={company} credentials={credentials} contactLine={contactLine} />
+            <CompanyIdentity company={company} contactLine={contactLine} />
           </div>
           <div style={{ flexShrink: 0, marginLeft: 'auto' }}>
             <DocMeta docType={docType} number={number} metaRows={metaRows} status={status} />
@@ -129,8 +126,8 @@ export default function DocumentShell({
             </p>
           )}
           <p style={{ margin: footer ? '10px 0 0' : 0, fontSize: 10.5, lineHeight: 1.55, color: DOC_COLORS.inkMuted }}>
-            {[company?.name, credentials].filter(Boolean).join(' · ')}
-            {contactLine ? ` — Questions? ${contactLine}` : ''}
+            {company?.name || ''}
+            {contactLine ? `${company?.name ? ' — ' : ''}Questions? ${contactLine}` : ''}
           </p>
         </footer>
       </div>
@@ -142,7 +139,7 @@ export default function DocumentShell({
    Internal blocks
    ───────────────────────────────────────────────────────── */
 
-function CompanyIdentity({ company, credentials, contactLine }: any) {
+function CompanyIdentity({ company, contactLine }: any) {
   return (
     <div style={{ minWidth: 0, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
       {company?.logo_url && (
@@ -167,11 +164,6 @@ function CompanyIdentity({ company, credentials, contactLine }: any) {
         >
           {company?.name || 'Contractor'}
         </div>
-        {credentials && (
-          <div style={{ marginTop: 4, fontSize: 11, color: DOC_COLORS.inkMuted, lineHeight: 1.45 }}>
-            {credentials}
-          </div>
-        )}
         {company?.address && (
           <div style={{ marginTop: 2, fontSize: 11, color: DOC_COLORS.inkMuted, lineHeight: 1.45 }}>
             {company.address}
