@@ -44,7 +44,8 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { markWon, markLost, reopen } from '../lib/pipeline.ts'
-import { detailRoute } from '../lib/stages.ts'
+import { detailRoute, LIST_STAGE_META as STAGE_META } from '../lib/stages.ts'
+import { moneyK as money } from '../lib/format.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
 import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
@@ -66,22 +67,6 @@ const CHIPS: { id: ChipId; label: string; match: (c: JobRow) => boolean }[] = [
   { id: 'lost',   label: 'Lost',   match: (c) => c.stage === 'lost' }
 ]
 
-// One stage vocabulary for the whole list.
-const STAGE_META: Record<string, { label: string; color: string }> = {
-  lead:    { label: 'Lead',   color: 'var(--v3-stage-lead)' },
-  quote:   { label: 'Quote',  color: 'var(--v3-stage-quote)' },
-  job:     { label: 'Active', color: 'var(--v3-stage-active)' },
-  invoice: { label: 'Active', color: 'var(--v3-stage-active)' },
-  closed:  { label: 'Done',   color: 'var(--v3-success-bright)' },
-  lost:    { label: 'Lost',   color: 'var(--v3-text-muted)' }
-}
-
-function money(n: number | string | null | undefined) {
-  const v = Number(n || 0)
-  if (!v) return null
-  if (v >= 1000) return `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
 
 function followUpMeta(c: Pick<JobRow, 'follow_up_on'>): { label: string; tone: 'danger' | 'warn' | 'muted' } | null {
   if (!c.follow_up_on) return null

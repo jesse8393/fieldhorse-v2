@@ -20,24 +20,10 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useJobs, useJobsRealtime } from '../../lib/queries.ts'
 import { useInfiniteRender } from '../../lib/useInfiniteRender.ts'
 import { hapticTap } from '../../lib/haptics.ts'
-import { detailRoute } from '../../lib/stages.ts'
+import { detailRoute, LIST_STAGE_META as STAGE_META } from '../../lib/stages.ts'
+import { moneyK as money } from '../../lib/format.ts'
 import { prefetchJobDetail } from '../../screens/ContactDetail/hooks/useJobData.ts'
 
-const STAGE_META: Record<string, { label: string; color: string }> = {
-  lead:    { label: 'Lead',     color: 'var(--v3-stage-lead, #6B7CA8)' },
-  quote:   { label: 'Quote',    color: 'var(--v3-stage-quote, #C9963A)' },
-  job:     { label: 'Active',   color: 'var(--v3-stage-active, #7BB58E)' },
-  invoice: { label: 'Active',   color: 'var(--v3-stage-active, #7BB58E)' },
-  closed:  { label: 'Complete', color: 'var(--v3-success-bright, #7BB58E)' },
-  lost:    { label: 'Lost',     color: 'var(--v3-text-muted, rgba(242, 237, 228, 0.55))' }
-}
-
-function money(n: any) {
-  const v = Number(n || 0)
-  if (!v) return ''
-  if (v >= 1000) return `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
 
 export default function DetailListRail() {
   const { id: currentId } = useParams()

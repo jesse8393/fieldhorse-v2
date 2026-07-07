@@ -313,3 +313,16 @@ export function detailRoute(
   if (stage === 'quote') return `/quotes/${c.id}?tab=quote`
   return opts?.financials ? `/jobs/${c.id}?tab=financials` : `/jobs/${c.id}`
 }
+
+// ─── list-card display vocabulary ───────────────────────────────
+// Friendlier than the formal pipeline labels (job→Active, closed→Done)
+// — used by every unified deal card (Work list, desktop rail). One map,
+// or the rail and the card drift ("Complete" vs "Done", audit finding).
+export const LIST_STAGE_META: Record<string, { label: string; color: string }> = {
+  lead:    { label: 'Lead',   color: 'var(--v3-stage-lead)' },
+  quote:   { label: 'Quote',  color: 'var(--v3-stage-quote)' },
+  job:     { label: 'Active', color: 'var(--v3-stage-active)' },
+  invoice: { label: 'Active', color: 'var(--v3-stage-active)' },
+  closed:  { label: 'Done',   color: 'var(--v3-success-bright)' },
+  lost:    { label: 'Lost',   color: 'var(--v3-text-muted)' }
+}
