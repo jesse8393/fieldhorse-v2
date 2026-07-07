@@ -56,6 +56,15 @@ const TABLES = {
   fh_documents: [], fh_files: []
 }
 
+// Every row belongs to org-1, mirroring production where migration 032
+// backfilled org_id and the 035 trigger fills it on insert. Without
+// this, org-scoped queries (Home dashboard) return zero rows in the
+// rig while working fine in production — a fidelity gap that hid the
+// dashboard from QA. Row-level org_id (if a seed ever sets one) wins.
+for (const rows of Object.values(TABLES)) {
+  for (let i = 0; i < rows.length; i++) rows[i] = { org_id: 'org-1', ...rows[i] }
+}
+
 function applyFilters(rows, url) {
   // Honor PostgREST eq./is.null query filters so .eq('id', x).maybeSingle()
   // resolves the right row instead of erroring on a multi-row response.
