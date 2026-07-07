@@ -625,17 +625,13 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
           )}
         </button>
 
-        {/* ⋯ — the only control on the card. The calendar Popover
-            anchors to an invisible marker pinned over this button
-            (the ui/ wrappers aren't forwardRef, so asChild ref
-            plumbing through the DropdownMenuTrigger never reaches
-            the DOM node and Radix popper gets no anchor rect). */}
+        {/* ⋯ — the only control on the card. The calendar Popover and
+            the dropdown share this button: PopoverAnchor→Trigger→button
+            composes via asChild (the ui/ wrappers forward refs), so the
+            calendar opens exactly where the menu just closed. */}
         <Popover open={dateOpen} onOpenChange={setDateOpen}>
-        <PopoverAnchor
-          aria-hidden="true"
-          style={{ position: 'absolute', right: 12, top: '50%', width: 36, height: 1, pointerEvents: 'none' }}
-        />
         <DropdownMenu>
+          <PopoverAnchor asChild>
             <DropdownMenuTrigger asChild>
             <button
               type="button"
@@ -653,6 +649,7 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
               <MoreHorizontal size={15} aria-hidden="true" />
             </button>
             </DropdownMenuTrigger>
+          </PopoverAnchor>
           <DropdownMenuContent side="bottom" align="end" sideOffset={6} collisionPadding={20}>
             {!isTerminal && (
               <>
