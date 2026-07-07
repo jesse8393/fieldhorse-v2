@@ -122,6 +122,41 @@ export function useJobsRealtime(userId: string | undefined, client: QueryClient)
   }, [userId, client])
 }
 
+// ---- Server-side deal search ----
+// The list query is capped at the 2000 most-recently-touched rows; this
+// hook lets the Work search box reach the WHOLE book. Runs a projected
+// ilike across the fields the operator actually types (name, phone,
+// email, address, title, type, source), newest first, capped at 100 hits.
+// The screen merges these with the cached list (dedupe by id), so recent
+// rows stay instant and older rows stream in behind them.
+export function useJobSearch(term: string) {
+  // PostgREST or() syntax delimits with commas/parens — strip them (and
+  // bare wildcards) from user input so a stray character can't break the
+  // filter expression.
+  const q = term.trim().replace(/[,()%_\\]/g, ' ').trim()
+  return useQuery({
+    queryKey: ['jobSearch', q],
+    queryFn: async (): Promise<JobRow[]> => {
+      const like = `%${q}%`
+      const orExpr = ['name', 'phone', 'email', 'address', 'job_title', 'job_type', 'referred_by']
+        .map((c) => `${c}.ilike.${like}`)
+        .join(',')
+      const { data, error } = await supabase
+        .from('fh_contacts')
+        .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+        .or(orExpr)
+        .order('updated_at', { ascending: false })
+        .limit(100)
+      if (error) throw error
+      return (data ?? []) as JobRow[]
+    },
+    enabled: q.length >= 2,
+    staleTime: 30_000,
+    // Keep prior hits on screen while the next keystroke's query runs.
+    placeholderData: keepPreviousData
+  })
+}
+
 // Convenience: invalidate jobs from anywhere (e.g. after a mutation).
 export function useInvalidateJobs() {
   const client = useQueryClient()
@@ -329,7 +364,18 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
 // invoices, not just per-job balances. Bundled so the screen keeps a
 // single loading flag, matching its prior behavior.
 
-export type InvoiceJob = Contact & {
+// Projected — the AR screen renders identity/billing fields only; the
+// wide text columns on fh_contacts (scope, notes, proposal bodies) never
+// appear on this surface.
+export const INVOICE_JOB_COLUMNS =
+  'id, user_id, client_id, name, email, phone, address, stage, amount, job_title, job_type, completed_at, created_at, updated_at'
+
+export type InvoiceJob = Pick<
+  Contact,
+  | 'id' | 'user_id' | 'client_id' | 'name' | 'email' | 'phone' | 'address'
+  | 'stage' | 'amount' | 'job_title' | 'job_type' | 'completed_at'
+  | 'created_at' | 'updated_at'
+> & {
   fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
 }
 
@@ -346,10 +392,11 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
   const [jobsRes, paymentsRes, invoicesRes, coRes] = await Promise.all([
     supabase
       .from('fh_contacts')
-      .select('*, fh_clients(name, email, phone, address)')
+      .select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`)
       .eq('user_id', userId)
       .in('stage', ['job', 'invoice', 'closed'])
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(2000),
     supabase
       .from('fh_payments')
       .select('*')

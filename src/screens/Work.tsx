@@ -50,7 +50,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { canHover } from '../lib/hover.ts'
-import { useJobs, useJobsRealtime, queryKeys, type JobRow } from '../lib/queries.ts'
+import { useJobs, useJobsRealtime, useJobSearch, queryKeys, type JobRow } from '../lib/queries.ts'
 
 const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 
@@ -121,6 +121,15 @@ export default function Work() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [chip, setChip] = useState<ChipId>('all')
   const [search, setSearch] = useState('')
+  // Server-side search: the cached list holds the 2000 most-recent deals;
+  // typing also queries the whole book (debounced) and the hits merge in
+  // below, so an operator can find a deal from years back by name.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+  const { data: serverHits = [] } = useJobSearch(debouncedSearch)
   const [addOpen, setAddOpen] = useState(false)
   const [addStage, setAddStage] = useState<'lead' | 'quote' | 'job'>('lead')
   const [justAddedId, setJustAddedId] = useState<string | null>(null)
@@ -163,7 +172,14 @@ export default function Work() {
     : { ...baseChip, match: (c: JobRow) => baseChip.match(c) && c.stage !== 'lead' && c.stage !== 'quote' }
 
   const filtered = useMemo(() => {
-    let rows = contacts.filter(activeChip.match)
+    // While searching, widen the pool with server hits the cached window
+    // doesn't hold (dedupe by id — recent rows exist in both).
+    let pool = contacts
+    if (search.trim() && serverHits.length) {
+      const seen = new Set(contacts.map((c) => c.id))
+      pool = contacts.concat(serverHits.filter((h) => !seen.has(h.id)))
+    }
+    let rows = pool.filter(activeChip.match)
     const q = search.trim().toLowerCase()
     if (q) {
       rows = rows.filter((c) =>
@@ -182,7 +198,7 @@ export default function Work() {
     }))
     decorated.sort((a, b) => (a.fu !== b.fu ? a.fu - b.fu : b.up - a.up))
     return decorated.map((d) => d.c)
-  }, [contacts, activeChip, search])
+  }, [contacts, serverHits, activeChip, search])
 
   const { visible, sentinelRef, hasMore } = useInfiniteRender(filtered, `${effectiveChip}|${search}`)
 
