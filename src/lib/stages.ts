@@ -297,3 +297,19 @@ export function marginTier(pct: number) {
   if (pct >= 15) return 'warn'
   return 'thin'
 }
+
+// ─── detail routing ─────────────────────────────────────────────
+// THE stage → detail-URL mapping. Work, the desktop rail, Home's
+// pipeline, and universal search all consume this one function —
+// the audit found five drifting inline copies of it.
+//   opts.financials: land on the money tab (opt-in — Home's pipeline
+//   uses it for invoice-age rows; list surfaces open the overview).
+export function detailRoute(
+  c: { id: string; stage?: string | null },
+  opts?: { financials?: boolean }
+) {
+  const stage = String(c?.stage || '').toLowerCase()
+  if (stage === 'lead' || stage === 'lost') return `/leads/${c.id}`
+  if (stage === 'quote') return `/quotes/${c.id}?tab=quote`
+  return opts?.financials ? `/jobs/${c.id}?tab=financials` : `/jobs/${c.id}`
+}

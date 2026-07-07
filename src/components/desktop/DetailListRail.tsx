@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useJobs, useJobsRealtime } from '../../lib/queries.ts'
 import { useInfiniteRender } from '../../lib/useInfiniteRender.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { detailRoute } from '../../lib/stages.ts'
 import { prefetchJobDetail } from '../../screens/ContactDetail/hooks/useJobData.ts'
 
 const STAGE_META: Record<string, { label: string; color: string }> = {
@@ -86,9 +87,11 @@ export default function DetailListRail() {
   function open(c: any) {
     if (c.id === currentId) return
     hapticTap()
-    if (surface === 'quotes' || c.stage === 'quote') navigate(`/quotes/${c.id}?tab=quote`)
-    else if (surface === 'leads' || c.stage === 'lead' || c.stage === 'lost') navigate(`/leads/${c.id}`)
-    else navigate(`/jobs/${c.id}`)
+    // Surface override keeps rail context (a lead opened from the quotes
+    // rail stays in quote mode); otherwise the canonical stage mapping.
+    if (surface === 'quotes') navigate(`/quotes/${c.id}?tab=quote`)
+    else if (surface === 'leads') navigate(`/leads/${c.id}`)
+    else navigate(detailRoute(c))
   }
 
   const title = surface === 'leads' ? 'Leads' : surface === 'quotes' ? 'Quotes' : 'Jobs'

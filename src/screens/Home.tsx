@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
+import { detailRoute } from '../lib/stages.ts'
 import { getWeather, MURFREESBORO } from '../lib/weather.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import CountUp from '../components/fx/CountUp.tsx'
@@ -1156,11 +1157,10 @@ function jobActionPath(contactId: any, tab?: any, intent?: any) {
 }
 
 function pipelineDetailPath(deal: any) {
+  // Canonical mapping in stages.ts; Home opts collectable rows
+  // (invoice-stage / work-complete) onto the financials tab.
   const stage = String(deal?.stage || '').toLowerCase()
-  if (stage === 'lead' || stage === 'lost') return `/leads/${deal.id}`
-  if (stage === 'quote') return `/quotes/${deal.id}?tab=quote`
-  if (stage === 'invoice' || deal?.completed_at) return `/jobs/${deal.id}?tab=financials`
-  return `/jobs/${deal.id}`
+  return detailRoute(deal, { financials: stage === 'invoice' || !!deal?.completed_at })
 }
 
 function nextActionPath(action: any) {

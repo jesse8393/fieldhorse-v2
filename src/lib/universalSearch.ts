@@ -18,6 +18,7 @@
 // known item, not for browsing — go to the dedicated screen for that.
 
 import { supabase } from './supabase.ts'
+import { detailRoute } from './stages.ts'
 
 const PER_KIND = 6
 
@@ -53,12 +54,8 @@ function fmtDateTime(iso: string | null | undefined) {
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
 }
 
-function contactRoute(row: any) {
-  const stage = String(row?.stage || '').toLowerCase()
-  if (stage === 'lead' || stage === 'lost') return `/leads/${row.id}`
-  if (stage === 'quote') return `/quotes/${row.id}?tab=quote`
-  return `/jobs/${row.id}`
-}
+// Canonical stage→URL mapping lives in stages.ts (audit: 5 copies drifted).
+const contactRoute = (row: any) => detailRoute(row)
 
 export async function universalSearch(query: string | null | undefined, userId: string | undefined): Promise<SearchResults> {
   const q = String(query || '').trim()

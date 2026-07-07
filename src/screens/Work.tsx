@@ -44,6 +44,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { markWon, markLost, reopen } from '../lib/pipeline.ts'
+import { detailRoute } from '../lib/stages.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
 import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
@@ -95,13 +96,7 @@ function followUpMeta(c: Pick<JobRow, 'follow_up_on'>): { label: string; tone: '
   return { label: `Follow up ${due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, tone: 'muted' }
 }
 
-// Detail route per stage — same mapping the old boards used, so the
-// stage-aware detail (and its quote workspace) opens in the right mode.
-function detailRoute(c: Pick<JobRow, 'id' | 'stage'>) {
-  if (c.stage === 'quote') return `/quotes/${c.id}?tab=quote`
-  if (c.stage === 'lead' || c.stage === 'lost') return `/leads/${c.id}`
-  return `/jobs/${c.id}`
-}
+// Detail route per stage — canonical mapping imported from stages.ts.
 
 export default function Work() {
   const { user } = useAuth()
