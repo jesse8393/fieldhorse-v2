@@ -28,6 +28,7 @@ import {
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
 import { money, moneyFull } from '../../lib/format.ts'
+import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
 type Rollup = {
@@ -98,22 +99,19 @@ const COLUMNS = [
 ]
 
 function toCsv(rows: ClientRow[]): string {
-  const esc = (v: unknown) => {
-    const s = String(v ?? '')
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const head = 'Client,Status,Last activity,Outstanding,Active jobs,Next action,Phone,Email'
-  const body = rows.map((r) => [
-    esc(r.client.name || 'Unnamed'),
-    r.status.label,
-    r.client.last_activity_at ? new Date(r.client.last_activity_at).toISOString().slice(0, 10) : '',
-    r.outstanding.toFixed(2),
-    r.activeCount,
-    esc(r.nextAction),
-    esc(r.client.phone || ''),
-    esc(r.client.email || ''),
-  ].join(','))
-  return [head, ...body].join('\n')
+  return buildCsv(
+    ['Client', 'Status', 'Last activity', 'Outstanding', 'Active jobs', 'Next action', 'Phone', 'Email'],
+    rows.map((r) => [
+      r.client.name || 'Unnamed',
+      r.status.label,
+      r.client.last_activity_at ? new Date(r.client.last_activity_at).toISOString().slice(0, 10) : '',
+      r.outstanding.toFixed(2),
+      r.activeCount,
+      r.nextAction,
+      r.client.phone || '',
+      r.client.email || '',
+    ])
+  )
 }
 
 export default function SnowClientsBuild(props: Props) {
@@ -169,14 +167,7 @@ export default function SnowClientsBuild(props: Props) {
   const viewRows = table.getRowModel().rows
 
   function exportCsv() {
-    const csv = toCsv(viewRows.map((r) => r.original))
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'fieldhorse-clients.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadCsv('fieldhorse-clients.csv', toCsv(viewRows.map((r) => r.original)))
   }
 
   return (

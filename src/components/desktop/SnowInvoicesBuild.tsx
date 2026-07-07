@@ -21,6 +21,7 @@ import {
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
 import { money, moneyFull } from '../../lib/format.ts'
+import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
 type Row = {
@@ -98,21 +99,18 @@ function rowMatches(row: { original: Row }, _columnId: string, needle: string) {
 }
 
 function toCsv(rows: Row[]): string {
-  const esc = (v: unknown) => {
-    const s = String(v ?? '')
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const head = 'Client,Job,Status,Age (days),Contract,Paid,Balance'
-  const body = rows.map((r) => [
-    esc(r.job.name || 'Untitled'),
-    esc(r.job.job_title || r.job.job_type || ''),
-    ageBucket(r.ageDays).label,
-    r.ageDays,
-    r.amount.toFixed(2),
-    r.paid.toFixed(2),
-    r.balance.toFixed(2),
-  ].join(','))
-  return [head, ...body].join('\n')
+  return buildCsv(
+    ['Client', 'Job', 'Status', 'Age (days)', 'Contract', 'Paid', 'Balance'],
+    rows.map((r) => [
+      r.job.name || 'Untitled',
+      r.job.job_title || r.job.job_type || '',
+      ageBucket(r.ageDays).label,
+      r.ageDays,
+      r.amount.toFixed(2),
+      r.paid.toFixed(2),
+      r.balance.toFixed(2),
+    ])
+  )
 }
 
 export default function SnowInvoicesBuild({
@@ -143,14 +141,7 @@ export default function SnowInvoicesBuild({
   const visibleRows = useMemo(() => viewRows.slice(0, 80), [viewRows])
 
   function exportCsv() {
-    const csv = toCsv(viewRows.map((r) => r.original))
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `fieldhorse-invoices-${filter}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(`fieldhorse-invoices-${filter}.csv`, toCsv(viewRows.map((r) => r.original)))
   }
 
   return (
