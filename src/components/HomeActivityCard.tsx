@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 import { Activity as ActivityIcon, DollarSign, FileEdit, Check, Briefcase, Receipt, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { Eyebrow } from './v3'
 
 const PER_SOURCE = 8
 
@@ -173,15 +174,10 @@ export default function HomeActivityCard() {
         borderBottom: '1px solid var(--v3-border)',
         background: 'var(--v3-surface-2)'
       }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: 'var(--v3-primary-bright)'
-        }}>
+        <Eyebrow tone="gold">
           <ActivityIcon size={12} aria-hidden="true" />
           Recent activity
-        </span>
+        </Eyebrow>
         <Link
           to="/activity"
           style={{

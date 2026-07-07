@@ -28,6 +28,7 @@ import {
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import { Eyebrow } from '../components/v3'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -483,9 +484,9 @@ export default function SubPortal() {
 function ProfileRow({ label, value, tone, muted }: { label: string; value: string; tone?: 'warn' | 'bad'; muted?: boolean }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 180px) minmax(0, 1fr)', gap: 14, alignItems: 'baseline' }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+      <Eyebrow>
         {label}
-      </span>
+      </Eyebrow>
       <span style={{
         fontSize: 14,
         color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : 'var(--v3-text)',

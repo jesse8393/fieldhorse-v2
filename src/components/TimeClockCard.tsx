@@ -5,6 +5,7 @@ import { recalcCost } from '../lib/stages.ts'
 import { getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
+import { Eyebrow } from './v3'
 
 // Time clock card — Phase 19 / Upgrade Move #A2.
 //
@@ -234,9 +235,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             <Clock size={14} />
           </span>
           <div>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+            <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
               Time on this job
-            </div>
+            </Eyebrow>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1, marginTop: 4, color: start ? 'var(--signal-green)' : 'var(--ink-strong)' }}>
               {start ? fmtElapsed(elapsedMs) : 'Not clocked in'}
             </div>
@@ -269,7 +270,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Hourly rate</span>
+              <Eyebrow style={{ color: 'var(--ink-muted)' }}>Hourly rate</Eyebrow>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ fontFamily: 'var(--font-display)', color: 'var(--ink-muted)' }}>$</span>
                 <input
@@ -284,7 +285,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
               </div>
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Billable</span>
+              <Eyebrow style={{ color: 'var(--ink-muted)' }}>Billable</Eyebrow>
               <span style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--field-gold-bright)' }}>
                 ${billablePreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>

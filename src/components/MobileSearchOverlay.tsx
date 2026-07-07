@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { Eyebrow } from './v3'
 
 // Mobile-native search overlay — replaces CommandPalette on phone widths
 // (the cmdk popover renders clipped on iOS Safari + Chrome behind the
@@ -288,19 +289,9 @@ function ResultsList({ results, onGo }: any) {
         const meta = KIND_META[GROUP_TO_KIND[groupKey]]
         return (
           <section key={groupKey}>
-            <div
-              style={{
-                padding: '0 6px 6px',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: '0.16em',
-                color: 'var(--v3-text-muted)',
-                textTransform: 'uppercase'
-              }}
-            >
+            <Eyebrow as="div" style={{ padding: '0 6px 6px' }}>
               {meta.heading}
-            </div>
+            </Eyebrow>
             <ul
               role="list"
               style={{

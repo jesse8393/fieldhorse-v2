@@ -7,6 +7,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { canHover } from '../../../lib/hover.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { loadUserRateCard } from '../../../lib/rateCard.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * Quote items section — fh_quote_items CRUD editor.
@@ -660,16 +661,9 @@ function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, on
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
           {row.section && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center',
-              padding: '2px 8px', borderRadius: 999,
-              background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
-              color: 'var(--v3-text-muted)',
-              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-              letterSpacing: '0.10em', textTransform: 'uppercase'
-            }}>
+            <Eyebrow style={{ padding: '2px 8px', borderRadius: 999, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
               {row.section}
-            </span>
+            </Eyebrow>
           )}
           {isOptional && <StatusChip label="Optional" tone="gold" />}
           {isExcluded && <StatusChip label="Excluded" tone="muted" />}
@@ -799,16 +793,9 @@ function StatusChip({ label, tone }: any) {
         color: 'var(--v3-text-muted)'
       }
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '2px 8px', borderRadius: 999,
-      background: palette.bg, border: `1px solid ${palette.border}`,
-      color: palette.color,
-      fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-      letterSpacing: '0.10em', textTransform: 'uppercase'
-    }}>
+    <Eyebrow style={{ padding: '2px 8px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       {label}
-    </span>
+    </Eyebrow>
   )
 }
 
@@ -1007,13 +994,9 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
           silently reset every non-Base selection back to Base on the
           Add form. Inline div avoids the label-forward path entirely. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.10em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Mode
-        </span>
+        </Eyebrow>
         <KindPicker
           value={draft.is_excluded ? 'excluded' : draft.is_optional ? 'optional' : 'base'}
           onChange={(kind: any) => onChange('kind', kind)}
@@ -1088,13 +1071,9 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
 function FormField({ label, required, hint, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.10em',
-        textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow>
         {label}{required ? ' *' : ''}
-      </span>
+      </Eyebrow>
       {children}
       {hint && (
         <span style={{

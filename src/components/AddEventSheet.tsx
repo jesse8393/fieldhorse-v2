@@ -17,6 +17,7 @@ import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
 import { toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
+import { Eyebrow } from './v3'
 
 export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '', event = null }: any) {
   const editing = !!event?.id
@@ -129,10 +130,10 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
         style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow as="div">
             <CalendarIcon size={12} />
             Schedule
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"

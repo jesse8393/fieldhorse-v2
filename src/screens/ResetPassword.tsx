@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import Aurora from '../components/fx/Aurora.tsx'
 import GridPattern from '../components/fx/GridPattern.tsx'
+import { Eyebrow } from '../components/v3'
 
 export default function ResetPassword() {
   const { updatePassword } = useAuth()
@@ -75,27 +76,10 @@ export default function ResetPassword() {
             <br />
             password.
           </h1>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              marginTop: 12,
-              padding: '3px 10px',
-              borderRadius: 999,
-              background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)',
-              border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)',
-              color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase'
-            }}
-          >
+          <Eyebrow as="div" style={{ marginTop: 12, padding: '3px 10px', borderRadius: 999, background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)', border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)', color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }} />
             {ready ? 'Link verified' : 'Verifying'}
-          </div>
+          </Eyebrow>
         </div>
 
         {ready ? (
@@ -114,7 +98,7 @@ export default function ResetPassword() {
             }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>New password</span>
+              <Eyebrow style={{ color: 'var(--ink-muted)' }}>New password</Eyebrow>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
                 <input
@@ -132,7 +116,7 @@ export default function ResetPassword() {
             </label>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Confirm password</span>
+              <Eyebrow style={{ color: 'var(--ink-muted)' }}>Confirm password</Eyebrow>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
                 <input

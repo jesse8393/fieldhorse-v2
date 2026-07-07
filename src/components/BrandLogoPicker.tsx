@@ -4,6 +4,7 @@ import { Upload, Trash2, Image as ImageIcon, Check } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
+import { Eyebrow } from './v3'
 
 const BUCKET = 'company-logos'
 const MAX_BYTES = 1 * 1024 * 1024 // 1 MB per spec
@@ -128,9 +129,9 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+      <Eyebrow style={{ color: 'var(--ink-muted)' }}>
         Company logo
-      </span>
+      </Eyebrow>
 
       {/* Simulated dark header preview */}
       <div

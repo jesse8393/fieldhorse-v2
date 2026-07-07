@@ -20,6 +20,7 @@ import { ORG_ROLES } from '../lib/permissions.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../components/v3'
 
 function fmtJoined(iso: string | null): string {
   if (!iso) return '—'
@@ -167,7 +168,7 @@ export default function Team() {
               <div key={m.id} className="fh-build-table__row is-team">
                 <strong className="fh-build-truncate" title={m.name || ''}>
                   {m.name || (m.is_self ? 'You' : '—')}
-                  {m.is_self && <span style={{ color: 'var(--v3-primary, #c9963a)', marginLeft: 8, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}>You</span>}
+                  {m.is_self && <Eyebrow tone="gold" style={{ marginLeft: 8 }}>You</Eyebrow>}
                 </strong>
                 <span className="fh-build-truncate fh-build-rel" title={m.email || ''}>{m.email || '—'}</span>
                 <span style={{ textTransform: 'capitalize' }}><span className={`fh-build-dot is-${roleTone(m.role)}`}>{m.role}</span></span>

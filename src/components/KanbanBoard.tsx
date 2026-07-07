@@ -12,6 +12,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { motion } from 'framer-motion'
 import { GripVertical } from 'lucide-react'
 import { hapticStageChange, hapticTap } from '../lib/haptics.ts'
+import { Eyebrow } from './v3'
 
 // Stage columns shown left-to-right. "lost" lives off-board (URL-only).
 // Pipeline v2: the Invoice column is gone — invoicing is fh_invoices
@@ -91,9 +92,9 @@ function KanbanCard({ contact, dragging, onOpen }: any) {
         <span className="fh-money" style={{ fontFamily: 'var(--font-display)', fontSize: 16, lineHeight: 1, opacity: Number(contact.amount || 0) > 0 ? 1 : 0.4 }}>
           {money(contact.amount)}
         </span>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+        <Eyebrow style={{ color: 'var(--ink-faint)' }}>
           #{String(contact.id).slice(0, 6)}
-        </span>
+        </Eyebrow>
       </div>
     </div>
   )
@@ -121,9 +122,9 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }: any) {
         <span className={`fh-stage-pill fh-stage-pill--${id}`}>
           {label.toUpperCase()}
         </span>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+        <Eyebrow style={{ color: 'var(--ink-muted)' }}>
           {contacts.length} · {money(total)}
-        </span>
+        </Eyebrow>
       </header>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {contacts.map((c: any) => (

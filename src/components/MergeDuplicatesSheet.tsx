@@ -17,6 +17,7 @@ import { Users, Check, AlertTriangle, X } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mergeClients } from '../lib/clientMerge.ts'
+import { Eyebrow } from './v3'
 
 function fmtPhone(n: any) {
   if (!n) return ''
@@ -204,14 +205,9 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
         background: 'var(--v3-surface-2)'
       }}>
         <AlertTriangle size={13} aria-hidden="true" style={{ color: 'var(--ink-strong)' }} />
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: 'var(--ink-strong)'
-        }}>
+        <Eyebrow style={{ color: 'var(--ink-strong)' }}>
           {cluster.members.length} duplicates · matched on {matchedOn}
-        </span>
+        </Eyebrow>
       </header>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {cluster.members.map((m: any, i: any) => {
@@ -256,15 +252,9 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                   }}>
                     {m.name || 'Unnamed'}
                     {isSurvivor && (
-                      <span style={{
-                        marginLeft: 8,
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 9, fontWeight: 700,
-                        letterSpacing: '0.16em', textTransform: 'uppercase',
-                        color: 'var(--ink-strong)'
-                      }}>
+                      <Eyebrow style={{ marginLeft: 8, color: 'var(--ink-strong)' }}>
                         Keep
-                      </span>
+                      </Eyebrow>
                     )}
                   </div>
                   <div style={{

@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Users, UserPlus } from 'lucide-react'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * Invite Partner section — single-action surface that opens InvitePartnerSheet
@@ -12,13 +13,9 @@ export default function InvitePartnerSection({ contact, onOpenInvitePartner }: a
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
 
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-        textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow>
         Invite Partner
-      </span>
+      </Eyebrow>
 
       <div style={{
         padding: '20px 18px',

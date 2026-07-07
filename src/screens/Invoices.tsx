@@ -602,12 +602,7 @@ export default function Invoices() {
                       <StampNumber size="md" tone={tone}>{fmtMoney(value)}</StampNumber>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                         <Eyebrow style={{ whiteSpace: 'nowrap' }}>{b.label}</Eyebrow>
-                        <span style={{
-                          fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 600,
-                          letterSpacing: '0.08em', textTransform: 'uppercase',
-                          color: 'var(--v3-text-faint, color-mix(in srgb, var(--v3-text-muted) 70%, transparent))',
-                          whiteSpace: 'nowrap'
-                        }}>{b.short}</span>
+                        <Eyebrow style={{ color: 'var(--v3-text-faint, color-mix(in srgb, var(--v3-text-muted) 70%, transparent))', whiteSpace: 'nowrap' }}>{b.short}</Eyebrow>
                       </div>
                     </div>
                   )

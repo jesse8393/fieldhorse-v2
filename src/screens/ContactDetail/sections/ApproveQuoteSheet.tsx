@@ -10,6 +10,7 @@ import { approveQuote as pipelineApproveQuote } from '../../../lib/pipeline.ts'
 import { generateQuote } from '../../../lib/pdf.js'
 import SignaturePad from '../../../components/SignaturePad.tsx'
 import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * Approve Quote sheet — Phase 4C-2.
@@ -406,10 +407,10 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow as="div">
             <ShieldCheck size={12} />
             Approve
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"

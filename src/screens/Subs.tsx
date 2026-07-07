@@ -510,43 +510,13 @@ function SubCard({ g, contacts, isTop }: any) {
               }}>
                 {g.name}
               </span>
-              <span style={{
-                flexShrink: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '2px 8px',
-                borderRadius: 999,
-                background: 'var(--v3-primary-soft)',
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-                color: 'var(--v3-primary)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.10em',
-                textTransform: 'uppercase',
-                lineHeight: 1.4
-              }}>
+              <Eyebrow tone="gold" style={{ flexShrink: 0, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)' }}>
                 {g.jobsCount} {g.jobsCount === 1 ? 'job' : 'jobs'}
-              </span>
+              </Eyebrow>
               {isTop && (
-                <span aria-hidden="true" style={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '2px 7px',
-                  borderRadius: 999,
-                  background: 'var(--v3-primary-soft)',
-                  border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)',
-                  color: 'var(--v3-primary)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  lineHeight: 1
-                }}>
+                <Eyebrow tone="gold" aria-hidden="true" style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)' }}>
                   Top
-                </span>
+                </Eyebrow>
               )}
             </div>
 
@@ -717,20 +687,9 @@ function SubCard({ g, contacts, isTop }: any) {
                   }}>
                     {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '—'}
                   </span>
-                  <span style={{
-                    flexShrink: 0,
-                    padding: '2px 7px',
-                    borderRadius: 6,
-                    background: 'var(--v3-surface-2)',
-                    border: '1px solid var(--v3-border)',
-                    color: 'var(--v3-text-muted)',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase'
-                  }}>
+                  <Eyebrow style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 6, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
                     {r.status || 'scheduled'}
-                  </span>
+                  </Eyebrow>
                 </li>
               )
             })}
@@ -948,23 +907,8 @@ function SubsStateChip({ activeRecent, tradesCount, totalSubs }: any) {
     label = 'No subs yet'
   }
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '3px 9px',
-      borderRadius: 999,
-      background: bg,
-      border: `1px solid ${border}`,
-      color,
-      fontFamily: 'var(--font-body)',
-      fontSize: 10,
-      fontWeight: 700,
-      letterSpacing: '0.16em',
-      textTransform: 'uppercase',
-      lineHeight: 1,
-      fontVariantNumeric: 'tabular-nums'
-    }}>
+    <Eyebrow style={{ padding: '3px 9px', borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
       {label}
-    </span>
+    </Eyebrow>
   )
 }

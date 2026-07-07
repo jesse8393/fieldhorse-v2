@@ -25,6 +25,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import { Eyebrow } from '../components/v3'
 
 const PAGE_SIZE = 60
 
@@ -191,16 +192,10 @@ export default function Activity() {
       }}
     >
       <motion.div variants={item} style={{ padding: '12px 20px 8px' }}>
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: 'var(--v3-primary)',
-          display: 'inline-flex', alignItems: 'center', gap: 6
-        }}>
+        <Eyebrow as="div" tone="gold">
           <ActivityIcon size={11} aria-hidden="true" />
           Recent
-        </div>
+        </Eyebrow>
         <h1 style={{
           fontFamily: 'var(--font-display)',
           fontSize: 'clamp(28px, 7vw, 38px)',
@@ -238,18 +233,12 @@ export default function Activity() {
         )}
         {grouped && grouped.map(([label, items]) => (
           <section key={label} style={{ marginBottom: 22 }}>
-            <div style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)',
-              marginBottom: 10
-            }}>
+            <Eyebrow as="div" style={{ marginBottom: 10 }}>
               {label}
               <span style={{ marginLeft: 8, color: 'var(--v3-text-faint, var(--v3-text-muted))' }}>
                 · {items.length}
               </span>
-            </div>
+            </Eyebrow>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {items.map((e: any) => <EventRow key={e.id} event={e} />)}
             </ul>

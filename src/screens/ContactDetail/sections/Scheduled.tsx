@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, ArrowRight, Plus } from 'lucide-react'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * Scheduled section — read-only display of fh_schedule entries for this job.
@@ -26,13 +27,9 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Scheduled
-        </span>
+        </Eyebrow>
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Plus, Trash2 } from 'lucide-react'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * Milestones section — operator-defined checklist persisted as JSONB on
@@ -50,16 +51,9 @@ export default function MilestonesSection({ contact, patch }: any) {
         justifyContent: 'space-between',
         gap: 8
       }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Milestones
-        </span>
+        </Eyebrow>
         {list.length > 0 && (
           <span style={{
             fontFamily: 'var(--font-body)',

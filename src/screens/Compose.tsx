@@ -223,27 +223,7 @@ export default function Compose() {
               <PenLine size={11} aria-hidden="true" />
               AI Compose
             </Eyebrow>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignSelf: 'flex-start',
-                maxWidth: '100%',
-                alignItems: 'center',
-                gap: 6,
-                padding: '3px 8px',
-                borderRadius: 999,
-                background: 'var(--v3-surface-2)',
-                border: '1px solid var(--v3-border)',
-                color: 'var(--v3-text-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                lineHeight: 1.2,
-                opacity: contact ? 1 : 0.75
-              }}
-            >
+            <Eyebrow as="div" style={{ alignSelf: 'flex-start', maxWidth: '100%', padding: '3px 8px', borderRadius: 999, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', opacity: contact ? 1 : 0.75 }}>
               <span style={{ color: 'var(--v3-text-muted)' }}>To</span>
               <span aria-hidden="true" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))' }}>·</span>
               <span
@@ -261,7 +241,7 @@ export default function Compose() {
               >
                 {contact?.name || 'Generic'}
               </span>
-            </div>
+            </Eyebrow>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -868,11 +848,11 @@ function EmailHero({ draft, contact, profile, intent }: any) {
         color: 'var(--v3-text-muted)'
       }}>
         <div style={{ display: 'flex', gap: 10 }}>
-          <span style={{ width: 44, fontSize: 10, letterSpacing: '0.18em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>From</span>
+          <Eyebrow style={{ width: 44 }}>From</Eyebrow>
           <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{fromName}{fromAddr ? ` <${fromAddr}>` : ''}</span>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <span style={{ width: 44, fontSize: 10, letterSpacing: '0.18em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>To</span>
+          <Eyebrow style={{ width: 44 }}>To</Eyebrow>
           <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>
             {contact?.name || 'Recipient'}{contact?.email ? ` <${contact.email}>` : ''}
           </span>
@@ -906,13 +886,9 @@ function VoiceHero({ draft }: any) {
       padding: '14px 16px',
       display: 'flex', flexDirection: 'column', gap: 10
     }}>
-      <div style={{
-        fontFamily: 'var(--font-body)', fontSize: 10,
-        fontWeight: 700, letterSpacing: '0.18em',
-        textTransform: 'uppercase', color: 'var(--v3-primary)'
-      }}>
+      <Eyebrow as="div" tone="gold">
         Script · read this aloud
-      </div>
+      </Eyebrow>
       <pre style={{
         margin: 0,
         fontFamily: 'var(--font-body)', fontSize: 15, lineHeight: 1.6,

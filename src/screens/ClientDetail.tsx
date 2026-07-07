@@ -355,33 +355,14 @@ export default function ClientDetail() {
               </h1>
               <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {activeCount > 0 ? (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '2px 8px', borderRadius: 999,
-                    background: 'var(--v3-success-soft)',
-                    border: '1px solid rgba(79, 140, 94, 0.40)',
-                    color: 'var(--v3-success-bright)',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.1em', textTransform: 'uppercase',
-                    fontVariantNumeric: 'tabular-nums'
-                  }}>
+                  <Eyebrow tone="success" style={{ gap: 5, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-success-soft)', border: '1px solid rgba(79, 140, 94, 0.40)', fontVariantNumeric: 'tabular-nums' }}>
                     <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-success-bright)' }} />
                     Active
-                  </span>
+                  </Eyebrow>
                 ) : (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '2px 8px', borderRadius: 999,
-                    background: 'var(--v3-glass-tint)',
-                    border: '1px solid var(--v3-border-strong)',
-                    color: 'var(--v3-text-muted)',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.1em', textTransform: 'uppercase'
-                  }}>
+                  <Eyebrow style={{ gap: 5, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-strong)' }}>
                     Inactive
-                  </span>
+                  </Eyebrow>
                 )}
                 {client.company_name && (
                   <span style={{
@@ -639,7 +620,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
     return (
       <div aria-disabled="true" style={baseStyle}>
         <Icon size={18} aria-hidden="true" />
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
+        <Eyebrow>{label}</Eyebrow>
       </div>
     )
   }
@@ -662,7 +643,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
       style={baseStyle}
     >
       <Icon size={20} aria-hidden="true" />
-      <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
+      <Eyebrow>{label}</Eyebrow>
     </a>
   )
 }
@@ -705,13 +686,9 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
         overflow: 'hidden'
       }}>
         <div style={{ padding: '14px 18px 8px' }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-          }}>
+          <Eyebrow>
             Contact info
-          </span>
+          </Eyebrow>
         </div>
         <ContactRow icon={Phone} label="Phone" value={fmtPhone(client.phone)} href={client.phone ? `tel:${client.phone}` : null} />
         <ContactRow icon={Mail} label="Email" value={client.email} href={client.email ? `mailto:${client.email}` : null} />
@@ -788,15 +765,9 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
               }}>
                 {client.address}
               </span>
-              <span style={{
-                flexShrink: 0,
-                fontFamily: 'var(--font-body)',
-                fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.14em', textTransform: 'uppercase',
-                color: 'var(--v3-primary)'
-              }}>
+              <Eyebrow tone="gold" style={{ flexShrink: 0 }}>
                 Open in Maps →
-              </span>
+              </Eyebrow>
             </div>
           </a>
         </div>
@@ -811,14 +782,9 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
           border: '1px solid var(--v3-border-strong)',
           boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
         }}>
-          <div style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: 'var(--v3-text-muted)',
-            marginBottom: 8
-          }}>
+          <Eyebrow as="div" style={{ marginBottom: 8 }}>
             Internal Notes
-          </div>
+          </Eyebrow>
           <div style={{
             fontFamily: 'var(--font-body)',
             fontSize: 14, lineHeight: 1.5,
@@ -862,17 +828,9 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
         <Icon size={15} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          color: 'var(--v3-text-muted)',
-          marginBottom: 4
-        }}>
+        <Eyebrow as="div" style={{ marginBottom: 4 }}>
           {label}
-        </div>
+        </Eyebrow>
         <div style={{
           fontFamily: 'var(--font-body)',
           fontSize: 15,
@@ -1049,21 +1007,13 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
         gap: 8, padding: '14px 18px 8px'
       }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Pipeline
-        </span>
+        </Eyebrow>
         {totalRevenue > 0 && (
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.14em', textTransform: 'uppercase',
-            color: 'var(--v3-success-bright, #4ade80)'
-          }}>
+          <Eyebrow tone="success">
             {money(totalRevenue)} collected
-          </span>
+          </Eyebrow>
         )}
       </header>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -1399,16 +1349,9 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                       }}>
                         {money(amount)}
                       </div>
-                      <div style={{
-                        marginTop: 4,
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: '0.16em', textTransform: 'uppercase',
-                        color: c
-                      }}>
+                      <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
                         {j.stage}
-                      </div>
+                      </Eyebrow>
                     </div>
                   </div>
 
@@ -1449,15 +1392,9 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
 
                   {/* Row 3 — last-touch stamp */}
                   {stamp && (
-                    <div style={{
-                      fontFamily: 'var(--font-body)',
-                      fontSize: 10, fontWeight: 600,
-                      letterSpacing: '0.08em', textTransform: 'uppercase',
-                      color: 'var(--v3-text-faint, var(--v3-text-muted))',
-                      fontVariantNumeric: 'tabular-nums'
-                    }}>
+                    <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
                       Updated {stamp} ago
-                    </div>
+                    </Eyebrow>
                   )}
                 </motion.button>
               </li>
@@ -1530,21 +1467,10 @@ function NotesList({ notes }: any) {
                 }}>{body}</p>
               )}
               {n.fh_contacts?.name && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  marginTop: 8,
-                  padding: '3px 9px',
-                  borderRadius: 999,
-                  background: 'var(--v3-primary-soft)',
-                  border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-                  color: 'var(--v3-primary)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 10, fontWeight: 700,
-                  letterSpacing: '0.08em', textTransform: 'uppercase'
-                }}>
+                <Eyebrow tone="gold" style={{ gap: 4, marginTop: 8, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)' }}>
                   <Briefcase size={10} />
                   {n.fh_contacts.name}
-                </span>
+                </Eyebrow>
               )}
             </li>
           )

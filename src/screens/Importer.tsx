@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
+import { Eyebrow } from '../components/v3'
 
 // Importable target fields, in display order. Used by the mapping
 // review UI + the AI mapper prompt.
@@ -241,9 +242,9 @@ export default function Importer() {
       {/* HEADER */}
       <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 14px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow>
             Import
-          </span>
+          </Eyebrow>
           <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
             Import your{' '}
             data.
@@ -260,9 +261,9 @@ export default function Importer() {
       {/* CSV UPLOAD SECTION */}
       <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
         <header style={{ marginBottom: 10 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+          <Eyebrow style={{ color: 'var(--ink-muted)' }}>
             CSV upload
-          </span>
+          </Eyebrow>
         </header>
 
         {/* Preset selector */}
@@ -331,9 +332,9 @@ export default function Importer() {
         {csvHeaders.length > 0 && (
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+              <Eyebrow style={{ color: 'var(--ink-muted)' }}>
                 Column mapping
-              </span>
+              </Eyebrow>
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.96 }}
@@ -393,9 +394,9 @@ export default function Importer() {
         {/* Preview + import */}
         {mapped.length > 0 && (
           <div style={{ marginTop: 14 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>
               Preview (first 5)
-            </span>
+            </Eyebrow>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
               {mapped.slice(0, 5).map((m, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
@@ -415,10 +416,10 @@ export default function Importer() {
             </div>
             {importing && (
               <div style={{ marginTop: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+                <Eyebrow as="div" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--ink-muted)' }}>
                   <span>Inserting…</span>
                   <span style={{ fontFamily: 'var(--font-mono)' }}>{progress}%</span>
-                </div>
+                </Eyebrow>
                 <Progress value={progress} className="ui:h-1.5 ui:bg-white/[0.06]" />
               </div>
             )}
@@ -496,9 +497,9 @@ export default function Importer() {
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <Zap size={14} color="var(--field-gold-bright)" />
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--ink-strong)' }}>
+              <Eyebrow style={{ color: 'var(--ink-strong)' }}>
                 Lead intake link
-              </span>
+              </Eyebrow>
             </span>
             <ChevronDown size={16} color="var(--ink-muted)" className="fh-importer-chev" />
           </summary>
@@ -557,26 +558,16 @@ export default function Importer() {
               </motion.button>
             )}
 
-            <p style={{
-              margin: '14px 0 6px',
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-              textTransform: 'uppercase', color: 'var(--ink-muted)',
-              fontFamily: 'var(--font-body)'
-            }}>
+            <Eyebrow as="p" style={{ margin: '14px 0 6px', color: 'var(--ink-muted)' }}>
               What to send
-            </p>
+            </Eyebrow>
             <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
               <strong style={{ color: 'var(--ink-strong)' }}>Required:</strong> name. <strong style={{ color: 'var(--ink-strong)' }}>Optional:</strong> phone, email, address, job title, amount, notes.
             </p>
 
-            <p style={{
-              margin: '0 0 6px',
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-              textTransform: 'uppercase', color: 'var(--ink-muted)',
-              fontFamily: 'var(--font-body)'
-            }}>
+            <Eyebrow as="p" style={{ margin: '0 0 6px', color: 'var(--ink-muted)' }}>
               Example lead details
-            </p>
+            </Eyebrow>
             <pre
               style={{
                 margin: 0,

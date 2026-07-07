@@ -27,6 +27,7 @@ import { hapticTap } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { loadPastPartners, PARTNER_ROLES } from '../lib/partners.ts'
 import { authHeaders } from '../lib/supabase.ts'
+import { Eyebrow } from './v3'
 
 function friendlyInviteError(code: any) {
   if (code === 'server_misconfigured') return "Server isn't set up — missing Supabase keys in Netlify env."
@@ -216,10 +217,10 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow as="div">
             <Users size={12} />
             Partner
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
@@ -387,12 +388,9 @@ const iconStyle: import('react').CSSProperties = {
 function RecentPartnersStrip({ partners, onPick }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
-        textTransform: 'uppercase', color: 'var(--ink-muted)'
-      }}>
+      <Eyebrow style={{ color: 'var(--ink-muted)' }}>
         Recent partners
-      </span>
+      </Eyebrow>
       <div style={{
         display: 'flex', flexWrap: 'nowrap', gap: 8,
         overflowX: 'auto', WebkitOverflowScrolling: 'touch',
@@ -440,14 +438,9 @@ function RecentPartnersStrip({ partners, onPick }: any) {
                 {p.name || p.email}
               </span>
               {p.role && (
-                <span style={{
-                  marginTop: 1,
-                  fontSize: 9, fontWeight: 700,
-                  letterSpacing: '0.12em', textTransform: 'uppercase',
-                  color: 'var(--ink-muted)'
-                }}>
+                <Eyebrow style={{ marginTop: 1, color: 'var(--ink-muted)' }}>
                   {p.role}
-                </span>
+                </Eyebrow>
               )}
             </span>
           </button>

@@ -13,6 +13,7 @@ import { parseLeadFromImage } from '../lib/docIntelligence.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { JOB_TYPES } from '../lib/jobTypes.ts'
 import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.ts'
+import { Eyebrow } from './v3'
 
 const STAGE_OPTIONS = [
   { value: 'lead', label: 'Lead intake' },
@@ -528,10 +529,10 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         style={{ ...drawerStyle, height: '88dvh', maxHeight: '88dvh' }}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow as="div">
             <Sparkles size={12} />
             New {stageNoun}
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"

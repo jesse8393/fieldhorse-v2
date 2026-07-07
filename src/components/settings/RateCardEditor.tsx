@@ -19,6 +19,7 @@ import {
   RATE_CARD, TRADE_LABELS, RATE_UNITS,
   loadUserRateCard, upsertRate, resetRate
 } from '../../lib/rateCard.ts'
+import { Eyebrow } from '../v3'
 
 function slugify(s: any) {
   return String(s || '')
@@ -228,25 +229,14 @@ export default function RateCardEditor() {
                   {row.current?.label || TRADE_LABELS[row.key] || row.key}
                 </span>
                 {isCustom && (
-                  <span style={{
-                    padding: '1px 7px', borderRadius: 999,
-                    background: 'var(--surface-2)', border: '1px solid var(--rule)',
-                    fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
-                    color: 'var(--ink-muted)'
-                  }}>
+                  <Eyebrow style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }}>
                     Custom
-                  </span>
+                  </Eyebrow>
                 )}
                 {isOverride && !isCustom && (
-                  <span style={{
-                    padding: '1px 7px', borderRadius: 999,
-                    background: 'rgba(201,150,58,0.14)',
-                    border: '1px solid rgba(201,150,58,0.35)',
-                    fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
-                    color: 'var(--field-gold-bright, var(--field-gold, #d4af37))'
-                  }}>
+                  <Eyebrow style={{ padding: '1px 7px', borderRadius: 999, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright, var(--field-gold, #d4af37))' }}>
                     Customized
-                  </span>
+                  </Eyebrow>
                 )}
               </div>
 

@@ -29,6 +29,7 @@ import {
 import { commitCapture, type CaptureContact } from '../lib/captureActions.ts'
 import { pushOutbox, flushOutbox, outboxCount } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
+import { Eyebrow } from './v3'
 
 type Phase = 'input' | 'parsing' | 'confirm' | 'saving'
 
@@ -251,10 +252,10 @@ export default function CaptureSheet() {
     <Drawer open={open} onOpenChange={(v: any) => { if (!v) close() }}>
       <DrawerContent className="ui:max-w-full ui:overflow-x-hidden" style={drawerStyle}>
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow as="div">
             <Sparkles size={12} />
             Capture
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
@@ -362,15 +363,9 @@ export default function CaptureSheet() {
                 background: 'var(--surface-2)', border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, var(--rule))'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    padding: '4px 10px', borderRadius: 999,
-                    background: 'color-mix(in srgb, var(--v3-primary) 16%, transparent)',
-                    color: 'var(--v3-primary)', fontSize: 11, fontWeight: 700,
-                    letterSpacing: '0.1em', textTransform: 'uppercase'
-                  }}>
+                  <Eyebrow tone="gold" style={{ padding: '4px 10px', borderRadius: 999, background: 'color-mix(in srgb, var(--v3-primary) 16%, transparent)' }}>
                     {meta.label}
-                  </span>
+                  </Eyebrow>
                   <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {intent.summary}
                   </span>

@@ -17,6 +17,7 @@ import { safePayUrl } from '../lib/payLink.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Switch } from '@/components/ui/switch'
+import { Eyebrow } from '../components/v3'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
 
@@ -351,7 +352,7 @@ export default function Settings() {
       <Section variants={item} title={<>Your <em>brand.</em></>} sub="Make Fieldhorse feel like your app.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Display name</span>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>Display name</Eyebrow>
             <input
               type="text"
               value={displayName}
@@ -364,7 +365,7 @@ export default function Settings() {
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Company name</span>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>Company name</Eyebrow>
             <input
               type="text"
               value={companyName}
@@ -588,16 +589,9 @@ export default function Settings() {
             background: 'var(--surface-2)',
             border: '1px solid var(--rule)'
           }}>
-            <span style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-muted)'
-            }}>
+            <Eyebrow style={{ color: 'var(--ink-muted)' }}>
               Service area
-            </span>
+            </Eyebrow>
             <span style={{
               fontFamily: 'var(--font-body)',
               fontSize: 15,
@@ -829,9 +823,9 @@ export default function Settings() {
     <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '10px 20px 14px' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+        <Eyebrow>
           Profile
-        </span>
+        </Eyebrow>
         <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
           Your business,{' '}
           organized.
@@ -1068,7 +1062,7 @@ function renderSectionTitle(node: any) {
 function Meta({ label, value }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', minWidth: 80 }}>
-      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>{label}</span>
+      <Eyebrow style={{ color: 'var(--ink-muted)' }}>{label}</Eyebrow>
       <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{value}</span>
     </div>
   )
@@ -1078,23 +1072,13 @@ function BrandField({ label, hint, optional, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
-          textTransform: 'uppercase', color: 'var(--ink-muted)'
-        }}>
+        <Eyebrow style={{ color: 'var(--ink-muted)' }}>
           {label}
-        </span>
+        </Eyebrow>
         {optional && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '1px 7px', borderRadius: 999,
-            background: 'var(--surface-2)', border: '1px solid var(--rule)',
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.12em',
-            textTransform: 'uppercase', color: 'var(--ink-faint, var(--ink-muted))',
-            fontFamily: 'var(--font-body)'
-          }}>
+          <Eyebrow style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint, var(--ink-muted))' }}>
             Optional
-          </span>
+          </Eyebrow>
         )}
       </span>
       {children}
@@ -1285,12 +1269,9 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
         {/* Eyebrow + hero number row */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
           <div>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-              letterSpacing: '0.18em', color: previewColor, textTransform: 'uppercase'
-            }}>
+            <Eyebrow as="div" style={{ color: previewColor }}>
               Invoice
-            </div>
+            </Eyebrow>
             <div style={{
               fontFamily: 'var(--font-display)',
               fontSize: 20, fontWeight: 600,
@@ -1302,17 +1283,9 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
             </div>
           </div>
           {/* Status pill */}
-          <span style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '4px 9px', borderRadius: 999,
-            background: `color-mix(in srgb, ${previewColor} 16%, white)`,
-            border: `1px solid ${previewColor}`,
-            color: previewColor,
-            fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-            letterSpacing: '0.18em', textTransform: 'uppercase'
-          }}>
+          <Eyebrow style={{ padding: '4px 9px', borderRadius: 999, background: `color-mix(in srgb, ${previewColor} 16%, white)`, border: `1px solid ${previewColor}`, color: previewColor }}>
             Sample
-          </span>
+          </Eyebrow>
         </div>
         {/* Hero money */}
         <div style={{

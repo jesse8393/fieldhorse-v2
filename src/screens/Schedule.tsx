@@ -6,7 +6,7 @@ import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
 import AddEventSheet from '../components/AddEventSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
-import { FloatingActionButton, ScreenCloser } from '../components/v3'
+import { FloatingActionButton, ScreenCloser, Eyebrow } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import {
@@ -286,19 +286,13 @@ export default function Schedule() {
           the screen. Stats live inline under the eyebrow instead of
           inside a heavy black-glass panel. */}
       <motion.div variants={item} style={{ padding: '14px 20px 4px' }}>
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--v3-primary)',
-          marginBottom: 6
-        }}>
+        <Eyebrow as="div" tone="gold" style={{ marginBottom: 6 }}>
           {cursor.toLocaleDateString(undefined, { weekday: 'short' })} ·{' '}
           {cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           {(events && events.length > 0) && (
             <> · {events.length} {events.length === 1 ? 'visit' : 'visits'}</>
           )}
-        </div>
+        </Eyebrow>
         <h1 style={{
           margin: 0,
           fontFamily: 'var(--font-display)',
@@ -468,16 +462,9 @@ export default function Schedule() {
       {/* DAY HEADER — "TUE, APR 28" eyebrow that titles the timeline */}
       {view === 'day' && (
         <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 8px' }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.10em',
-            textTransform: 'uppercase',
-            color: 'var(--v3-text-muted)'
-          }}>
+          <Eyebrow>
             {cursor.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-          </span>
+          </Eyebrow>
         </motion.div>
       )}
 

@@ -6,7 +6,7 @@ import { toastError, toastUndo, toastSuccess } from '../../../lib/toast.ts'
 import { resilientInsert } from '../../../lib/outbox.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { canHover } from '../../../lib/hover.ts'
-import { PostedByChip } from '../../../components/v3'
+import { PostedByChip, Eyebrow } from '../../../components/v3'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 /**
@@ -82,13 +82,9 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Messages
-        </span>
+        </Eyebrow>
         {notes.length > 0 && (
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 11,

@@ -11,6 +11,7 @@ import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
 import { queuePhoto, isNetworkError } from '../../../lib/outbox.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 const BUCKET = 'job-photos'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per photo
@@ -330,13 +331,9 @@ export default function PhotosSection({ jobId, userId }: any) {
 
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           {rows.length} {rows.length === 1 ? 'photo' : 'photos'}
-        </span>
+        </Eyebrow>
         <div style={{ display: 'inline-flex', gap: 6 }}>
           {rows.length >= 2 && (
             <motion.button
@@ -495,21 +492,9 @@ export default function PhotosSection({ jobId, userId }: any) {
                     operator scan the grid and see which photos still
                     need to be tagged to a scope section. */}
                 {r.section_tag && !captioning && (
-                  <div style={{
-                    position: 'absolute', bottom: 4, right: 4,
-                    padding: '3px 7px', borderRadius: 6,
-                    background: 'color-mix(in srgb, var(--v3-primary) 80%, transparent)',
-                    color: 'var(--v3-on-primary, #1a1208)',
-                    fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    maxWidth: 'calc(100% - 12px)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
+                  <Eyebrow as="div" style={{ position: 'absolute', bottom: 4, right: 4, padding: '3px 7px', borderRadius: 6, background: 'color-mix(in srgb, var(--v3-primary) 80%, transparent)', color: 'var(--v3-on-primary, #1a1208)', maxWidth: 'calc(100% - 12px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {r.section_tag}
-                  </div>
+                  </Eyebrow>
                 )}
               </motion.button>
             )
@@ -722,13 +707,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             attaches to on the proposal. Auto-saves on pick. */}
         <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: 'var(--v3-primary)'
-            }}>
+            <Eyebrow tone="gold">
               Scope section
-            </span>
+            </Eyebrow>
             {sectionTag && (
               <button
                 type="button"
@@ -805,13 +786,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
 
         {/* Caption editor */}
         <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
-            color: 'var(--v3-primary)'
-          }}>
+          <Eyebrow tone="gold">
             Caption
-          </span>
+          </Eyebrow>
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value)}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate.ts'
+import { Eyebrow } from '../../../components/v3'
 
 /**
  * Quote terms section — customer-facing prose blocks + expiration.
@@ -140,13 +141,9 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
 function FieldLabel({ label, hint, children }: any) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.10em',
-        textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow>
         {label}
-      </span>
+      </Eyebrow>
       {children}
       {hint && (
         <span style={{

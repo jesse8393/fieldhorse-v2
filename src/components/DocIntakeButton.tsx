@@ -4,6 +4,7 @@ import { Camera, Upload, Sparkles, X, Loader2 } from 'lucide-react'
 import { compressImageToDataUrl, imageFromClipboardEvent } from '../lib/docIntelligence.ts'
 import { hapticTap, hapticSuccess } from './../lib/haptics.ts'
 import { toastError } from '../lib/toast.ts'
+import { Eyebrow } from './v3'
 
 /**
  * DocIntakeButton — the entry surface for document-intelligence flows.
@@ -133,10 +134,10 @@ export default function DocIntakeButton({
               <X size={14} />
             </button>
 
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+            <Eyebrow as="div">
               <Sparkles size={12} />
               AI doc parse
-            </div>
+            </Eyebrow>
             <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
               {description}
             </p>
@@ -177,9 +178,9 @@ export default function DocIntakeButton({
             )}
 
             {!busy && (
-              <p style={{ margin: '10px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', textAlign: 'center' }}>
+              <Eyebrow as="p" style={{ margin: '10px 0 0', color: 'var(--ink-faint)', textAlign: 'center' }}>
                 or paste an image · ⌘V
-              </p>
+              </Eyebrow>
             )}
 
             <input

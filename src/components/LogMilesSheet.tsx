@@ -4,6 +4,7 @@ import { Car, Save as SaveIcon, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { supabase } from '../lib/supabase.ts'
 import { toastError } from '../lib/toast.ts'
+import { Eyebrow } from './v3'
 
 const IRS_RATE = 0.67
 
@@ -76,10 +77,10 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
     <Drawer open={open} onOpenChange={(v: any) => { if (!(!v && saving)) onOpenChange(v) }}>
       <DrawerContent>
         <DrawerHeader>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow as="div">
             <Car size={12} />
             Mileage
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
@@ -166,7 +167,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
 
           {milesNum > 0 && (
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 12, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Deduction</span>
+              <Eyebrow style={{ color: 'var(--ink-muted)' }}>Deduction</Eyebrow>
               <span className="fh-text-gradient-gold" style={{ fontFamily: 'var(--font-display)', fontSize: 22, letterSpacing: '0.01em' }}>
                 ${deduction.toFixed(2)}
               </span>

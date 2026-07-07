@@ -21,6 +21,7 @@ import { Archive as ArchiveIcon } from 'lucide-react'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../components/v3'
 const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
@@ -602,12 +603,9 @@ export default function Notes() {
                     <span style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {g.name}
                     </span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase',
-                      color: 'var(--v3-text-muted)', flexShrink: 0
-                    }}>
+                    <Eyebrow style={{ flexShrink: 0 }}>
                       {g.items.length} {g.items.length === 1 ? 'note' : 'notes'}
-                    </span>
+                    </Eyebrow>
                   </span>
                   <ChevronRight size={16} color="var(--v3-text-muted)" />
                 </button>
@@ -980,44 +978,16 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
         {(!hideJobChip && contact?.name) || actionCount > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {!hideJobChip && contact?.name && (
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '3px 9px',
-                borderRadius: 999,
-                background: 'var(--v3-surface-2)',
-                border: '1px solid var(--v3-border-strong)',
-                color: 'var(--v3-text-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase'
-              }}>
+              <Eyebrow style={{ gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)' }}>
                 <Briefcase size={10} color="var(--v3-primary)" />
                 {contact.name}
-              </span>
+              </Eyebrow>
             )}
             {actionCount > 0 && (
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '3px 9px',
-                borderRadius: 999,
-                background: 'var(--v3-success-soft)',
-                border: '1px solid color-mix(in srgb, var(--v3-success) 30%, transparent)',
-                color: 'var(--v3-success-bright)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase'
-              }}>
+              <Eyebrow tone="success" style={{ gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-success-soft)', border: '1px solid color-mix(in srgb, var(--v3-success) 30%, transparent)' }}>
                 <ClipboardCheck size={10} />
                 {actionCount} {actionCount === 1 ? 'action' : 'actions'}
-              </span>
+              </Eyebrow>
             )}
           </div>
         ) : null}
@@ -1039,20 +1009,10 @@ function ParsedList({ title, items, Icon, tone }: any) {
       : 'var(--v3-text-muted)'
   return (
     <div style={{ marginTop: 10 }}>
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 6,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.10em',
-        textTransform: 'uppercase',
-        color
-      }}>
+      <Eyebrow as="div" style={{ marginBottom: 6, color }}>
         {Icon ? <Icon size={11} /> : null}
         {title}
-      </div>
+      </Eyebrow>
       <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
         {items.map((it: any, i: any) => <li key={i} style={{ marginBottom: 2 }}>{it}</li>)}
       </ul>

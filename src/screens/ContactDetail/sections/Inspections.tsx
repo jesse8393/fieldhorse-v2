@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/drawer'
 import { notifySelf } from '../../../lib/notifications.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { Eyebrow } from '../../../components/v3'
 
 const TRADES = [
   'Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing',
@@ -95,13 +96,9 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
       {/* Trade grid — only shown when enabled */}
       {enabled ? (
         <>
-          <div style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-            textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-          }}>
+          <Eyebrow as="div">
             Trades
-          </div>
+          </Eyebrow>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
@@ -193,15 +190,10 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
         <DrawerHeader>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: 'var(--v3-primary)'
-          }}>
+          <Eyebrow as="div" tone="gold">
             <ClipboardCheck size={12} />
             Inspection
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2 style={{
               margin: '6px 0 0',
@@ -221,13 +213,9 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
 
         <div style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)'
-            }}>
+            <Eyebrow>
               Result
-            </span>
+            </Eyebrow>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {['pass', 'fail', 'na'].map((r) => {
                 const on = result === r
@@ -258,13 +246,9 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
           </div>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: 'var(--v3-text-muted)'
-            }}>
+            <Eyebrow>
               Notes
-            </span>
+            </Eyebrow>
             <textarea
               rows={3}
               value={notes}

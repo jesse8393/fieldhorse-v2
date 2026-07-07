@@ -19,6 +19,7 @@ import { logPayment } from '../lib/pipeline.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
+import { Eyebrow } from './v3'
 
 function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -116,10 +117,10 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
         style={drawerStyle}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+          <Eyebrow as="div">
             <DollarSign size={12} />
             Record payment
-          </div>
+          </Eyebrow>
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"

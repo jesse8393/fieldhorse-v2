@@ -1225,25 +1225,9 @@ function NextTodoDueChip({ iso }: any) {
           color: 'var(--v3-text-muted)'
         }
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      marginTop: 4,
-      padding: '2px 8px',
-      borderRadius: 999,
-      background: palette.bg,
-      border: `1px solid ${palette.border}`,
-      color: palette.color,
-      fontFamily: 'var(--font-body)',
-      fontSize: 9,
-      fontWeight: 700,
-      letterSpacing: '0.06em',
-      textTransform: 'uppercase',
-      lineHeight: 1.4,
-      whiteSpace: 'nowrap'
-    }}>
+    <Eyebrow style={{ marginTop: 4, padding: '2px 8px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color, whiteSpace: 'nowrap' }}>
       Due · {status.label}
-    </span>
+    </Eyebrow>
   )
 }
 
@@ -1324,16 +1308,9 @@ function DeleteCascadeRow({ label, count, detail = 'deleted' }: any) {
       border: '1px solid var(--v3-border)',
       borderRadius: 8
     }}>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 11,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)',
-        fontWeight: 700
-      }}>
+      <Eyebrow>
         {label}
-      </span>
+      </Eyebrow>
       <span style={{
         fontFamily: 'var(--font-body)',
         fontSize: 13,

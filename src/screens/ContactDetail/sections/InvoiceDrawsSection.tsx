@@ -27,6 +27,7 @@ import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -519,18 +520,14 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
       flexWrap: 'wrap'
     }}>
       <FileText size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
-      <span style={{
-        fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-        letterSpacing: '0.16em', color: 'var(--v3-primary-bright)',
-        textTransform: 'uppercase'
-      }}>
+      <Eyebrow tone="gold">
         Invoice draws
         {count > 0 && (
           <span style={{ marginLeft: 8, color: 'var(--v3-text-muted)' }}>
             · {count}
           </span>
         )}
-      </span>
+      </Eyebrow>
       <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
         {canGenerate && (
           <button
@@ -850,15 +847,9 @@ function Tag({ tone, children }: any) {
     red:   { bg: 'rgba(232, 90, 87, 0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232, 90, 87, 0.30)' }
   } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '3px 7px', borderRadius: 999,
-      background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg,
-      fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-      letterSpacing: '0.16em', textTransform: 'uppercase'
-    }}>
+    <Eyebrow style={{ padding: '3px 7px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
       {children}
-    </span>
+    </Eyebrow>
   )
 }
 

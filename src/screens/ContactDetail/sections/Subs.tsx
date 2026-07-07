@@ -7,6 +7,7 @@ import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { formatPhone } from '../../../lib/utils.ts'
 import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_ } from '../../../components/ActionSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 const SheetField = SheetField_ as any
 const SheetChipRow = SheetChipRow_ as any
 
@@ -97,13 +98,9 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-          textTransform: 'uppercase', color: 'var(--v3-text-muted)'
-        }}>
+        <Eyebrow>
           Subs
-        </span>
+        </Eyebrow>
         <span style={{
           fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
           color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums'
@@ -184,13 +181,9 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <span style={{
-                    fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.08em', textTransform: 'uppercase',
-                    color: STATUS_COLOR[s.status] || 'var(--v3-text-muted)'
-                  }}>
+                  <Eyebrow style={{ color: STATUS_COLOR[s.status] || 'var(--v3-text-muted)' }}>
                     {s.status}
-                  </span>
+                  </Eyebrow>
                   <span style={{
                     fontFamily: 'var(--font-display)', fontSize: 14,
                     color: 'var(--v3-primary)',

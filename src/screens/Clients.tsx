@@ -348,13 +348,9 @@ export default function Clients() {
                 {duplicateClusters.length} {duplicateClusters.length === 1 ? 'cluster' : 'clusters'} sharing a phone or email
               </div>
             </div>
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-              letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: 'var(--v3-primary)'
-            }}>
+            <Eyebrow tone="gold">
               Review →
-            </span>
+            </Eyebrow>
           </button>
         </motion.div>
       )}
@@ -735,23 +731,8 @@ function ClientsStateChip({ stats, totalAccounts }: any) {
     label = `${totalAccounts} ${totalAccounts === 1 ? 'account' : 'accounts'}`
   }
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '3px 9px',
-      borderRadius: 999,
-      background: bg,
-      border: `1px solid ${border}`,
-      color,
-      fontFamily: 'var(--font-body)',
-      fontSize: 10,
-      fontWeight: 700,
-      letterSpacing: '0.16em',
-      textTransform: 'uppercase',
-      lineHeight: 1,
-      fontVariantNumeric: 'tabular-nums'
-    }}>
+    <Eyebrow style={{ padding: '3px 9px', borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
       {label}
-    </span>
+    </Eyebrow>
   )
 }

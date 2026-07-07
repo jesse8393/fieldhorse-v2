@@ -26,6 +26,7 @@ import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { Eyebrow } from '../../../components/v3'
 
 const SkeletonAny = SkeletonList as any
 
@@ -222,14 +223,14 @@ export default function MaterialsSection({ jobId, userId }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--v3-text-muted)' }}>
+        <Eyebrow>
           Materials
           {counts.total > 0 && (
             <span style={{ marginLeft: 12, color: 'var(--v3-text)' }}>
               {counts.installed}/{counts.total} installed · {counts.needed} to order
             </span>
           )}
-        </span>
+        </Eyebrow>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" onClick={() => setNotesPromptOpen(true)} style={chipBtnGhost}>
             <Sparkles size={11} /> Pull from notes

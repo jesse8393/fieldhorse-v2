@@ -970,13 +970,9 @@ function SectionTitle({ children }: any) {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       gap: 8, padding: '8px 2px 0'
     }}>
-      <span style={{
-        fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
-        color: 'var(--v3-text-muted)'
-      }}>
+      <Eyebrow>
         {children}
-      </span>
+      </Eyebrow>
     </div>
   )
 }
@@ -1011,16 +1007,8 @@ function StatusPill({ status }: any) {
     }
   })()
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '5px 12px', borderRadius: 999,
-      background: palette.bg, border: `1px solid ${palette.border}`,
-      color: palette.color,
-      fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700,
-      letterSpacing: '0.14em', textTransform: 'uppercase',
-      lineHeight: 1
-    }}>
+    <Eyebrow style={{ padding: '5px 12px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       Invoice · {status.label}
-    </span>
+    </Eyebrow>
   )
 }
