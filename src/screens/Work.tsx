@@ -109,7 +109,7 @@ export default function Work() {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(t)
   }, [search])
-  const { data: serverHits = [] } = useJobSearch(debouncedSearch)
+  const { data: serverHits = [], isError: searchDegraded } = useJobSearch(debouncedSearch)
   const [addOpen, setAddOpen] = useState(false)
   const [addStage, setAddStage] = useState<'lead' | 'quote' | 'job'>('lead')
   const [justAddedId, setJustAddedId] = useState<string | null>(null)
@@ -331,6 +331,18 @@ export default function Work() {
             }}
           />
         </div>
+        {/* Whole-book search failed (offline / server error): results
+            below are the cached recent window only — say so instead of
+            letting old deals silently look deleted. */}
+        {searchDegraded && search.trim().length >= 2 && (
+          <div role="status" style={{
+            marginTop: 6, fontSize: 11, fontFamily: 'var(--font-body)',
+            color: 'var(--v3-primary)', display: 'flex', alignItems: 'center', gap: 6
+          }}>
+            <Sparkles size={11} aria-hidden="true" />
+            Showing recent deals only — full-history search is unreachable right now.
+          </div>
+        )}
       </motion.div>
 
       {/* STAGE CHIPS — the whole pipeline in one row. */}

@@ -221,11 +221,14 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Persist while typing (best-effort). writeDraft self-clears when the
-  // form empties, so backspacing everything also discards the draft.
+  // Persist while typing (best-effort), debounced — JSON.stringify +
+  // synchronous localStorage.setItem per keystroke is main-thread work
+  // the field device doesn't need. writeDraft self-clears when the form
+  // empties, so backspacing everything also discards the draft.
   useEffect(() => {
     if (!open || committed) return
-    writeDraft(form)
+    const t = setTimeout(() => writeDraft(form), 400)
+    return () => clearTimeout(t)
   }, [open, committed, form])
 
   // When the trade changes, drop any template that no longer applies.

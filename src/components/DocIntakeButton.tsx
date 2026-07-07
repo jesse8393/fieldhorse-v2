@@ -178,7 +178,7 @@ export default function DocIntakeButton({
             )}
 
             {!busy && (
-              <Eyebrow as="p" style={{ margin: '10px 0 0', color: 'var(--ink-faint)', textAlign: 'center' }}>
+              <Eyebrow as="p" style={{ margin: '10px 0 0', color: 'var(--ink-faint)', display: 'flex', justifyContent: 'center' }}>
                 or paste an image · ⌘V
               </Eyebrow>
             )}

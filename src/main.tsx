@@ -112,7 +112,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           persistOptions={{
             persister: queryPersister,
             maxAge: 7 * 24 * 60 * 60 * 1000,
-            buster: typeof __FH_BUILD_SHA__ === 'string' ? __FH_BUILD_SHA__ : 'dev'
+            buster: typeof __FH_BUILD_SHA__ === 'string' ? __FH_BUILD_SHA__ : 'dev',
+            dehydrateOptions: {
+              // Don't persist per-keystroke search results — every
+              // ['jobSearch', pattern] entry carries up to 100 rows and
+              // there's one per pattern typed; they'd bloat the blob and
+              // are worthless offline (the cached list already covers
+              // recent rows). Persist only settled, successful queries.
+              shouldDehydrateQuery: (q) =>
+                q.state.status === 'success' && q.queryKey[0] !== 'jobSearch'
+            }
           }}
         >
           <ThemeProvider>

@@ -130,14 +130,20 @@ export function useJobsRealtime(userId: string | undefined, client: QueryClient)
 // The screen merges these with the cached list (dedupe by id), so recent
 // rows stay instant and older rows stream in behind them.
 export function useJobSearch(term: string) {
-  // PostgREST or() syntax delimits with commas/parens — strip them (and
-  // bare wildcards) from user input so a stray character can't break the
-  // filter expression.
-  const q = term.trim().replace(/[,()%_\\]/g, ' ').trim()
+  // PostgREST or() syntax delimits with commas/parens, and % _ \ are
+  // ilike metacharacters — but simply STRIPPING them broke real
+  // searches (ultrareview x5: "(615) 555-1234" became "615  555-1234",
+  // which matches nothing). Instead, collapse every run of punctuation
+  // or whitespace into a single % wildcard: the pattern
+  // %615%555%1234% matches the stored "(615) 555-1234" regardless of
+  // formatting, and "john_doe@x" still finds john_doe@x. Still
+  // injection-safe: no commas/parens survive into the or() expression.
+  const q = term.trim()
+  const pattern = '%' + q.replace(/[,()%_\\\s]+/g, '%') + '%'
   return useQuery({
-    queryKey: ['jobSearch', q],
+    queryKey: ['jobSearch', pattern],
     queryFn: async (): Promise<JobRow[]> => {
-      const like = `%${q}%`
+      const like = pattern
       const orExpr = ['name', 'phone', 'email', 'address', 'job_title', 'job_type', 'referred_by']
         .map((c) => `${c}.ilike.${like}`)
         .join(',')
@@ -395,8 +401,12 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
       .select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`)
       .eq('user_id', userId)
       .in('stage', ['job', 'invoice', 'closed'])
-      .order('created_at', { ascending: false })
-      .limit(2000),
+      .order('created_at', { ascending: false }),
+      // Deliberately UNCAPPED (ultrareview x3): a recency cap here
+      // silently drops the oldest rows — exactly the most-overdue
+      // receivables — understating outstanding totals and the 60+
+      // aging bucket. The column projection above already carries the
+      // payload win; A/R math must see every row.
     supabase
       .from('fh_payments')
       .select('*')
