@@ -115,11 +115,18 @@ export async function getActivePunchForContact(
 }
 
 /** Punch in. Inserts a new row with punch_in_at = now(). org_id is
- *  filled in by the BEFORE INSERT trigger from migration 035. */
+ *  filled in by the BEFORE INSERT trigger from migration 035.
+ *
+ *  Open-punch guard: if the caller already has an un-clocked-out punch
+ *  (double-tap, second tab, stale UI), return THAT punch instead of
+ *  inserting a second one — two open punches later double-count labor
+ *  hours in job cost. */
 export async function punchIn(opts: {
   userId: string
   contactId?: string | null
 }): Promise<TimePunch> {
+  const existing = await getActivePunch(opts.userId)
+  if (existing) return existing
   const { lat, lon, acc } = await tryGeolocate()
   const { data, error } = await supabase
     .from('fh_time_punches')
