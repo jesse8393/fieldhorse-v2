@@ -1,29 +1,30 @@
 // src/components/documents/ProposalTemplate.tsx
 //
-// Customer-facing HTML preview of a contractor proposal — restrained
-// editorial layout matching the reference estimate. Composes:
+// Customer-facing HTML preview of a contractor proposal. The bar is a
+// $500M company's estimate: the project total and expiry are visible
+// without scrolling, every line item is priced in the open (qty ·
+// rate · amount, grouped by trade with subtotals), options read as
+// add-ons that are explicitly NOT in the total, and the signature
+// block is honest — blank until someone actually signs.
 //
-//   1. DocumentShell           (logo + ESTIMATE/PROPOSAL # + recipient / sender)
-//   2. LineItemsTable          (dark header bar + multi-line desc rows)
-//   3. Totals block            (right-aligned, bordered TOTAL box)
-//   4. Optional upgrades       (when items.is_optional present)
-//   5. Optional change orders  (when changeOrders has entries)
-//   6. Optional insurance      (when insurance payload present)
-//   7. Payment terms paragraph (configurable, defaults to 50/40/10)
-//   8. Approval section        (signature lines)
-//   9. Disclaimer paragraph    (DocumentShell footer)
-//
-// The reference layout is calm-and-confident. Where the prior version
-// stacked many bordered cards, this one leans on whitespace + a single
-// dark items table as the visual anchor. The brand_accent_hex drives
-// the table header bar so each contractor's identity still shows.
+// Composes:
+//   1. DocumentShell      (letterhead + number + meta dates + hero band)
+//   2. Hero band          (project total · line-item count · valid-until)
+//   3. LineItemsTable     (grouped itemized rows w/ section subtotals)
+//   4. Totals block       (subtotal → change orders → total)
+//   5. Optional add-ons   (is_optional items, "+$" amounts, not in total)
+//   6. Change orders      (when present)
+//   7. Photos             (tagged strips, when present)
+//   8. Insurance          (when present)
+//   9. Terms grid         (payment terms · warranty · exclusions)
+//  10. Approval           (blank sig lines, or the recorded approval)
 
-import DocumentShell from './DocumentShell.tsx'
+import DocumentShell, { StatusChip } from './DocumentShell.tsx'
 import LineItemsTable from './LineItemsTable.tsx'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
-import { DOC_COLORS, DOC_FONTS } from './tokens.ts'
-import { money } from './format.ts'
+import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
+import { money, longDate } from './format.ts'
 import { proposalNumber } from './numbers.ts'
 import { SlateProposal, MintProposal, EditorialProposal } from './proposalThemes.tsx'
 
@@ -40,10 +41,10 @@ export default function ProposalTemplate({
   company = {},
   contact = {},
   project,
-  scopeSections = [],     // legacy — flattened into rows
-  upgrades = [],          // is_optional items, rendered as a second table
+  scopeSections = [],
+  upgrades = [],          // is_optional items — rendered as add-ons
   pricing = { baseTotal: 0, upgradeTotal: 0, discount: 0, taxRate: 0 },
-  paymentSchedule = null, // unused in v2 — payment terms are a paragraph now
+  paymentSchedule = null, // optional [{ label, note }] override of the default terms copy
   warrantyText,
   exclusions = [],
   insurance = null,
@@ -52,89 +53,57 @@ export default function ProposalTemplate({
   meta = {},
   status = 'draft',
   showInternalNotes = false,
-  photos = []             // [{ url, section_tag, caption }] — tagged
-                          // photos surface grouped under Project photos.
+  photos = []
 }: any) {
   const number = meta.number || proposalNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
   const expiresAt = meta.expiresAt || null
+  const brand = resolveBrandGold(company)
 
-  // Individual line items — one row per service (Qty · Unit Price ·
-  // Amount), flattened across scope sections in their original order.
-  const lineItems = scopeSections.flatMap((sec: any) =>
-    (sec.items || []).map((it: any) => ({
-      description: (it.description || '—').trim(),
-      qty: Number(it.qty || 1),
-      unit: (it.unit || '').trim(),
-      rate: Number(it.rate || 0),
-      amount: itemAmount(it)
-    }))
-  )
-
-  // Classic layout keeps one row per trade (its items as stacked scope
-  // lines) so existing accounts render unchanged.
-  const baseRows = scopeSections.map((sec: any) => ({
-    id: sec.id,
+  // Itemized groups — one table section per trade, every row priced.
+  const groups = scopeSections.map((sec: any) => ({
     title: sec.title,
-    descriptionLines: (sec.items || []).map(scopeLine),
-    amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
-  }))
+    items: (sec.items || []).map(normalizeItem)
+  })).filter((g: any) => g.items.length > 0)
 
-  const upgradeRows = upgrades.map((sec: any) => ({
-    id: sec.id,
-    title: sec.title,
-    descriptionLines: (sec.items || []).map(scopeLine),
-    amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
-  }))
-
-  // Individual-line upgrade groups for the new themes.
-  const upgradeGroups = upgrades.map((sec: any) => ({
-    title: sec.title,
-    items: (sec.items || []).map((it: any) => ({
-      description: (it.description || '—').trim(),
-      qty: Number(it.qty || 1),
-      unit: (it.unit || '').trim(),
-      rate: Number(it.rate || 0),
-      amount: itemAmount(it)
-    })),
-    amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
-  }))
+  const upgradeGroupsFlat = upgrades.flatMap((sec: any) => (sec.items || []).map((it: any) => ({
+    ...normalizeItem(it),
+    section: sec.title
+  })))
 
   const projectTitle = (project?.title || project?.name || contact?.job_title || '').trim()
 
-  // Approved change orders bump the contract total in the on-screen
-  // grand total. They render as their own table row too so the
-  // customer sees what got added.
   const coAdjustment = (changeOrders || [])
     .filter((co: any) => co?.status === 'approved')
     .reduce((s: any, co: any) => s + Number(co.amount || 0), 0)
 
   const subtotal = Math.max(0, Number(pricing.baseTotal || 0))
-  const upgradeSubtotal = Math.max(0, Number(pricing.upgradeTotal || 0))
   const discount = Math.max(0, Number(pricing.discount || 0))
   const tax = (subtotal - discount) * Number(pricing.taxRate || 0)
   const grandTotal = Math.max(0, subtotal - discount + tax + coAdjustment)
+  const itemCount = groups.reduce((s: number, g: any) => s + g.items.length, 0)
 
   const statusChip = statusToChip(status)
 
-  // Template dispatch. 'classic' (default + legacy) renders the
-  // editorial DocumentShell layout below; the named themes render a
-  // fully distinct design from a normalized view bundle. Falls back to
-  // classic for any unknown value so a bad/empty column never breaks
-  // the render.
+  // Theme dispatch — named alternates render their own full design.
   const template = String(company?.estimate_template || 'classic').toLowerCase()
   const ThemeComponent = TEMPLATE_COMPONENTS[template]
   if (ThemeComponent) {
+    const lineItems = groups.flatMap((g: any) => g.items)
     const view = {
       company,
       recipient: contact,
-      number: shortNumber(number),
+      number,
       issuedAt,
       expiresAt,
       projectTitle,
       scopeText: project?.scope || contact?.scope_text || '',
       lineItems,
-      upgrades: upgradeGroups,
+      upgrades: upgrades.map((sec: any) => ({
+        title: sec.title,
+        items: (sec.items || []).map(normalizeItem),
+        amount: (sec.items || []).reduce((s: any, it: any) => s + itemAmount(it), 0)
+      })),
       subtotal,
       discount,
       tax,
@@ -152,68 +121,72 @@ export default function ProposalTemplate({
     return <ThemeComponent view={view} />
   }
 
+  const paymentTermsCopy = Array.isArray(paymentSchedule) && paymentSchedule.length > 0
+    ? paymentSchedule.map((m: any) => [m.label, m.note].filter(Boolean).join(' — ')).join(' · ')
+    : DEFAULT_PAYMENT_COPY
+
   return (
     <DocumentShell
       company={company}
-      docType="ESTIMATE"
-      number={shortNumber(number)}
-      issuedAt={issuedAt}
-      recipient={contact}
+      docType="Estimate"
+      number={number}
+      metaRows={[
+        { label: 'Issued', value: longDate(issuedAt) || '—' },
+        expiresAt && { label: 'Valid until', value: longDate(expiresAt), strong: true }
+      ].filter(Boolean)}
       status={statusChip}
+      recipient={contact}
+      recipientLabel="Prepared for"
+      project={projectTitle ? { title: projectTitle, address: project?.address || '' } : null}
+      hero={
+        <HeroBand
+          brand={brand}
+          total={grandTotal}
+          itemCount={itemCount}
+          expiresAt={expiresAt}
+          approved={String(status).toLowerCase() === 'approved'}
+        />
+      }
       footer={DEFAULT_DISCLAIMER}
     >
-      {/* Project title — what the estimate is for */}
-      {projectTitle && (
-        <section style={{ marginBottom: -8 }}>
-          <div style={{
-            fontFamily: DOC_FONTS.body,
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: DOC_COLORS.inkMuted,
-            marginBottom: 4
-          }}>
-            Project
-          </div>
-          <div style={{
-            fontFamily: DOC_FONTS.serif,
-            fontSize: 24,
-            fontWeight: 500,
-            letterSpacing: '-0.01em',
-            color: DOC_COLORS.ink,
-            lineHeight: 1.15
-          }}>
-            {projectTitle}
-          </div>
-        </section>
-      )}
-
-      {/* Items table */}
-      {baseRows.length > 0 && (
-        <LineItemsTable rows={baseRows} company={company} layout="sectioned" />
-      )}
-
-      {/* Totals — right-aligned with the boxed TOTAL */}
-      <TotalsBlock
-        subtotal={subtotal}
-        discount={discount}
-        tax={tax}
-        taxRate={pricing.taxRate || 0}
-        coAdjustment={coAdjustment}
-        grandTotal={grandTotal}
-      />
-
-      {/* Optional upgrades — separate table to keep base/upgrade
-          arithmetic obvious. */}
-      {upgradeRows.length > 0 && (
+      {/* Scope narrative — the contractor's own words, when present. */}
+      {(contact?.scope_text || project?.scope) && (
         <section>
-          <SectionLabel>Optional upgrades</SectionLabel>
-          <LineItemsTable rows={upgradeRows} company={company} layout="sectioned" />
+          <SectionLabel>Scope of work</SectionLabel>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: DOC_COLORS.inkMid, whiteSpace: 'pre-wrap', maxWidth: '70ch' }}>
+            {contact?.scope_text || project?.scope}
+          </p>
         </section>
       )}
 
-      {/* Change orders */}
+      {/* Itemized pricing — the trust engine. Every line in the open. */}
+      {groups.length > 0 && (
+        <section>
+          <LineItemsTable groups={groups} company={company} layout="grouped" />
+          <TotalsBlock
+            subtotal={subtotal}
+            discount={discount}
+            tax={tax}
+            taxRate={pricing.taxRate || 0}
+            coAdjustment={coAdjustment}
+            grandTotal={grandTotal}
+            brand={brand}
+          />
+        </section>
+      )}
+
+      {/* Optional add-ons — explicitly outside the total. */}
+      {upgradeGroupsFlat.length > 0 && (
+        <section>
+          <SectionLabel>Optional add-ons</SectionLabel>
+          <p style={{ margin: '-4px 0 10px', fontSize: 11.5, color: DOC_COLORS.inkMuted, lineHeight: 1.5 }}>
+            Priced separately and not included in the estimate total. Approve any option to add it to the contract.
+          </p>
+          <AddOnsTable items={upgradeGroupsFlat} />
+        </section>
+      )}
+
+      {/* Contract amendments */}
       {(changeOrders || []).filter((co: any) => co?.status !== 'void').length > 0 && (
         <section>
           <SectionLabel>Contract amendments</SectionLabel>
@@ -221,41 +194,37 @@ export default function ProposalTemplate({
         </section>
       )}
 
-      {/* Project photos — grouped by section_tag with an untagged
-          remainder at the end. Quiet treatment, magazine-style, sits
-          between Insurance and Payment Terms so the reader has visual
-          proof before the legal text. Renders nothing when there are
-          no photos in scope. */}
-      {photos.length > 0 && (
-        <ProjectPhotosBlock photos={photos} company={company} />
-      )}
+      {/* Project photos */}
+      {photos.length > 0 && <ProjectPhotosBlock photos={photos} />}
 
       {/* Insurance */}
       <InsuranceModeBlock insurance={insurance} company={company} />
 
-      {/* Payment terms + warranty + exclusions as a single editorial
-          block instead of three card sections — matches the reference
-          calm. */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <Detail label="PAYMENT TERMS">
-          {DEFAULT_PAYMENT_COPY}
-        </Detail>
-        {warrantyText && (
-          <Detail label="WARRANTY">{warrantyText}</Detail>
-        )}
+      {/* Terms grid — payment · warranty · exclusions */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 20,
+          borderTop: `1px solid ${DOC_COLORS.rule}`,
+          paddingTop: 20
+        }}
+      >
+        <Detail label="Payment terms">{paymentTermsCopy}</Detail>
+        {warrantyText && <Detail label="Warranty">{warrantyText}</Detail>}
         {exclusions.length > 0 && (
-          <Detail label="EXCLUSIONS">
-            {exclusions.join(' · ')}
+          <Detail label="Not included">
+            <ul style={{ margin: 0, paddingLeft: 16 }}>
+              {exclusions.map((x: any, i: number) => (
+                <li key={i} style={{ marginTop: i === 0 ? 0 : 3 }}>{x}</li>
+              ))}
+            </ul>
           </Detail>
         )}
       </section>
 
-      {/* Signature lines */}
-      <ApprovalLines
-        company={company}
-        contact={contact}
-        approval={approval}
-      />
+      {/* Approval — honest signatures */}
+      <ApprovalLines company={company} contact={contact} approval={approval} status={status} />
     </DocumentShell>
   )
 }
@@ -266,23 +235,100 @@ function itemAmount(it: any) {
   return Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0)))
 }
 
-// One scope line per item. Quantity is shown as a trailing tag only
-// when it carries information (qty > 1), so a "1 ls" line reads as
-// plain prose while "320 sf" still surfaces. Consistent placement —
-// always trailing — avoids the ragged mix of prefixed/unprefixed lines.
-function scopeLine(it: any) {
-  const desc = (it.description || '—').trim()
-  const qty = Number(it.qty || 1)
-  const unit = (it.unit || '').trim()
-  if (qty > 1) return `${desc} · ${qty}${unit ? ` ${unit}` : ''}`
-  return desc
+function normalizeItem(it: any) {
+  return {
+    description: (it.description || '—').trim().replace(/^OPTION\s*[—–-]\s*/i, ''),
+    qty: Number(it.qty || 1),
+    unit: (it.unit || '').trim(),
+    rate: Number(it.rate || 0),
+    amount: itemAmount(it)
+  }
 }
 
 /* ─── Internal blocks ─── */
 
-function ProjectPhotosBlock({ photos, company }: any) {
-  // Group by section_tag. Untagged photos collect into a single
-  // 'Other' bucket so they still render but stay visually separate.
+function HeroBand({ brand, total, itemCount, expiresAt, approved }: any) {
+  return (
+    <section
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        gap: 24,
+        flexWrap: 'wrap',
+        padding: '18px 22px',
+        background: DOC_COLORS.paperSoft,
+        border: `1px solid ${DOC_COLORS.rule}`,
+        borderRadius: 6
+      }}
+    >
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 4 }}>
+          {approved ? 'Approved contract total' : 'Estimate total'}
+        </div>
+        <div
+          style={{
+            fontFamily: DOC_FONTS.serif,
+            fontSize: 40,
+            fontWeight: 500,
+            letterSpacing: '-0.02em',
+            lineHeight: 1,
+            color: approved ? DOC_COLORS.signalGreen : DOC_COLORS.ink,
+            fontVariantNumeric: 'tabular-nums'
+          }}
+        >
+          {money(total)}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', fontSize: 11.5, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
+        {itemCount > 0 && <div>{itemCount} priced line item{itemCount === 1 ? '' : 's'} — itemized below</div>}
+        {expiresAt && !approved && (
+          <div>
+            Pricing honored through <span style={{ color: DOC_COLORS.ink, fontWeight: 600 }}>{longDate(expiresAt)}</span>
+          </div>
+        )}
+        {approved && <div style={{ color: DOC_COLORS.signalGreen, fontWeight: 600 }}>Approved — thank you</div>}
+      </div>
+    </section>
+  )
+}
+
+function AddOnsTable({ items }: any) {
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 13 }}>
+      <tbody>
+        {items.map((it: any, i: number) => (
+          <tr key={i}>
+            <td style={{ padding: '10px 12px 10px 0', borderBottom: `1px solid ${DOC_COLORS.rule}`, verticalAlign: 'top' }}>
+              <span style={{ color: DOC_COLORS.ink }}>{it.description}</span>
+              {it.section && (
+                <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: DOC_COLORS.inkFaint }}>
+                  {it.section}
+                </span>
+              )}
+            </td>
+            <td
+              style={{
+                padding: '10px 0',
+                borderBottom: `1px solid ${DOC_COLORS.rule}`,
+                textAlign: 'right',
+                whiteSpace: 'nowrap',
+                fontWeight: 700,
+                color: DOC_COLORS.inkMid,
+                fontVariantNumeric: 'tabular-nums',
+                verticalAlign: 'top'
+              }}
+            >
+              +{money(it.amount, { cents: true })}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function ProjectPhotosBlock({ photos }: any) {
   const groups = new Map()
   for (const p of photos) {
     if (!p?.url) continue
@@ -300,56 +346,23 @@ function ProjectPhotosBlock({ photos, company }: any) {
         {entries.map(([tag, arr]) => (
           <div key={tag}>
             {entries.length > 1 && (
-              <div style={{
-                fontFamily: DOC_FONTS.body,
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: DOC_COLORS.inkMuted,
-                marginBottom: 8
-              }}>
+              <div style={{ fontFamily: DOC_FONTS.body, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 8 }}>
                 {tag}
               </div>
             )}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: 8
-            }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
               {arr.slice(0, 6).map((p: any, i: any) => (
                 <figure key={`${tag}-${i}`} style={{ margin: 0 }}>
-                  <div style={{
-                    width: '100%',
-                    aspectRatio: '4 / 3',
-                    background: '#e8e2d4',
-                    borderRadius: 4,
-                    overflow: 'hidden'
-                  }}>
+                  <div style={{ width: '100%', aspectRatio: '4 / 3', background: '#e8e2d4', borderRadius: 4, overflow: 'hidden' }}>
                     <img
                       src={p.url}
                       alt={p.caption || tag}
                       loading="lazy"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block'
-                      }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                   </div>
                   {p.caption && (
-                    <figcaption style={{
-                      marginTop: 4,
-                      fontFamily: DOC_FONTS.body,
-                      fontSize: 10,
-                      color: DOC_COLORS.inkMuted,
-                      lineHeight: 1.35,
-                      overflow: 'hidden',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical'
-                    }}>
+                    <figcaption style={{ marginTop: 4, fontFamily: DOC_FONTS.body, fontSize: 10, color: DOC_COLORS.inkMuted, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {p.caption}
                     </figcaption>
                   )}
@@ -384,82 +397,53 @@ function SectionLabel({ children }: any) {
 function Detail({ label, children }: any) {
   return (
     <div>
-      <div
-        style={{
-          fontFamily: DOC_FONTS.body,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          color: DOC_COLORS.ink,
-          marginBottom: 4
-        }}
-      >
+      <div style={{ fontFamily: DOC_FONTS.body, fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: DOC_COLORS.inkFaint, marginBottom: 5 }}>
         {label}
       </div>
-      <div
-        style={{
-          fontFamily: DOC_FONTS.body,
-          fontSize: 13,
-          color: DOC_COLORS.inkMid,
-          lineHeight: 1.5
-        }}
-      >
+      <div style={{ fontFamily: DOC_FONTS.body, fontSize: 12, color: DOC_COLORS.inkMid, lineHeight: 1.55 }}>
         {children}
       </div>
     </div>
   )
 }
 
-function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTotal }: any) {
+function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTotal, brand }: any) {
   return (
-    <section
-      style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        marginTop: -8
-      }}
-    >
-      <div style={{ minWidth: 320 }}>
-        {(discount > 0 || taxRate > 0 || coAdjustment !== 0) && (
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10 }}>
-            <tbody>
-              <Row label="Subtotal" value={money(subtotal, { cents: true })} />
-              {discount > 0 && <Row label="Discount" value={`−${money(discount, { cents: true })}`} muted />}
-              {taxRate > 0 && <Row label={`Tax · ${(taxRate * 100).toFixed(2)}%`} value={money(tax, { cents: true })} />}
-              {coAdjustment !== 0 && <Row label="Approved change orders" value={`${coAdjustment >= 0 ? '+' : ''}${money(coAdjustment, { cents: true })}`} />}
-            </tbody>
-          </table>
-        )}
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+      <div style={{ minWidth: 300 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <Row label="Subtotal" value={money(subtotal, { cents: true })} />
+            {discount > 0 && <Row label="Discount" value={`−${money(discount, { cents: true })}`} muted />}
+            {taxRate > 0 && <Row label={`Tax · ${(taxRate * 100).toFixed(2)}%`} value={money(tax, { cents: true })} />}
+            {coAdjustment !== 0 && (
+              <Row
+                label="Approved change orders"
+                value={`${coAdjustment >= 0 ? '+' : '−'}${money(Math.abs(coAdjustment), { cents: true })}`}
+              />
+            )}
+          </tbody>
+        </table>
         <div
           style={{
             display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
             gap: 18,
-            paddingTop: 6
+            marginTop: 6,
+            paddingTop: 10,
+            borderTop: `2px solid ${DOC_COLORS.ink}`
           }}
         >
-          <span
-            style={{
-              fontFamily: DOC_FONTS.body,
-              fontSize: 14,
-              fontWeight: 600,
-              color: DOC_COLORS.ink
-            }}
-          >
+          <span style={{ fontFamily: DOC_FONTS.body, fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: DOC_COLORS.ink }}>
             Total
           </span>
           <span
             style={{
               fontFamily: DOC_FONTS.body,
-              fontSize: 16,
+              fontSize: 19,
               fontWeight: 700,
               color: DOC_COLORS.ink,
-              border: `1px solid ${DOC_COLORS.ink}`,
-              padding: '8px 18px',
-              borderRadius: 2,
-              minWidth: 130,
-              textAlign: 'right',
               fontVariantNumeric: 'tabular-nums'
             }}
           >
@@ -467,80 +451,75 @@ function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTota
           </span>
         </div>
       </div>
-    </section>
+    </div>
   )
 }
 
 function Row({ label, value, muted }: any) {
   return (
     <tr>
-      <td
-        style={{
-          padding: '6px 0',
-          fontFamily: DOC_FONTS.body,
-          fontSize: 13,
-          color: DOC_COLORS.inkMuted,
-          textAlign: 'left'
-        }}
-      >
+      <td style={{ padding: '5px 0', fontFamily: DOC_FONTS.body, fontSize: 12.5, color: DOC_COLORS.inkMuted, textAlign: 'left' }}>
         {label}
       </td>
-      <td
-        style={{
-          padding: '6px 0',
-          fontFamily: DOC_FONTS.body,
-          fontSize: 13,
-          color: muted ? DOC_COLORS.inkMuted : DOC_COLORS.ink,
-          fontWeight: 600,
-          textAlign: 'right',
-          fontVariantNumeric: 'tabular-nums'
-        }}
-      >
+      <td style={{ padding: '5px 0', fontFamily: DOC_FONTS.body, fontSize: 12.5, color: muted ? DOC_COLORS.inkMuted : DOC_COLORS.ink, fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </td>
     </tr>
   )
 }
 
-function ApprovalLines({ company, contact, approval }: any) {
-  const stamped = approval?.mode === 'approved'
+/*
+ * Signature block. The old version pre-filled the customer's name in a
+ * cursive font on UNSIGNED documents — which reads as a forged
+ * signature and is exactly the kind of thing that kills trust at
+ * contract time. Rules now:
+ *
+ *   - unsigned  → a true blank line (the customer signs on paper, or
+ *                 approves via the secure-link bar below the document)
+ *   - approved  → the recorded typed signature in serif italic, with
+ *                 the date and an "approved electronically" record line
+ */
+function ApprovalLines({ company, contact, approval, status }: any) {
+  const stamped = approval?.mode === 'approved' || String(status).toLowerCase() === 'approved'
   return (
-    <section style={{ marginTop: 12 }}>
-      <SectionLabel>Approval</SectionLabel>
-      <p style={{
-        margin: '0 0 18px',
-        fontFamily: DOC_FONTS.body,
-        fontSize: 12,
-        lineHeight: 1.5,
-        color: DOC_COLORS.inkMid,
-        maxWidth: '60ch'
-      }}>
-        By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.
+    <section style={{ marginTop: 4 }}>
+      <SectionLabel>Acceptance</SectionLabel>
+      <p style={{ margin: '0 0 20px', fontFamily: DOC_FONTS.body, fontSize: 12, lineHeight: 1.55, color: DOC_COLORS.inkMid, maxWidth: '64ch' }}>
+        Signing below (or approving through the secure link this estimate was delivered with) authorizes {company?.name || 'the contractor'} to perform the work described above and forms a binding agreement under the stated terms.
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
         <SigLine
-          label="Client signature"
-          name={approval?.clientName || contact?.name}
+          label="Customer"
+          name={stamped ? (approval?.clientName || contact?.name) : null}
+          nameUnder={contact?.name}
           dataUrl={stamped ? approval?.clientSignatureDataUrl : null}
-          date={stamped ? approval?.clientApprovedAt : ''}
+          date={stamped ? (approval?.clientApprovedAt || approval?.approvedAt) : ''}
+          stamped={stamped}
         />
         <SigLine
-          label="Contractor signature"
-          name={company?.name}
+          label="Contractor"
+          name={stamped ? company?.name : null}
+          nameUnder={company?.name}
           dataUrl={stamped ? approval?.contractorSignatureDataUrl : null}
           date={stamped ? approval?.contractorApprovedAt : ''}
+          stamped={stamped}
         />
       </div>
+      {stamped && (
+        <p style={{ margin: '14px 0 0', fontSize: 10.5, color: DOC_COLORS.inkFaint, lineHeight: 1.5 }}>
+          Approved electronically via secure link. Name, date, and network address are recorded with this approval.
+        </p>
+      )}
     </section>
   )
 }
 
-function SigLine({ label, name, dataUrl, date }: any) {
+function SigLine({ label, name, nameUnder, dataUrl, date, stamped }: any) {
   return (
     <div>
       <div
         style={{
-          height: 56,
+          height: 52,
           display: 'flex',
           alignItems: 'flex-end',
           borderBottom: `1px solid ${DOC_COLORS.ink}`,
@@ -548,15 +527,9 @@ function SigLine({ label, name, dataUrl, date }: any) {
         }}
       >
         {dataUrl ? (
-          <img loading="lazy"src={dataUrl} alt="Signature" style={{ maxHeight: 48, maxWidth: '100%' }} />
+          <img loading="lazy" src={dataUrl} alt="Signature" style={{ maxHeight: 44, maxWidth: '100%' }} />
         ) : name ? (
-          <span
-            style={{
-              fontFamily: "'Caveat', 'Snell Roundhand', cursive",
-              fontSize: 24,
-              color: DOC_COLORS.inkMid
-            }}
-          >
+          <span style={{ fontFamily: DOC_FONTS.serif, fontStyle: 'italic', fontSize: 22, color: DOC_COLORS.ink, letterSpacing: '0.01em' }}>
             {name}
           </span>
         ) : null}
@@ -573,17 +546,12 @@ function SigLine({ label, name, dataUrl, date }: any) {
         }}
       >
         <span style={{ fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-          {label}
+          {label}{!stamped && nameUnder ? ` — ${nameUnder}` : ''}
         </span>
         <span style={{ fontSize: 11 }}>
           Date{date ? `: ${shortDateOnly(date)}` : ''}
         </span>
       </div>
-      {name && (
-        <div style={{ marginTop: 3, fontSize: 11, color: DOC_COLORS.inkMuted }}>
-          {name}
-        </div>
-      )}
     </div>
   )
 }
@@ -595,20 +563,12 @@ function shortDateOnly(d: any) {
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function shortNumber(num: any) {
-  // Reference layout shows "#62" — drop the prefix + year. Keep only
-  // the trailing seed segment so the # reads short on the doc.
-  if (!num) return ''
-  const parts = String(num).split('-')
-  return parts[parts.length - 1] || String(num)
-}
-
 function statusToChip(status: any) {
   switch (String(status || 'draft').toLowerCase()) {
-    case 'approved': return { label: 'APPROVED', tone: 'green' }
-    case 'sent':     return { label: 'SENT',     tone: 'gold' }
-    case 'expired':  return { label: 'EXPIRED',  tone: 'red' }
-    case 'rejected': return { label: 'REJECTED', tone: 'red' }
-    default:         return { label: 'DRAFT',    tone: 'slate' }
+    case 'approved': return { label: 'Approved', tone: 'green' }
+    case 'sent':     return { label: 'Sent',     tone: 'gold' }
+    case 'expired':  return { label: 'Expired',  tone: 'red' }
+    case 'rejected': return { label: 'Declined', tone: 'red' }
+    default:         return { label: 'Draft',    tone: 'slate' }
   }
 }

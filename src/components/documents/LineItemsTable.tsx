@@ -1,47 +1,98 @@
 // src/components/documents/LineItemsTable.tsx
 //
-// Shared product/service table — dark header bar + multi-line
-// description rows. Matches the reference Estimate layout.
+// Shared items table for customer documents. Editorial treatment:
+// small-caps column labels over a strong hairline, per-row hairlines,
+// right-aligned tabular-number money — no colored header bars.
 //
-// Columns: Product/Service | Description | Qty. | Unit Price | Total
+// Three layouts:
 //
-// `rows` shape (unified across proposal + invoice surfaces):
+//   'grouped'   — the proposal workhorse. `groups` prop:
+//                 [{ title, items: [{description, qty, unit, rate, amount}], subtotal }]
+//                 Section name rows break up the itemized rows; each
+//                 section closes with a right-aligned subtotal.
+//   'detailed'  — flat rows with Description | Qty | Rate | Amount.
+//   'sectioned' — legacy roll-up (one lump-sum row per section) kept
+//                 for callers that still pass pre-rolled rows.
+//
+// `rows` shape (detailed/sectioned):
 //   { id, title, description?, descriptionLines?, qty, rate, amount, unit? }
-// `descriptionLines` is rendered one per line — lets the contractor
-// stack short specs ("12x14.5 concrete\n5x4 concrete") cleanly. Falls
-// back to `description` (single line) when not provided.
 
-import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
+import { DOC_COLORS, DOC_FONTS } from './tokens.ts'
 import { money } from './format.ts'
 
-export default function LineItemsTable({ rows = [], company, showQty = true, layout = 'detailed' }: { rows?: any[]; company?: any; showQty?: boolean; layout?: 'detailed' | 'sectioned' }) {
-  const brand = resolveBrandGold(company)
-  // Dark header bar — uses the brand accent. Default contractors get
-  // gold; Parker (brand_accent_hex=#1A1814 example) gets near-black,
-  // matching the reference. The brand color reads as a confident
-  // identity anchor without overwhelming the document.
-  const headerBg = brand
+export default function LineItemsTable({
+  rows = [],
+  groups = [],
+  company,
+  showQty = true,
+  layout = 'detailed',
+  amountHeading = 'Amount'
+}: {
+  rows?: any[]
+  groups?: any[]
+  company?: any
+  showQty?: boolean
+  layout?: 'detailed' | 'sectioned' | 'grouped'
+  amountHeading?: string
+}) {
+  if (layout === 'grouped') {
+    return (
+      <table style={tableStyle()}>
+        <thead>
+          <HeadRow showQty={showQty} amountHeading={amountHeading} />
+        </thead>
+        <tbody>
+          {groups.map((g: any, gi: number) => {
+            const items = g.items || []
+            const subtotal = g.subtotal != null
+              ? Number(g.subtotal)
+              : items.reduce((s: number, it: any) => s + itemAmount(it), 0)
+            return [
+              <tr key={`g-${gi}`}>
+                <td
+                  colSpan={showQty ? 4 : 2}
+                  style={{
+                    paddingTop: gi === 0 ? 14 : 22,
+                    paddingBottom: 6,
+                    fontFamily: DOC_FONTS.body,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: DOC_COLORS.inkMuted
+                  }}
+                >
+                  {g.title || 'General'}
+                </td>
+              </tr>,
+              ...items.map((it: any, i: number) => (
+                <ItemRow key={`g-${gi}-i-${i}`} item={it} showQty={showQty} />
+              )),
+              items.length > 1 && (
+                <tr key={`g-${gi}-sub`}>
+                  <td colSpan={showQty ? 3 : 1} style={{ padding: '7px 12px 7px 0', textAlign: 'right', fontSize: 11, color: DOC_COLORS.inkFaint }}>
+                    {g.title} subtotal
+                  </td>
+                  <td style={{ padding: '7px 0', textAlign: 'right', fontSize: 12, fontWeight: 600, color: DOC_COLORS.inkMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                    {money(subtotal, { cents: true })}
+                  </td>
+                </tr>
+              )
+            ]
+          })}
+        </tbody>
+      </table>
+    )
+  }
 
-  // Sectioned layout: one row per trade. Each row shows the trade name,
-  // the scope lines that make it up, and a single lump-sum amount — no
-  // per-line Qty/Unit-Price columns (those read as noise when every
-  // section row is a rolled-up total).
   if (layout === 'sectioned') {
     return (
-      <table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontFamily: DOC_FONTS.body,
-          fontSize: 13,
-          color: DOC_COLORS.ink
-        }}
-      >
+      <table style={tableStyle()}>
         <thead>
           <tr>
-            <Th align="left"  bg={headerBg} style={{ width: '30%' }}>Scope of Work</Th>
-            <Th align="left"  bg={headerBg} style={{ width: '52%' }}>Description</Th>
-            <Th align="right" bg={headerBg} style={{ width: '18%' }}>Amount</Th>
+            <Th style={{ width: '30%' }}>Scope of work</Th>
+            <Th style={{ width: '52%' }}>Description</Th>
+            <Th align="right" style={{ width: '18%' }}>{amountHeading}</Th>
           </tr>
         </thead>
         <tbody>
@@ -51,7 +102,7 @@ export default function LineItemsTable({ rows = [], company, showQty = true, lay
             const amount = Number(r.amount != null ? r.amount : Number(r.qty || 1) * Number(r.rate || 0))
             return (
               <tr key={r.id || r.title}>
-                <Td><div style={{ fontWeight: 700, color: DOC_COLORS.ink }}>{r.title || '—'}</div></Td>
+                <Td><span style={{ fontWeight: 700, color: DOC_COLORS.ink }}>{r.title || '—'}</span></Td>
                 <Td>
                   {descLines.length > 0 ? descLines.map((line: string, i: number) => (
                     <div key={i} style={{ marginTop: i === 0 ? 0 : 5, color: DOC_COLORS.inkMid }}>
@@ -68,78 +119,103 @@ export default function LineItemsTable({ rows = [], company, showQty = true, lay
     )
   }
 
+  // 'detailed' — flat itemized rows.
   return (
-    <table
-      style={{
-        width: '100%',
-        borderCollapse: 'collapse',
-        fontFamily: DOC_FONTS.body,
-        fontSize: 13,
-        color: DOC_COLORS.ink
-      }}
-    >
+    <table style={tableStyle()}>
       <thead>
-        <tr>
-          <Th align="left"  bg={headerBg} style={{ width: '24%' }}>Product/Service</Th>
-          <Th align="left"  bg={headerBg} style={{ width: '40%' }}>Description</Th>
-          {showQty && <Th align="right" bg={headerBg} style={{ width: '8%' }}>Qty.</Th>}
-          <Th align="right" bg={headerBg} style={{ width: '14%' }}>Unit Price</Th>
-          <Th align="right" bg={headerBg} style={{ width: '14%' }}>Total</Th>
-        </tr>
+        <HeadRow showQty={showQty} amountHeading={amountHeading} />
       </thead>
       <tbody>
-        {rows.map((r) => {
-          const qty = Number(r.qty || 1)
-          const rate = Number(r.rate || 0)
-          const amount = Number(r.amount != null ? r.amount : qty * rate)
-          const descLines = r.descriptionLines
-            || (r.description ? String(r.description).split(/\n+/).map((s) => s.trim()).filter(Boolean) : [])
-
-          return (
-            <tr key={r.id || r.title}>
-              <Td>
-                <div style={{ fontWeight: 700, color: DOC_COLORS.ink }}>{r.title || '—'}</div>
-                {r.subtitle && (
-                  <div style={{ marginTop: 4, fontSize: 11, color: DOC_COLORS.inkMuted }}>
-                    {r.subtitle}
-                  </div>
-                )}
-              </Td>
-              <Td>
-                {descLines.length > 0 ? descLines.map((line: string, i: number) => (
-                  <div key={i} style={{ marginTop: i === 0 ? 0 : 4 }}>
-                    {line}
-                  </div>
-                )) : <span style={{ color: DOC_COLORS.inkFaint }}>—</span>}
-              </Td>
-              {showQty && (
-                <Td align="right" mono>
-                  {qty}{r.unit ? ` ${r.unit}` : ''}
-                </Td>
-              )}
-              <Td align="right" mono>{money(rate, { cents: true })}</Td>
-              <Td align="right" mono bold>{money(amount, { cents: true })}</Td>
-            </tr>
-          )
-        })}
+        {rows.map((r, i) => (
+          <ItemRow
+            key={r.id || i}
+            item={{
+              description: r.title || r.description || '—',
+              detailLines: r.descriptionLines
+                || (r.description && r.title ? String(r.description).split(/\n+/).map((s: string) => s.trim()).filter(Boolean) : []),
+              qty: r.qty,
+              unit: r.unit,
+              rate: r.rate,
+              amount: r.amount
+            }}
+            showQty={showQty}
+          />
+        ))}
       </tbody>
     </table>
   )
 }
 
-function Th({ children, align = 'left', bg, style }: { children?: import('react').ReactNode; align?: any; bg?: string; style?: import('react').CSSProperties }) {
+/* ─── Shared row/cell pieces ─── */
+
+function tableStyle() {
+  return {
+    width: '100%',
+    borderCollapse: 'collapse' as const,
+    fontFamily: DOC_FONTS.body,
+    fontSize: 13,
+    color: DOC_COLORS.ink
+  }
+}
+
+function itemAmount(it: any) {
+  return Number(it.amount != null ? it.amount : Number(it.qty || 1) * Number(it.rate || 0))
+}
+
+function HeadRow({ showQty, amountHeading }: any) {
+  return (
+    <tr>
+      <Th style={{ width: showQty ? '58%' : '80%' }}>Description</Th>
+      {showQty && <Th align="right" style={{ width: '12%' }}>Qty</Th>}
+      {showQty && <Th align="right" style={{ width: '14%' }}>Rate</Th>}
+      <Th align="right" style={{ width: showQty ? '16%' : '20%' }}>{amountHeading}</Th>
+    </tr>
+  )
+}
+
+function ItemRow({ item, showQty }: any) {
+  const qty = Number(item.qty || 1)
+  const unit = (item.unit || '').trim()
+  const rate = Number(item.rate || 0)
+  const amount = itemAmount(item)
+  const detailLines = item.detailLines || []
+  return (
+    <tr>
+      <Td>
+        <span style={{ color: DOC_COLORS.ink }}>{item.description || '—'}</span>
+        {detailLines.map((line: string, i: number) => (
+          <div key={i} style={{ marginTop: 3, fontSize: 11.5, color: DOC_COLORS.inkMuted }}>
+            {line}
+          </div>
+        ))}
+      </Td>
+      {showQty && (
+        <Td align="right" mono muted>
+          {qty}{unit ? ` ${unit}` : ''}
+        </Td>
+      )}
+      {showQty && (
+        <Td align="right" mono muted>{money(rate, { cents: true })}</Td>
+      )}
+      <Td align="right" mono bold>{money(amount, { cents: true })}</Td>
+    </tr>
+  )
+}
+
+function Th({ children, align = 'left', style }: { children?: import('react').ReactNode; align?: any; style?: import('react').CSSProperties }) {
   return (
     <th
       scope="col"
       style={{
-        background: bg,
-        color: '#ffffff',
         textAlign: align,
-        padding: '11px 14px',
+        padding: '0 0 8px',
+        borderBottom: `2px solid ${DOC_COLORS.ink}`,
         fontFamily: DOC_FONTS.body,
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: 700,
-        letterSpacing: '0.02em',
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        color: DOC_COLORS.inkMuted,
         ...style
       }}
     >
@@ -148,20 +224,21 @@ function Th({ children, align = 'left', bg, style }: { children?: import('react'
   )
 }
 
-function Td({ children, align = 'left', mono = false, bold = false }: { children?: import('react').ReactNode; align?: any; mono?: boolean; bold?: boolean }) {
+function Td({ children, align = 'left', mono = false, bold = false, muted = false }: { children?: import('react').ReactNode; align?: any; mono?: boolean; bold?: boolean; muted?: boolean }) {
   return (
     <td
       style={{
         verticalAlign: 'top',
-        padding: '14px',
+        padding: align === 'left' ? '10px 12px 10px 0' : '10px 0 10px 12px',
         borderBottom: `1px solid ${DOC_COLORS.rule}`,
         textAlign: align,
-        color: DOC_COLORS.ink,
+        color: muted ? DOC_COLORS.inkMuted : DOC_COLORS.ink,
         fontFamily: DOC_FONTS.body,
         fontSize: 13,
         fontVariantNumeric: mono ? 'tabular-nums' : undefined,
         fontWeight: bold ? 700 : undefined,
-        lineHeight: 1.45
+        lineHeight: 1.45,
+        whiteSpace: mono ? 'nowrap' : undefined
       }}
     >
       {children}
