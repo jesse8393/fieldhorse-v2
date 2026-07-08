@@ -84,7 +84,10 @@ export default function NotificationsBell() {
       await markRead(row.id, user.id)
     }
     if (row.link) {
-      setOpen(false)
+      // Route through handleOpenChange so the rest of the list is
+      // marked seen too — leaving via one item shouldn't keep the
+      // other five badged.
+      handleOpenChange(false)
       navigate(row.link)
     }
   }
@@ -94,6 +97,18 @@ export default function NotificationsBell() {
     if (!user) return
     setRows((prev) => prev.map((r) => r.read_at ? r : { ...r, read_at: new Date().toISOString() }))
     await markAllRead(user.id)
+  }
+
+  // Opening the inbox counts as seeing it — standard inbox semantics.
+  // While the drawer is up the unread styling still shows what's new,
+  // but closing it marks everything read so the badge and "N new"
+  // header stop nagging about weeks-old items nobody taps one by one.
+  function handleOpenChange(next: boolean) {
+    if (!next && user && rows.some((r) => !r.read_at)) {
+      setRows((prev) => prev.map((r) => r.read_at ? r : { ...r, read_at: new Date().toISOString() }))
+      markAllRead(user.id)
+    }
+    setOpen(next)
   }
 
   return (
@@ -152,7 +167,7 @@ export default function NotificationsBell() {
         )}
       </button>
 
-      <Drawer open={open} onOpenChange={setOpen}>
+      <Drawer open={open} onOpenChange={handleOpenChange}>
         <DrawerContent
           className="ui:max-w-full ui:overflow-x-hidden"
           style={{ maxWidth: '100%', overflowX: 'hidden' }}

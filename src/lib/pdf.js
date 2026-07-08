@@ -17,7 +17,8 @@ import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
 import { safePayUrl } from './payLink.ts'
 import {
   invoiceNumber as docInvoiceNumber,
-  proposalNumber as docProposalNumber
+  proposalNumber as docProposalNumber,
+  companyPrefix as docCompanyPrefix
 } from '../components/documents/numbers.ts'
 import { mapItemsToScope } from '../components/documents/mapItems.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.tsx'
@@ -2633,19 +2634,25 @@ async function preloadProposalPhotos(input) {
  * Utility: save a jsPDF doc from the result of generate* functions.
 /**
  * Generate a one-page Certificate of Completion PDF from a saved
- * fh_closeouts row. Same editorial chrome as the invoice/proposal —
- * branded logo letterhead, gold rule, parties block — followed by:
+ * fh_closeouts row, in the same design language as the redesigned
+ * estimate/invoice documents: company-name letterhead (no logo
+ * billboard), small-caps doc type with a real number, serif headline,
+ * neutral hairline sections, and a flow-safe footer.
  *
  *   • Project block — name + address + completion date
  *   • Warranty block — start date + duration + computed end date
  *   • Sign-off block — customer name + method + signed-on date
  *   • Closing notes (when present)
- *   • Final figures (contract / paid / balance)
+ *   • Final figures (contract / paid / status)
  *   • Two-line signature/date footer the customer can sign on paper
  *
+ * Layout safety: the signature block + disclaimer reserve their space
+ * up front — if the flowing content would collide (long notes), the
+ * footer moves to a fresh page instead of overprinting (the old
+ * fixed-position footer drew straight over the Final figures rows).
+ *
  * Returns { doc, filename } so the existing downloadPdf() helper can
- * trip the browser save. Async because drawDocLogo loads the brand
- * image (via loadLogoForPdf).
+ * trip the browser save. Async because the brand image loads first.
  */
 export async function generateCertificate({
   company = {},
@@ -2661,63 +2668,130 @@ export async function generateCertificate({
   const brandRGB = parseBrandRGB(company.brand_accent_hex) || FIELD_GOLD
   const logo = company.logo_url ? await loadLogoForPdf(company.logo_url) : null
 
-  // Cream paper backdrop
-  doc.setFillColor(...RAW_LINEN)
-  doc.rect(0, 0, pageWidth, pageHeight, 'F')
+  const paintPage = () => {
+    doc.setFillColor(...RAW_LINEN)
+    doc.rect(0, 0, pageWidth, pageHeight, 'F')
+    doc.setFillColor(...brandRGB)
+    doc.rect(0, 0, pageWidth, 1.4, 'F')
+  }
+  paintPage()
 
-  // Letterhead — logo on left, COMPLETION CERTIFICATE on right
   const closedAt = closeout.closed_at || closeout.signoff_at || new Date().toISOString()
-  let cursor = drawDocLetterhead(doc, {
-    pageWidth, margin,
-    docType: 'COMPLETION CERTIFICATE',
-    number: shortDocNumber(closeout.id || contact.id) || '—',
-    issuedAt: closedAt,
-    company, logo, brandRGB
-  })
+  const rightCol = pageWidth - margin
 
-  // Recipient + sender
-  cursor = drawDocParties(doc, {
-    pageWidth, margin,
-    y: cursor + 4,
-    recipient: contact,
-    company
-  })
-
-  cursor += 8
-
-  // Headline — large serif-ish (jsPDF doesn't ship a serif by default,
-  // helvetica bold reads as the closest premium analog at this size).
+  // ── Letterhead — company identity left, doc meta right ──
+  let cursor = 16
+  let leftY = cursor
+  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
+    const maxH = 12
+    const aspect = logo.width / logo.height
+    let h = maxH
+    let w = h * aspect
+    if (w > 42) { w = 42; h = w / aspect }
+    try {
+      doc.addImage(logo.dataUrl, logo.format || 'PNG', margin, leftY, w, h)
+      leftY += h + 4
+    } catch { /* logo optional */ }
+  }
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(24)
+  doc.setFontSize(14)
+  doc.setTextColor(...ONYX)
+  doc.text(company.name || 'Contractor', margin, leftY + 4)
+  leftY += 9
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(...INK_MUTED)
+  if (company.address) { doc.text(String(company.address), margin, leftY); leftY += 4 }
+  const contactLine = [company.phone, company.email, company.website].filter(Boolean).join('  ·  ')
+  if (contactLine) { doc.text(contactLine, margin, leftY); leftY += 4 }
+
+  // Right-aligned tracked caps: jsPDF's align:'right' ignores
+  // charSpace, so measure the tracked width and left-anchor instead —
+  // otherwise the title clips off the page edge.
+  const docTypeText = 'COMPLETION CERTIFICATE'
+  const track = 0.8
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(track)
+  const trackedW = doc.getTextWidth(docTypeText) + (docTypeText.length - 1) * track
+  doc.text(docTypeText, rightCol - trackedW, cursor + 4)
+  doc.setCharSpace(0)
+  doc.setFontSize(10)
+  doc.setTextColor(60, 56, 51)
+  doc.text(certificateNumber(company.name, closeout.id || contact.id), rightCol, cursor + 10, { align: 'right' })
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.7)
+  doc.text('ISSUED', rightCol - 26, cursor + 16, { align: 'right' })
+  doc.setCharSpace(0)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...ONYX)
+  doc.text(formatDocDate(closedAt), rightCol, cursor + 16, { align: 'right' })
+
+  cursor = Math.max(leftY, cursor + 20) + 4
+  doc.setDrawColor(213, 207, 190)
+  doc.setLineWidth(0.3)
+  doc.line(margin, cursor, rightCol, cursor)
+  cursor += 10
+
+  // ── Headline — real serif via the built-in Times face ──
+  doc.setFont('times', 'normal')
+  doc.setFontSize(26)
   doc.setTextColor(...ONYX)
   doc.text('Certificate of Completion', margin, cursor)
   cursor += 8
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(11)
+  doc.setFontSize(10.5)
   doc.setTextColor(...INK_MUTED)
   const subline = `${company.name || 'Contractor'} certifies that the work described below was completed for ${contact.name || 'the customer'} on ${formatDocDate(closedAt)}.`
   const sublines = doc.splitTextToSize(subline, pageWidth - margin * 2)
   doc.text(sublines, margin, cursor)
-  cursor += sublines.length * 5 + 4
+  cursor += sublines.length * 4.8 + 6
 
-  // Section: Project
-  cursor = drawCertSection(doc, {
-    margin, pageWidth, y: cursor, brandRGB,
-    label: 'Project',
-    rows: [
-      { k: 'Job', v: contact.job_title || contact.name || '—' },
-      { k: 'Address', v: contact.address || '—' },
-      { k: 'Completed on', v: formatDocDate(closedAt) }
-    ]
-  })
+  // ── Parties — prepared for / project site ──
+  const colW = (pageWidth - margin * 2 - 12) / 2
+  const rightX = margin + colW + 12
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(163, 159, 149)
+  doc.setCharSpace(0.8)
+  doc.text('PREPARED FOR', margin, cursor)
+  doc.text('PROJECT', rightX, cursor)
+  doc.setCharSpace(0)
+  cursor += 5.5
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(...ONYX)
+  doc.text(contact.name || '—', margin, cursor)
+  const jobLines = doc.splitTextToSize(contact.job_title || contact.name || '—', colW)
+  doc.text(jobLines, rightX, cursor)
+  let pLeft = cursor + 5
+  let pRight = cursor + jobLines.length * 5
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(60, 56, 51)
+  if (contact.address) {
+    const addr = doc.splitTextToSize(String(contact.address), colW)
+    doc.text(addr, margin, pLeft)
+    pLeft += addr.length * 4.2
+    doc.text(addr, rightX, pRight)
+    pRight += addr.length * 4.2
+  }
+  doc.setTextColor(...INK_MUTED)
+  doc.text(`Completed ${formatDocDate(closedAt)}`, rightX, pRight)
+  pRight += 4.2
+  cursor = Math.max(pLeft, pRight) + 7
 
-  // Section: Warranty
+  // ── Sections ──
   const months = Number(closeout.warranty_months) || 0
   const warrantyStart = closeout.warranty_start_date || null
   const warrantyEnd = warrantyStart && months > 0 ? addMonthsIso(warrantyStart, months) : null
   cursor = drawCertSection(doc, {
-    margin, pageWidth, y: cursor, brandRGB,
+    margin, pageWidth, y: cursor,
     label: 'Warranty',
     rows: months > 0
       ? [
@@ -2730,7 +2804,6 @@ export async function generateCertificate({
         ]
   })
 
-  // Section: Sign-off
   const methodLabel = ({
     verbal: 'Verbal confirmation',
     text: 'Text confirmation',
@@ -2739,7 +2812,7 @@ export async function generateCertificate({
     signature_typed: 'Typed signature'
   })[closeout.signoff_method] || 'Verbal confirmation'
   cursor = drawCertSection(doc, {
-    margin, pageWidth, y: cursor, brandRGB,
+    margin, pageWidth, y: cursor,
     label: 'Customer sign-off',
     rows: [
       { k: 'Signed by', v: closeout.signoff_name || contact.name || '—' },
@@ -2748,40 +2821,50 @@ export async function generateCertificate({
     ]
   })
 
-  // Closing notes
   if (closeout.notes && String(closeout.notes).trim()) {
     cursor = drawCertSection(doc, {
-      margin, pageWidth, y: cursor, brandRGB,
+      margin, pageWidth, y: cursor,
       label: 'Closing notes',
       bodyText: String(closeout.notes).trim()
     })
   }
 
-  // Final figures
   const contract = Number(closeout.final_amount || contact.amount || 0)
   const paid = Number(closeout.paid_at_close || 0)
   const balance = Math.max(0, contract - paid)
   cursor = drawCertSection(doc, {
-    margin, pageWidth, y: cursor, brandRGB,
+    margin, pageWidth, y: cursor,
     label: 'Final figures',
     rows: [
       { k: 'Contract', v: moneyCompact(contract) },
       { k: 'Paid to date', v: moneyCompact(paid) },
-      { k: balance > 0 ? 'Outstanding' : 'Status', v: balance > 0 ? moneyCompact(balance) : 'Paid in full' }
+      balance > 0
+        ? { k: 'Outstanding', v: moneyCompact(balance) }
+        : { k: 'Status', v: 'Paid in full', green: true }
     ]
   })
 
-  // Physical signature footer — two underlines for customer + contractor.
-  // Positioned a fixed distance above the page bottom so re-flow doesn't
-  // shove it off-page when notes/sections grow.
-  const sigY = Math.max(cursor + 14, pageHeight - 50)
+  // ── Flow-safe footer: signatures + disclaimer ──
+  // Reserve the exact space both need; a long notes section pushes the
+  // footer to a fresh page instead of overprinting the figures (the
+  // old fixed-anchor draw caused exactly that collision).
+  const disclaimerText = 'Issuance of this certificate confirms that work was completed in accordance with the contracted scope. Warranty terms above govern the express coverage period; latent defects outside the scope are excluded.'
+  doc.setFontSize(8)
+  const discLines = doc.splitTextToSize(disclaimerText, pageWidth - margin * 2)
+  const discH = discLines.length * 3.6
+  // Signature block bottoms out 6mm above the disclaimer, which is
+  // anchored at the bottom margin. 17mm = sig lines + date stubs.
+  const sigY = pageHeight - 12 - discH - 6 - 17
+  if (cursor > sigY - 8) {
+    doc.addPage()
+    paintPage()
+  }
   drawCertSignatureLines(doc, { y: sigY, margin, pageWidth })
 
-  // Disclaimer
-  drawDocDisclaimer(doc, {
-    pageWidth, pageHeight, margin,
-    text: 'Issuance of this certificate confirms that work was completed in accordance with the contracted scope. Warranty terms above govern the express coverage period; latent defects outside the scope are excluded. Past-due balances may accrue at 1.5% per month.'
-  })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(...INK_MUTED)
+  doc.text(discLines, margin, pageHeight - 12 - (discLines.length - 1) * 3.6)
 
   const safeName = (contact.name || 'completion').replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 40)
   const stamp = new Date(closedAt).toISOString().slice(0, 10)
@@ -2789,45 +2872,54 @@ export async function generateCertificate({
   return { doc, filename }
 }
 
+// Certificate number — company prefix + short stable tail, matching
+// the estimate/invoice numbering family (never a raw 12-char id chunk).
+function certificateNumber(companyName, seed) {
+  const pfx = docCompanyPrefix(companyName)
+  const tail = String(seed || '').replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase() || '0001'
+  return pfx ? `${pfx}-CERT-${tail}` : `CERT-${tail}`
+}
+
 function drawCertSection(doc, opts) {
-  const { margin, pageWidth, y, brandRGB, label, rows, bodyText } = opts
+  const { margin, pageWidth, y, label, rows, bodyText } = opts
   let cursor = y
 
-  // Brand-color eyebrow rule
-  doc.setDrawColor(...brandRGB)
-  doc.setLineWidth(0.6)
-  doc.line(margin, cursor, margin + 18, cursor)
-  cursor += 4
-
-  // Label
+  // Full-width hairline + ink small-caps label — same idiom as the
+  // HTML documents' section headers.
+  doc.setDrawColor(213, 207, 190)
+  doc.setLineWidth(0.3)
+  doc.line(margin, cursor, pageWidth - margin, cursor)
+  cursor += 5
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
-  doc.setTextColor(...brandRGB)
-  doc.setCharSpace(0.8)
-  doc.text(String(label || '').toUpperCase(), margin, cursor + 2)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(0.9)
+  doc.text(String(label || '').toUpperCase(), margin, cursor)
   doc.setCharSpace(0)
-  cursor += 6
+  cursor += 3
 
   if (bodyText) {
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setTextColor(...ONYX)
     const lines = doc.splitTextToSize(bodyText, pageWidth - margin * 2)
     doc.text(lines, margin, cursor + 4)
-    cursor += lines.length * 5 + 6
-    return cursor + 2
+    cursor += lines.length * 4.6 + 6
+    return cursor + 4
   }
 
   for (const row of rows || []) {
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.5)
     doc.text(String(row.k || '').toUpperCase(), margin, cursor + 4)
+    doc.setCharSpace(0)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(...ONYX)
+    doc.setFontSize(10.5)
+    doc.setTextColor(...(row.green ? SIGNAL_GREEN : ONYX))
     doc.text(String(row.v || '—'), pageWidth - margin, cursor + 4, { align: 'right' })
-    cursor += 7
+    cursor += 6.5
   }
   return cursor + 4
 }
@@ -2843,14 +2935,14 @@ function drawCertSignatureLines(doc, { y, margin, pageWidth }) {
   doc.line(rightX, y, rightX + colW, y)
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
+  doc.setFontSize(7.5)
   doc.setTextColor(...INK_MUTED)
   doc.setCharSpace(0.6)
   doc.text('CUSTOMER SIGNATURE', leftX, y + 4)
   doc.text('CONTRACTOR SIGNATURE', rightX, y + 4)
 
   // Date stubs
-  const dateY = y + 14
+  const dateY = y + 13
   doc.setLineWidth(0.3)
   doc.line(leftX, dateY, leftX + 50, dateY)
   doc.line(rightX, dateY, rightX + 50, dateY)
