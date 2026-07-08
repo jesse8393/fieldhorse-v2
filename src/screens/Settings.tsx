@@ -765,7 +765,7 @@ export default function Settings() {
           padding: '12px 20px',
           display: 'flex',
           justifyContent: 'flex-end',
-          background: 'linear-gradient(180deg, rgba(20,20,20,0) 0%, rgba(20,20,20,0.88) 35%, rgba(20,20,20,0.96) 100%)',
+          background: 'linear-gradient(180deg, var(--fh-chrome-veil-0) 0%, var(--fh-chrome-veil-2) 35%, var(--fh-chrome-veil-1) 100%)',
           backdropFilter: 'blur(10px)',
           WebkitBackdropFilter: 'blur(10px)',
           pointerEvents: 'none'

@@ -115,7 +115,22 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Vite's dynamic-import preload helper is a virtual module the
+          // entry imports statically (it wraps all 33 lazy `import()`s) and
+          // that ~20 lazy chunks also import. Rollup was colocating it into
+          // vendor-jspdf, so the entry's static import of the helper dragged
+          // the whole 391KB jspdf chunk onto the modulepreload critical
+          // path. Pin the helper to its own tiny chunk BEFORE the
+          // node_modules guard (the virtual id isn't under node_modules).
+          if (id.includes('vite/preload-helper')) return 'vendor-preload-helper'
           if (!id.includes('node_modules')) return undefined
+          // Tiny shared class-name utils (clsx, tailwind-merge, cva) are
+          // imported by eager UI (Home / Login / AppShell), so the entry
+          // statically references whatever chunk they land in. Pin them to
+          // their own micro-chunk FIRST so Rollup can't colocate them with
+          // a heavyweight vendor (charts / jspdf) and thereby drag that
+          // whole chunk onto the modulepreloaded critical path.
+          if (id.includes('clsx') || id.includes('tailwind-merge') || id.includes('class-variance-authority')) return 'vendor-utils'
           if (id.includes('jspdf-autotable')) return 'vendor-pdf-table'
           if (id.includes('jspdf')) return 'vendor-jspdf'
           if (id.includes('html2canvas')) return 'vendor-html2canvas'
@@ -125,6 +140,13 @@ export default defineConfig({
           if (id.includes('lucide-react')) return 'vendor-icons'
           if (id.includes('@supabase')) return 'vendor-supabase'
           if (id.includes('@radix-ui') || id.includes('cmdk') || id.includes('vaul')) return 'vendor-ui'
+          // Lazy-only libraries whose package name contains "react" — MUST
+          // be matched BEFORE the generic 'react' catch-all below, or they
+          // fall into the eagerly-modulepreloaded vendor-react chunk and
+          // defeat the lazy Calendar (react-day-picker) / any lazy table
+          // view (@tanstack/react-table).
+          if (id.includes('react-day-picker')) return 'vendor-daypicker'
+          if (id.includes('@tanstack/react-table')) return 'vendor-table'
           if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('scheduler')) return 'vendor-react'
           return undefined
         }

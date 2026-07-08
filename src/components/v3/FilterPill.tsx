@@ -24,6 +24,15 @@ type FilterPillProps = import('react').ButtonHTMLAttributes<HTMLButtonElement> &
   count?: number | null
   ariaLabel?: string
   size?: 'sm' | 'md'
+  /**
+   * ARIA role. Defaults to a standalone toggle button (role="button" +
+   * aria-pressed), which is valid in ANY container. Pass `asTab` only
+   * when the pill lives inside a role="tablist" (e.g. Work.tsx) — then it
+   * emits role="tab" + aria-selected. Invoices.tsx renders these pills in
+   * a plain flex div, so the default keeps them from being orphaned
+   * role="tab" nodes.
+   */
+  asTab?: boolean
 }
 
 export default function FilterPill({
@@ -33,6 +42,7 @@ export default function FilterPill({
   ariaLabel,
   children,
   size = 'md',
+  asTab = false,
   className,
   style,
   ...rest
@@ -45,8 +55,9 @@ export default function FilterPill({
     <button
       type="button"
       onClick={onClick}
-      role="tab"
-      aria-selected={active}
+      role={asTab ? 'tab' : 'button'}
+      aria-selected={asTab ? active : undefined}
+      aria-pressed={asTab ? undefined : active}
       aria-label={ariaLabel}
       className={className}
       style={{

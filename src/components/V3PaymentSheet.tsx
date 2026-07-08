@@ -19,7 +19,17 @@ import { logPayment } from '../lib/pipeline.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
+import { todayYmd } from '../lib/dates.ts'
 import { Eyebrow } from './v3'
+
+// Format a dollar amount for the editable input WITHOUT stranding cents:
+// a $4,999.50 balance must prefill as "4999.50", not "5000" (rounding it
+// leaves a residual that blocks auto-close). Whole amounts drop the ".00".
+function amountInput(n: any) {
+  const v = Number(n || 0)
+  if (!(v > 0)) return ''
+  return Number.isInteger(v) ? String(v) : v.toFixed(2)
+}
 
 function money(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -51,13 +61,13 @@ const PAYMENT_KINDS = [
 export default function V3PaymentSheet({ contact, balance, invoice = null, onClose, onLogged }: any) {
   const [amount, setAmount] = useState(() => {
     const invoiceAmt = Number(invoice?.amount || 0)
-    if (invoiceAmt > 0) return String(Math.round(invoiceAmt))
-    return balance > 0 ? String(Math.round(balance)) : ''
+    if (invoiceAmt > 0) return amountInput(invoiceAmt)
+    return amountInput(balance)
   })
   const [method, setMethod] = useState('check')
   const [kind, setKind] = useState('other')
   const [reference, setReference] = useState('')
-  const [paidOn, setPaidOn] = useState(() => new Date().toISOString().slice(0, 10))
+  const [paidOn, setPaidOn] = useState(() => todayYmd())
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   // Drawer always opens when this component is mounted; parent controls
@@ -231,10 +241,10 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
                     ? `Balance ${money(balance)}${overage ? ' · overage' : ''}`
                     : 'No outstanding balance'}
                 </span>
-                {Number(balance) > 0 && Number(amount) !== Math.round(Number(balance)) && Number(amount) > 0 && (
+                {Number(balance) > 0 && Number(amount).toFixed(2) !== Number(balance).toFixed(2) && Number(amount) > 0 && (
                   <button
                     type="button"
-                    onClick={() => setAmount(String(Math.round(Number(balance))))}
+                    onClick={() => setAmount(amountInput(balance))}
                     style={{
                       background: 'transparent', border: 'none',
                       color: 'var(--ink-strong)',

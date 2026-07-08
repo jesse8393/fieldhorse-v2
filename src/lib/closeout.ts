@@ -56,8 +56,8 @@ export async function loadCloseout({ userId, contactId }: { userId: string | und
 // Snapshot helpers — called by the sheet before save so the modal can
 // show the operator what's about to be locked in.
 export async function snapshotJobTotals({ userId, contactId }: { userId: string | undefined; contactId: string | undefined }) {
-  if (!userId || !contactId) return { paid: 0, photoCount: 0 }
-  const [{ data: payments }, { count: photoCount }] = await Promise.all([
+  if (!userId || !contactId) return { paid: 0, photoCount: 0, approvedCO: 0 }
+  const [{ data: payments }, { count: photoCount }, { data: cos }] = await Promise.all([
     supabase
       .from('fh_payments')
       .select('amount')
@@ -67,10 +67,20 @@ export async function snapshotJobTotals({ userId, contactId }: { userId: string 
       .from('fh_job_files')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('job_id', contactId)
+      .eq('job_id', contactId),
+    // Approved change orders count toward the final contract — a
+    // certificate that says "Paid in full" while CO money is owed is
+    // exactly the error the auto-close path already guards against.
+    supabase
+      .from('fh_change_orders')
+      .select('amount, status')
+      .eq('user_id', userId)
+      .eq('contact_id', contactId)
+      .eq('status', 'approved')
   ])
   const paid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  return { paid, photoCount: photoCount || 0 }
+  const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
+  return { paid, photoCount: photoCount || 0, approvedCO }
 }
 
 // Persist a closeout. Upserts on (contact_id), so re-completing an
@@ -94,7 +104,10 @@ export async function saveCloseout({ userId, contact, payload, advanceStage = tr
       : 'verbal',
     signoff_at: payload.signoff_at || new Date().toISOString(),
     notes: payload.notes?.trim() || null,
-    final_amount: Number(contact.amount || 0),
+    // Contract snapshot INCLUDES approved change orders so the
+    // certificate's Final Figures reconcile (contract − paid = balance)
+    // instead of printing "Paid in full" while CO money is outstanding.
+    final_amount: Number(contact.amount || 0) + Number(totals.approvedCO || 0),
     paid_at_close: totals.paid,
     final_photo_count: totals.photoCount
   }

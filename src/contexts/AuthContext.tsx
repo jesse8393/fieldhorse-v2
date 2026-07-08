@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { del as idbDel } from 'idb-keyval'
@@ -32,19 +32,36 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  // Tracks whether a session was ever established, so we can purge on a
+  // session→null transition without firing on the initial null.
+  const hadSessionRef = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
+      hadSessionRef.current = !!data.session
       setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
+      // A SIGNED_OUT event (token expiry, remote revocation, sign-out in
+      // another tab) — or any transition from an established session to
+      // null — must purge the local book too, not just the app's own
+      // signOut(). Guard the initial null so we never purge before anyone
+      // signed in. Best-effort + async-safe (purgeLocalData swallows its
+      // own errors).
+      if (event === 'SIGNED_OUT' || (hadSessionRef.current && !s)) {
+        void purgeLocalData()
+      }
+      hadSessionRef.current = !!s
     })
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  const value: AuthContextValue = {
+  // Memoized so a token-refresh onAuthStateChange (which only rebuilds the
+  // session object) doesn't mint a new context value every render and
+  // cascade a full-app re-render through every consumer.
+  const value = useMemo<AuthContextValue>(() => ({
     session,
     user: session?.user ?? null,
     loading,
@@ -60,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         redirectTo: `${window.location.origin}/reset-password`
       }),
     updatePassword: (password) => supabase.auth.updateUser({ password })
-  }
+  }), [session, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

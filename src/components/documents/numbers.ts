@@ -63,10 +63,17 @@ export function invoiceNumber(companyName: string | null | undefined, seed: stri
 
 /**
  * Sequence-aware invoice number — the form a real business uses.
- * fh_invoices carries a per-job sequence_number; when the caller has
- * one, the customer sees "PCC-INV-003" instead of four random id
- * characters. Falls back to the seed form when no sequence exists
- * (legacy whole-job invoices).
+ *
+ * fh_invoices.sequence_number is unique only PER JOB (per contact_id),
+ * so a bare "PCC-INV-003" collides across every job — each job restarts
+ * at 001. To keep numbers unique across the whole company we prefix a
+ * short, stable per-job discriminator drawn from the contact id
+ * (the `seed`): "PCC-4F2A-03". Same job + same draw always yields the
+ * same number, so the emailed PDF and the web link agree, and two
+ * different jobs never share an invoice number.
+ *
+ * Falls back to the year+seed form when no sequence exists (legacy
+ * whole-job invoices).
  */
 export function invoiceNumberFromSequence(
   companyName: string | null | undefined,
@@ -76,6 +83,16 @@ export function invoiceNumberFromSequence(
   const seq = Number(sequence)
   if (!Number.isFinite(seq) || seq <= 0) return invoiceNumber(companyName, seed)
   const pfx = companyPrefix(companyName)
-  const num = String(Math.floor(seq)).padStart(3, '0')
-  return pfx ? `${pfx}-INV-${num}` : `INV-${num}`
+  const job = jobDiscriminator(seed)
+  const num = String(Math.floor(seq)).padStart(2, '0')
+  const body = job ? `${job}-${num}` : String(Math.floor(seq)).padStart(3, '0')
+  return pfx ? `${pfx}-${body}` : `INV-${body}`
+}
+
+// Short, stable per-job tag from the contact id: 4 uppercased
+// alphanumerics off the tail. Deterministic, so the same job always
+// renders the same tag on every draw and every delivery surface.
+function jobDiscriminator(seed: string | null | undefined) {
+  const clean = String(seed || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+  return clean ? clean.slice(-4) : ''
 }

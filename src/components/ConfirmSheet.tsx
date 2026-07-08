@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { hapticTap } from '../lib/haptics.ts'
@@ -73,6 +73,65 @@ export function ConfirmProvider({ children }: any) {
 }
 
 function ConfirmSheet({ state, onCancel, onConfirm }: any) {
+  const open = !!state
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const restoreRef = useRef<HTMLElement | null>(null)
+  // Keep onCancel current without re-running the open effect (the provider
+  // passes a fresh arrow each render). Re-running would clobber restoreRef
+  // with a focus target inside the dialog and lose the real caller element.
+  const onCancelRef = useRef(onCancel)
+  onCancelRef.current = onCancel
+
+  // Focus management + escape + Tab trap. Runs only on the open→closed
+  // transition so the restore target is captured once (before focus moves
+  // into the dialog) and returned to on close. Dependency-free.
+  useEffect(() => {
+    if (!open) return
+    restoreRef.current = (document.activeElement as HTMLElement | null) ?? null
+    // Move focus into the dialog after it mounts/animates in.
+    const raf = requestAnimationFrame(() => {
+      (cancelRef.current ?? dialogRef.current)?.focus()
+    })
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onCancelRef.current?.()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusables = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute('disabled'))
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || active === dialog)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      cancelAnimationFrame(raf)
+      document.removeEventListener('keydown', onKeyDown)
+      // Restore focus to whatever was focused before the dialog opened.
+      const el = restoreRef.current
+      if (el && typeof el.focus === 'function') el.focus()
+      restoreRef.current = null
+    }
+  }, [open])
+
   if (typeof document === 'undefined') return null
 
   return createPortal(
@@ -91,9 +150,11 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
             }}
           />
           <motion.div
+            ref={dialogRef}
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="fh-confirm-title"
+            tabIndex={-1}
             onPointerDown={(e) => e.stopPropagation()}
             initial={{ y: '100%', opacity: 0.6 }}
             animate={{ y: 0, opacity: 1 }}
@@ -144,6 +205,7 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <button
+                ref={cancelRef}
                 type="button"
                 onClick={() => { hapticTap(); onCancel() }}
                 style={{

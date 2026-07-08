@@ -103,6 +103,27 @@ export default function Invoices() {
     return m
   }, [jobs])
 
+  // Receivable-age anchor per job: the earliest OPEN (issued but not
+  // paid/void/draft) invoice's due date, else its issue date. A/R aging
+  // must run from when the bill went out — NOT the job's creation date,
+  // or a job that ran for months reads as "90d overdue" the day it's
+  // first billed. Jobs with no issued invoice fall back to created_at.
+  const arAnchorByJob = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const inv of invoices) {
+      const st = String((inv as any).status || '').toLowerCase()
+      if (st === 'paid' || st === 'void' || st === 'draft') continue
+      const cid = (inv as any).contact_id
+      if (!cid) continue
+      const anchor = (inv as any).due_at || (inv as any).issued_at || (inv as any).created_at
+      const t = anchor ? new Date(anchor).getTime() : NaN
+      if (!Number.isFinite(t)) continue
+      const prev = m.get(cid)
+      if (prev == null || t < prev) m.set(cid, t)
+    }
+    return m
+  }, [invoices])
+
   // Roll up payment totals per contact for fast lookup.
   const paidByJob = useMemo(() => {
     const m = new Map()
@@ -123,13 +144,16 @@ export default function Invoices() {
       const amount = Number(j.amount || 0) + (approvedCoByJob.get(j.id) || 0)
       const paid = paidByJob.get(j.id) || 0
       const balance = amount - paid
-      const ageDays = Math.floor((now - new Date(j.created_at as any).getTime()) / 86400000)
+      // Age from the receivable date (oldest open invoice), not the job
+      // creation date. Unbilled jobs anchor to created_at as a fallback.
+      const anchorMs = arAnchorByJob.get(j.id) ?? new Date(j.created_at as any).getTime()
+      const ageDays = Math.floor((now - anchorMs) / 86400000)
       const bucket = bucketFor(ageDays)
       const isOutstanding = balance > 0.5 && j.stage !== 'lost'
       out.push({ job: j, amount, paid, balance, ageDays, bucket, isOutstanding })
     }
     return out.sort((a, b) => b.balance - a.balance)
-  }, [jobs, paidByJob, approvedCoByJob])
+  }, [jobs, paidByJob, approvedCoByJob, arAnchorByJob])
 
   // Memoized so `filtered` keeps a stable identity across unrelated
   // re-renders — it feeds TanStack Table (SnowInvoicesBuild) as `data`,
@@ -322,6 +346,13 @@ export default function Invoices() {
     return payments.filter((p) => p.contact_id === jobId)
   }
 
+  // Change orders scoped to one job — must be threaded into every PDF /
+  // email path or the customer-facing balance omits signed CO money
+  // (the A/R row already includes it, so the doc would understate).
+  function changeOrdersForJob(jobId: string) {
+    return changeOrders.filter((co) => (co as any).contact_id === jobId)
+  }
+
   // Email the remaining balance straight from a job row. Pipeline v2:
   // this now mints a real fh_invoices row first, so the send is tracked
   // (status, due date, mark-paid) instead of an untracked ad-hoc PDF.
@@ -335,21 +366,35 @@ export default function Invoices() {
     }
     setSendingId(job.id)
     try {
-      const { data: invoice, error } = await createInvoice({
-        contact: job,
-        userId: user.id,
-        title: 'Balance due',
-        amount: row.balance,
-        due_at: new Date(Date.now() + 14 * 86400000).toISOString()
-      })
-      if (error || !invoice) throw new Error(error?.message || "Couldn't create the invoice")
+      // Reuse an existing open (unsent draft or already-sent, not paid/
+      // void) invoice that covers this balance instead of minting a new
+      // "Balance due" row on every tap — repeated taps were creating
+      // duplicate open invoices for the same money.
+      const existing = invoices.find((inv) =>
+        (inv as any).contact_id === job.id
+        && !['paid', 'void'].includes(String((inv as any).status || '').toLowerCase())
+        && Math.abs(Number((inv as any).amount || 0) - Number(row.balance || 0)) < 0.5
+      )
+      let invoice = existing
+      if (!invoice) {
+        const { data: created, error } = await createInvoice({
+          contact: job,
+          userId: user.id,
+          title: 'Balance due',
+          amount: row.balance,
+          due_at: new Date(Date.now() + 14 * 86400000).toISOString()
+        })
+        if (error || !created) throw new Error(error?.message || "Couldn't create the invoice")
+        invoice = created
+      }
       const res = await sendInvoiceEmail({
         invoice,
         contact: job,
         company,
         userId: user.id,
         recipientEmail: c.email,
-        payments: paymentsForJob(job.id)
+        payments: paymentsForJob(job.id),
+        changeOrders: changeOrdersForJob(job.id)
       })
       if (res.ok) {
         toastSuccess(`Invoice sent to ${res.recipient}`, res.filename)
@@ -388,7 +433,8 @@ export default function Invoices() {
         company,
         userId: user.id,
         recipientEmail: c.email,
-        payments: paymentsForJob(job.id)
+        payments: paymentsForJob(job.id),
+        changeOrders: changeOrdersForJob(job.id)
       })
       if (res.ok) {
         toastSuccess(`Invoice sent to ${res.recipient}`, res.filename)
@@ -416,7 +462,8 @@ export default function Invoices() {
     try {
       const result = await buildInvoicePdf({
         invoice, contact: job, company,
-        payments: paymentsForJob(job.id)
+        payments: paymentsForJob(job.id),
+        changeOrders: changeOrdersForJob(job.id)
       })
       const { downloadPdf } = await loadPdf()
       downloadPdf(result)

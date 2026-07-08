@@ -262,11 +262,14 @@ export default function NotificationsBell() {
                               width: 3,
                               borderRadius: '0 3px 3px 0',
                               background: meta.color,
-                              boxShadow: `0 0 8px ${meta.color}99`
+                              // meta.color is a var() ref — hex-alpha
+                              // concatenation ('…99') is invalid CSS and
+                              // silently drops. color-mix keeps the glow.
+                              boxShadow: `0 0 8px color-mix(in srgb, ${meta.color} 60%, transparent)`
                             }}
                           />
                         )}
-                        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: `${meta.color}22`, border: `1px solid ${meta.color}44`, color: meta.color }}>
+                        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: `color-mix(in srgb, ${meta.color} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${meta.color} 27%, transparent)`, color: meta.color }}>
                           <I size={14} />
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>

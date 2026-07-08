@@ -19,7 +19,7 @@
 // /leads, /quotes, /jobs, /pipeline all redirect here (App.tsx keeps
 // the mapping so old links and habits still land correctly).
 
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -52,7 +52,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { canHover } from '../lib/hover.ts'
-import { useJobs, useJobsRealtime, useJobSearch, queryKeys, type JobRow } from '../lib/queries.ts'
+import { useJobs, useJobsRealtime, useJobSearch, jobsKey, type JobRow } from '../lib/queries.ts'
 
 const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 
@@ -94,10 +94,13 @@ export default function Work() {
   // couldn't reach /leads or /quotes at all; now that everything funnels
   // through /work, gate those surfaces in-view instead — they see only
   // the active/done work they're actually on, with no deal $ or pipeline
-  // moves. (membershipLoading → treat as full-access so first paint
-  // doesn't flash a stripped list for an owner.)
+  // moves. Fail CLOSED while membership resolves: the list hydrates
+  // instantly from IDB cache, so defaulting to money-visible would flash
+  // '$ in play', Leads/Quotes rows, and dollar amounts to a crew member
+  // on every cold open until membership resolved. Owners simply see the
+  // money view a beat later — the correct trade.
   const { canCreateFinancialDocs, loading: membershipLoading } = useMembership()
-  const isMoneyRole = membershipLoading || canCreateFinancialDocs
+  const isMoneyRole = !membershipLoading && canCreateFinancialDocs
   const [searchParams, setSearchParams] = useSearchParams()
   const [chip, setChip] = useState<ChipId>('all')
   const [search, setSearch] = useState('')
@@ -152,21 +155,28 @@ export default function Work() {
     : { ...baseChip, match: (c: JobRow) => baseChip.match(c) && c.stage !== 'lead' && c.stage !== 'quote' }
 
   const filtered = useMemo(() => {
-    // While searching, widen the pool with server hits the cached window
-    // doesn't hold (dedupe by id — recent rows exist in both).
-    let pool = contacts
-    if (search.trim() && serverHits.length) {
-      const seen = new Set(contacts.map((c) => c.id))
-      pool = contacts.concat(serverHits.filter((h) => !seen.has(h.id)))
-    }
-    let rows = pool.filter(activeChip.match)
     const q = search.trim().toLowerCase()
+    // Local (cached) rows: filter the recent window by a naive substring.
+    let localRows = contacts.filter(activeChip.match)
     if (q) {
-      rows = rows.filter((c) =>
+      localRows = localRows.filter((c) =>
         [c.name, c.phone, c.email, c.address, c.referred_by, c.job_type, c.job_title]
           .filter(Boolean)
           .some((s) => String(s).toLowerCase().includes(q))
       )
+    }
+    // Server hits already matched the WHOLE book via a wildcard ilike that
+    // normalizes punctuation ('615-555-1234' ~ '(615) 555-1234'). Do NOT
+    // re-run a raw .includes() over them — that discarded exactly the
+    // punctuation-normalized hits the server search found. Union them in
+    // applying only the chip filter + dedupe. Dedupe against the rows
+    // we're KEEPING, so a cached row the naive filter dropped but the
+    // server matched is recovered via its server-hit twin.
+    let rows = localRows
+    if (q && serverHits.length) {
+      const seen = new Set(localRows.map((c) => c.id))
+      const extra = serverHits.filter((h) => !seen.has(h.id) && activeChip.match(h))
+      rows = localRows.concat(extra)
     }
     // Follow-ups due float to the top; inside each band, newest first.
     // Decorate-sort-undecorate: parse each row's dates ONCE (O(n)) instead
@@ -207,20 +217,27 @@ export default function Work() {
     return { open: open.length, inPlay, due }
   }, [contacts, isMoneyRole])
 
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.jobs })
-  }
+  // Guards concurrent stage moves without making `run` depend on the
+  // busyId state (which would re-create every per-row handler on each
+  // busy toggle and defeat DealCard's memoization). busyId state stays
+  // for the `busy` render prop only.
+  const busyRef = useRef(false)
+
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: jobsKey(user?.id) })
+  }, [queryClient, user?.id])
 
   // Optimistic single-column moves — the card responds the instant the
   // thumb lifts; refresh() reconciles (and rolls back on error).
-  function patchJobsCache(id: string, patch: Partial<JobRow>) {
-    queryClient.setQueryData(queryKeys.jobs, (prev: unknown) =>
+  const patchJobsCache = useCallback((id: string, patch: Partial<JobRow>) => {
+    queryClient.setQueryData(jobsKey(user?.id), (prev: unknown) =>
       Array.isArray(prev) ? prev.map((r: any) => (r.id === id ? { ...r, ...patch } : r)) : prev
     )
-  }
+  }, [queryClient, user?.id])
 
-  async function run(c: JobRow, fn: (c: JobRow) => Promise<any>, optimistic: Partial<JobRow> | null, failMsg: string, after?: () => void) {
-    if (busyId) return
+  const run = useCallback(async (c: JobRow, fn: (c: JobRow) => Promise<any>, optimistic: Partial<JobRow> | null, failMsg: string, after?: () => void) => {
+    if (busyRef.current) return
+    busyRef.current = true
     setBusyId(c.id)
     if (optimistic) patchJobsCache(c.id, optimistic)
     try {
@@ -232,13 +249,14 @@ export default function Work() {
       toastError(failMsg, e?.message || 'Try again')
       await refresh()
     } finally {
+      busyRef.current = false
       setBusyId(null)
     }
-  }
+  }, [patchJobsCache, refresh])
 
   // Accepts a preset offset in days, an exact Date from the calendar
   // picker, or null to clear.
-  async function setFollowUp(c: JobRow, when: number | Date | null) {
+  const setFollowUp = useCallback(async (c: JobRow, when: number | Date | null) => {
     // Format a Date to a LOCAL YYYY-MM-DD. toISOString would render the
     // UTC day, shifting the stored date for anyone not on UTC — which
     // made "Follow up tomorrow" land two days out for evening US users.
@@ -268,7 +286,18 @@ export default function Work() {
       toastError("Couldn't set follow-up", error.message)
     }
     await refresh()
-  }
+  }, [patchJobsCache, refresh])
+
+  // Stable per-row handlers (take the contact as an arg instead of
+  // closing over it inline) so DealCard's props keep referential identity
+  // across search keystrokes and React.memo can skip re-rendering the ~40
+  // mounted cards.
+  const handleOpen = useCallback((c: JobRow) => navigate(detailRoute(c)), [navigate])
+  const handleHover = useCallback((c: JobRow) => { if (canHover) prefetchJobDetail(queryClient, c.id, user?.id) }, [queryClient, user?.id])
+  const handleWon = useCallback((c: JobRow) => run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`)), [run, navigate])
+  const handleLost = useCallback((c: JobRow) => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost"), [run])
+  const handleReopen = useCallback((c: JobRow) => run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen"), [run])
+  const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
   const lostCount = Number(chipCounts.lost || 0)
@@ -430,12 +459,12 @@ export default function Work() {
                 isNew={c.id === justAddedId}
                 busy={busyId === c.id}
                 canSell={isMoneyRole}
-                onOpen={() => navigate(detailRoute(c))}
-                onHover={() => { if (canHover) prefetchJobDetail(queryClient, c.id, user?.id) }}
-                onWon={() => run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`))}
-                onLost={() => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost")}
-                onReopen={() => run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen")}
-                onFollowUp={(when: number | Date | null) => setFollowUp(c, when)}
+                onOpen={handleOpen}
+                onHover={handleHover}
+                onWon={handleWon}
+                onLost={handleLost}
+                onReopen={handleReopen}
+                onFollowUp={handleFollowUp}
               />
             ))}
           </AnimatePresence>
@@ -492,15 +521,22 @@ type DealCardProps = {
   // Whether this role may move the deal through the pipeline (Mark
   // won/lost). Field roles get follow-up actions but no stage moves.
   canSell: boolean
-  onOpen: () => void
-  onHover: () => void
-  onWon: () => void
-  onLost: () => void
-  onReopen: () => void
-  onFollowUp: (when: number | Date | null) => void
+  // Handlers take the contact as an arg (rather than closing over it in
+  // the parent) so their identity is stable across renders — that's what
+  // lets React.memo below skip the untouched cards on every keystroke.
+  onOpen: (c: JobRow) => void
+  onHover: (c: JobRow) => void
+  onWon: (c: JobRow) => void
+  onLost: (c: JobRow) => void
+  onReopen: (c: JobRow) => void
+  onFollowUp: (c: JobRow, when: number | Date | null) => void
 }
 
-function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
+// React.memo — DealCard used to re-render all ~40 mounted cards on every
+// search keystroke because the parent passed fresh inline-arrow callbacks
+// each render. With stable handlers (above) + memo, only cards whose own
+// props (contact ref / isNew / busy / canSell) actually change re-render.
+const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
   // Calendar popover for "Pick a date…" — anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)
@@ -546,7 +582,7 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
         initial={isNew ? { opacity: 0, scale: 0.97 } : false}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, height: 0, marginBottom: -8 }}
-        onMouseEnter={onHover}
+        onMouseEnter={() => onHover(c)}
         style={{
           position: 'relative',
           display: 'flex', alignItems: 'center', gap: 12,
@@ -569,7 +605,7 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
         {/* Body — the whole area is the tap target */}
         <button
           type="button"
-          onClick={() => { hapticTap(); onOpen() }}
+          onClick={() => { hapticTap(); onOpen(c) }}
           style={{
             flex: 1, minWidth: 0,
             display: 'flex', flexDirection: 'column', gap: 5,
@@ -645,13 +681,13 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
           <DropdownMenuContent side="bottom" align="end" sideOffset={6} collisionPadding={20}>
             {!isTerminal && (
               <>
-                <DropdownMenuItem onSelect={() => onFollowUp(1)}>
+                <DropdownMenuItem onSelect={() => onFollowUp(c, 1)}>
                   <CalendarClock size={13} /> Follow up tomorrow
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onFollowUp(3)}>
+                <DropdownMenuItem onSelect={() => onFollowUp(c, 3)}>
                   <CalendarClock size={13} /> Follow up in 3 days
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onFollowUp(7)}>
+                <DropdownMenuItem onSelect={() => onFollowUp(c, 7)}>
                   <CalendarClock size={13} /> Follow up next week
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => {
@@ -662,7 +698,7 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
                   <CalendarDays size={13} /> Pick a date…
                 </DropdownMenuItem>
                 {c.follow_up_on && (
-                  <DropdownMenuItem onSelect={() => onFollowUp(null)}>
+                  <DropdownMenuItem onSelect={() => onFollowUp(c, null)}>
                     Clear follow-up
                   </DropdownMenuItem>
                 )}
@@ -671,16 +707,16 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
             {canSell && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => { hapticMedium(); onWon() }}>
+                <DropdownMenuItem onSelect={() => { hapticMedium(); onWon(c) }}>
                   <Trophy size={13} /> Mark won
                 </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onSelect={onLost}>
+                <DropdownMenuItem variant="destructive" onSelect={() => onLost(c)}>
                   <XCircle size={13} /> Mark lost
                 </DropdownMenuItem>
               </>
             )}
             {canReopen && (
-              <DropdownMenuItem onSelect={onReopen}>
+              <DropdownMenuItem onSelect={() => onReopen(c)}>
                 <RotateCcw size={13} /> Reopen
               </DropdownMenuItem>
             )}
@@ -693,7 +729,7 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
             selected={c.follow_up_on ? new Date(c.follow_up_on + 'T00:00:00') : undefined}
             disabled={{ before: new Date() }}
             onSelect={(d: Date | undefined) => {
-              if (d) onFollowUp(d)
+              if (d) onFollowUp(c, d)
               setDateOpen(false)
             }}
           />
@@ -703,4 +739,4 @@ function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHo
       </motion.article>
     </SwipeableRow>
   )
-}
+})

@@ -12,6 +12,7 @@
 // whitelists and the live job roster before the UI offers to save it.
 
 import { claudeMessage, extractJson } from './anthropic.ts'
+import { todayYmd } from './dates.ts'
 
 export type CaptureKind = 'note' | 'todo' | 'payment' | 'expense' | 'schedule' | 'lead'
 
@@ -116,7 +117,7 @@ function rosterBlock(roster: RosterEntry[]) {
  * Throws on network/AI failure; callers degrade to a plain note.
  */
 export async function routeCapture({ text, roster, now = new Date() }: { text: string; roster: RosterEntry[]; now?: Date }): Promise<CaptureIntent> {
-  const today = now.toISOString().slice(0, 10)
+  const today = todayYmd(now)
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
   const res = await claudeMessage({
     // Intent routing is correctness-sensitive (it writes money rows) —
@@ -215,7 +216,7 @@ export function normalizeIntent(raw: any, roster: RosterEntry[]): CaptureIntent 
       intent.description = str(raw.description, 200) || str(raw.text, 200) || 'Expense'
       // Categories are Capitalized in the DB check — match case-insensitively.
       intent.category = pick(raw.category, EXPENSE_CATEGORIES, 'Other')
-      intent.expense_date = cleanDate(raw.expense_date) || new Date().toISOString().slice(0, 10)
+      intent.expense_date = cleanDate(raw.expense_date) || todayYmd()
       break
     }
     case 'schedule': {

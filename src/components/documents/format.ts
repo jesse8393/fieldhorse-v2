@@ -3,6 +3,8 @@
 // Small formatting helpers used across document templates. Keeping them
 // here (not in lib/) so document concerns stay co-located.
 
+import { parseDateOnly } from '../../lib/dates.ts'
+
 export function money(n: number | string | null | undefined, { cents = false }: { cents?: boolean } = {}) {
   const v = Number(n || 0)
   return v.toLocaleString(undefined, {
@@ -13,17 +15,19 @@ export function money(n: number | string | null | undefined, { cents = false }: 
   })
 }
 
+// Date-only columns (paid_on, due_at-as-date, warranty dates) must be
+// parsed as LOCAL calendar dates, not UTC — otherwise a payment dated
+// "2026-06-01" prints as "May 31" on the customer's invoice in every US
+// timezone. parseDateOnly handles both bare dates and full timestamps.
 export function longDate(iso: string | Date | null | undefined) {
-  if (!iso) return ''
-  const d = iso instanceof Date ? iso : new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseDateOnly(iso)
+  if (!d) return ''
   return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 export function shortDate(iso: string | Date | null | undefined) {
-  if (!iso) return ''
-  const d = iso instanceof Date ? iso : new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseDateOnly(iso)
+  if (!d) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 

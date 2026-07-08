@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { todayYmd } from '../lib/dates.ts'
 import { motion } from 'framer-motion'
 import { Car, Save as SaveIcon, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
@@ -9,7 +10,7 @@ import { Eyebrow } from './v3'
 const IRS_RATE = 0.67
 
 export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: any) {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const today = useMemo(() => todayYmd(), [])
   const [droveOn, setDroveOn] = useState(today)
   const [miles, setMiles] = useState('')
   const [purpose, setPurpose] = useState('')

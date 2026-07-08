@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Clock, Play, Square, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
+import { todayYmd } from '../lib/dates.ts'
 import { recalcCost } from '../lib/stages.ts'
 import { getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
@@ -190,7 +191,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
         description: note.trim() || `Labor — ${hours.toFixed(2)} hrs @ $${rate}/hr`,
         amount: billable,
         category: 'Labor',
-        expense_date: new Date().toISOString().slice(0, 10)
+        expense_date: todayYmd()
       })
       if (error) throw error
       writePreferredRate(rate)

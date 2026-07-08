@@ -50,12 +50,15 @@ export default async (request) => {
   })
 
   // 1) Sub profiles matching this caller's email (across all orgs).
-  //    Email is lowercased in the column too (most callers), so we
-  //    use ilike for safety against case drift.
+  //    Exact match, NOT .ilike: authEmail is caller-controlled and LIKE
+  //    metacharacters (`_`, `%`) in their own address would match OTHER subs'
+  //    rows and leak foreign profiles/docs into this bundle. authEmail is
+  //    already lowercased above and sub emails are stored lowercased, so .eq
+  //    is both correct and wildcard-safe.
   const profilesRes = await admin
     .from('fh_sub_profiles')
     .select('id, org_id, name, company, email, phone, address, ein, trades, insurance_carrier, insurance_policy, insurance_expires_on, coi_path, w9_path, license_path, license_number, payment_handle, payment_method, notes, created_at, updated_at')
-    .ilike('email', authEmail)
+    .eq('email', authEmail)
     .order('updated_at', { ascending: false })
 
   if (profilesRes.error) {

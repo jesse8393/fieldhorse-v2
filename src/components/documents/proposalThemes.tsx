@@ -125,7 +125,7 @@ function fmtLongDate(d: any) {
    photos, insurance, change orders, signature). Accent-tinted so it
    reads as part of each theme. ─── */
 function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }: any) {
-  const { scopeText, paymentTerms, warrantyText, exclusions = [], photos = [], insurance, changeOrders = [], company, recipient, approval, upgrades = [] } = view
+  const { scopeText, paymentTerms, warrantyText, exclusions = [], photos = [], insurance, changeOrders = [], company, recipient, approval, upgrades = [], status } = view
   const Label = ({ children }: any) => (
     <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: accent, marginBottom: 6 }}>
       {children}
@@ -133,7 +133,15 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
   )
   const showInsurance = insurance && (insurance.mode === 'insurance' || insurance.claimNumber || insurance.carrier)
   const visibleCOs = (changeOrders || []).filter((co: any) => co?.status && co.status !== 'void')
-  const stamped = approval?.mode === 'approved'
+  // Stamp a signature ONLY when a real approval record exists — a typed
+  // name, a signature image, or a recorded approval timestamp. Status
+  // alone must never fabricate a cursive "signature" (the public link
+  // marks a proposal 'approved' without returning the approval payload).
+  // Mirrors ProposalTemplate's ApprovalLines.
+  const approvedAt = approval?.clientApprovedAt || approval?.approvedAt || null
+  const stamped = !!(approval?.mode === 'approved'
+    && (approval?.clientName || approval?.clientSignatureDataUrl || approvedAt))
+  const isApproved = stamped || String(status || '').toLowerCase() === 'approved'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, marginTop: 30 }}>
       {scopeText && scopeText.trim() && (
@@ -209,9 +217,18 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
           By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
-          <SignatureLine label="Client signature" name={approval?.clientName || recipient?.name} dataUrl={stamped ? approval?.clientSignatureDataUrl : null} date={stamped ? approval?.clientApprovedAt : ''} muted={muted} />
-          <SignatureLine label="Contractor signature" name={company?.name} dataUrl={null} date="" muted={muted} />
+          <SignatureLine label="Client signature" name={stamped ? (approval?.clientName || recipient?.name) : null} dataUrl={stamped ? approval?.clientSignatureDataUrl : null} date={stamped ? approvedAt : ''} muted={muted} />
+          <SignatureLine label="Contractor signature" name={stamped ? company?.name : null} dataUrl={stamped ? approval?.contractorSignatureDataUrl : null} date={stamped ? approval?.contractorApprovedAt : ''} muted={muted} />
         </div>
+        {stamped ? (
+          <p style={{ margin: '14px 0 0', fontSize: 10.5, color: muted, lineHeight: 1.5 }}>
+            Approved electronically via secure link. Name, date, and network address are recorded with this approval.
+          </p>
+        ) : isApproved ? (
+          <p style={{ margin: '14px 0 0', fontSize: 10.5, color: accent, fontWeight: 600, lineHeight: 1.5 }}>
+            {approvedAt ? `Approved electronically on ${fmtDate(approvedAt)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
+          </p>
+        ) : null}
       </section>
     </div>
   )
@@ -236,11 +253,24 @@ function SignatureLine({ label, name, dataUrl, date, muted }: any) {
 function TotalsRows({ view, accentText = '#1A1814', boxed }: any) {
   const showTax = Number(view.taxRate || 0) > 0
   const showDiscount = Number(view.discount || 0) > 0
+  // Approved change orders fold into view.total (subtotal − discount +
+  // tax + coAdjustment); without an explicit line the visible arithmetic
+  // wouldn't reconcile to the printed Total. Computed the same way
+  // ProposalTemplate does.
+  const coAdjustment = (view.changeOrders || [])
+    .filter((co: any) => co?.status === 'approved')
+    .reduce((s: number, co: any) => s + Number(co.amount || 0), 0)
   return (
     <>
       <Totline label="Subtotal" value={money(view.subtotal, { cents: true })} />
       {showDiscount && <Totline label="Discount" value={`−${money(view.discount, { cents: true })}`} />}
       {showTax && <Totline label={`Tax (${(Number(view.taxRate) * 100).toFixed(0)}%)`} value={money(view.tax, { cents: true })} />}
+      {coAdjustment !== 0 && (
+        <Totline
+          label="Approved change orders"
+          value={`${coAdjustment >= 0 ? '+' : '−'}${money(Math.abs(coAdjustment), { cents: true })}`}
+        />
+      )}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         marginTop: 8, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.12)',

@@ -139,7 +139,14 @@ export default async (request) => {
   const replyTo = (profile?.company_email || authData.user.email || '').trim()
 
   // 3. Download the uploaded proposal PDF from job-files. Service role
-  // bypasses the per-user folder RLS — we already verified ownership.
+  // bypasses the per-user folder RLS, so we must re-impose tenant scoping
+  // ourselves: every job-files object is written under `${userId}/...`
+  // (see src/screens/**/Quote.tsx upload paths), so a path that doesn't
+  // start with the caller's own id belongs to another tenant. Reject it
+  // rather than let a forged storage_path exfiltrate another user's PDF.
+  if (!String(storage_path).startsWith(`${sender_user_id}/`)) {
+    return json({ error: 'forbidden_path', detail: 'storage_path is outside your namespace.' }, 403)
+  }
   const { data: fileBlob, error: dlErr } = await supabase.storage
     .from('job-files')
     .download(storage_path)

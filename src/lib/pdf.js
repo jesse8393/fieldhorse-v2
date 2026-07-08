@@ -17,6 +17,7 @@ import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
 import { safePayUrl } from './payLink.ts'
 import {
   invoiceNumber as docInvoiceNumber,
+  invoiceNumberFromSequence as docInvoiceNumberFromSequence,
   proposalNumber as docProposalNumber,
   companyPrefix as docCompanyPrefix
 } from '../components/documents/numbers.ts'
@@ -383,17 +384,20 @@ function drawDocParties(doc, opts) {
   doc.text('SENDER:', rightX, y + 6)
   doc.setCharSpace(0)
 
-  // Names
+  // Names — wrap to the column width so a long recipient/company name
+  // doesn't overprint the adjacent column or run off the page.
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
-  doc.text(recipient?.name || '—', leftX, y + 13)
-  doc.text(company?.name || 'My Company', rightX, y + 13)
+  const recipNameLines = doc.splitTextToSize(String(recipient?.name || '—'), colW)
+  const compNameLines = doc.splitTextToSize(String(company?.name || 'My Company'), colW)
+  doc.text(recipNameLines, leftX, y + 13)
+  doc.text(compNameLines, rightX, y + 13)
 
-  // Address lines
+  // Address lines — start below however many lines the name occupied.
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(60, 56, 51)
-  let leftY = y + 19
+  let leftY = y + 19 + (recipNameLines.length - 1) * 5
   if (recipient?.address) {
     const lines = doc.splitTextToSize(String(recipient.address), colW)
     doc.text(lines, leftX, leftY)
@@ -406,7 +410,7 @@ function drawDocParties(doc, opts) {
     leftY += lines.length * 4.5
   }
 
-  let rightY = y + 19
+  let rightY = y + 19 + (compNameLines.length - 1) * 5
   if (company?.address) {
     const lines = doc.splitTextToSize(String(company.address), colW)
     doc.text(lines, rightX, rightY)
@@ -718,10 +722,28 @@ async function drawProjectPhotosBlock(doc, opts) {
   return cursor + 4
 }
 
+// Parse a value that may be a Date, a full ISO timestamp, or a bare
+// date-only "YYYY-MM-DD" column. Date-only strings are constructed in
+// LOCAL time so the calendar day is preserved — `new Date("2026-06-01")`
+// parses as UTC midnight, which is the PREVIOUS day in every US
+// timezone (a due/warranty date would print a day early). Mirrors
+// src/lib/dates.ts parseDateOnly.
+function parseDateLocal(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+  const s = String(value)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const d = new Date(s)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 function formatDocDate(d) {
-  if (!d) return ''
-  const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return ''
+  const dt = parseDateLocal(d)
+  if (!dt) return ''
   return dt.toLocaleDateString(undefined, { month: 'long', day: '2-digit', year: 'numeric' })
 }
 
@@ -738,6 +760,380 @@ function moneyCompact(n) {
     style: 'currency', currency: 'USD',
     minimumFractionDigits: 2, maximumFractionDigits: 2
   })
+}
+
+// ============================================================
+// V5 "premium letterhead" chrome — matches DocumentShell.tsx: a
+// company-name letterhead (small logo when present, NO gold monogram
+// billboard), small-caps doc type + full number + Issued/Due meta on
+// the right, and the brand accent reduced to a thin top keyline. Used
+// by all customer-facing PDFs (invoice, quote, statement) so they read
+// like the on-screen premium documents. No license/insured lines.
+// ============================================================
+function drawModernLetterhead(doc, {
+  pageWidth, margin, docType, number, company, logo, brandRGB,
+  metaRows = []
+}) {
+  const topY = 15
+  const rightCol = pageWidth - margin
+
+  // Thin brand keyline across the very top — the one place the accent
+  // frames the page.
+  doc.setFillColor(...brandRGB)
+  doc.rect(0, 0, pageWidth, 1.4, 'F')
+
+  // ── Left: company identity (small logo + name + contact lines) ──
+  let nameX = margin
+  let logoBottom = topY
+  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
+    const maxH = 13
+    const maxW = 34
+    const aspect = logo.width / logo.height
+    let h = maxH
+    let w = h * aspect
+    if (w > maxW) { w = maxW; h = w / aspect }
+    try {
+      doc.addImage(logo.dataUrl, logo.format || 'PNG', margin, topY, w, h)
+      nameX = margin + w + 5
+      logoBottom = topY + h
+    } catch { /* fall through — name-only identity */ }
+  }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(15)
+  doc.setTextColor(...ONYX)
+  doc.text(company?.name || 'Contractor', nameX, topY + 5)
+  let ly = topY + 10
+  const identityW = rightCol - nameX - 60
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...INK_MUTED)
+  if (company?.address) {
+    const lines = doc.splitTextToSize(String(company.address), Math.max(60, identityW))
+    doc.text(lines, nameX, ly)
+    ly += lines.length * 4.2
+  }
+  const contactLine = [company?.phone, company?.email, company?.website].filter(Boolean).join('  ·  ')
+  if (contactLine) {
+    const lines = doc.splitTextToSize(contactLine, Math.max(60, identityW))
+    doc.text(lines, nameX, ly)
+    ly += lines.length * 4.2
+  }
+  const leftBottom = Math.max(ly, logoBottom + 2)
+
+  // ── Right: doc meta (small-caps type + full number + Issued/Due) ──
+  let ry = topY
+  const dt = String(docType || '').toUpperCase()
+  const track = 1.1
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(track)
+  // jsPDF's align:'right' ignores charSpace, so measure the tracked
+  // width and left-anchor to keep the caps from clipping the page edge.
+  const trackedW = doc.getTextWidth(dt) + (dt.length - 1) * track
+  doc.text(dt, rightCol - trackedW, ry + 4)
+  doc.setCharSpace(0)
+  ry += 4
+
+  if (number) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(58, 56, 51)
+    doc.text(String(number), rightCol, ry + 5, { align: 'right' })
+    ry += 5
+  }
+
+  ry += 3
+  for (const r of metaRows) {
+    if (!r) continue
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.6)
+    doc.text(String(r.label || '').toUpperCase(), rightCol - 38, ry + 4, { align: 'right' })
+    doc.setCharSpace(0)
+    doc.setFont('helvetica', r.strong ? 'bold' : 'normal')
+    doc.setFontSize(9.5)
+    doc.setTextColor(...(r.strong ? ONYX : [58, 56, 51]))
+    doc.text(String(r.value || '—'), rightCol, ry + 4, { align: 'right' })
+    ry += 6
+  }
+  const rightBottom = ry
+
+  // Divider under the letterhead
+  const cursor = Math.max(leftBottom, rightBottom) + 4
+  doc.setDrawColor(213, 207, 190)
+  doc.setLineWidth(0.3)
+  doc.line(margin, cursor, rightCol, cursor)
+  return cursor + 8
+}
+
+// Small-caps section label with the ink color — matches the HTML
+// documents' SectionLabel. Returns the y just below the label text.
+function drawModernSectionLabel(doc, { margin, y, text }) {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...ONYX)
+  doc.setCharSpace(1)
+  doc.text(String(text || '').toUpperCase(), margin, y)
+  doc.setCharSpace(0)
+  return y + 2
+}
+
+// Hero summary band — soft-tinted rounded panel with a big serif figure
+// (amount due / total) on the left, secondary lines on the right, and a
+// thin collection progress bar. Mirrors the InvoiceTemplate HeroBand.
+function drawHeroBand(doc, {
+  startY, margin, pageWidth, brandRGB, label,
+  amount, isPaid = false, paidLabel = 'Paid in full',
+  rightLines = [], paid = 0, contractTotal = 0
+}) {
+  const innerW = pageWidth - margin * 2
+  const x = margin
+  const y = startY
+  const hasBar = contractTotal > 0
+  const boxH = hasBar ? 32 : 26
+
+  doc.setFillColor(251, 248, 241)
+  doc.setDrawColor(232, 228, 216)
+  doc.setLineWidth(0.3)
+  doc.roundedRect(x, y, innerW, boxH, 2, 2, 'FD')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.8)
+  doc.text(String(label || '').toUpperCase(), x + 8, y + 8)
+  doc.setCharSpace(0)
+
+  doc.setFont('times', 'normal')
+  doc.setFontSize(30)
+  doc.setTextColor(...(isPaid ? SIGNAL_GREEN : ONYX))
+  doc.text(isPaid ? paidLabel : moneyCompact(amount), x + 8, y + 20)
+
+  let rly = y + 8
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+  doc.setTextColor(...INK_MUTED)
+  for (const line of rightLines) {
+    if (!line) continue
+    doc.text(String(line), x + innerW - 8, rly, { align: 'right' })
+    rly += 5
+  }
+
+  if (hasBar) {
+    const pct = Math.max(0, Math.min(1, paid / contractTotal))
+    const barX = x + 8
+    const barY = y + boxH - 6
+    const barW = innerW - 16
+    doc.setFillColor(232, 228, 216)
+    doc.roundedRect(barX, barY, barW, 1.8, 0.9, 0.9, 'F')
+    if (pct > 0) {
+      doc.setFillColor(...(isPaid ? SIGNAL_GREEN : brandRGB))
+      doc.roundedRect(barX, barY, Math.max(1, barW * pct), 1.8, 0.9, 0.9, 'F')
+    }
+  }
+
+  return y + boxH + 8
+}
+
+// Compact billing-schedule table — one row per draw (number, issued,
+// due, amount, Paid/Due). Mirrors InvoiceTemplate's BillingSchedule.
+// Void AND draft rows are filtered by the caller (never shown to
+// customers). Returns the new cursor Y.
+function drawBillingSchedule(doc, { startY, margin, pageWidth, brandRGB, company, currentId, rows, jobSeed }) {
+  let cursor = drawModernSectionLabel(doc, { margin, y: startY, text: 'Billing schedule' })
+  cursor += 4
+  autoTable(doc, {
+    startY: cursor,
+    head: [['Invoice', 'Issued', 'Due', 'Amount', 'Status']],
+    body: rows.map((inv) => {
+      const isPaid = String(inv.status || '').toLowerCase() === 'paid'
+      // All draws of one job share the job discriminator (from the
+      // contact id) and differ only by sequence, so the numbers read as
+      // a consistent series (PCC-4F2A-01/-02/-03), not per-row noise.
+      const num = docInvoiceNumberFromSequence(company?.name, inv.sequence_number, jobSeed || inv.contact_id || inv.id)
+      const label = inv.title ? `${num} · ${inv.title}` : num
+      const marked = currentId != null && inv.id === currentId
+      return [
+        marked ? `${label}  (this invoice)` : label,
+        formatDocDate(inv.issued_at || inv.created_at) || '—',
+        isPaid ? '—' : (formatDocDate(inv.due_at) || '—'),
+        money(Number(inv.amount || 0)),
+        isPaid ? 'Paid' : 'Due'
+      ]
+    }),
+    theme: 'plain',
+    headStyles: {
+      fillColor: brandRGB,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 9.5,
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+    },
+    bodyStyles: {
+      fontSize: 9.5,
+      textColor: [40, 38, 35],
+      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+    },
+    didDrawCell: (data) => {
+      if (data.section === 'body') {
+        const { doc: d, cell } = data
+        d.setDrawColor(232, 228, 216)
+        d.setLineWidth(0.15)
+        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
+      }
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto', fontStyle: 'bold' },
+      1: { cellWidth: 26 },
+      2: { cellWidth: 26 },
+      3: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
+      4: { halign: 'right', cellWidth: 18 }
+    },
+    margin: { left: margin, right: margin }
+  })
+  return doc.lastAutoTable.finalY
+}
+
+// Insurance-claim card — 3-col field grid in a brand-bordered soft
+// panel. Mirrors InsuranceModeBlock.tsx. Renders only when the payload
+// carries at least one field. Returns the new cursor Y.
+function drawModernInsurance(doc, { startY, margin, pageWidth, pageHeight, brandRGB, insurance }) {
+  if (!insurance) return startY
+  const fields = [
+    { label: 'Claim number',     value: insurance.claim_number },
+    { label: 'Carrier',          value: insurance.carrier },
+    { label: 'Adjuster',         value: insurance.adjuster },
+    { label: 'Deductible',       value: insurance.deductible != null ? money(insurance.deductible) : '' },
+    { label: 'RCV',              value: insurance.rcv != null ? money(insurance.rcv) : '' },
+    { label: 'ACV',              value: insurance.acv != null ? money(insurance.acv) : '' },
+    { label: 'Depreciation',     value: insurance.depreciation != null ? money(insurance.depreciation) : '' },
+    { label: 'Supplement',       value: insurance.supplement_amount != null ? money(insurance.supplement_amount) : '' },
+    { label: 'Mortgage company', value: insurance.mortgage_company }
+  ].filter((f) => f.value)
+  if (!fields.length) return startY
+
+  const innerW = pageWidth - margin * 2
+  const gridRows = Math.ceil(fields.length / 3)
+  const cardH = gridRows * 14 + 12
+  let cursor = startY + 8
+  if (cursor + cardH + 12 > pageHeight - 20) { doc.addPage(); cursor = 18 }
+
+  cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Insurance claim' })
+  cursor += 6
+
+  const cardY = cursor
+  doc.setFillColor(251, 248, 241)
+  doc.setDrawColor(...brandRGB)
+  doc.setLineWidth(0.4)
+  doc.roundedRect(margin, cardY, innerW, cardH, 2, 2, 'FD')
+
+  const colW = innerW / 3
+  fields.forEach((f, i) => {
+    const col = i % 3
+    const row = Math.floor(i / 3)
+    const cx = margin + colW * col + 8
+    const cy = cardY + 9 + row * 14
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(...INK_MUTED)
+    doc.setCharSpace(0.6)
+    doc.text(f.label.toUpperCase(), cx, cy)
+    doc.setCharSpace(0)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(...ONYX)
+    doc.text(String(f.value), cx, cy + 5)
+  })
+  return cardY + cardH + 6
+}
+
+// Acceptance / approval block for proposals. When the estimate is
+// approved AND an approval record is present, renders the recorded
+// signature (image or typed name), the approval date, and an
+// "approved electronically" note — mirroring ProposalTemplate's
+// ApprovalLines. When NOT approved, draws honest BLANK signature lines
+// (never pre-fills the customer's name as cursive — that reads as a
+// forged signature). Returns the new cursor Y.
+function drawModernApproval(doc, {
+  startY, margin, pageWidth, pageHeight, company, contact, approval, status
+}) {
+  const stamped = String(status || '').toLowerCase() === 'approved'
+    && approval
+    && (approval.clientSignatureDataUrl || approval.signature || approval.signatureDataUrl ||
+        approval.clientName || approval.approvedByName)
+
+  let cursor = startY + 14
+  if (cursor + 66 > pageHeight - 18) { doc.addPage(); cursor = 18 }
+
+  cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Acceptance' })
+  cursor += 5
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(58, 56, 51)
+  const copy = `Signing below (or approving through the secure link this estimate was delivered with) authorizes ${company?.name || 'the contractor'} to perform the work described above and forms a binding agreement under the stated terms.`
+  const copyLines = doc.splitTextToSize(copy, pageWidth - margin * 2)
+  doc.text(copyLines, margin, cursor)
+  cursor += copyLines.length * 4.6 + 12
+
+  const colW = (pageWidth - margin * 2 - 16) / 2
+  const leftX = margin
+  const rightX = margin + colW + 16
+
+  drawSigCell(doc, {
+    x: leftX, y: cursor, w: colW, label: 'Customer',
+    dataUrl: stamped ? (approval.clientSignatureDataUrl || approval.signature || approval.signatureDataUrl) : null,
+    name: stamped ? (approval.clientName || approval.approvedByName || contact?.name) : null,
+    date: stamped ? (approval.clientApprovedAt || approval.approvedAt || approval.approved_at) : null
+  })
+  drawSigCell(doc, {
+    x: rightX, y: cursor, w: colW, label: 'Contractor',
+    dataUrl: stamped ? approval.contractorSignatureDataUrl : null,
+    name: stamped ? company?.name : null,
+    date: stamped ? approval.contractorApprovedAt : null
+  })
+  cursor += 30
+
+  if (stamped) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...INK_MUTED)
+    const note = doc.splitTextToSize('Approved electronically via secure link. Name, date, and network address are recorded with this approval.', pageWidth - margin * 2)
+    doc.text(note, margin, cursor)
+    cursor += note.length * 3.6
+  }
+  return cursor
+}
+
+function drawSigCell(doc, { x, y, w, label, dataUrl, name, date }) {
+  if (dataUrl) {
+    try {
+      doc.addImage(dataUrl, 'PNG', x, y, Math.min(w, 60), 16)
+    } catch {
+      if (name) {
+        doc.setFont('times', 'italic'); doc.setFontSize(18); doc.setTextColor(...ONYX)
+        doc.text(String(name), x, y + 14)
+      }
+    }
+  } else if (name) {
+    doc.setFont('times', 'italic'); doc.setFontSize(18); doc.setTextColor(...ONYX)
+    doc.text(String(name), x, y + 14)
+  }
+  doc.setDrawColor(...ONYX)
+  doc.setLineWidth(0.4)
+  doc.line(x, y + 20, x + w, y + 20)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(...INK_MUTED)
+  doc.setCharSpace(0.6)
+  doc.text(String(label || '').toUpperCase(), x, y + 25)
+  doc.setCharSpace(0)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(`Date${date ? `: ${formatDocDate(date)}` : ''}`, x + w, y + 25, { align: 'right' })
 }
 
 // ============================================================
@@ -758,12 +1154,15 @@ export async function generateInvoice({
   taxRate = 0,
   notes = '',
   dueDate = '',
+  dueDateIso = null,
   invoiceId,
   payments = [],
   contractTotal,
   previouslyPaid,
   insurance = null,
   changeOrders = [],
+  invoices = [],
+  currentInvoice = null,
   photos = []
 } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
@@ -771,27 +1170,35 @@ export async function generateInvoice({
   const pageHeight = doc.internal.pageSize.getHeight()
   const margin = 16
 
-  const number = docInvoiceNumber(company?.name, invoiceId || contact?.id)
+  // Sequence-aware, company-unique, per-job number so the emailed PDF
+  // number matches the web link. Rendered in FULL (not truncated).
+  // Seed the number from the CONTACT (job) id, not the invoice id, so
+  // the hero number matches the "this invoice" row in the billing
+  // schedule and every draw of the job shares one consistent series.
+  const number = docInvoiceNumberFromSequence(
+    company?.name,
+    currentInvoice?.sequence_number,
+    contact?.id || invoiceId
+  )
   const logo = company?.logo_url
     ? await loadLogoForPdf(company.logo_url, { maxDimension: 720 })
     : null
   const brandRGB = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
 
-  // 1. Letterhead
-  let cursor = drawDocLetterhead(doc, {
-    pageWidth, margin, docType: 'INVOICE',
-    number: shortDocNumber(number),
-    issuedAt: new Date(),
-    company, logo, brandRGB
+  // Real dates. Due prefers the raw ISO / currentInvoice.due_at (parsed
+  // as a LOCAL calendar day), then any pre-formatted human string.
+  const issuedAt = currentInvoice?.issued_at || new Date()
+  const dueRaw = dueDateIso || currentInvoice?.due_at || null
+  const dueDisplay = dueRaw ? formatDocDate(dueRaw) : (dueDate || '')
+
+  // 1. Letterhead (premium company-name chrome + Issued/Due meta)
+  const metaRows = [{ label: 'Issued', value: formatDocDate(issuedAt) || '—' }]
+  if (dueDisplay) metaRows.push({ label: 'Due', value: dueDisplay, strong: true })
+  let cursor = drawModernLetterhead(doc, {
+    pageWidth, margin, docType: 'Invoice', number, company, logo, brandRGB, metaRows
   })
 
-  // 2. Parties
-  cursor = drawDocParties(doc, {
-    pageWidth, margin, y: cursor + 6,
-    recipient: contact, company
-  })
-
-  // 3. Items
+  // Money math up front — the hero and the reconciliation share it.
   const rows = (lineItems && lineItems.length > 0)
     ? lineItems.map((li) => ({
         title: li.description || 'Item',
@@ -801,65 +1208,98 @@ export async function generateInvoice({
         rate: li.rate,
         amount: li.amount
       }))
-    : [{
-        title: contact?.job_title || 'Construction services per agreement',
-        descriptionLines: [],
-        qty: 1,
-        rate: contractTotal || 0,
-        amount: contractTotal || 0
-      }]
-  cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows, brandRGB, margin, pageWidth })
-
-  // 4. Totals + AMOUNT DUE
+    : []
   const subtotal = rows.reduce((s, r) => {
     const q = Number(r.qty || 1)
     const rt = Number(r.rate || 0)
     return s + Number(r.amount != null ? r.amount : q * rt)
   }, 0)
   const tax = subtotal * Number(taxRate || 0)
-  const total = subtotal + tax
+  const thisInvoice = subtotal + tax
 
-  const totalsRows = []
-  if (taxRate > 0) {
-    totalsRows.push({ label: 'Subtotal', value: moneyCompact(subtotal) })
-    totalsRows.push({ label: `Tax · ${(taxRate * 100).toFixed(2)}%`, value: moneyCompact(tax) })
-  }
-  if (dueDate) totalsRows.push({ label: 'Due', value: dueDate, muted: true })
-
-  cursor = drawDocTotalsBlock(doc, {
-    startY: cursor, pageWidth, margin,
-    label: 'Amount due', total, rows: totalsRows
-  })
-
-  // 5. Balance summary (only when payments matter)
   const approvedCO = (changeOrders || [])
     .filter((co) => co?.status === 'approved')
     .reduce((s, co) => s + Number(co.amount || 0), 0)
-  const ct = Number(contractTotal != null ? contractTotal : total) + approvedCO
+  const rawContract = Number(contractTotal != null ? contractTotal : thisInvoice)
+  const ct = rawContract + approvedCO
   const pp = previouslyPaid != null
     ? Number(previouslyPaid)
     : (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  const br = Math.max(0, ct - pp)
+  // The hero "Amount due" is the outstanding BALANCE on the contract
+  // (contract incl. approved COs − previously paid) — NOT the line-item
+  // total, which is only this draw. The full contract and this-invoice
+  // line still reconcile in the balance summary below.
+  const balance = Math.max(0, ct - pp)
+  const isPaid = balance < 0.5
 
-  if (pp > 0 || ct !== total) {
+  // 2. Hero band — Amount due (balance)
+  const heroRight = []
+  if (!isPaid && dueDisplay) heroRight.push(`Due ${dueDisplay}`)
+  if (ct > 0) heroRight.push(`${moneyCompact(pp)} of ${moneyCompact(ct)} collected`)
+  cursor = drawHeroBand(doc, {
+    startY: cursor, margin, pageWidth, brandRGB,
+    label: isPaid ? 'Balance' : 'Amount due',
+    amount: balance, isPaid, rightLines: heroRight,
+    paid: pp, contractTotal: ct
+  })
+
+  // 3. Parties
+  cursor = drawDocParties(doc, {
+    pageWidth, margin, y: cursor + 6,
+    recipient: contact, company
+  })
+
+  // 4. Items — only when the invoice actually carries line items.
+  if (rows.length > 0) {
+    cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Billed this invoice' })
+    cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows, brandRGB, margin, pageWidth })
+    if (taxRate > 0) {
+      cursor = drawDocTotalsBlock(doc, {
+        startY: cursor, pageWidth, margin,
+        label: 'This invoice', total: thisInvoice,
+        rows: [
+          { label: 'Subtotal', value: moneyCompact(subtotal) },
+          { label: `Tax · ${(taxRate * 100).toFixed(2)}%`, value: moneyCompact(tax) }
+        ]
+      })
+    }
+  }
+
+  // 5. Billing schedule — the draw plan with live status. Void AND
+  //    draft rows are hidden (drafts are never shown to customers).
+  const scheduleRows = (invoices || []).filter(
+    (inv) => inv && inv.status !== 'void' && inv.status !== 'draft'
+  )
+  if (scheduleRows.length > 0) {
     cursor += 8
+    if (cursor > pageHeight - 50) { doc.addPage(); cursor = 18 }
+    cursor = drawBillingSchedule(doc, {
+      startY: cursor, margin, pageWidth, brandRGB, company,
+      currentId: currentInvoice?.id || null, rows: scheduleRows,
+      jobSeed: contact?.id
+    })
+  }
+
+  // 6. Balance summary / contract position — the one reconciliation the
+  //    customer can check (contract → COs → this invoice → paid → balance).
+  if (ct > 0 || pp > 0) {
+    cursor += 10
     if (cursor > pageHeight - 60) { doc.addPage(); cursor = 18 }
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(...ONYX)
-    doc.setCharSpace(0.8)
-    doc.text('BALANCE SUMMARY', margin, cursor)
-    doc.setCharSpace(0)
-    doc.setDrawColor(...ONYX)
+    cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Contract position' })
+    doc.setDrawColor(213, 207, 190)
     doc.setLineWidth(0.3)
     doc.line(margin, cursor + 2, pageWidth - margin, cursor + 2)
     cursor += 8
 
-    const balanceRows = [
-      ['Contract total',  moneyCompact(ct)],
-      ['Previously paid', pp > 0 ? `-${moneyCompact(pp)}` : moneyCompact(0)],
-      ['This invoice',    moneyCompact(total)]
-    ]
+    const balanceRows = []
+    balanceRows.push(['Original contract', moneyCompact(rawContract)])
+    if (approvedCO !== 0) {
+      balanceRows.push(['Approved change orders', `${approvedCO >= 0 ? '+' : '−'}${moneyCompact(Math.abs(approvedCO))}`])
+      balanceRows.push(['Contract to date', moneyCompact(ct)])
+    }
+    balanceRows.push(['This invoice', moneyCompact(thisInvoice)])
+    balanceRows.push(['Paid to date', pp > 0 ? `−${moneyCompact(pp)}` : moneyCompact(0)])
+
     const labelX = margin
     const valueX = pageWidth - margin
     doc.setFont('helvetica', 'normal')
@@ -879,12 +1319,17 @@ export async function generateInvoice({
     doc.text('BALANCE REMAINING', labelX, cursor)
     doc.setCharSpace(0)
     doc.setFontSize(16)
-    doc.setTextColor(...(br > 0.5 ? brandRGB : SIGNAL_GREEN))
-    doc.text(br > 0.5 ? moneyCompact(br) : 'PAID', valueX, cursor, { align: 'right' })
+    doc.setTextColor(...(balance > 0.5 ? brandRGB : SIGNAL_GREEN))
+    doc.text(balance > 0.5 ? moneyCompact(balance) : 'PAID', valueX, cursor, { align: 'right' })
     cursor += 8
   }
 
-  // 6. Notes / payment instructions
+  // 7. Insurance claim (roofing / restoration jobs) — dead code before.
+  cursor = drawModernInsurance(doc, {
+    startY: cursor, margin, pageWidth, pageHeight, brandRGB, insurance
+  })
+
+  // 8. Notes / payment instructions
   if (notes) {
     cursor += 8
     if (cursor > pageHeight - 40) { doc.addPage(); cursor = 18 }
@@ -958,12 +1403,10 @@ export async function generateStatement({
     : null
   const brandRGB = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
 
-  // 1. Letterhead
-  let cursor = drawDocLetterhead(doc, {
-    pageWidth, margin, docType: 'STATEMENT',
-    number: shortDocNumber(number),
-    issuedAt: new Date(),
-    company, logo, brandRGB
+  // 1. Letterhead (premium company-name chrome, full number)
+  let cursor = drawModernLetterhead(doc, {
+    pageWidth, margin, docType: 'Statement', number, company, logo, brandRGB,
+    metaRows: [{ label: 'Issued', value: formatDocDate(new Date()) }]
   })
 
   // 2. Parties — the client is the recipient. A client's own
@@ -1061,10 +1504,9 @@ export async function generateStatement({
 
 
 function shortDate(iso) {
-  if (!iso) return ''
-  const d = iso instanceof Date ? iso : new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const d = parseDateLocal(iso)
+  if (!d) return ''
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function drawLetterheadLogo(doc, { x, y, size, company, logo, brandGold }) {
@@ -1702,12 +2144,14 @@ export async function generateQuote({
     ]
     await drawThemedProposal(doc, {
       template, pageWidth, pageHeight, margin, company, logo,
-      contact, number: shortDocNumber(number),
+      contact, number,
       issuedAt: new Date(), expiresAt,
       projectTitle: String(contact?.job_title || '').trim(),
       scope: scope || '',
       warranty: (company?.warranty_default || '').trim(),
-      paymentTerms: '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.',
+      paymentTerms: (terms && terms.trim())
+        ? terms.trim()
+        : '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.',
       exclusions: exclusionsArray,
       lineItems, upgradeItems,
       subtotal: baseTotal, total: grandTotal,
@@ -1720,12 +2164,12 @@ export async function generateQuote({
     }
   }
 
-  // Letterhead
-  let cursor = drawDocLetterhead(doc, {
-    pageWidth, margin, docType: 'ESTIMATE',
-    number: shortDocNumber(number),
-    issuedAt: new Date(),
-    company, logo, brandRGB
+  // Letterhead (premium company-name chrome + Issued / Valid until meta)
+  const estMetaRows = [{ label: 'Issued', value: formatDocDate(new Date()) }]
+  if (expiresAt) estMetaRows.push({ label: 'Valid until', value: formatDocDate(expiresAt), strong: true })
+  let cursor = drawModernLetterhead(doc, {
+    pageWidth, margin, docType: 'Estimate', number, company, logo, brandRGB,
+    metaRows: estMetaRows
   })
 
   // Parties
@@ -1818,47 +2262,30 @@ export async function generateQuote({
     cursor += lines.length * 4.5
   }
 
-  drawDetailBlock('Payment terms', '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.')
+  // Payment terms — the contractor's own terms_text when provided,
+  // otherwise the 50/40/10 default. (Ignoring terms_text and always
+  // hardcoding the default was the bug.)
+  drawDetailBlock(
+    'Payment terms',
+    (terms && terms.trim())
+      ? terms.trim()
+      : '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
+  )
   if (warranty)                drawDetailBlock('Warranty', warranty)
   if (exclusionsArray.length)  drawDetailBlock('Exclusions', exclusionsArray.join(' · '))
 
-  // Approval signature lines
-  cursor += 14
-  if (cursor > pageHeight - 60) { doc.addPage(); cursor = 18 }
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(...ONYX)
-  doc.setCharSpace(0.8)
-  doc.text('APPROVAL', margin, cursor)
-  doc.setCharSpace(0)
-  cursor += 4
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(58, 56, 51)
-  const approvalLines = doc.splitTextToSize(
-    'By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.',
-    pageWidth - margin * 2
-  )
-  doc.text(approvalLines, margin, cursor)
-  cursor += approvalLines.length * 4.5 + 16
+  // Insurance claim card (restoration jobs) — hidden for cash jobs.
+  cursor = drawModernInsurance(doc, {
+    startY: cursor, margin, pageWidth, pageHeight, brandRGB, insurance
+  })
 
-  // Two signature lines
-  const colW = (pageWidth - margin * 2 - 16) / 2
-  doc.setDrawColor(...ONYX)
-  doc.setLineWidth(0.4)
-  doc.line(margin, cursor, margin + colW, cursor)
-  doc.line(margin + colW + 16, cursor, pageWidth - margin, cursor)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...INK_MUTED)
-  doc.setCharSpace(0.6)
-  doc.text('CLIENT SIGNATURE', margin, cursor + 5)
-  doc.text('CONTRACTOR SIGNATURE', margin + colW + 16, cursor + 5)
-  doc.setCharSpace(0)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text('Date', margin + colW, cursor + 5, { align: 'right' })
-  doc.text('Date', pageWidth - margin, cursor + 5, { align: 'right' })
+  // Acceptance — honest signatures: the recorded approval when the
+  // estimate is approved, blank lines otherwise (never a pre-filled
+  // cursive name, which reads as a forged signature).
+  cursor = drawModernApproval(doc, {
+    startY: cursor, margin, pageWidth, pageHeight,
+    company, contact, approval, status
+  })
 
   // Disclaimer on every page
   const total_pages = doc.internal.getNumberOfPages()
@@ -2791,7 +3218,7 @@ export async function generateCertificate({
   const warrantyStart = closeout.warranty_start_date || null
   const warrantyEnd = warrantyStart && months > 0 ? addMonthsIso(warrantyStart, months) : null
   cursor = drawCertSection(doc, {
-    margin, pageWidth, y: cursor,
+    margin, pageWidth, pageHeight, paintPage, y: cursor,
     label: 'Warranty',
     rows: months > 0
       ? [
@@ -2812,7 +3239,7 @@ export async function generateCertificate({
     signature_typed: 'Typed signature'
   })[closeout.signoff_method] || 'Verbal confirmation'
   cursor = drawCertSection(doc, {
-    margin, pageWidth, y: cursor,
+    margin, pageWidth, pageHeight, paintPage, y: cursor,
     label: 'Customer sign-off',
     rows: [
       { k: 'Signed by', v: closeout.signoff_name || contact.name || '—' },
@@ -2823,7 +3250,7 @@ export async function generateCertificate({
 
   if (closeout.notes && String(closeout.notes).trim()) {
     cursor = drawCertSection(doc, {
-      margin, pageWidth, y: cursor,
+      margin, pageWidth, pageHeight, paintPage, y: cursor,
       label: 'Closing notes',
       bodyText: String(closeout.notes).trim()
     })
@@ -2833,7 +3260,7 @@ export async function generateCertificate({
   const paid = Number(closeout.paid_at_close || 0)
   const balance = Math.max(0, contract - paid)
   cursor = drawCertSection(doc, {
-    margin, pageWidth, y: cursor,
+    margin, pageWidth, pageHeight, paintPage, y: cursor,
     label: 'Final figures',
     rows: [
       { k: 'Contract', v: moneyCompact(contract) },
@@ -2881,8 +3308,18 @@ function certificateNumber(companyName, seed) {
 }
 
 function drawCertSection(doc, opts) {
-  const { margin, pageWidth, y, label, rows, bodyText } = opts
+  const { margin, pageWidth, pageHeight, y, label, rows, bodyText, paintPage } = opts
   let cursor = y
+
+  // Page-break guard — a long closing-notes section used to push the
+  // Final figures + signature footer off the bottom of the page. If we
+  // start within ~40mm of the page bottom, open a fresh page and
+  // repaint the cream background before drawing the section.
+  if (pageHeight && cursor > pageHeight - 40) {
+    doc.addPage()
+    if (paintPage) paintPage()
+    cursor = 18
+  }
 
   // Full-width hairline + ink small-caps label — same idiom as the
   // HTML documents' section headers.
@@ -2903,9 +3340,18 @@ function drawCertSection(doc, opts) {
     doc.setFontSize(10)
     doc.setTextColor(...ONYX)
     const lines = doc.splitTextToSize(bodyText, pageWidth - margin * 2)
-    doc.text(lines, margin, cursor + 4)
-    cursor += lines.length * 4.6 + 6
-    return cursor + 4
+    cursor += 4
+    // Flow long notes across pages instead of overprinting the footer.
+    for (const line of lines) {
+      if (pageHeight && cursor > pageHeight - 24) {
+        doc.addPage()
+        if (paintPage) paintPage()
+        cursor = 18
+      }
+      doc.text(line, margin, cursor)
+      cursor += 4.6
+    }
+    return cursor + 6
   }
 
   for (const row of rows || []) {
@@ -2952,10 +3398,16 @@ function drawCertSignatureLines(doc, { y, margin, pageWidth }) {
 }
 
 function addMonthsIso(isoDate, months) {
-  const d = new Date(isoDate)
-  if (Number.isNaN(d.getTime())) return null
+  // Parse date-only values as LOCAL calendar days (not UTC) so the
+  // warranty-end date doesn't drift a day, then return a local
+  // "YYYY-MM-DD" (never toISOString, which re-introduces the UTC shift).
+  const d = parseDateLocal(isoDate)
+  if (!d) return null
   d.setMonth(d.getMonth() + months)
-  return d.toISOString().slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function parseBrandRGB(hex) {

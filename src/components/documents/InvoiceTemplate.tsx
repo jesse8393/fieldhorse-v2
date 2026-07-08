@@ -138,6 +138,7 @@ export default function InvoiceTemplate({
                 currentId={currentInvoice?.id || null}
                 company={company}
                 brand={brand}
+                jobSeed={contact?.id}
               />
             </div>
           </div>
@@ -288,7 +289,7 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
   )
 }
 
-function BillingSchedule({ invoices, currentId, company, brand }: any) {
+function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 12.5 }}>
       <thead>
@@ -321,7 +322,7 @@ function BillingSchedule({ invoices, currentId, company, brand }: any) {
             <tr key={inv.id} style={{ background: isCurrent ? DOC_COLORS.paperSoft : undefined }}>
               <td style={cell()}>
                 <span style={{ fontWeight: isCurrent ? 700 : 500, color: DOC_COLORS.ink, fontVariantNumeric: 'tabular-nums' }}>
-                  {invoiceNumberFromSequence(company?.name, inv.sequence_number, inv.id)}
+                  {invoiceNumberFromSequence(company?.name, inv.sequence_number, jobSeed || inv.contact_id || inv.id)}
                 </span>
                 {inv.title && <span style={{ color: DOC_COLORS.inkMuted }}> · {inv.title}</span>}
                 {isCurrent && (

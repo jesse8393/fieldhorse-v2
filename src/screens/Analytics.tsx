@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.tsx'
+import { parseDateOnly } from '../lib/dates.ts'
 import CountUp from '../components/fx/CountUp.tsx'
 import LogMilesSheet from '../components/LogMilesSheet.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
@@ -164,6 +165,10 @@ export default function Analytics() {
     // not fh_invoices), so "Invoiced YTD" stays connected even for
     // operators who skip the formal invoice creation step.
     const invoicedFromInvoices = invoices.reduce((s, inv) => {
+      // Void invoices don't count toward billed (the Void action's own
+      // copy says so), and drafts were never issued — exclude both.
+      const st = String(inv.status || '').toLowerCase()
+      if (st === 'void' || st === 'draft') return s
       const t = new Date(inv.issued_at || inv.created_at || 0).getTime()
       return (Number.isFinite(t) && t >= yearStart) ? s + Number(inv.amount || 0) : s
     }, 0)
@@ -181,7 +186,11 @@ export default function Analytics() {
     const collected = payments.length === 0
       ? null
       : payments.reduce((s, p) => {
-          const t = new Date(p.paid_on || p.created_at || 0).getTime()
+          // paid_on is a date-only column — parse as LOCAL so a Jan 1
+          // payment isn't shoved before the local year start (UTC parse
+          // lands it Dec 31 of last year and drops it from YTD).
+          const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
+          const t = when ? when.getTime() : NaN
           return (Number.isFinite(t) && t >= yearStart) ? s + Number(p.amount || 0) : s
         }, 0)
     return {
@@ -218,8 +227,10 @@ export default function Analytics() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const next = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
       const total = payments.reduce((s, p) => {
-        const when = new Date((p.paid_on || p.created_at) as any)
-        if (Number.isNaN(when.getTime())) return s
+        // Local-parse the date-only paid_on so a payment dated the 1st
+        // of a month isn't bucketed into the previous month.
+        const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
+        if (!when) return s
         if (when >= d && when < next) return s + Number(p.amount || 0)
         return s
       }, 0)

@@ -94,6 +94,14 @@ export default async (request) => {
   if (!contact) return json({ error: 'forbidden_or_not_found' }, 403)
 
   // 2. Download PDF → base64
+  // Tenant guard: service role bypasses the per-user folder RLS, and every
+  // job-files object is written under `${userId}/...` (see the upload paths
+  // in src/screens/**). A path that doesn't start with the caller's own id
+  // belongs to another tenant — reject it so a forged storage_path can't
+  // exfiltrate another user's PDF.
+  if (!String(storage_path).startsWith(`${sender_user_id}/`)) {
+    return json({ error: 'forbidden_path', detail: 'storage_path is outside your namespace.' }, 403)
+  }
   const { data: blob, error: dlErr } = await supabase.storage.from('job-files').download(storage_path)
   if (dlErr || !blob) return json({ error: 'pdf_download_failed', detail: dlErr?.message || 'not found' }, 500)
   const base64Pdf = Buffer.from(await blob.arrayBuffer()).toString('base64')

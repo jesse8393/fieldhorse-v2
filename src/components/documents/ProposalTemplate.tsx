@@ -480,7 +480,17 @@ function Row({ label, value, muted }: any) {
  *                 the date and an "approved electronically" record line
  */
 function ApprovalLines({ company, contact, approval, status }: any) {
-  const stamped = approval?.mode === 'approved' || String(status).toLowerCase() === 'approved'
+  // Stamp a signature ONLY when we have a real approval record — a typed
+  // name, a signature image, or a recorded approval timestamp. Status
+  // alone must never fabricate a signature: the public link marks a
+  // proposal 'approved' without returning the approval payload, and
+  // rendering the customer's name in cursive off status alone reads as
+  // a forged signature. When approved-but-unstamped, we show an honest
+  // "approved electronically on <date>" line and leave the sig blank.
+  const approvedAt = approval?.clientApprovedAt || approval?.approvedAt || null
+  const stamped = !!(approval?.mode === 'approved'
+    && (approval?.clientName || approval?.clientSignatureDataUrl || approvedAt))
+  const isApproved = stamped || String(status).toLowerCase() === 'approved'
   return (
     <section style={{ marginTop: 4 }}>
       <SectionLabel>Acceptance</SectionLabel>
@@ -493,7 +503,7 @@ function ApprovalLines({ company, contact, approval, status }: any) {
           name={stamped ? (approval?.clientName || contact?.name) : null}
           nameUnder={contact?.name}
           dataUrl={stamped ? approval?.clientSignatureDataUrl : null}
-          date={stamped ? (approval?.clientApprovedAt || approval?.approvedAt) : ''}
+          date={stamped ? approvedAt : ''}
           stamped={stamped}
         />
         <SigLine
@@ -505,11 +515,15 @@ function ApprovalLines({ company, contact, approval, status }: any) {
           stamped={stamped}
         />
       </div>
-      {stamped && (
+      {stamped ? (
         <p style={{ margin: '14px 0 0', fontSize: 10.5, color: DOC_COLORS.inkFaint, lineHeight: 1.5 }}>
           Approved electronically via secure link. Name, date, and network address are recorded with this approval.
         </p>
-      )}
+      ) : isApproved ? (
+        <p style={{ margin: '14px 0 0', fontSize: 10.5, color: DOC_COLORS.signalGreen, fontWeight: 600, lineHeight: 1.5 }}>
+          {approvedAt ? `Approved electronically on ${shortDateOnly(approvedAt)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
+        </p>
+      ) : null}
     </section>
   )
 }

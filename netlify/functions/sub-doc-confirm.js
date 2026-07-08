@@ -73,10 +73,15 @@ export default async (request) => {
   const col = COLUMN_BY_KIND[kind]
   const patch = { [col]: storagePath }
 
+  // Exact (case-insensitive) match, NOT .ilike: authEmail is caller-controlled
+  // and LIKE metacharacters (`_`, `%`) in their own address would match OTHER
+  // subs' rows and let them stamp a doc path onto foreign profiles. authEmail
+  // is already lowercased above and sub emails are stored lowercased, so .eq
+  // is both correct and wildcard-safe.
   const { data: updated, error: updErr } = await admin
     .from('fh_sub_profiles')
     .update(patch)
-    .ilike('email', authEmail)
+    .eq('email', authEmail)
     .select('id')
 
   if (updErr) return json({ error: 'confirm_failed', message: updErr.message }, 500)

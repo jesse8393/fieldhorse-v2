@@ -94,6 +94,10 @@ export default async (request) => {
     // Non-fatal — return members without emails if the admin API call fails.
   }
 
+  // Pay rates are management-only data. Every member can see the roster,
+  // but crew/foreman must NOT learn each teammate's default_hourly_rate —
+  // only owners and admins get the field; for everyone else it's omitted.
+  const canSeeRates = myMember.role === 'owner' || myMember.role === 'admin'
   const members = (memberRows || []).map((m) => ({
     id: m.id,
     user_id: m.user_id,
@@ -101,7 +105,7 @@ export default async (request) => {
     joined_at: m.joined_at,
     invited_by: m.invited_by,
     is_self: m.user_id === authUserId,
-    default_hourly_rate: m.default_hourly_rate ?? null,
+    ...(canSeeRates ? { default_hourly_rate: m.default_hourly_rate ?? null } : {}),
     name: profilesById[m.user_id]?.full_name || null,
     company_name: profilesById[m.user_id]?.company_name || null,
     email: emailsById[m.user_id] || null,

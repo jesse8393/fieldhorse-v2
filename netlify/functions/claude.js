@@ -11,6 +11,7 @@
 // Optional: ANTHROPIC_MODEL (defaults to claude-fable-5)
 
 import { createClient } from '@supabase/supabase-js'
+import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -52,6 +53,16 @@ export default async (request) => {
   const { data: authData, error: authErr } = await supabase.auth.getUser(accessToken)
   if (authErr || !authData?.user) {
     return json({ error: 'invalid_token' }, 401)
+  }
+
+  // Per-user rate limit. A valid token otherwise lets one signed-in user
+  // drain the shared Anthropic budget with an unbounded request loop. Key on
+  // the authenticated user id (hashed) so the cap is per-account, not per-IP.
+  const rlOk = await checkRateLimit(supabase, {
+    scope: 'claude', identifier: hashIdentifier(authData.user.id), limit: 60,
+  })
+  if (!rlOk) {
+    return json({ error: 'rate_limited', message: 'Too many requests. Please try again in a minute.' }, 429)
   }
 
   let body

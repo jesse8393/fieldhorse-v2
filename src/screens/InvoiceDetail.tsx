@@ -12,8 +12,10 @@ import {
   Send,
   Link as LinkIcon
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
+import { fetchInvoicesForContact } from '../lib/invoices.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 // Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
@@ -99,6 +101,35 @@ export default function InvoiceDetail() {
   const insurance = bundle?.insurance ?? null
   const changeOrders = bundle?.changeOrders ?? []
   const error = isError ? (queryError?.message || 'Could not load invoice') : ''
+
+  // First-class invoice draws (fh_invoices) for this job. fh_contacts has
+  // no due_at column — the real issue/due dates, invoice number, and the
+  // billing schedule all live on these rows, so the on-screen document
+  // and the emailed PDF stay in sync with the public link.
+  const { data: invoiceRows = [] } = useQuery({
+    queryKey: ['invoiceDraws', id],
+    queryFn: async () => {
+      const { data, error: fetchErr } = await fetchInvoicesForContact(id as string)
+      if (fetchErr) throw fetchErr
+      return data
+    },
+    enabled: !!id
+  })
+
+  // The draw this screen bills: first still-open row (not void/paid/draft),
+  // falling back to the latest non-void row so we always have a real
+  // invoice number + due date when any draw exists.
+  const currentDraw = useMemo(() => {
+    const rows = invoiceRows || []
+    const open = rows.find((r: any) => {
+      const s = String(r?.status || '').toLowerCase()
+      return s !== 'void' && s !== 'paid' && s !== 'draft'
+    })
+    if (open) return open
+    const nonVoid = rows.filter((r: any) => String(r?.status || '').toLowerCase() !== 'void')
+    if (nonVoid.length) return nonVoid[nonVoid.length - 1]
+    return rows.length ? rows[rows.length - 1] : null
+  }, [invoiceRows])
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
   // 'detail' = existing list-style breakdown (default — original UX).
@@ -202,12 +233,15 @@ export default function InvoiceDetail() {
         taxRate: 0,
         notes: '',
         dueDate: '',
+        dueDateIso: currentDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
         contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
         insurance,
-        changeOrders
+        changeOrders,
+        invoices: invoiceRows,
+        currentInvoice: currentDraw
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
@@ -284,12 +318,15 @@ export default function InvoiceDetail() {
         taxRate: 0,
         notes: '',
         dueDate: '',
+        dueDateIso: currentDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
         contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
         insurance,
-        changeOrders
+        changeOrders,
+        invoices: invoiceRows,
+        currentInvoice: currentDraw
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
 
@@ -459,6 +496,8 @@ export default function InvoiceDetail() {
           item={item}
           insurance={insurance}
           changeOrders={changeOrders}
+          invoices={invoiceRows}
+          currentInvoice={currentDraw}
         />
       ) : null}
       {viewMode === 'document' ? null : (
@@ -863,7 +902,7 @@ export default function InvoiceDetail() {
    out of state and shapes them into the template's prop contract.
    No new queries; no schema changes.
    ───────────────────────────────────────────────────────── */
-function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item, insurance, changeOrders }: any) {
+function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item, insurance, changeOrders, invoices = [], currentInvoice = null }: any) {
   const docStatus = (() => {
     const tone = status?.tone
     if (tone === 'good')   return 'paid'
@@ -901,9 +940,14 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
         previouslyPaid={totals.paid}
         thisInvoice={totals.balance}
         balanceRemaining={totals.balance}
+        invoices={invoices}
+        currentInvoice={currentInvoice}
         meta={{
-          issuedAt: contact.created_at,
-          dueDate: contact.due_at || null
+          // fh_contacts has no due_at column — issue/due dates come off
+          // the current fh_invoices draw, falling back to job created_at
+          // for the issue date and no due date when there is no draw.
+          issuedAt: currentInvoice?.issued_at || contact.created_at,
+          dueDate: currentInvoice?.due_at || null
         }}
         status={docStatus}
         insurance={insurance}

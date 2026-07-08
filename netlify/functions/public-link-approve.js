@@ -63,7 +63,9 @@ export default async function handler(req) {
 
   const token = String(body?.token || '').trim()
   const signatureName = String(body?.signature_name || '').trim()
-  const approvalNote = String(body?.note || '').trim() || null
+  // Cap the note to 1000 chars (mirrors public-co-approve.js) so an
+  // unauthenticated caller can't store an unbounded blob via the public link.
+  const approvalNote = String(body?.note || '').trim().slice(0, 1000) || null
   if (!token) return json({ error: 'missing_token' }, 400)
   if (!signatureName) return json({ error: 'missing_signature_name' }, 400)
   if (signatureName.length > 200) return json({ error: 'name_too_long' }, 400)

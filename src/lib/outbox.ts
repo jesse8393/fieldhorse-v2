@@ -231,8 +231,18 @@ async function drainEntry(e: OutboxEntry): Promise<boolean> {
     const { error: upErr } = await supabase.storage
       .from(e.bucket)
       .upload(e.path, e.blob, { upsert: true, contentType: e.contentType || 'image/jpeg' })
-    if (upErr && isNetworkError(upErr)) return false
-    // "already exists" upsert conflicts are fine — the row write decides.
+    if (upErr) {
+      // Network failure → keep the entry and retry on the next trigger.
+      if (isNetworkError(upErr)) return false
+      // Non-network failure (413 too large / RLS / missing bucket): the
+      // object never landed, so DON'T write the fh_job_files row — that
+      // would orphan a DB row pointing at storage that doesn't exist.
+      // Treat as permanent (like the insert branch): drop the entry.
+      console.warn('[fieldhorse] outbox photo upload failed permanently — dropping entry', upErr)
+      return true
+    }
+    // Upload succeeded ("already exists" upsert conflicts count as
+    // success) — only NOW write the DB row that points at the object.
     const { error } = await db
       .from('fh_job_files')
       .upsert(e.row, { onConflict: 'id', ignoreDuplicates: true })

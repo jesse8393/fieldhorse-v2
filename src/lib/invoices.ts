@@ -6,8 +6,12 @@
 // so "send an invoice" is callable from anywhere with one function.
 
 import { supabase, authHeaders } from './supabase.ts'
-import { generateInvoice, downloadPdf } from './pdf.js'
 import type { Database } from './database.types.ts'
+
+// pdf.js pulls in jspdf (~390KB). Load it lazily at call time so merely
+// importing this module (Invoices, ClientDetail, PublicDoc route graphs)
+// doesn't drag the PDF engine into the critical path.
+const loadPdf = () => import('./pdf.js')
 
 export type InvoiceRow = Database['public']['Tables']['fh_invoices']['Row']
 type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -128,6 +132,7 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
   const description = (invoice as any).description?.trim()
     || contact.job_title
     || 'Construction services'
+  const { generateInvoice } = await loadPdf()
   return generateInvoice({
     company,
     contact: {
@@ -147,7 +152,12 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
     dueDate: invoice.due_at
       ? new Date(invoice.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
       : '',
+    dueDateIso: invoice.due_at || null,
     invoiceId: invoice.id,
+    // The fh_invoices row this PDF bills — gives the PDF the same real
+    // sequence number, issue date, and due date the web link shows, so
+    // the emailed PDF and the public page never disagree.
+    currentInvoice: invoice,
     payments,
     contractTotal,
     previouslyPaid: paid,
@@ -220,6 +230,7 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
   const sendBody = await sendRes.json().catch(() => ({}))
 
   if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
+    const { downloadPdf } = await loadPdf()
     downloadPdf(result)
     return { ok: false, reason: 'sender_not_configured' }
   }

@@ -89,10 +89,15 @@ export default async (request) => {
   })
 
   // Update all matching rows.
+  // Exact (case-insensitive) match, NOT .ilike: authEmail is caller-controlled
+  // and LIKE metacharacters (`_`, `%`) in their own address would match OTHER
+  // subs' rows and let them overwrite foreign profiles. authEmail is already
+  // lowercased above and sub emails are stored lowercased, so .eq is both
+  // correct and wildcard-safe.
   const { data: updated, error: updErr } = await admin
     .from('fh_sub_profiles')
     .update(patch)
-    .ilike('email', authEmail)
+    .eq('email', authEmail)
     .select('id')
 
   if (updErr) return json({ error: 'update_failed', message: updErr.message }, 500)

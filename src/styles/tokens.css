@@ -307,12 +307,25 @@
   --v3-on-primary: #1A1814;
   /* v3 borders — warm rules */
   --v3-border: rgba(20, 20, 18, 0.10);
+  --v3-border-mid: rgba(20, 20, 18, 0.14); /* 7/8 — dark block value was linen-on-paper (invisible on light + drops fills). Sits between border 0.10 and border-strong 0.18. */
   --v3-border-strong: rgba(20, 20, 18, 0.18);
+  /* Gold hairline — dark block's rgba(201,150,58,0.28) washes out on paper.
+     Match the light --v3-gold-stroke tint at a border-weight alpha. */
+  --v3-border-gold: rgba(182, 138, 46, 0.45);
   /* v3 brand — slightly muted on light so the gold doesn't burn */
   --v3-primary: #B68A2E;
   --v3-primary-hot: #D4A640;
+  /* primary-bright is consumed as TEXT color across mobile screens (Bid,
+     Partners, Activity, ContactDetail, HomeActivityCard…). The dark
+     #E8B865 read ~1.7:1 on paper. #8A6A1F ≈ 5.0:1 on #FFFFFF → WCAG AA. */
+  --v3-primary-bright: #8A6A1F;
   --v3-primary-deep: #6E5320;
   --v3-primary-soft: rgba(182, 138, 46, 0.10);
+  /* warn is TEXT color (Home stale-lead tone, HealthDonut "At Risk",
+     JobCard). Dark #D4A042 read ~1.9:1 on paper. #9A6410 ≈ 5.0:1 on
+     #FFFFFF → WCAG AA. warn-soft is a background wash only. */
+  --v3-warn: #9A6410;
+  --v3-warn-soft: rgba(200, 140, 40, 0.16);
   --v3-success: #1F8F4A;
   --v3-success-bright: #178A3A;
   --v3-success-soft: rgba(31, 143, 74, 0.10);
