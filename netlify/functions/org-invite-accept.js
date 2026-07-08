@@ -66,6 +66,12 @@ export default async (request) => {
   if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
     return json({ error: 'invite_expired' }, 410)
   }
+  // Single-use: once an invite has been accepted it must not be replayable.
+  // A multi-use invite lets anyone who ever saw the link re-join (and, before
+  // the revoked-membership guard below, silently revive a removed member).
+  if (invite.accepted_at) {
+    return json({ error: 'invite_already_used', detail: 'This invite has already been used.' }, 410)
+  }
   if (String(invite.email).toLowerCase() !== authEmail) {
     return json({ error: 'email_mismatch', detail: 'This invite was issued to a different email.' }, 403)
   }
@@ -82,24 +88,26 @@ export default async (request) => {
     return json({ ok: true, already_member: true, org_id: invite.org_id, role: existingMember.role })
   }
 
-  // Create the membership row OR revive a revoked one.
+  // Do NOT resurrect a revoked membership. An owner removed this person on
+  // purpose; accepting a (possibly old) invite must not clear revoked_at and
+  // silently re-admit them. They need a fresh invite issued after removal.
   if (existingMember && existingMember.revoked_at) {
-    const { error: revErr } = await admin
-      .from('org_members')
-      .update({ role: invite.role, revoked_at: null, invited_by: invite.invited_by ?? null })
-      .eq('id', existingMember.id)
-    if (revErr) return json({ error: 'membership_revive_failed', message: revErr.message }, 500)
-  } else {
-    const { error: insErr } = await admin
-      .from('org_members')
-      .insert({
-        org_id: invite.org_id,
-        user_id: authUserId,
-        role: invite.role,
-        invited_by: invite.invited_by ?? null,
-      })
-    if (insErr) return json({ error: 'membership_create_failed', message: insErr.message }, 500)
+    return json({
+      error: 'membership_revoked',
+      detail: 'This membership was removed. Ask an owner for a new invite.'
+    }, 403)
   }
+
+  // Fresh (never-member) user — create the membership row.
+  const { error: insErr } = await admin
+    .from('org_members')
+    .insert({
+      org_id: invite.org_id,
+      user_id: authUserId,
+      role: invite.role,
+      invited_by: invite.invited_by ?? null,
+    })
+  if (insErr) return json({ error: 'membership_create_failed', message: insErr.message }, 500)
 
   // Mark invite accepted (best-effort; the membership row is the
   // source of truth, so don't fail the request if this step has a

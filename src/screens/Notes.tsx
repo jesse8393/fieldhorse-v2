@@ -149,20 +149,33 @@ export default function Notes() {
     // below is the same row that lands in the DB (online or queued).
     const { queued, error, id } = await resilientInsert('fh_notes', payload)
     setSaving(false)
-    if (!error) {
-      const localRow = { ...payload, id, created_at: new Date().toISOString(), done: false }
-      setDraft('')
-      setParsed(null)
-      setContactId('')
-      patchNotes((n: any) => [localRow, ...n])
-      toastSuccess('Note saved', queued ? 'Will sync when signal returns' : 'Synced across devices')
+    if (error) {
+      // resilientInsert only surfaces a non-network error here (dead zones
+      // queue instead) — a real failure the user must see, not a silent
+      // no-op that looks like the note was saved.
+      toastError("Couldn't save note", error.message || 'Try again')
+      return
     }
+    const localRow = { ...payload, id, created_at: new Date().toISOString(), done: false }
+    setDraft('')
+    setParsed(null)
+    setContactId('')
+    patchNotes((n: any) => [localRow, ...n])
+    toastSuccess('Note saved', queued ? 'Will sync when signal returns' : 'Synced across devices')
   }
 
   async function markDone(id: any) {
     if (!user) return
-    await supabase.from('fh_notes').update({ done: true }).eq('id', id).eq('user_id', user.id)
-    patchNotes((n: any) => n.filter((x: any) => x.id !== id))
+    // Optimistically remove, then reconcile: on a failed write, roll the
+    // note back into the list (else it vanishes, then reappears on the
+    // next refetch) and tell the user.
+    const prev = notes
+    patchNotes(() => prev.filter((x: any) => x.id !== id))
+    const { error } = await supabase.from('fh_notes').update({ done: true }).eq('id', id).eq('user_id', user.id)
+    if (error) {
+      patchNotes(() => prev)
+      toastError("Couldn't archive note", error.message)
+    }
   }
 
   async function remove(id: any) {

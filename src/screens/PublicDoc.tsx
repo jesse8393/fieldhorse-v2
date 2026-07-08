@@ -21,7 +21,8 @@ import { useParams } from 'react-router-dom'
 import {
   ProposalTemplate,
   InvoiceTemplate,
-  mapItemsToScope
+  mapItemsToScope,
+  resolveBrandGold
 } from '../components/documents'
 import ApproveProposalBar from '../components/public/ApproveProposalBar.tsx'
 import { safePayUrl } from '../lib/payLink.ts'
@@ -108,6 +109,9 @@ export default function PublicDoc() {
    typed-signature approval bar proposals use. */
 function ChangeOrderView({ data, token, onApproved }: any) {
   const { contact, company, changeOrders } = data
+  // Respect the contractor's brand accent instead of hardcoding gold, so
+  // the change order matches the estimate/invoice they've been receiving.
+  const brand = resolveBrandGold(company)
   const co = (changeOrders || []).find((c: any) => c.id === data.change_order_id)
   if (!co) return <ErrorState message="This change order is no longer available." />
 
@@ -145,7 +149,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
             )}
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A154' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: brand }}>
               Change order
             </div>
             <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 28, fontWeight: 600 }}>
@@ -183,7 +187,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
           <MoneyRow
             label={isCredit ? 'This change (credit)' : 'This change'}
             value={`${isCredit ? '−' : '+'}${moneyFmt(Math.abs(delta))}`}
-            accent={isCredit ? '#48825F' : '#C8A154'}
+            accent={isCredit ? '#48825F' : brand}
           />
           <MoneyRow label="Contract after approval" value={moneyFmt(contractAfter)} strong />
         </div>
@@ -363,7 +367,13 @@ function InvoiceView({ data }: any) {
   // row. Gives the document a real sequence number, issue date, and
   // due date instead of anonymous whole-job math. Absent rows (legacy
   // jobs) degrade to the whole-job presentation.
-  const invoiceRows = (data.invoices || []).filter((inv: any) => inv && inv.status !== 'void')
+  //
+  // Only ISSUED draws are shown to the customer — draft (never-sent)
+  // and void rows must never leak into the public billing schedule or
+  // be selected as "this invoice" (a draft's amount/due date is not a
+  // real bill). Customer-visible statuses: sent, paid, overdue.
+  const VISIBLE = new Set(['sent', 'paid', 'overdue'])
+  const invoiceRows = (data.invoices || []).filter((inv: any) => inv && VISIBLE.has(String(inv.status || '').toLowerCase()))
   const currentInvoice = invoiceRows.find((inv: any) => String(inv.status || '').toLowerCase() !== 'paid') || null
   const thisInvoiceAmount = currentInvoice ? Math.min(balance, Number(currentInvoice.amount || 0)) : balance
   return (
@@ -402,6 +412,7 @@ function InvoiceView({ data }: any) {
    what the contractor sent. */
 function StatementView({ data }: any) {
   const { client, company, jobs, payments, changeOrders } = data
+  const brand = resolveBrandGold(company)
   const rolled = gatherStatement(jobs || [], payments || [], changeOrders || [])
   const who = client?.company_name || client?.name || 'Customer'
   const today = new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
@@ -432,7 +443,7 @@ function StatementView({ data }: any) {
             )}
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A154' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: brand }}>
               Statement
             </div>
             <div style={{ fontSize: 12, color: '#6B6A66', marginTop: 4 }}>{today}</div>
@@ -475,7 +486,7 @@ function StatementView({ data }: any) {
                 </span>
               </div>
             ))}
-            <MoneyRow label="Total due" value={moneyFmt(rolled.totalDue)} strong accent="#C8A154" />
+            <MoneyRow label="Total due" value={moneyFmt(rolled.totalDue)} strong accent={brand} />
           </div>
         )}
       </div>
@@ -488,6 +499,7 @@ function StatementView({ data }: any) {
    instructions. Renders nothing when the contractor hasn't set a link.
    Cream-paper aesthetic to match the document, not the app chrome. */
 function PayNowBar({ company, amount }: any) {
+  const brand = resolveBrandGold(company)
   const link = (company?.payment_link || '').trim()
   const instructions = (company?.payment_instructions || '').trim()
   if (!link && !instructions) return null
@@ -506,7 +518,7 @@ function PayNowBar({ company, amount }: any) {
       fontFamily: "'DM Sans', system-ui, sans-serif", color: '#3A3833',
       textAlign: 'center'
     }}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A154', marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: brand, marginBottom: 10 }}>
         Pay your balance
       </div>
       {url && (

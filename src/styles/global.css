@@ -8759,7 +8759,10 @@ select {
 }
 
 .v3-btn--sm {
-  min-height: 36px;
+  /* Touch target min 44px (was 36). Padding stays tight so the label
+     reads compact; align-items:center on .v3-btn keeps content centered
+     inside the taller box, so dense rows don't look chunky. */
+  min-height: 44px;
   padding: 8px 13px;
   border-radius: 9px;
   font-size: 12px;
@@ -8772,7 +8775,7 @@ select {
 }
 .v3-btn--full { width: 100%; }
 .v3-btn--icon-only { width: 44px; padding: 0; }
-.v3-btn--sm.v3-btn--icon-only { width: 36px; }
+.v3-btn--sm.v3-btn--icon-only { width: 44px; } /* was 36 — meet 44×44 tap target */
 
 /* =========================================================================
    WORK — the single deal list (IA round 2). Desktop composition mirrors

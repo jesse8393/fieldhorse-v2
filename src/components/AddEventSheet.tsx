@@ -17,12 +17,13 @@ import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
 import { toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
+import { todayYmd, toYmd } from '../lib/dates.ts'
 import { Eyebrow } from './v3'
 
 export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '', event = null }: any) {
   const editing = !!event?.id
   const [title, setTitle] = useState('')
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(() => todayYmd())
   const [time, setTime] = useState('08:00')
   const [contactId, setContactId] = useState(defaultContactId)
   const [contacts, setContacts] = useState<any[]>([])
@@ -42,15 +43,18 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
       setContactId(defaultContactId)
       setRecurs(false)
       setRecurDays(7)
-      setDate(new Date().toISOString().slice(0, 10))
+      setDate(todayYmd())
       setTime('08:00')
     } else if (event?.id) {
       // Edit mode: prefill from the row being edited.
       setTitle(event.title || '')
       setContactId(event.contact_id || '')
       setRecurs(false)
+      // Derive BOTH date and time from local parts. Using UTC for the
+      // date (toISOString) while the time is local silently bumps an
+      // evening event to the next day on save.
       const start = event.start_at ? new Date(event.start_at) : new Date()
-      setDate(start.toISOString().slice(0, 10))
+      setDate(toYmd(start))
       setTime(start.toTimeString().slice(0, 5))
     } else {
       setContactId(defaultContactId)

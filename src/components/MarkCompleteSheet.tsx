@@ -10,6 +10,7 @@
 // the record instead of starting over.
 
 import { useEffect, useRef, useState } from 'react'
+import { todayYmd } from '../lib/dates.ts'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Check, ShieldCheck, X, Calendar as CalendarIcon, Trash2, Download, Send } from 'lucide-react'
@@ -36,7 +37,7 @@ function moneyFmt(n: any) {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return todayYmd()
 }
 
 export default function MarkCompleteSheet({ open, userId, contact, onClose, onSaved }: any) {

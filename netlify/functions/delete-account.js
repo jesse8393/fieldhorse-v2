@@ -27,6 +27,53 @@ const USER_TABLES = [
   'profiles'
 ]
 
+// Storage buckets the app writes to. Every object is stored under a
+// `${userId}/...` path prefix (job-files: `${userId}/${jobId}/…`, job-photos
+// same, sub-docs: `${userId}/${subId}/…`, logos: `${userId}/logo.ext`), so we
+// can enumerate + purge a user's objects by walking that prefix.
+const USER_BUCKETS = ['job-files', 'job-photos', 'sub-docs', 'logos', 'company-logos']
+
+// Recursively collect every object path under `prefix` in `bucket`. The
+// storage list API is one directory deep and returns nested folders as
+// entries whose `id` is null, so we recurse into those. Best-effort: on any
+// error we return what we have so a partial listing still gets cleaned up.
+async function listAllObjects(supabase, bucket, prefix) {
+  const out = []
+  let stack = [prefix]
+  while (stack.length > 0) {
+    const dir = stack.pop()
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .list(dir, { limit: 1000 })
+    if (error || !Array.isArray(data)) continue
+    for (const entry of data) {
+      const full = dir ? `${dir}/${entry.name}` : entry.name
+      // A null id marks a folder; a real id marks a file object.
+      if (entry.id === null || entry.id === undefined) stack.push(full)
+      else out.push(full)
+    }
+  }
+  return out
+}
+
+// Best-effort purge of the user's storage objects across every bucket.
+// Wrapped by the caller in try/catch so a storage hiccup never aborts the
+// account deletion (the auth-user removal is the hard requirement).
+async function purgeUserStorage(supabase, userId, warnings) {
+  for (const bucket of USER_BUCKETS) {
+    try {
+      const paths = await listAllObjects(supabase, bucket, userId)
+      for (let i = 0; i < paths.length; i += 100) {
+        const batch = paths.slice(i, i + 100)
+        const { error } = await supabase.storage.from(bucket).remove(batch)
+        if (error) warnings.push({ bucket, message: error.message })
+      }
+    } catch (e) {
+      warnings.push({ bucket, message: e?.message || String(e) })
+    }
+  }
+}
+
 export default async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders() })
@@ -65,6 +112,17 @@ export default async (request) => {
     if (error) failed.push({ table, message: error.message })
   }
 
+  // Best-effort purge of the user's storage objects (job-files, job-photos,
+  // sub-docs, logos, …). Wrapped so a storage failure logs a warning but
+  // never aborts the account deletion below.
+  const storageWarnings = []
+  try {
+    await purgeUserStorage(supabase, userId, storageWarnings)
+  } catch (e) {
+    console.error('[delete-account] storage purge failed', e)
+    storageWarnings.push({ bucket: '*', message: e?.message || String(e) })
+  }
+
   // Hard requirement: remove the auth account.
   const { error: delErr } = await supabase.auth.admin.deleteUser(userId)
   if (delErr) {
@@ -72,7 +130,7 @@ export default async (request) => {
     return json({ error: 'delete_failed', detail: delErr.message }, 500)
   }
 
-  return json({ ok: true, purge_warnings: failed })
+  return json({ ok: true, purge_warnings: failed, storage_warnings: storageWarnings })
 }
 
 function corsHeaders() {

@@ -32,6 +32,7 @@
 // and fall back to the existing mailto: handoff.
 
 import { createClient } from '@supabase/supabase-js'
+import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -83,10 +84,14 @@ export default async (request) => {
     body: messageBody
   } = body || {}
 
-  if (!sender_user_id || !recipient_email || !messageBody) {
+  // contact_id is REQUIRED: without it any signed-in user could use this
+  // white-label relay to email arbitrary recipients. Tying every send to a
+  // contact the caller owns (verified below) keeps the relay scoped to the
+  // caller's own client list.
+  if (!contact_id || !sender_user_id || !recipient_email || !messageBody) {
     return json({
       error: 'missing_fields',
-      required: ['sender_user_id', 'recipient_email', 'body']
+      required: ['contact_id', 'sender_user_id', 'recipient_email', 'body']
     }, 400)
   }
 
@@ -115,21 +120,26 @@ export default async (request) => {
     return json({ error: 'forbidden', detail: 'sender_user_id must match the signed-in user.' }, 403)
   }
 
-  // Verify the caller owns the contact (when one is linked). For "generic"
-  // Compose drafts where no contact is selected, the activity log skips
-  // the contact_id column — but we still require sender_user_id auth.
-  let contact = null
-  if (contact_id) {
-    const { data, error: cErr } = await supabase
-      .from('fh_contacts')
-      .select('id, name, job_title, user_id')
-      .eq('id', contact_id)
-      .eq('user_id', sender_user_id)
-      .maybeSingle()
-    if (cErr) return json({ error: 'contact_lookup_failed', detail: cErr.message }, 500)
-    if (!data) return json({ error: 'forbidden_or_not_found' }, 403)
-    contact = data
+  // Per-user rate limit — this is an outbound white-label email relay, so
+  // throttle it to blunt spam/abuse from a single compromised or malicious
+  // account. Keyed on the authenticated user id (hashed).
+  const rlOk = await checkRateLimit(supabase, {
+    scope: 'send-message', identifier: hashIdentifier(sender_user_id), limit: 20,
+  })
+  if (!rlOk) {
+    return json({ error: 'rate_limited', message: 'Too many messages. Please try again in a minute.' }, 429)
   }
+
+  // Verify the caller owns the contact. contact_id is required (checked
+  // above), so the relay can only reach a client on the caller's own roster.
+  const { data: contact, error: cErr } = await supabase
+    .from('fh_contacts')
+    .select('id, name, job_title, user_id')
+    .eq('id', contact_id)
+    .eq('user_id', sender_user_id)
+    .maybeSingle()
+  if (cErr) return json({ error: 'contact_lookup_failed', detail: cErr.message }, 500)
+  if (!contact) return json({ error: 'forbidden_or_not_found' }, 403)
 
   // Pull contractor branding for From-line + Reply-To.
   const { data: profile } = await supabase

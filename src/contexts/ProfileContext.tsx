@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from './AuthContext.tsx'
@@ -87,14 +87,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     [user?.id]
   )
 
-  const value = {
+  // Memoized so a token-refresh onAuthStateChange (which reruns the fetch
+  // but often resolves to the same profile) doesn't mint a new context
+  // value every render and cascade a full-app re-render.
+  const value = useMemo<ProfileContextValue>(() => ({
     profile,
     loading,
     error,
     isOnboarded: Boolean(profile?.onboarded_at),
     refresh: fetchProfile,
     upsertProfile
-  }
+  }), [profile, loading, error, fetchProfile, upsertProfile])
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>
 }

@@ -7,6 +7,7 @@ import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import ClientPicker from './ClientPicker.tsx'
 import DocIntakeButton from './DocIntakeButton.tsx'
 import { supabase } from '../lib/supabase.ts'
+import { resilientInsert } from '../lib/outbox.ts'
 import { findOrCreateClient } from '../lib/clients.ts'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { parseLeadFromImage } from '../lib/docIntelligence.ts'
@@ -395,13 +396,19 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     // Universal Capture via findOrCreateClient. Passing `company` means
     // a typed company name is preserved on the client (fh_contacts has
     // no company column, so it was previously dropped).
-    const resolvedClientId = client?.id || await findOrCreateClient(userId, {
-      name: form.name,
-      phone: form.phone,
-      email: form.email,
-      address: form.address,
-      company: form.company
-    })
+    // The client find-or-create needs the network. Offline, skip it (the
+    // lead still queues via the outbox and can link a client on a later
+    // edit) — mirrors the Universal Capture lead path in captureActions.
+    let resolvedClientId: string | null = client?.id || null
+    if (!resolvedClientId && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+      resolvedClientId = await findOrCreateClient(userId, {
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        address: form.address,
+        company: form.company
+      })
+    }
 
     const payload = {
       user_id: userId,
@@ -420,37 +427,43 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
       stage: form.stage || 'lead',
       client_id: resolvedClientId
     }
-    try {
-      const { data, error } = await supabase
-        .from('fh_contacts')
-        .insert(payload)
-        .select()
-        .single()
-      if (error) throw error
-      // Remember the job type choice for next lead
-      if (form.job_type) writeLastJobType(form.job_type)
-      // Apply template milestones (if picked) BEFORE we close, so the
-      // checklist is already populated when the user lands on the job.
-      // Failure is non-fatal — the lead is already saved.
-      if (templateSlug) {
-        const tmpl = getTemplate(templateSlug)
-        if (tmpl) {
-          const { inserted } = await applyTemplate(supabase, { template: tmpl, jobId: data.id, userId })
+    // Route through the outbox — the outbox's rule is "a write never fails
+    // for lack of signal", so a dead-zone capture queues instead of
+    // throwing an error toast. resilientInsert mints the id client-side,
+    // so the optimistic close + template application use the same id that
+    // lands in the DB (online or queued).
+    const { queued, error, id } = await resilientInsert('fh_contacts', payload)
+    if (error) {
+      console.error('Lead commit failed:', error)
+      setSaving(false)
+      setErr("Couldn't save this lead. Check your connection and try again.")
+      return
+    }
+    // Remember the job type choice for next lead
+    if (form.job_type) writeLastJobType(form.job_type)
+    // Apply template milestones (if picked) BEFORE we close, so the
+    // checklist is already populated when the user lands on the job. Only
+    // when the insert actually reached the server — offline (queued) the
+    // job row doesn't exist yet to hang milestones off. Failure is
+    // non-fatal — the lead is already saved.
+    if (templateSlug && !queued) {
+      const tmpl = getTemplate(templateSlug)
+      if (tmpl) {
+        try {
+          const { inserted } = await applyTemplate(supabase, { template: tmpl, jobId: id, userId })
           if (inserted > 0) {
             toastSuccess(`Loaded ${inserted} milestones`, tmpl.label)
           }
+        } catch (e) {
+          console.warn('[fieldhorse] template apply failed (non-fatal)', e)
         }
       }
-      // Success: flash "Captured." + step 03/03 briefly, then close.
-      clearDraft()
-      setCommitted(true)
-      setSaving(false)
-      setTimeout(() => onCreated?.(data), 600)
-    } catch (err: any) {
-      console.error('Lead commit failed:', err)
-      setSaving(false)
-      setErr("Couldn't save this lead. Check your connection and try again.")
     }
+    // Success (landed or queued): flash "Captured." + step 03/03, close.
+    clearDraft()
+    setCommitted(true)
+    setSaving(false)
+    setTimeout(() => onCreated?.({ ...payload, id }), 600)
   }
 
   const voiceLabel = {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess } from '../../../lib/toast.ts'
+import { contractTotals } from '../../../lib/invoices.ts'
 import type { Database } from '../../../lib/database.types.ts'
 
 type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -150,9 +151,12 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
     () => d.payments.reduce((s, p) => s + Number(p.amount || 0), 0),
     [d.payments]
   )
+  // Balance must fold in approved change orders — otherwise the money
+  // stat and the stage CTA ("Send invoice" vs "Mark complete") read the
+  // job as fully collected while CO money is still owed.
   const balance = useMemo(
-    () => Math.max(0, Number(d.contact?.amount || 0) - paid),
-    [d.contact?.amount, paid]
+    () => contractTotals({ contact: d.contact, payments: d.payments, changeOrders: d.changeOrders }).balance,
+    [d.contact, d.payments, d.changeOrders]
   )
 
   return {

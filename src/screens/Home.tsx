@@ -392,21 +392,18 @@ export default function Home() {
           brand luminance — presentation only, not a fake chart.
           Card-top gold accent stripe + View-all link removed: gold is
           scarce here, only the money + the small sweep wear it. */}
+      {/* Findings 66 + 69: the outer card is no longer a role="button"
+          wrapper — it contained real <button> breakdown cells, which
+          violates the button content model (no nested interactive
+          controls). It's now a plain container. The "Open pipeline"
+          affordance is an explicit inner <button> (the eyebrow + money
+          block); the breakdown cells stay as their own sibling buttons.
+          The open-pipeline button navigates to '/work' (all stages) so
+          the destination matches the WHOLE-pipeline figure shown — the
+          old '/jobs' redirected to Active-only, a mismatch. */}
       <motion.div
         variants={item}
         className="v3-section"
-        role="button"
-        tabIndex={0}
-        aria-label="Open pipeline"
-        whileTap={{ scale: 0.995 }}
-        onClick={() => { hapticTap(); navigate('/jobs') }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            hapticTap()
-            navigate('/jobs')
-          }
-        }}
         style={{
           position: 'relative',
           overflow: 'hidden',
@@ -429,30 +426,52 @@ export default function Home() {
             'inset 0 -1px 0 rgba(0, 0, 0, 0.18)',
             '0 1px 2px rgba(0, 0, 0, 0.40)',
             '0 12px 28px rgba(0, 0, 0, 0.30)'
-          ].join(', '),
-          cursor: 'pointer',
-          WebkitTapHighlightColor: 'transparent'
+          ].join(', ')
         }}
       >
-        {/* Eyebrow — muted ink, slightly looser tracking than the v3
-            default to give the longer phrase room. */}
-        <span className="v3-eyebrow" style={{
-          color: 'var(--v3-text-muted)',
-          letterSpacing: '0.16em'
-        }}>
-          Total Pipeline
-        </span>
+        {/* Open-pipeline affordance — an explicit button wrapping the
+            eyebrow + money block. This is the card's single primary
+            control; keyboard access (Enter/Space) comes free from the
+            native <button>. The breakdown cells below are siblings, not
+            nested inside this button. */}
+        <motion.button
+          type="button"
+          aria-label="Open pipeline"
+          whileTap={{ scale: 0.995 }}
+          onClick={() => { hapticTap(); navigate('/work') }}
+          style={{
+            display: 'block',
+            width: '100%',
+            textAlign: 'left',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            margin: 0,
+            color: 'inherit',
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+        >
+          {/* Eyebrow — muted ink, slightly looser tracking than the v3
+              default to give the longer phrase room. */}
+          <span className="v3-eyebrow" style={{
+            display: 'block',
+            color: 'var(--v3-text-muted)',
+            letterSpacing: '0.16em'
+          }}>
+            Total Pipeline
+          </span>
 
-        {/* Money + trend row — money baseline-aligned with a tiny
-            gold-bronze $ glyph and an inline arrow+pct trend. No Pill
-            chip; trend is just colored text. */}
-        <div style={{
-          marginTop: 6,
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 12,
-          flexWrap: 'nowrap'
-        }}>
+          {/* Money + trend row — money baseline-aligned with a tiny
+              gold-bronze $ glyph and an inline arrow+pct trend. No Pill
+              chip; trend is just colored text. */}
+          <div style={{
+            marginTop: 6,
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 12,
+            flexWrap: 'nowrap'
+          }}>
           <div style={{
             flex: 1,
             minWidth: 0,
@@ -513,7 +532,8 @@ export default function Home() {
               {trendUp ? '+' : ''}{trendPct}% · 7d
             </span>
           )}
-        </div>
+          </div>
+        </motion.button>
 
         {/* NOTE: a synthesized always-ascending sparkline used to sit here.
             It rendered "up and to the right" regardless of the real number —

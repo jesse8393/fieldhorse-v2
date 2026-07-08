@@ -14,7 +14,10 @@
 // gatherStatement is a PURE function over jobs + payments the caller
 // already has — no DB round-trip, trivially unit-testable.
 
-import { generateStatement, downloadPdf } from './pdf.js'
+// pdf.js pulls in jspdf (~390KB) — load it lazily so importing this
+// module (ClientDetail route graph) doesn't ship the PDF engine on the
+// critical path. downloadPdf is fetched alongside generateStatement.
+const loadPdf = () => import('./pdf.js')
 
 export type StatementJob = {
   id: string
@@ -114,6 +117,7 @@ export async function buildStatementPdf({ company, client, data }: {
 }) {
   // generateStatement lives in the untyped pdf.js — its array params
   // infer as never[], so the typed payload goes through `as any`.
+  const { generateStatement } = await loadPdf()
   return generateStatement({
     company,
     client,
@@ -125,6 +129,7 @@ export async function buildStatementPdf({ company, client, data }: {
 /** Build + trigger a local download. */
 export async function downloadStatement(args: { company: any; client: any; data: StatementData }) {
   const result = await buildStatementPdf(args)
+  const { downloadPdf } = await loadPdf()
   downloadPdf(result)
   return result
 }
@@ -175,6 +180,7 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
   const body = await sendRes.json().catch(() => ({}))
 
   if (sendRes.status === 503 && body?.error === 'sender_not_configured') {
+    const { downloadPdf } = await loadPdf()
     downloadPdf(result)
     return { ok: false, reason: 'sender_not_configured' }
   }

@@ -24,7 +24,7 @@
 //     context only answers "who am I, and what role do I have?"
 //   - load anything for an unauthenticated user (returns nulls)
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from './AuthContext.tsx'
@@ -128,6 +128,11 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [membership, setMembership] = useState<MembershipRow | null>(null)
   const [org, setOrg] = useState<OrgRow | null>(null)
+  // Tracks the auth user a fetch was started for. An in-flight fetch for
+  // user A can resolve after a fast sign-out→sign-in to user B; without
+  // this guard the stale response would overwrite B's org/role. Mirrors
+  // the pattern in ProfileContext.
+  const activeUserIdRef = useRef<string | null>(null)
 
   const fetchMembership = useCallback(async () => {
     if (!user) {
@@ -150,6 +155,9 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       .eq('user_id', user.id)
       .is('revoked_at', null)
       .order('joined_at', { ascending: false })
+
+    // Drop the response if the auth user changed while we were waiting.
+    if (activeUserIdRef.current !== user.id) return
 
     if (memberQuery.error) {
       console.warn('[fieldhorse] membership fetch error', memberQuery.error)
@@ -186,6 +194,9 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       .eq('id', picked.org_id)
       .maybeSingle()
 
+    // Drop the response if the auth user changed while we were waiting.
+    if (activeUserIdRef.current !== user.id) return
+
     if (orgQuery.error) {
       console.warn('[fieldhorse] org fetch error', orgQuery.error)
       setError(orgQuery.error.message)
@@ -198,7 +209,9 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   }, [user?.id])
 
   // Reset on user change so we never paint a previous user's org name.
+  // Also re-point the stale-response guard at the new user.
   useEffect(() => {
+    activeUserIdRef.current = user?.id ?? null
     setMembership(null)
     setOrg(null)
   }, [user?.id])
@@ -207,42 +220,40 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     fetchMembership()
   }, [fetchMembership, session?.access_token])
 
-  if (!user) {
-    return (
-      <MembershipContext.Provider value={emptyValue(false, null)}>
-        {children}
-      </MembershipContext.Provider>
-    )
-  }
-
-  const role = membership?.role ?? null
-
-  const value: MembershipContextValue = {
-    loading,
-    error,
-    orgId: membership?.org_id ?? null,
-    orgName: org?.name ?? null,
-    orgSlug: org?.slug ?? null,
-    role,
-    memberId: membership?.id ?? null,
-    joinedAt: membership?.joined_at ?? null,
-    refresh: fetchMembership,
-    // bound helpers
-    isOwner: isOwner(role),
-    isAdmin: isAdmin(role),
-    isOwnerOrAdmin: isOwnerOrAdmin(role),
-    canSeeFinancials: canSeeFinancials(role),
-    canManageTeam: canManageTeam(role),
-    canSeeAllJobs: canSeeAllJobs(role),
-    canEditSettings: canEditSettings(role),
-    canInviteMembers: canInviteMembers(role),
-    canApproveTimesheets: canApproveTimesheets(role),
-    canBillOrDelete: canBillOrDelete(role),
-    canCreateFinancialDocs: canCreateFinancialDocs(role),
-    canManageSubs: canManageSubs(role),
-    canDoFieldWork: canDoFieldWork(role),
-    canViewRoute: (path: string) => canViewRoute(role, path),
-  }
+  // Memoized so a token-refresh onAuthStateChange doesn't rebuild the
+  // value object + cascade a full-app re-render through every consumer.
+  // The unauthenticated case is handled inside so the hook order stays
+  // stable (no early return between hooks).
+  const value = useMemo<MembershipContextValue>(() => {
+    if (!user) return emptyValue(false, null)
+    const role = membership?.role ?? null
+    return {
+      loading,
+      error,
+      orgId: membership?.org_id ?? null,
+      orgName: org?.name ?? null,
+      orgSlug: org?.slug ?? null,
+      role,
+      memberId: membership?.id ?? null,
+      joinedAt: membership?.joined_at ?? null,
+      refresh: fetchMembership,
+      // bound helpers
+      isOwner: isOwner(role),
+      isAdmin: isAdmin(role),
+      isOwnerOrAdmin: isOwnerOrAdmin(role),
+      canSeeFinancials: canSeeFinancials(role),
+      canManageTeam: canManageTeam(role),
+      canSeeAllJobs: canSeeAllJobs(role),
+      canEditSettings: canEditSettings(role),
+      canInviteMembers: canInviteMembers(role),
+      canApproveTimesheets: canApproveTimesheets(role),
+      canBillOrDelete: canBillOrDelete(role),
+      canCreateFinancialDocs: canCreateFinancialDocs(role),
+      canManageSubs: canManageSubs(role),
+      canDoFieldWork: canDoFieldWork(role),
+      canViewRoute: (path: string) => canViewRoute(role, path),
+    }
+  }, [user, loading, error, membership, org, fetchMembership])
 
   return <MembershipContext.Provider value={value}>{children}</MembershipContext.Provider>
 }

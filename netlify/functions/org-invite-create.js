@@ -116,6 +116,12 @@ export default async (request) => {
         .eq('id', myMember.org_id)
         .maybeSingle()
       const orgName = orgRow?.name || 'their team'
+      // orgName is tenant-controlled free text, so escape it before it lands
+      // in the invite email's HTML to prevent markup/script injection.
+      const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]))
+      const safeOrgName = safe(orgName)
 
       const subject = `You're invited to join ${orgName} on FieldHorse`
       const text = [
@@ -128,9 +134,9 @@ export default async (request) => {
       const html = `
         <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;padding:24px;color:#1a1a1a">
           <p style="font-size:14px;color:#666;letter-spacing:.14em;text-transform:uppercase;margin:0 0 8px">FieldHorse</p>
-          <h1 style="font-size:24px;margin:0 0 16px">Join ${orgName}</h1>
+          <h1 style="font-size:24px;margin:0 0 16px">Join ${safeOrgName}</h1>
           <p style="font-size:15px;line-height:1.5;margin:0 0 20px">
-            You've been invited to join <strong>${orgName}</strong> as a <strong>${role}</strong>.
+            You've been invited to join <strong>${safeOrgName}</strong> as a <strong>${role}</strong>.
           </p>
           <p style="margin:0 0 24px">
             <a href="${acceptUrl}" style="display:inline-block;padding:12px 20px;background:#c9963a;color:#0c0d0f;text-decoration:none;font-weight:700;border-radius:6px">Accept invite →</a>

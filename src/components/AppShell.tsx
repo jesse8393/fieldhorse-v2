@@ -146,7 +146,7 @@ export default function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
-  const { canViewRoute, role, loading: membershipLoading } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading, error: membershipError } = useMembership()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -158,13 +158,18 @@ export default function AppShell() {
 
   useEffect(() => {
     if (membershipLoading) return
+    // A membership FETCH ERROR (offline / transient) leaves role null,
+    // which is indistinguishable from "confirmed not a member" — don't
+    // hard-eject an authenticated user to /sub-portal on a network blip.
+    // The persisted cache covers reads until membership resolves.
+    if (membershipError && role === null) return
     const route = permissionRouteForPath(location.pathname)
     if (route === '/sub-portal') return
     const allowed = role ? canViewRoute(route) : false
     if (!allowed) {
       navigate(fallbackRouteForRole(role), { replace: true })
     }
-  }, [canViewRoute, location.pathname, membershipLoading, navigate, role])
+  }, [canViewRoute, location.pathname, membershipLoading, membershipError, navigate, role])
 
   // Global navigation event so chrome buttons inside Build components
   // (bell, footer links, etc.) can navigate without each component

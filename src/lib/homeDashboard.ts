@@ -5,6 +5,13 @@ import { ACTIVE_STAGES } from './stages.ts'
 import { fetchCoverPhotosByJob } from './photos.ts'
 import type { Database } from './database.types.ts'
 
+// Local-calendar YYYY-MM-DD (NOT UTC) so evening follow-ups don't read
+// as due a day early. Mirrors src/lib/dates.ts todayYmd.
+function localYmd(d: Date) {
+  const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0')
+  return `${y}-${m}-${day}`
+}
+
 type ContactRow = Pick<
   Database['public']['Tables']['fh_contacts']['Row'],
   'id' | 'name' | 'amount' | 'stage' | 'updated_at' | 'created_at' | 'completed_at' | 'follow_up_on' | 'proposal_status'
@@ -276,9 +283,9 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     })
   }
 
-  const todayYmd = now.toISOString().slice(0, 10)
+  const todayYmdStr = localYmd(now)
   for (const contact of contacts) {
-    if (!contact.follow_up_on || contact.follow_up_on > todayYmd) continue
+    if (!contact.follow_up_on || contact.follow_up_on > todayYmdStr) continue
     if (!['lead', 'quote'].includes(contact.stage || '')) continue
     const due = new Date(`${contact.follow_up_on}T12:00:00`)
     const overdueDays = Math.max(0, Math.round((now.getTime() - due.getTime()) / 86400000))

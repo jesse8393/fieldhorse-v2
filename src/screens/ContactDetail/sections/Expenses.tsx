@@ -6,6 +6,7 @@ import { recalcCost } from '../../../lib/stages.ts'
 import { crewLaborForContact, type CrewLabor } from '../../../lib/labor.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { todayYmd } from '../../../lib/dates.ts'
 import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_, SheetMoneyField as SheetMoneyField_ } from '../../../components/ActionSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
 const SheetField = SheetField_ as any
@@ -36,7 +37,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
     description: '',
     amount: '',
     category: 'Materials',
-    expense_date: new Date().toISOString().slice(0, 10)
+    expense_date: todayYmd()
   })
   const [saving, setSaving] = useState(false)
   const total = expenses.reduce((s: any, e: any) => s + Number(e.amount || 0), 0)
@@ -57,7 +58,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       description: '',
       amount: '',
       category: 'Materials',
-      expense_date: new Date().toISOString().slice(0, 10)
+      expense_date: todayYmd()
     })
   }, [open])
 

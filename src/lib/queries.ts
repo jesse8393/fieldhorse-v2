@@ -22,6 +22,7 @@ import {
 import { supabase } from './supabase.ts'
 import { fetchCoverPhotosByJob } from './photos.ts'
 import { loadPartnerDirectory } from './partners.ts'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import type { Database } from './database.types.ts'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -49,6 +50,16 @@ export const queryKeys = {
   jobPhotos: ['jobPhotos'] as const,
   clients: ['clients'] as const,
   payments: ['payments'] as const
+}
+
+// The jobs list is user-scoped so a device that switches accounts (sign
+// out → sign in as someone else) can never read the prior user's cached
+// list. All readers/invalidators derive the key from the current auth
+// user via this helper. A bare ['jobs'] prefix still matches for broad
+// invalidation (TanStack does prefix matching), but reads + optimistic
+// setQueryData must use the exact user-scoped key.
+export function jobsKey(userId: string | undefined) {
+  return ['jobs', userId ?? null] as const
 }
 
 // ---- Jobs ----
@@ -79,9 +90,14 @@ async function fetchJobs(): Promise<JobRow[]> {
 }
 
 export function useJobs() {
+  // Derive the user id here (rather than as a param) so every caller —
+  // Work, the desktop DetailListRail — shares the one user-scoped key
+  // without each having to thread the id through.
+  const { user } = useAuth()
   return useQuery({
-    queryKey: queryKeys.jobs,
+    queryKey: jobsKey(user?.id),
     queryFn: fetchJobs,
+    enabled: !!user?.id,
     staleTime: 30_000
   })
 }
@@ -108,13 +124,20 @@ export function useJobsRealtime(userId: string | undefined, client: QueryClient)
     let debounce: ReturnType<typeof setTimeout> | null = null
     const invalidate = () => {
       if (debounce) clearTimeout(debounce)
-      debounce = setTimeout(() => client.invalidateQueries({ queryKey: queryKeys.jobs }), 1200)
+      debounce = setTimeout(() => client.invalidateQueries({ queryKey: jobsKey(userId) }), 1200)
     }
+    // NO user_id filter: fetchJobs deliberately omits the user_id filter
+    // so RLS can surface partner-shared jobs. A `user_id=eq.${userId}`
+    // channel filter would only fire for the user's OWN rows, so a
+    // partner-owned shared job changing never invalidated the list. A
+    // table-level subscription (RLS still scopes which change events this
+    // user receives) fixes that; the existing 1200ms debounce coalesces
+    // the extra volume into one refetch.
     const channel = supabase
       .channel(`fh_contacts:jobs:${userId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'fh_contacts', filter: `user_id=eq.${userId}` },
+        { event: '*', schema: 'public', table: 'fh_contacts' },
         invalidate
       )
       .subscribe()
@@ -415,7 +438,13 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
       .from('fh_invoices')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      // Bound the issued-invoice DISPLAY list — the Invoices screen only
+      // renders these rows (invoiceRows), it does NOT compute A/R totals
+      // from them (totals derive from the uncapped jobs + payments +
+      // change-orders sets above). So a huge invoice history no longer
+      // ships every row; the 500 most-recent cover the list.
+      .limit(500),
     // Approved change orders adjust each job's true contract — needed so
     // "Who owes you" / statements don't understate a job with signed COs.
     supabase
@@ -705,7 +734,17 @@ export type AnalyticsBundle = {
 
 async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
   const [c, m, p, inv, co, cli, st] = await Promise.all([
-    supabase.from('fh_contacts').select('*').eq('user_id', userId),
+    // Explicit projection instead of `*` — fh_contacts carries wide text
+    // columns (notes, scope, proposal HTML) Analytics never touches. This
+    // list covers exactly the fields Analytics.tsx reads off a contact:
+    // stage/amount/cost for KPIs + margin, the date fields for trends,
+    // job_type for the trade breakdown, client_id/name for top-revenue,
+    // and quote_sent_at for deposit-lag. follow_up_on + proposal_status
+    // are included per the projection spec.
+    supabase
+      .from('fh_contacts')
+      .select('id, user_id, client_id, name, stage, amount, cost, created_at, completed_at, updated_at, follow_up_on, proposal_status, job_type, quote_sent_at')
+      .eq('user_id', userId),
     supabase.from('fh_mileage').select('*').eq('user_id', userId).order('drove_on', { ascending: false }),
     supabase.from('fh_payments').select('*').eq('user_id', userId),
     supabase.from('fh_invoices').select('*').eq('user_id', userId),

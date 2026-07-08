@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
+import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
@@ -38,22 +39,27 @@ function money(n: any) {
 }
 
 function shortDate(iso: any) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseDateOnly(iso)
+  if (!d) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// Store the due date at LOCAL end-of-day so an invoice only reads
+// "past due" AFTER the due date has fully passed — not for the entire
+// due day (which a midnight timestamp compared with `< now` would do).
 function isoFromDateInput(s: any) {
   if (!s) return null
-  return new Date(s + 'T00:00:00').toISOString()
+  const parts = String(s).split('-').map(Number)
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null
+  const [y, m, d] = parts
+  return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
 }
 
+// Read the stored timestamp back as a LOCAL calendar date for the
+// <input type="date"> — using UTC (toISOString) shifts the day in
+// UTC+ timezones and walks the due date back on every re-edit.
 function dateInputFromIso(iso: any) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toISOString().slice(0, 10)
+  return toYmd(iso)
 }
 
 export default function InvoiceDrawsSection({ contact, payments = [], changeOrders = [], insurance = null, userId }: any) {
@@ -293,9 +299,15 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       ],
       notes: draw.notes || '',
       dueDate: draw.due_at ? shortDate(draw.due_at) : '',
+      dueDateIso: draw.due_at || null,
       invoiceId: draw.id,
+      currentInvoice: draw,
+      invoices: draws,
       payments,
-      contractTotal,
+      // RAW contract amount — generateInvoice folds approved COs in from
+      // the changeOrders array itself, so passing the CO-inclusive
+      // contractTotal here would double-count them in the balance box.
+      contractTotal: Number(contact?.amount || 0),
       previouslyPaid,
       insurance,
       changeOrders

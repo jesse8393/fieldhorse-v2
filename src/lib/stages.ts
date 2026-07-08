@@ -1,5 +1,6 @@
 // Fieldhorse pipeline stages + auto-transitions
 import { supabase } from './supabase.ts'
+import { todayYmd } from './dates.ts'
 import { crewLaborForContact } from './labor.ts'
 import type { Database } from './database.types.ts'
 
@@ -170,7 +171,7 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
     // defaults to 'other' so legacy callers stay valid.
     kind: normalizedKind,
     reference: reference || null,
-    paid_on: paid_on || new Date().toISOString().slice(0, 10),
+    paid_on: paid_on || todayYmd(),
     // Optional pointer to the fh_invoices row this payment satisfies
     // (migration 047). Contact-level payments pass nothing.
     invoice_id: invoice_id || null
@@ -180,12 +181,24 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
     .upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
   if (insErr) return { error: insErr }
 
-  // Payment against a specific invoice settles that invoice. Best-effort:
-  // the payment row is the source of truth for money math either way.
+  // Payment against a specific invoice settles that invoice — but only
+  // flip it to 'paid' when the payments actually COVER its amount. A
+  // partial payment (the operator can freely edit the amount, and
+  // partial pay is an explicit feature) must leave the invoice 'sent'
+  // with a residual balance, not read as fully paid. Best-effort: the
+  // payment rows remain the source of truth for money math either way.
   if (invoice_id) {
+    const [{ data: inv }, { data: invPays }] = await Promise.all([
+      supabase.from('fh_invoices').select('amount').eq('id', invoice_id).eq('user_id', contact.user_id).maybeSingle(),
+      supabase.from('fh_payments').select('amount').eq('invoice_id', invoice_id).eq('user_id', contact.user_id)
+    ])
+    const invoiceAmount = Number(inv?.amount || 0)
+    const paidToInvoice = (invPays || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
+    // Cent tolerance so floating-point sums don't strand a "paid" flip.
+    const covered = invoiceAmount > 0 && paidToInvoice + 0.005 >= invoiceAmount
     const { error: invErr } = await supabase
       .from('fh_invoices')
-      .update({ status: 'paid' })
+      .update({ status: covered ? 'paid' : 'sent' })
       .eq('id', invoice_id)
       .eq('user_id', contact.user_id)
     if (invErr) {

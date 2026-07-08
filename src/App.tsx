@@ -56,8 +56,14 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function RequireOnboarded({ children }: { children: ReactNode }) {
-  const { loading, isOnboarded } = useProfile()
+  const { loading, isOnboarded, error } = useProfile()
   if (loading) return <AppLoading label="Loading workspace" />
+  // Fail open on a profile fetch error (offline cold open / transient
+  // failure): an already-authenticated owner must NOT be bounced to
+  // /onboarding just because the profile row couldn't load — the
+  // persisted TanStack cache covers reads. Only redirect when we have a
+  // clean, error-free "not onboarded" answer from the server.
+  if (error) return children
   if (!isOnboarded) return <Navigate to="/onboarding" replace />
   return children
 }
