@@ -1,42 +1,46 @@
 // src/components/documents/DocumentShell.tsx
 //
-// Letter-paper wrapper — restrained editorial layout matching the
-// "Estimate #62" reference the contractor approved. Premium feel via
-// confident whitespace + a single dark logo block + minimal hairlines.
+// Letter-paper wrapper for every customer-facing document. The design
+// bar is "what a $500M company sends": the number that matters is in
+// the first viewport, the letterhead reads as an established business,
+// and everything else is hairlines, small-caps labels, and whitespace.
 //
 // Layout (top → bottom):
 //
 //   ┌────────────────────────────────────────────────────────────┐
-//   │  [LOGO]                              {DOC_TYPE} #{NUMBER}  │
-//   │                                      ─────────────────     │
-//   │                                      SENT ON:              │
-//   │                                      {issued date}         │
-//   │                                                             │
-//   │  ──────────────────         ──────────────────────         │
-//   │  RECIPIENT:                  SENDER:                       │
-//   │  {client name + address}     {company name + address}      │
-//   │                              {phone / email / website}     │
-//   │                                                             │
-//   │  {children — body sections}                                 │
+//   │  [logo] Company Name                    ESTIMATE            │
+//   │  license · insured line                 Nº PCC-2026-4F2A    │
+//   │  phone · email · website                Issued  July 5      │
+//   │                                         Valid   Aug 4       │
+//   │  ────────────────────────────────────────────────────────   │
+//   │  {hero — template-owned summary band (amount due, total)}   │
+//   │                                                              │
+//   │  PREPARED FOR             PROJECT                            │
+//   │  {client + address}       {project title + site address}     │
+//   │                                                              │
+//   │  {children — body sections}                                  │
+//   │  ────────────────────────────────────────────────────────   │
+//   │  fine print · license · questions? phone · email             │
 //   └────────────────────────────────────────────────────────────┘
 //
-// Replaces the prior gold-accent letterhead. Type stays sans-serif
-// (DM Sans) throughout — the reference is calm-and-confident, not
-// editorial-display. brand_accent_hex still drives the table header
-// bar on the items table inside children + the logo monogram fallback
-// frame, so each contractor's brand color still surfaces without
-// overwhelming the doc.
+// No colored header bars, no monogram billboard: the brand accent
+// surfaces only in the hero figure and small marks, which is how
+// premium invoices (Stripe, Ramp, high-end architecture firms) carry
+// identity without shouting.
 
 import { DOC_COLORS, DOC_FONTS, DOC_SPACE, resolveBrandGold } from './tokens.ts'
 
 /**
  * @param {object}    props
  * @param {object}    props.company
- * @param {string}    props.docType       — 'ESTIMATE' | 'PROPOSAL' | 'INVOICE'
- * @param {string}    props.number        — full doc number
- * @param {Date|string} [props.issuedAt]  — sent / issued date
+ * @param {string}    props.docType       — 'ESTIMATE' | 'PROPOSAL' | 'INVOICE' | 'CHANGE ORDER' | 'STATEMENT'
+ * @param {string}    props.number        — full document number (never truncated)
+ * @param {Array}     [props.metaRows]    — [{ label, value, strong? }] date/term rows under the number
+ * @param {object}    [props.status]      — { label, tone } chip next to the doc type
+ * @param {ReactNode} [props.hero]        — full-width summary band under the letterhead
  * @param {object}    props.recipient     — { name, address, phone, email }
- * @param {object}    [props.status]      — { label, tone } small chip top-right
+ * @param {string}    [props.recipientLabel] — 'PREPARED FOR' | 'BILLED TO'
+ * @param {object}    [props.project]     — { title, address } second column of the parties row
  * @param {ReactNode} props.children      — body (items table, totals, etc.)
  * @param {ReactNode} [props.footer]      — fine-print paragraph at bottom
  */
@@ -44,13 +48,17 @@ export default function DocumentShell({
   company = {},
   docType,
   number,
-  issuedAt,
-  recipient = {},
+  metaRows = [],
   status = null,
+  hero = null,
+  recipient = {},
+  recipientLabel = 'Prepared for',
+  project = null,
   children,
   footer
 }: any) {
   const brand = resolveBrandGold(company)
+  const contactLine = [company?.phone, company?.email, company?.website].filter(Boolean).join('  ·  ')
 
   return (
     <article
@@ -69,53 +77,59 @@ export default function DocumentShell({
         overflow: 'hidden'
       }}
     >
+      {/* Hairline brand keyline across the very top — the one place the
+          accent color frames the page. */}
+      <div style={{ height: 3, background: brand }} aria-hidden="true" />
+
       <div
         style={{
-          padding: `${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx + 20}px`,
+          padding: `${DOC_SPACE.marginPx - 8}px ${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx - 12}px`,
           display: 'flex',
           flexDirection: 'column',
-          gap: 28
+          gap: 30
         }}
       >
-        {/* ─── Header row ─────────────────────────────────── */}
+        {/* ─── Letterhead ─────────────────────────────────── */}
         <header
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
             gap: 24,
-            alignItems: 'flex-start'
+            flexWrap: 'wrap'
           }}
         >
-          <LogoBlock company={company} brand={brand} />
-          <DocMetaBlock
-            docType={docType}
-            number={number}
-            issuedAt={issuedAt}
-            status={status}
-          />
+          <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: 460 }}>
+            <CompanyIdentity company={company} contactLine={contactLine} />
+          </div>
+          <div style={{ flexShrink: 0, marginLeft: 'auto' }}>
+            <DocMeta docType={docType} number={number} metaRows={metaRows} status={status} />
+          </div>
         </header>
 
-        {/* ─── Recipient / Sender ─────────────────────────── */}
-        <PartiesBlock recipient={recipient} company={company} />
+        {/* ─── Hero summary band (template-owned) ─────────── */}
+        {hero}
 
-        {/* ─── Body — items table, totals, supporting sections ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* ─── Parties ─────────────────────────────────────── */}
+        <PartiesRow recipient={recipient} recipientLabel={recipientLabel} project={project} />
+
+        {/* ─── Body ────────────────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {children}
         </div>
 
-        {/* ─── Footer fine print ──────────────────────────── */}
-        {footer && (
-          <footer
-            style={{
-              marginTop: 4,
-              fontSize: 11,
-              lineHeight: 1.5,
-              color: DOC_COLORS.inkMuted
-            }}
-          >
-            {footer}
-          </footer>
-        )}
+        {/* ─── Footer fine print ───────────────────────────── */}
+        <footer style={{ marginTop: 8, borderTop: `1px solid ${DOC_COLORS.rule}`, paddingTop: 16 }}>
+          {footer && (
+            <p style={{ margin: 0, fontSize: 10.5, lineHeight: 1.55, color: DOC_COLORS.inkFaint }}>
+              {footer}
+            </p>
+          )}
+          <p style={{ margin: footer ? '10px 0 0' : 0, fontSize: 10.5, lineHeight: 1.55, color: DOC_COLORS.inkMuted }}>
+            {company?.name || ''}
+            {contactLine ? `${company?.name ? ' — ' : ''}Questions? ${contactLine}` : ''}
+          </p>
+        </footer>
       </div>
     </article>
   )
@@ -125,189 +139,184 @@ export default function DocumentShell({
    Internal blocks
    ───────────────────────────────────────────────────────── */
 
-function LogoBlock({ company, brand }: any) {
-  const hasLogo = !!company?.logo_url
-  const monogram = (company?.name || 'MC')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w: any) => w[0])
-    .join('')
-    .toUpperCase()
-    .replace(/[^A-Z]/g, '')
-    .slice(0, 2) || 'MC'
-
-  const size = 96
-
-  if (hasLogo) {
-    return (
-      <div
-        style={{
-          width: size,
-          height: size,
-          background: brand,
-          borderRadius: 4,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden'
-        }}
-      >
-        <img loading="lazy"src={company.logo_url}
-          alt={`${company?.name || 'Company'} logo`}
-          style={{
-            maxWidth: size - 10,
-            maxHeight: size - 10,
-            objectFit: 'contain',
-            display: 'block'
-          }}
-          onError={(e) => {
-            const parent = e.currentTarget.parentNode as HTMLElement | null
-            if (parent && parent.dataset.monogramFallback !== 'on') {
-              parent.dataset.monogramFallback = 'on'
-              e.currentTarget.style.display = 'none'
-              const span = document.createElement('span')
-              span.textContent = monogram
-              span.style.cssText = `font-family:${DOC_FONTS.display};font-size:28px;letter-spacing:0.08em;color:white;font-weight:600;`
-              parent.appendChild(span)
-            }
-          }}
-        />
-      </div>
-    )
-  }
-
-  // Monogram fallback — dark brand-accent square with white initials.
+function CompanyIdentity({ company, contactLine }: any) {
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        background: brand,
-        borderRadius: 4,
-        display: 'grid',
-        placeItems: 'center',
-        color: '#ffffff',
-        fontFamily: DOC_FONTS.display,
-        fontSize: 32,
-        fontWeight: 600,
-        letterSpacing: '0.06em'
-      }}
-    >
-      {monogram}
+    <div style={{ minWidth: 0, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+      {company?.logo_url && (
+        <img
+          loading="lazy"
+          src={company.logo_url}
+          alt=""
+          style={{ height: 44, maxWidth: 120, objectFit: 'contain', display: 'block', flexShrink: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
+        />
+      )}
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: DOC_FONTS.body,
+            fontSize: 18,
+            fontWeight: 700,
+            letterSpacing: '-0.015em',
+            color: DOC_COLORS.ink,
+            lineHeight: 1.2
+          }}
+        >
+          {company?.name || 'Contractor'}
+        </div>
+        {company?.address && (
+          <div style={{ marginTop: 2, fontSize: 11, color: DOC_COLORS.inkMuted, lineHeight: 1.45 }}>
+            {company.address}
+          </div>
+        )}
+        {contactLine && (
+          <div style={{ marginTop: 2, fontSize: 11, color: DOC_COLORS.inkMuted, lineHeight: 1.45 }}>
+            {contactLine}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function DocMetaBlock({ docType, number, issuedAt, status }: any) {
+function DocMeta({ docType, number, metaRows, status }: any) {
   return (
-    <div style={{ textAlign: 'right' }}>
+    <div style={{ textAlign: 'right', flexShrink: 0 }}>
       <div
         style={{
-          fontFamily: DOC_FONTS.body,
-          fontSize: 26,
-          fontWeight: 700,
-          letterSpacing: '0.01em',
-          color: DOC_COLORS.ink,
-          marginBottom: 12
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 10
         }}
       >
-        {docType?.toUpperCase()} #{number}
+        <span
+          style={{
+            fontFamily: DOC_FONTS.body,
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.24em',
+            textTransform: 'uppercase',
+            color: DOC_COLORS.ink
+          }}
+        >
+          {docType}
+        </span>
+        {status && <StatusChip {...status} />}
       </div>
-      <div style={{ height: 1, background: DOC_COLORS.ink, opacity: 0.85, marginBottom: 14 }} />
-      <div
-        style={{
-          fontFamily: DOC_FONTS.body,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: DOC_COLORS.ink,
-          marginBottom: 6
-        }}
-      >
-        Sent on:
-      </div>
-      <div
-        style={{
-          fontFamily: DOC_FONTS.body,
-          fontSize: 13,
-          color: DOC_COLORS.ink
-        }}
-      >
-        {formatLongDate(issuedAt) || '—'}
-      </div>
-      {status && (
-        <div style={{ marginTop: 12 }}>
-          <StatusChip {...status} />
+      {number && (
+        <div
+          style={{
+            marginTop: 4,
+            fontFamily: DOC_FONTS.body,
+            fontSize: 13,
+            fontWeight: 600,
+            color: DOC_COLORS.inkMid,
+            fontVariantNumeric: 'tabular-nums'
+          }}
+        >
+          {number}
         </div>
+      )}
+      {metaRows.length > 0 && (
+        <table style={{ marginTop: 10, marginLeft: 'auto', borderCollapse: 'collapse' }}>
+          <tbody>
+            {metaRows.map((r: any) => (
+              <tr key={r.label}>
+                <td
+                  style={{
+                    padding: '2px 12px 2px 0',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: DOC_COLORS.inkFaint,
+                    textAlign: 'right',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {r.label}
+                </td>
+                <td
+                  style={{
+                    padding: '2px 0',
+                    fontSize: 12,
+                    fontWeight: r.strong ? 700 : 500,
+                    color: r.strong ? DOC_COLORS.ink : DOC_COLORS.inkMid,
+                    textAlign: 'right',
+                    whiteSpace: 'nowrap',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}
+                >
+                  {r.value}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )
 }
 
-function PartiesBlock({ recipient, company }: any) {
+function PartiesRow({ recipient, recipientLabel, project }: any) {
   return (
     <section
       style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 24
+        gridTemplateColumns: project ? '1fr 1fr' : '1fr',
+        gap: 24,
+        borderTop: `1px solid ${DOC_COLORS.rule}`,
+        paddingTop: 18
       }}
     >
-      <Party label="RECIPIENT" name={recipient?.name} lines={[
-        recipient?.address,
-        [recipient?.phone, recipient?.email].filter(Boolean).join(' · ')
-      ].filter(Boolean)} />
-      <Party label="SENDER" name={company?.name} lines={[
-        company?.address,
-        company?.phone ? `Phone: ${company.phone}` : '',
-        company?.email ? `Email: ${company.email}` : '',
-        company?.website ? `Website: ${company.website}` : ''
-      ].filter(Boolean)} />
+      <Party
+        label={recipientLabel}
+        name={recipient?.name}
+        lines={[
+          recipient?.address,
+          [recipient?.phone, recipient?.email].filter(Boolean).join(' · ')
+        ].filter(Boolean)}
+      />
+      {project && (
+        <Party
+          label="Project"
+          name={project?.title}
+          lines={[project?.address].filter(Boolean)}
+        />
+      )}
     </section>
   )
 }
 
 function Party({ label, name, lines }: any) {
   return (
-    <div>
-      <div style={{ height: 1, background: DOC_COLORS.ink, opacity: 0.85, marginBottom: 14 }} />
+    <div style={{ minWidth: 0 }}>
       <div
         style={{
-          fontFamily: DOC_FONTS.body,
           fontSize: 10,
           fontWeight: 700,
           letterSpacing: '0.18em',
           textTransform: 'uppercase',
-          color: DOC_COLORS.ink,
-          marginBottom: 8
+          color: DOC_COLORS.inkFaint,
+          marginBottom: 6
         }}
       >
-        {label}:
+        {label}
       </div>
       <div
         style={{
-          fontFamily: DOC_FONTS.body,
-          fontSize: 15,
+          fontSize: 14.5,
           fontWeight: 700,
           color: DOC_COLORS.ink,
-          marginBottom: 4,
-          wordBreak: 'break-word'
+          wordBreak: 'break-word',
+          lineHeight: 1.3
         }}
       >
         {name || '—'}
       </div>
       {lines.map((line: any, i: any) => (
-        <div
-          key={i}
-          style={{
-            fontFamily: DOC_FONTS.body,
-            fontSize: 13,
-            color: DOC_COLORS.inkMid,
-            lineHeight: 1.5,
-            marginTop: i === 0 ? 0 : 2
-          }}
-        >
+        <div key={i} style={{ fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.5, marginTop: i === 0 ? 3 : 1 }}>
           {line}
         </div>
       ))}
@@ -315,7 +324,7 @@ function Party({ label, name, lines }: any) {
   )
 }
 
-function StatusChip({ label, tone = 'neutral' }: any) {
+export function StatusChip({ label, tone = 'neutral' }: any) {
   const palette = ({
     neutral: { bg: '#F0EFEC', fg: '#5C6168', br: '#C8C5BD' },
     gold:    { bg: '#F4ECD8', fg: '#8A6F2A', br: '#C8A154' },
@@ -327,26 +336,20 @@ function StatusChip({ label, tone = 'neutral' }: any) {
     <span
       style={{
         display: 'inline-block',
-        padding: '4px 10px',
-        borderRadius: 4,
+        padding: '3px 8px',
+        borderRadius: 999,
         background: palette.bg,
         border: `1px solid ${palette.br}`,
         color: palette.fg,
         fontFamily: DOC_FONTS.body,
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: 700,
         letterSpacing: '0.16em',
-        textTransform: 'uppercase'
+        textTransform: 'uppercase',
+        verticalAlign: 'middle'
       }}
     >
       {label}
     </span>
   )
-}
-
-function formatLongDate(iso: any) {
-  if (!iso) return ''
-  const d = iso instanceof Date ? iso : new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, { month: 'long', day: '2-digit', year: 'numeric' })
 }

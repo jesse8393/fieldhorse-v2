@@ -60,3 +60,22 @@ export function invoiceNumber(companyName: string | null | undefined, seed: stri
   const tail = seedTail(seed)
   return pfx ? `${pfx}-INV-${y}-${tail}` : `INVOICE-${y}-${tail}`
 }
+
+/**
+ * Sequence-aware invoice number — the form a real business uses.
+ * fh_invoices carries a per-job sequence_number; when the caller has
+ * one, the customer sees "PCC-INV-003" instead of four random id
+ * characters. Falls back to the seed form when no sequence exists
+ * (legacy whole-job invoices).
+ */
+export function invoiceNumberFromSequence(
+  companyName: string | null | undefined,
+  sequence: number | null | undefined,
+  seed?: string | null
+) {
+  const seq = Number(sequence)
+  if (!Number.isFinite(seq) || seq <= 0) return invoiceNumber(companyName, seed)
+  const pfx = companyPrefix(companyName)
+  const num = String(Math.floor(seq)).padStart(3, '0')
+  return pfx ? `${pfx}-INV-${num}` : `INV-${num}`
+}

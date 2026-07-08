@@ -359,6 +359,13 @@ function InvoiceView({ data }: any) {
     .filter((co: any) => co?.status === 'approved')
     .reduce((s: any, co: any) => s + Number(co?.amount || 0), 0)
   const balance = Math.max(0, contractTotal + approvedCO - paid)
+  // The specific draw this link bills: the oldest still-open invoice
+  // row. Gives the document a real sequence number, issue date, and
+  // due date instead of anonymous whole-job math. Absent rows (legacy
+  // jobs) degrade to the whole-job presentation.
+  const invoiceRows = (data.invoices || []).filter((inv: any) => inv && inv.status !== 'void')
+  const currentInvoice = invoiceRows.find((inv: any) => String(inv.status || '').toLowerCase() !== 'paid') || null
+  const thisInvoiceAmount = currentInvoice ? Math.min(balance, Number(currentInvoice.amount || 0)) : balance
   return (
     <>
     {balance > 0.5 && <PayNowBar company={company} amount={balance} />}
@@ -372,11 +379,13 @@ function InvoiceView({ data }: any) {
       contractTotal={contractTotal}
       payments={payments}
       previouslyPaid={paid}
-      thisInvoice={balance}
+      thisInvoice={thisInvoiceAmount}
       balanceRemaining={balance}
+      invoices={invoiceRows}
+      currentInvoice={currentInvoice}
       meta={{
-        issuedAt: contact?.created_at,
-        dueDate: null
+        issuedAt: currentInvoice?.issued_at || contact?.created_at,
+        dueDate: currentInvoice?.due_at || null
       }}
       status={balance < 0.5 ? 'paid' : 'outstanding'}
       insurance={insurance}
