@@ -21,6 +21,7 @@ import {
 } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { fetchCoverPhotosByJob } from './photos.ts'
+import { subMatchesKey } from './subIdentity.ts'
 import { loadPartnerDirectory } from './partners.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import type { Database } from './database.types.ts'
@@ -979,15 +980,16 @@ async function fetchSubDetail(key: string, userId: string, orgId?: string | null
     throw profErr
   }
 
-  const subRows = ((subs ?? []) as Sub[]).filter((r) => {
-    const k = (r.phone || r.name || '').toLowerCase().trim()
-    return k === key
-  })
+  // Shared normalization with the Subs list (lib/subIdentity.ts), plus
+  // legacy raw-string keys so old links keep resolving. The old exact
+  // string compare meant a formatted vs digits-only phone split one sub
+  // across cards, and the list's '__untitled__' card dead-ended here.
+  const subRows = ((subs ?? []) as Sub[]).filter((r) => subMatchesKey(r, key))
 
   const matchingProfile = ((prof ?? []) as Sub_Detail_Profile[]).find((p) => {
-    const byPhone = (p.phone || '').toLowerCase().trim()
+    if (subMatchesKey(p, key)) return true
     const byName = (p.name || '').toLowerCase().trim()
-    return byPhone === key || byName === key
+    return byName === key.toLowerCase().trim()
   }) || null
 
   const ids = Array.from(new Set(subRows.map((r) => r.contact_id).filter(Boolean))) as string[]

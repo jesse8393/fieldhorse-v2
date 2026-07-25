@@ -91,7 +91,10 @@ export default function InvoiceTemplate({
       }))
     : []
 
-  const scheduleRows = (invoices || []).filter((inv: any) => inv && inv.status !== 'void')
+  // Match the PDF and public link: drafts are never shown to customers,
+  // so the in-app preview must hide them too or the operator previews a
+  // billing schedule the customer will never receive.
+  const scheduleRows = (invoices || []).filter((inv: any) => inv && inv.status !== 'void' && inv.status !== 'draft')
 
   const paymentInstructions = (company?.payment_instructions || '').trim()
 

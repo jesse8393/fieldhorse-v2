@@ -76,10 +76,16 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
   // Stable idempotency key for this payment intent. If the insert commits
   // but the response is lost and the operator retaps, the same id upserts
-  // to a no-op instead of double-recording. Regenerated only after success.
+  // to a no-op instead of double-recording. But the key is only valid for
+  // the exact payload it was minted for: if the operator EDITS the form
+  // after a failed attempt (fix $500 → $5,000) and retries, reusing the
+  // old id would no-op against the already-committed $500 row while the
+  // UI claims "$5,000 recorded". Mint a fresh id whenever the payload
+  // changes; keep the same id for identical retries.
   const paymentIdRef = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
   )
+  const paymentKeyRef = useRef<string | null>(null)
 
   async function submit(e: any) {
     e?.preventDefault()
@@ -89,6 +95,11 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
       toastError('Enter an amount', 'Amount must be greater than zero.')
       return
     }
+    const payloadKey = JSON.stringify([numeric, method, kind, reference, paidOn, invoice?.id || null])
+    if (paymentKeyRef.current != null && paymentKeyRef.current !== payloadKey && typeof crypto !== 'undefined' && crypto.randomUUID) {
+      paymentIdRef.current = crypto.randomUUID()
+    }
+    paymentKeyRef.current = payloadKey
     setSaving(true)
     try {
       const res = await logPayment(contact, { id: paymentIdRef.current, amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: invoice?.id || null })

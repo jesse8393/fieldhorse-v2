@@ -259,11 +259,23 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // If the CO fetch fails we can't know the true contract, so fail safe:
   // skip the auto-close rather than treat a failed fetch as "no COs" and
   // prematurely close a job that still owes change-order money.
+  //
+  // Re-read the contract amount rather than trusting the caller's
+  // in-memory contact row — a quote edited moments earlier (or on
+  // another device) could make a stale cached amount auto-close a job
+  // that still owes money, or miss a close that should fire.
+  const { data: freshContact } = await supabase
+    .from('fh_contacts')
+    .select('amount, stage')
+    .eq('id', contact.id)
+    .maybeSingle()
+  const baseAmount = Number((freshContact?.amount ?? contact.amount) || 0)
+  const currentStage = freshContact?.stage ?? contact.stage
   let closed = false
   if (!coErr) {
     const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
-    const contractAmount = Number(contact.amount || 0) + approvedCO
-    if (contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
+    const contractAmount = baseAmount + approvedCO
+    if (contractAmount > 0 && total >= contractAmount && currentStage !== 'closed') {
       const { error: closeErr } = await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
       closed = !closeErr
     }

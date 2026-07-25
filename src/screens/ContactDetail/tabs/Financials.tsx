@@ -37,12 +37,14 @@ export default function FinancialsTab({
   const defaultSub = balance > 0.5 ? 'invoice' : 'subs'
   const [sub, setSub] = useState(defaultSub)
 
+  // No count badge on the Invoice tab — it used to show payments.length,
+  // so four recorded payments rendered "Invoice · 4" implying four
+  // invoices existed.
   const subTabsWithCounts = useMemo(() => SUB_TABS.map((t) => {
     if (t.id === 'subs')     return subs.length     > 0 ? { ...t, count: subs.length }     : t
     if (t.id === 'expenses') return expenses.length > 0 ? { ...t, count: expenses.length } : t
-    if (t.id === 'invoice')  return payments.length > 0 ? { ...t, count: payments.length } : t
     return t
-  }), [subs, expenses, payments])
+  }), [subs, expenses])
 
   return (
     <div>
