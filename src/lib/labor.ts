@@ -50,6 +50,10 @@ export async function crewLaborForContact(
     .eq('contact_id', contactId)
     .not('punch_out_at', 'is', null)
     .neq('user_id', ownerUserId)
+    // Flagged punches are disputed ("wrong rate", "GPS mismatch") —
+    // they must not bill the job while under review. Clearing the flag
+    // (or approving via the workflow) puts them back in.
+    .eq('flagged', false)
   if (error || !data) return empty
 
   // The punches all belong to one org (the contact's). Scope the rate

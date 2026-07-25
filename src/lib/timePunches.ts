@@ -187,6 +187,27 @@ export async function punchOut(opts: {
   return data as TimePunch
 }
 
+/** The caller's own default hourly rate (org_members self-read row).
+ *  Used to snapshot the rate onto a punch at clock-out so historical
+ *  shifts keep pricing at the rate that was in effect when they were
+ *  worked — without a snapshot, a later raise silently repriced every
+ *  past (even approved) shift on every job. Best-effort: returns null
+ *  when no membership/rate exists. When the caller belongs to several
+ *  orgs, prefers the membership matching orgId. */
+export async function fetchMyDefaultRate(userId: string, orgId?: string | null): Promise<number | null> {
+  // database.types.ts predates migration 057's default_hourly_rate
+  // column — same `as any` cast lib/labor.ts uses for this table.
+  const { data, error } = await (supabase.from('org_members') as any)
+    .select('org_id, default_hourly_rate')
+    .eq('user_id', userId)
+    .is('revoked_at', null)
+  if (error || !data?.length) return null
+  const rows = data as { org_id: string | null; default_hourly_rate: number | null }[]
+  const match = (orgId && rows.find((r) => r.org_id === orgId)) || rows[0]
+  const rate = Number(match?.default_hourly_rate)
+  return Number.isFinite(rate) && rate > 0 ? rate : null
+}
+
 /** List the caller's recent punches (newest first). */
 export async function listMyRecentPunches(
   userId: string,

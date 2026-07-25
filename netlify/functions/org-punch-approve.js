@@ -60,6 +60,43 @@ export default async (request) => {
     return json({ error: 'insufficient_role' }, 403)
   }
 
+  // Freeze the rate on approval: any punch still missing an
+  // hourly_rate snapshot gets the member's CURRENT default rate
+  // stamped before the approval lands. Approving without a snapshot
+  // left the shift priced at whatever the member's rate happens to be
+  // when job cost is next computed — a raise months later silently
+  // repriced already-approved (even closed-job) shifts. Service role
+  // is exempt from the 054 one-time-set guard, but we only fill NULLs.
+  const { data: unrated } = await admin
+    .from('fh_time_punches')
+    .select('id, user_id')
+    .in('id', punchIds)
+    .eq('org_id', myMember.org_id)
+    .is('hourly_rate', null)
+  if (unrated?.length) {
+    const userIds = [...new Set(unrated.map((p) => p.user_id).filter(Boolean))]
+    const { data: members } = await admin
+      .from('org_members')
+      .select('user_id, default_hourly_rate')
+      .eq('org_id', myMember.org_id)
+      .in('user_id', userIds)
+      .is('revoked_at', null)
+    const rateByUser = new Map()
+    for (const m of members || []) {
+      const r = Number(m.default_hourly_rate)
+      if (Number.isFinite(r) && r > 0) rateByUser.set(m.user_id, r)
+    }
+    await Promise.all(unrated.map((p) => {
+      const rate = rateByUser.get(p.user_id)
+      if (!rate) return null
+      return admin
+        .from('fh_time_punches')
+        .update({ hourly_rate: rate })
+        .eq('id', p.id)
+        .is('hourly_rate', null)
+    }).filter(Boolean))
+  }
+
   // Only approve punches that are (a) in the caller's org, (b) not
   // already approved, and (c) actually clocked out. Doing the org
   // match in the UPDATE filter (not just trusting punch_ids) is the

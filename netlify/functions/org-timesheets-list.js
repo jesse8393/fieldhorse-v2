@@ -104,10 +104,29 @@ export default async (request) => {
     contactsById = Object.fromEntries((cs || []).map((c) => [c.id, c]))
   }
 
+  // Default rates for punches without a snapshot rate — the SAME
+  // fallback lib/labor.ts uses to charge these hours to job cost.
+  // Without it, unrated crew punches showed cost "—/$0" on the approval
+  // screen while the approval itself booked real dollars to the job.
+  let defaultRateByUser = {}
+  if (userIds.length > 0) {
+    const { data: members } = await admin
+      .from('org_members')
+      .select('user_id, default_hourly_rate')
+      .eq('org_id', myMember.org_id)
+      .in('user_id', userIds)
+      .is('revoked_at', null)
+    for (const m of members || []) {
+      const r = Number(m.default_hourly_rate)
+      if (Number.isFinite(r) && r > 0) defaultRateByUser[m.user_id] = r
+    }
+  }
+
   const decorated = (punches || []).map((p) => {
     const inMs = p.punch_in_at ? new Date(p.punch_in_at).getTime() : 0
     const outMs = p.punch_out_at ? new Date(p.punch_out_at).getTime() : 0
     const minutes = Math.max(0, Math.round((outMs - inMs) / 60_000) - (p.break_minutes || 0))
+    const rate = p.hourly_rate != null ? Number(p.hourly_rate) : (defaultRateByUser[p.user_id] ?? null)
     return {
       id: p.id,
       user_id: p.user_id,
@@ -118,8 +137,8 @@ export default async (request) => {
       punch_in_at: p.punch_in_at,
       punch_out_at: p.punch_out_at,
       minutes,
-      hourly_rate: p.hourly_rate != null ? Number(p.hourly_rate) : null,
-      cost: (p.hourly_rate != null) ? Number(((minutes / 60) * Number(p.hourly_rate)).toFixed(2)) : null,
+      hourly_rate: rate,
+      cost: (rate != null) ? Number(((minutes / 60) * rate).toFixed(2)) : null,
       break_minutes: p.break_minutes || 0,
       notes: p.notes || null,
       flagged: !!p.flagged,
