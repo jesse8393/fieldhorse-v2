@@ -83,30 +83,24 @@ export default async (request) => {
 
   // 3) Linked job rows (the partner-read RLS would let the client read
   //    these too, but we already have service-role open — one batch).
+  //    No `amount` — the GC's contract value with THEIR customer is not
+  //    the sub's business.
   let linkedJobs = {}
   if (jobIds.length > 0) {
     const { data: jobs } = await admin
       .from('fh_contacts')
-      .select('id, name, address, stage, amount, updated_at, job_title')
+      .select('id, name, address, stage, updated_at, job_title')
       .in('id', jobIds)
     linkedJobs = Object.fromEntries((jobs || []).map((j) => [j.id, j]))
   }
 
-  // 4) Payments tied to those jobs. fh_payments has no partner-read
-  //    policy, so the sub-facing view only exists through service-role
-  //    here. We narrow by contact_id IN jobIds so a sub never sees an
-  //    unrelated org's payment row.
-  let payments = []
-  if (jobIds.length > 0) {
-    const { data: pmt } = await admin
-      .from('fh_payments')
-      .select('id, contact_id, amount, kind, method, reference, paid_on, created_at')
-      .in('contact_id', jobIds)
-      .order('paid_on', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(100)
-    payments = pmt || []
-  }
+  // NOTE — deliberately NO fh_payments here. Those rows are the GC's
+  // client→contractor receipts, not money paid to the sub; returning
+  // them (as this endpoint used to) both showed the sub a wildly wrong
+  // "Paid YTD" (the GC's revenue) and leaked every payment's amount /
+  // method / reference to every partner on the job. There is no per-sub
+  // payment ledger in the schema today; until one exists the portal
+  // shows no payment figures at all.
 
   return json({
     ok: true,
@@ -114,7 +108,6 @@ export default async (request) => {
     matched_profiles: profilesRes.data || [],
     accepted_partners: partners,
     linked_jobs: linkedJobs,
-    payments,
   })
 }
 
