@@ -338,7 +338,11 @@ function ProposalView({ data }: any) {
         discount: 0,
         taxRate: 0
       }}
-      warrantyText={contact?.terms_text || company?.warranty_default || ''}
+      // terms_text is the contractor's PAYMENT terms — it was being
+      // shoved under the Warranty heading while the payment section
+      // showed a hardcoded 50/40/10 schedule the contractor never set.
+      paymentTermsText={contact?.terms_text || ''}
+      warrantyText={company?.warranty_default || ''}
       exclusions={exclusionsArray}
       insurance={insurance}
       changeOrders={changeOrders}
@@ -378,7 +382,11 @@ function InvoiceView({ data }: any) {
   const thisInvoiceAmount = currentInvoice ? Math.min(balance, Number(currentInvoice.amount || 0)) : balance
   return (
     <>
-    {balance > 0.5 && <PayNowBar company={company} amount={balance} />}
+    {/* The Pay button quotes THE SAME number as the page's "Amount due"
+        hero — it used to quote the whole remaining balance while the
+        hero showed the current draw, so a $2,500 deposit page carried a
+        "Pay $10,000 now" button. */}
+    {balance > 0.5 && <PayNowBar company={company} amount={thisInvoiceAmount} />}
     <InvoiceTemplate
       company={company}
       contact={contact}

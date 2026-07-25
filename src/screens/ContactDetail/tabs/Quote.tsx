@@ -759,7 +759,8 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
             discount: 0,
             taxRate: 0
           }}
-          warrantyText={contact?.terms_text || company?.warranty_default || ''}
+          paymentTermsText={contact?.terms_text || ''}
+          warrantyText={company?.warranty_default || ''}
           exclusions={exclusions}
           insurance={insurance}
           changeOrders={changeOrders}

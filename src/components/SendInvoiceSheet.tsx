@@ -126,7 +126,9 @@ export default function SendInvoiceSheet({
 
   function applyPct(pct: number) {
     const base = totals.unbilled > 0 ? totals.unbilled : totals.balance
-    setAmount(String(Math.max(1, Math.round(base * pct))))
+    // Cents, not whole dollars — rounding to $1 left invoice sets that
+    // never reconciled against a contract carrying cents.
+    setAmount(String(Math.max(0.01, Math.round(base * pct * 100) / 100)))
   }
 
   // Always lands as a draft row first; sendInvoiceEmail flips it to
@@ -301,7 +303,7 @@ export default function SendInvoiceSheet({
                         onClick={() => {
                           hapticTap()
                           setKind(c.id)
-                          if (c.id === 'final') setAmount(String(Math.round(totals.unbilled || totals.balance)))
+                          if (c.id === 'final') setAmount(String(Math.round((totals.unbilled > 0.005 ? totals.unbilled : totals.balance) * 100) / 100))
                         }}
                         disabled={!!busy}
                         style={chipStyle(active, !!busy)}
@@ -333,7 +335,7 @@ export default function SendInvoiceSheet({
                     inputMode="decimal"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    placeholder={totals.unbilled > 0 ? String(Math.round(totals.unbilled)) : '0'}
+                    placeholder={totals.unbilled > 0 ? String(Math.round(totals.unbilled * 100) / 100) : '0'}
                     disabled={!!busy}
                     style={{ ...fieldStyle, paddingLeft: 28 }}
                   />
