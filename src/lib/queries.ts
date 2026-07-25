@@ -52,6 +52,28 @@ export const queryKeys = {
   payments: ['payments'] as const
 }
 
+// PostgREST caps every response at the server's max-rows (Supabase
+// default: 1000) even when no .limit() is set — so the "deliberately
+// uncapped" aggregate fetches below were silently losing their oldest
+// rows past 1000 (payments dropped from A/R sums, jobs from rollups).
+// This pages through .range() windows until a short page arrives.
+// Callers MUST give the query a stable order (we pass an id tiebreak)
+// or pages can overlap/skip under concurrent writes.
+const FETCH_PAGE = 1000
+export async function fetchAllRows<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const out: T[] = []
+  for (let from = 0; ; from += FETCH_PAGE) {
+    const { data, error } = await build(from, from + FETCH_PAGE - 1)
+    if (error) throw error
+    const rows = (data ?? []) as T[]
+    out.push(...rows)
+    if (rows.length < FETCH_PAGE) break
+  }
+  return out
+}
+
 // The jobs list is user-scoped so a device that switches accounts (sign
 // out → sign in as someone else) can never read the prior user's cached
 // list. All readers/invalidators derive the key from the current auth
@@ -202,32 +224,52 @@ export type ClientsBundle = {
   clients: Client[]
   jobs: Pick<Contact, 'id' | 'client_id' | 'amount' | 'stage'>[]
   payments: Pick<Payment, 'contact_id' | 'amount'>[]
+  changeOrders: Pick<Database['public']['Tables']['fh_change_orders']['Row'], 'contact_id' | 'amount' | 'status'>[]
 }
 
 async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
-  const [clientsRes, jobsRes, paymentsRes] = await Promise.all([
+  const [clientsRes, jobs, payments, changeOrders] = await Promise.all([
     supabase
       .from('fh_clients')
       .select('*')
       .eq('user_id', userId)
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }),
-    supabase
-      .from('fh_contacts')
-      .select('id, client_id, amount, stage')
-      .eq('user_id', userId),
-    supabase
-      .from('fh_payments')
-      .select('contact_id, amount')
-      .eq('user_id', userId)
+    fetchAllRows<ClientsBundle['jobs'][number]>((from, to) =>
+      supabase
+        .from('fh_contacts')
+        .select('id, client_id, amount, stage')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<ClientsBundle['payments'][number]>((from, to) =>
+      supabase
+        .from('fh_payments')
+        .select('contact_id, amount')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    // Approved change orders adjust each job's true contract — without
+    // them the Clients-list "outstanding" understates any job carrying
+    // a signed CO (the statement/A-R surfaces already include them).
+    fetchAllRows<ClientsBundle['changeOrders'][number]>((from, to) =>
+      supabase
+        .from('fh_change_orders')
+        .select('contact_id, amount, status')
+        .eq('user_id', userId)
+        .eq('status', 'approved')
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   ])
   if (clientsRes.error) throw clientsRes.error
-  if (jobsRes.error) throw jobsRes.error
-  if (paymentsRes.error) throw paymentsRes.error
   return {
     clients: (clientsRes.data ?? []) as Client[],
-    jobs: (jobsRes.data ?? []) as ClientsBundle['jobs'],
-    payments: (paymentsRes.data ?? []) as ClientsBundle['payments']
+    jobs,
+    payments,
+    changeOrders
   }
 }
 
@@ -418,22 +460,29 @@ export type InvoicesBundle = {
 }
 
 async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
-  const [jobsRes, paymentsRes, invoicesRes, coRes] = await Promise.all([
-    supabase
-      .from('fh_contacts')
-      .select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`)
-      .eq('user_id', userId)
-      .in('stage', ['job', 'invoice', 'closed'])
-      .order('created_at', { ascending: false }),
-      // Deliberately UNCAPPED (ultrareview x3): a recency cap here
-      // silently drops the oldest rows — exactly the most-overdue
-      // receivables — understating outstanding totals and the 60+
-      // aging bucket. The column projection above already carries the
-      // payload win; A/R math must see every row.
-    supabase
-      .from('fh_payments')
-      .select('*')
-      .eq('user_id', userId),
+  const [jobs, payments, invoicesRes, changeOrders] = await Promise.all([
+    fetchAllRows<InvoiceJob>((from, to) =>
+      supabase
+        .from('fh_contacts')
+        .select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`)
+        .eq('user_id', userId)
+        .in('stage', ['job', 'invoice', 'closed'])
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    // Deliberately UNCAPPED, and PAGED past PostgREST's max-rows
+    // (default 1000): a cap here silently drops the oldest rows —
+    // exactly the most-overdue receivables — understating outstanding
+    // totals and the 60+ aging bucket. A/R math must see every row.
+    fetchAllRows<Payment>((from, to) =>
+      supabase
+        .from('fh_payments')
+        .select('*')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
     supabase
       .from('fh_invoices')
       .select('*')
@@ -447,21 +496,22 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
       .limit(500),
     // Approved change orders adjust each job's true contract — needed so
     // "Who owes you" / statements don't understate a job with signed COs.
-    supabase
-      .from('fh_change_orders')
-      .select('contact_id, amount, status')
-      .eq('user_id', userId)
-      .eq('status', 'approved')
+    fetchAllRows<InvoicesBundle['changeOrders'][number]>((from, to) =>
+      supabase
+        .from('fh_change_orders')
+        .select('contact_id, amount, status')
+        .eq('user_id', userId)
+        .eq('status', 'approved')
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   ])
-  if (jobsRes.error) throw jobsRes.error
-  if (paymentsRes.error) throw paymentsRes.error
   if (invoicesRes.error) throw invoicesRes.error
-  if (coRes.error) throw coRes.error
   return {
-    jobs: (jobsRes.data ?? []) as InvoiceJob[],
-    payments: (paymentsRes.data ?? []) as Payment[],
+    jobs,
+    payments,
     invoices: (invoicesRes.data ?? []) as InvoiceRecord[],
-    changeOrders: (coRes.data ?? []) as InvoicesBundle['changeOrders']
+    changeOrders
   }
 }
 
@@ -741,34 +791,52 @@ async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
     // job_type for the trade breakdown, client_id/name for top-revenue,
     // and quote_sent_at for deposit-lag. follow_up_on + proposal_status
     // are included per the projection spec.
-    supabase
-      .from('fh_contacts')
-      .select('id, user_id, client_id, name, stage, amount, cost, created_at, completed_at, updated_at, follow_up_on, proposal_status, job_type, quote_sent_at')
-      .eq('user_id', userId),
+    fetchAllRows<Contact>((from, to) =>
+      supabase
+        .from('fh_contacts')
+        .select('id, user_id, client_id, name, stage, amount, cost, created_at, completed_at, updated_at, follow_up_on, proposal_status, job_type, quote_sent_at')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
     supabase.from('fh_mileage').select('*').eq('user_id', userId).order('drove_on', { ascending: false }),
-    supabase.from('fh_payments').select('*').eq('user_id', userId),
-    supabase.from('fh_invoices').select('*').eq('user_id', userId),
-    supabase.from('fh_change_orders').select('*').eq('user_id', userId),
+    fetchAllRows<Payment>((from, to) =>
+      supabase.from('fh_payments').select('*').eq('user_id', userId).order('id', { ascending: true }).range(from, to)
+    ),
+    fetchAllRows<AnalyticsBundle['invoices'][number]>((from, to) =>
+      supabase.from('fh_invoices').select('*').eq('user_id', userId).order('id', { ascending: true }).range(from, to)
+    ),
+    fetchAllRows<AnalyticsBundle['changeOrders'][number]>((from, to) =>
+      supabase.from('fh_change_orders').select('*').eq('user_id', userId).order('id', { ascending: true }).range(from, to)
+    ),
     supabase.from('fh_clients').select('id, name').eq('user_id', userId),
-    // Funnel source — every stage move with its timestamp (mig 023).
+    // Funnel source — stage moves with timestamps (mig 023). Bounded at
+    // 4000 rows, keeping the NEWEST: the funnel windows on the trailing
+    // 90 days, so when history exceeds the cap it's the oldest rows
+    // that must drop. (The old ascending+limit kept the oldest 4000 and
+    // starved the funnel of exactly the recent rows it needed.)
     supabase
       .from('fh_stage_transitions')
       .select('contact_id, from_stage, to_stage, transitioned_at')
       .eq('user_id', userId)
-      .order('transitioned_at', { ascending: true })
+      .order('transitioned_at', { ascending: false })
       .limit(4000)
   ])
-  for (const result of [c, m, p, inv, co, cli, st]) {
+  for (const result of [m, cli, st]) {
     if (result.error) throw result.error
   }
+  // computeFunnel's days-to-decision pairing expects chronological order.
+  const transitions = ((st.data ?? []) as StageTransition[])
+    .slice()
+    .sort((a, b) => new Date(a.transitioned_at).getTime() - new Date(b.transitioned_at).getTime())
   return {
-    contacts: (c.data ?? []) as Contact[],
+    contacts: c,
     mileage: (m.data ?? []) as AnalyticsBundle['mileage'],
-    payments: (p.data ?? []) as Payment[],
-    invoices: (inv.data ?? []) as AnalyticsBundle['invoices'],
-    changeOrders: (co.data ?? []) as AnalyticsBundle['changeOrders'],
+    payments: p,
+    invoices: inv,
+    changeOrders: co,
     clients: (cli.data ?? []) as AnalyticsBundle['clients'],
-    stageTransitions: (st.data ?? []) as StageTransition[]
+    stageTransitions: transitions
   }
 }
 

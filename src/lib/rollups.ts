@@ -5,6 +5,8 @@
 // list showed Won 2) both came from per-screen ad-hoc aggregations.
 // Centralize here so the four surfaces can never drift again.
 
+import { parseDateOnly } from './dates.ts'
+
 // Structural inputs — callers pass full fh_contacts / fh_payments rows
 // or partial picks of them, so these list only the fields read here and
 // keep every field optional/nullable.
@@ -20,6 +22,11 @@ type PaymentRow = {
   contact_id?: string | null
   amount?: number | string | null
 }
+type ChangeOrderRow = {
+  contact_id?: string | null
+  amount?: number | string | null
+  status?: string | null
+}
 
 export type JobRollup = {
   lifetime: number
@@ -32,9 +39,26 @@ export type JobRollup = {
 // Pipeline v2: 'invoice' survives in these sets only as the legacy
 // alias of 'job' (pre-migration rows). Every job is a won deal now —
 // a converted lead counts as won the moment it becomes a job.
-const ACTIVE_BILLING_STAGES = new Set(['job', 'invoice'])
+//
+// BILLING_STAGES includes 'closed': a job moved to Closed with money
+// still owed (the Mark Complete sheet never checks the balance) must
+// keep showing in "outstanding" — statements and the A/R screen count
+// it, so the list rollups must too or the surfaces disagree.
+const BILLING_STAGES = new Set(['job', 'invoice', 'closed'])
 const ACTIVE_PIPELINE_STAGES = new Set(['lead', 'quote', 'job', 'invoice'])
 const WON_STAGES = new Set(['job', 'invoice', 'closed'])
+
+// Sum of APPROVED change orders per contact. Same rule as
+// statement.ts's approvedCoByContact — approved COs adjust the true
+// contract, pending/declined ones don't.
+function coByContact(changeOrders: ChangeOrderRow[] | null | undefined) {
+  const m = new Map<string, number>()
+  for (const co of changeOrders || []) {
+    if (co?.status !== 'approved' || !co.contact_id) continue
+    m.set(co.contact_id, (m.get(co.contact_id) || 0) + Number(co.amount || 0))
+  }
+  return m
+}
 
 // Sum payments per contact_id from a flat fh_payments array.
 function paidByContact(payments: PaymentRow[] | null | undefined) {
@@ -51,22 +75,27 @@ function paidByContact(payments: PaymentRow[] | null | undefined) {
 //
 //   { lifetime, outstanding, activeCount, wonCount, paidTotal }
 //
-// lifetime    — sum of every job amount, all stages. Matches the user's
-//               mental model of "all the work I've done with this client."
-// outstanding — sum of (amount - paid), clipped at 0, only for jobs in
-//               billing stages (job + invoice). Closed/lost drop out.
-//               Known divergence: this uses raw fh_contacts.amount and
-//               does NOT add approved change-order adjustments the way
-//               InvoiceDrawsSection / InvoiceTemplate do, so a job with
-//               approved COs reports a smaller outstanding here than on
-//               the invoice screen. Acceptable for list rollups today;
-//               revisit if COs become a primary balance driver.
+// lifetime    — sum of job amounts for WON deals (job/invoice/closed).
+//               Lost bids and raw leads are money that never existed;
+//               counting them made a client with one $2K job and a $9K
+//               lost bid read "Lifetime $11K".
+// outstanding — sum of (contract - paid) per job for jobs in billing
+//               stages (job/invoice/closed), where contract = amount +
+//               approved change orders. This is the SAME definition the
+//               Invoices screen and client statements use, so all three
+//               surfaces agree. Balances of ≤ $0.50 are ignored, same
+//               as statement.ts, so rounding dust never bills.
 // activeCount — count of jobs in any active pipeline stage.
 // wonCount    — count of won deals: stage in (job, closed) — plus the
 //               legacy 'invoice' alias.
 // paidTotal   — sum of all payments received against these jobs.
-export function rollupJobs(jobs: JobRow[] | null | undefined, payments: PaymentRow[] | null | undefined): JobRollup {
+export function rollupJobs(
+  jobs: JobRow[] | null | undefined,
+  payments: PaymentRow[] | null | undefined,
+  changeOrders: ChangeOrderRow[] | null | undefined = []
+): JobRollup {
   const paidMap = paidByContact(payments)
+  const coMap = coByContact(changeOrders)
   let lifetime = 0
   let outstanding = 0
   let activeCount = 0
@@ -75,12 +104,15 @@ export function rollupJobs(jobs: JobRow[] | null | undefined, payments: PaymentR
   for (const j of jobs || []) {
     const amount = Number(j.amount || 0)
     const stage = j.stage || ''
-    lifetime += amount
     if (ACTIVE_PIPELINE_STAGES.has(stage)) activeCount += 1
-    if (WON_STAGES.has(stage)) wonCount += 1
-    if (ACTIVE_BILLING_STAGES.has(stage)) {
-      const bal = amount - (paidMap.get(j.id || '') || 0)
-      outstanding += Math.max(0, bal)
+    if (WON_STAGES.has(stage)) {
+      wonCount += 1
+      lifetime += amount + (coMap.get(j.id || '') || 0)
+    }
+    if (BILLING_STAGES.has(stage)) {
+      const contract = amount + (coMap.get(j.id || '') || 0)
+      const bal = contract - (paidMap.get(j.id || '') || 0)
+      if (bal > 0.5) outstanding += bal
     }
   }
   for (const p of payments || []) paidTotal += Number(p.amount || 0)
@@ -90,7 +122,11 @@ export function rollupJobs(jobs: JobRow[] | null | undefined, payments: PaymentR
 // Group rollupJobs() by client_id. Returns Map<client_id, rollup>.
 // Used by Clients list to render per-row lifetime/outstanding/active
 // without 60 round-trips.
-export function rollupByClient(jobs: JobRow[] | null | undefined, payments: PaymentRow[] | null | undefined) {
+export function rollupByClient(
+  jobs: JobRow[] | null | undefined,
+  payments: PaymentRow[] | null | undefined,
+  changeOrders: ChangeOrderRow[] | null | undefined = []
+) {
   const byClient = new Map<string, JobRollup>()
   // Bucket jobs by client_id.
   const jobsByClient = new Map<string, JobRow[]>()
@@ -100,7 +136,7 @@ export function rollupByClient(jobs: JobRow[] | null | undefined, payments: Paym
     arr.push(j)
     jobsByClient.set(j.client_id, arr)
   }
-  // Bucket payments by client via the job they hit.
+  // Bucket payments and change orders by client via the job they hit.
   const jobToClient = new Map<string, string>()
   for (const j of jobs || []) {
     if (j.client_id && j.id) jobToClient.set(j.id, j.client_id)
@@ -113,39 +149,80 @@ export function rollupByClient(jobs: JobRow[] | null | undefined, payments: Paym
     arr.push(p)
     paysByClient.set(cid, arr)
   }
+  const cosByClient = new Map<string, ChangeOrderRow[]>()
+  for (const co of changeOrders || []) {
+    const cid = co.contact_id ? jobToClient.get(co.contact_id) : undefined
+    if (!cid) continue
+    const arr = cosByClient.get(cid) || []
+    arr.push(co)
+    cosByClient.set(cid, arr)
+  }
   for (const [cid, jArr] of jobsByClient) {
-    byClient.set(cid, rollupJobs(jArr, paysByClient.get(cid) || []))
+    byClient.set(cid, rollupJobs(jArr, paysByClient.get(cid) || [], cosByClient.get(cid) || []))
   }
   return byClient
 }
 
 // Year-to-date filter helper. Pass a date column name (e.g. "updated_at"
 // for jobs or "paid_on" for payments). Used by Analytics for YTD numbers.
+// Date-only values ("YYYY-MM-DD", e.g. paid_on) parse as LOCAL midnight —
+// a raw new Date() parse lands them at UTC midnight, which is Dec 31 of
+// last year in every US timezone, silently dropping Jan-1 rows from YTD.
 export function filterYTD<T extends Record<string, unknown>>(rows: T[] | null | undefined, dateField: string, now = new Date()): T[] {
   const yearStart = new Date(now.getFullYear(), 0, 1).getTime()
   return (rows || []).filter((r) => {
     const v = r?.[dateField]
     if (!v) return false
-    const t = new Date(v as string).getTime()
-    return Number.isFinite(t) && t >= yearStart
+    const d = parseDateOnly(v as string)
+    return d != null && d.getTime() >= yearStart
   })
 }
 
-// Profit YTD = sum of (amount - cost) for won jobs whose updated_at
-// falls in this calendar year. Falls back to amount when cost is null.
-export function profitYTD(jobs: JobRow[] | null | undefined, now = new Date()) {
-  const wonThisYear = filterYTD(jobs as Record<string, unknown>[], 'updated_at', now).filter((j) => WON_STAGES.has((j.stage as string) || ''))
-  return wonThisYear.reduce((s, j) => {
+// Resolve when each contact was WON: the first transition into a won
+// stage from the audit log (migration 023). Jobs edited later keep
+// their true win date — filtering by updated_at re-booked a $50K job
+// closed last year into this year's totals whenever a typo was fixed.
+function wonAtByContact(transitions: TransitionRow[] | null | undefined) {
+  const m = new Map<string, number>()
+  for (const t of transitions || []) {
+    if (!WON_STAGES.has(t.to_stage)) continue
+    const at = new Date(t.transitioned_at).getTime()
+    if (!Number.isFinite(at)) continue
+    const prev = m.get(t.contact_id)
+    if (prev == null || at < prev) m.set(t.contact_id, at)
+  }
+  return m
+}
+
+// Filter won jobs to those won this calendar year. Uses the transition
+// log when the job appears in it; falls back to updated_at for legacy
+// jobs that predate the audit log.
+function wonThisYear(jobs: JobRow[] | null | undefined, transitions: TransitionRow[] | null | undefined, now: Date) {
+  const yearStart = new Date(now.getFullYear(), 0, 1).getTime()
+  const wonAt = wonAtByContact(transitions)
+  return (jobs || []).filter((j) => {
+    if (!WON_STAGES.has(j.stage || '')) return false
+    const anchor = (j.id ? wonAt.get(j.id) : undefined) ?? parseDateOnly(j.updated_at)?.getTime() ?? NaN
+    return Number.isFinite(anchor) && anchor >= yearStart
+  })
+}
+
+// Profit YTD = sum of (amount - cost) for jobs won this calendar year.
+// Losses subtract — clamping each job at 0 overstated profit by hiding
+// every over-budget job. A job with no cost recorded still counts its
+// full amount (cost 0 is indistinguishable from "not tracked" here;
+// Analytics' avg-margin note covers that caveat).
+export function profitYTD(jobs: JobRow[] | null | undefined, transitions: TransitionRow[] | null | undefined = null, now = new Date()) {
+  return wonThisYear(jobs, transitions, now).reduce((s, j) => {
     const amount = Number(j.amount || 0)
     const cost = Number(j.cost || 0)
-    return s + Math.max(0, amount - cost)
+    return s + (amount - cost)
   }, 0)
 }
 
 // Won YTD = sum of amount for jobs that hit a won stage this year.
-export function wonYTD(jobs: JobRow[] | null | undefined, now = new Date()) {
-  const wonThisYear = filterYTD(jobs as Record<string, unknown>[], 'updated_at', now).filter((j) => WON_STAGES.has((j.stage as string) || ''))
-  return wonThisYear.reduce((s, j) => s + Number(j.amount || 0), 0)
+export function wonYTD(jobs: JobRow[] | null | undefined, transitions: TransitionRow[] | null | undefined = null, now = new Date()) {
+  return wonThisYear(jobs, transitions, now).reduce((s, j) => s + Number(j.amount || 0), 0)
 }
 
 // Close rate = won / (won + lost) over jobs that have hit a terminal
@@ -210,6 +287,10 @@ export function computeFunnel(
   const quotedSet = new Set<string>()
   const wonSet = new Set<string>()
   const lostSet = new Set<string>()
+  // Per contact: the LATEST decision (won/lost) inside the window wins.
+  // Counting a contact in both sets (lost in May, reopened and won in
+  // June) double-counted it in winRate's denominator.
+  const latestDecision = new Map<string, { stage: 'job' | 'lost'; at: number }>()
   // Per contact: first quote time + first decision (won/lost) AFTER it.
   const firstQuote = new Map<string, number>()
   const firstDecisionAfterQuote = new Map<string, number>()
@@ -221,13 +302,19 @@ export function computeFunnel(
     if (t.to_stage === 'quote') {
       if (inWindow) quotedSet.add(t.contact_id)
       if (!firstQuote.has(t.contact_id)) firstQuote.set(t.contact_id, at.getTime())
-    } else if (t.to_stage === 'job') {
-      if (inWindow) wonSet.add(t.contact_id)
-      noteDecision(t.contact_id, at.getTime())
-    } else if (t.to_stage === 'lost') {
-      if (inWindow) lostSet.add(t.contact_id)
+    } else if (t.to_stage === 'job' || t.to_stage === 'lost') {
+      if (inWindow) {
+        const prev = latestDecision.get(t.contact_id)
+        if (!prev || at.getTime() >= prev.at) {
+          latestDecision.set(t.contact_id, { stage: t.to_stage, at: at.getTime() })
+        }
+      }
       noteDecision(t.contact_id, at.getTime())
     }
+  }
+  for (const [id, d] of latestDecision) {
+    if (d.stage === 'job') wonSet.add(id)
+    else lostSet.add(id)
   }
 
   function noteDecision(id: string, time: number) {

@@ -5,11 +5,13 @@
 // manager with several buildings) who want a single "here's everything
 // I owe you" document instead of one invoice per job.
 //
-// "Owed" = contract amount − payments, per property. This is the SAME
-// definition used on the Invoices screen and ClientDetail's
-// "outstanding" metric, so the statement always agrees with what the
-// app shows elsewhere (and never comes back empty for a contractor who
-// tracks balances by contract/paid rather than discrete invoice rows).
+// "Owed" = (contract amount + approved change orders) − payments, per
+// property, over billing stages job/invoice/closed. This is the SAME
+// definition used on the Invoices screen and in rollups.ts (Clients
+// list + ClientDetail "outstanding"), so the statement always agrees
+// with what the app shows elsewhere (and never comes back empty for a
+// contractor who tracks balances by contract/paid rather than discrete
+// invoice rows).
 //
 // gatherStatement is a PURE function over jobs + payments the caller
 // already has — no DB round-trip, trivially unit-testable.

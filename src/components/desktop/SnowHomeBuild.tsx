@@ -252,7 +252,9 @@ export default function SnowHomeBuild(props: Props) {
             <MiniMetric label="Crews on site" value={todayOnSite == null ? '—' : String(todayOnSite.length)} />
             <MiniMetric label="Reports missing" value="—" />
             <MiniMetric label="Client follow-ups" value={nextActions == null ? '—' : String(nextActions.length)} />
-            <MiniMetric label="Ready to invoice" value={invoicingWeek == null ? '—' : money(invoicingWeek)} />
+            {/* invoicingWeek is money COLLECTED since Sunday — labeling it
+                "Ready to invoice" claimed already-received cash was billable. */}
+            <MiniMetric label="Collected this week" value={invoicingWeek == null ? '—' : money(invoicingWeek)} />
           </div>
         </section>
 
@@ -565,7 +567,7 @@ function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
           → "Estimates needing action". Other titles already matched. */}
       <RailMetric title="Goals at risk" value={dealsValue} sub={dealsSub} chart="red" />
       <RailMetric title="Jobs behind" value={jobsBehindValue} sub={jobsBehindSub} chart="gold" />
-      <RailMetric title="Invoicing this week" value={invoicingValue} sub={invoicingSub} />
+      <RailMetric title="Collected this week" value={invoicingValue} sub={invoicingSub} />
       <RailMetric title="Follow-ups due" value={followUpsValue} sub={followUpsSub} />
       <RailMetric title="Estimates needing action" value={quotesValue} sub={quotesSub} />
     </aside>

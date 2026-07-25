@@ -21,6 +21,7 @@ import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
 import StatementSheet from '../components/StatementSheet.tsx'
 import { gatherStatement } from '../lib/statement.ts'
+import { rollupJobs } from '../lib/rollups.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
 
 function money(n: any) {
@@ -72,31 +73,17 @@ export default function ClientDetail() {
   // Statement sheet — roll all open invoices into one document.
   const [statementOpen, setStatementOpen] = useState(false)
 
-  // Derived metrics — computed from jobs[] + payments[].
-  // Lifetime: sum of every job amount under this client, all stages.
-  // Outstanding: sum of (amount - paid) for jobs in billing pipeline
-  // (job + invoice stages). Closed/lost jobs drop out automatically.
-  const lifetime = useMemo(
-    () => (jobs || []).reduce((s, j) => s + Number(j.amount || 0), 0),
-    [jobs]
+  // Derived metrics — the shared rollup, NOT an inline copy. The inline
+  // version this replaced excluded closed jobs and approved change
+  // orders from "outstanding", so this screen's tile could say $0 while
+  // the statement button right below it billed the client $2,000.
+  const rollup = useMemo(
+    () => rollupJobs(jobs as any, payments as any, changeOrders as any),
+    [jobs, payments, changeOrders]
   )
-  const outstanding = useMemo(() => {
-    const paidByJob = new Map()
-    for (const p of payments || []) {
-      if (!p.contact_id) continue
-      paidByJob.set(p.contact_id, (paidByJob.get(p.contact_id) || 0) + Number(p.amount || 0))
-    }
-    return (jobs || [])
-      .filter((j) => j.stage === 'job' || j.stage === 'invoice')
-      .reduce((s, j) => {
-        const bal = Number(j.amount || 0) - (paidByJob.get(j.id) || 0)
-        return s + Math.max(0, bal)
-      }, 0)
-  }, [jobs, payments])
-  const activeCount = useMemo(
-    () => (jobs || []).filter((j) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage as string)).length,
-    [jobs]
-  )
+  const lifetime = rollup.lifetime
+  const outstanding = rollup.outstanding
+  const activeCount = rollup.activeCount
 
   // Statement rollup — the SAME computation the StatementSheet/PDF use,
   // so the "Statement · $X across N properties" button always agrees

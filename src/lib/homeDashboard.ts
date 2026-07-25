@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { ACTIVE_STAGES } from './stages.ts'
 import { fetchCoverPhotosByJob } from './photos.ts'
+import { fetchAllRows } from './queries.ts'
 import type { Database } from './database.types.ts'
 
 // Local-calendar YYYY-MM-DD (NOT UTC) so evening follow-ups don't read
@@ -28,7 +29,12 @@ type ScheduleWithContact = ScheduleRow & {
 
 type PaymentRow = Pick<
   Database['public']['Tables']['fh_payments']['Row'],
-  'contact_id' | 'amount' | 'created_at'
+  'contact_id' | 'amount' | 'created_at' | 'paid_on'
+>
+
+type ApprovedCoRow = Pick<
+  Database['public']['Tables']['fh_change_orders']['Row'],
+  'contact_id' | 'amount' | 'status'
 >
 
 type PublicLinkRow = Pick<
@@ -152,12 +158,15 @@ export type HomeDashboardSource = {
   now: Date
   contacts: ContactRow[]
   overdueSchedules: Pick<ScheduleRow, 'contact_id'>[]
+  // ALL payments for the scope, not just this week's — paid state,
+  // "chase invoice", and job-health outstanding need full history.
   payments: PaymentRow[]
   todaySchedules: ScheduleWithContact[]
   photoUrlByJob: Record<string, string>
   proposalViews: PublicLinkRow[]
   sentChangeOrders: ChangeOrderRow[]
   openInvoices: InvoiceRow[]
+  approvedChangeOrders: ApprovedCoRow[]
 }
 
 export const homeDashboardKey = (userId: string | undefined, orgId?: string | null) =>
@@ -211,9 +220,37 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
 
   const overdueContactIds = new Set(source.overdueSchedules.map((row) => row.contact_id).filter(Boolean) as string[])
   const behind = contacts.filter((contact) => contact.stage === 'job' && overdueContactIds.has(contact.id))
-  const weekTotal = source.payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
 
-  const paidContactIds = new Set(source.payments.map((payment) => payment.contact_id).filter(Boolean) as string[])
+  // All-time paid per contact. The dashboard used to fetch ONLY this
+  // week's payments and treat them as all payments — so a job paid in
+  // full last month read "Chase invoice · $25,000 owed" and Job Health
+  // showed "Outstanding" until a payment happened to land inside the
+  // current calendar week.
+  const payByContact = new Map<string, number>()
+  for (const payment of source.payments) {
+    if (!payment.contact_id) continue
+    payByContact.set(payment.contact_id, (payByContact.get(payment.contact_id) || 0) + Number(payment.amount || 0))
+  }
+  const coByContact = new Map<string, number>()
+  for (const co of source.approvedChangeOrders) {
+    if (co?.status !== 'approved' || !co.contact_id) continue
+    coByContact.set(co.contact_id, (coByContact.get(co.contact_id) || 0) + Number(co.amount || 0))
+  }
+  const balanceFor = (contact: ContactRow) => {
+    const contract = Number(contact.amount || 0) + (coByContact.get(contact.id) || 0)
+    return contract - (payByContact.get(contact.id) || 0)
+  }
+
+  // Collected this week — keyed on paid_on (the date the money actually
+  // arrived), falling back to created_at for legacy rows without one.
+  const weekStartMs = startOfWeek(now).getTime()
+  const weekTotal = source.payments.reduce((sum, payment) => {
+    const paidOn = payment.paid_on
+      ? new Date(`${String(payment.paid_on).slice(0, 10)}T12:00:00`).getTime()
+      : new Date(payment.created_at || 0).getTime()
+    return Number.isFinite(paidOn) && paidOn >= weekStartMs ? sum + Number(payment.amount || 0) : sum
+  }, 0)
+
   const actions: HomeNextAction[] = []
 
   for (const contact of risky) {
@@ -261,7 +298,11 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
 
   for (const contact of contacts) {
     const awaitingPayment = contact.stage === 'invoice' || (contact.stage === 'job' && contact.completed_at)
-    if (!awaitingPayment || paidContactIds.has(contact.id)) continue
+    if (!awaitingPayment) continue
+    // Only chase money that's actually owed — a fully (or over-) paid
+    // job is done, no matter when its payments landed.
+    const owed = balanceFor(contact)
+    if (owed <= 0.5) continue
     const updated = new Date(contact.updated_at || contact.created_at || 0)
     if (updated > fiveDaysAgo) continue
     actions.push({
@@ -270,11 +311,13 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       contactId: contact.id,
       verb: 'Chase invoice',
       contactName: contact.name || 'Unnamed job',
-      contactAmount: Number(contact.amount || 0),
+      contactAmount: owed,
       dueIso: updated.toISOString(),
       dueKind: 'invoiced',
       title: `Chase invoice for ${contact.name || 'job'}`,
-      detail: Number(contact.amount) > 0 ? `$${Number(contact.amount).toLocaleString()} owed` : 'Awaiting payment',
+      // The remaining balance, not the full contract — a $25K job with
+      // $20K collected is owed $5K, and that's the number to chase.
+      detail: `$${Math.round(owed).toLocaleString()} owed`,
       urgencyLabel: 'Invoice pending',
       urgencyTone: 'success',
       urgency: updated.getTime(),
@@ -441,12 +484,6 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       updatedAt: contact.updated_at || contact.created_at || null,
     }))
 
-  const payByContact = new Map<string, number>()
-  for (const payment of source.payments) {
-    if (!payment.contact_id) continue
-    payByContact.set(payment.contact_id, (payByContact.get(payment.contact_id) || 0) + Number(payment.amount || 0))
-  }
-
   const jobHealth = contacts
     .filter((contact) => contact.stage === 'job' || contact.stage === 'invoice')
     .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
@@ -454,36 +491,37 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     .map((contact) => {
       const isBehind = overdueContactIds.has(contact.id)
       const scheduleTone: DashboardTone = isBehind ? 'bad' : 'good'
-      const amount = Number(contact.amount || 0)
-      const paid = payByContact.get(contact.id) || 0
-      const outstanding = amount > 0 ? amount - paid : 0
+      const amount = Number(contact.amount || 0) + (coByContact.get(contact.id) || 0)
+      const outstanding = amount > 0 ? balanceFor(contact) : 0
       const workDone = !!contact.completed_at || contact.stage === 'invoice'
+      // Same "real balance" threshold as rollups/statements — sub-50¢
+      // dust never drives a warning.
+      const owes = outstanding > 0.5
       const billingTone: DashboardTone =
-        workDone && outstanding > 0 ? 'warn'
+        workDone && owes ? 'warn'
         : amount === 0 ? 'warn'
-        : amount > 0 && outstanding <= 0 ? 'good'
         : 'good'
       const tones = [scheduleTone, billingTone]
       const riskTone: DashboardTone = tones.includes('bad') ? 'bad' : tones.includes('warn') ? 'warn' : 'good'
       return {
         id: contact.id,
         job: contact.name || 'Untitled',
-        stage: workDone && outstanding > 0 ? 'Invoicing' : 'Active',
+        stage: workDone && owes ? 'Invoicing' : 'Active',
         schedule: isBehind ? 'Behind' : 'On track',
         scheduleTone,
         report: '-',
         reportTone: 'neutral' as DashboardTone,
         billing:
-          workDone && outstanding > 0 ? 'Outstanding'
+          workDone && owes ? 'Outstanding'
           : amount === 0 ? 'Not set'
-          : outstanding > 0 ? 'In progress'
+          : owes ? 'In progress'
           : 'Paid',
         billingTone,
         risk: riskTone === 'bad' ? 'High' : riskTone === 'warn' ? 'Medium' : 'Low',
         riskTone,
         next:
           isBehind ? 'Reschedule + update client'
-          : workDone && outstanding > 0 ? 'Send the final invoice'
+          : workDone && owes ? 'Send the final invoice'
           : workDone ? 'Close out the job'
           : 'Keep crew moving',
       }
@@ -523,7 +561,6 @@ export async function fetchHomeDashboard(
 ): Promise<HomeDashboardBundle> {
   const fourteenDaysAgo = new Date(now)
   fourteenDaysAgo.setDate(now.getDate() - 14)
-  const weekStart = startOfWeek(now)
   const todayStart = new Date(now)
   todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart)
@@ -536,11 +573,24 @@ export async function fetchHomeDashboard(
     .lt('end_at', now.toISOString())
     .gte('end_at', fourteenDaysAgo.toISOString())
 
-  const paymentsQuery = (orgId
-    ? supabase.from('fh_payments').select('contact_id, amount, created_at').eq('org_id', orgId)
-    : supabase.from('fh_payments').select('contact_id, amount, created_at').eq('user_id', userId)
+  // ALL payments for the scope, paged past PostgREST's 1000-row cap.
+  // A week-scoped fetch here made every downstream consumer treat
+  // "payments since Sunday" as "all payments ever" — wrong paid state
+  // on every job paid before this week.
+  const paymentsPromise = fetchAllRows<PaymentRow>((from, to) =>
+    (orgId
+      ? supabase.from('fh_payments').select('contact_id, amount, created_at, paid_on').eq('org_id', orgId)
+      : supabase.from('fh_payments').select('contact_id, amount, created_at, paid_on').eq('user_id', userId)
+    )
+      .order('id', { ascending: true })
+      .range(from, to)
   )
-    .gte('created_at', weekStart.toISOString())
+
+  const approvedCoQuery = (orgId
+    ? supabase.from('fh_change_orders').select('contact_id, amount, status').eq('org_id', orgId)
+    : supabase.from('fh_change_orders').select('contact_id, amount, status').eq('user_id', userId)
+  )
+    .eq('status', 'approved')
 
   const todayScheduleQuery = (orgId
     ? supabase.from('fh_schedule').select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)').eq('org_id', orgId)
@@ -573,12 +623,13 @@ export async function fetchHomeDashboard(
   const [
     contactsRes,
     overdueSchedRes,
-    paymentsRes,
+    payments,
     todaySchedRes,
     photoUrlByJob,
     proposalViewsRes,
     sentChangeOrdersRes,
     openInvoicesRes,
+    approvedCoRes,
   ] = await Promise.all([
     // Scope contacts the same way as every sibling query (org, else user).
     // Left unscoped this pulled the whole RLS-visible table to the phone AND
@@ -589,32 +640,34 @@ export async function fetchHomeDashboard(
       : supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status').eq('user_id', userId)
     ),
     overdueScheduleQuery,
-    paymentsQuery,
+    paymentsPromise,
     todayScheduleQuery,
     fetchCoverPhotosByJob(userId).catch(() => ({} as Record<string, string>)),
     proposalViewsQuery,
     sentChangeOrdersQuery,
     openInvoicesQuery,
+    approvedCoQuery,
   ])
 
   assertOk('contacts', contactsRes)
   assertOk('overdue schedule', overdueSchedRes)
-  assertOk('payments', paymentsRes)
   assertOk('today schedule', todaySchedRes)
   assertOk('proposal views', proposalViewsRes)
   assertOk('sent change orders', sentChangeOrdersRes)
   assertOk('open invoices', openInvoicesRes)
+  assertOk('approved change orders', approvedCoRes)
 
   return buildHomeDashboardBundle({
     now,
     contacts: (contactsRes.data ?? []) as ContactRow[],
     overdueSchedules: (overdueSchedRes.data ?? []) as Pick<ScheduleRow, 'contact_id'>[],
-    payments: (paymentsRes.data ?? []) as PaymentRow[],
+    payments,
     todaySchedules: (todaySchedRes.data ?? []) as unknown as ScheduleWithContact[],
     photoUrlByJob: photoUrlByJob || {},
     proposalViews: (proposalViewsRes.data ?? []) as PublicLinkRow[],
     sentChangeOrders: (sentChangeOrdersRes.data ?? []) as ChangeOrderRow[],
     openInvoices: (openInvoicesRes.data ?? []) as InvoiceRow[],
+    approvedChangeOrders: (approvedCoRes.data ?? []) as ApprovedCoRow[],
   })
 }
 
