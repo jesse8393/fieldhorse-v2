@@ -286,12 +286,12 @@ export default function Home() {
             margin: '4px 0 0',
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(24px, 7vw, 32px)',
-            lineHeight: 1.05,
+            lineHeight: 1.1,
             letterSpacing: '0.01em',
             color: 'var(--v3-text)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            /* Wraps to two lines on narrow phones — never truncate the
+               user's own name ("Good afternoon, Cl…" read as broken). */
+            overflowWrap: 'anywhere'
           }}>
             {greetingPrefix().replace(',', '')},{' '}
             <span style={{
