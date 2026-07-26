@@ -160,3 +160,63 @@
 .fh-build-rail-cta:hover {
   background: color-mix(in srgb, var(--v3-primary) 20%, transparent);
 }
+
+/* ---- Cold load skeletons (Build dashboard, July 26 evening pass) ----
+   During the first seconds after sign in the dashboard used to print
+   em dash placeholders and "Loading" strings, and the three tables
+   printed their EMPTY states ("No actions queued, you are caught up")
+   while data was still in flight. These shimmer blocks replace all of
+   that: gray pulses read as "loading", never as a confident zero. */
+@keyframes fhSkelShimmer {
+  0%   { background-position: 160% 0; }
+  100% { background-position: -60% 0; }
+}
+.fh-build-skel {
+  display: inline-block;
+  height: 12px;
+  width: 72px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: fhSkelShimmer 1.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+.fh-build-skel--money  { height: 34px; width: 190px; border-radius: 10px; }
+.fh-build-skel--stat   { height: 20px; width: 40px;  border-radius: 7px;  }
+.fh-build-skel--metric { height: 16px; width: 64px;  border-radius: 6px;  }
+.fh-build-skel--sub    { height: 10px; width: 84px;  }
+.fh-build-skel--chip   { height: 24px; width: 96px;  border-radius: 999px; }
+.fh-build-skel--line   { height: 11px; width: 60%;   }
+@media (prefers-reduced-motion: reduce) {
+  .fh-build-skel { animation: none; opacity: 0.6; }
+}
+
+/* Loading tile for the Lead to cash stage strip. Mirrors the real
+   .fh-crm-flow__stages button shell (border, radius, padding) but is
+   inert and carries shimmer bars instead of $0 / 0 deals. */
+.fh-crm-flow__stage-skel {
+  min-width: 0;
+  border: 1px solid var(--v3-border-mid);
+  background:
+    linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint)),
+    var(--v3-glass-tint);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.fh-crm-flow__stage-skel > span {
+  display: block;
+  color: var(--v3-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
