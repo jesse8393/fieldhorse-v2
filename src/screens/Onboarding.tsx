@@ -233,9 +233,16 @@ export default function Onboarding() {
     // Membership context fetched before the org existed — refresh it so
     // Home sees the new owner role instead of bouncing to /sub-portal.
     await refreshMembership()
+    // Persist trade LABELS ('Concrete'), not the picker's internal keys
+    // ('concrete') — Settings and every other reader canonicalize
+    // against the label vocabulary, so key-cased values were silently
+    // dropped and Settings showed 0 services after onboarding picked 2.
+    const serviceLabels = services.map(
+      (k: any) => SERVICES.find((s) => s.key === k)?.label || k
+    )
     const { error: profErr } = await upsertProfile({
       company_name: companyName.trim(),
-      services,
+      services: serviceLabels,
       location_lat: coords?.lat ?? null,
       location_lon: coords?.lon ?? null,
       onboarded_at: new Date().toISOString()
@@ -285,12 +292,17 @@ export default function Onboarding() {
         <p className="fh-onb__lede">
           Three things to lock in before the work day starts.
         </p>
+        {/* Plain words, not cockpit jargon — "COORDS PENDING · NO LOCK ·
+            NEW OPERATOR" read like a video game to a contractor filling
+            out a signup form. */}
         <p className="fh-hero-coord">
-          {coords ? `${coords.lat.toFixed(4)}° N` : 'COORDS PENDING'}
+          {coords
+            ? `${coords.lat.toFixed(4)}° N`
+            : 'LOCATION NOT SET'}
           <span className="fh-hero-coord__dot">·</span>
-          {coords ? `${coords.lon.toFixed(4)}° W` : 'NO LOCK'}
+          {coords ? `${coords.lon.toFixed(4)}° W` : 'OPTIONAL'}
           <span className="fh-hero-coord__dot">·</span>
-          {(companyName || 'NEW OPERATOR').toUpperCase()}
+          {(companyName || 'YOUR COMPANY').toUpperCase()}
         </p>
       </section>
 
