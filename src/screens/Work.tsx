@@ -126,20 +126,32 @@ export default function Work() {
 
   // Deep links: ?stage=<chip> selects a chip; ?new=1 opens the create
   // sheet (optionally ?asStage=job from Home's "New Job" tile).
+  // ?stage stays IN the URL so the active filter survives refresh and
+  // is shareable/bookmarkable (UI audit #30) — only the one-shot
+  // new/asStage params are consumed.
   useEffect(() => {
     const requested = searchParams.get('stage')
     const wantsNew = searchParams.get('new') === '1'
     const asStage = searchParams.get('asStage')
-    if (!requested && !wantsNew) return
     if (requested && CHIPS.some((c) => c.id === requested)) setChip(requested as ChipId)
+    if (!requested) setChip('all')
     if (wantsNew) {
       setAddStage(asStage === 'job' ? 'job' : asStage === 'quote' ? 'quote' : 'lead')
       setAddOpen(true)
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('new'); sp.delete('asStage')
+      setSearchParams(sp, { replace: true })
     }
-    const sp = new URLSearchParams(searchParams)
-    sp.delete('stage'); sp.delete('new'); sp.delete('asStage')
-    setSearchParams(sp, { replace: true })
   }, [searchParams, setSearchParams])
+
+  // Chip clicks write the URL; the effect above syncs state from it.
+  const selectChip = (id: ChipId) => {
+    const sp = new URLSearchParams(searchParams)
+    if (id === 'all') sp.delete('stage')
+    else sp.set('stage', id)
+    setSearchParams(sp, { replace: true })
+    setChip(id)
+  }
 
   // Money roles see the full lifecycle; field roles see only the work
   // they're on (Active/Done). 'all' stays for both but, for field roles,
@@ -386,7 +398,7 @@ export default function Work() {
               active={effectiveChip === c.id}
               count={chipCounts[c.id]}
               ariaLabel={`Show ${c.label.toLowerCase()}`}
-              onClick={() => { hapticTap(); setChip(c.id) }}
+              onClick={() => { hapticTap(); selectChip(c.id) }}
             >
               {c.label}
             </FilterPill>

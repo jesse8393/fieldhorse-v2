@@ -7,7 +7,7 @@
 // courtesy.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, Check, CheckCheck, ChevronRight, Search, AlertTriangle } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { orgPunchApprove, orgPunchFlag, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
@@ -59,8 +59,16 @@ export default function Timesheets() {
   const [error, setError] = useState<string | null>(null)
   const [punches, setPunches] = useState<PendingPunch[]>([])
   const [approving, setApproving] = useState<Record<string, boolean>>({})
-  // Filter window: 'all' or 'thisWeek' (Mon–now)
-  const [windowMode, setWindowMode] = useState<'all' | 'thisWeek'>('thisWeek')
+  // Filter window in the URL (?window=) so it survives refresh and is
+  // shareable (UI audit #30). 'all' or 'thisWeek' (Mon–now).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const windowMode: 'all' | 'thisWeek' = searchParams.get('window') === 'all' ? 'all' : 'thisWeek'
+  const setWindowMode = (next: 'all' | 'thisWeek') => {
+    const sp = new URLSearchParams(searchParams)
+    if (next === 'thisWeek') sp.delete('window')
+    else sp.set('window', next)
+    setSearchParams(sp, { replace: true })
+  }
 
   const load = useCallback(async () => {
     setLoading(true)

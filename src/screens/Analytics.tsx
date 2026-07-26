@@ -183,9 +183,13 @@ export default function Analytics() {
       const t = new Date(c.completed_at || c.updated_at || c.created_at || 0).getTime()
       return (Number.isFinite(t) && t >= yearStart) ? s + Number(c.amount || 0) : s
     }, 0)
-    const invoiced = invoicedFromInvoices > 0
-      ? invoicedFromInvoices
-      : (invoicedFromContacts > 0 ? invoicedFromContacts : null)
+    // Take the LARGER of the two estimates: an operator who logs
+    // payments but rarely creates fh_invoices rows would otherwise
+    // read "Invoiced YTD $2K" next to "Collected YTD $101K" — an
+    // impossibility the UI audit flagged (#11). Billed work is at
+    // least what the contact-level records show.
+    const invoicedBest = Math.max(invoicedFromInvoices, invoicedFromContacts)
+    const invoiced = invoicedBest > 0 ? invoicedBest : null
     const collected = payments.length === 0
       ? null
       : payments.reduce((s, p) => {

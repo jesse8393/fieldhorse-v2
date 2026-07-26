@@ -249,9 +249,12 @@ export default function SnowHomeBuild(props: Props) {
           <FocusCard onGoToSchedule={onGoToSchedule} />
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Crews on site" value={todayOnSite == null ? '—' : String(todayOnSite.length)} />
+            {/* Labels match what the numbers actually measure — "Crews
+                on site" here vs "Crews active" on Schedule disagreed
+                because both were mislabeled (UI audit #11/#28). */}
+            <MiniMetric label="On site today" value={todayOnSite == null ? '—' : String(todayOnSite.length)} />
             <MiniMetric label="Reports missing" value="—" />
-            <MiniMetric label="Client follow-ups" value={nextActions == null ? '—' : String(nextActions.length)} />
+            <MiniMetric label="Queued actions" value={nextActions == null ? '—' : String(nextActions.length)} />
             {/* invoicingWeek is money COLLECTED since Sunday — labeling it
                 "Ready to invoice" claimed already-received cash was billable. */}
             <MiniMetric label="Collected this week" value={invoicingWeek == null ? '—' : money(invoicingWeek)} />

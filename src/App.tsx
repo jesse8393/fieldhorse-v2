@@ -11,6 +11,7 @@ import AppShell from './components/AppShell.tsx'
 //   Home: the post-auth landing screen; lazy here would flash a spinner
 //         on every cold app open, defeats premium feel
 import Home from './screens/Home.tsx'
+import NotFound from './screens/NotFound.tsx'
 import Login from './screens/Login.tsx'
 
 // Lazy — every other route. Each becomes its own chunk.
@@ -228,8 +229,10 @@ export default function App() {
               beat the silent catch-all bounce to Home. (/leads is a
               real route now — pipeline v2.) */}
           <Route path="/templates" element={<Navigate to={{ pathname: '/settings', hash: '#templates' }} replace />} />
+          {/* Real 404 inside the shell — the old silent bounce to Home
+              gave a mistyped/stale link no error signal (UI audit #7). */}
+          <Route path="*" element={<NotFound />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
   )

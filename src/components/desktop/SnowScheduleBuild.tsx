@@ -16,6 +16,7 @@ import {
   Search,
 } from 'lucide-react'
 import MiniMetric from '../MiniMetric.tsx'
+import TopbarWeather from './TopbarWeather.tsx'
 
 type EventRow = {
   id: string
@@ -24,6 +25,7 @@ type EventRow = {
   end_at?: string | null
   location?: string | null
   notes?: string | null
+  contact_id?: string | null
 }
 
 type ScheduleView = 'day' | 'week' | 'month'
@@ -147,7 +149,7 @@ export default function SnowScheduleBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{rangeLabel}</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <TopbarWeather />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onAddEvent}>
@@ -202,10 +204,16 @@ export default function SnowScheduleBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid">
+            {/* "Crews active · 4" and "Conflicts · 0" were HARDCODED
+                numbers — Home simultaneously said 0 crews on site (UI
+                audit #11). Show only metrics computed from real data. */}
             <MiniMetric label="On site today" value={String(todayCount)} accent />
             <MiniMetric label="This week" value={String(weekCount)} />
-            <MiniMetric label="Crews active" value="4" />
-            <MiniMetric label="Conflicts" value="0" />
+            <MiniMetric
+              label="Jobs scheduled today"
+              value={String(new Set(events.filter((e) => e.start_at && e.contact_id && sameDay(new Date(e.start_at), new Date())).map((e) => e.contact_id)).size)}
+            />
+            <MiniMetric label="View" value={view === 'day' ? 'Day' : view === 'week' ? 'Week' : 'Month'} />
           </div>
         </section>
 

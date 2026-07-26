@@ -199,7 +199,16 @@ export default function SnowJobDetailBuild(props: Props) {
                 />
                 <MiniMetric
                   label="Last touch"
-                  value={relDate(contact?.last_contact || contact?.updated_at)}
+                  // Clamped to the record's creation — imported rows can
+                  // carry a last_contact BEFORE the job existed, which
+                  // read as "last touch predates creation" next to the
+                  // activity log (UI audit #11).
+                  value={relDate((() => {
+                    const touch = new Date(contact?.last_contact || contact?.updated_at || 0).getTime()
+                    const created = new Date(contact?.created_at || 0).getTime()
+                    const anchor = Math.max(touch || 0, created || 0)
+                    return anchor > 0 ? new Date(anchor).toISOString() : null
+                  })())}
                 />
                 <MiniMetric label="Stage" value={stageLabel} />
               </>
