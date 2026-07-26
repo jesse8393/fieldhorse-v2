@@ -39,7 +39,7 @@ const PRIMARY: { to: string; label: string; icon: string; end?: boolean; match?:
    useMembership().canViewRoute(path), same pattern the desktop
    sidebar uses. Groups with zero visible items disappear. */
 type DrawerItem = { to: string; label: string; Icon: any }
-type DrawerGroup = { label: string; items: DrawerItem[] }
+type DrawerGroup = { label: string; items: DrawerItem[]; crewOnly?: boolean }
 
 const NAV_GROUPS: DrawerGroup[] = [
   {
@@ -54,10 +54,19 @@ const NAV_GROUPS: DrawerGroup[] = [
       { to: '/work',        label: 'Work & Deals',        Icon: Briefcase },
       { to: '/schedule',    label: 'Schedule',            Icon: Calendar },
       { to: '/bid',         label: 'Estimates',           Icon: Calculator },
+      { to: '/pour-window', label: 'Forecast',            Icon: CloudSun }
+    ]
+  },
+  {
+    // Solo mode: crew screens only exist when the org has more than
+    // one active member (gated at render via membership.hasCrew).
+    label: 'Team',
+    crewOnly: true,
+    items: [
       { to: '/crew',        label: 'Crew Home',           Icon: PlayCircle },
       { to: '/tasks',       label: 'Tasks',               Icon: ClipboardCheck },
       { to: '/timesheets',  label: 'Timesheets',          Icon: Clock },
-      { to: '/pour-window', label: 'Forecast',            Icon: CloudSun }
+      { to: '/team',        label: 'Team',                Icon: UsersRound }
     ]
   },
   {
@@ -71,7 +80,6 @@ const NAV_GROUPS: DrawerGroup[] = [
     label: 'Office',
     items: [
       { to: '/clients',     label: 'Clients',             Icon: Users },
-      { to: '/team',        label: 'Team',                Icon: UsersRound },
       { to: '/subs',        label: 'Sub Directory',       Icon: Hammer },
       { to: '/partners',    label: 'Partners',            Icon: Users },
       { to: '/sub-portal',  label: 'Sub Portal',          Icon: Briefcase },
@@ -97,7 +105,7 @@ export default function BottomNav() {
   }, [location.pathname])
   const { signOut, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { canViewRoute, role, loading: membershipLoading } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading, hasCrew } = useMembership()
   const userEmail = user?.email || ''
 
   // Filter the More-drawer groups by the caller's role. Mirrors the
@@ -115,6 +123,10 @@ export default function BottomNav() {
     return path === '/sub-portal'
   }
   const visibleGroups = NAV_GROUPS
+    // Solo mode: the Team group only exists when the org actually has
+    // crew. Hidden while membership loads too, so a solo owner never
+    // sees crew nav flash and vanish.
+    .filter((g) => !g.crewOnly || hasCrew)
     .map((g) => ({ ...g, items: g.items.filter((it) => canSee(it.to)) }))
     .filter((g) => g.items.length > 0)
 
