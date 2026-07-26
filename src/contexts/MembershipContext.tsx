@@ -70,6 +70,12 @@ type MembershipContextValue = {
   role: OrgRole | null
   memberId: string | null
   joinedAt: string | null
+  // Active (non revoked) members in the picked org. Owners/admins/
+  // managers see the true count (org_members_financial_roles_read);
+  // crew RLS only returns their own row, so for them this reads 1,
+  // which is fine: hasCrew only drives owner-facing nav.
+  memberCount: number
+  hasCrew: boolean
   // refreshable
   refresh: () => Promise<void>
   // bound permission helpers (read role from context, no arg needed)
@@ -104,6 +110,8 @@ function emptyValue(loading: boolean, error: string | null): MembershipContextVa
     role: null,
     memberId: null,
     joinedAt: null,
+    memberCount: 0,
+    hasCrew: false,
     refresh: async () => {},
     isOwner: false,
     isAdmin: false,
@@ -128,6 +136,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [membership, setMembership] = useState<MembershipRow | null>(null)
   const [org, setOrg] = useState<OrgRow | null>(null)
+  const [memberCount, setMemberCount] = useState<number>(0)
   // Tracks the auth user a fetch was started for. An in-flight fetch for
   // user A can resolve after a fast sign-out→sign-in to user B; without
   // this guard the stale response would overwrite B's org/role. Mirrors
@@ -205,6 +214,16 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     }
 
     setOrg((orgQuery.data as OrgRow | null) || null)
+
+    // Step 3 — active member count for the picked org (drives the
+    // solo-mode nav: crew screens only appear when hasCrew).
+    const { count } = await supabase
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', picked.org_id)
+      .is('revoked_at', null)
+    if (activeUserIdRef.current !== user.id) return
+    setMemberCount(count ?? 1)
     setLoading(false)
   }, [user?.id])
 
@@ -214,6 +233,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     activeUserIdRef.current = user?.id ?? null
     setMembership(null)
     setOrg(null)
+    setMemberCount(0)
   }, [user?.id])
 
   useEffect(() => {
@@ -236,6 +256,8 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       role,
       memberId: membership?.id ?? null,
       joinedAt: membership?.joined_at ?? null,
+      memberCount,
+      hasCrew: memberCount > 1,
       refresh: fetchMembership,
       // bound helpers
       isOwner: isOwner(role),
@@ -253,7 +275,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       canDoFieldWork: canDoFieldWork(role),
       canViewRoute: (path: string) => canViewRoute(role, path),
     }
-  }, [user, loading, error, membership, org, fetchMembership])
+  }, [user, loading, error, membership, org, memberCount, fetchMembership])
 
   return <MembershipContext.Provider value={value}>{children}</MembershipContext.Provider>
 }
