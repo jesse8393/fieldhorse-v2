@@ -39,7 +39,13 @@
          cold visits. `crossorigin` matches the fetch credentials mode
          the Supabase client uses. -->
     <link rel="preconnect" href="https://pnmhblvslftdzfcdezbw.supabase.co" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- ASYNC font load. The plain stylesheet link was render-blocking:
+         if the fonts CDN is slow or unreachable (job sites, filtered
+         networks) the app sat on a black screen before React mounted.
+         media="print" + onload swap paints the app immediately with
+         system fallbacks and swaps the brand fonts in when they land. -->
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" /></noscript>
     <title>Fieldhorse</title>
   </head>
   <body>
