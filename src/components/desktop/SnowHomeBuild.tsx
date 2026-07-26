@@ -465,29 +465,11 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
 
       <p className="fh-build-pipeline__copy">{oppLabel}</p>
 
-      <div className="fh-build-stage-grid">
-        {rows.map((row: PipelineRailRow) => (
-          <button
-            key={row.label}
-            type="button"
-            data-stage={row.key}
-            onClick={(e) => {
-              e.stopPropagation()
-              openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)
-            }}
-          >
-            {/* Stage-key colored dot — sourced from CSS via the
-                data-stage attribute (audit M2). Previously the cell
-                had no dot at all; the mock shows a colored dot per
-                stage on the gold track. */}
-            <span className="fh-build-stage-grid__dot" aria-hidden="true" />
-            <span>{row.label}</span>
-            <strong>{row.amount}</strong>
-            <small>{row.count}</small>
-          </button>
-        ))}
-      </div>
-
+      {/* The per-stage tile grid was removed here (UI audit #14/#31/#32):
+          it duplicated the Pipeline-workflow strip rendered directly
+          above, nested five cards inside this card, and its stage dots
+          overlapped the neighboring tiles' deal counts. This card is
+          the money hero; the strip above is the per-stage breakdown. */}
       <div className="fh-build-stage-line">
         {rows.map((row: any) => (
           <span key={row.label} style={{ width: row.width }} />

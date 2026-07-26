@@ -241,7 +241,11 @@ export default function SnowJobDetailBuild(props: Props) {
             {!isExecution && (
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Deal</div>
-                <strong>{contact?.referred_by ? `via ${contact.referred_by}` : 'Source not set'}</strong>
+                {/* data-empty renders the missing-data fallback at quiet
+                    body scale instead of a 42px display headline. */}
+                {contact?.referred_by
+                  ? <strong>{`via ${contact.referred_by}`}</strong>
+                  : <strong data-empty>Source not set</strong>}
                 <span>
                   {contact?.phone || contact?.email
                     ? [contact?.phone, contact?.email].filter(Boolean).join(' · ')

@@ -409,7 +409,7 @@ export default function Tasks() {
                         {assigneeLabel}
                       </span>
                     )}
-                    <span className={b.key === 'overdue' ? 'fh-build-num' : 'fh-build-rel'} style={{ color: b.key === 'overdue' ? '#ee4942' : undefined, fontWeight: b.key === 'overdue' ? 700 : undefined }}>
+                    <span className={b.key === 'overdue' ? 'fh-build-num' : 'fh-build-rel'} style={{ color: b.key === 'overdue' ? 'var(--v3-danger-bright)' : undefined, fontWeight: b.key === 'overdue' ? 700 : undefined }}>
                       {t.due_at ? <><Calendar size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{fmtDue(t.due_at)}</> : '—'}
                     </span>
                     <span style={{ display: 'inline-flex', gap: 4 }}>

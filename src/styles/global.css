@@ -96,7 +96,9 @@ select:focus-visible,
 
   --font-display: 'Bebas Neue', 'Helvetica Neue', sans-serif;
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'Instrument Serif', Georgia, serif;
+  /* Two-family brand (DM Sans + Bebas Neue): the retired serif accent
+     maps to the body family (UI audit #37). */
+  --font-serif: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 
   --radius-xs: 0px;
   --radius-sm: 2px;
@@ -217,11 +219,10 @@ select:focus-visible,
   animation: fh-scan-line 3s ease-in-out infinite;
 }
 
+/* Brand rule: no gradient text. Solid brand gold instead — same accent,
+   no clipped-fill effect (UI audit #38). */
 .fh-text-gradient-gold {
-  background: linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-hot), var(--field-gold));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--field-gold-bright);
 }
 
 .fh-font-serif { font-family: var(--font-serif); }
@@ -739,11 +740,16 @@ select:focus-visible,
    ============================================================ */
 .jobs-title {
   margin: 0;
-  font-weight: 600;
-  font-size: 28px;
-  letter-spacing: -0.025em;
-  line-height: 1.0;
+  /* Matches the page-H1 scale every other screen uses (Bebas display,
+     36px, weight 400) — Work was the lone 28px/600 DM Sans H1, so the
+     type scale changed as you navigated (UI audit #42). */
+  font-family: var(--font-display, 'Bebas Neue', Impact, sans-serif);
+  font-weight: 400;
+  font-size: clamp(28px, 7vw, 36px);
+  letter-spacing: 0.01em;
+  line-height: 0.95;
   color: var(--v3-text);
+  text-transform: uppercase;
 }
 .jobs-stats {
   margin-top: 8px;
@@ -790,13 +796,9 @@ select:focus-visible,
   letter-spacing: 0.005em;
 }
 .gold-italic {
-  font-family: var(--font-serif);
   font-style: italic;
   font-weight: 400;
-  background: linear-gradient(95deg, #B17F1F 0%, #E6B14B 45%, var(--v3-primary) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--v3-primary);
   letter-spacing: -0.01em;
 }
 
@@ -866,6 +868,21 @@ select:focus-visible,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Icons inside flex rows must never be crushed to sub-pixel widths by
+   long siblings — the UI audit found delete/approve/flag buttons and
+   weather icons collapsed to 0.67px (invisible destructive controls,
+   audit #2). Lucide icons all carry explicit width/height attributes;
+   this simply stops flexbox from shrinking them below that. */
+svg {
+  flex-shrink: 0;
+}
+
+/* Overlays that lock body scroll used to drop the scrollbar and shift
+   the whole layout ~15px (audit #26). Reserve the gutter permanently. */
+html {
+  scrollbar-gutter: stable;
 }
 
 html,
@@ -3344,11 +3361,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border-color: var(--field-gold);
   box-shadow: var(--shadow-card);
 }
+/* Brand rule: no thick colored side stripes on cards (UI audit #17) —
+   stage is communicated by the pill badge alone. The ::before hook
+   stays (the just-added flash animation uses it) but renders no
+   permanent stripe. */
 .fh-card--stage::before {
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
-  width: 3px;
+  width: 0;
 }
 @keyframes fh-justadded-flash {
   0%   { background: var(--field-gold-bright); box-shadow: 0 0 16px color-mix(in srgb, var(--v3-primary) 60%, transparent); }
@@ -5518,10 +5539,25 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     display: block;
     margin-top: 12px;
     font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
-    font-size: 42px;
+    /* Below the 36px page H1 — at the old 42px, fallback strings like
+       "SOURCE NOT SET" were literally the biggest text on the page
+       (UI audit #18). */
+    font-size: 30px;
     line-height: .9;
     color: var(--v3-text);
     font-weight: 400;
+  }
+  /* Empty-state fallbacks render quietly at body scale, not as a
+     display-face hero (audit #18). Screens opt in by adding
+     data-empty to the metric value they'd otherwise shout. */
+  .fh-build-rail-card strong[data-empty],
+  .fh-build-focus strong[data-empty] {
+    font-family: var(--font-body, 'DM Sans', sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--v3-text-muted);
+    letter-spacing: 0.02em;
+    line-height: 1.3;
   }
 
   .fh-build-rail-card span {
@@ -5531,21 +5567,11 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     font-size: 12px;
   }
 
+  /* The old .fh-build-spark drew decorative gradient slashes that read
+     as (nonexistent) chart data — "two floating diagonal slashes" in
+     the UI audit (#22). No real data feeds it, so it renders nothing. */
   .fh-build-spark {
-    height: 32px;
-    margin-top: 12px;
-    border-bottom: 1px solid currentColor;
-    opacity: .75;
-  }
-
-  .fh-build-spark.is-red {
-    color: var(--v3-danger-bright);
-    background: linear-gradient(135deg, transparent 20%, color-mix(in srgb, var(--v3-danger-bright) 25%, transparent) 20% 24%, transparent 24% 42%, color-mix(in srgb, var(--v3-danger-bright) 35%, transparent) 42% 46%, transparent 46%);
-  }
-
-  .fh-build-spark.is-gold {
-    color: var(--v3-primary, #c9963a);
-    background: linear-gradient(135deg, transparent 20%, color-mix(in srgb, var(--v3-primary) 20%, transparent) 20% 24%, transparent 24% 42%, color-mix(in srgb, var(--v3-primary) 35%, transparent) 42% 46%, transparent 46%);
+    display: none;
   }
 
   .fh-build-owner {
@@ -7688,6 +7714,26 @@ select:focus-visible,
   color: var(--v3-text-muted);
 }
 
+/* Table cards clip: .fh-build-card sets overflow:hidden, and the
+   audit found 50px of the Invoices table (BALANCE column, Export
+   button) permanently unreachable at narrow desktop widths (#3).
+   Let table cards scroll horizontally instead of amputating columns,
+   and give the wide list tables a shared minimum so every row keeps
+   the same column tracks while overflowing. */
+.fh-build-card.fh-build-table {
+  overflow-x: auto;
+}
+@media (min-width: 900px) {
+  .fh-build-table__head.is-invoices,  .fh-build-table__row.is-invoices,
+  .fh-build-table__head.is-clients,   .fh-build-table__row.is-clients,
+  .fh-build-table__head.is-subs,      .fh-build-table__row.is-subs,
+  .fh-build-table__head.is-team,      .fh-build-table__row.is-team,
+  .fh-build-table__head.is-timesheet, .fh-build-table__row.is-timesheet,
+  .fh-build-table__head.is-tasks,     .fh-build-table__row.is-tasks {
+    min-width: 640px;
+  }
+}
+
 .fh-build-table {
   width: 100%;
   display: flex;
@@ -7700,27 +7746,34 @@ select:focus-visible,
    truncate utility. Same approach: provide mobile baseline so screens
    are usable; desktop @media still wins on >=900px. */
 
-.fh-build-table__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 4px;
-  color: var(--v3-text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--v3-glass-tint-2);
-}
+/* MOBILE ONLY. This baseline used to be unscoped, and because it sits
+   LATER in the file than the >=900px grid rules, its display:flex won
+   at every width — so desktop table headers piled up at the left while
+   cells drifted, on every table screen (UI audit #6). Scoping it lets
+   the desktop grid-template-columns actually align header and cells. */
+@media (max-width: 899px) {
+  .fh-build-table__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+    color: var(--v3-text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--v3-glass-tint-2);
+  }
 
-.fh-build-table__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 4px;
-  border-bottom: 1px solid var(--v3-glass-tint-2);
-  font-size: 14px;
-  color: var(--ink-strong, #f4f1ea);
+  .fh-build-table__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--v3-glass-tint-2);
+    font-size: 14px;
+    color: var(--ink-strong, #f4f1ea);
+  }
 }
 .fh-build-table__row:last-child {
   border-bottom: 0;
@@ -7901,10 +7954,15 @@ select:focus-visible,
    font-size on every text-entry control globally. The visual
    difference between 14px and 16px is barely perceptible.
    ================================================================ */
-input,
-textarea,
-select {
-  font-size: 16px !important;
+/* Scoped to narrow viewports only — the 16px floor exists to stop iOS
+   from zooming on focus, but applied globally it forced every desktop
+   input to 16px next to 12–14px buttons (UI audit #40). */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 /* ================================================================
@@ -8082,10 +8140,35 @@ select {
 }
 
 @media (min-width: 900px) {
+  /* The old three-column rule floored its tracks at 340+420+220 = 980px
+     plus gaps, but with the sidebar open the container can be ~700px —
+     the whole third column (saved views, "needs attention" total)
+     rendered past the right edge under overflow:hidden, unreachable
+     (UI audit #4). Tiers now use minmax(0, fr) so tracks can never
+     overflow, and the column count steps with real available width:
+     1 col from 900, 2 cols + full-width saved rail from 1200, the
+     original 3-col layout from 1500. */
   .fh-crm-os {
-    grid-template-columns: minmax(340px, 1.06fr) minmax(420px, 1.44fr) minmax(220px, 0.62fr);
     align-items: stretch;
   }
+}
+@media (min-width: 1200px) {
+  .fh-crm-os {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  }
+  .fh-crm-saved {
+    grid-column: 1 / -1;
+  }
+}
+@media (min-width: 1500px) {
+  .fh-crm-os {
+    grid-template-columns: minmax(0, 1.06fr) minmax(0, 1.44fr) minmax(0, 0.62fr);
+  }
+  .fh-crm-saved {
+    grid-column: auto;
+  }
+}
+@media (min-width: 900px) {
 
   .fh-build-page {
     color: var(--ink-strong, #f4f1ea);
@@ -8788,10 +8871,14 @@ select {
     margin-left: auto;
     margin-right: auto;
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(240px, 380px) minmax(0, auto);
+    /* Chips get a full-width row of their own — packed into a squeezed
+       auto column they wrapped one-per-line into a vertical stack at
+       the top-right corner (UI audit #15). */
+    grid-template-columns: minmax(280px, 1fr) minmax(240px, 380px);
     grid-template-areas:
-      "head search chips"
-      "list list list";
+      "head search"
+      "chips chips"
+      "list list";
     column-gap: 16px;
     row-gap: 14px;
     align-items: center;
@@ -8815,10 +8902,9 @@ select {
   .v3-screen--work > .fh-work__chips > div {
     overflow-x: visible !important;
     padding-bottom: 0 !important;
-    /* Wrap instead of clipping at the grid edge — with Done + Lost
-       visible the row is wider than its column. */
+    /* One left-aligned wrapping row under the heading. */
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
   .v3-screen--work > .fh-work__list {
     grid-area: list;

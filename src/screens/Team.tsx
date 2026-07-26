@@ -227,16 +227,19 @@ export default function Team() {
               )}
             </section>
 
+            {/* Customer-facing copy only — this rail used to show the
+                internal sprint plan ("Phase B", "ship in /crew next")
+                and raw route paths (UI audit #19). */}
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Crew portal</div>
-              <strong>Phase B</strong>
-              <span>Own schedule, own time, own tasks ship in /crew next.</span>
+              <strong data-empty>For your crew</strong>
+              <span>Crew members sign in to see their own schedule, clock in and out, and check tasks.</span>
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Subs / vendors</div>
-              <strong>Separate</strong>
-              <span>One-off vendor bench lives at /subs. This page is the recurring team.</span>
+              <strong data-empty>Tracked separately</strong>
+              <span>One-off vendors and subcontractors have their own page. This page is your recurring team.</span>
               <button type="button" className="fh-build-rail-card__action" onClick={() => navigate('/subs')}>
                 Open subs <ChevronRight size={13} />
               </button>
@@ -509,7 +512,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
             </label>
 
             {error && (
-              <div style={{ marginBottom: 14, padding: 10, borderRadius: 6, background: 'rgba(238,73,66,.10)', border: '1px solid rgba(238,73,66,.30)', color: '#ee4942', fontSize: 12 }}>
+              <div style={{ marginBottom: 14, padding: 10, borderRadius: 6, background: 'rgba(216,93,74,.10)', border: '1px solid rgba(216,93,74,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
                 {error}
               </div>
             )}

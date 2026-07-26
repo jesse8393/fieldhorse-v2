@@ -44,7 +44,9 @@ export const DOC_COLORS = {
 
 export const DOC_FONTS: Record<string, string> = {
   display:  "'Bebas Neue', 'Helvetica Neue', sans-serif",
-  serif:    "'Instrument Serif', Georgia, 'Times New Roman', serif",
+  // Two-family brand: the serif slot maps to the body family so legacy
+  // template call sites keep working without shipping a third font.
+  serif:    "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   body:     "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 }
 

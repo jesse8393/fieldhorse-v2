@@ -362,6 +362,10 @@ export const LIST_STAGE_META: Record<string, { label: string; color: string }> =
   quote:   { label: 'Quote',  color: 'var(--v3-stage-quote)' },
   job:     { label: 'Active', color: 'var(--v3-stage-active)' },
   invoice: { label: 'Active', color: 'var(--v3-stage-active)' },
-  closed:  { label: 'Done',   color: 'var(--v3-success-bright)' },
+  // Done uses the stage-closed steel, NOT a second green — Active and
+  // Done rendered as two near-identical greens, making in-progress vs
+  // finished indistinguishable at a glance (UI audit #33). Green is
+  // reserved for the in-progress money stage.
+  closed:  { label: 'Done',   color: 'var(--v3-stage-closed)' },
   lost:    { label: 'Lost',   color: 'var(--v3-text-muted)' }
 }

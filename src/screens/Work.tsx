@@ -59,7 +59,10 @@ const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 type ChipId = 'all' | 'leads' | 'quotes' | 'active' | 'done' | 'lost'
 
 const CHIPS: { id: ChipId; label: string; match: (c: JobRow) => boolean }[] = [
-  { id: 'all',    label: 'All',    match: (c) => c.stage !== 'lost' },
+  // 'All' really means all: it used to exclude lost, so its count (26)
+  // never matched the sum of the stage chips (28) — flagged by the UI
+  // audit (#11) as "data does not agree with itself".
+  { id: 'all',    label: 'All',    match: () => true },
   { id: 'leads',  label: 'Leads',  match: (c) => c.stage === 'lead' },
   { id: 'quotes', label: 'Quotes', match: (c) => c.stage === 'quote' },
   { id: 'active', label: 'Active', match: (c) => c.stage === 'job' || c.stage === 'invoice' },

@@ -379,7 +379,7 @@ export default function SubPortal() {
 
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Insurance</div>
-                <strong style={{ color: ins.tone === 'bad' ? '#ee4942' : ins.tone === 'warn' ? '#e0a141' : ins.tone === 'good' ? '#73c982' : undefined }}>
+                <strong style={{ color: ins.tone === 'bad' ? 'var(--v3-danger-bright)' : ins.tone === 'warn' ? '#e0a141' : ins.tone === 'good' ? '#73c982' : undefined }}>
                   {ins.label}
                 </strong>
                 <span>
@@ -431,7 +431,7 @@ function ProfileRow({ label, value, tone, muted }: { label: string; value: strin
       </Eyebrow>
       <span style={{
         fontSize: 14,
-        color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : 'var(--v3-text)',
+        color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#e0a141' : 'var(--v3-text)',
         wordBreak: 'break-word',
       }}>
         {value}
@@ -643,7 +643,7 @@ function EditProfileDialog({
         </div>
 
         {error && (
-          <div style={{ marginTop: 14, padding: 10, borderRadius: 6, background: 'rgba(238,73,66,.10)', border: '1px solid rgba(238,73,66,.30)', color: '#ee4942', fontSize: 12 }}>
+          <div style={{ marginTop: 14, padding: 10, borderRadius: 6, background: 'rgba(216,93,74,.10)', border: '1px solid rgba(216,93,74,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
             {error}
           </div>
         )}
