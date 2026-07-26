@@ -22,6 +22,9 @@ test_out/
 qa-shots/
 
 # Local audit/verification harness (session tooling, not app code)
+# Root level .mjs files are all session harness scripts; real build
+# scripts live under scripts/ and stay tracked.
+/*.mjs
 shots.mjs
 sbproxy.mjs
 probe.mjs
