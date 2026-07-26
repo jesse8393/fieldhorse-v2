@@ -92,6 +92,40 @@ function greetingFor(now: Date) {
   return 'Good evening'
 }
 
+/* Cold-load shimmer block. Variant maps to a .fh-build-skel--* class in
+   fixes-2026-07.css (money / stat / metric / sub / chip / line). Every
+   spot that used to print an em dash or a "Loading" string during the
+   first seconds now renders one of these instead — gray pulse reads as
+   loading, never as a confident zero. */
+function Skel({ variant, width }: { variant?: string; width?: number | string }) {
+  return (
+    <span
+      className={`fh-build-skel${variant ? ` fh-build-skel--${variant}` : ''}`}
+      style={width != null ? { width } : undefined}
+      aria-hidden="true"
+    />
+  )
+}
+
+/* Loading rows for the three dashboard tables. Same .fh-build-table__row
+   shell as real rows so column rhythm holds; single shimmer bar per row
+   with staggered widths so the block reads as content arriving. */
+function SkelRows({ variantClass }: { variantClass: string }) {
+  return (
+    <>
+      {['82%', '64%', '48%'].map((w) => (
+        <div
+          key={w}
+          className={`fh-build-table__row ${variantClass}`}
+          style={{ gridTemplateColumns: '1fr', cursor: 'default' }}
+        >
+          <Skel variant="line" width={w} />
+        </div>
+      ))}
+    </>
+  )
+}
+
 // Coerces dealsAtRisk into { count, value, followUps, quotesAttention }
 // regardless of upstream shape so the right-rail tile can interpolate
 // primitives safely. Returns null when the data hasn't loaded yet so
@@ -202,11 +236,15 @@ export default function SnowHomeBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{dateLabel}</span>
           <span className="fh-build-vline" />
-          {hasCoords && tempStr ? (
-            <>
-              <span>{tempStr}{condStr ? ` · ${condStr}` : ''}</span>
-              <Sun size={16} className="fh-build-sun" />
-            </>
+          {hasCoords ? (
+            tempStr ? (
+              <>
+                <span>{tempStr}{condStr ? ` · ${condStr}` : ''}</span>
+                <Sun size={16} className="fh-build-sun" />
+              </>
+            ) : (
+              <Skel variant="sub" width={56} />
+            )
           ) : (
             <span style={{ opacity: 0.6 }}>Weather not set</span>
           )}
@@ -251,13 +289,16 @@ export default function SnowHomeBuild(props: Props) {
           <div className="fh-build-mini-grid">
             {/* Labels match what the numbers actually measure — "Crews
                 on site" here vs "Crews active" on Schedule disagreed
-                because both were mislabeled (UI audit #11/#28). */}
-            <MiniMetric label="On site today" value={todayOnSite == null ? '—' : String(todayOnSite.length)} />
-            <MiniMetric label="Reports missing" value="—" />
-            <MiniMetric label="Queued actions" value={nextActions == null ? '—' : String(nextActions.length)} />
+                because both were mislabeled (UI audit #11/#28).
+                "Reports missing" (a hardcoded placeholder dash — the
+                count was never wired) is replaced by "Open deals",
+                which the stage rail already computes for real. */}
+            <MiniMetric label="On site today" value={todayOnSite == null ? <Skel variant="metric" width={28} /> : String(todayOnSite.length)} />
+            <MiniMetric label="Open deals" value={stageRail == null && stageBreakdown == null ? <Skel variant="metric" width={28} /> : String(totalOppCount)} />
+            <MiniMetric label="Queued actions" value={nextActions == null ? <Skel variant="metric" width={28} /> : String(nextActions.length)} />
             {/* invoicingWeek is money COLLECTED since Sunday — labeling it
                 "Ready to invoice" claimed already-received cash was billable. */}
-            <MiniMetric label="Collected this week" value={invoicingWeek == null ? '—' : money(invoicingWeek)} />
+            <MiniMetric label="Collected this week" value={invoicingWeek == null ? <Skel variant="metric" width={56} /> : money(invoicingWeek)} />
           </div>
         </section>
 
@@ -304,18 +345,21 @@ export default function SnowHomeBuild(props: Props) {
 
           <OwnerQueue
             rows={queueRows}
+            loading={nextActions == null}
             onOpenJobAtTab={onOpenJobAtTab}
             onViewAll={onGoToActivity}
           />
 
           <RevenueOpportunities
             rows={revenueRows}
+            loading={topPipeline == null}
             onOpenJob={onOpenJob}
             onViewAll={onGoToLeads}
           />
 
           <JobHealthPreview
             rows={jobRows}
+            loading={jobHealth == null}
             onGoToJobs={onGoToJobs}
             onOpenJob={onOpenJob}
           />
@@ -362,9 +406,9 @@ function RevenueOperatingLayer({
             : `${moneyFull(pipeline)} in active pipeline across ${openCount} open opportunities. ${healthCopy}`}
         </p>
         <div className="fh-crm-brief__chips">
-          <span>{risk == null ? 'Risk loading' : `${risk.count} at risk`}</span>
-          <span>{jobsBehind == null ? 'Schedule loading' : `${jobsBehind} behind`}</span>
-          <span>{actionCount == null ? 'Actions loading' : `${actionCount} owner actions`}</span>
+          {risk == null ? <Skel variant="chip" width={78} /> : <span>{risk.count} at risk</span>}
+          {jobsBehind == null ? <Skel variant="chip" width={72} /> : <span>{jobsBehind} behind</span>}
+          {actionCount == null ? <Skel variant="chip" width={110} /> : <span>{actionCount} owner actions</span>}
         </div>
         <div className="fh-crm-brief__actions">
           <button type="button" onClick={() => onGoToActivity?.()}>
@@ -382,21 +426,35 @@ function RevenueOperatingLayer({
             <div className="fh-build-eyebrow">Pipeline workflow</div>
             <strong>Lead to cash</strong>
           </div>
-          <span>{invoicingWeek == null ? 'Invoices loading' : `${moneyFull(invoicingWeek)} collected this week`}</span>
+          {invoicingWeek == null
+            ? <Skel variant="sub" width={150} />
+            : <span>{moneyFull(invoicingWeek)} collected this week</span>}
         </div>
         <div className="fh-crm-flow__stages">
-          {rows.map((row: PipelineRailRow) => (
-            <button
-              key={row.label}
-              type="button"
-              data-stage={row.key}
-              onClick={() => openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)}
-            >
-              <span>{row.label}</span>
-              <strong>{row.amount}</strong>
-              <small>{row.count} {Number(row.count) === 1 ? 'deal' : 'deals'}</small>
-            </button>
-          ))}
+          {/* While the dashboard query is in flight the fallback rows
+              carry zero counts — printing "$0 · 0 deals" per stage read
+              as an empty book on every cold load. Shimmer tiles until
+              pipeline resolves. */}
+          {pipeline == null
+            ? ['Lead', 'Active', 'Complete'].map((label) => (
+                <div key={label} className="fh-crm-flow__stage-skel">
+                  <span>{label}</span>
+                  <Skel variant="metric" width={54} />
+                  <Skel variant="sub" width={44} />
+                </div>
+              ))
+            : rows.map((row: PipelineRailRow) => (
+                <button
+                  key={row.label}
+                  type="button"
+                  data-stage={row.key}
+                  onClick={() => openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)}
+                >
+                  <span>{row.label}</span>
+                  <strong>{row.amount}</strong>
+                  <small>{row.count} {Number(row.count) === 1 ? 'deal' : 'deals'}</small>
+                </button>
+              ))}
         </div>
       </article>
 
@@ -456,7 +514,9 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
       <div className="fh-build-eyebrow">Active Pipeline · All stages</div>
 
       <div className="fh-build-pipeline__top">
-        <div className="fh-build-money">{pipeline == null ? '—' : moneyFull(pipeline)}</div>
+        <div className="fh-build-money">
+          {pipeline == null ? <Skel variant="money" /> : moneyFull(pipeline)}
+        </div>
 
         {trendPct != null && (
           <div className={trendUp ? 'fh-build-trend is-up' : 'fh-build-trend is-down'}>
@@ -466,7 +526,12 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
         )}
       </div>
 
-      <p className="fh-build-pipeline__copy">{oppLabel}</p>
+      {/* While the dashboard query is in flight the count is a raw 0 —
+          printing "No active opportunities yet" then would be a
+          confident lie for a second. Shimmer until pipeline resolves. */}
+      <p className="fh-build-pipeline__copy">
+        {pipeline == null ? <Skel variant="sub" width={230} /> : oppLabel}
+      </p>
 
       {/* The per-stage tile grid was removed here (UI audit #14/#31/#32):
           it duplicated the Pipeline-workflow strip rendered directly
@@ -493,11 +558,11 @@ function TodayCard({ todayOnSite, activeJobsCount, onGoToSchedule, onNewLead }: 
 
         <div className="fh-build-today__stats">
           <div>
-            <strong>{todayOnSite == null ? '—' : todayOnSite.length}</strong>
+            <strong>{todayOnSite == null ? <Skel variant="stat" /> : todayOnSite.length}</strong>
             <span>{todayOnSite?.length === 1 ? 'visit today' : 'visits today'}</span>
           </div>
           <div>
-            <strong>{activeJobsCount == null ? '—' : activeJobsCount}</strong>
+            <strong>{activeJobsCount == null ? <Skel variant="stat" /> : activeJobsCount}</strong>
             <span>jobs in progress</span>
           </div>
         </div>
@@ -531,20 +596,20 @@ function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
   // quotesAttention }, or null. normalizeDealsAtRisk returns null when not
   // yet loaded — render '—' rather than a fabricated number.
   const risk = normalizeDealsAtRisk(dealsAtRisk)
-  const dealsValue = risk == null ? '—' : moneyFull(risk.value)
+  const dealsValue = risk == null ? <Skel variant="metric" /> : moneyFull(risk.value)
   const dealsSub =
-    risk == null ? 'Loading…' : `${risk.count} ${risk.count === 1 ? 'deal' : 'deals'}`
-  const jobsBehindValue = jobsBehind == null ? '—' : String(jobsBehind)
+    risk == null ? <Skel variant="sub" /> : `${risk.count} ${risk.count === 1 ? 'deal' : 'deals'}`
+  const jobsBehindValue = jobsBehind == null ? <Skel variant="metric" width={32} /> : String(jobsBehind)
   const jobsBehindSub =
-    jobsBehind == null ? 'Loading…' : jobsBehind === 0 ? 'All on track' : 'needs attention'
-  const invoicingValue = invoicingWeek == null ? '—' : moneyFull(invoicingWeek)
-  const invoicingSub = invoicingWeek == null ? 'Loading…' : 'this week'
+    jobsBehind == null ? <Skel variant="sub" /> : jobsBehind === 0 ? 'All on track' : 'needs attention'
+  const invoicingValue = invoicingWeek == null ? <Skel variant="metric" /> : moneyFull(invoicingWeek)
+  const invoicingSub = invoicingWeek == null ? <Skel variant="sub" width={56} /> : 'this week'
   const followUpsValue =
-    risk?.followUps == null ? '—' : String(risk.followUps)
-  const followUpsSub = risk?.followUps == null ? 'Loading…' : 'leads waiting'
+    risk?.followUps == null ? <Skel variant="metric" width={32} /> : String(risk.followUps)
+  const followUpsSub = risk?.followUps == null ? <Skel variant="sub" /> : 'leads waiting'
   const quotesValue =
-    risk?.quotesAttention == null ? '—' : String(risk.quotesAttention)
-  const quotesSub = risk?.quotesAttention == null ? 'Loading…' : 'quotes waiting'
+    risk?.quotesAttention == null ? <Skel variant="metric" width={32} /> : String(risk.quotesAttention)
+  const quotesSub = risk?.quotesAttention == null ? <Skel variant="sub" /> : 'quotes waiting'
   return (
     <aside className="fh-build-rail">
       {/* Card names aligned to the approved mock (audit M4):
@@ -570,7 +635,7 @@ function RailMetric({ title, value, sub, chart }: any) {
   )
 }
 
-function OwnerQueue({ rows, onOpenJobAtTab, onViewAll }: any) {
+function OwnerQueue({ rows, loading, onOpenJobAtTab, onViewAll }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-owner">
       <CardHeader title="Owner Queue" />
@@ -583,8 +648,13 @@ function OwnerQueue({ rows, onOpenJobAtTab, onViewAll }: any) {
         <span>Due</span>
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyRow label="No actions queued — you’re caught up." />
+      {/* Loading first: printing the "caught up" empty state while the
+          query is still in flight told the owner a comforting lie for
+          a second on every cold load. */}
+      {loading ? (
+        <SkelRows variantClass="is-owner" />
+      ) : rows.length === 0 ? (
+        <EmptyRow label="No actions queued. You are caught up." />
       ) : (
         rows.map((row: any, index: number) => (
           <button
@@ -612,7 +682,7 @@ function OwnerQueue({ rows, onOpenJobAtTab, onViewAll }: any) {
   )
 }
 
-function RevenueOpportunities({ rows, onOpenJob, onViewAll }: any) {
+function RevenueOpportunities({ rows, loading, onOpenJob, onViewAll }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-revenue">
       <CardHeader title="Revenue Opportunities" />
@@ -624,8 +694,10 @@ function RevenueOpportunities({ rows, onOpenJob, onViewAll }: any) {
         <span>Next step</span>
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyRow label="No active deals yet — start a new lead to populate this list." />
+      {loading ? (
+        <SkelRows variantClass="is-revenue" />
+      ) : rows.length === 0 ? (
+        <EmptyRow label="No active deals yet. Start a new lead to populate this list." />
       ) : (
         rows.map((row: any) => (
           <button
@@ -649,7 +721,7 @@ function RevenueOpportunities({ rows, onOpenJob, onViewAll }: any) {
   )
 }
 
-function JobHealthPreview({ rows, onGoToJobs, onOpenJob }: any) {
+function JobHealthPreview({ rows, loading, onGoToJobs, onOpenJob }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-health">
       <CardHeader title="Job Health Preview" action="Operational Risks" />
@@ -663,8 +735,10 @@ function JobHealthPreview({ rows, onGoToJobs, onOpenJob }: any) {
         <span>Next Action</span>
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyRow label="Job-health signals not connected yet." />
+      {loading ? (
+        <SkelRows variantClass="is-health" />
+      ) : rows.length === 0 ? (
+        <EmptyRow label="No job health signals yet. Active jobs show up here." />
       ) : (
         rows.map((row: any) => (
           <button
@@ -760,7 +834,7 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
     .map((s) => ({
       key: s.key,
       label: LABEL[s.key] || s.key,
-      amount: s.total > 0 ? money(s.total) : '—',
+      amount: s.total > 0 ? money(s.total) : '$0',
       count: s.count,
       ...(ROUTE[s.key] || { route: 'jobs' as const, filter: 'all' }),
     }))
@@ -796,7 +870,7 @@ function buildPipelineStages(
   const rows = (['lead', 'active', 'won'] as const).map((k) => ({
     key: buckets[k].key,
     label: buckets[k].label,
-    amount: sums[k] > 0 ? money(sums[k]) : '—',
+    amount: sums[k] > 0 ? money(sums[k]) : '$0',
     count: stageBreakdown?.[k] ?? 0,
     route: buckets[k].route,
     filter: buckets[k].filter,
@@ -830,14 +904,14 @@ function buildOwnerQueue(nextActions: any[] | null) {
       a.urgencyTone === 'danger' ? 'High'
       : a.urgencyTone === 'warn' ? 'Medium'
       : a.urgencyTone === 'success' ? 'Action'
-      : '—'
+      : 'Queued'
     // Verb-only action. New payload provides `verb`; legacy payload
     // (no verb) falls back to the full title.
     const action = a.verb || a.title || a.label || 'Action required'
     const client = a.contactName || a.client || ''
     const amount = Number(a.contactAmount || 0) > 0
       ? moneyFull(Number(a.contactAmount))
-      : '—'
+      : ''
     const due = formatDue(a.dueIso, a.dueKind)
     return {
       action,
@@ -855,9 +929,9 @@ function buildOwnerQueue(nextActions: any[] | null) {
 }
 
 function formatDue(iso: string | null | undefined, kind: string | null | undefined) {
-  if (!iso) return '—'
+  if (!iso) return ''
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return ''
   // `waited` → "Nd ago" (last touch was N days back, follow-up overdue)
   // `overdue` → "Today" (action is needed right now)
   // `invoiced` → "Nd ago" (invoice sent N days back, payment expected)
@@ -890,7 +964,7 @@ function buildRevenueRows(topPipeline: any[] | null) {
     job: 'Keep crew moving',
     invoice: 'Collect balance',
     closed: 'Request referral',
-    lost: '—',
+    lost: 'Archive or revisit',
   }
   return topPipeline.slice(0, 5).map((c: any) => {
     const sid = String(c.stage || '').toLowerCase()
@@ -899,11 +973,11 @@ function buildRevenueRows(topPipeline: any[] | null) {
     return {
       id: c.id,
       name: c.name || 'Unnamed',
-      stage: stageLabel[sid] || c.stage || '—',
+      stage: stageLabel[sid] || c.stage || 'New',
       stageKey: sid,
       amount: moneyFull(c.amount || c.value || 0),
-      touch: days == null ? '—' : days <= 0 ? 'Today' : `${days}d ago`,
-      next: nextByStage[sid] || '—',
+      touch: days == null ? 'New' : days <= 0 ? 'Today' : `${days}d ago`,
+      next: nextByStage[sid] || 'Review',
     }
   })
 }
