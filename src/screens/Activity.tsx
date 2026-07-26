@@ -94,7 +94,15 @@ export default function Activity() {
           kind: 'stage',
           icon: t.to_stage === 'closed' ? Check : t.to_stage === 'invoice' ? Receipt : Briefcase,
           tone: STAGE_TONE[t.to_stage] || 'gold',
-          title: t.from_stage ? `${capitalize(t.from_stage)} → ${capitalize(t.to_stage)}` : `New ${capitalize(t.to_stage)}`
+          // Stage labels that read as sentences: "New Closed" is not a
+          // thing anyone says. "Deal closed" / "Deal lost" / "New lead".
+          title: t.from_stage
+            ? `${capitalize(t.from_stage)} → ${capitalize(t.to_stage)}`
+            : t.to_stage === 'closed'
+              ? 'Deal closed'
+              : t.to_stage === 'lost'
+                ? 'Deal lost'
+                : `New ${capitalize(t.to_stage)}`
         })
       }
 
