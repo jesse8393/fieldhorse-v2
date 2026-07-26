@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
@@ -169,6 +170,7 @@ const SERVICES = [
 export default function Onboarding() {
   const { user, signOut } = useAuth()
   const { profile, loading, isOnboarded, upsertProfile } = useProfile()
+  const { refresh: refreshMembership } = useMembership()
   const navigate = useNavigate()
 
   // Onboarding is for fresh signups. Never read from an existing profile —
@@ -216,6 +218,21 @@ export default function Onboarding() {
     if (!canSubmit || busy) return
     setBusy(true)
     setError('')
+    // Create the caller's org + owner membership first (idempotent RPC).
+    // Every downstream insert depends on it: fh_set_org_id stamps rows
+    // from org_members, and Home routes members-without-an-org to the
+    // sub portal. Without this, a brand-new signup dead-ends.
+    const { error: orgErr } = await supabase.rpc('create_own_org', {
+      p_name: companyName.trim()
+    })
+    if (orgErr) {
+      setBusy(false)
+      setError(orgErr.message || 'Could not create your workspace')
+      return
+    }
+    // Membership context fetched before the org existed — refresh it so
+    // Home sees the new owner role instead of bouncing to /sub-portal.
+    await refreshMembership()
     const { error: profErr } = await upsertProfile({
       company_name: companyName.trim(),
       services,
