@@ -106,7 +106,16 @@ export default function SubPortal() {
       const res = await subPortalContext()
       setCtx(res)
     } catch (e: any) {
-      setError(e?.detail || e?.message || 'Could not load portal data.')
+      const raw = e?.detail || e?.message || ''
+      // Raw server codes ("http_404") read as gibberish. A 404 here just
+      // means no partner records exist for this account yet.
+      setError(
+        /^http_404$/i.test(raw)
+          ? 'No partner records yet. When a contractor adds you to a job, it shows up here.'
+          : /^http_\d+$/i.test(raw)
+            ? 'Could not load portal data. Check your connection and retry.'
+            : raw || 'Could not load portal data.'
+      )
     } finally {
       setLoading(false)
     }
