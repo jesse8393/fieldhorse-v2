@@ -14,6 +14,7 @@ import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import { queryClient } from './lib/queryClient.ts'
 import './styles/tokens.css'
 import './styles/global.css'
+import './styles/fixes-2026-07.css'
 import './styles/v3.css'
 // Loaded LAST so cascade-equal rules win. See file header for context.
 import './styles/mobile-keyboard-fix.css'
