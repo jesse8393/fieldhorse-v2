@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
-import { Routes, Route, Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext.tsx'
 import { useProfile } from './contexts/ProfileContext.tsx'
 import { useMediaQuery } from './lib/useMediaQuery.ts'
@@ -47,12 +47,19 @@ const Subs           = lazy(() => import('./screens/Subs.tsx'))
 const Partners       = lazy(() => import('./screens/Partners.tsx'))
 const SubDetail      = lazy(() => import('./screens/SubDetail.tsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
+const Landing        = lazy(() => import('./screens/Landing.tsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
+  const { pathname } = useLocation()
   if (loading) return <AppLoading label="Checking session" />
-  if (!session) return <Navigate to="/login" replace />
+  if (!session) {
+    // A logged out visitor at the root gets the marketing page, not a
+    // login wall. Deep links into the app still bounce to /login.
+    if (pathname === '/') return <Landing />
+    return <Navigate to="/login" replace />
+  }
   return children
 }
 
