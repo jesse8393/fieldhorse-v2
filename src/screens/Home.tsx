@@ -153,9 +153,11 @@ export default function Home() {
     return Math.round(pct)
   }, [pipeline, pipelinePrev])
 
+  // Empty while loading — consumers show a shimmer or ellipsis instead
+  // of a printed dash (user-facing copy carries no dashes).
   const tempStr = weather?.current?.temperature_2m != null
     ? `${Math.round(weather.current.temperature_2m)}°`
-    : '—'
+    : ''
   const condStr = weatherLabel(weather?.current?.weather_code)
   const followUpCount = dealsAtRisk?.followUps ?? null
   const quoteAttentionCount = dealsAtRisk?.quotesAttention ?? null
@@ -334,7 +336,7 @@ export default function Home() {
               fontWeight: 700,
               lineHeight: 1
             }}>
-              {tempStr}
+              {tempStr || '…'}
             </span>
           </motion.button>
         ) : (
@@ -835,7 +837,7 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
   const endTime = row.endAt
     ? new Date(row.endAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
     : ''
-  const timeLabel = startTime && endTime ? `${startTime} – ${endTime}` : (startTime || '—')
+  const timeLabel = startTime && endTime ? `${startTime} to ${endTime}` : (startTime || 'Anytime')
   return (
     <motion.button
       type="button"
@@ -1404,9 +1406,9 @@ function RowThumb({ photoUrl, name, size = 32 }: any) {
 }
 
 function nameInitials(name: any) {
-  if (!name) return '—'
+  if (!name) return '·'
   const parts = String(name).trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '—'
+  if (parts.length === 0) return '·'
   if (parts.length === 1) return parts[0][0].toUpperCase()
   return (parts[0][0] + parts[1][0]).toUpperCase()
 }
