@@ -477,7 +477,13 @@ export default function Crew() {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Timesheets</div>
               <strong data-empty>Shifts reviewed weekly</strong>
-              <span>Your manager approves shifts at the end of the week.</span>
+              {/* The owner IS the manager — "your manager approves your
+                  shifts" read as nonsense on a solo operator's screen. */}
+              <span>
+                {role === 'owner' || role === 'admin'
+                  ? 'You review and approve shifts under Timesheets.'
+                  : 'Your manager approves shifts at the end of the week.'}
+              </span>
             </section>
 
             <section className="fh-build-rail-card">
