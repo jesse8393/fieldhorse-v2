@@ -20,3 +20,14 @@ lerna-debug.log*
 _reference/
 test_out/
 qa-shots/
+
+# Local audit/verification harness (session tooling, not app code)
+shots.mjs
+sbproxy.mjs
+probe.mjs
+netprobe.mjs
+onboard*.mjs
+inspect_*.mjs
+checkhdr.mjs
+verify*.mjs
+.env.local
