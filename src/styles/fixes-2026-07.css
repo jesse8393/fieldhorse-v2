@@ -1,0 +1,141 @@
+/* fixes-2026-07.css — July 2026 redesign overrides.
+   Loaded AFTER global.css (see main.tsx import order), so equal
+   specificity rules here win the cascade. Additions that would have
+   gone into global.css live here instead to keep that file stable. */
+
+/* Desktop chrome dedup. When the current screen renders its own Build
+   topbar (search + weather + bell + CTA), the global AppHeader strip is
+   a second copy of the same chrome stacked above it: two search
+   triggers, two bells, and the header text visibly collided with the
+   topbar pill. One chrome layer per screen. Work keeps the AppHeader
+   (its desktop composition has no Build topbar). !important because
+   AppHeader sets display:flex inline. */
+@media (min-width: 900px) {
+  body:has(.fh-build-topbar) .fh-app-header {
+    display: none !important;
+  }
+}
+
+@media (min-width: 900px) {
+  /* Invoices table. minmax floor on the name track: at narrow card
+     widths the old bare 1.4fr resolved to 0px, the fixed tracks plus
+     gaps consumed the whole row, and the CLIENT/JOB cell (the one
+     column that says WHO owes you) silently vanished. */
+  .fh-build-table__head.is-invoices,
+  .fh-build-table__row.is-invoices {
+    grid-template-columns: minmax(170px, 1.4fr) 110px 60px 110px 90px 100px 130px;
+  }
+
+  /* Card-width-aware column diet. The AR card can be ~675px wide on a
+     1440 desktop (main column minus the 290px rail); the full 7-track
+     layout needs ~780px. Below that, drop the PAID column (balance
+     already tells the story) and tighten the rest so the name track
+     keeps real room instead of scrolling sideways. */
+  .fh-build-invoices-table {
+    container-type: inline-size;
+  }
+  @container (max-width: 789px) {
+    .fh-build-table__head.is-invoices,
+    .fh-build-table__row.is-invoices {
+      grid-template-columns: minmax(150px, 1.6fr) 84px 44px 92px 92px 108px;
+      column-gap: 10px;
+      min-width: 0;
+    }
+    .fh-build-table__head.is-invoices > :nth-child(5),
+    .fh-build-table__row.is-invoices > :nth-child(5) {
+      display: none;
+    }
+  }
+
+  /* Month calendar grid, desktop /schedule Month view. */
+  .fh-build-cal {
+    background: var(--v3-surface-glass);
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .fh-build-cal__week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    border-bottom: 1px solid var(--v3-glass-tint-2);
+  }
+  .fh-build-cal__week span {
+    padding: 10px 12px;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--v3-text-muted);
+    text-align: left;
+  }
+  .fh-build-cal__grid {
+    display: grid;
+    /* minmax(0,1fr): a wide event chip must truncate, not stretch its
+       whole weekday column (nowrap chips set min-content wide). */
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .fh-build-cal__day {
+    min-width: 0;
+    appearance: none;
+    background: none;
+    border: 0;
+    border-top: 1px solid var(--v3-glass-tint-2);
+    border-right: 1px solid var(--v3-glass-tint-2);
+    min-height: 104px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    text-align: left;
+    cursor: pointer;
+    color: var(--v3-text);
+    transition: background 120ms ease;
+  }
+  .fh-build-cal__day:nth-child(7n) { border-right: 0; }
+  .fh-build-cal__day:nth-child(-n+7) { border-top: 0; }
+  .fh-build-cal__day:hover { background: color-mix(in srgb, var(--v3-primary) 6%, transparent); }
+  .fh-build-cal__day.is-out { opacity: .38; }
+  .fh-build-cal__num {
+    font-family: var(--font-display);
+    font-size: 14px;
+    letter-spacing: .04em;
+    color: var(--v3-text-muted);
+    line-height: 1;
+  }
+  .fh-build-cal__day.is-today .fh-build-cal__num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--field-gold-bright, #e5c158), var(--field-gold-deep, #c9963a));
+    color: var(--onyx, #17130c);
+    font-weight: 700;
+  }
+  .fh-build-cal__day.has-events .fh-build-cal__num { color: var(--v3-text); }
+  .fh-build-cal__chips {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .fh-build-cal__chip {
+    font-size: 11px;
+    line-height: 1.35;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--v3-primary) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--v3-primary) 26%, transparent);
+    color: var(--v3-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fh-build-cal__more {
+    font-size: 10.5px;
+    color: var(--v3-text-muted);
+    padding-left: 2px;
+  }
+}
