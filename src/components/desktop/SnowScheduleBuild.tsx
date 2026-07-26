@@ -225,7 +225,59 @@ export default function SnowScheduleBuild(props: Props) {
             {!loading && days.length === 0 && (
               <div className="fh-build-table__empty">Nothing in range.</div>
             )}
-            {!loading && days.map((d) => {
+            {/* MONTH — a real calendar grid. The agenda loop below used
+                to render every day of the month as its own card, so July
+                was 31 stacked "No events scheduled." rows with zero
+                glance value. Seven columns, event chips, today ring;
+                click a day to open it in Day view. */}
+            {!loading && view === 'month' && (
+              <div className="fh-build-cal">
+                <div className="fh-build-cal__week">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((w) => (
+                    <span key={w}>{w}</span>
+                  ))}
+                </div>
+                <div className="fh-build-cal__grid">
+                  {(() => {
+                    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
+                    const gridStart = addDays(first, -first.getDay())
+                    const cells: Date[] = []
+                    for (let i = 0; i < 42; i++) cells.push(addDays(gridStart, i))
+                    // Drop a trailing all-out-of-month week so most
+                    // months render 5 rows, not 6.
+                    const lastRowStart = cells[35]
+                    const rows = lastRowStart.getMonth() === cursor.getMonth() ? 42 : 35
+                    return cells.slice(0, rows).map((d) => {
+                      const evs = eventsByDay.get(startOfDay(d).toISOString()) || []
+                      const inMonth = d.getMonth() === cursor.getMonth()
+                      const isToday = sameDay(d, new Date())
+                      return (
+                        <button
+                          key={d.toISOString()}
+                          type="button"
+                          className={`fh-build-cal__day${inMonth ? '' : ' is-out'}${isToday ? ' is-today' : ''}${evs.length ? ' has-events' : ''}`}
+                          onClick={() => { setCursor(startOfDay(d)); setView('day') }}
+                          aria-label={fmtDayShort(d) + (evs.length ? `, ${evs.length} events` : '')}
+                        >
+                          <span className="fh-build-cal__num">{d.getDate()}</span>
+                          <span className="fh-build-cal__chips">
+                            {evs.slice(0, 3).map((e) => (
+                              <span key={e.id} className="fh-build-cal__chip" title={e.title || 'Event'}>
+                                {fmtTime(e.start_at || '').replace(':00', '')} {e.title || 'Event'}
+                              </span>
+                            ))}
+                            {evs.length > 3 && (
+                              <span className="fh-build-cal__more">+{evs.length - 3} more</span>
+                            )}
+                          </span>
+                        </button>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+            )}
+            {!loading && view !== 'month' && days.map((d) => {
               const key = d.toISOString()
               const evs = eventsByDay.get(key) || []
               const isToday = sameDay(d, new Date())
