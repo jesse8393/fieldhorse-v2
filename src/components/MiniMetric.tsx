@@ -6,9 +6,9 @@
 //
 // Props:
 //   label   Small caption under the value.
-//   value   Pre-formatted display string. Format upstream — this
+//   value   Pre-formatted display node. Format upstream — this
 //           component is dumb so callers can pick money(), moneyFull(),
-//           plain numbers, or '—' as appropriate.
+//           plain numbers, or a loading skeleton as appropriate.
 //   accent  When true, paints the value in the brand gold so the tile
 //           reads as a primary signal in a row of equal-weight tiles.
 //   tone    Override colour for warning ('warn' → amber) or alert
@@ -16,6 +16,8 @@
 //
 // Crew.tsx keeps its own inline copy because it has special
 // capitalize-on-label='Your role' logic that doesn't generalize.
+
+import type { ReactNode } from 'react'
 
 type Tone = 'warn' | 'bad'
 
@@ -26,7 +28,7 @@ export default function MiniMetric({
   tone,
 }: {
   label: string
-  value: string
+  value: ReactNode
   accent?: boolean
   tone?: Tone
 }) {
