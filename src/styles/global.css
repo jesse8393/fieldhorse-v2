@@ -885,6 +885,21 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Desktop treatment for bottom-sheet drawers (UI audit #27): full-width
+   phone sheets read as a mobile pattern on a large screen and could
+   extend past the viewport with two competing scrollbars. Centered,
+   width-capped, height-capped; the sheet body remains the only scroll
+   region. */
+@media (min-width: 900px) {
+  [vaul-drawer][vaul-drawer-direction='bottom'] {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 18px 18px 0 0;
+    max-height: 88dvh;
+  }
+}
+
 /* Scrollable strips (tab rows, chip rows) that must never draw a
    native scrollbar — content still scrolls by wheel/drag/keys. */
 .fh-scrollbar-hidden {
@@ -8831,6 +8846,17 @@ select:focus-visible,
 }
 .v3-btn:active { transform: scale(0.97); }
 .v3-btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+/* ONE disabled treatment for primary buttons (UI audit #24): drop the
+   gold fill entirely so an inert button can never read as clickable —
+   half-opacity gold still looked live. */
+.v3-btn--primary:disabled {
+  background: var(--v3-surface-2);
+  border-color: var(--v3-border);
+  color: var(--v3-text-muted);
+  box-shadow: none;
+  opacity: 1;
+  cursor: default;
+}
 @media (hover: hover) {
   .v3-btn:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--v3-primary) 36%, var(--v3-border-strong));

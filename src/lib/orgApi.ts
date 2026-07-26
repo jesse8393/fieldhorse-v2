@@ -141,6 +141,8 @@ export type PendingPunch = {
   notes: string | null
   flagged: boolean
   flag_reason: string | null
+  /** Zero-length shift (out <= in) — not approvable payroll. */
+  invalid?: boolean
 }
 
 export function orgTimesheetsList(

@@ -428,7 +428,7 @@ export default function Tasks() {
                         onClick={() => deleteTask(t.id)}
                         title="Delete task"
                         aria-label="Delete task"
-                        style={{ color: 'rgba(232,90,87,0.8)' }}
+                        style={{ color: 'var(--v3-danger-bright)' }}
                       >
                         <Trash2 size={14} />
                       </button>

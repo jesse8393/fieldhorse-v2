@@ -50,11 +50,11 @@ export default function InvoiceTemplate({
   currentInvoice = null,  // the fh_invoices row this document bills
   photos = []
 }: any) {
+  const issuedAt = meta.issuedAt || currentInvoice?.issued_at || new Date()
   const number = meta.number
     || (currentInvoice?.sequence_number
       ? invoiceNumberFromSequence(company?.name, currentInvoice.sequence_number, contact?.id)
-      : invoiceNumber(company?.name, contact?.id))
-  const issuedAt = meta.issuedAt || currentInvoice?.issued_at || new Date()
+      : invoiceNumber(company?.name, contact?.id, issuedAt))
   const dueDate = meta.dueDate || currentInvoice?.due_at || null
   const brand = resolveBrandGold(company)
 

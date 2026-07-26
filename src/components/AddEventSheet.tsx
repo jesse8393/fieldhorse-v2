@@ -9,7 +9,7 @@
 // loop (every N days × 4 follow-ups), same default time, same contact
 // pre-selection from defaultContactId.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Calendar as CalendarIcon, Check, X } from 'lucide-react'
@@ -30,16 +30,30 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   const [recurs, setRecurs] = useState(false)
   const [recurDays, setRecurDays] = useState(7)
   const [saving, setSaving] = useState(false)
+  // Inline validation — submitting without a title used to do nothing
+  // at all (no message, no focus), which read as a successful save
+  // (UI audit #8).
+  const [titleError, setTitleError] = useState(false)
+  const titleRef = useRef<HTMLInputElement | null>(null)
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   useEffect(() => {
     if (!userId) return
-    supabase.from('fh_contacts').select('id, name').eq('user_id', userId).then(({ data }: any) => setContacts(data || []))
+    // Enough fields to tell two "Justin Bryan" jobs apart in the picker
+    // (UI audit #10): project title / address / stage disambiguate.
+    supabase
+      .from('fh_contacts')
+      .select('id, name, job_title, address, stage')
+      .eq('user_id', userId)
+      .neq('stage', 'lost')
+      .order('updated_at', { ascending: false })
+      .then(({ data }: any) => setContacts(data || []))
   }, [userId])
 
   useEffect(() => {
     if (!open) {
       setTitle('')
+      setTitleError(false)
       setContactId(defaultContactId)
       setRecurs(false)
       setRecurDays(7)
@@ -63,7 +77,13 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
 
   async function save(e: any) {
     e?.preventDefault?.()
-    if (!title.trim() || saving) return
+    if (saving) return
+    if (!title.trim()) {
+      setTitleError(true)
+      titleRef.current?.focus()
+      return
+    }
+    setTitleError(false)
     setSaving(true)
     const startMs = new Date(`${date}T${time}:00`).getTime()
     // EDIT: update the single row in place.
@@ -161,14 +181,24 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={labelStyle}>Title *</span>
             <input
+              ref={titleRef}
               type="text"
               required
+              aria-invalid={titleError || undefined}
               disabled={saving}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => { setTitle(e.target.value); if (titleError && e.target.value.trim()) setTitleError(false) }}
               placeholder="Pour foundation, inspection…"
-              style={fieldStyle}
+              style={{
+                ...fieldStyle,
+                ...(titleError ? { borderColor: 'var(--v3-danger-bright)' } : {})
+              }}
             />
+            {titleError && (
+              <span role="alert" style={{ fontSize: 12, color: 'var(--v3-danger-bright)' }}>
+                Give the event a title before saving.
+              </span>
+            )}
           </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -203,7 +233,18 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               style={{ ...fieldStyle, cursor: 'pointer' }}
             >
               <option value="">None</option>
-              {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {contacts.map((c) => {
+                // "Justin Bryan" × 8 with no other context was
+                // unpickable — append project / address and the stage
+                // so each option is distinguishable (UI audit #10).
+                const where = (c.job_title || c.address || '').trim()
+                const stage = c.stage ? ` · ${String(c.stage)[0].toUpperCase()}${String(c.stage).slice(1)}` : ''
+                return (
+                  <option key={c.id} value={c.id}>
+                    {c.name || 'Unnamed'}{where ? ` — ${where}` : ''}{stage}
+                  </option>
+                )
+              })}
             </select>
           </label>
 

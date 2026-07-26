@@ -169,10 +169,12 @@ export default function Timesheets() {
   // KPI snapshot. Flagged punches are excluded from hours/cost — they
   // don't bill the job while disputed (lib/labor.ts skips them), so
   // counting them here made the approval screen disagree with job cost.
-  const unflagged = punches.filter((p) => !p.flagged)
+  // Zero-length punches (invalid) count as needing attention too — the
+  // audit found 0:00 shifts sitting approvable with FLAGGED reading 0.
+  const unflagged = punches.filter((p) => !p.flagged && !p.invalid)
   const totalMinutes = unflagged.reduce((s, p) => s + p.minutes, 0)
   const totalCost    = unflagged.reduce((s, p) => s + (p.cost ?? 0), 0)
-  const flaggedCount = punches.filter((p) => p.flagged).length
+  const flaggedCount = punches.filter((p) => p.flagged || p.invalid).length
 
   // Role-gate the entire screen at first paint; backend re-checks anyway.
   if (!memLoading && !canApproveTimesheets) {
@@ -302,12 +304,12 @@ export default function Timesheets() {
                   <button
                     type="button"
                     className="fh-build-primary-btn"
-                    // Flagged rows stay OUT of "Approve all" — a punch
-                    // the owner flagged as suspicious must be resolved
-                    // (or explicitly approved) on its own row, not
+                    // Flagged AND zero-length rows stay OUT of "Approve
+                    // all" — disputed or invalid punches must be resolved
+                    // (or explicitly approved) on their own row, not
                     // swept through with the batch.
-                    onClick={() => approve(g.rows.filter((r) => !r.flagged).map((r) => r.id))}
-                    disabled={g.rows.every((r) => r.flagged) || g.rows.some((r) => approving[r.id])}
+                    onClick={() => approve(g.rows.filter((r) => !r.flagged && !r.invalid).map((r) => r.id))}
+                    disabled={g.rows.every((r) => r.flagged || r.invalid) || g.rows.some((r) => approving[r.id])}
                   >
                     <CheckCheck size={13} /> Approve all
                   </button>
@@ -344,6 +346,8 @@ export default function Timesheets() {
                   <span>
                     {r.flagged ? (
                       <span className="fh-build-dot is-warn" title={r.flag_reason || ''}>Flagged</span>
+                    ) : r.invalid ? (
+                      <span className="fh-build-dot is-bad" title="Clock-out is not after clock-in">Invalid</span>
                     ) : (
                       <span className="fh-build-dot is-neutral">Pending</span>
                     )}

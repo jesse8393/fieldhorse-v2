@@ -5,7 +5,7 @@
 // canManageTeam (owner/admin only) — the backend re-checks the same
 // gate, so hiding the UI is a courtesy, not security.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell, ChevronRight, Copy, Plus, Search, Trash2, UserPlus, Mail, X,
@@ -50,7 +50,12 @@ export default function Team() {
   const [invites, setInvites] = useState<OrgInvitePending[]>([])
   const [inviteOpen, setInviteOpen] = useState(false)
 
+  // In-flight guard — overlapping triggers (membership resolve +
+  // retries) used to fire the same failing query up to 9 times.
+  const inFlight = useRef(false)
   const load = useCallback(async () => {
+    if (inFlight.current) return
+    inFlight.current = true
     setLoading(true)
     setError(null)
     try {
@@ -58,8 +63,13 @@ export default function Team() {
       setMembers(res.members || [])
       setInvites(res.invites || [])
     } catch (e: any) {
-      setError(e?.detail || e?.message || 'Could not load team.')
+      // Never print raw database errors to the operator (the audit
+      // caught a literal Postgres "column ... does not exist" string
+      // in this banner). Log the real error; show a human one.
+      console.error('[team] roster load failed', e)
+      setError("Couldn't load your team roster. Try again in a moment.")
     } finally {
+      inFlight.current = false
       setLoading(false)
     }
   }, [])

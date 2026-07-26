@@ -464,7 +464,6 @@ export default function Notes() {
             disabled={!draft.trim() || saving}
             className="v3-btn v3-btn--primary v3-btn--sm"
             style={{
-              opacity: !draft.trim() || saving ? 0.55 : 1,
               cursor: !draft.trim() || saving ? 'default' : 'pointer'
             }}
           >

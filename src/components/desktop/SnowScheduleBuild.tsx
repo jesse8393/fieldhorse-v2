@@ -91,8 +91,13 @@ export default function SnowScheduleBuild(props: Props) {
     const base = startOfDay(cursor)
     if (view === 'day')   return [base]
     if (view === 'week')  return Array.from({ length: 7 }, (_, i) => addDays(base, i))
-    // month view: show the next ~28 days from the cursor as a flat agenda
-    return Array.from({ length: 28 }, (_, i) => addDays(base, i))
+    // Month view shows the LABELED calendar month, 1st → last day. It
+    // used to render a rolling 28 days from the cursor while the header
+    // said "July 2026" — July 1–24 missing, August dates present (UI
+    // audit #9).
+    const first = new Date(base.getFullYear(), base.getMonth(), 1)
+    const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate()
+    return Array.from({ length: daysInMonth }, (_, i) => addDays(first, i))
   }, [cursor, view])
 
   // Bucket events by day
@@ -172,13 +177,25 @@ export default function SnowScheduleBuild(props: Props) {
               ))}
             </div>
             <div className="fh-build-datenav">
-              <button type="button" onClick={() => setCursor(addDays(cursor, view === 'day' ? -1 : view === 'week' ? -7 : -28))} aria-label="Previous">
+              <button
+                type="button"
+                onClick={() => setCursor(view === 'month'
+                  ? new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1)
+                  : addDays(cursor, view === 'day' ? -1 : -7))}
+                aria-label="Previous"
+              >
                 <ChevronLeft size={14} />
               </button>
               <button type="button" className="fh-build-datenav__today" onClick={() => setCursor(startOfDay(new Date()))}>
                 Today
               </button>
-              <button type="button" onClick={() => setCursor(addDays(cursor, view === 'day' ? 1 : view === 'week' ? 7 : 28))} aria-label="Next">
+              <button
+                type="button"
+                onClick={() => setCursor(view === 'month'
+                  ? new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+                  : addDays(cursor, view === 'day' ? 1 : 7))}
+                aria-label="Next"
+              >
                 <ChevronRight size={14} />
               </button>
             </div>

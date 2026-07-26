@@ -129,6 +129,11 @@ export default async (request) => {
     const rate = p.hourly_rate != null ? Number(p.hourly_rate) : (defaultRateByUser[p.user_id] ?? null)
     return {
       id: p.id,
+      // Zero-length shifts (in == out, or out before in) are not valid
+      // payroll rows — the audit found 0:00 punches listed as approvable
+      // with the FLAGGED counter reading 0. Surfaced as invalid so the
+      // UI can exclude them from batch approval.
+      invalid: minutes <= 0,
       user_id: p.user_id,
       user_name: profilesById[p.user_id]?.full_name || null,
       user_email: emailsById[p.user_id] || null,

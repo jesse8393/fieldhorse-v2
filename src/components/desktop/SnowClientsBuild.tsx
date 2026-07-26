@@ -201,20 +201,11 @@ export default function SnowClientsBuild(props: Props) {
             <h1 className="fh-build-title">RELATIONSHIP DESK.</h1>
           </div>
 
+          {/* One filter control per screen: the counted pill row below
+              is the filter. This card used to duplicate it with a
+              second All/Active/Recent segmented control (UI audit #29). */}
           <div className="fh-build-focus">
-            <div className="fh-build-eyebrow">Filter</div>
-            <div className="fh-build-view-toggle fh-build-view-toggle--inline">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  className={filter === f.key ? 'is-active' : ''}
-                  onClick={() => setFilter(f.key)}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            <div className="fh-build-eyebrow">Book of business</div>
             <p>
               {filtered.length.toLocaleString()} {FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} ·
               {' '}{screenStats.activeAccounts} with open jobs

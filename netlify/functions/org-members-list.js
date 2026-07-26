@@ -52,7 +52,9 @@ export default async (request) => {
     .limit(1)
     .maybeSingle()
 
-  if (myErr) return json({ error: 'membership_lookup_failed', message: myErr.message }, 500)
+  // Log the raw DB error server-side; the client gets a human string
+  // (a schema error was previously printed verbatim in the Team UI).
+  if (myErr) { console.error('[org-members-list] membership lookup failed', myErr); return json({ error: 'membership_lookup_failed', message: 'Could not load your membership. Try again shortly.' }, 500) }
   if (!myMember) return json({ error: 'no_membership' }, 403)
 
   // Anyone in the org can SEE the roster (foreman + crew need to know
@@ -68,7 +70,7 @@ export default async (request) => {
     .is('revoked_at', null)
     .order('joined_at', { ascending: true })
 
-  if (memErr) return json({ error: 'member_list_failed', message: memErr.message }, 500)
+  if (memErr) { console.error('[org-members-list] member list failed', memErr); return json({ error: 'member_list_failed', message: 'Could not load the team roster. Try again shortly.' }, 500) }
 
   // 3. Decorate with full_name + email from auth + profiles. Auth
   //    emails come from auth.users via admin API; profile info is a
