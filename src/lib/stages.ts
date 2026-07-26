@@ -259,11 +259,23 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // If the CO fetch fails we can't know the true contract, so fail safe:
   // skip the auto-close rather than treat a failed fetch as "no COs" and
   // prematurely close a job that still owes change-order money.
+  //
+  // Re-read the contract amount rather than trusting the caller's
+  // in-memory contact row — a quote edited moments earlier (or on
+  // another device) could make a stale cached amount auto-close a job
+  // that still owes money, or miss a close that should fire.
+  const { data: freshContact } = await supabase
+    .from('fh_contacts')
+    .select('amount, stage')
+    .eq('id', contact.id)
+    .maybeSingle()
+  const baseAmount = Number((freshContact?.amount ?? contact.amount) || 0)
+  const currentStage = freshContact?.stage ?? contact.stage
   let closed = false
   if (!coErr) {
     const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
-    const contractAmount = Number(contact.amount || 0) + approvedCO
-    if (contractAmount > 0 && total >= contractAmount && contact.stage !== 'closed') {
+    const contractAmount = baseAmount + approvedCO
+    if (contractAmount > 0 && total >= contractAmount && currentStage !== 'closed') {
       const { error: closeErr } = await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
       closed = !closeErr
     }
@@ -275,26 +287,40 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
 
 export async function recalcCost(contactId: string | undefined, userId: string | undefined) {
   if (!contactId || !userId) return 0
+  // The job OWNER anchors the labor split (lib/labor.ts skips the
+  // owner's punches — their job-screen clock already books through
+  // fh_expenses). Resolve it from the contact rather than assuming the
+  // caller is the owner: when an admin/manager triggered a recalc, the
+  // old code computed a garbage number from the caller's perspective
+  // and then no-op'd the write behind a user_id filter.
+  const { data: contactRow } = await supabase
+    .from('fh_contacts')
+    .select('id, user_id')
+    .eq('id', contactId)
+    .maybeSingle()
+  const ownerId = contactRow?.user_id || userId
+  // No user_id filter on the sums: the job screen shows ALL fh_subs /
+  // fh_expenses rows on the contact (org RLS), so the cached cost must
+  // count them all too — filtering to the caller's own rows dropped
+  // every sub/expense a different org member logged.
   const [{ data: subs }, { data: exps }, crewLabor] = await Promise.all([
     supabase
       .from('fh_subs')
       .select('rate')
-      .eq('contact_id', contactId)
-      .eq('user_id', userId),
+      .eq('contact_id', contactId),
     supabase
       .from('fh_expenses')
       .select('amount')
-      .eq('contact_id', contactId)
-      .eq('user_id', userId),
+      .eq('contact_id', contactId),
     // Crew clock-ins (other org members' completed punches × their
     // hourly rate). The owner's own job-screen clock already lands in
     // fh_expenses as category='Labor' — see lib/labor.ts for the split.
-    crewLaborForContact(contactId, userId)
+    crewLaborForContact(contactId, ownerId)
   ])
   const subsTotal = (subs || []).reduce((s, r) => s + Number(r.rate || 0), 0)
   const expsTotal = (exps || []).reduce((s, r) => s + Number(r.amount || 0), 0)
   const cost = subsTotal + expsTotal + crewLabor.cost
-  await supabase.from('fh_contacts').update({ cost }).eq('id', contactId).eq('user_id', userId)
+  await supabase.from('fh_contacts').update({ cost }).eq('id', contactId)
   return cost
 }
 

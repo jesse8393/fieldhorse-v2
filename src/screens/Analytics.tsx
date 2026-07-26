@@ -83,11 +83,12 @@ export default function Analytics() {
   const stats = useMemo(() => {
     // Pipeline = sum of all jobs in active stages.
     const pipeline = contacts.filter((c) => ACTIVE_STAGES.includes(c.stage as string)).reduce((s, c) => s + Number(c.amount || 0), 0)
-    // Won YTD + Profit YTD now share the rollups.ts definition with
-    // Jobs/Clients (won = stage in (invoice, closed)). Was previously
-    // 'closed' only, so any job sitting in 'invoice' read as $0 won.
-    const wonYTD = wonYTDFn(contacts)
-    const profitYTD = profitYTDFn(contacts)
+    // Won YTD + Profit YTD share the rollups.ts definition with
+    // Jobs/Clients (won = stage in (invoice, closed)), anchored to the
+    // stage-transition log so editing an old job (which bumps
+    // updated_at) can't re-book last year's revenue into this year.
+    const wonYTD = wonYTDFn(contacts, stageTransitions as any)
+    const profitYTD = profitYTDFn(contacts, stageTransitions as any)
     // Close rate honesty guard (5/17 — replaces Phase 11's sample-size-3
     // guard which still showed 100% when an operator had 3+ wins and 0
     // losses). Requires BOTH at least one won AND at least one lost so
@@ -177,7 +178,9 @@ export default function Analytics() {
       // stage rides along for pre-migration rows).
       const billed = c.stage === 'closed' || c.stage === 'invoice' || (c.stage === 'job' && c.completed_at)
       if (!billed) return s
-      const t = new Date(c.updated_at || c.created_at || 0).getTime()
+      // Anchor on when the work completed, not updated_at — editing an
+      // old job bumps updated_at and would re-book it into this year.
+      const t = new Date(c.completed_at || c.updated_at || c.created_at || 0).getTime()
       return (Number.isFinite(t) && t >= yearStart) ? s + Number(c.amount || 0) : s
     }, 0)
     const invoiced = invoicedFromInvoices > 0
@@ -200,7 +203,7 @@ export default function Analytics() {
       milesYTD, mileageDeduction,
       invoiced, collected,
     }
-  }, [contacts, mileage, invoices, payments])
+  }, [contacts, mileage, invoices, payments, stageTransitions])
 
   const byStage = useMemo(() => {
     // Legacy 'invoice'-stage rows count under 'job' (their v2 home).
@@ -243,17 +246,20 @@ export default function Analytics() {
   }, [payments])
   const maxMonthlyRevenue = Math.max(...revenueByMonth.map((b) => b.total), 1)
 
-  // Win rate by job_type. won = stage='closed' (or 'invoice' if you
-  // count signed work as won); lost = stage='lost'. Skips types with
-  // fewer than 2 outcomes so a single lucky/unlucky job doesn't
-  // dominate the table.
+  // Win rate by job_type. Uses the SAME won definition as the Close
+  // Rate tile and rollups.ts (job/invoice/closed) — this table used to
+  // count only 'closed' as won, so the two win rates on this one screen
+  // disagreed whenever active jobs existed. Skips types with fewer than
+  // 2 outcomes so a single lucky/unlucky job doesn't dominate.
   const winRateByType = useMemo(() => {
+    const WON = new Set(['job', 'invoice', 'closed'])
     const map = new Map()
     for (const c of contacts) {
       const k = c.job_type || 'Other'
-      if (c.stage !== 'closed' && c.stage !== 'lost') continue
+      const stage = c.stage || ''
+      if (!WON.has(stage) && stage !== 'lost') continue
       const cur = map.get(k) || { type: k, won: 0, lost: 0 }
-      if (c.stage === 'closed') cur.won++
+      if (WON.has(stage)) cur.won++
       else cur.lost++
       map.set(k, cur)
     }
@@ -278,8 +284,10 @@ export default function Analytics() {
     const clientById = new Map(clients.map((c) => [c.id, c]))
     const totals = new Map()
     for (const p of payments) {
-      const when = new Date((p.paid_on || p.created_at) as any)
-      if (Number.isNaN(when.getTime()) || when < cutoff) continue
+      // paid_on is date-only — parse LOCAL (same rule as the YTD sums
+      // above) so boundary-day payments don't shift out of the window.
+      const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
+      if (!when || when < cutoff) continue
       const c = contactById.get(p.contact_id as string)
       const clientName = c?.client_id ? clientById.get(c.client_id)?.name : null
       const key = clientName || c?.name || 'Unknown'
@@ -308,8 +316,8 @@ export default function Analytics() {
   const avgDepositLagDays = useMemo(() => {
     const firstPaymentByContact = new Map()
     for (const p of payments) {
-      const when = new Date((p.paid_on || p.created_at) as any)
-      if (Number.isNaN(when.getTime())) continue
+      const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
+      if (!when) continue
       const prev = firstPaymentByContact.get(p.contact_id)
       if (!prev || when < prev) firstPaymentByContact.set(p.contact_id, when)
     }

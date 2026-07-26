@@ -24,6 +24,7 @@ import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
 import { money, longDate, shortDate } from './format.ts'
+import { parseDateOnly } from '../../lib/dates.ts'
 import { invoiceNumber, invoiceNumberFromSequence } from './numbers.ts'
 
 const DEFAULT_PAYMENT_COPY = 'Please remit payment by the due date above. Payments are applied to the project balance.'
@@ -71,7 +72,12 @@ export default function InvoiceTemplate({
     : Math.max(0, adjustedContractTotal - paid)
   const amountDue = thisInvoice != null ? Number(thisInvoice) : balance
   const isPaid = String(status).toLowerCase() === 'paid' || balance < 0.5
-  const isOverdue = !isPaid && dueDate && new Date(dueDate).getTime() < Date.now()
+  // due_at can be a date-only string — parse LOCAL (the codebase rule,
+  // see format.ts) and don't flag "Past due" until the due DAY has
+  // fully passed; the raw UTC parse flipped the chip red the evening
+  // before the due date in every US timezone.
+  const dueParsed = parseDateOnly(dueDate)
+  const isOverdue = !isPaid && dueParsed != null && dueParsed.getTime() + 86400000 <= Date.now()
 
   const rows = (lineItems && lineItems.length > 0)
     ? lineItems.map((li: any) => ({
@@ -85,7 +91,10 @@ export default function InvoiceTemplate({
       }))
     : []
 
-  const scheduleRows = (invoices || []).filter((inv: any) => inv && inv.status !== 'void')
+  // Match the PDF and public link: drafts are never shown to customers,
+  // so the in-app preview must hide them too or the operator previews a
+  // billing schedule the customer will never receive.
+  const scheduleRows = (invoices || []).filter((inv: any) => inv && inv.status !== 'void' && inv.status !== 'draft')
 
   const paymentInstructions = (company?.payment_instructions || '').trim()
 

@@ -261,10 +261,19 @@ export function suggestNextInvoice({ contact, payments = [], changeOrders = [], 
 }) {
   const totals = contractTotals({ contact, payments, changeOrders, invoices })
   const sequence = (invoices || []).filter((i) => i?.status !== 'void').length + 1
-  const isFinal = !!(contact as any)?.completed_at || (totals.unbilled > 0 && totals.unbilled === totals.balance && sequence > 1)
+  // Cent-tolerant compare — unbilled and balance are independently
+  // summed floats, so strict === mislabeled the final invoice whenever
+  // FP dust crept in.
+  const isFinal = !!(contact as any)?.completed_at || (totals.unbilled > 0.005 && Math.abs(totals.unbilled - totals.balance) < 0.005 && sequence > 1)
+  // Suggest ONLY unbilled money, rounded to cents (whole-dollar
+  // rounding left invoice sets that never reconciled to the contract).
+  // When everything is already invoiced, suggest $0 — the old
+  // `unbilled || balance` fallthrough prefilled a duplicate invoice for
+  // the full outstanding balance the moment unbilled hit exactly 0.
+  const amount = totals.unbilled > 0.005 ? Math.round(totals.unbilled * 100) / 100 : 0
   return {
     title: isFinal ? 'Final balance' : sequence === 1 ? 'Deposit' : `Progress draw ${sequence}`,
-    amount: Math.round(totals.unbilled || totals.balance),
+    amount,
     totals
   }
 }

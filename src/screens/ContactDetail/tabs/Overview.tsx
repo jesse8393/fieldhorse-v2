@@ -191,7 +191,15 @@ export default function OverviewTab({
     onOpenAddEvent?.()
   }
 
-  const contractValue = Number(contact?.amount || 0)
+  // True contract = base amount + approved change orders — the same
+  // number the header balance, Financials tab, and customer PDF use.
+  // Without the CO term this cockpit read "Paid in full / $0 remaining"
+  // on a job whose approved CO was still owed.
+  const approvedCo = (changeOrders || []).reduce(
+    (s: number, co: any) => s + (co?.status === 'approved' ? Number(co.amount || 0) : 0),
+    0
+  )
+  const contractValue = Number(contact?.amount || 0) + approvedCo
   const paidNum = Number(paid || 0)
   const remaining = Math.max(0, contractValue - paidNum)
   const billedPct = contractValue > 0 ? Math.min(1, paidNum / contractValue) : 0

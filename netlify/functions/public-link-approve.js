@@ -114,6 +114,21 @@ export default async function handler(req) {
   if ((contact.proposal_status || 'draft').toLowerCase() === 'approved') {
     return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
   }
+  // The quote's own validity date must gate approval too — links are
+  // minted with expires_at NULL, so without this check a customer could
+  // open an old text-message link months later and legally-bind stale
+  // pricing the contractor considered dead ("Valid until Aug 4" printed
+  // right on the document they'd be approving).
+  const quoteExpiry = contact.quote_expires_at ? new Date(contact.quote_expires_at) : null
+  if (quoteExpiry && !Number.isNaN(quoteExpiry.getTime())) {
+    const expiryEnd = new Date(quoteExpiry.getTime() + 24 * 60 * 60 * 1000) // valid through the stated day
+    if (expiryEnd < new Date()) {
+      return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
+    }
+  }
+  if ((contact.proposal_status || '').toLowerCase() === 'expired') {
+    return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
+  }
 
   // 2. Snapshot the live items + the profile branding so the approved
   //    version is independent of future edits.
@@ -151,7 +166,13 @@ export default async function handler(req) {
   let optionalTotal = 0
   let excludedCount = 0
   const snapItems = itemRows.map((i) => {
-    const amt = Number(i.amount || 0)
+    // Same qty×rate fallback every renderer applies (mapItems.ts,
+    // pdf.js, LineItemsTable) — without it, an item stored with a null
+    // amount showed as $520 on the document the customer approved but
+    // $0 in the legally-binding snapshot total.
+    const amt = i.amount != null
+      ? Number(i.amount || 0)
+      : Number(i.qty || 0) * Number(i.rate || 0)
     if (i.is_excluded) excludedCount += 1
     else if (i.is_optional) optionalTotal += amt
     else baseTotal += amt

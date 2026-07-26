@@ -43,6 +43,7 @@ export default function Clients() {
   // Both come from the same Query bundle as the client roster.
   const jobs = bundle?.jobs ?? []
   const payments = bundle?.payments ?? []
+  const changeOrders = bundle?.changeOrders ?? []
 
   // After a save/merge, invalidate the clients query so the list +
   // rollups refresh. Replaces the old load() refetch.
@@ -50,7 +51,7 @@ export default function Clients() {
 
   // Map<client_id, { lifetime, outstanding, activeCount, ... }> — built
   // once per (jobs|payments) change. Per-row lookup is O(1).
-  const rollupMap = useMemo(() => rollupByClient(jobs, payments), [jobs, payments])
+  const rollupMap = useMemo(() => rollupByClient(jobs, payments, changeOrders), [jobs, payments, changeOrders])
 
   // Duplicate detection — runs every time the client roster changes.
   // Match policy lives in lib/clientMerge.ts (phone or email normalized).

@@ -28,6 +28,7 @@ const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import StatementSheet from '../components/StatementSheet.tsx'
 import { approvedCoByContact } from '../lib/statement.ts'
+import { parseDateOnly } from '../lib/dates.ts'
 import { useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
@@ -214,7 +215,10 @@ export default function Invoices() {
     const now = Date.now()
     return invoices.map((inv) => {
       const job = jobById.get(inv.contact_id) || null
-      const pastDue = inv.status === 'sent' && inv.due_at && new Date(inv.due_at).getTime() < now
+      // due_at can be date-only — LOCAL parse, and a bill due "July 25"
+      // isn't overdue until July 25 has fully passed locally.
+      const due = parseDateOnly(inv.due_at)
+      const pastDue = inv.status === 'sent' && due != null && due.getTime() + 86400000 <= now
       const effStatus = pastDue ? 'overdue' : (inv.status || 'draft')
       return { invoice: inv, job, effStatus }
     })
@@ -249,7 +253,10 @@ export default function Invoices() {
     let monthCollected = 0
     let priorTotal = 0
     for (const p of payments) {
-      const t = p.paid_on ? new Date(p.paid_on as any).getTime() : new Date(p.created_at as any).getTime()
+      // paid_on is date-only — parse LOCAL so a payment dated the 1st
+      // doesn't bucket into the prior month (UTC parse shifts it back
+      // a day in every US timezone).
+      const t = (parseDateOnly(p.paid_on) || parseDateOnly(p.created_at))?.getTime() ?? NaN
       const amt = Number(p.amount || 0)
       if (t >= startOfMonth) monthCollected += amt
       else if (t >= threeMonthsAgo) priorTotal += amt

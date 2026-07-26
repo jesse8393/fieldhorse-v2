@@ -11,6 +11,8 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Check, CheckCheck, ChevronRight, Search, AlertTriangle } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { orgPunchApprove, orgPunchFlag, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
+import { recalcCost } from '../lib/stages.ts'
+import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 
@@ -50,6 +52,7 @@ function startOfWeek(): Date {
 
 export default function Timesheets() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { orgName, role, loading: memLoading, canApproveTimesheets } = useMembership()
 
   const [loading, setLoading] = useState(true)
@@ -96,6 +99,20 @@ export default function Timesheets() {
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [punches])
 
+  // Refresh the cached job cost for the contacts behind these punch
+  // ids — approval can stamp rates (repricing unrated hours) and
+  // flag/unflag moves hours in and out of billable labor. Best-effort;
+  // the cache also self-heals on the next owner-side recalc.
+  function recalcAffected(ids: string[]) {
+    if (!user?.id) return
+    const contactIds = new Set(
+      punches.filter((p) => ids.includes(p.id) && p.contact_id).map((p) => p.contact_id as string)
+    )
+    for (const cid of contactIds) {
+      recalcCost(cid, user.id).catch(() => {})
+    }
+  }
+
   async function approve(ids: string[]) {
     if (ids.length === 0) return
     setApproving((m) => Object.fromEntries([...Object.entries(m), ...ids.map((id) => [id, true] as const)]))
@@ -104,6 +121,7 @@ export default function Timesheets() {
       toastSuccess(`${res.approved_count} approved`)
       // Optimistic: drop the approved rows.
       setPunches((cur) => cur.filter((p) => !res.approved_ids.includes(p.id)))
+      recalcAffected(res.approved_ids || ids)
     } catch (e: any) {
       toastError('Approve failed', e?.detail || e?.message || '')
     } finally {
@@ -126,6 +144,7 @@ export default function Timesheets() {
       await orgPunchFlag([id], true, reason.trim())
       toastSuccess('Punch flagged')
       setPunches((cur) => cur.map((p) => p.id === id ? { ...p, flagged: true, flag_reason: reason.trim() || null } : p))
+      recalcAffected([id])
     } catch (e: any) {
       toastError('Flag failed', e?.detail || e?.message || '')
     } finally {
@@ -139,6 +158,7 @@ export default function Timesheets() {
       await orgPunchFlag([id], false)
       toastSuccess('Flag cleared')
       setPunches((cur) => cur.map((p) => p.id === id ? { ...p, flagged: false, flag_reason: null } : p))
+      recalcAffected([id])
     } catch (e: any) {
       toastError('Failed', e?.detail || e?.message || '')
     } finally {
@@ -146,9 +166,12 @@ export default function Timesheets() {
     }
   }
 
-  // KPI snapshot
-  const totalMinutes = punches.reduce((s, p) => s + p.minutes, 0)
-  const totalCost    = punches.reduce((s, p) => s + (p.cost ?? 0), 0)
+  // KPI snapshot. Flagged punches are excluded from hours/cost — they
+  // don't bill the job while disputed (lib/labor.ts skips them), so
+  // counting them here made the approval screen disagree with job cost.
+  const unflagged = punches.filter((p) => !p.flagged)
+  const totalMinutes = unflagged.reduce((s, p) => s + p.minutes, 0)
+  const totalCost    = unflagged.reduce((s, p) => s + (p.cost ?? 0), 0)
   const flaggedCount = punches.filter((p) => p.flagged).length
 
   // Role-gate the entire screen at first paint; backend re-checks anyway.
@@ -279,8 +302,12 @@ export default function Timesheets() {
                   <button
                     type="button"
                     className="fh-build-primary-btn"
-                    onClick={() => approve(g.rows.map((r) => r.id))}
-                    disabled={g.rows.some((r) => approving[r.id])}
+                    // Flagged rows stay OUT of "Approve all" — a punch
+                    // the owner flagged as suspicious must be resolved
+                    // (or explicitly approved) on its own row, not
+                    // swept through with the batch.
+                    onClick={() => approve(g.rows.filter((r) => !r.flagged).map((r) => r.id))}
+                    disabled={g.rows.every((r) => r.flagged) || g.rows.some((r) => approving[r.id])}
                   >
                     <CheckCheck size={13} /> Approve all
                   </button>

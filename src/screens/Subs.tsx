@@ -5,6 +5,7 @@ import { Phone, Plus, Search, Hammer, ChevronRight, MessageSquare, IdCard } from
 import { supabase } from '../lib/supabase.ts'
 import { useSubsBundle, useInvalidateSubs } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.ts'
+import { subIdentityKey } from '../lib/subIdentity.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -71,13 +72,14 @@ export default function Subs() {
     return map
   }, [bundle?.contacts])
 
-  // Roll up by sub identity. Phone wins (unique) when present; falls
-  // back to lowercased name. Subs with neither name nor phone get
-  // grouped as "Untitled" so they're still listed but obvious.
+  // Roll up by sub identity — shared normalization (lib/subIdentity.ts):
+  // digits-only phone when present, else lowercased name. Formatting
+  // differences ("(615) 555-0101" vs "6155550101") no longer split one
+  // sub into multiple cards with partial totals.
   const grouped = useMemo(() => {
     const map = new Map()
     for (const r of rows) {
-      const key = (r.phone || r.name || '').toLowerCase().trim() || '__untitled__'
+      const key = subIdentityKey(r)
       if (!map.has(key)) {
         map.set(key, {
           key,

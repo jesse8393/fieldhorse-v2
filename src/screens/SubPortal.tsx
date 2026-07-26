@@ -4,11 +4,13 @@
 //   - Invitations list (read-only — direct fh_job_partners query)
 //   - Sub profile section (read + edit via /api/sub-profile-update)
 //   - Document uploads (COI / W-9 / License) via signed-upload-URL
-//   - Payment history (service-role fetch via /api/sub-portal-context
-//     because fh_payments RLS is org-scoped)
+//
+// Deliberately NO payment history here: fh_payments rows are the GC's
+// client receipts, not money paid to the sub — showing them here both
+// mis-stated the sub's income and leaked the GC's revenue.
 //
 // One round trip via /api/sub-portal-context returns profiles,
-// invites, jobs, and payments together. Document uploads go through
+// invites, and jobs together. Document uploads go through
 // a sign + PUT + confirm dance; profile metadata writes go through
 // the update endpoint so the same insurance info propagates to every
 // GC that has this sub on file.
@@ -35,11 +37,6 @@ function fmtDate(iso: string | null): string {
   try {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   } catch { return '—' }
-}
-
-function fmtMoney(n: number | null): string {
-  if (n == null) return '—'
-  return `$${Math.round(Number(n)).toLocaleString()}`
 }
 
 function stageTone(stage: string | null): 'good' | 'warn' | 'bad' | 'neutral' {
@@ -120,8 +117,11 @@ export default function SubPortal() {
   const profile = useMemo(() => mergedProfile(ctx?.matched_profiles || []), [ctx])
   const partners = ctx?.accepted_partners || []
   const jobs = ctx?.linked_jobs || {}
-  const payments = ctx?.payments || []
 
+  // No payment figures in the portal: fh_payments rows are the GC's
+  // client receipts, not money paid to the sub. The old "Paid YTD" KPI
+  // summed the GC's revenue on shared jobs — wrong for the sub AND a
+  // leak of the GC's financials. The server no longer returns them.
   const stats = useMemo(() => {
     const active = partners.filter((p) => {
       const s = String(jobs[p.job_id]?.stage || '').toLowerCase()
@@ -131,16 +131,6 @@ export default function SubPortal() {
     const trades = Array.from(new Set(partners.map((p) => p.partner_role || '').filter(Boolean)))
     return { active, completed, total: partners.length, trades }
   }, [partners, jobs])
-
-  // YTD paid: every payment paid in the current calendar year
-  const ytdPaid = useMemo(() => {
-    const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime()
-    return payments.reduce((sum, p) => {
-      const t = new Date(p.paid_on || p.created_at || 0).getTime()
-      if (Number.isFinite(t) && t >= yearStart) return sum + Number(p.amount || 0)
-      return sum
-    }, 0)
-  }, [payments])
 
   async function handleUpload(kind: DocKind, file: File | null) {
     if (!file) return
@@ -209,7 +199,7 @@ export default function SubPortal() {
           <div className="fh-build-mini-grid">
             <MiniMetric label="Active jobs" value={String(stats.active)} accent />
             <MiniMetric label="Completed" value={String(stats.completed)} />
-            <MiniMetric label="Paid YTD" value={fmtMoney(ytdPaid)} />
+            <MiniMetric label="All-time jobs" value={String(stats.total)} />
             <MiniMetric
               label="Insurance"
               value={ins.label}
@@ -365,54 +355,6 @@ export default function SubPortal() {
                 )}
               </section>
 
-              {/* Payments */}
-              <section className="fh-build-card fh-build-table">
-                <header className="fh-build-card-head">
-                  <div className="fh-build-eyebrow">
-                    Payments · {payments.length}
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>
-                    YTD {fmtMoney(ytdPaid)}
-                  </span>
-                </header>
-                {payments.length === 0 ? (
-                  <div className="fh-build-table__empty">No payments recorded yet for the jobs you're on.</div>
-                ) : (
-                  <>
-                    <div className="fh-build-table__head is-subportal-pay">
-                      <span>Job</span>
-                      <span>Date</span>
-                      <span>Kind</span>
-                      <span>Method</span>
-                      <span>Amount</span>
-                    </div>
-                    {payments.slice(0, 50).map((pmt) => {
-                      const j = pmt.contact_id ? jobs[pmt.contact_id] : null
-                      return (
-                        <div
-                          key={pmt.id}
-                          className="fh-build-table__row is-subportal-pay is-clickable"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => pmt.contact_id && navigate(`/jobs/${pmt.contact_id}`)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' && pmt.contact_id) navigate(`/jobs/${pmt.contact_id}`) }}
-                        >
-                          <strong className="fh-build-truncate">{j?.name || 'Job'}</strong>
-                          <span className="fh-build-rel">{fmtDate(pmt.paid_on || pmt.created_at)}</span>
-                          <span className="fh-build-rel" style={{ textTransform: 'capitalize' }}>{pmt.kind || '—'}</span>
-                          <span className="fh-build-rel">{pmt.method || '—'}</span>
-                          <span className="fh-build-num" style={{ color: 'var(--v3-primary, #c9963a)', fontWeight: 700 }}>
-                            {fmtMoney(Number(pmt.amount))}
-                          </span>
-                        </div>
-                      )
-                    })}
-                    {payments.length > 50 && (
-                      <div className="fh-build-table__more">Showing the 50 most recent.</div>
-                    )}
-                  </>
-                )}
-              </section>
             </div>
 
             {/* RAIL — quick links + help */}

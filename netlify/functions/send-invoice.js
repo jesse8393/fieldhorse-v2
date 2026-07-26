@@ -262,7 +262,11 @@ export default async (request) => {
 function formatMoneyLabel(n) {
   const v = Number(n || 0)
   if (!Number.isFinite(v) || v <= 0) return ''
-  return `$${Math.round(v).toLocaleString()}`
+  // Show cents when the amount has them — rounding a $2,499.50 invoice
+  // to "$2,500" in the email subject made customers overpay by 50¢ and
+  // the invoice never reconciled.
+  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 })}`
 }
 
 function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, senderLine, companyName, payLink, payInstructions }) {

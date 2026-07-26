@@ -45,6 +45,7 @@ export default function ProposalTemplate({
   upgrades = [],          // is_optional items — rendered as add-ons
   pricing = { baseTotal: 0, upgradeTotal: 0, discount: 0, taxRate: 0 },
   paymentSchedule = null, // optional [{ label, note }] override of the default terms copy
+  paymentTermsText = null, // contractor's own terms copy (contact.terms_text) — beats the 50/40/10 default
   warrantyText,
   exclusions = [],
   insurance = null,
@@ -109,7 +110,10 @@ export default function ProposalTemplate({
       tax,
       taxRate: Number(pricing.taxRate || 0),
       total: grandTotal,
-      paymentTerms: DEFAULT_PAYMENT_COPY,
+      // The contractor's own terms when set — hardcoding the 50/40/10
+      // default here told customers a deposit schedule the contractor
+      // never agreed to.
+      paymentTerms: (paymentTermsText || '').trim() || DEFAULT_PAYMENT_COPY,
       warrantyText,
       exclusions,
       status,
@@ -121,9 +125,12 @@ export default function ProposalTemplate({
     return <ThemeComponent view={view} />
   }
 
-  const paymentTermsCopy = Array.isArray(paymentSchedule) && paymentSchedule.length > 0
-    ? paymentSchedule.map((m: any) => [m.label, m.note].filter(Boolean).join(' — ')).join(' · ')
-    : DEFAULT_PAYMENT_COPY
+  // Precedence: contractor's written terms > structured schedule >
+  // the generic 50/40/10 default (last resort only).
+  const paymentTermsCopy = (paymentTermsText || '').trim()
+    || (Array.isArray(paymentSchedule) && paymentSchedule.length > 0
+      ? paymentSchedule.map((m: any) => [m.label, m.note].filter(Boolean).join(' — ')).join(' · ')
+      : DEFAULT_PAYMENT_COPY)
 
   return (
     <DocumentShell

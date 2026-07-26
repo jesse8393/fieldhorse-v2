@@ -103,11 +103,16 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   async function handleSave(payload: any) {
     if (!contact?.id || !userId) return false
     try {
+      const amount = Number(payload.amount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        toastError('Amount required', 'Enter a positive amount for this draw.')
+        return false
+      }
       const row = {
         contact_id: contact.id,
         user_id: userId,
         title: payload.title?.trim() || `Draw ${(draws.length || 0) + 1}`,
-        amount: Number(payload.amount) || 0,
+        amount,
         status: payload.status || 'draft',
         issued_at: payload.issued_at || null,
         due_at: payload.due_at || null,
@@ -175,12 +180,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         const row = schedule[i]
         const pct = Number(row.pct || 0)
         // Each draw rounds independently EXCEPT the last, which takes
-        // the remainder — otherwise per-draw Math.round drifts and the
-        // schedule doesn't reconcile to the contract total (e.g. $3,000
-        // ÷ 3 → $1,000 + $1,000 + $999 if every draw rounds on its own).
+        // the remainder — otherwise per-draw rounding drifts and the
+        // schedule doesn't reconcile to the contract total. Round to
+        // CENTS, not whole dollars: a $3,000.50 contract must produce
+        // draws that sum to exactly $3,000.50, or the schedule printed
+        // on the customer's invoice disagrees with the contract line.
         const amount = i === schedule.length - 1
-          ? Math.round(contractTotal - issuedSoFar)
-          : Math.round(contractTotal * (pct / 100))
+          ? Math.round((contractTotal - issuedSoFar) * 100) / 100
+          : Math.round(contractTotal * pct) / 100
         issuedSoFar += amount
         const { error } = await supabase.from('fh_invoices').insert({
           contact_id: contact.id,
@@ -757,7 +764,10 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
   function set(k: any, v: any) { setForm((prev) => ({ ...prev, [k]: v })) }
 
   async function submit() {
-    if (Number(form.amount) <= 0) {
+    // NaN fails BOTH `<= 0` and `> 0` — check the valid case, not the
+    // invalid one, so garbage input can't slip through as $0.
+    const amt = Number(form.amount)
+    if (!Number.isFinite(amt) || amt <= 0) {
       toastError('Amount required', 'Enter a positive amount for this draw.')
       return
     }
@@ -787,7 +797,11 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
               type="text"
               inputMode="decimal"
               value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
+              // Strip everything but digits/decimal — same rule as
+              // V3PaymentSheet/SendInvoiceSheet. Without it, typing
+              // "1,500" (or pasting "$1,500") passed validation as NaN
+              // and persisted a $0 draw.
+              onChange={(e) => set('amount', e.target.value.replace(/[^0-9.]/g, ''))}
               placeholder={unbilled > 0 ? String(unbilled) : '0'}
               style={{ ...inputStyle, paddingLeft: 20 }}
             />

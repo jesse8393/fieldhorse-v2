@@ -12,7 +12,7 @@ import {
   Send,
   Link as LinkIcon
 } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
 import { fetchInvoicesForContact } from '../lib/invoices.ts'
@@ -95,7 +95,14 @@ export default function InvoiceDetail() {
   // back in the bundle below.
   const { data: bundle, isPending: loading, isError, error: queryError } = useInvoiceDetail(id, user?.id)
   const invalidateInvoiceDetail = useInvalidateInvoiceDetail()
-  const refresh = () => invalidateInvoiceDetail(id)
+  const queryClient = useQueryClient()
+  // Refresh BOTH caches — a payment can settle the current draw
+  // (stages.ts flips it to 'paid'), and refreshing only the contact
+  // left the document view billing an already-paid draw until remount.
+  const refresh = () => {
+    invalidateInvoiceDetail(id)
+    queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] })
+  }
   const contact = bundle?.contact ?? null
   const payments = bundle?.payments ?? []
   const insurance = bundle?.insurance ?? null
@@ -171,15 +178,26 @@ export default function InvoiceDetail() {
     const amount = Number(contact?.amount || 0) + approvedCo
     const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
     const balance = Math.max(0, amount - paid)
-    const ageDays = contact?.created_at
-      ? Math.floor((Date.now() - new Date(contact.created_at).getTime()) / 86400000)
-      : 0
+    // Age from when the receivable went out (open draw's due/issue
+    // date), NOT the job's creation date — the same anchor the Invoices
+    // list uses. Anchoring on created_at made a job quoted in April and
+    // first billed yesterday open with a red "Overdue · 91d" pill while
+    // the A/R list said "Current · 1d".
+    const drawAnchor = (() => {
+      const s = String(currentDraw?.status || '').toLowerCase()
+      if (!currentDraw || s === 'paid' || s === 'void' || s === 'draft') return null
+      const raw = currentDraw.due_at || currentDraw.issued_at || currentDraw.created_at
+      const t = raw ? new Date(raw).getTime() : NaN
+      return Number.isFinite(t) ? t : null
+    })()
+    const anchorMs = drawAnchor ?? (contact?.created_at ? new Date(contact.created_at).getTime() : NaN)
+    const ageDays = Number.isFinite(anchorMs) ? Math.floor((Date.now() - anchorMs) / 86400000) : 0
     const bucket = bucketFor(ageDays)
     const isPaid = balance < 0.5 && amount > 0
     const isClosed = (contact?.stage || '').toLowerCase() === 'closed'
     const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0
     return { amount, paid, balance, ageDays, bucket, isPaid, isClosed, pctPaid }
-  }, [contact, payments, changeOrders])
+  }, [contact, payments, changeOrders, currentDraw])
 
   const status = useMemo(() => {
     // Computed status — no stored invoice_status column today. The four
@@ -204,6 +222,36 @@ export default function InvoiceDetail() {
     payment_instructions: (profile as any)?.payment_instructions || ''
   }), [profile])
 
+  // What this screen is billing right now. When an open draw exists,
+  // the PDF/email bill THAT draw (same as the Draws tab and the public
+  // link) — this path used to bill the whole contract, so the same
+  // customer could receive a $20,000 "invoice" from here and a $5,000
+  // draw from the Draws tab for the same job. Jobs without draw rows
+  // keep the whole-balance presentation.
+  const billingDraw = useMemo(() => {
+    const s = String(currentDraw?.status || '').toLowerCase()
+    return currentDraw && s !== 'paid' && s !== 'void' && s !== 'draft' ? currentDraw : null
+  }, [currentDraw])
+  const pdfLineItems = useMemo(() => (
+    billingDraw
+      ? [{
+          description: billingDraw.title?.trim() || `Invoice #${billingDraw.sequence_number}`,
+          notes: contact?.job_title || 'Construction services',
+          qty: 1,
+          rate: Number(billingDraw.amount || 0),
+          amount: Number(billingDraw.amount || 0)
+        }]
+      : [{
+          description: contact?.job_title || 'Construction services per agreement',
+          qty: 1,
+          rate: totals.amount,
+          amount: totals.amount
+        }]
+  ), [billingDraw, contact?.job_title, totals.amount])
+  const amountDueNow = billingDraw
+    ? Math.min(totals.balance, Number(billingDraw.amount || 0))
+    : totals.balance
+
   async function handleGeneratePDF() {
     if (!contact || generating) return
     setGenerating(true)
@@ -222,14 +270,7 @@ export default function InvoiceDetail() {
         // Single canonical line — the new template renders a full
         // Balance Summary section underneath, so we no longer need
         // to inject a synthetic "Less: payments received" row.
-        lineItems: [
-          {
-            description: contact.job_title || 'Construction services per agreement',
-            qty: 1,
-            rate: totals.amount,
-            amount: totals.amount
-          }
-        ],
+        lineItems: pdfLineItems,
         taxRate: 0,
         notes: '',
         dueDate: '',
@@ -307,14 +348,7 @@ export default function InvoiceDetail() {
           email: resolved.email,
           job_title: contact.job_title
         },
-        lineItems: [
-          {
-            description: contact.job_title || 'Construction services per agreement',
-            qty: 1,
-            rate: totals.amount,
-            amount: totals.amount
-          }
-        ],
+        lineItems: pdfLineItems,
         taxRate: 0,
         notes: '',
         dueDate: '',
@@ -364,7 +398,7 @@ export default function InvoiceDetail() {
           recipient_name: resolved.name || null,
           storage_path: path,
           filename: result.filename,
-          amount_due: totals.balance
+          amount_due: amountDueNow
         })
       })
       const sendBody = await sendRes.json().catch(() => ({}))
@@ -910,6 +944,15 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
     if (tone === 'muted')  return 'closed'
     return 'outstanding'
   })()
+  // "This invoice" = the current open draw's amount (capped at the
+  // balance), exactly like the public link — billing totals.balance
+  // here made this preview demand the whole remaining contract while
+  // the Draws tab sent the same customer a $5K draw.
+  const drawIsOpen = currentInvoice
+    && !['paid', 'void', 'draft'].includes(String(currentInvoice.status || '').toLowerCase())
+  const thisInvoiceAmount = drawIsOpen
+    ? Math.min(totals.balance, Number(currentInvoice.amount || 0))
+    : totals.balance
 
   return (
     <motion.div
@@ -938,7 +981,7 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
         contractTotal={Number(contact?.amount || 0)}
         payments={payments}
         previouslyPaid={totals.paid}
-        thisInvoice={totals.balance}
+        thisInvoice={thisInvoiceAmount}
         balanceRemaining={totals.balance}
         invoices={invoices}
         currentInvoice={currentInvoice}

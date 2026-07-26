@@ -141,7 +141,16 @@ export default async function handler(req) {
     supabase.from('fh_payments').select('*').eq('contact_id', link.contact_id).order('paid_on', { ascending: false }),
     supabase.from('fh_change_orders').select('*').eq('contact_id', link.contact_id).order('sequence_number', { ascending: true }),
     supabase.from('fh_insurance_claims').select('*').eq('contact_id', link.contact_id).maybeSingle(),
-    supabase.from('fh_invoices').select('*').eq('contact_id', link.contact_id).order('sequence_number', { ascending: true }),
+    // Customer-visible draws only, projected columns only. `*` shipped
+    // draft/void rows (amounts for bills that were never issued) and
+    // internal notes to anyone with the link — the UI filtered them,
+    // but the JSON payload is one View-Source away.
+    supabase
+      .from('fh_invoices')
+      .select('id, contact_id, sequence_number, title, amount, status, issued_at, due_at, description')
+      .eq('contact_id', link.contact_id)
+      .in('status', ['sent', 'paid', 'overdue'])
+      .order('sequence_number', { ascending: true }),
     supabase
       .from('fh_job_files')
       .select('id, storage_path, caption, section_tag, uploaded_at')

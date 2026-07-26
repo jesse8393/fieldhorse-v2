@@ -178,7 +178,10 @@ export default async (request) => {
 function formatMoneyLabel(n) {
   const v = Number(n || 0)
   if (!Number.isFinite(v) || v <= 0) return ''
-  return `$${Math.round(v).toLocaleString()}`
+  // Cents shown when present so the emailed figure matches the PDF's
+  // cent-precise total (see send-invoice.js formatMoneyLabel).
+  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 })}`
 }
 
 function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, payLink, payInstructions }) {

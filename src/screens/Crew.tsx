@@ -20,10 +20,11 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import {
-  getActivePunch, punchIn, punchOut, listMyRecentPunches, workedMinutes,
+  getActivePunch, punchIn, punchOut, listMyRecentPunches, workedMinutes, fetchMyDefaultRate,
   type TimePunch,
 } from '../lib/timePunches.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
+import { recalcCost } from '../lib/stages.ts'
 
 type ScheduleRow = {
   id: string
@@ -174,7 +175,18 @@ export default function Crew() {
     if (!user || punching || !activePunch) return
     setPunching(true)
     try {
-      await punchOut({ punchId: activePunch.id })
+      // Snapshot the member's current rate onto the punch (allowed
+      // once, NULL→value, by the 054 guard). Without it the shift
+      // priced at whatever the rate happens to be when job cost is
+      // next computed — a raise retroactively repriced old shifts.
+      const rate = await fetchMyDefaultRate(user.id, activePunch.org_id).catch(() => null)
+      await punchOut({ punchId: activePunch.id, hourlyRate: rate ?? undefined })
+      // Push the new labor hours into the job's cached cost right away —
+      // without this, Home KPIs and margins didn't move until the owner
+      // happened to touch an unrelated expense on the job.
+      if (activePunch.contact_id) {
+        recalcCost(activePunch.contact_id, user.id).catch(() => {})
+      }
       setActivePunch(null)
       toastSuccess('Clocked out')
       await load()
@@ -185,13 +197,18 @@ export default function Crew() {
     }
   }
 
-  // Today minutes = sum of completed punches with punch_in_at today + active worked
+  // Today minutes = completed punches today + the active shift. The
+  // recent list has no punch_out filter, so the ACTIVE punch is in it
+  // too — skip it there or the running shift counts twice ("Today on
+  // the clock 6:00" three hours into a shift).
   const todayMs = (() => {
     const start = new Date()
     start.setHours(0, 0, 0, 0)
     const startMs = start.getTime()
     let total = 0
     for (const p of recentPunches) {
+      if (activePunch && p.id === activePunch.id) continue
+      if (!p.punch_out_at) continue
       const inMs = new Date(p.punch_in_at).getTime()
       if (inMs < startMs) continue
       total += workedMinutes(p)

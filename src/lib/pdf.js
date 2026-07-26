@@ -1225,21 +1225,29 @@ export async function generateInvoice({
   const pp = previouslyPaid != null
     ? Number(previouslyPaid)
     : (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  // The hero "Amount due" is the outstanding BALANCE on the contract
-  // (contract incl. approved COs − previously paid) — NOT the line-item
-  // total, which is only this draw. The full contract and this-invoice
-  // line still reconcile in the balance summary below.
   const balance = Math.max(0, ct - pp)
   const isPaid = balance < 0.5
+  // The hero "Amount due" is THIS invoice's amount (capped at the
+  // remaining contract balance), matching the email subject, the
+  // line-item table, and the public web link. It used to print the
+  // whole remaining contract balance — so a $2,500 deposit draw arrived
+  // with a PDF banner demanding $10,000 while every other surface said
+  // $2,500. Jobs billed without draw rows (no currentInvoice, no line
+  // items) still show the full balance — for them the invoice IS the
+  // balance. The Contract position section below reconciles either way.
+  const drawAmount = currentInvoice != null && currentInvoice.amount != null
+    ? Number(currentInvoice.amount)
+    : (rows.length > 0 ? thisInvoice : null)
+  const amountDue = !isPaid && drawAmount != null ? Math.min(balance, drawAmount) : balance
 
-  // 2. Hero band — Amount due (balance)
+  // 2. Hero band — Amount due (this invoice)
   const heroRight = []
   if (!isPaid && dueDisplay) heroRight.push(`Due ${dueDisplay}`)
   if (ct > 0) heroRight.push(`${moneyCompact(pp)} of ${moneyCompact(ct)} collected`)
   cursor = drawHeroBand(doc, {
     startY: cursor, margin, pageWidth, brandRGB,
     label: isPaid ? 'Balance' : 'Amount due',
-    amount: balance, isPaid, rightLines: heroRight,
+    amount: amountDue, isPaid, rightLines: heroRight,
     paid: pp, contractTotal: ct
   })
 
