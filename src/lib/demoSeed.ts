@@ -97,7 +97,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
         phone: '615-555-0142',
         email: 'henderson.family@example.com',
         address: '142 Maple Ridge Dr',
-        job_title: 'Kitchen remodel — full gut',
+        job_title: 'Kitchen remodel, full gut',
         job_type: 'Kitchen',
         amount: 42000,
         cost: 24500,
@@ -184,7 +184,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
     .select('id, name, job_title, stage, client_id')
   if (jobsErr) throw jobsErr
   counts.jobs = jobs.length
-  const henKitchen = jobs.find((j: any) => j.job_title === 'Kitchen remodel — full gut')
+  const henKitchen = jobs.find((j: any) => j.job_title === 'Kitchen remodel, full gut')
   const henBath = jobs.find((j: any) => j.job_title === 'Primary bath refresh')
   const mccOffice = jobs.find((j: any) => j.job_title === 'Office tenant build-out')
   const patelYard = jobs.find((j: any) => j.job_title === 'Front yard redesign')
@@ -196,8 +196,8 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   const { data: events, error: eventsErr } = await supabase
     .from('fh_schedule')
     .insert([
-      { user_id: userId, contact_id: henKitchen.id, title: 'Site visit — counter template', start_at: todayAt(9, 0) },
-      { user_id: userId, contact_id: murray.id,    title: 'Concrete pour — slab',           start_at: todayAt(13, 0) },
+      { user_id: userId, contact_id: henKitchen.id, title: 'Site visit for counter template', start_at: todayAt(9, 0) },
+      { user_id: userId, contact_id: murray.id,    title: 'Concrete pour, slab',           start_at: todayAt(13, 0) },
       { user_id: userId, contact_id: mccOffice.id, title: 'Final walkthrough w/ client',    start_at: dayAt(1, 8, 30) },
       { user_id: userId, contact_id: patelYard.id, title: 'On-site quote review',           start_at: dayAt(3, 10, 0) }
     ])
@@ -214,7 +214,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       {
         user_id: userId,
         contact_id: henKitchen.id,
-        text: 'Called Henderson — going with quartz over the granite option. Reorder counters Monday.',
+        text: 'Called Henderson. Going with quartz over the granite option. Reorder counters Monday.',
         category: 'note'
       },
       {
@@ -233,7 +233,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       {
         user_id: userId,
         contact_id: patelYard.id,
-        text: 'Patel mentioned budget around 10K — watch creep. She loved the Henderson driveway look.',
+        text: 'Patel mentioned budget around 10K, watch creep. She loved the Henderson driveway look.',
         category: 'note'
       }
     ])
@@ -245,9 +245,9 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       const { data: notes2, error: notes2Err } = await supabase
         .from('fh_notes')
         .insert([
-          { user_id: userId, contact_id: henKitchen.id, text: 'Called Henderson — going with quartz over the granite option. Reorder counters Monday.', category: 'note' },
+          { user_id: userId, contact_id: henKitchen.id, text: 'Called Henderson. Going with quartz over the granite option. Reorder counters Monday.', category: 'note' },
           { user_id: userId, contact_id: murray.id, text: 'Need shingles ordered by Friday or framing slips a week. Owner ok with the upgrade if it adds <$400.', category: 'note' },
-          { user_id: userId, contact_id: patelYard.id, text: 'Patel mentioned budget around 10K — watch creep. She loved the Henderson driveway look.', category: 'note' }
+          { user_id: userId, contact_id: patelYard.id, text: 'Patel mentioned budget around 10K, watch creep. She loved the Henderson driveway look.', category: 'note' }
         ])
         .select('id')
       if (notes2Err) throw notes2Err
