@@ -49,13 +49,16 @@ type Group = { label: string; items: Item[] }
 const exact = (target: string) => (p: string) => p === target
 const prefix = (target: string) => (p: string) => p === target || p.startsWith(target + '/')
 
-// IA collapse (redesign W2): groups renamed from software-speak
-// (Command / Execution / Intelligence / Workspace) to the contractor's
-// verbs — Sell / Work / Get paid / Office. A deal reads top-to-bottom:
-// you sell it, you work it, you collect on it. Same routes, same role
-// gates; only the grouping and a few labels changed (Lead Desk → Leads,
-// Command Center → Home).
-const GROUPS: Group[] = [
+// Solo mode IA (redesign W3). A one man company saw sixteen nav items,
+// half of them crew management for a crew that doesn't exist. The
+// sidebar now carries the solo backbone only; everything crew flavored
+// lives in a Team group that renders exclusively when the org has more
+// than one active member (membership.hasCrew). Sub Portal disappears
+// for role holders (it's the landing page for partner-only accounts).
+// Templates moved inside Settings where it already lives.
+type GateGroup = Group & { crewOnly?: boolean }
+
+const GROUPS: GateGroup[] = [
   {
     label: 'Today',
     items: [
@@ -71,9 +74,6 @@ const GROUPS: Group[] = [
       { label: 'Work & Deals',   to: '/work',     Icon: Hammer,          match: (p) => p === '/work' || p.startsWith('/leads') || p.startsWith('/quotes') || p.startsWith('/jobs') },
       { label: 'Schedule',       to: '/schedule', Icon: Calendar,        match: prefix('/schedule') },
       { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
-      { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
-      { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
-      { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },
       { label: 'Forecast',       to: '/pour-window', Icon: LineChart,    match: prefix('/pour-window') },
     ],
   },
@@ -85,19 +85,24 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    label: 'Team',
+    crewOnly: true,
+    items: [
+      { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
+      { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
+      { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },
+      { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },
+    ],
+  },
+  {
     label: 'Office',
     items: [
       { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
-      { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },
       { label: 'Subs',           to: '/subs',     Icon: Hammer,          match: prefix('/subs') },
       { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
       { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
       { label: 'Sub Portal',     to: '/sub-portal', Icon: Briefcase,     match: prefix('/sub-portal') },
-      { label: 'Templates',      to: '/settings#templates', Icon: FileText,        match: (p) => p === '/settings' && typeof window !== 'undefined' && window.location.hash === '#templates' },
-      // Settings is the parent — when hash points at #templates, the
-      // Templates row above owns the active state; otherwise Settings
-      // does. Previously both highlighted at once on /settings#templates.
-      { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: (p) => p === '/settings' && !(typeof window !== 'undefined' && window.location.hash === '#templates') },
+      { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: (p) => p === '/settings' },
     ],
   },
 ]
@@ -106,7 +111,7 @@ export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
-  const { canViewRoute, role, loading: membershipLoading } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading, hasCrew } = useMembership()
 
   const userEmail = user?.email || ''
 
@@ -127,6 +132,11 @@ export default function DesktopSidebar() {
 
       <nav className="fh-desktop-sidebar__nav" aria-label="Primary">
         {GROUPS.map((group, gi) => {
+          // Solo mode: the Team group only exists when the org has
+          // more than one active member. While membership is loading
+          // it stays hidden too — a solo owner's first paint should
+          // never flash crew nav that's about to disappear.
+          if (group.crewOnly && !hasCrew) return null
           // Filter items by the caller's role. While membership is
           // still resolving (role === null), show everything so the
           // first paint doesn't hide owner nav — once the membership
@@ -134,14 +144,19 @@ export default function DesktopSidebar() {
           // Filter rules:
           //   - membership still loading → show everything so the
           //     first paint doesn't strip owner nav
-          //   - has a role → use canViewRoute (the role-aware gate)
+          //   - has a role → use canViewRoute (the role-aware gate);
+          //     Sub Portal is additionally hidden for role holders
+          //     (it's the landing surface for partner-only accounts)
           //   - settled with NO role (sub-only / pre-onboarding) →
           //     only show the Sub Portal so they don't bounce off
           //     RLS errors on every owner screen
           const visibleItems = group.items.filter((it) => {
             const path = it.to.split('?')[0].split('#')[0]
-            if (membershipLoading) return true
-            if (role) return canViewRoute(path)
+            if (membershipLoading) return path !== '/sub-portal'
+            if (role) {
+              if (path === '/sub-portal') return false
+              return canViewRoute(path)
+            }
             return path === '/sub-portal'
           })
           if (visibleItems.length === 0) return null
