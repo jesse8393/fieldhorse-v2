@@ -255,11 +255,21 @@ export default function SnowJobDetailBuild(props: Props) {
                 {contact?.referred_by
                   ? <strong>{`via ${contact.referred_by}`}</strong>
                   : <strong data-empty>Source not set</strong>}
-                <span>
-                  {contact?.phone || contact?.email
-                    ? [contact?.phone, contact?.email].filter(Boolean).join(' · ')
-                    : 'No contact info yet'}
-                </span>
+                {contact?.phone || contact?.email ? (
+                  <span>{[contact?.phone, contact?.email].filter(Boolean).join(' · ')}</span>
+                ) : (
+                  /* Workflow dead end fix: a deal with no client used to
+                     just SAY "No contact info yet" with nothing to do
+                     about it. Now it opens the Overview edit form, which
+                     has the client picker + contact fields. */
+                  <button
+                    type="button"
+                    className="fh-build-rail-cta"
+                    onClick={() => onEdit?.()}
+                  >
+                    Add client info
+                  </button>
+                )}
               </section>
             )}
             {isExecution && (<>
