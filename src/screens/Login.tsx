@@ -23,6 +23,15 @@ export default function Login() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  // True the moment THIS form kicks off a signup. The session lands via
+  // the auth subscription and re-renders Login BEFORE the async handler
+  // reaches its navigate('/onboarding') — so the render-redirect below
+  // used to win the race and bounce brand-new accounts through '/'
+  // (a visible flash of the dashboard shell, then a second hop into
+  // onboarding). With the flag, the very first post-signup render goes
+  // straight to /onboarding. Login unmounts on navigation, so the flag
+  // resets naturally for later visits.
+  const [justSignedUp, setJustSignedUp] = useState(false)
   const controlsDisabled = busy
   const submitDisabled = busy || !isSupabaseConfigured
 
@@ -32,7 +41,10 @@ export default function Login() {
     : '/'
 
   if (loading) return null
-  if (session) return <Navigate to={afterAuthTarget} replace />
+  if (session) {
+    const dest = justSignedUp && !partnerInviteToken ? '/onboarding' : afterAuthTarget
+    return <Navigate to={dest} replace />
+  }
 
   async function handleForgotPassword() {
     setError('')
@@ -72,9 +84,15 @@ export default function Login() {
         if (error) throw error
         navigate(afterAuthTarget, { replace: true })
       } else {
+        // Raise the flag BEFORE the call: the auth subscription can
+        // re-render this component with a live session before this
+        // handler resumes after the await.
+        setJustSignedUp(true)
         const { data, error } = await signUp(email, password)
         if (error) throw error
         if (!data.session) {
+          // Email-confirmation flow — no session yet, no redirect.
+          setJustSignedUp(false)
           setNotice('Check your email to confirm, then sign in.')
           setMode('signin')
         } else if (partnerInviteToken) {
@@ -84,6 +102,7 @@ export default function Login() {
         }
       }
     } catch (err) {
+      setJustSignedUp(false)
       setError(getErrorMessage(err, 'Authentication failed'))
     } finally {
       setBusy(false)
