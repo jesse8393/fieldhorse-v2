@@ -18,11 +18,15 @@ export default function MilestonesSection({ contact, patch }: any) {
     [contact?.milestones]
   )
   const [draft, setDraft] = useState('')
+  // Empty submit shows an inline error — silently doing nothing read
+  // as a successful save (UI audit #8).
+  const [draftError, setDraftError] = useState(false)
   const doneCount = list.filter((m: any) => m.done).length
 
   async function add() {
     const txt = draft.trim()
-    if (!txt) return
+    if (!txt) { setDraftError(true); return }
+    setDraftError(false)
     hapticTap()
     const next = [...list, { label: txt, done: false, created_at: new Date().toISOString() }]
     setDraft('')
@@ -69,24 +73,32 @@ export default function MilestonesSection({ contact, patch }: any) {
 
       {/* Inline add row */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') add() }}
-          placeholder="Add milestone…"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            padding: '11px 14px',
-            borderRadius: 12,
-            background: 'var(--v3-surface)',
-            border: '1px solid var(--v3-border)',
-            color: 'var(--v3-text)',
-            fontFamily: 'var(--font-body)',
-            fontSize: 14,
-            outline: 'none'
-          }}
-        />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <input
+            value={draft}
+            aria-invalid={draftError || undefined}
+            onChange={(e) => { setDraft(e.target.value); if (draftError && e.target.value.trim()) setDraftError(false) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') add() }}
+            placeholder="Add milestone…"
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '11px 14px',
+              borderRadius: 12,
+              background: 'var(--v3-surface)',
+              border: draftError ? '1px solid var(--v3-danger-bright)' : '1px solid var(--v3-border)',
+              color: 'var(--v3-text)',
+              fontFamily: 'var(--font-body)',
+              fontSize: 14,
+              outline: 'none'
+            }}
+          />
+          {draftError && (
+            <span role="alert" style={{ fontSize: 12, color: 'var(--v3-danger-bright)', fontFamily: 'var(--font-body)' }}>
+              Type the milestone first.
+            </span>
+          )}
+        </div>
         <motion.button
           type="button"
           whileTap={{ scale: 0.96 }}
@@ -154,7 +166,7 @@ export default function MilestonesSection({ contact, patch }: any) {
                     border: m.done
                       ? '1px solid color-mix(in srgb, var(--v3-success-bright) 60%, transparent)'
                       : '1px solid var(--v3-border-strong)',
-                    background: m.done ? 'rgba(46, 204, 113, 0.18)' : 'transparent',
+                    background: m.done ? 'var(--v3-success-soft)' : 'transparent',
                     color: 'var(--v3-success-bright)',
                     cursor: 'pointer',
                     display: 'grid',

@@ -870,6 +870,16 @@ select:focus-visible,
   box-sizing: border-box;
 }
 
+/* Form controls and kbd don't inherit the page family by default —
+   the audit found ui-monospace / -apple-system leaking into rendered
+   text on ten screens (UI audit #39). */
+button, input, select, textarea {
+  font-family: inherit;
+}
+kbd {
+  font-family: var(--font-body, 'DM Sans', sans-serif);
+}
+
 /* Icons inside flex rows must never be crushed to sub-pixel widths by
    long siblings — the UI audit found delete/approve/flag buttons and
    weather icons collapsed to 0.67px (invisible destructive controls,
