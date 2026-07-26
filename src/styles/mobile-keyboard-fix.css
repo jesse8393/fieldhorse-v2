@@ -78,17 +78,14 @@ i,
   font-style: normal !important;
   font-family: var(--font-body) !important;
 }
-/* Keep the gold gradient color treatment on the accent utility classes
-   — only the italic + serif-substitution is being killed. */
+/* Solid brand gold on the accent utility classes — gradient text is
+   off-brand (UI audit #38). */
 .gold-italic,
 .fh-font-serif-italic,
 .v3-h1 em,
 .dt-jobs__h1 em,
 .dt-home__h1 em {
-  background: linear-gradient(95deg, #B17F1F 0%, #E6B14B 45%, #C9963A 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--field-gold, #C9963A);
   letter-spacing: -0.005em;
 }
 

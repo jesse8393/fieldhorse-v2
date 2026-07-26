@@ -16,6 +16,7 @@ import {
   Search,
 } from 'lucide-react'
 import MiniMetric from '../MiniMetric.tsx'
+import TopbarWeather from './TopbarWeather.tsx'
 
 type EventRow = {
   id: string
@@ -24,6 +25,7 @@ type EventRow = {
   end_at?: string | null
   location?: string | null
   notes?: string | null
+  contact_id?: string | null
 }
 
 type ScheduleView = 'day' | 'week' | 'month'
@@ -91,8 +93,13 @@ export default function SnowScheduleBuild(props: Props) {
     const base = startOfDay(cursor)
     if (view === 'day')   return [base]
     if (view === 'week')  return Array.from({ length: 7 }, (_, i) => addDays(base, i))
-    // month view: show the next ~28 days from the cursor as a flat agenda
-    return Array.from({ length: 28 }, (_, i) => addDays(base, i))
+    // Month view shows the LABELED calendar month, 1st → last day. It
+    // used to render a rolling 28 days from the cursor while the header
+    // said "July 2026" — July 1–24 missing, August dates present (UI
+    // audit #9).
+    const first = new Date(base.getFullYear(), base.getMonth(), 1)
+    const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate()
+    return Array.from({ length: daysInMonth }, (_, i) => addDays(first, i))
   }, [cursor, view])
 
   // Bucket events by day
@@ -142,7 +149,7 @@ export default function SnowScheduleBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{rangeLabel}</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <TopbarWeather />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onAddEvent}>
@@ -172,23 +179,41 @@ export default function SnowScheduleBuild(props: Props) {
               ))}
             </div>
             <div className="fh-build-datenav">
-              <button type="button" onClick={() => setCursor(addDays(cursor, view === 'day' ? -1 : view === 'week' ? -7 : -28))} aria-label="Previous">
+              <button
+                type="button"
+                onClick={() => setCursor(view === 'month'
+                  ? new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1)
+                  : addDays(cursor, view === 'day' ? -1 : -7))}
+                aria-label="Previous"
+              >
                 <ChevronLeft size={14} />
               </button>
               <button type="button" className="fh-build-datenav__today" onClick={() => setCursor(startOfDay(new Date()))}>
                 Today
               </button>
-              <button type="button" onClick={() => setCursor(addDays(cursor, view === 'day' ? 1 : view === 'week' ? 7 : 28))} aria-label="Next">
+              <button
+                type="button"
+                onClick={() => setCursor(view === 'month'
+                  ? new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+                  : addDays(cursor, view === 'day' ? 1 : 7))}
+                aria-label="Next"
+              >
                 <ChevronRight size={14} />
               </button>
             </div>
           </div>
 
           <div className="fh-build-mini-grid">
+            {/* "Crews active · 4" and "Conflicts · 0" were HARDCODED
+                numbers — Home simultaneously said 0 crews on site (UI
+                audit #11). Show only metrics computed from real data. */}
             <MiniMetric label="On site today" value={String(todayCount)} accent />
             <MiniMetric label="This week" value={String(weekCount)} />
-            <MiniMetric label="Crews active" value="4" />
-            <MiniMetric label="Conflicts" value="0" />
+            <MiniMetric
+              label="Jobs scheduled today"
+              value={String(new Set(events.filter((e) => e.start_at && e.contact_id && sameDay(new Date(e.start_at), new Date())).map((e) => e.contact_id)).size)}
+            />
+            <MiniMetric label="View" value={view === 'day' ? 'Day' : view === 'week' ? 'Week' : 'Month'} />
           </div>
         </section>
 

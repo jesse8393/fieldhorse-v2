@@ -15,6 +15,7 @@ import QuoteItemsSection from '../sections/QuoteItems.tsx'
 import QuoteTermsSection from '../sections/QuoteTerms.tsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.tsx'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { proposalNumber } from '../../../components/documents/numbers.ts'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { Eyebrow } from '../../../components/v3'
@@ -513,6 +514,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           job in the mobile flow. */}
       <WorkspaceHead
         contact={contact}
+        companyName={company?.name}
         status={status}
         baseCount={baseCount}
         busy={busy}
@@ -886,8 +888,12 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
    proposal_status is the closest equivalent. saved-ago hint omitted
    (we'd need to track a separate dirty timestamp).
    ============================================================ */
-function WorkspaceHead({ contact, status, baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onSend }: any) {
-  const idShort = contact?.id ? `EST · ${String(contact.id).slice(0, 8).toUpperCase()}` : 'ESTIMATE'
+function WorkspaceHead({ contact, companyName, status, baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onSend }: any) {
+  // Use the SAME document number the customer sees on the PDF/public
+  // page (numbers.ts) — the raw first block of the record UUID
+  // ("EST · DFAEFF81") leaked a database id as the estimate number
+  // (UI audit #21).
+  const idShort = contact?.id ? proposalNumber(companyName, contact.id) : 'ESTIMATE'
   const statusLabel = (status?.label || 'Draft').toUpperCase()
   const titleText = contact?.job_title || contact?.name || 'Estimate'
   const subBits = [

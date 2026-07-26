@@ -30,6 +30,7 @@ import type { SortingState } from '@tanstack/react-table'
 import { money, moneyFull } from '../../lib/format.ts'
 import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import TopbarWeather from './TopbarWeather.tsx'
 
 type Rollup = {
   activeCount: number
@@ -186,7 +187,7 @@ export default function SnowClientsBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{rows.length.toLocaleString()} clients on file</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <TopbarWeather />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onNewClient}>
@@ -201,20 +202,11 @@ export default function SnowClientsBuild(props: Props) {
             <h1 className="fh-build-title">RELATIONSHIP DESK.</h1>
           </div>
 
+          {/* One filter control per screen: the counted pill row below
+              is the filter. This card used to duplicate it with a
+              second All/Active/Recent segmented control (UI audit #29). */}
           <div className="fh-build-focus">
-            <div className="fh-build-eyebrow">Filter</div>
-            <div className="fh-build-view-toggle fh-build-view-toggle--inline">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  className={filter === f.key ? 'is-active' : ''}
-                  onClick={() => setFilter(f.key)}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            <div className="fh-build-eyebrow">Book of business</div>
             <p>
               {filtered.length.toLocaleString()} {FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} ·
               {' '}{screenStats.activeAccounts} with open jobs

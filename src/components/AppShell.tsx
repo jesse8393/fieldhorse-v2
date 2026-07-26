@@ -257,13 +257,17 @@ export default function AppShell() {
 
       {/* Existing custom toaster stays — Sonner runs alongside it */}
       <Toaster />
+      {/* Bottom-anchored: top-center toasts overlapped the header/search
+          bar and clipped past the top edge (UI audit #23). Offsets keep
+          them clear of the mobile bottom nav. */}
       <SonnerToaster
-        position="top-center"
+        position="bottom-center"
         theme="dark"
         richColors
         expand
         visibleToasts={3}
-        mobileOffset={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: '16px', right: '16px' }}
+        offset={{ bottom: '24px' }}
+        mobileOffset={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)', left: '16px', right: '16px' }}
         toastOptions={{
           style: {
             width: '100%',

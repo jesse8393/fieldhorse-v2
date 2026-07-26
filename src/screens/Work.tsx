@@ -59,7 +59,10 @@ const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 type ChipId = 'all' | 'leads' | 'quotes' | 'active' | 'done' | 'lost'
 
 const CHIPS: { id: ChipId; label: string; match: (c: JobRow) => boolean }[] = [
-  { id: 'all',    label: 'All',    match: (c) => c.stage !== 'lost' },
+  // 'All' really means all: it used to exclude lost, so its count (26)
+  // never matched the sum of the stage chips (28) — flagged by the UI
+  // audit (#11) as "data does not agree with itself".
+  { id: 'all',    label: 'All',    match: () => true },
   { id: 'leads',  label: 'Leads',  match: (c) => c.stage === 'lead' },
   { id: 'quotes', label: 'Quotes', match: (c) => c.stage === 'quote' },
   { id: 'active', label: 'Active', match: (c) => c.stage === 'job' || c.stage === 'invoice' },
@@ -123,20 +126,32 @@ export default function Work() {
 
   // Deep links: ?stage=<chip> selects a chip; ?new=1 opens the create
   // sheet (optionally ?asStage=job from Home's "New Job" tile).
+  // ?stage stays IN the URL so the active filter survives refresh and
+  // is shareable/bookmarkable (UI audit #30) — only the one-shot
+  // new/asStage params are consumed.
   useEffect(() => {
     const requested = searchParams.get('stage')
     const wantsNew = searchParams.get('new') === '1'
     const asStage = searchParams.get('asStage')
-    if (!requested && !wantsNew) return
     if (requested && CHIPS.some((c) => c.id === requested)) setChip(requested as ChipId)
+    if (!requested) setChip('all')
     if (wantsNew) {
       setAddStage(asStage === 'job' ? 'job' : asStage === 'quote' ? 'quote' : 'lead')
       setAddOpen(true)
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('new'); sp.delete('asStage')
+      setSearchParams(sp, { replace: true })
     }
-    const sp = new URLSearchParams(searchParams)
-    sp.delete('stage'); sp.delete('new'); sp.delete('asStage')
-    setSearchParams(sp, { replace: true })
   }, [searchParams, setSearchParams])
+
+  // Chip clicks write the URL; the effect above syncs state from it.
+  const selectChip = (id: ChipId) => {
+    const sp = new URLSearchParams(searchParams)
+    if (id === 'all') sp.delete('stage')
+    else sp.set('stage', id)
+    setSearchParams(sp, { replace: true })
+    setChip(id)
+  }
 
   // Money roles see the full lifecycle; field roles see only the work
   // they're on (Active/Done). 'all' stays for both but, for field roles,
@@ -383,7 +398,7 @@ export default function Work() {
               active={effectiveChip === c.id}
               count={chipCounts[c.id]}
               ariaLabel={`Show ${c.label.toLowerCase()}`}
-              onClick={() => { hapticTap(); setChip(c.id) }}
+              onClick={() => { hapticTap(); selectChip(c.id) }}
             >
               {c.label}
             </FilterPill>

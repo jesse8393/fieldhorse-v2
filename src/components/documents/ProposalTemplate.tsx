@@ -56,8 +56,8 @@ export default function ProposalTemplate({
   showInternalNotes = false,
   photos = []
 }: any) {
-  const number = meta.number || proposalNumber(company?.name, contact?.id)
   const issuedAt = meta.issuedAt || new Date()
+  const number = meta.number || proposalNumber(company?.name, contact?.id, issuedAt)
   const expiresAt = meta.expiresAt || null
   const brand = resolveBrandGold(company)
 

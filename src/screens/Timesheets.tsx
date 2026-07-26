@@ -7,7 +7,7 @@
 // courtesy.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, Check, CheckCheck, ChevronRight, Search, AlertTriangle } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { orgPunchApprove, orgPunchFlag, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
@@ -59,8 +59,16 @@ export default function Timesheets() {
   const [error, setError] = useState<string | null>(null)
   const [punches, setPunches] = useState<PendingPunch[]>([])
   const [approving, setApproving] = useState<Record<string, boolean>>({})
-  // Filter window: 'all' or 'thisWeek' (Mon–now)
-  const [windowMode, setWindowMode] = useState<'all' | 'thisWeek'>('thisWeek')
+  // Filter window in the URL (?window=) so it survives refresh and is
+  // shareable (UI audit #30). 'all' or 'thisWeek' (Mon–now).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const windowMode: 'all' | 'thisWeek' = searchParams.get('window') === 'all' ? 'all' : 'thisWeek'
+  const setWindowMode = (next: 'all' | 'thisWeek') => {
+    const sp = new URLSearchParams(searchParams)
+    if (next === 'thisWeek') sp.delete('window')
+    else sp.set('window', next)
+    setSearchParams(sp, { replace: true })
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -169,10 +177,12 @@ export default function Timesheets() {
   // KPI snapshot. Flagged punches are excluded from hours/cost — they
   // don't bill the job while disputed (lib/labor.ts skips them), so
   // counting them here made the approval screen disagree with job cost.
-  const unflagged = punches.filter((p) => !p.flagged)
+  // Zero-length punches (invalid) count as needing attention too — the
+  // audit found 0:00 shifts sitting approvable with FLAGGED reading 0.
+  const unflagged = punches.filter((p) => !p.flagged && !p.invalid)
   const totalMinutes = unflagged.reduce((s, p) => s + p.minutes, 0)
   const totalCost    = unflagged.reduce((s, p) => s + (p.cost ?? 0), 0)
-  const flaggedCount = punches.filter((p) => p.flagged).length
+  const flaggedCount = punches.filter((p) => p.flagged || p.invalid).length
 
   // Role-gate the entire screen at first paint; backend re-checks anyway.
   if (!memLoading && !canApproveTimesheets) {
@@ -302,12 +312,12 @@ export default function Timesheets() {
                   <button
                     type="button"
                     className="fh-build-primary-btn"
-                    // Flagged rows stay OUT of "Approve all" — a punch
-                    // the owner flagged as suspicious must be resolved
-                    // (or explicitly approved) on its own row, not
+                    // Flagged AND zero-length rows stay OUT of "Approve
+                    // all" — disputed or invalid punches must be resolved
+                    // (or explicitly approved) on their own row, not
                     // swept through with the batch.
-                    onClick={() => approve(g.rows.filter((r) => !r.flagged).map((r) => r.id))}
-                    disabled={g.rows.every((r) => r.flagged) || g.rows.some((r) => approving[r.id])}
+                    onClick={() => approve(g.rows.filter((r) => !r.flagged && !r.invalid).map((r) => r.id))}
+                    disabled={g.rows.every((r) => r.flagged || r.invalid) || g.rows.some((r) => approving[r.id])}
                   >
                     <CheckCheck size={13} /> Approve all
                   </button>
@@ -344,6 +354,8 @@ export default function Timesheets() {
                   <span>
                     {r.flagged ? (
                       <span className="fh-build-dot is-warn" title={r.flag_reason || ''}>Flagged</span>
+                    ) : r.invalid ? (
+                      <span className="fh-build-dot is-bad" title="Clock-out is not after clock-in">Invalid</span>
                     ) : (
                       <span className="fh-build-dot is-neutral">Pending</span>
                     )}

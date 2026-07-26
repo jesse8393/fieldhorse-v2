@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
@@ -33,7 +33,17 @@ export default function Clients() {
   const rows = bundle?.clients ?? []
   const invalidateClients = useInvalidateClients()
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState('all') // 'all' | 'active' | 'recent'
+  // Filter lives in the URL (?filter=) so it survives refresh and is
+  // shareable, like the deal-page tabs already are (UI audit #30).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlFilter = searchParams.get('filter')
+  const filter = urlFilter === 'active' || urlFilter === 'recent' ? urlFilter : 'all'
+  const setFilter = (next: string) => {
+    const sp = new URLSearchParams(searchParams)
+    if (next === 'all') sp.delete('filter')
+    else sp.set('filter', next)
+    setSearchParams(sp, { replace: true })
+  }
   const [addOpen, setAddOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
 

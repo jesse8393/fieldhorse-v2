@@ -249,9 +249,12 @@ export default function SnowHomeBuild(props: Props) {
           <FocusCard onGoToSchedule={onGoToSchedule} />
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Crews on site" value={todayOnSite == null ? '—' : String(todayOnSite.length)} />
+            {/* Labels match what the numbers actually measure — "Crews
+                on site" here vs "Crews active" on Schedule disagreed
+                because both were mislabeled (UI audit #11/#28). */}
+            <MiniMetric label="On site today" value={todayOnSite == null ? '—' : String(todayOnSite.length)} />
             <MiniMetric label="Reports missing" value="—" />
-            <MiniMetric label="Client follow-ups" value={nextActions == null ? '—' : String(nextActions.length)} />
+            <MiniMetric label="Queued actions" value={nextActions == null ? '—' : String(nextActions.length)} />
             {/* invoicingWeek is money COLLECTED since Sunday — labeling it
                 "Ready to invoice" claimed already-received cash was billable. */}
             <MiniMetric label="Collected this week" value={invoicingWeek == null ? '—' : money(invoicingWeek)} />
@@ -465,29 +468,11 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
 
       <p className="fh-build-pipeline__copy">{oppLabel}</p>
 
-      <div className="fh-build-stage-grid">
-        {rows.map((row: PipelineRailRow) => (
-          <button
-            key={row.label}
-            type="button"
-            data-stage={row.key}
-            onClick={(e) => {
-              e.stopPropagation()
-              openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)
-            }}
-          >
-            {/* Stage-key colored dot — sourced from CSS via the
-                data-stage attribute (audit M2). Previously the cell
-                had no dot at all; the mock shows a colored dot per
-                stage on the gold track. */}
-            <span className="fh-build-stage-grid__dot" aria-hidden="true" />
-            <span>{row.label}</span>
-            <strong>{row.amount}</strong>
-            <small>{row.count}</small>
-          </button>
-        ))}
-      </div>
-
+      {/* The per-stage tile grid was removed here (UI audit #14/#31/#32):
+          it duplicated the Pipeline-workflow strip rendered directly
+          above, nested five cards inside this card, and its stage dots
+          overlapped the neighboring tiles' deal counts. This card is
+          the money hero; the strip above is the per-stage breakdown. */}
       <div className="fh-build-stage-line">
         {rows.map((row: any) => (
           <span key={row.label} style={{ width: row.width }} />

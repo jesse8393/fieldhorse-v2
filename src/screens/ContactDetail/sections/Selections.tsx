@@ -303,7 +303,7 @@ function SelectionCard({
             </p>
           )}
           {(row.due_at || overdue) && (
-            <div style={{ marginTop: 6, fontSize: 11, color: overdue ? '#ee4942' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ marginTop: 6, fontSize: 11, color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               {overdue && <AlertTriangle size={11} />}
               Due {fmtDate(row.due_at)} {overdue ? '— overdue' : ''}
             </div>
@@ -513,7 +513,7 @@ function SelectionComposer({
             <input value={o.brand || ''} onChange={(e) => setOpt(idx, { brand: e.target.value })} placeholder="Brand" style={inputStyle} />
             <input value={o.sku || ''} onChange={(e) => setOpt(idx, { sku: e.target.value })} placeholder="SKU / model" style={inputStyle} />
             <input type="number" value={o.price ?? ''} onChange={(e) => setOpt(idx, { price: e.target.value === '' ? null : Number(e.target.value) })} placeholder="$" style={inputStyle} />
-            <button type="button" onClick={() => removeOpt(idx)} disabled={options.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: options.length === 1 ? 'var(--v3-text-muted)' : '#ee4942' }}>
+            <button type="button" onClick={() => removeOpt(idx)} disabled={options.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: options.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-bright)' }}>
               <X size={13} />
             </button>
           </div>
@@ -582,7 +582,7 @@ function OptionsEditor({
           <input value={o.brand || ''} onChange={(e) => setOpt(idx, { brand: e.target.value })} placeholder="Brand" style={inputStyle} />
           <input value={o.sku || ''} onChange={(e) => setOpt(idx, { sku: e.target.value })} placeholder="SKU" style={inputStyle} />
           <input type="number" value={o.price ?? ''} onChange={(e) => setOpt(idx, { price: e.target.value === '' ? null : Number(e.target.value) })} placeholder="$" style={inputStyle} />
-          <button type="button" onClick={() => removeOpt(idx)} disabled={opts.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: opts.length === 1 ? 'var(--v3-text-muted)' : '#ee4942' }}>
+          <button type="button" onClick={() => removeOpt(idx)} disabled={opts.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: opts.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-bright)' }}>
             <X size={13} />
           </button>
         </div>

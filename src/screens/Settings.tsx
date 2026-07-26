@@ -479,7 +479,7 @@ export default function Settings() {
           <BrandField
             label="Brand accent color"
             optional
-            hint="Drives the gold rule on each PDF, status pills, eyebrows, and the hero money number on proposals + invoices. Leave blank to use the FieldHorse default."
+            hint="The accent color on your customer documents — proposals, invoices, and statements. Leave blank to use the default."
           >
             <BrandColorEditor
               value={brandAccentHex}

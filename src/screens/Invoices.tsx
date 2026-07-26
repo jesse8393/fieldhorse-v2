@@ -29,7 +29,7 @@ import { useConfirm } from '../components/ConfirmSheet.tsx'
 import StatementSheet from '../components/StatementSheet.tsx'
 import { approvedCoByContact } from '../lib/statement.ts'
 import { parseDateOnly } from '../lib/dates.ts'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
 
@@ -85,7 +85,16 @@ export default function Invoices() {
   // Approved change orders raise each job's true contract; without this
   // the balances below understate what a job with signed COs owes.
   const approvedCoByJob = useMemo(() => approvedCoByContact(changeOrders), [changeOrders])
-  const [filter, setFilter] = useState('outstanding') // 'outstanding' | 'all'
+  // View toggle in the URL (?view=) — survives refresh, shareable
+  // (UI audit #30). 'outstanding' | 'all'.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter = searchParams.get('view') === 'all' ? 'all' : 'outstanding'
+  const setFilter = (next: string) => {
+    const sp = new URLSearchParams(searchParams)
+    if (next === 'outstanding') sp.delete('view')
+    else sp.set('view', next)
+    setSearchParams(sp, { replace: true })
+  }
   // Row whose Mark Paid sheet is open. null = closed. Stores the full row
   // so the sheet can prefill amount=balance and pass the contact (job).
   // When the sheet was opened from a specific issued invoice, `invoice`

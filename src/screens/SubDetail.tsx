@@ -662,7 +662,7 @@ function SubDetailDesktop({
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Compliance</div>
-              <strong style={{ color: insuranceTone === 'bad' ? '#ee4942' : insuranceTone === 'warn' ? '#e0a141' : undefined }}>
+              <strong style={{ color: insuranceTone === 'bad' ? 'var(--v3-danger-bright)' : insuranceTone === 'warn' ? '#e0a141' : undefined }}>
                 {insuranceLabel}
               </strong>
               <span>

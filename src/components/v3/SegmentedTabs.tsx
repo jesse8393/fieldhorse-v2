@@ -28,12 +28,15 @@ type SegmentedTabsProps = {
 export default function SegmentedTabs({ value, onChange, tabs, variant = 'underline', ariaLabel = 'Tabs' }: SegmentedTabsProps) {
   if (variant === 'pill') {
     return (
-      <div role="tablist" aria-label={ariaLabel} style={{
+      <div role="tablist" aria-label={ariaLabel} className="fh-scrollbar-hidden" style={{
         display: 'flex',
         gap: 6,
         padding: '0 20px 12px',
         overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'touch',
+        // Desktop drew a full native scrollbar (arrow buttons and all)
+        // under the strip even when all tabs fit (UI audit #25).
+        scrollbarWidth: 'none'
       }}>
         {tabs.map((t) => {
           const isActive = value === t.id

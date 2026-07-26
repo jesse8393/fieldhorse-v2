@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react'
 import { Bell, Search, LogOut, CheckCircle2 } from 'lucide-react'
 import MiniMetric from '../MiniMetric.tsx'
+import TopbarWeather from './TopbarWeather.tsx'
 
 type Props = {
   userEmail?: string | null
@@ -46,7 +47,7 @@ export default function SnowSettingsBuild(props: Props) {
         <div className="fh-build-topbar__meta">
           <span>{companyName || userEmail || 'Account'}</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <TopbarWeather />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>

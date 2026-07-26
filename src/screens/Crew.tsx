@@ -298,7 +298,7 @@ export default function Crew() {
                   className="fh-build-primary-btn"
                   onClick={doClockOut}
                   disabled={punching}
-                  style={{ background: '#ee4942', color: '#fff' }}
+                  style={{ background: 'var(--v3-danger-bright)', color: '#fff' }}
                 >
                   <Square size={13} /> {punching ? 'Clocking out…' : 'Clock out'}
                 </button>
@@ -461,7 +461,7 @@ export default function Crew() {
                         style={{ gridTemplateColumns: 'auto 1fr', cursor: 'pointer' }}
                         onClick={() => navigate(`/jobs/${t.job_id}`)}
                       >
-                        <span style={{ color: overdue ? '#ee4942' : 'var(--v3-primary, #c9963a)' }}>
+                        <span style={{ color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-primary, #c9963a)' }}>
                           {overdue ? <AlertTriangle size={11} /> : <Clock size={11} />}
                         </span>
                         <span className="fh-build-rail-list__title" title={t.text}>
@@ -476,13 +476,13 @@ export default function Crew() {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Timesheets</div>
-              <strong>Pending review</strong>
+              <strong data-empty>Shifts reviewed weekly</strong>
               <span>Your manager approves shifts at the end of the week.</span>
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Field reports</div>
-              <strong>Capture in /notes</strong>
+              <strong data-empty>Capture from the field</strong>
               <span>Snap a photo, dictate a note, AI organizes the rest.</span>
               <button
                 type="button"
@@ -503,7 +503,7 @@ function MiniMetric({ label, value, accent, tone }: { label: string; value: stri
   return (
     <div className="fh-build-mini">
       <strong style={{
-        color: tone === 'bad' ? '#ee4942' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
+        color: tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
         textTransform: label === 'Your role' ? 'capitalize' : undefined,
       }}>
         {value}

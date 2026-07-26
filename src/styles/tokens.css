@@ -49,7 +49,10 @@
      fall back to body font automatically; new code should reference --font-body directly. */
   --font-display: 'Bebas Neue', 'Helvetica Neue', sans-serif;
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'Instrument Serif', Georgia, serif;
+  /* Brand permits exactly two families: DM Sans + Bebas Neue (UI audit
+     #37). The old Instrument Serif accent maps to DM Sans so every
+     .fh-font-serif call site degrades gracefully. */
+  --font-serif: 'DM Sans', system-ui, sans-serif;
 
   /* High-viz money gold — brighter than --field-gold-bright, reserved for $amount
      numerics only. Bumped saturation + value off the hot gold so money reads

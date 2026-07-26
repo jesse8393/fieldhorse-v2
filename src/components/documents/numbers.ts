@@ -49,14 +49,26 @@ function seedTail(seed: string | null | undefined, n = 4) {
   return String(seed).slice(-n).toUpperCase()
 }
 
-export function proposalNumber(companyName: string | null | undefined, seed: string | null | undefined) {
-  const pfx = companyPrefix(companyName) || 'PROPOSAL'
-  return `${pfx}-${new Date().getFullYear()}-${seedTail(seed)}`
+// Year anchor: prefer the document's issue date so a proposal sent as
+// PCC-2026-4F2A in December doesn't re-render as PCC-2027-4F2A when the
+// customer opens it in January (UI audit L4). Falls back to "now" only
+// when no issue date exists.
+function yearOf(issuedAt?: string | Date | null) {
+  if (issuedAt) {
+    const d = issuedAt instanceof Date ? issuedAt : new Date(issuedAt)
+    if (!Number.isNaN(d.getTime())) return d.getFullYear()
+  }
+  return new Date().getFullYear()
 }
 
-export function invoiceNumber(companyName: string | null | undefined, seed: string | null | undefined) {
+export function proposalNumber(companyName: string | null | undefined, seed: string | null | undefined, issuedAt?: string | Date | null) {
+  const pfx = companyPrefix(companyName) || 'PROPOSAL'
+  return `${pfx}-${yearOf(issuedAt)}-${seedTail(seed)}`
+}
+
+export function invoiceNumber(companyName: string | null | undefined, seed: string | null | undefined, issuedAt?: string | Date | null) {
   const pfx = companyPrefix(companyName)
-  const y = new Date().getFullYear()
+  const y = yearOf(issuedAt)
   const tail = seedTail(seed)
   return pfx ? `${pfx}-INV-${y}-${tail}` : `INVOICE-${y}-${tail}`
 }
