@@ -762,7 +762,9 @@ export default function Settings() {
           right: 0,
           bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
           zIndex: 'calc(var(--z-nav, 40) - 1)',
-          padding: '12px 20px',
+          /* Right padding clears the capture FAB column (fixed right:20,
+             56px wide) — the save button used to render underneath it. */
+          padding: '12px 92px 12px 20px',
           display: 'flex',
           justifyContent: 'flex-end',
           background: 'linear-gradient(180deg, var(--fh-chrome-veil-0) 0%, var(--fh-chrome-veil-2) 35%, var(--fh-chrome-veil-1) 100%)',
