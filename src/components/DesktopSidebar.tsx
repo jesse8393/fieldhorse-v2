@@ -111,7 +111,7 @@ export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
-  const { canViewRoute, role, loading: membershipLoading, hasCrew } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading, hasCrew, isPartner } = useMembership()
 
   const userEmail = user?.email || ''
 
@@ -154,7 +154,9 @@ export default function DesktopSidebar() {
             const path = it.to.split('?')[0].split('#')[0]
             if (membershipLoading) return path !== '/sub-portal'
             if (role) {
-              if (path === '/sub-portal') return false
+              // Role holders lose the Sub Portal entry UNLESS they also
+              // sub on someone else's jobs (accepted partnership).
+              if (path === '/sub-portal') return isPartner
               return canViewRoute(path)
             }
             return path === '/sub-portal'
