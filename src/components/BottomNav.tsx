@@ -105,7 +105,7 @@ export default function BottomNav() {
   }, [location.pathname])
   const { signOut, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { canViewRoute, role, loading: membershipLoading, hasCrew } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading, hasCrew, isPartner } = useMembership()
   const userEmail = user?.email || ''
 
   // Filter the More-drawer groups by the caller's role. Mirrors the
@@ -118,8 +118,14 @@ export default function BottomNav() {
   //     owner screen
   const canSee = (to: string) => {
     const path = to.split('?')[0].split('#')[0]
-    if (membershipLoading) return true
-    if (role) return canViewRoute(path)
+    if (membershipLoading) return path !== '/sub-portal'
+    if (role) {
+      // Role holders lose the Sub Portal entry UNLESS they also sub on
+      // someone else's jobs (accepted partnership). Mirrors the desktop
+      // sidebar rule.
+      if (path === '/sub-portal') return isPartner
+      return canViewRoute(path)
+    }
     return path === '/sub-portal'
   }
   const visibleGroups = NAV_GROUPS
