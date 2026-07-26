@@ -12,7 +12,6 @@ import MobileSearchOverlay from './MobileSearchOverlay.tsx'
 import CaptureFab from './CaptureFab.tsx'
 import CaptureSheet from './CaptureSheet.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
-import Toaster from './Toaster.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOutboxSync } from '../lib/outbox.ts'
@@ -255,23 +254,23 @@ export default function AppShell() {
       <MobileSearchOverlay />
       <InstallPrompt />
 
-      {/* Existing custom toaster stays — Sonner runs alongside it */}
-      <Toaster />
-      {/* Bottom-anchored: top-center toasts overlapped the header/search
-          bar and clipped past the top edge (UI audit #23). Offsets keep
-          them clear of the mobile bottom nav. */}
+      {/* Single toast system: Sonner only. The legacy fh:toast banner
+          rendered the SAME event a second time (top banner + bottom
+          card for one action), which read as debris. lib/toast.ts still
+          dispatches fh:toast for any listener, but nothing renders it.
+          Desktop: compact bottom-right cards, offset left of the FAB
+          column (FAB is fixed right:20 / 56px wide) so toasts never
+          cover it. Mobile: full-width banner above the bottom nav. */}
       <SonnerToaster
-        position="bottom-center"
+        position="bottom-right"
         theme="dark"
         richColors
-        expand
         visibleToasts={3}
-        offset={{ bottom: '24px' }}
+        offset={{ bottom: '20px', right: '92px' }}
         mobileOffset={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)', left: '16px', right: '16px' }}
         toastOptions={{
           style: {
-            width: '100%',
-            maxWidth: 'calc(100vw - 32px)',
+            maxWidth: 'min(380px, calc(100vw - 32px))',
             background: 'var(--v3-surface-glass)',
             color: 'var(--ink-strong)',
             border: '1px solid rgba(201, 150, 58, 0.35)',
