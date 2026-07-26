@@ -141,13 +141,41 @@ export default function Bid() {
       const jobTitle = bid.summary
         || (jobType ? `${capitalize(jobType)} project` : 'New estimate')
 
+      // ONE price everywhere. The header used to carry the recommended
+      // (with-margin) price while the quote items summed the raw
+      // high-end rates — two different totals for the same bid on the
+      // same screen ($9,673 up top, $8,620 in the builder). Scale every
+      // line rate so the items sum EXACTLY to the recommended price;
+      // the last item absorbs the rounding remainder.
+      const rawItems = (bid.line_items || []).map((li: any) => ({
+        li,
+        qty: Number(li.qty || 1),
+        rate: Number(li.rate_high ?? li.rate_low ?? 0)
+      })).filter((r: any) => r.qty * r.rate > 0)
+      const rawSubtotal = rawItems.reduce((s: number, r: any) => s + r.qty * r.rate, 0)
+      const scale = rawSubtotal > 0 ? recommendedPrice / rawSubtotal : 1
+      let allocated = 0
+      const scaledItems = rawItems.map((r: any, idx: number) => {
+        const isLast = idx === rawItems.length - 1
+        let amount = isLast
+          ? recommendedPrice - allocated
+          : Math.round(r.qty * r.rate * scale)
+        if (amount < 0) amount = 0
+        allocated += amount
+        const rate = r.qty > 0 ? Math.round((amount / r.qty) * 100) / 100 : amount
+        return { ...r, amount, rate }
+      })
+
       // 1. Create the contact (stage='quote' so it lands in the
       //    Pipeline at the right column).
       const { data: contact, error: cErr } = await supabase
         .from('fh_contacts')
         .insert({
           user_id: user.id,
-          name: 'New estimate',
+          // The bid summary, not a generic label — a pipeline full of
+          // rows all named "New estimate" is unscannable. The real
+          // client attaches on the quote screen.
+          name: jobTitle,
           job_title: jobTitle,
           job_type: jobType || null,
           amount: recommendedPrice,
@@ -166,15 +194,15 @@ export default function Bid() {
       //    high end of the rate range as the rate — gives the
       //    contractor room to negotiate down rather than scrambling
       //    to add charges later.
-      const items = (bid.line_items || []).map((li: any, idx: any) => ({
+      const items = scaledItems.map((r: any, idx: number) => ({
         user_id: user.id,
         contact_id: contact.id,
         section: TRADE_LABELS[picks[0]] || 'Scope',
-        description: li.name + (li.notes ? ` — ${li.notes}` : ''),
-        qty: Number(li.qty || 1),
-        unit: li.unit || null,
-        rate: Number(li.rate_high ?? li.rate_low ?? 0),
-        amount: Number(li.qty || 1) * Number(li.rate_high ?? li.rate_low ?? 0),
+        description: r.li.name + (r.li.notes ? ` (${r.li.notes})` : ''),
+        qty: r.qty,
+        unit: r.li.unit || null,
+        rate: r.rate,
+        amount: r.amount,
         is_optional: false,
         is_excluded: false,
         sort_order: idx
@@ -319,7 +347,7 @@ export default function Bid() {
             display: 'inline-flex', alignItems: 'center', gap: 6
           }}>
             <Calculator size={11} aria-hidden="true" />
-            AI Estimate
+            Estimates
           </span>
           <h1 className={isDesktop ? 'fh-build-title' : undefined} style={isDesktop ? undefined : {
             margin: '6px 0 0',
@@ -330,7 +358,7 @@ export default function Bid() {
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
-            {isDesktop ? 'BUILD THE BID.' : 'Build a clean estimate'}
+            {isDesktop ? 'BUILD THE ESTIMATE.' : 'Build a clean estimate'}
           </h1>
           <p style={{
             margin: '6px 0 0',
