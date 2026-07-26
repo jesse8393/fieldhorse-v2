@@ -76,6 +76,10 @@ type MembershipContextValue = {
   // which is fine: hasCrew only drives owner-facing nav.
   memberCount: number
   hasCrew: boolean
+  // True when this user is an accepted partner (sub) on at least one
+  // job. Role holders normally lose the Sub Portal nav entry; partners
+  // keep it, because they work both sides.
+  isPartner: boolean
   // refreshable
   refresh: () => Promise<void>
   // bound permission helpers (read role from context, no arg needed)
@@ -112,6 +116,7 @@ function emptyValue(loading: boolean, error: string | null): MembershipContextVa
     joinedAt: null,
     memberCount: 0,
     hasCrew: false,
+    isPartner: false,
     refresh: async () => {},
     isOwner: false,
     isAdmin: false,
@@ -137,6 +142,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const [membership, setMembership] = useState<MembershipRow | null>(null)
   const [org, setOrg] = useState<OrgRow | null>(null)
   const [memberCount, setMemberCount] = useState<number>(0)
+  const [isPartner, setIsPartner] = useState<boolean>(false)
   // Tracks the auth user a fetch was started for. An in-flight fetch for
   // user A can resolve after a fast sign-out→sign-in to user B; without
   // this guard the stale response would overwrite B's org/role. Mirrors
@@ -224,6 +230,17 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       .is('revoked_at', null)
     if (activeUserIdRef.current !== user.id) return
     setMemberCount(count ?? 1)
+
+    // Step 4 — accepted partnerships (RLS: partner_user_id = auth.uid()).
+    // Keeps the Sub Portal nav entry visible for role holders who also
+    // sub on other contractors' jobs.
+    const { count: partnerCount } = await supabase
+      .from('fh_job_partners')
+      .select('*', { count: 'exact', head: true })
+      .eq('partner_user_id', user.id)
+      .not('accepted_at', 'is', null)
+    if (activeUserIdRef.current !== user.id) return
+    setIsPartner((partnerCount ?? 0) > 0)
     setLoading(false)
   }, [user?.id])
 
@@ -234,6 +251,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     setMembership(null)
     setOrg(null)
     setMemberCount(0)
+    setIsPartner(false)
   }, [user?.id])
 
   useEffect(() => {
@@ -258,6 +276,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       joinedAt: membership?.joined_at ?? null,
       memberCount,
       hasCrew: memberCount > 1,
+      isPartner,
       refresh: fetchMembership,
       // bound helpers
       isOwner: isOwner(role),
@@ -275,7 +294,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       canDoFieldWork: canDoFieldWork(role),
       canViewRoute: (path: string) => canViewRoute(role, path),
     }
-  }, [user, loading, error, membership, org, memberCount, fetchMembership])
+  }, [user, loading, error, membership, org, memberCount, isPartner, fetchMembership])
 
   return <MembershipContext.Provider value={value}>{children}</MembershipContext.Provider>
 }
