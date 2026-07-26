@@ -139,3 +139,24 @@
     padding-left: 2px;
   }
 }
+
+/* Rail card call to action (Add client info on an unattached deal). */
+.fh-build-rail-cta {
+  appearance: none;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--v3-primary) 12%, transparent);
+  color: var(--v3-primary-bright, #e5c158);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.fh-build-rail-cta:hover {
+  background: color-mix(in srgb, var(--v3-primary) 20%, transparent);
+}
