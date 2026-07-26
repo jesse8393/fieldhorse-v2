@@ -885,6 +885,15 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Scrollable strips (tab rows, chip rows) that must never draw a
+   native scrollbar — content still scrolls by wheel/drag/keys. */
+.fh-scrollbar-hidden {
+  scrollbar-width: none;
+}
+.fh-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 html,
 body,
 #root {
@@ -2498,10 +2507,15 @@ a {
     gap: 24px;
     padding: 8px 0 14px;
     border-bottom: 1px solid var(--rule);
+    /* Wrap the action buttons below the title when the pane is narrow —
+       the title used to be squeezed to ~110px, breaking across four
+       lines of display type and colliding with Preview / Send (UI
+       audit #20). */
+    flex-wrap: wrap;
   }
   .v3-screen--quote-active .fh-quote-workspace__head-text {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 320px;
+    min-width: 260px;
   }
   .v3-screen--quote-active .fh-quote-workspace__head-eyebrow {
     display: block;
@@ -2516,9 +2530,9 @@ a {
   .v3-screen--quote-active .fh-quote-workspace__head-title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 36px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-size: clamp(24px, 2.6vw, 36px);
+    font-weight: 400;
+    letter-spacing: 0.01em;
     color: var(--v3-text);
     line-height: 1.05;
   }
@@ -2945,6 +2959,17 @@ a {
    cutout. */
 [data-sonner-toaster][data-y-position="top"] {
   top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
+}
+
+/* FABs float over the scroll content; without reserved space they sit
+   on top of the last rows, row-action menus, sticky save bars, and
+   send buttons (UI audit #16). Reserve the height of the two-button
+   stack at the bottom of every scrollable page body. */
+@media (min-width: 900px) {
+  .fh-build-main,
+  .v3-screen {
+    padding-bottom: 160px;
+  }
 }
 
 /* Floating Action Button (override of the earlier .fh-fab declaration
@@ -6725,9 +6750,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-window-card.is-good { border-color: color-mix(in srgb, var(--v3-success-bright) 42%, transparent); }
   .fh-build-window-card.is-warn { border-color: color-mix(in srgb, var(--v3-primary-bright) 42%, transparent); }
 
+  /* Seven fixed fractions crushed each tile to ~48px in a narrow card:
+     day names ran into dates ("SATJul25"), temps overflowed the tile,
+     and the two metric values printed on top of each other (UI audit
+     #5). Tiles now keep a readable minimum and the strip scrolls. */
   .fh-build-forecast-days {
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(96px, 1fr);
+    overflow-x: auto;
     gap: 10px;
     padding: 18px 22px 22px;
   }
