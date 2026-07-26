@@ -2285,6 +2285,10 @@ export type Database = {
     }
     Functions: {
       auth_user_org_ids: { Args: never; Returns: string[] }
+      create_own_org: {
+        Args: { p_name: string }
+        Returns: string
+      }
       fh_clients_recompute: {
         Args: { p_client_id: string }
         Returns: undefined
