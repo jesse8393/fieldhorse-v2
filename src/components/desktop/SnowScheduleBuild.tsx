@@ -120,7 +120,7 @@ export default function SnowScheduleBuild(props: Props) {
 
   const rangeLabel = (() => {
     if (view === 'day')   return fmtDayHeading(cursor)
-    if (view === 'week')  return `${fmtDayShort(days[0])} – ${fmtDayShort(days[6])}`
+    if (view === 'week')  return `${fmtDayShort(days[0])} to ${fmtDayShort(days[6])}`
     return `${cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`
   })()
 
@@ -307,7 +307,7 @@ export default function SnowScheduleBuild(props: Props) {
                         <li key={e.id} className="fh-build-agenda__event">
                           <span className="fh-build-agenda__time">
                             <Clock size={12} />
-                            {fmtTime(e.start_at || '')}{e.end_at && ` – ${fmtTime(e.end_at)}`}
+                            {fmtTime(e.start_at || '')}{e.end_at && ` to ${fmtTime(e.end_at)}`}
                           </span>
                           <strong className="fh-build-agenda__title">{e.title || 'Untitled event'}</strong>
                           {e.location && (
