@@ -412,10 +412,10 @@ export default function Crew() {
                         }}
                       >
                         <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>
-                          {day ? day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '—'}
+                          {day ? day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}
                         </span>
                         <span style={{ color: 'var(--v3-text-muted)' }}>
-                          {fmtTime(p.punch_in_at)} – {p.punch_out_at ? fmtTime(p.punch_out_at) : 'now'}
+                          {fmtTime(p.punch_in_at)} to {p.punch_out_at ? fmtTime(p.punch_out_at) : 'now'}
                         </span>
                         <span>
                           {p.approved_at ? (
