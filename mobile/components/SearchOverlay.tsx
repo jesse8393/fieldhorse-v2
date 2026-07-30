@@ -1,4 +1,4 @@
-// mobile/components/SearchOverlay.tsx — universal search palette.
+// mobile/components/SearchOverlay.tsx, universal search palette.
 // Mirrors web's MobileSearchOverlay: one query across jobs and clients,
 // results navigate straight to the detail screen. Opened by the Search
 // button in the Home header.
@@ -55,8 +55,8 @@ export function SearchOverlay({ open, onClose, userId }: { open: boolean; onClos
     <Modal visible={open} animationType="fade" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top + 8 }}>
         {/* Search bar */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 10 }}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12 }}>
             <Search color={theme.goldBright} size={18} />
             <TextInput
               value={q}
@@ -68,7 +68,7 @@ export function SearchOverlay({ open, onClose, userId }: { open: boolean; onClos
             />
           </View>
           <Pressable onPress={() => { setQ(''); onClose() }} hitSlop={8}>
-            <Text style={{ color: theme.goldBright, fontSize: 15, fontWeight: '700' }}>Cancel</Text>
+            <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Cancel</Text>
           </Pressable>
         </View>
 
@@ -81,15 +81,15 @@ export function SearchOverlay({ open, onClose, userId }: { open: boolean; onClos
             <>
               {jobHits.length > 0 ? (
                 <>
-                  <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 14, marginBottom: 8 }}>Jobs</Text>
+                  <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginTop: 14, marginBottom: 8 }}>Jobs</Text>
                   {jobHits.map((j) => (
                     <Pressable key={j.id} onPress={() => go(`/jobs/${j.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}>
                       <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.border }}>
                         <Briefcase color={theme.goldBright} size={15} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
-                        <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }} numberOfLines={1}>{j.job_title || j.job_type || j.stage || '—'}</Text>
+                        <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
+                        <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }} numberOfLines={1}>{j.job_title || j.job_type || j.stage || '\u2003'}</Text>
                       </View>
                       {j.amount ? <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '800' }}>{money(j.amount)}</Text> : null}
                     </Pressable>
@@ -99,15 +99,15 @@ export function SearchOverlay({ open, onClose, userId }: { open: boolean; onClos
 
               {clientHits.length > 0 ? (
                 <>
-                  <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 18, marginBottom: 8 }}>Clients</Text>
+                  <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginTop: 18, marginBottom: 8 }}>Clients</Text>
                   {clientHits.map((c) => (
                     <Pressable key={c.id} onPress={() => go(`/clients/${c.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}>
                       <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.border }}>
                         <User color={theme.goldBright} size={15} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>{c.name || 'Unnamed'}</Text>
-                        <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }} numberOfLines={1}>{c.company_name || c.email || c.phone || '—'}</Text>
+                        <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{c.name || 'Unnamed'}</Text>
+                        <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }} numberOfLines={1}>{c.company_name || c.email || c.phone || '\u2003'}</Text>
                       </View>
                     </Pressable>
                   ))}

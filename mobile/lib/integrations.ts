@@ -3,7 +3,7 @@
 // Integration hub data layer. Reads fh_integrations (migration 030) to
 // show connection status per provider, and exposes connect/disconnect.
 //
-// The OAuth/token work lives in Supabase Edge Functions (service role) —
+// The OAuth/token work lives in Supabase Edge Functions (service role) :
 // the client only kicks off the flow and reads status. Until a provider's
 // edge function is deployed with real credentials, `connect` reports that
 // the backend isn't wired yet rather than launching a broken flow.
@@ -41,7 +41,7 @@ export const PROVIDERS: ProviderMeta[] = [
   {
     id: 'stripe',
     name: 'Stripe',
-    blurb: 'Accept card & ACH payments on invoices; auto-reconcile to payments.',
+    blurb: 'Accept card & ACH payments on invoices; reconcile automatically to payments.',
     live: false,
     setupNote: 'Needs your Stripe secret key in the edge function.'
   },
@@ -55,7 +55,7 @@ export const PROVIDERS: ProviderMeta[] = [
   {
     id: 'google_calendar',
     name: 'Google Calendar',
-    blurb: 'Two-way sync your schedule with Google Calendar.',
+    blurb: 'Two way sync your schedule with Google Calendar.',
     live: false,
     setupNote: 'Needs a Google OAuth client id/secret + consent screen.'
   },
@@ -69,7 +69,7 @@ export const PROVIDERS: ProviderMeta[] = [
   {
     id: 'jobber',
     name: 'Jobber',
-    blurb: 'One-time import of customers & jobs from Jobber.',
+    blurb: 'One time import of customers & jobs from Jobber.',
     live: false,
     setupNote: 'Needs a Jobber developer app (client id/secret) + partner approval.'
   }
@@ -80,7 +80,7 @@ async function fetchIntegrations(userId: string): Promise<IntegrationRow[]> {
     .from('fh_integrations' as any)
     .select('id, provider, status, display_name, external_account_id, last_synced_at, last_error')
     .eq('user_id', userId)
-  // Table may not exist yet (migration not applied) — treat as none connected.
+  // Table may not exist yet (migration not applied), treat as none connected.
   if (error) return []
   return (data ?? []) as unknown as IntegrationRow[]
 }

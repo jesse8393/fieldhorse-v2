@@ -320,34 +320,34 @@ function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName, partner
   }[c]))
   const greeting = partnerName ? `Hi ${safe(partnerName)},` : 'Hi,'
   const roleClause = partnerRole
-    ? `as ${aOrAn(partnerRole)} <strong style="color:#c9963a;">${safe(partnerRole)}</strong>`
+    ? `as ${aOrAn(partnerRole)} <strong style="color:#C9963A;">${safe(partnerRole)}</strong>`
     : 'as a partner'
   return `<!doctype html>
 <html lang="en">
-<body style="margin:0;padding:0;background:#f7f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f1f1f;line-height:1.55;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f7f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e7e5e0;overflow:hidden;">
-        <tr><td style="padding:28px 32px 8px;">
-          <p style="margin:0;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#9a9a93;">Partner invite</p>
-          <h1 style="margin:8px 0 0;font-size:22px;font-weight:600;color:#1f1f1f;letter-spacing:-0.01em;">You've been invited to co-manage <em style="color:#c9963a;">${safe(jobName)}</em>.</h1>
+      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
+        <tr><td style="padding:32px 32px 8px;">
+          <p style="margin:0;font-size:12px;letter-spacing:0;text-transform:uppercase;color:#5C5C5C;">Partner invite</p>
+          <h1 style="margin:8px 0 0;font-size:24px;font-weight:600;color:#141414;letter-spacing:0;">You've been invited to help manage <em style="color:#C9963A;">${safe(jobName)}</em>.</h1>
         </td></tr>
         <tr><td style="padding:16px 32px;">
-          <p style="margin:0 0 10px;font-size:15px;color:#1f1f1f;">${greeting}</p>
-          <p style="margin:0;font-size:15px;color:#1f1f1f;">${safe(senderLine)} added you ${roleClause} on this job. You will only see this specific job — no other contacts, rates, or data from their account.</p>
+          <p style="margin:0 0 12px;font-size:16px;color:#141414;">${greeting}</p>
+          <p style="margin:0;font-size:16px;color:#141414;">${safe(senderLine)} added you ${roleClause} on this job. You will only see this specific job and no other contacts, rates, or data from their account.</p>
         </td></tr>
         <tr><td style="padding:8px 32px 24px;" align="left">
-          <a href="${safe(inviteUrl)}" style="display:inline-block;background:#c9963a;color:#1a1a1a;text-decoration:none;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0.06em;">Accept Invite</a>
+          <a href="${safe(inviteUrl)}" style="display:inline-block;background:#C9963A;color:#141414;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0;">Accept Invite</a>
         </td></tr>
         <tr><td style="padding:0 32px 24px;">
-          <p style="margin:0;font-size:12px;color:#5d5d57;">If the button doesn't work, copy this link into your browser:</p>
-          <p style="margin:6px 0 0;font-size:12px;color:#1f1f1f;word-break:break-all;">${safe(inviteUrl)}</p>
+          <p style="margin:0;font-size:12px;color:#5C5C5C;">If the button doesn't work, copy this link into your browser:</p>
+          <p style="margin:8px 0 0;font-size:12px;color:#141414;word-break:break-all;">${safe(inviteUrl)}</p>
         </td></tr>
-        <tr><td style="padding:0 32px 28px;">
-          <p style="margin:0;font-size:14px;color:#1f1f1f;">— ${safe(senderLine)}</p>
+        <tr><td style="padding:0 32px 32px;">
+          <p style="margin:0;font-size:14px;color:#141414;">From ${safe(senderLine)}</p>
         </td></tr>
       </table>
-      ${companyName ? `<p style="margin:14px 0 0;font-size:11px;color:#9a9a93;letter-spacing:0.08em;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
+      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
     </td></tr>
   </table>
 </body>

@@ -65,7 +65,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
     setForm((prev) => ({ ...prev, [k]: v }))
   }
 
-  // Partner view — read-only summary. Insurance details RLS prevents
+  // Partner view, read-only summary. Insurance details RLS prevents
   // partners reading the row at all, so this branch is defensive: it
   // shows a generic "private to contractor" notice.
   if (!isOwner) {
@@ -75,14 +75,14 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
           <Shield size={14} aria-hidden="true" />
           Insurance claim
         </div>
-        <div style={{ padding: 16, color: 'var(--v3-text-muted)', fontSize: 13, fontFamily: 'var(--font-body)' }}>
+        <div style={{ padding: 16, color: 'var(--v3-text-muted)', fontSize: 14, fontFamily: 'var(--font-body)' }}>
           Insurance details are private to the contractor on file.
         </div>
       </div>
     )
   }
 
-  // Empty state — no claim on file
+  // Empty state, no claim on file
   if (!insurance && !editing) {
     return (
       <div style={panelStyle()}>
@@ -90,8 +90,8 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
           <Shield size={14} aria-hidden="true" />
           Insurance claim
         </div>
-        <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10 }}>
-          <div style={{ fontSize: 13, color: 'var(--v3-text-secondary)', fontFamily: 'var(--font-body)', lineHeight: 1.5, maxWidth: 480 }}>
+        <div style={{ padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ fontSize: 14, color: 'var(--v3-text-secondary)', fontFamily: 'var(--font-body)', lineHeight: 1.5, maxWidth: 480 }}>
             Tracking a carrier? Add the claim payload so it surfaces on every proposal + invoice for this job.
           </div>
           <button type="button" onClick={() => setEditing(true)} style={primaryBtnStyle()}>
@@ -167,7 +167,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
             </button>
           </div>
         </div>
-        <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+        <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
           {hasAny ? FIELDS.map((f) => {
             const v = insurance[f.key]
             if (v == null || v === '') return null
@@ -196,13 +196,13 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
       </div>
       <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
         {FIELDS.map((f) => (
-          <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={labelStyle()}>{f.label}</span>
             {f.type === 'money' ? (
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <span style={{
                   position: 'absolute', left: 12,
-                  color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 13,
+                  color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 14,
                   pointerEvents: 'none'
                 }}>$</span>
                 <input
@@ -211,7 +211,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
                   value={form[f.key]}
                   onChange={(e) => setField(f.key, e.target.value)}
                   placeholder={f.placeholder}
-                  style={{ ...inputStyle(), paddingLeft: 22 }}
+                  style={{ ...inputStyle(), paddingLeft: 24 }}
                 />
               </div>
             ) : (
@@ -246,7 +246,7 @@ function panelStyle() {
   return {
     background: 'var(--v3-surface)',
     border: '1px solid var(--v3-border)',
-    borderRadius: 14,
+    borderRadius: 10,
     overflow: 'hidden'
   }
 }
@@ -259,9 +259,9 @@ function panelHeaderStyle() {
     borderBottom: '1px solid var(--v3-border)',
     background: 'var(--v3-surface-2)',
     fontFamily: 'var(--font-body)',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 700,
-    letterSpacing: '0.16em',
+    letterSpacing: 0,
     color: 'var(--v3-primary-bright)',
     textTransform: 'uppercase'
   }
@@ -269,9 +269,9 @@ function panelHeaderStyle() {
 function labelStyle(): import('react').CSSProperties {
   return {
     fontFamily: 'var(--font-body)',
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: 700,
-    letterSpacing: '0.14em',
+    letterSpacing: 0,
     color: 'var(--v3-text-muted)',
     textTransform: 'uppercase'
   }
@@ -290,13 +290,13 @@ function inputStyle(): import('react').CSSProperties {
   return {
     width: '100%',
     boxSizing: 'border-box',
-    padding: '10px 12px',
-    borderRadius: 8,
+    padding: '12px 12px',
+    borderRadius: 10,
     background: 'var(--v3-surface-2)',
     border: '1px solid var(--v3-border-strong)',
     color: 'var(--v3-text)',
     fontFamily: 'var(--font-body)',
-    fontSize: 13,
+    fontSize: 14,
     outline: 'none'
   }
 }
@@ -304,16 +304,16 @@ function primaryBtnStyle() {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
-    padding: '9px 14px',
-    borderRadius: 8,
+    gap: 8,
+    padding: '8px 12px',
+    borderRadius: 10,
     border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
     background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
-    color: '#1a1208',
+    color: '#141414',
     fontFamily: 'var(--font-body)',
     fontSize: 12,
     fontWeight: 700,
-    letterSpacing: '0.06em',
+    letterSpacing: 0,
     textTransform: 'uppercase',
     cursor: 'pointer'
   }
@@ -322,9 +322,9 @@ function ghostBtnStyle() {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
-    padding: '7px 12px',
-    borderRadius: 8,
+    gap: 8,
+    padding: '8px 12px',
+    borderRadius: 10,
     background: 'transparent',
     border: '1px solid var(--v3-border-strong)',
     color: 'var(--v3-text)',
@@ -339,11 +339,11 @@ function dangerGhostBtnStyle() {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    padding: '7px 10px',
-    borderRadius: 8,
+    padding: '8px 12px',
+    borderRadius: 10,
     background: 'transparent',
-    border: '1px solid color-mix(in srgb, var(--v3-danger, #B33A3A) 40%, transparent)',
-    color: 'var(--v3-danger-bright, #f5a294)',
+    border: '1px solid color-mix(in srgb, var(--v3-danger, #C0392B) 40%, transparent)',
+    color: 'var(--v3-danger-bright, #C9963A)',
     cursor: 'pointer'
   }
 }

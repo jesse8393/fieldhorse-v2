@@ -1,4 +1,4 @@
-// mobile/components/MarkCompleteSheet.tsx — close out a job.
+// mobile/components/MarkCompleteSheet.tsx, close out a job.
 // Mirrors web src/components/MarkCompleteSheet.tsx: confirm the final
 // contract amount, mark the job `closed`, and optionally record a final
 // payment in one step.
@@ -57,12 +57,12 @@ export function MarkCompleteSheet({ open, onClose, userId, contactId, currentAmo
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Mark complete">
-      <Text style={{ color: theme.inkMuted, fontSize: 13, marginBottom: 16 }}>Confirm the final contract amount and close this job out.</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 16 }}>Confirm the final contract amount and close this job out.</Text>
       <SheetField label="Final amount ($)" value={finalAmount} onChange={setFinalAmount} keyboardType="numeric" placeholder="0" />
 
-      <Pressable onPress={() => setRecordPay((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: recordPay ? 14 : 18 }}>
-        <View style={{ width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: recordPay ? theme.goldBright : theme.borderMid, backgroundColor: recordPay ? theme.goldBright : 'transparent' }}>
-          {recordPay ? <Text style={{ color: theme.onGold, fontSize: 13, fontWeight: '900' }}>✓</Text> : null}
+      <Pressable onPress={() => setRecordPay((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: recordPay ? 14 : 18 }}>
+        <View style={{ width: 22, height: 22, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: recordPay ? theme.goldBright : theme.borderMid, backgroundColor: recordPay ? theme.goldBright : 'transparent' }}>
+          {recordPay ? <Text style={{ color: theme.onGold, fontSize: 14, fontWeight: '900' }}>✓</Text> : null}
         </View>
         <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>Record a final payment</Text>
       </Pressable>
@@ -70,13 +70,13 @@ export function MarkCompleteSheet({ open, onClose, userId, contactId, currentAmo
       {recordPay ? (
         <>
           <SheetField label="Payment amount ($)" value={payAmount} onChange={setPayAmount} keyboardType="numeric" placeholder="0" />
-          <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Method</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Method</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 18 }}>
             {METHODS.map((m) => {
               const on = method === m
               return (
-                <Pressable key={m} onPress={() => setMethod(m)} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
-                  <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 13, fontWeight: '700', textTransform: 'uppercase' }}>{m}</Text>
+                <Pressable key={m} onPress={() => setMethod(m)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
+                  <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700', textTransform: 'uppercase' }}>{m}</Text>
                 </Pressable>
               )
             })}
@@ -84,7 +84,7 @@ export function MarkCompleteSheet({ open, onClose, userId, contactId, currentAmo
         </>
       ) : null}
 
-      {err ? <Text style={{ color: theme.danger, fontSize: 13, marginBottom: 12 }}>{err}</Text> : null}
+      {err ? <Text style={{ color: theme.danger, fontSize: 14, marginBottom: 12 }}>{err}</Text> : null}
       <GoldButton label="Mark job complete" onPress={submit} loading={saving} />
     </BottomSheet>
   )

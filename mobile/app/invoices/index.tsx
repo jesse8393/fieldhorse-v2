@@ -1,4 +1,4 @@
-// mobile/app/invoices.tsx — Invoices & Payments hub.
+// mobile/app/invoices.tsx, Invoices & Payments hub.
 // Money-owed summary with aging buckets + an outstanding list with
 // working Mark Paid / Email. Reads real fh_invoices + payments.
 import { useState } from 'react'
@@ -35,7 +35,7 @@ export default function InvoicesScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
         <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Invoices & Payments" title="Money owed" />
 
         {isLoading ? (
@@ -44,21 +44,21 @@ export default function InvoicesScreen() {
           <>
             {/* Money owed card */}
             <Card glow style={{ marginTop: 18, marginBottom: 20 }}>
-              <View style={{ padding: 20 }}>
+              <View style={{ padding: 24 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <DollarSign color={theme.goldBright} size={14} />
-                    <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' }}>Money owed</Text>
+                    <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>Money owed</Text>
                   </View>
-                  <View style={{ paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: theme.borderGold }}>
-                    <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>COLLECT · {data?.outstandingCount ?? 0}</Text>
+                  <View style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: theme.borderGold }}>
+                    <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>COLLECT · {data?.outstandingCount ?? 0}</Text>
                   </View>
                 </View>
-                <Text style={{ color: theme.ink, fontSize: 40, fontWeight: '800', letterSpacing: -1, marginTop: 10 }}>{full(total)}</Text>
-                <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>Total outstanding</Text>
+                <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800', letterSpacing: 0, marginTop: 10 }}>{full(total)}</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase' }}>Total outstanding</Text>
 
                 {/* aging bar */}
-                <View style={{ flexDirection: 'row', height: 7, borderRadius: 4, overflow: 'hidden', marginTop: 16, backgroundColor: 'rgba(255,240,210,0.06)' }}>
+                <View style={{ flexDirection: 'row', height: 7, borderRadius: 10, overflow: 'hidden', marginTop: 16, backgroundColor: 'rgba(242, 237, 228,0.06)' }}>
                   <View style={{ flex: buckets[0] / bucketMax, backgroundColor: theme.inkMuted }} />
                   <View style={{ flex: buckets[1] / bucketMax, backgroundColor: '#C9963A' }} />
                   <View style={{ flex: buckets[2] / bucketMax, backgroundColor: theme.danger }} />
@@ -66,11 +66,11 @@ export default function InvoicesScreen() {
                 </View>
                 <View style={{ flexDirection: 'row', marginTop: 12 }}>
                   <Bucket label="Current · 0–30D" value={full(buckets[0])} tone={theme.ink} />
-                  <Bucket label="Late · 31–60D" value={full(buckets[1])} tone="#E8B865" />
+                  <Bucket label="Late · 31–60D" value={full(buckets[1])} tone="#C9963A" />
                   <Bucket label="Overdue · 60+D" value={full(buckets[2])} tone={theme.danger} />
                 </View>
                 <View style={{ borderTopWidth: 1, borderTopColor: theme.border, marginTop: 14, paddingTop: 12 }}>
-                  <Text style={{ color: theme.inkMuted, fontSize: 13 }}>
+                  <Text style={{ color: theme.inkMuted, fontSize: 14 }}>
                     <Text style={{ color: theme.success, fontWeight: '700' }}>{full(data?.collectedThisMonth ?? 0)}</Text> collected this month
                   </Text>
                 </View>
@@ -79,10 +79,10 @@ export default function InvoicesScreen() {
 
             {/* tabs */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>Outstanding</Text>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
+              <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>Outstanding</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
                 {(['outstanding', 'all'] as const).map((t) => (
-                  <Pressable key={t} onPress={() => setTab(t)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: tab === t ? theme.goldBright : theme.borderMid, backgroundColor: tab === t ? `${theme.goldBright}26` : 'transparent' }}>
+                  <Pressable key={t} onPress={() => setTab(t)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: tab === t ? theme.goldBright : theme.borderMid, backgroundColor: tab === t ? `${theme.goldBright}26` : 'transparent' }}>
                     <Text style={{ color: tab === t ? theme.goldBright : theme.inkMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
                   </Pressable>
                 ))}
@@ -90,7 +90,7 @@ export default function InvoicesScreen() {
             </View>
 
             {shown.length === 0 ? (
-              <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 12 }}>{tab === 'outstanding' ? 'Nothing outstanding — all caught up.' : 'No invoices yet.'}</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 12 }}>{tab === 'outstanding' ? 'Nothing outstanding, all caught up.' : 'No invoices yet.'}</Text>
             ) : (
               <View style={{ gap: 12 }}>
                 {shown.map((inv) => {
@@ -98,28 +98,28 @@ export default function InvoicesScreen() {
                   const paid = inv.status === 'paid'
                   return (
                     <Card key={inv.id} accent={paid ? theme.success : '#C9963A'}>
-                      <View style={{ padding: 16, paddingLeft: 18 }}>
+                      <View style={{ padding: 16, paddingLeft: 16 }}>
                         <Pressable onPress={() => inv.contactId && router.push(`/invoices/${inv.contactId}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ color: theme.ink, fontSize: 17, fontWeight: '700', flex: 1 }} numberOfLines={1}>{inv.name || `Invoice #${inv.sequence ?? ''}`}</Text>
-                          <Text style={{ color: theme.ink, fontSize: 18, fontWeight: '800' }}>{full(inv.amount)}</Text>
+                          <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700', flex: 1 }} numberOfLines={1}>{inv.name || `Invoice #${inv.sequence ?? ''}`}</Text>
+                          <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800' }}>{full(inv.amount)}</Text>
                         </Pressable>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: `${age.tint}55`, backgroundColor: `${age.tint}1f` }}>
-                            <Text style={{ color: age.tint, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{age.txt}</Text>
+                          <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: `${age.tint}55`, backgroundColor: `${age.tint}1f` }}>
+                            <Text style={{ color: age.tint, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>{age.txt}</Text>
                           </View>
                         </View>
                         {!paid ? (
                           <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
                             {inv.email ? (
-                              <Pressable onPress={() => Linking.openURL(`mailto:${inv.email}?subject=Invoice`)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingVertical: 11, borderWidth: 1, borderColor: theme.borderMid }}>
+                              <Pressable onPress={() => Linking.openURL(`mailto:${inv.email}?subject=Invoice`)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 12, borderWidth: 1, borderColor: theme.borderMid }}>
                                 <Send color={theme.ink} size={14} />
-                                <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 13 }}>Email</Text>
+                                <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 14 }}>Email</Text>
                               </Pressable>
                             ) : null}
-                            <Pressable onPress={() => user && markPaid({ id: inv.id, userId: user.id })} style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, backgroundColor: theme.goldBright }}>
+                            <Pressable onPress={() => user && markPaid({ id: inv.id, userId: user.id })} style={{ flex: 1, borderRadius: 10, overflow: 'hidden' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, backgroundColor: theme.goldBright }}>
                                 <DollarSign color={theme.onGold} size={14} />
-                                <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 13 }}>Mark Paid</Text>
+                                <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Mark Paid</Text>
                               </View>
                             </Pressable>
                           </View>
@@ -140,8 +140,8 @@ export default function InvoicesScreen() {
 function Bucket({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
     <View style={{ flex: 1 }}>
-      <Text style={{ color: tone, fontSize: 17, fontWeight: '800' }} numberOfLines={1}>{value}</Text>
-      <Text style={{ color: theme.inkMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 2 }}>{label}</Text>
+      <Text style={{ color: tone, fontSize: 16, fontWeight: '800' }} numberOfLines={1}>{value}</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginTop: 2 }}>{label}</Text>
     </View>
   )
 }

@@ -1,4 +1,4 @@
-// mobile/components/NewClientSheet.tsx — create a client (not a job/lead).
+// mobile/components/NewClientSheet.tsx, create a client (not a job/lead).
 // Mirrors web src/components/NewClientSheet.tsx. Rendered by the Clients tab
 // "+ New client" FAB.
 import { useState } from 'react'
@@ -48,7 +48,7 @@ export function NewClientSheet({ open, onClose, userId, onCreated }: Props) {
       <SheetField label="Phone" value={phone} onChange={setPhone} keyboardType="phone-pad" placeholder="(555) 555-5555" />
       <SheetField label="Email" value={email} onChange={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="name@email.com" />
       <SheetField label="Address" value={address} onChange={setAddress} placeholder="Street, city" />
-      {err ? <Text style={{ color: theme.danger, fontSize: 13, marginBottom: 12 }}>{err}</Text> : null}
+      {err ? <Text style={{ color: theme.danger, fontSize: 14, marginBottom: 12 }}>{err}</Text> : null}
       <GoldButton label="Create client" onPress={submit} loading={saving} />
     </BottomSheet>
   )

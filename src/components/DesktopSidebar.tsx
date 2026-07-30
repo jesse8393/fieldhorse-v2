@@ -1,12 +1,12 @@
-// DesktopSidebar — grouped nav for the Build dashboard direction.
+// DesktopSidebar, grouped nav for the Build dashboard direction.
 //
 // Mounted in AppShell at >=900px. Below 900px the sidebar is
 // display:none and the existing BottomNav remains the primary nav
 // surface (mobile experience untouched).
 //
 // Brand area: corrected FieldHorseMark emblem + wordmark.
-// Nav: four labeled groups — COMMAND / EXECUTION / INTELLIGENCE /
-// SETTINGS — routed to the closest existing app routes.
+// Nav: four labeled groups, COMMAND / EXECUTION / INTELLIGENCE /
+// SETTINGS, routed to the closest existing app routes.
 // Foot: account email + sign out (preserved from the prior sidebar).
 
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -39,7 +39,7 @@ type Item = {
   label: string
   to: string
   Icon: any
-  // Optional custom match — returns true when this item should show
+  // Optional custom match, returns true when this item should show
   // as active for the given location pathname.
   match?: (pathname: string) => boolean
 }
@@ -68,7 +68,7 @@ const GROUPS: GateGroup[] = [
   {
     label: 'Work',
     items: [
-      // One list for the whole deal lifecycle — the detail routes
+      // One list for the whole deal lifecycle, the detail routes
       // (/leads/:id, /quotes/:id, /jobs/:id) still exist, so Work
       // stays lit while any deal is open.
       { label: 'Work & Deals',   to: '/work',     Icon: Hammer,          match: (p) => p === '/work' || p.startsWith('/leads') || p.startsWith('/quotes') || p.startsWith('/jobs') },
@@ -134,12 +134,12 @@ export default function DesktopSidebar() {
         {GROUPS.map((group, gi) => {
           // Solo mode: the Team group only exists when the org has
           // more than one active member. While membership is loading
-          // it stays hidden too — a solo owner's first paint should
+          // it stays hidden too, a solo owner's first paint should
           // never flash crew nav that's about to disappear.
           if (group.crewOnly && !hasCrew) return null
           // Filter items by the caller's role. While membership is
           // still resolving (role === null), show everything so the
-          // first paint doesn't hide owner nav — once the membership
+          // first paint doesn't hide owner nav, once the membership
           // query settles, items the role can't reach disappear.
           // Filter rules:
           //   - membership still loading → show everything so the
@@ -250,8 +250,8 @@ function FieldHorseMark() {
       >
         <defs>
           <linearGradient id="fhOrange" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#F29A2E" />
-            <stop offset="100%" stopColor="#F26A21" />
+            <stop offset="0%" stopColor="#C9963A" />
+            <stop offset="100%" stopColor="#C9963A" />
           </linearGradient>
         </defs>
 
@@ -261,16 +261,16 @@ function FieldHorseMark() {
           width="68"
           height="68"
           rx="16"
-          fill="#101317"
+          fill="#141414"
           stroke="var(--v3-border-mid)"
         />
 
-        {/* F — white. Stem + top bar + middle bar, no overlap with H. */}
-        <rect x="12" y="14" width="8"  height="44" fill="#F4F4F0" />
-        <rect x="12" y="14" width="22" height="8"  fill="#F4F4F0" />
-        <rect x="12" y="30" width="18" height="8"  fill="#F4F4F0" />
+        {/* F, white. Stem + top bar + middle bar, no overlap with H. */}
+        <rect x="12" y="14" width="8"  height="44" fill="#F2EDE4" />
+        <rect x="12" y="14" width="22" height="8"  fill="#F2EDE4" />
+        <rect x="12" y="30" width="18" height="8"  fill="#F2EDE4" />
 
-        {/* H — orange gradient. Left stem + right stem + crossbar. */}
+        {/* H, orange gradient. Left stem + right stem + crossbar. */}
         <rect x="38" y="14" width="8"  height="44" fill="url(#fhOrange)" />
         <rect x="52" y="14" width="8"  height="44" fill="url(#fhOrange)" />
         <rect x="38" y="30" width="22" height="8"  fill="url(#fhOrange)" />

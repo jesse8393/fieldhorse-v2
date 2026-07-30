@@ -1,9 +1,9 @@
-// mobile/app/compose.tsx — AI message drafting.
+// mobile/app/compose.tsx, AI message drafting.
 //
 // Native port of the web Compose screen. Picks a channel + intent (and
-// optionally a job/contact for context), asks Claude for an on-brand
+// optionally a job/contact for context), asks Claude for an branded
 // draft, then copies it or hands off to the SMS / mail app via Linking.
-// The web's server-side Resend send is omitted — the native deep-link
+// The web's on the server Resend send is omitted, the native deep-link
 // handoff is the natural mobile path.
 import { useMemo, useState } from 'react'
 import {
@@ -29,7 +29,7 @@ const INTENTS = [
   'First outreach to new lead',
   'Follow up after quote sent',
   'Reminder for scheduled job',
-  'Change-order explanation',
+  'Change order explanation',
   'Invoice overdue nudge',
   'Thank you after job close',
   'Weather delay notice'
@@ -117,18 +117,18 @@ export default function ComposeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40, paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
         <ScreenHeader backLabel="Back" onBack={() => router.back()} eyebrow="Assistant" title="Compose" />
-        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6, marginBottom: 20 }}>Draft an on-brand message, then copy or send it.</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6, marginBottom: 20 }}>Draft an branded message, then copy or send it.</Text>
 
         <Text style={lbl}>Channel</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {CHANNELS.map((c) => {
             const on = channel === c.id
             return (
-              <Pressable key={c.id} onPress={() => setChannel(c.id)} style={[chip, on && chipOn, { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' }]}>
+              <Pressable key={c.id} onPress={() => setChannel(c.id)} style={[chip, on && chipOn, { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 8, alignItems: 'center' }]}>
                 <c.Icon color={on ? theme.goldBright : theme.inkMuted} size={14} />
-                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 13, fontWeight: '700' }}>{c.label}</Text>
+                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 14, fontWeight: '700' }}>{c.label}</Text>
               </Pressable>
             )
           })}
@@ -151,7 +151,7 @@ export default function ComposeScreen() {
           <Text style={{ color: contact ? theme.ink : theme.inkFaint, fontSize: 14 }} numberOfLines={1}>
             {contact ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : 'No job linked'}
           </Text>
-          {contact ? <Text onPress={() => setContactId('')} style={{ color: theme.inkMuted, fontSize: 13 }}>Clear</Text> : null}
+          {contact ? <Text onPress={() => setContactId('')} style={{ color: theme.inkMuted, fontSize: 14 }}>Clear</Text> : null}
         </Pressable>
 
         <Text style={[lbl, { marginTop: 18 }]}>Extra context (optional)</Text>
@@ -159,7 +159,7 @@ export default function ComposeScreen() {
           value={context}
           onChangeText={setContext}
           multiline
-          placeholder="Anything specific to mention — dates, amounts, tone…"
+          placeholder="Anything specific to mention, dates, amounts, tone…"
           placeholderTextColor="rgba(242,237,228,0.4)"
           style={[input, { minHeight: 80, textAlignVertical: 'top' }]}
         />
@@ -176,9 +176,9 @@ export default function ComposeScreen() {
               value={draft}
               onChangeText={setDraft}
               multiline
-              style={[input, { minHeight: 140, textAlignVertical: 'top', fontSize: 15, lineHeight: 21 }]}
+              style={[input, { minHeight: 140, textAlignVertical: 'top', fontSize: 14, lineHeight: 21 }]}
             />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 14 }}>
               <Pressable onPress={copy} style={[outlineBtn, { flex: 1 }]}>
                 {copied ? <Check color={theme.success} size={16} /> : <Copy color={theme.goldBright} size={16} />}
                 <Text style={{ color: theme.ink, fontWeight: '700' }}>{copied ? 'Copied' : 'Copy'}</Text>
@@ -197,14 +197,14 @@ export default function ComposeScreen() {
           <Pressable style={{ flex: 1 }} onPress={() => setPickerOpen(false)} />
           <View style={{ backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: theme.borderMid, maxHeight: '70%', paddingBottom: insets.bottom + 16 }}>
             <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800', padding: 24, paddingBottom: 12 }}>Link a job</Text>
-            <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12, gap: 6 }}>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
               {jobs.map((j) => (
                 <Pressable
                   key={j.id}
                   onPress={() => { setContactId(j.id); setPickerOpen(false) }}
-                  style={{ backgroundColor: 'rgba(24,20,17,0.6)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: contactId === j.id ? theme.goldBright : theme.borderMid }}
+                  style={{ backgroundColor: 'rgba(20, 20, 20,0.6)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: contactId === j.id ? theme.goldBright : theme.borderMid }}
                 >
-                  <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{j.name}</Text>
+                  <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{j.name}</Text>
                   <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{j.job_title || j.job_type || j.stage}</Text>
                 </Pressable>
               ))}
@@ -216,8 +216,8 @@ export default function ComposeScreen() {
   )
 }
 
-const lbl = { color: theme.inkMuted, fontSize: 11, fontWeight: '700' as const, letterSpacing: 1, textTransform: 'uppercase' as const, marginBottom: 8 }
-const input = { backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(255,240,210,0.12)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink }
-const chip = { backgroundColor: 'rgba(24,20,17,0.6)', borderWidth: 1, borderColor: theme.borderMid, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 }
-const chipOn = { borderColor: theme.goldBright, backgroundColor: 'rgba(232,184,101,0.14)' }
-const outlineBtn = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 8, backgroundColor: 'rgba(24,20,17,0.6)', borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingVertical: 14 }
+const lbl = { color: theme.inkMuted, fontSize: 12, fontWeight: '700' as const, letterSpacing: 0, textTransform: 'uppercase' as const, marginBottom: 8 }
+const input = { backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(242, 237, 228,0.12)', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink }
+const chip = { backgroundColor: 'rgba(20, 20, 20,0.6)', borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 }
+const chipOn = { borderColor: theme.goldBright, backgroundColor: 'rgba(201, 150, 58,0.14)' }
+const outlineBtn = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 8, backgroundColor: 'rgba(20, 20, 20,0.6)', borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingVertical: 12 }

@@ -1,9 +1,9 @@
-// Crew — /crew. The foreman/crew landing page.
+// Crew, /crew. The foreman/crew landing page.
 //
 // Read-mostly view of the punching user's own data:
 //   - Today's schedule slice (fh_schedule rows where assigned_to is
 //     the caller, OR all rows in their org if assigned_to isn't set)
-//   - Active punch + clock-in/out controls (fh_time_punches)
+//   - Active punch + clock in/out controls (fh_time_punches)
 //   - Own task list (fh_job_todos belonging to user_id) plus a
 //     truthful "not-tracked" hint when no tasks exist
 //
@@ -45,10 +45,10 @@ type TodoRow = {
 }
 
 function fmtTime(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   try {
     return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  } catch { return '—' }
+  } catch { return '\u2003' }
 }
 
 function fmtDayHeading(d: Date): string {
@@ -58,7 +58,7 @@ function fmtDayHeading(d: Date): string {
 // Duration formatter for the display-font (Bebas Neue) metrics on Crew.
 // Bebas Neue has only uppercase glyphs, so "0m" silently rendered as
 // "0M" / "1h 30m" → "1H 30M" which the audit flagged as a bug. Using
-// HH:MM digits and ":" avoids the case-sensitivity issue — they look
+// HH:MM digits and ":" avoids the case-sensitivity issue, they look
 // identical in any font.
 function fmtMinutes(min: number): string {
   const h = Math.floor(min / 60)
@@ -77,7 +77,7 @@ export default function Crew() {
   const [tasks, setTasks] = useState<TodoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [punching, setPunching] = useState(false)
-  // Which job the next clock-in attaches to. Defaults to today's first
+  // Which job the next clock in attaches to. Defaults to today's first
   // scheduled job so a punch is never orphaned when there's an obvious
   // one; '' means "no job" (general shift), which is still valid.
   const [clockJobId, setClockJobId] = useState<string>('')
@@ -112,7 +112,7 @@ export default function Crew() {
         supabase
           .from('fh_job_todos')
           .select('id, text, job_id, due_at, done, completed_at')
-          // Show tasks assigned to me, OR — if no assigned_to is set —
+          // Show tasks assigned to me, OR, if no assigned_to is set :
           // tasks I created. This lets the page work both for the
           // owner-of-one (legacy: every task user_id = self) and for
           // multi-member orgs (managers assign via assigned_to).
@@ -132,7 +132,7 @@ export default function Crew() {
 
   useEffect(() => { if (!memLoading) load() }, [memLoading, load])
 
-  // Today's jobs, deduped by contact_id — the pick-list for clock-in.
+  // Today's jobs, deduped by contact_id, the pick-list for clock in.
   // Schedule rows carry the event title which doubles as a good label.
   const todayJobs = (() => {
     const seen = new Map<string, string>()
@@ -144,7 +144,7 @@ export default function Crew() {
     return Array.from(seen, ([id, label]) => ({ id, label }))
   })()
 
-  // Default the clock-in job to today's first scheduled job once loaded,
+  // Default the clock in job to today's first scheduled job once loaded,
   // but never override a choice the user already made.
   useEffect(() => {
     if (!clockJobId && todayJobs.length > 0) setClockJobId(todayJobs[0].id)
@@ -164,7 +164,7 @@ export default function Crew() {
         toastError('Already clocked in', 'Refresh to see the active shift.')
         await load()
       } else {
-        toastError('Clock-in failed', msg || '')
+        toastError('Clock in failed', msg || '')
       }
     } finally {
       setPunching(false)
@@ -178,10 +178,10 @@ export default function Crew() {
       // Snapshot the member's current rate onto the punch (allowed
       // once, NULL→value, by the 054 guard). Without it the shift
       // priced at whatever the rate happens to be when job cost is
-      // next computed — a raise retroactively repriced old shifts.
+      // next computed, a raise retroactively repriced old shifts.
       const rate = await fetchMyDefaultRate(user.id, activePunch.org_id).catch(() => null)
       await punchOut({ punchId: activePunch.id, hourlyRate: rate ?? undefined })
-      // Push the new labor hours into the job's cached cost right away —
+      // Push the new labor hours into the job's cached cost right away :
       // without this, Home KPIs and margins didn't move until the owner
       // happened to touch an unrelated expense on the job.
       if (activePunch.contact_id) {
@@ -191,7 +191,7 @@ export default function Crew() {
       toastSuccess('Clocked out')
       await load()
     } catch (e: any) {
-      toastError('Clock-out failed', e?.message || '')
+      toastError('Clock out failed', e?.message || '')
     } finally {
       setPunching(false)
     }
@@ -199,7 +199,7 @@ export default function Crew() {
 
   // Today minutes = completed punches today + the active shift. The
   // recent list has no punch_out filter, so the ACTIVE punch is in it
-  // too — skip it there or the running shift counts twice ("Today on
+  // too, skip it there or the running shift counts twice ("Today on
   // the clock 6:00" three hours into a shift).
   const todayMs = (() => {
     const start = new Date()
@@ -259,7 +259,7 @@ export default function Crew() {
             <div className="fh-build-eyebrow">
               {activePunch ? 'On the clock' : 'Not clocked in'}
             </div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
               {activePunch
                 ? `Since ${fmtTime(activePunch.punch_in_at)}`
                 : 'Ready when you are.'}
@@ -271,7 +271,7 @@ export default function Crew() {
             )}
             {!activePunch && todayJobs.length > 0 && (
               <label style={{ display: 'block', marginTop: 12 }}>
-                <span style={{ display: 'block', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--v3-text-muted)', marginBottom: 4 }}>
+                <span style={{ display: 'block', fontSize: 12, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-text-muted)', marginBottom: 4 }}>
                   Clock in to
                 </span>
                 <select
@@ -279,15 +279,15 @@ export default function Crew() {
                   onChange={(e) => setClockJobId(e.target.value)}
                   disabled={punching}
                   style={{
-                    width: '100%', background: 'rgba(0,0,0,.25)', color: 'var(--v3-text)',
-                    border: '1px solid var(--v3-border-mid)', borderRadius: 8,
-                    padding: '8px 10px', fontSize: 13, fontWeight: 600,
+                    width: '100%', background: 'rgba(20, 20, 20,.25)', color: 'var(--v3-text)',
+                    border: '1px solid var(--v3-border-mid)', borderRadius: 10,
+                    padding: '8px 12px', fontSize: 14, fontWeight: 600,
                   }}
                 >
                   {todayJobs.map((j) => (
-                    <option key={j.id} value={j.id} style={{ color: '#111' }}>{j.label}</option>
+                    <option key={j.id} value={j.id} style={{ color: '#141414' }}>{j.label}</option>
                   ))}
-                  <option value="" style={{ color: '#111' }}>No specific job</option>
+                  <option value="" style={{ color: '#141414' }}>No specific job</option>
                 </select>
               </label>
             )}
@@ -298,7 +298,7 @@ export default function Crew() {
                   className="fh-build-primary-btn"
                   onClick={doClockOut}
                   disabled={punching}
-                  style={{ background: 'var(--v3-danger-bright)', color: '#fff' }}
+                  style={{ background: 'var(--v3-danger-bright)', color: '#F2EDE4' }}
                 >
                   <Square size={13} /> {punching ? 'Clocking out…' : 'Clock out'}
                 </button>
@@ -319,7 +319,7 @@ export default function Crew() {
             <MiniMetric label="Today on the clock" value={fmtMinutes(todayMs)} accent />
             <MiniMetric label="Today's events" value={String(schedule.length)} />
             <MiniMetric label="Open tasks" value={String(tasks.length)} tone={tasks.length > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Your role" value={role || '—'} />
+            <MiniMetric label="Your role" value={role || '\u2003'} />
           </div>
         </section>
 
@@ -335,7 +335,7 @@ export default function Crew() {
                 <button
                   type="button"
                   onClick={() => navigate('/schedule')}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--v3-primary, #c9963a)', cursor: 'pointer', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--v3-primary, #C9963A)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}
                 >
                   Full schedule →
                 </button>
@@ -353,28 +353,28 @@ export default function Crew() {
                         display: 'grid',
                         gridTemplateColumns: '120px 1fr auto',
                         gap: 16,
-                        padding: '14px 22px',
+                        padding: '12px 24px',
                         borderTop: '1px solid var(--v3-glass-tint-2)',
                         alignItems: 'center',
                       }}
                     >
-                      <span style={{ color: 'var(--v3-primary, #c9963a)', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ color: 'var(--v3-primary, #C9963A)', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                         <Clock size={11} style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
                         {fmtTime(ev.start_at)}{ev.end_at ? ` – ${fmtTime(ev.end_at)}` : ''}
                       </span>
-                      <strong style={{ color: 'var(--v3-text)', fontSize: 13, fontWeight: 700 }}>
+                      <strong style={{ color: 'var(--v3-text)', fontSize: 14, fontWeight: 700 }}>
                         {ev.title || 'Untitled event'}
                       </strong>
                       {ev.contact_id ? (
                         <button
                           type="button"
                           onClick={() => navigate(`/jobs/${ev.contact_id}`)}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
                           <MapPin size={11} /> Job <ChevronRight size={11} />
                         </button>
                       ) : (
-                        <span style={{ color: 'var(--v3-text-faint)', fontSize: 11 }}>—</span>
+                        <span style={{ color: 'var(--v3-text-faint)', fontSize: 12 }}>:</span>
                       )}
                     </li>
                   ))}
@@ -404,8 +404,8 @@ export default function Crew() {
                         style={{
                           display: 'grid',
                           gridTemplateColumns: '130px 110px 1fr 90px',
-                          gap: 14,
-                          padding: '12px 22px',
+                          gap: 12,
+                          padding: '12px 24px',
                           borderTop: '1px solid var(--v3-glass-tint-2)',
                           alignItems: 'center',
                           fontSize: 12,
@@ -461,7 +461,7 @@ export default function Crew() {
                         style={{ gridTemplateColumns: 'auto 1fr', cursor: 'pointer' }}
                         onClick={() => navigate(`/jobs/${t.job_id}`)}
                       >
-                        <span style={{ color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-primary, #c9963a)' }}>
+                        <span style={{ color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-primary, #C9963A)' }}>
                           {overdue ? <AlertTriangle size={11} /> : <Clock size={11} />}
                         </span>
                         <span className="fh-build-rail-list__title" title={t.text}>
@@ -477,7 +477,7 @@ export default function Crew() {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Timesheets</div>
               <strong data-empty>Shifts reviewed weekly</strong>
-              {/* The owner IS the manager — "your manager approves your
+              {/* The owner IS the manager, "your manager approves your
                   shifts" read as nonsense on a solo operator's screen. */}
               <span>
                 {role === 'owner' || role === 'admin'
@@ -509,7 +509,7 @@ function MiniMetric({ label, value, accent, tone }: { label: string; value: stri
   return (
     <div className="fh-build-mini">
       <strong style={{
-        color: tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#e0a141' : accent ? 'var(--v3-primary, #c9963a)' : undefined,
+        color: tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#C9963A' : accent ? 'var(--v3-primary, #C9963A)' : undefined,
         textTransform: label === 'Your role' ? 'capitalize' : undefined,
       }}>
         {value}

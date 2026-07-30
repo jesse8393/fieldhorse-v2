@@ -3,7 +3,7 @@ import { Eraser } from 'lucide-react'
 import { Eyebrow } from './v3'
 
 /**
- * SignaturePad — drawn-signature capture (Phase 4C-4a).
+ * SignaturePad, drawn-signature capture (Phase 4C-4a).
  *
  * Self-contained, no external deps. Pointer Events for mouse + touch +
  * stylus on one code path. Devicepixel-ratio-aware so signatures stay
@@ -30,7 +30,7 @@ export default function SignaturePad({
   label = 'Draw signature',
   height = 100,
   className,
-  hint = 'Optional — hand the phone to the customer to sign.'
+  hint = 'Optional, hand the phone to the customer to sign.'
 }: any) {
   const canvasRef = useRef<any>(null)
   const isDrawing = useRef(false)
@@ -70,8 +70,8 @@ export default function SignaturePad({
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.lineWidth = 2.5
-    ctx.strokeStyle = '#121212'
-    ctx.fillStyle = '#121212'
+    ctx.strokeStyle = '#141414'
+    ctx.fillStyle = '#141414'
 
     if (saved) {
       const img = new Image()
@@ -110,7 +110,7 @@ export default function SignaturePad({
     }
     const img = new Image()
     img.onload = () => { try { ctx.drawImage(img, 0, 0, cssW, cssH) } catch { /* ignore */ } }
-    img.onerror = () => { /* ignore — leaves canvas blank */ }
+    img.onerror = () => { /* ignore, leaves canvas blank */ }
     img.src = value
     lastEmitted.current = value
   }, [value])
@@ -141,7 +141,7 @@ export default function SignaturePad({
       isDrawing.current = true
       const p = pointerPos(e)
       lastPoint.current = p
-      // Single-tap dot — pure tap (no drag) still leaves a mark.
+      // Single-tap dot, pure tap (no drag) still leaves a mark.
       ctx.beginPath()
       ctx.arc(p.x, p.y, 1.25, 0, Math.PI * 2)
       ctx.fill()
@@ -178,7 +178,7 @@ export default function SignaturePad({
         ctx.stroke()
       }
       lastPoint.current = null
-      // Emit data URL — the only React-boundary cross per stroke.
+      // Emit data URL, the only React-boundary cross per stroke.
       try {
         const dataUrl = canvas.toDataURL('image/png')
         if (dataUrl && dataUrl !== 'data:,') {
@@ -212,7 +212,7 @@ export default function SignaturePad({
   return (
     <div
       className={['fh-sigpad', className].filter(Boolean).join(' ')}
-      style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
     >
       {label && (
         <Eyebrow>
@@ -224,8 +224,8 @@ export default function SignaturePad({
           position: 'relative',
           background: 'var(--v3-surface-2)',
           border: '1px solid var(--v3-border)',
-          borderRadius: 12,
-          padding: 6,
+          borderRadius: 10,
+          padding: 8,
           opacity: disabled ? 0.55 : 1
         }}
       >
@@ -238,8 +238,8 @@ export default function SignaturePad({
             display: 'block',
             width: '100%',
             height: `${height}px`,
-            background: '#F4F0E8',
-            borderRadius: 8,
+            background: '#F2EDE4',
+            borderRadius: 10,
             touchAction: 'none',
             cursor: disabled ? 'not-allowed' : 'crosshair',
             pointerEvents: disabled ? 'none' : 'auto',
@@ -259,7 +259,7 @@ export default function SignaturePad({
             width: 40,
             height: 40,
             borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.92)',
+            background: 'rgba(242, 237, 228, 0.92)',
             border: '1px solid var(--v3-border)',
             color: 'var(--v3-text-muted)',
             cursor: disabled ? 'not-allowed' : 'pointer',
@@ -274,7 +274,7 @@ export default function SignaturePad({
       </div>
       {hint && (
         <span style={{
-          fontSize: 11, lineHeight: 1.45,
+          fontSize: 12, lineHeight: 1.45,
           color: 'var(--v3-text-faint, var(--v3-text-muted))',
           fontFamily: 'var(--font-body)'
         }}>

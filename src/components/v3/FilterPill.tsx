@@ -1,5 +1,5 @@
 /**
- * FilterPill — canonical segmented filter chip with optional count.
+ * FilterPill, canonical segmented filter chip with optional count.
  *
  * Replaces 4+ near-identical inline copies in Jobs, Subs, Bid,
  * Invoices. Active state uses the gold gradient + halo + on-primary
@@ -17,7 +17,7 @@
  * Notes:
  *   - Count chip is optional. Omit `count` for label-only pills.
  *   - The active state is intentionally bold (gold gradient + halo
- *     ring) — this is THE primary affordance for "you are filtering".
+ *     ring), this is THE primary affordance for "you are filtering".
  */
 type FilterPillProps = import('react').ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean
@@ -27,7 +27,7 @@ type FilterPillProps = import('react').ButtonHTMLAttributes<HTMLButtonElement> &
   /**
    * ARIA role. Defaults to a standalone toggle button (role="button" +
    * aria-pressed), which is valid in ANY container. Pass `asTab` only
-   * when the pill lives inside a role="tablist" (e.g. Work.tsx) — then it
+   * when the pill lives inside a role="tablist" (e.g. Work.tsx), then it
    * emits role="tab" + aria-selected. Invoices.tsx renders these pills in
    * a plain flex div, so the default keeps them from being orphaned
    * role="tab" nodes.
@@ -66,7 +66,7 @@ export default function FilterPill({
         alignItems: 'center',
         gap: 8,
         padding: `${padY}px ${padX}px`,
-        borderRadius: 999,
+        borderRadius: 10,
         border: active
           ? '1px solid color-mix(in srgb, var(--v3-primary) 75%, transparent)'
           : '1px solid var(--v3-border-strong)',
@@ -77,12 +77,12 @@ export default function FilterPill({
         fontFamily: 'var(--font-body)',
         fontSize,
         fontWeight: 700,
-        letterSpacing: '0.04em',
+        letterSpacing: 0,
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
         boxShadow: active
-          ? '0 0 0 3px rgba(228, 190, 111, 0.18), 0 6px 18px rgba(201, 150, 58, 0.32), 0 1px 0 rgba(255, 240, 210, 0.30) inset'
-          : '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 2px 8px rgba(0, 0, 0, 0.20)',
+          ? '0 0 0 3px rgba(201, 150, 58, 0.18), 0 6px 18px rgba(201, 150, 58, 0.32), 0 1px 0 rgba(242, 237, 228, 0.30) inset'
+          : '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 2px 8px rgba(20, 20, 20, 0.20)',
         transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 200ms ease',
         ...style
       }}
@@ -96,13 +96,13 @@ export default function FilterPill({
           justifyContent: 'center',
           minWidth: 18,
           height: 18,
-          padding: '0 5px',
-          borderRadius: 999,
+          padding: '0 4px',
+          borderRadius: 10,
           background: active
-            ? 'rgba(26, 18, 8, 0.22)'
+            ? 'rgba(20, 20, 20, 0.22)'
             : 'var(--v3-surface-2)',
           color: active ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: 700,
           fontVariantNumeric: 'tabular-nums',
           lineHeight: 1

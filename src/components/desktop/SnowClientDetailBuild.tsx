@@ -1,4 +1,4 @@
-// SnowClientDetailBuild — desktop chrome for /clients/:id.
+// SnowClientDetailBuild, desktop chrome for /clients/:id.
 //
 // Presentational. Receives the existing tab body as children plus
 // presentational vitals computed by the parent. Forms, edit/save
@@ -35,9 +35,9 @@ type Props = {
 }
 
 function relTime(iso: any) {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   const diff = Date.now() - t
   if (diff < 60_000) return 'just now'
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
@@ -74,11 +74,11 @@ export default function SnowClientDetailBuild(props: Props) {
       new Date(a.updated_at || a.created_at || 0).getTime())
     .slice(0, 4)
 
-  // Next action heuristic — honest derivations from data
+  // Next action heuristic, honest derivations from data
   const nextAction = outstanding > 0
     ? { label: 'Chase outstanding invoice', tone: 'warn' as const }
     : activeCount === 0
-      ? { label: 'Re-engage client', tone: 'neutral' as const }
+      ? { label: 'Contact again client', tone: 'neutral' as const }
       : status.tone === 'warn'
         ? { label: 'Follow up on stale jobs', tone: 'warn' as const }
         : { label: 'On track', tone: 'good' as const }
@@ -147,13 +147,13 @@ export default function SnowClientDetailBuild(props: Props) {
 
           <div className="fh-build-mini-grid fh-build-mini-grid--detail">
             <MiniMetric label="Lifetime value" value={money(lifetime)} accent />
-            <MiniMetric label="Open value" value={openValue > 0 ? money(openValue) : '—'} />
+            <MiniMetric label="Open value" value={openValue > 0 ? money(openValue) : '\u2003'} />
             <MiniMetric label="Active jobs" value={String(activeCount)} />
-            <MiniMetric label="Outstanding AR" value={outstanding > 0 ? money(outstanding) : '—'} tone={outstanding > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Outstanding AR" value={outstanding > 0 ? money(outstanding) : '\u2003'} tone={outstanding > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
-        {/* Tab strip — controlled by the parent */}
+        {/* Tab strip, controlled by the parent */}
         {tabs.length > 0 && (
           <nav className="fh-build-tabs" aria-label="Sections">
             {tabs.map((t) => (
@@ -206,12 +206,12 @@ export default function SnowClientDetailBuild(props: Props) {
               <div className="fh-build-eyebrow">Open risks</div>
               {activeCount === 0 ? (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>No active jobs</span>
                 </>
               ) : status.tone === 'warn' ? (
                 <>
-                  <strong style={{ color: 'var(--v3-primary-bright)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <strong style={{ color: 'var(--v3-primary-bright)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     <AlertTriangle size={14} /> Cooling
                   </strong>
                   <span>30+ days since last touch</span>
@@ -228,7 +228,7 @@ export default function SnowClientDetailBuild(props: Props) {
               <div className="fh-build-eyebrow">Recent activity</div>
               {recent.length === 0 ? (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>No jobs yet</span>
                 </>
               ) : (
@@ -264,7 +264,7 @@ export default function SnowClientDetailBuild(props: Props) {
                   </div>
                 )}
                 {!client?.phone && !client?.email && !client?.address && (
-                  <span className="fh-build-rel" style={{ display: 'block', padding: '6px 0' }}>
+                  <span className="fh-build-rel" style={{ display: 'block', padding: '8px 0' }}>
                     No contact info on file
                   </span>
                 )}

@@ -31,8 +31,8 @@ export default function ActionSheet({
   currentStep = 1,
   commitLabel = 'Commit',
   commitBusy = false,
-  // Human in-flight label — overrides the legacy 'Committing…' default
-  // so customer-facing wording isn't database/version-control-ish.
+  // Human in-flight label, overrides the legacy 'Committing…' default
+  // so customer facing wording isn't database/version-control-ish.
   // ApproveQuoteSheet passes 'Approving…' for accuracy.
   commitBusyLabel = 'Saving…',
   commitDisabled = false,
@@ -66,7 +66,7 @@ export default function ActionSheet({
 
   // Blur whatever input is focused before unmounting the sheet. Without
   // this, iOS Safari keeps the soft keyboard up after the sheet animates
-  // away because no element formally lost focus — the focused input is
+  // away because no element formally lost focus, the focused input is
   // simply destroyed. Blurring first gives iOS the focusout event it
   // needs to dismiss the keyboard cleanly.
   function requestClose(e?: any) {
@@ -74,7 +74,7 @@ export default function ActionSheet({
     onClose?.(e)
   }
 
-  // visualViewport — track real viewport height and keyboard height.
+  // visualViewport, track real viewport height and keyboard height.
   // Sets --fh-vvh + --fh-kbd CSS vars on the sheet element.
   useEffect(() => {
     if (!open) return
@@ -102,7 +102,7 @@ export default function ActionSheet({
   // scroll-into-view only works on the window scroll, but the body has
   // its own overflow:auto and the document scroll is locked above. The
   // 280ms delay covers the iOS keyboard slide-up so we scroll AFTER the
-  // visualViewport resize lands — otherwise the scroll target moves out
+  // visualViewport resize lands, otherwise the scroll target moves out
   // from under the animation. Pairs with scroll-margin on inputs (CSS)
   // so 'nearest' clears the footer + a comfortable gap.
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function ActionSheet({
     function onFocusIn(e: any) {
       const t = e.target
       if (!t || !t.matches?.('input, textarea, select')) return
-      // Skip non-text inputs (chips, radio buttons) — they're already
+      // Skip non-text inputs (chips, radio buttons), they're already
       // in view and don't summon the keyboard.
       const inputType = (t.getAttribute?.('type') || '').toLowerCase()
       if (inputType === 'checkbox' || inputType === 'radio' || inputType === 'button' || inputType === 'submit') return

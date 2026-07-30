@@ -13,7 +13,7 @@ export type JobNextAction = {
 }
 
 /**
- * Job Next Action — resolve "what should the operator do next?" via priority
+ * Job Next Action, resolve "what should the operator do next?" via priority
  * chain (Q2 decision):
  *
  *   1. Next upcoming fh_schedule entry  (start_at >= now, soonest first)
@@ -26,7 +26,7 @@ export type JobNextAction = {
  * When chain item 4 fires, the suggestion's `pipelineFn` advances the stage
  * via the existing pipeline.ts cascade (markComplete, approveQuote, reopen,
  * etc.). This is how the v3 NextActionCard subsumes the legacy StageActions
- * row — same backend cascade, single primary action per screen.
+ * row, same backend cascade, single primary action per screen.
  *
  * Pure function. Returns one of these shapes (always { kind, title, ctaLabel }
  * plus optional date/pipelineFn/sourceId/dueAt):
@@ -45,7 +45,7 @@ export type JobNextAction = {
  *   - idle      → open AddEventSheet
  */
 const STAGE_DEFAULTS: Record<string, Pick<JobNextAction, 'title' | 'ctaLabel' | 'pipelineFn'>> = {
-  lead:    { title: 'Send a quote.',                   ctaLabel: 'Start quote',     pipelineFn: 'startQuote' },
+  lead:    { title: 'Send a quote.',                   ctaLabel: 'Convert to quote', pipelineFn: 'startQuote' },
   quote:   { title: 'Approve the quote and kick off.', ctaLabel: 'Approve quote',   pipelineFn: 'approveQuote' },
   job:     { title: 'Wrap up and invoice.',            ctaLabel: 'Mark complete',   pipelineFn: 'markComplete' },
   // Legacy alias of 'job' (pipeline v2 retired the invoice stage).
@@ -57,7 +57,7 @@ const STAGE_DEFAULTS: Record<string, Pick<JobNextAction, 'title' | 'ctaLabel' | 
 // Job-stage default, work already marked complete: the next move is
 // collecting the money, not completing again.
 const JOB_COMPLETED_DEFAULT: Pick<JobNextAction, 'title' | 'ctaLabel' | 'pipelineFn'> = {
-  title: 'Work’s done — collect the balance.',
+  title: 'Work’s done, collect the balance.',
   ctaLabel: 'Send invoice',
   pipelineFn: 'sendInvoice'
 }
@@ -108,7 +108,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
 
   const now = Date.now()
 
-  // 1. SCHEDULE — soonest upcoming entry wins
+  // 1. SCHEDULE, soonest upcoming entry wins
   const upcoming = scheduleItems
     .filter((s) => s?.start_at && new Date(s.start_at).getTime() >= now)
     .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())[0]
@@ -123,7 +123,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
     }
   }
 
-  // 2. MILESTONES — first undone (operator-defined order matters; don't sort)
+  // 2. MILESTONES, first undone (operator-defined order matters; don't sort)
   const milestones = Array.isArray(contact.milestones) ? contact.milestones : []
   const milestoneIdx = milestones.findIndex((m: any) => m && !m.done)
   if (milestoneIdx !== -1) {
@@ -135,7 +135,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
     }
   }
 
-  // 3. TODOS — due-aware selection (migration 010 added due_at). Inside
+  // 3. TODOS, due-aware selection (migration 010 added due_at). Inside
   // the todos branch we rank: overdue (oldest first) > today > soonest
   // future > undated. Undated rows fall back to upstream array order
   // (TodosTab fetches done ASC, created_at DESC), preserving the prior
@@ -144,14 +144,14 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
   if (nextTodo) {
     return {
       kind: 'todo',
-      title: nextTodo.text || 'Next to-do',
+      title: nextTodo.text || 'Next task',
       dueAt: nextTodo.due_at || null,
       ctaLabel: 'Mark Complete',
       sourceId: nextTodo.id
     }
   }
 
-  // 4. STAGE DEFAULT — falls back to a sensible "what does this stage need?"
+  // 4. STAGE DEFAULT, falls back to a sensible "what does this stage need?"
   return resolvePipelineAction(contact) || { kind: 'idle', title: 'No next action.', ctaLabel: '+ Schedule next step' }
 }
 

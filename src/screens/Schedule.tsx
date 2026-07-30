@@ -106,7 +106,7 @@ export default function Schedule() {
   const [pendingDeleteEvt, setPendingDeleteEvt] = useState<any>(null)
   const [deletingEvt, setDeletingEvt] = useState(false)
 
-  // If the URL had ?d=YYYY-MM-DD, consume it once so the back button
+  // If the URL had ?d=year month day, consume it once so the back button
   // doesn't keep forcing the cursor back to that day.
   useEffect(() => {
     if (params.get('d')) {
@@ -216,12 +216,12 @@ export default function Schedule() {
     [weather, profile?.services]
   )
 
-  // 5/17 — daily forecast map keyed by YYYY-MM-DD so the Week strip
+  // 5/17, daily forecast map keyed by year month day so the Week strip
   // can render a tiny high/precip badge under each date. Addresses the
   // 5/13 audit's "Schedule should have a weather overlay (you already
   // have the forecast data!)" complaint. getWeather now fetches 7
   // days (was 3) so a full visible week has data. Cells outside the
-  // forecast horizon fall back to no badge — silent, not "—".
+  // forecast horizon fall back to no badge, silent, not "\u2003".
   const dailyForecast = useMemo(() => {
     const d = weather?.daily
     if (!d?.time?.length) return {}
@@ -238,7 +238,7 @@ export default function Schedule() {
   }, [weather])
 
   function dayKey(d: any) {
-    // Local-time YYYY-MM-DD, NOT toISOString (which converts to UTC and
+    // Local-time year month day, NOT toISOString (which converts to UTC and
     // can skew the date by one day for east-of-UTC locales like CDT/CST).
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -249,7 +249,7 @@ export default function Schedule() {
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
-  // Phase 7 — desktop-first composition. At >=900px the planner +
+  // Phase 7, desktop-first composition. At >=900px the planner +
   // upcoming rail workspace replaces the narrow mobile dispatch
   // board. Mobile <900px keeps every feature of the existing
   // motion.div.v3-screen--schedule flow (month grid, week / day
@@ -281,11 +281,11 @@ export default function Schedule() {
 
   return (
     <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))', position: 'relative', background: 'var(--v3-bg)' }}>
-      {/* COMPACT HEADER — matches design's app-head--titled pattern.
+      {/* COMPACT HEADER, matches design's app-head--titled pattern.
           Eyebrow gives context ("Tue · May 20 · 4 visits"), h1 anchors
           the screen. Stats live inline under the eyebrow instead of
           inside a heavy black-glass panel. */}
-      <motion.div variants={item} style={{ padding: '14px 20px 4px' }}>
+      <motion.div variants={item} style={{ padding: '12px 24px 4px' }}>
         <Eyebrow as="div" tone="gold" style={{ marginBottom: 6 }}>
           {cursor.toLocaleDateString(undefined, { weekday: 'short' })} ·{' '}
           {cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
@@ -296,8 +296,8 @@ export default function Schedule() {
         <h1 style={{
           margin: 0,
           fontFamily: 'var(--font-display)',
-          fontSize: 'clamp(28px, 8vw, 38px)',
-          lineHeight: 1, letterSpacing: '0.01em',
+          fontSize: 24,
+          lineHeight: 1, letterSpacing: 0,
           color: 'var(--v3-text)'
         }}>
           {sameDay(cursor, startOfDay(new Date()))
@@ -324,10 +324,10 @@ export default function Schedule() {
         </motion.div>
       )}
 
-      {/* MONTH NAV — chevron-prev · "April 2025" · chevron-next · Today */}
-      <motion.div variants={item} style={{ padding: '4px 20px 12px' }}>
+      {/* MONTH NAV, chevron-prev · "April 2025" · chevron-next · Today */}
+      <motion.div variants={item} style={{ padding: '4px 24px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
@@ -340,7 +340,7 @@ export default function Schedule() {
               fontFamily: 'var(--font-body)',
               fontSize: 14,
               fontWeight: 700,
-              letterSpacing: '0.02em',
+              letterSpacing: 0,
               color: 'var(--v3-text)',
               fontVariantNumeric: 'tabular-nums',
               minWidth: 130,
@@ -361,12 +361,12 @@ export default function Schedule() {
             type="button"
             onClick={() => setCursor(startOfDay(new Date()))}
             style={{
-              padding: '8px 14px', borderRadius: 10,
+              padding: '8px 12px', borderRadius: 10,
               border: '1px solid var(--v3-border-strong)',
               background: 'var(--v3-surface)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               cursor: 'pointer',
               WebkitTapHighlightColor: 'transparent'
             }}
@@ -376,9 +376,9 @@ export default function Schedule() {
         </div>
       </motion.div>
 
-      {/* WEEK STRIP — 7 cells anchored to Monday. Highlighted cell = cursor;
+      {/* WEEK STRIP, 7 cells anchored to Monday. Highlighted cell = cursor;
           ring around today (when not selected). Tap any day to jump. */}
-      {/* DISPATCH STRIP — slim 52px day pills, design's dispatch-day pattern.
+      {/* DISPATCH STRIP, slim 52px day pills, design's dispatch-day pattern.
           Today gets a bright gold gradient; selected (non-today) gets a
           gold-soft tint with a subtle border accent. */}
       <motion.div variants={item}>
@@ -406,7 +406,7 @@ export default function Schedule() {
                 {forecastFor && forecastFor.high != null && (
                   <span style={{
                     fontFamily: 'var(--font-body)',
-                    fontSize: 9,
+                    fontSize: 12,
                     fontWeight: 600,
                     lineHeight: 1,
                     color: isToday ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
@@ -423,11 +423,11 @@ export default function Schedule() {
         </div>
       </motion.div>
 
-      {/* DAY / WEEK / MONTH toggle — uses the same dispatch-state pill
+      {/* DAY / WEEK / MONTH toggle, uses the same dispatch-state pill
           pattern as the ALL/LIVE/UPCOMING/DONE row below it, so the two
           toggles read as siblings. Replaced the older SpecTabs boxy
           chips that didn't match the rest of the v3 dispatch-* family. */}
-      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+      <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
         <div
           className="dispatch-state"
           role="tablist"
@@ -459,7 +459,7 @@ export default function Schedule() {
           past 60 px shifts the cursor by 1 (left = next, right = prev),
           giving phone users the same gesture they expect from native
           calendar apps. Vertical scroll inside the body still works. */}
-      {/* DAY HEADER — "TUE, APR 28" eyebrow that titles the timeline */}
+      {/* DAY HEADER, "TUE, APR 28" eyebrow that titles the timeline */}
       {view === 'day' && (
         <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 8px' }}>
           <Eyebrow>
@@ -468,7 +468,7 @@ export default function Schedule() {
         </motion.div>
       )}
 
-      {/* TIMELINE — vertical time-block list. Matches mockup: each row
+      {/* TIMELINE, vertical time-block list. Matches mockup: each row
           is a job block with time, name, sub, status pill, avatar group. */}
       <SwipeShell onShift={shift}>
         <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 24px' }}>
@@ -492,7 +492,7 @@ export default function Schedule() {
             />
           )}
           {events != null && view === 'month' && (
-            // 5/17 — month view was implemented in MonthView() but never
+            // 5/17, month view was implemented in MonthView() but never
             // exposed in the VIEWS toggle. Wiring it in gives the
             // contractor the long-horizon planner audit flagged as
             // missing. Range memo already returns a 6-week window so
@@ -507,7 +507,7 @@ export default function Schedule() {
         </motion.div>
       </SwipeShell>
 
-      {/* FAB — canonical portal-rendered primitive, immune to
+      {/* FAB, canonical portal-rendered primitive, immune to
           containing-block traps from transformed ancestors. Hidden
           when the day view is showing its own "Schedule a job" empty
           state CTA so the screen never has two stacked gold +
@@ -566,23 +566,23 @@ export default function Schedule() {
         }}
       >
         <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{pendingDeleteEvt?.title || 'this event'}</strong> from your schedule. You'll get an Undo toast right after — tap it to restore.
+          Removing <strong>{pendingDeleteEvt?.title || 'this event'}</strong> from your schedule. You'll get an Undo toast right after, tap it to restore.
         </p>
       </ActionSheet>
     </motion.div>
   )
 }
 
-// Compact stat for the cockpit summary panel — tabular display number
+// Compact stat for the cockpit summary panel, tabular display number
 // over a small uppercase label. Tone "gold" for the primary today figure,
 // "muted" for secondary reads.
 function SummaryStat({ label, value, tone = 'muted' }: any) {
   const valueColor = tone === 'gold' ? 'var(--v3-primary)' : 'var(--v3-text)'
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
       <span style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+        fontSize: 20, lineHeight: 1, letterSpacing: 0,
         color: valueColor,
         fontVariantNumeric: 'tabular-nums'
       }}>
@@ -628,7 +628,7 @@ function SwipeShell({ onShift, children }: any) {
 const iconBtnStyle = {
   width: 44,
   height: 44,
-  borderRadius: 11,
+  borderRadius: 10,
   border: '1px solid var(--v3-border-strong)',
   background: 'var(--v3-surface)',
   color: 'var(--v3-text)',
@@ -654,7 +654,7 @@ const chevBtnStyle = {
 }
 
 function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
-  // Per-status counts — drive the All/Live/Upcoming/Done toggle badges
+  // Per-status counts, drive the All/Live/Upcoming/Done toggle badges
   // and let the filter persist even when zero of a bucket exists today.
   const [stateFilter, setStateFilter] = useState('all')
 
@@ -681,7 +681,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
 
   return (
     <>
-      {/* DISPATCH STATE TOGGLE — All / Live / Upcoming / Done. Always
+      {/* DISPATCH STATE TOGGLE, All / Live / Upcoming / Done. Always
           visible (even on empty days) so the operator immediately sees
           the state taxonomy and can filter live work. Ported from the
           v3 design's dispatch-state pattern. */}
@@ -707,25 +707,25 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
 
       {filtered.length === 0 ? (
         events.length === 0 ? (
-          // True empty day — premium hero treatment. The previous version
+          // True empty day, premium hero treatment. The previous version
           // was a small card floating in the middle of a sea of black;
           // a billion-dollar app fills the space with a confident
           // statement, not a footnote.
           <div style={{
             margin: '24px 20px 0',
-            padding: '56px 24px',
+            padding: '48px 24px',
             minHeight: '46vh',
-            borderRadius: 20,
+            borderRadius: 10,
             background:
               'radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--v3-primary) 12%, transparent) 0%, transparent 60%),' +
               'linear-gradient(180deg, var(--v3-surface), var(--v3-surface-2))',
             border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))',
             boxShadow:
-              'inset 0 1px 0 rgba(255, 240, 210, 0.06),' +
-              '0 24px 64px -28px rgba(0, 0, 0, 0.65)',
+              'inset 0 1px 0 rgba(242, 237, 228, 0.06),' +
+              '0 24px 64px -28px rgba(20, 20, 20, 0.65)',
             textAlign: 'center',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 18,
+            gap: 16,
             position: 'relative',
             overflow: 'hidden'
           }}>
@@ -734,21 +734,21 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
               position: 'absolute',
               top: '20%', left: '50%',
               transform: 'translate(-50%, -50%)',
-              width: 220, height: 220, borderRadius: '50%',
+              width: 220, height: 220, borderRadius: 10,
               background: 'radial-gradient(circle, color-mix(in srgb, var(--v3-primary) 22%, transparent) 0%, transparent 70%)',
               pointerEvents: 'none',
               filter: 'blur(8px)'
             }} />
             <div style={{
-              width: 72, height: 72, borderRadius: 20,
-              background: 'linear-gradient(135deg, #3a2a18, #1a1208)',
+              width: 72, height: 72, borderRadius: 10,
+              background: 'linear-gradient(135deg, #141414, #141414)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)',
               color: 'var(--v3-primary-bright, var(--v3-primary))',
               display: 'grid', placeItems: 'center',
               boxShadow:
-                'inset 0 1px 0 rgba(228,190,111,0.22),' +
-                '0 0 28px rgba(228,190,111,0.28),' +
-                '0 12px 28px rgba(0,0,0,0.45)',
+                'inset 0 1px 0 rgba(201, 150, 58,0.22),' +
+                '0 0 28px rgba(201, 150, 58,0.28),' +
+                '0 12px 28px rgba(20, 20, 20,0.45)',
               position: 'relative', zIndex: 1
             }}>
               <CalendarIcon size={28} aria-hidden="true" strokeWidth={1.8} />
@@ -756,8 +756,8 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
             <div style={{ position: 'relative', zIndex: 1 }}>
               <div style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 32, lineHeight: 1.05,
-                letterSpacing: '-0.005em',
+                fontSize: 24, lineHeight: 1.05,
+                letterSpacing: 0,
                 color: 'var(--v3-text)'
               }}>
                 Day's clear.
@@ -780,15 +780,15 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
               style={{
                 marginTop: 6,
                 display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '14px 24px', borderRadius: 14,
+                padding: '12px 24px', borderRadius: 10,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                 background: 'linear-gradient(180deg, var(--v3-primary-hot, var(--v3-primary)) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-                letterSpacing: '0.08em', textTransform: 'uppercase',
+                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+                letterSpacing: 0, textTransform: 'uppercase',
                 cursor: 'pointer',
                 boxShadow:
-                  '0 0 0 3px rgba(228, 190, 111, 0.14),' +
+                  '0 0 0 3px rgba(201, 150, 58, 0.14),' +
                   '0 12px 28px rgba(201, 150, 58, 0.42)',
                 WebkitTapHighlightColor: 'transparent',
                 position: 'relative', zIndex: 1
@@ -802,11 +802,11 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
           // Filtered-empty (events exist, just none in this bucket).
           <div style={{
             margin: '0 20px',
-            padding: '20px',
-            borderRadius: 14,
+            padding: '24px',
+            borderRadius: 10,
             border: '1px dashed var(--v3-border-strong)',
             color: 'var(--v3-text-muted)',
-            fontFamily: 'var(--font-body)', fontSize: 13,
+            fontFamily: 'var(--font-body)', fontSize: 14,
             textAlign: 'center'
           }}>
             Nothing in <strong style={{ color: 'var(--v3-text)' }}>{stateFilter}</strong> for this day.
@@ -845,14 +845,14 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
 }
 
 /* Status taxonomy mirrors the mockup pill colors:
-     On Site     — currently happening, has a job (contact_id) → green
-     In Progress — currently happening, no contact (office/admin) → blue
-     Upcoming    — future today → gold
-     Scheduled   — future, not today → gray
-     Done        — past → muted gray (mockup doesn't show this; quiet) */
+     On Site    , currently happening, has a job (contact_id) → green
+     In Progress, currently happening, no contact (office/admin) → blue
+     Upcoming   , future today → gold
+     Scheduled  , future, not today → gray
+     Done       , past → muted gray (mockup doesn't show this; quiet) */
 const STATUS_TONE: Record<string, any> = {
-  'On Site':     { color: 'var(--v3-stage-active)', soft: 'rgba(79, 140, 94, 0.16)',   border: 'rgba(79, 140, 94, 0.40)' },
-  'In Progress': { color: 'var(--v3-stage-lead)',   soft: 'rgba(107, 124, 168, 0.14)', border: 'rgba(107, 124, 168, 0.40)' },
+  'On Site':     { color: 'var(--v3-stage-active)', soft: 'rgba(45, 122, 79, 0.16)',   border: 'rgba(45, 122, 79, 0.40)' },
+  'In Progress': { color: 'var(--v3-stage-lead)',   soft: 'rgba(92, 92, 92, 0.14)', border: 'rgba(92, 92, 92, 0.40)' },
   'Upcoming':    { color: 'var(--v3-primary)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
   'Scheduled':   { color: 'var(--v3-text-muted)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border-mid)' },
   'Done':        { color: 'var(--v3-text-faint)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border)' }
@@ -871,7 +871,7 @@ function deriveStatus(e: any, now: any) {
 }
 
 // Status → dispatch-state-pill variant + label mapping.
-// 5/17 — ported from v3 design (screens-schedule-estimate.jsx +
+// 5/17, ported from v3 design (screens-schedule-estimate.jsx +
 // styles-refine.css). LIVE shows the pulsing dot; UP NEXT and UPCOMING
 // share the muted "up" pill; DONE uses the soft-gold "done" pill;
 // SCHEDULED falls back to the neutral "default" pill.
@@ -887,18 +887,18 @@ const PILL_FOR_STATUS: Record<string, any> = {
 // column (HR stamp above, AM/PM small caption below). Falls back to
 // the full string if no space is present.
 function splitTime(s: any) {
-  if (!s) return ['—', '']
+  if (!s) return ['\u2003', '']
   const idx = s.lastIndexOf(' ')
   if (idx < 0) return [s, '']
   return [s.slice(0, idx), s.slice(idx + 1)]
 }
 
 function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onClick, onEdit, onDelete, isClickable }: any) {
-  // 5/17 — full visual port of the v3 design's dispatch-card pattern
+  // 5/17, full visual port of the v3 design's dispatch-card pattern
   // (replaces the prior glass-row with status spine). Time column on
   // the left as HR/AM stamp, title + sub on the right, state pill at
   // the head-row top-right, optional secondary detail line below.
-  // The contact avatar/initial was removed — the design's pattern
+  // The contact avatar/initial was removed, the design's pattern
   // drops it (and reserves the bottom of the card for a future crew
   // row when crews data ships). Delete affordance moves to a top-right
   // absolute trash button so the card surface stays clean.
@@ -957,7 +957,7 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
           aria-label="Edit event"
           style={{
             position: 'absolute', bottom: 8, right: 40,
-            width: 28, height: 28, borderRadius: 8,
+            width: 28, height: 28, borderRadius: 10,
             border: 'none', background: 'transparent',
             color: 'var(--v3-text-muted)',
             cursor: 'pointer', display: 'grid', placeItems: 'center',
@@ -977,12 +977,12 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
           aria-label="Delete event"
           style={{
             position: 'absolute',
-            // Bottom-right instead of top-right — top-right is where
+            // Bottom-right instead of top-right, top-right is where
             // the LIVE / UP NEXT status pill lives, and stacking the
             // trash icon next to it looked crowded ("UP NEXT🗑️").
             bottom: 8,
             right: 8,
-            width: 28, height: 28, borderRadius: 8,
+            width: 28, height: 28, borderRadius: 10,
             border: 'none', background: 'transparent',
             color: 'var(--v3-text-muted)',
             cursor: 'pointer', display: 'grid', placeItems: 'center',
@@ -1013,10 +1013,10 @@ function WeekView({ start, events, onClick, onDelete }: any) {
               <span className="fh-week__num">{d.getDate()}</span>
             </header>
             <div className="fh-week__body">
-              {dayEvents.length === 0 && <span className="fh-week__empty">—</span>}
+              {dayEvents.length === 0 && <span className="fh-week__empty">:</span>}
               {dayEvents.map((e: any) => (
                 <div key={e.id} className="fh-week__evt" style={{ position: 'relative' }}>
-                  <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {/* Time + title used to render as inline spans with no
                         gap, producing "8:00 AMasbestos test". Stack them
                         vertically with a 2 px gap so the time reads as a
@@ -1057,7 +1057,7 @@ function WeekView({ start, events, onClick, onDelete }: any) {
 function MonthView({ cursor, events, onDay }: any) {
   // 6-week grid (always 42 cells) so the layout is stable across
   // months. Days from the prev/next month are rendered dimmed instead
-  // of as blank slots — matches every standard calendar app.
+  // of as blank slots, matches every standard calendar app.
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
   const gridStart = addDays(monthStart, -monthStart.getDay())
   const today = startOfDay(new Date())

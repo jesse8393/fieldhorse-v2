@@ -1,4 +1,4 @@
-// mobile/app/(tabs)/schedule.tsx — upcoming schedule.
+// mobile/app/(tabs)/schedule.tsx, upcoming schedule.
 // Uses the shared useUpcomingEvents() hook and groups events by day, the
 // same shape the web Schedule upcoming rail uses. A floating "+" opens a
 // sheet to create an event (title + date + time + optional linked job);
@@ -87,19 +87,19 @@ export default function ScheduleScreen() {
   return (
     <View style={{ flex: 1, paddingTop: insets.top + 10 }}>
       <ScreenBackground />
-      <View style={{ paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+      <View style={{ paddingHorizontal: 24, paddingBottom: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <View>
           <Eyebrow>Schedule</Eyebrow>
-          <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', letterSpacing: -0.5 }}>Next {range} days</Text>
+          <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800', letterSpacing: 0 }}>Next {range} days</Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 6 }}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
           {([7, 30] as const).map((r) => {
             const active = range === r
             return (
               <Pressable
                 key={r}
                 onPress={() => setRange(r)}
-                style={{ borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7, borderWidth: 1, borderColor: active ? theme.goldBright : theme.borderMid, backgroundColor: active ? `${theme.goldBright}26` : 'transparent' }}
+                style={{ borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: active ? theme.goldBright : theme.borderMid, backgroundColor: active ? `${theme.goldBright}26` : 'transparent' }}
               >
                 <Text style={{ fontSize: 12, fontWeight: '800', color: active ? theme.goldBright : theme.inkMuted }}>{r}d</Text>
               </Pressable>
@@ -112,7 +112,7 @@ export default function ScheduleScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingBottom: 6 }}
+        contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 8 }}
         style={{ maxHeight: 78, flexGrow: 0 }}
       >
         {weekDays.map((d) => {
@@ -123,17 +123,17 @@ export default function ScheduleScreen() {
               key={d.toISOString()}
               onPress={() => jumpToDay(d)}
               style={{
-                width: 46, borderRadius: 14, paddingVertical: 8, alignItems: 'center',
+                width: 46, borderRadius: 10, paddingVertical: 8, alignItems: 'center',
                 borderWidth: 1,
                 borderColor: isToday ? theme.goldBright : count > 0 ? theme.borderGold : theme.border,
                 backgroundColor: isToday ? `${theme.goldBright}1f` : theme.surface
               }}
             >
-              <Text style={{ color: isToday ? theme.goldBright : theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+              <Text style={{ color: isToday ? theme.goldBright : theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>
                 {d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3)}
               </Text>
-              <Text style={{ color: isToday ? theme.goldBright : theme.ink, fontSize: 17, fontWeight: '800', marginTop: 2 }}>{d.getDate()}</Text>
-              <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 4, backgroundColor: count > 0 ? theme.goldBright : 'transparent' }} />
+              <Text style={{ color: isToday ? theme.goldBright : theme.ink, fontSize: 16, fontWeight: '800', marginTop: 2 }}>{d.getDate()}</Text>
+              <View style={{ width: 5, height: 5, borderRadius: 10, marginTop: 4, backgroundColor: count > 0 ? theme.goldBright : 'transparent' }} />
             </Pressable>
           )
         })}
@@ -146,18 +146,18 @@ export default function ScheduleScreen() {
           ref={listRef}
           sections={sections}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 100 }}
           stickySectionHeadersEnabled={false}
           onScrollToIndexFailed={() => {}}
           renderSectionHeader={({ section }) => (
-            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 18, marginBottom: 10 }}>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginTop: 18, marginBottom: 10 }}>
               {section.title}
             </Text>
           )}
           renderItem={({ item }) => (
             <Pressable onPress={() => openEdit(item)} style={{ marginBottom: 10 }}>
               <Card accent={theme.gold}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, paddingLeft: 18 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, paddingLeft: 16 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{item.title || 'Scheduled event'}</Text>
                     <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>{item.fh_contacts?.name || 'No job linked'}</Text>
@@ -167,17 +167,17 @@ export default function ScheduleScreen() {
               </Card>
             </Pressable>
           )}
-          ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>A clear stretch — nothing scheduled.</Text>}
-          ListFooterComponent={events.length ? <Text style={{ color: theme.inkMuted, fontSize: 10, textAlign: 'center', marginTop: 16 }}>Tap an event to edit or delete.</Text> : null}
+          ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>A clear stretch, nothing scheduled.</Text>}
+          ListFooterComponent={events.length ? <Text style={{ color: theme.inkMuted, fontSize: 12, textAlign: 'center', marginTop: 16 }}>Tap an event to edit or delete.</Text> : null}
         />
       )}
 
       {/* Floating add button */}
       <Pressable
         onPress={openCreate}
-        style={{ position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 999, shadowColor: '#E8B865', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12 }}
+        style={{ position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 10, shadowColor: '#C9963A', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12 }}
       >
-        <LinearGradient colors={['#F0CE86', '#E4BE6F', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>
+        <LinearGradient colors={['#F2EDE4', '#C9963A', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
           <Plus color={theme.onGold} size={26} strokeWidth={2.8} />
         </LinearGradient>
       </Pressable>

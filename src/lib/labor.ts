@@ -4,17 +4,17 @@
 //
 // Two clock systems feed job cost without overlapping:
 //   • The owner's job-screen TimeClockCard writes BOTH a punch row and
-//     an fh_expenses row (category='Labor') — its cost already flows
+//     an fh_expenses row (category='Labor'), its cost already flows
 //     through expenses, so its punches must NOT be counted again here.
 //   • Crew members clock in via Crew Home, which writes ONLY a punch
-//     row — before this module, that time never reached job cost.
+//     row, before this module, that time never reached job cost.
 //
 // The split: count punches whose user_id differs from the job owner's.
-// (Known small hole: the owner clocking via Crew Home is skipped too —
+// (Known small hole: the owner clocking via Crew Home is skipped too :
 // acceptable; their habit path is the job-screen clock.)
 //
 // Approval note: completed punches count whether or not a manager has
-// approved them yet — the owner wants margin truth same-day. If
+// approved them yet, the owner wants margin truth same-day. If
 // approval becomes the gate, filter on approved_at here.
 
 import { supabase } from './supabase.ts'
@@ -50,7 +50,7 @@ export async function crewLaborForContact(
     .eq('contact_id', contactId)
     .not('punch_out_at', 'is', null)
     .neq('user_id', ownerUserId)
-    // Flagged punches are disputed ("wrong rate", "GPS mismatch") —
+    // Flagged punches are disputed ("wrong rate", "GPS mismatch") :
     // they must not bill the job while under review. Clearing the flag
     // (or approving via the workflow) puts them back in.
     .eq('flagged', false)
@@ -77,7 +77,7 @@ export async function crewLaborForContact(
     let q = (supabase.from('org_members') as any)
       .select('user_id, default_hourly_rate')
       .in('user_id', needRateFor)
-      // Skip revoked memberships — a stale rate from a since-removed
+      // Skip revoked memberships, a stale rate from a since-removed
       // membership row must not overwrite the active one.
       .is('revoked_at', null)
     if (punchOrgId) q = q.eq('org_id', punchOrgId)

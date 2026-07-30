@@ -4,7 +4,7 @@
 //
 //   Contract total  ·  Previously paid  ·  This invoice  ·  Balance remaining
 //
-// Balance remaining is the hero — large, brand-accent gold, the number
+// Balance remaining is the hero, large, brand-accent gold, the number
 // the customer's eye lands on first. Other rows are subordinated stamps.
 //
 // Progress-billing aware: in the current single-invoice-per-job data
@@ -29,7 +29,7 @@ export default function InvoiceBalanceBlock({
   thisInvoice = null,    // null → derived from contractTotal − previouslyPaid
   balanceRemaining = null, // null → derived: same as thisInvoice in the
                             // single-invoice case; passed in for progress billing
-  payments = [],          // optional — when present, retainage rows
+  payments = [],          // optional, when present, retainage rows
                           //   (kind='retainage') get called out on a
                           //   separate line so the customer sees what
                           //   the contractor is holding back vs already
@@ -68,10 +68,10 @@ export default function InvoiceBalanceBlock({
   return (
     <section
       style={{
-        padding: '22px 24px',
+        padding: '24px 24px',
         background: DOC_COLORS.paperSoft,
         border: `1px solid ${DOC_COLORS.ruleStrong}`,
-        borderRadius: 6,
+        borderRadius: 10,
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: 24,
@@ -95,7 +95,7 @@ export default function InvoiceBalanceBlock({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'baseline',
-              padding: '7px 0',
+              padding: '8px 0',
               borderTop: i > 0 ? `1px solid ${DOC_COLORS.rule}` : 'none'
             }}
           >

@@ -6,7 +6,7 @@
 // Accepted / Revoked. Per-card actions: Resend invite, Revoke
 // everywhere.
 //
-// Resend reuses /api/partner-invite — the unique (job_id,
+// Resend reuses /api/partner-invite, the unique (job_id,
 // partner_email) constraint trips and the function falls into its
 // resend branch, returning the same token. Revoke flips status to
 // 'revoked' on every fh_job_partners row for the partner; we use the
@@ -57,10 +57,10 @@ export default function Partners() {
   const [busyKey, setBusyKey] = useState<any>(null)
 
   // The Pending metric used to count only top-level partner records with
-  // status='pending'. But the data model also has per-job share status —
+  // status='pending'. But the data model also has per-job share status :
   // an "accepted" partner can have individual jobs still in pending
   // state. The audit caught the summary saying "Pending 0" while an
-  // accepted partner's card showed a "Matthew Addition — PENDING" row.
+  // accepted partner's card showed a "Matthew Addition, PENDING" row.
   // Now: pending = partner-level pending + any job-level pending shares
   // on otherwise-accepted partners.
   const counts = useMemo(() => {
@@ -104,9 +104,9 @@ export default function Partners() {
       }
       hapticSuccess()
       if (body.sent) {
-        toastSuccess('Invite re-sent', `${partner.email} got a fresh link.`)
+        toastSuccess('Invite sent again', `${partner.email} got a fresh link.`)
       } else {
-        toastInfo('Link refreshed', 'Email sender skipped — share manually from the job sheet.')
+        toastInfo('Link refreshed', 'Email sender skipped, share manually from the job sheet.')
       }
     } catch (err: any) {
       hapticError()
@@ -121,7 +121,7 @@ export default function Partners() {
     if (active.length === 0) return
     const ok = await confirm({
       title: `Revoke ${partner.name || partner.email}?`,
-      body: `Cuts their access to ${active.length} ${active.length === 1 ? 'job' : 'jobs'}. They can't re-accept old invites after this — you'll need to send a fresh one.`,
+      body: `Cuts their access to ${active.length} ${active.length === 1 ? 'job' : 'jobs'}. They can't re-accept old invites after this, you'll need to send a fresh one.`,
       destructive: true,
       confirmLabel: 'Revoke everywhere'
     })
@@ -148,21 +148,21 @@ export default function Partners() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-      style={{ paddingBottom: 120, background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, background: 'var(--v3-bg)' }}
     >
       {/* COCKPIT */}
-      <div style={{ padding: '8px 20px 12px' }}>
+      <div style={{ padding: '8px 24px 12px' }}>
         <div style={{
-          padding: '14px 16px',
-          borderRadius: 16,
+          padding: '12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 8px 22px rgba(20, 20, 20, 0.40)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
             <Eyebrow tone="gold">Partners</Eyebrow>
             <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)'
+              fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)'
             }}>
               {counts.all} total
             </span>
@@ -170,7 +170,7 @@ export default function Partners() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr 1fr',
-            gap: 10,
+            gap: 12,
             alignItems: 'end'
           }}>
             <Metric label="Accepted" tone="good">{counts.accepted}</Metric>
@@ -181,8 +181,8 @@ export default function Partners() {
       </div>
 
       {/* Filter chips */}
-      <div style={{ padding: '0 20px 12px' }}>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+      <div style={{ padding: '0 24px 12px' }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
           {STATUS_FILTERS.map((f) => (
             <FilterPill
               key={f.id}
@@ -198,15 +198,15 @@ export default function Partners() {
       </div>
 
       {/* List */}
-      <div style={{ padding: '0 20px 32px' }}>
+      <div style={{ padding: '0 24px 32px' }}>
         {loading && <SkeletonList rows={4} card={false} />}
         {!loading && rows.length === 0 && (
           <div style={{
-            padding: '32px 24px', borderRadius: 16,
+            padding: '32px 24px', borderRadius: 10,
             background: 'var(--v3-surface)',
             border: '1px dashed var(--v3-border-strong)',
             textAlign: 'center', color: 'var(--v3-text-muted)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
           }}>
             <Users size={20} aria-hidden="true" style={{ color: 'var(--v3-primary)' }} />
             <div style={{
@@ -224,7 +224,7 @@ export default function Partners() {
           <div className="v3-empty">No partners in this filter.</div>
         )}
         {!loading && filtered.length > 0 && (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {filtered.map((p) => (
               <PartnerCard
                 key={p.email}
@@ -243,7 +243,7 @@ export default function Partners() {
 }
 
 function Metric({ label, tone = 'default', children }: any) {
-  const color = tone === 'good' ? 'var(--v3-good, #6FB387)'
+  const color = tone === 'good' ? 'var(--v3-good, #5C5C5C)'
     : tone === 'gold' ? 'var(--v3-primary-bright)'
     : 'var(--v3-text)'
   return (
@@ -261,27 +261,27 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
   return (
     <li>
       <section style={{
-        borderRadius: 16,
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.22)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.22)',
         overflow: 'hidden'
       }}>
         {/* Header */}
         <header style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          padding: '14px 16px',
+          padding: '12px 16px',
           borderBottom: '1px solid var(--v3-border)'
         }}>
           <span aria-hidden="true" style={{
             flexShrink: 0,
-            width: 44, height: 44, borderRadius: 12,
+            width: 44, height: 44, borderRadius: 10,
             background: 'var(--v3-primary-soft)',
             border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
             color: 'var(--v3-primary)',
             display: 'grid', placeItems: 'center',
-            fontFamily: 'var(--font-display)', fontSize: 18,
-            letterSpacing: '0.04em'
+            fontFamily: 'var(--font-display)', fontSize: 20,
+            letterSpacing: 0
           }}>
             {initial}
           </span>
@@ -296,7 +296,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
             <div style={{
               marginTop: 3,
               display: 'flex', alignItems: 'center', gap: 8,
-              fontFamily: 'var(--font-body)', fontSize: 11,
+              fontFamily: 'var(--font-body)', fontSize: 12,
               color: 'var(--v3-text-muted)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
             }}>
@@ -325,9 +325,9 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
               <li key={k} style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr auto auto',
-                gap: 10,
+                gap: 12,
                 alignItems: 'center',
-                padding: '11px 16px',
+                padding: '12px 16px',
                 borderTop: '1px solid var(--v3-border)'
               }}>
                 <Link
@@ -339,20 +339,20 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
                   }}
                 >
                   <span aria-hidden="true" style={{
-                    width: 8, height: 8, borderRadius: '50%',
+                    width: 8, height: 8, borderRadius: 10,
                     background: stageColor(j.stage),
                     boxShadow: `0 0 10px ${stageColor(j.stage)}66`,
                     flexShrink: 0
                   }} />
                   <span style={{
-                    fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
                     color: 'var(--v3-text)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                   }}>
                     {j.name || j.jobTitle || 'Untitled job'}
                   </span>
                 </Link>
-                <Eyebrow style={{ color: j.status === 'accepted' ? 'var(--v3-good, #6FB387)'
+                <Eyebrow style={{ color: j.status === 'accepted' ? 'var(--v3-good, #5C5C5C)'
                     : j.status === 'revoked' ? 'var(--v3-text-muted)'
                     : 'var(--v3-primary-bright)' }}>
                   {j.status}
@@ -376,18 +376,18 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
         {/* Footer */}
         <footer style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          gap: 10, padding: '10px 14px',
+          gap: 12, padding: '12px 12px',
           borderTop: '1px solid var(--v3-border)',
           background: 'var(--v3-surface-2)'
         }}>
           <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
             color: 'var(--v3-text-muted)',
-            letterSpacing: '0.04em'
+            letterSpacing: 0
           }}>
             <Clock size={11} aria-hidden="true" />
-            Last invited {relTime(partner.lastInvitedAt) || '—'}
+            Last invited {relTime(partner.lastInvitedAt) || '\u2003'}
           </span>
           {partner.jobs.some((j: any) => j.status !== 'revoked') && (
             <button
@@ -395,13 +395,13 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
               onClick={() => onRevoke(partner)}
               disabled={busy}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '6px 11px', borderRadius: 999,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', borderRadius: 10,
                 background: 'rgba(192,57,43,0.10)',
                 border: '1px solid rgba(192,57,43,0.35)',
-                color: 'var(--v3-danger-bright, #f5a294)',
-                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.04em',
+                color: 'var(--v3-danger-bright, #C9963A)',
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                letterSpacing: 0,
                 cursor: busy ? 'wait' : 'pointer',
                 opacity: busy ? 0.6 : 1
               }}
@@ -418,12 +418,12 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
 
 function StatusBadge({ status }: any) {
   const palette = status === 'accepted'
-    ? { bg: 'rgba(72, 130, 95, 0.14)', border: 'rgba(72, 130, 95, 0.45)', color: 'var(--v3-good, #6FB387)' }
+    ? { bg: 'rgba(45, 122, 79, 0.14)', border: 'rgba(45, 122, 79, 0.45)', color: 'var(--v3-good, #5C5C5C)' }
     : status === 'revoked'
       ? { bg: 'var(--v3-glass-tint)', border: 'var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
       : { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)', color: 'var(--v3-primary-bright)' }
   return (
-    <Eyebrow style={{ flexShrink: 0, padding: '3px 9px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
+    <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       {status}
     </Eyebrow>
   )
@@ -434,7 +434,7 @@ function iconBtnStyle(busy: any) {
     width: 32, height: 32, borderRadius: 10,
     background: 'var(--v3-surface-2)',
     border: '1px solid var(--v3-border-strong)',
-    color: busy ? 'var(--v3-good, #6FB387)' : 'var(--v3-text)',
+    color: busy ? 'var(--v3-good, #5C5C5C)' : 'var(--v3-text)',
     display: 'grid', placeItems: 'center',
     cursor: busy ? 'wait' : 'pointer',
     WebkitTapHighlightColor: 'transparent'
@@ -442,6 +442,6 @@ function iconBtnStyle(busy: any) {
 }
 
 const dotStyle = {
-  display: 'inline-block', width: 3, height: 3, borderRadius: '50%',
+  display: 'inline-block', width: 3, height: 3, borderRadius: 10,
   background: 'var(--v3-text-muted)', flexShrink: 0
 }

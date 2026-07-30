@@ -1,9 +1,9 @@
-// MembershipContext — single source of truth for the current user's
+// MembershipContext, single source of truth for the current user's
 // organization + role.
 //
 // Reads two rows on signin:
 //   1. own row in public.org_members  (RLS: org_members_self_read,
-//      a direct user_id = auth.uid() check — no self-recursion)
+//      a direct user_id = auth.uid() check, no self-recursion)
 //   2. the matching public.organizations row by org_id (RLS:
 //      organizations_member_read, an EXISTS against org_members)
 //
@@ -20,7 +20,7 @@
 // What this does NOT do:
 //   - mutate org membership (writes go through edge functions per the
 //     Phase 3 plan to keep RLS recursion-safe)
-//   - decide what queries see — that stays in the data layer; the
+//   - decide what queries see, that stays in the data layer; the
 //     context only answers "who am I, and what role do I have?"
 //   - load anything for an unauthenticated user (returns nulls)
 
@@ -144,7 +144,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const [memberCount, setMemberCount] = useState<number>(0)
   const [isPartner, setIsPartner] = useState<boolean>(false)
   // Tracks the auth user a fetch was started for. An in-flight fetch for
-  // user A can resolve after a fast sign-out→sign-in to user B; without
+  // user A can resolve after a fast sign-out→sign in to user B; without
   // this guard the stale response would overwrite B's org/role. Mirrors
   // the pattern in ProfileContext.
   const activeUserIdRef = useRef<string | null>(null)
@@ -161,7 +161,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
 
-    // Step 1 — own membership row(s). RLS policy `org_members_self_read`
+    // Step 1, own membership row(s). RLS policy `org_members_self_read`
     // permits a direct read where user_id = auth.uid() with no
     // self-recursion (per migration 034 fix).
     const memberQuery = await supabase
@@ -200,7 +200,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     const picked = (stored && rows.find((r) => r.org_id === stored)) || rows[0]
     setMembership(picked)
 
-    // Step 2 — the org row. RLS policy `organizations_member_read`
+    // Step 2, the org row. RLS policy `organizations_member_read`
     // permits this read because picked.org_id matches my org_members
     // row above.
     const orgQuery = await supabase
@@ -221,7 +221,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
 
     setOrg((orgQuery.data as OrgRow | null) || null)
 
-    // Step 3 — active member count for the picked org (drives the
+    // Step 3, active member count for the picked org (drives the
     // solo-mode nav: crew screens only appear when hasCrew).
     const { count } = await supabase
       .from('org_members')
@@ -231,7 +231,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     if (activeUserIdRef.current !== user.id) return
     setMemberCount(count ?? 1)
 
-    // Step 4 — accepted partnerships (RLS: partner_user_id = auth.uid()).
+    // Step 4, accepted partnerships (RLS: partner_user_id = auth.uid()).
     // Keeps the Sub Portal nav entry visible for role holders who also
     // sub on other contractors' jobs.
     const { count: partnerCount } = await supabase

@@ -1,4 +1,4 @@
-// permissions.ts — pure role-permission helpers.
+// permissions.ts, pure role-permission helpers.
 //
 // One source of truth for "what can role X do?". Lives outside React
 // so server code (edge functions), tests, and React both consume the
@@ -7,13 +7,13 @@
 // The roles come from the public.org_role Postgres enum created in
 // migration 032 (CREW_PORTAL_FOUNDATION):
 //
-//   owner    — everything, including billing + delete
-//   admin    — everything except billing + delete
-//   manager  — their crews + their jobs, financials visible
-//   foreman  — their crews + their jobs, financials hidden
-//   crew     — own shifts, own time, own tasks only
+//   owner   , everything, including billing + delete
+//   admin   , everything except billing + delete
+//   manager , their crews + their jobs, financials visible
+//   foreman , their crews + their jobs, financials hidden
+//   crew    , own shifts, own time, own tasks only
 //
-// `null` / undefined means "not a member of any org yet" — the same
+// `null` / undefined means "not a member of any org yet", the same
 // gating as an unauthenticated visitor. Helpers all return `false`
 // for null so a missing role fails closed.
 
@@ -40,7 +40,7 @@ export const isOwnerOrAdmin = (r: MaybeRole) => is(r, 'owner', 'admin')
 
 // ─── capability gates ───────────────────────────────────────
 // Each capability maps to the smallest set of roles allowed. Keep the
-// gates narrow — UI can opt to show "Not connected" rather than crash
+// gates narrow, UI can opt to show "Not connected" rather than crash
 // when a role lacks a permission.
 
 /** See $$ amounts, margins, AR balances, payment history, invoices. */
@@ -95,7 +95,7 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/quotes':         return canCreateFinancialDocs(role)    // proposal workflow, same revenue gate as leads
     case '/jobs':           return true                            // role-filtered in-view
     case '/clients':        return canSeeAllJobs(role)             // crew/foreman don't browse the client list
-    case '/notes':          return true                            // field reports — everyone can read+write their own
+    case '/notes':          return true                            // field reports, everyone can read+write their own
     case '/schedule':       return true                            // role-filtered in-view
     case '/activity':       return true                            // notifications hub
     case '/bid':            return canCreateFinancialDocs(role)    // estimate builder
@@ -109,8 +109,8 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/invoices':       return canSeeFinancials(role)
     case '/team':           return true                            // roster visible to all org members; mutations gated separately
     case '/timesheets':     return canApproveTimesheets(role)       // owner/admin/manager only
-    case '/tasks':          return canSeeAllJobs(role)               // cross-job dashboard — owner/admin only
-    case '/sub-portal':     return false                             // hidden from org members in the sidebar (DesktopSidebar shows it explicitly for sub-only / no-role users). The route itself is still reachable by URL — useful when an org member is also a sub on another contractor's job.
+    case '/tasks':          return canSeeAllJobs(role)               // cross-job dashboard, owner/admin only
+    case '/sub-portal':     return false                             // hidden from org members in the sidebar (DesktopSidebar shows it explicitly for sub-only / no-role users). The route itself is still reachable by URL, useful when an org member is also a sub on another contractor's job.
     default:                return true
   }
 }

@@ -9,7 +9,7 @@ const MODEL = (import.meta as any).env?.VITE_ANTHROPIC_MODEL || 'claude-fable-5'
 // Hard ceiling so a stuck /api/claude call never leaves the UI in an
 // indefinite "parsing…" or "drafting…" state. Fable 5 runs adaptive
 // thinking on every turn (it can't be disabled), so a turn takes longer
-// than the old Sonnet path — 30s gives it room without letting a truly
+// than the old Sonnet path, 30s gives it room without letting a truly
 // stuck call hang the UI. The proxy pins these utility calls to LOW
 // effort so they stay well inside this budget.
 const REQUEST_TIMEOUT_MS = 30000
@@ -17,7 +17,7 @@ const REQUEST_TIMEOUT_MS = 30000
 type ClaudeMessage = { role: string; content: unknown }
 
 // Claude 5 responses can lead with thinking blocks before the text block,
-// so `content[0].text` — the read every consumer does — comes back
+// so `content[0].text`, the read every consumer does, comes back
 // undefined. Normalize here (drop non-text blocks) so consumers keep
 // their simple `content[0].text` reads and heal in one place.
 function normalizeResponse(data: any) {
@@ -41,7 +41,7 @@ export async function claudeMessage({ system, messages, maxTokens = 1024, model,
     return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
-      throw new Error('Claude request timed out (15s)')
+      throw new Error(`Claude request timed out (${REQUEST_TIMEOUT_MS / 1000}s)`)
     }
     throw err
   } finally {
@@ -50,14 +50,14 @@ export async function claudeMessage({ system, messages, maxTokens = 1024, model,
 }
 
 /**
- * claudeVision — multimodal call. Sends one image + a text prompt.
+ * claudeVision, multimodal call. Sends one image + a text prompt.
  *
  *   imageData: data URL (data:image/jpeg;base64,...) OR raw base64 string
  *              with an explicit mediaType.
  *   mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
  *              (defaults to image/jpeg if data URL doesn't carry one)
  *
- * Returns the same shape as claudeMessage — { content: [{ text }, ...], ... }
+ * Returns the same shape as claudeMessage, { content: [{ text }, ...], ... }
  */
 export async function claudeVision({ system, prompt, imageData, mediaType, maxTokens = 1024 }: { system?: string; prompt: string; imageData: string; mediaType?: string; maxTokens?: number }) {
   // Accept data-URL or raw base64. Strip the data-URL header if present
@@ -95,7 +95,7 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
     return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
-      throw new Error('Claude vision request timed out (15s)')
+      throw new Error(`Claude vision request timed out (${REQUEST_TIMEOUT_MS / 1000}s)`)
     }
     throw err
   } finally {

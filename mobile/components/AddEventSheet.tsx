@@ -1,4 +1,4 @@
-// mobile/components/AddEventSheet.tsx — schedule a job event in a bottom sheet.
+// mobile/components/AddEventSheet.tsx, schedule a job event in a bottom sheet.
 // Mirrors web src/components/AddEventSheet.tsx: title, date, time, optional
 // linked job, and an optional recurrence ("every N days × M"). Handles both
 // create (with recurrence) and edit/delete of an existing event.
@@ -60,7 +60,7 @@ export function AddEventSheet({ open, onClose, userId, jobs, editEvent }: Props)
   async function submit() {
     if (!title.trim() || saving) { if (!title.trim()) setErr('A title is required.'); return }
     const start = toDate(date, time)
-    if (!start) { setErr('Use date YYYY-MM-DD and time HH:MM.'); return }
+    if (!start) { setErr('Use date year month day and time HH:MM.'); return }
     setSaving(true); setErr(null)
     if (editing && editEvent) {
       const { error } = await updateEvent({ id: editEvent.id, userId, title: title.trim(), startAt: start.toISOString(), contactId: jobId })
@@ -92,20 +92,20 @@ export function AddEventSheet({ open, onClose, userId, jobs, editEvent }: Props)
     <BottomSheet open={open} onClose={onClose} title={editing ? 'Edit event' : 'New event'}>
       <SheetField label="Title" value={title} onChange={setTitle} placeholder="Site visit, install, inspection…" autoFocus={!editing} />
       <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}><SheetField label="Date" value={date} onChange={setDate} placeholder="YYYY-MM-DD" /></View>
+        <View style={{ flex: 1 }}><SheetField label="Date" value={date} onChange={setDate} placeholder="year month day" /></View>
         <View style={{ width: 120 }}><SheetField label="Time" value={time} onChange={setTime} placeholder="09:00" /></View>
       </View>
 
-      <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Link to job (optional)</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Link to job (optional)</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }} style={{ marginBottom: 14 }}>
-        <Pressable onPress={() => setJobId(null)} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: jobId === null ? theme.goldBright : theme.borderMid, backgroundColor: jobId === null ? `${theme.goldBright}26` : theme.bg }}>
-          <Text style={{ color: jobId === null ? theme.goldBright : theme.inkMuted, fontSize: 13, fontWeight: '700' }}>None</Text>
+        <Pressable onPress={() => setJobId(null)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: jobId === null ? theme.goldBright : theme.borderMid, backgroundColor: jobId === null ? `${theme.goldBright}26` : theme.bg }}>
+          <Text style={{ color: jobId === null ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }}>None</Text>
         </Pressable>
         {jobs.slice(0, 40).map((j) => {
           const on = jobId === j.id
           return (
-            <Pressable key={j.id} onPress={() => setJobId(j.id)} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
-              <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
+            <Pressable key={j.id} onPress={() => setJobId(j.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
+              <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
             </Pressable>
           )
         })}
@@ -113,9 +113,9 @@ export function AddEventSheet({ open, onClose, userId, jobs, editEvent }: Props)
 
       {!editing ? (
         <>
-          <Pressable onPress={() => setRecurs((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: recurs ? 12 : 18 }}>
-            <View style={{ width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: recurs ? theme.goldBright : theme.borderMid, backgroundColor: recurs ? theme.goldBright : 'transparent' }}>
-              {recurs ? <Text style={{ color: theme.onGold, fontSize: 13, fontWeight: '900' }}>✓</Text> : null}
+          <Pressable onPress={() => setRecurs((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: recurs ? 12 : 18 }}>
+            <View style={{ width: 22, height: 22, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: recurs ? theme.goldBright : theme.borderMid, backgroundColor: recurs ? theme.goldBright : 'transparent' }}>
+              {recurs ? <Text style={{ color: theme.onGold, fontSize: 14, fontWeight: '900' }}>✓</Text> : null}
             </View>
             <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>Repeats</Text>
           </Pressable>
@@ -128,10 +128,10 @@ export function AddEventSheet({ open, onClose, userId, jobs, editEvent }: Props)
         </>
       ) : null}
 
-      {err ? <Text style={{ color: theme.danger, fontSize: 13, marginBottom: 12 }}>{err}</Text> : null}
+      {err ? <Text style={{ color: theme.danger, fontSize: 14, marginBottom: 12 }}>{err}</Text> : null}
       <GoldButton label={editing ? 'Save event' : 'Create event'} onPress={submit} loading={saving} />
       {editing ? (
-        <Pressable onPress={confirmDelete} style={{ borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}>
+        <Pressable onPress={confirmDelete} style={{ borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: 'rgba(192, 57, 43,0.3)', backgroundColor: 'rgba(192, 57, 43,0.10)' }}>
           <Text style={{ color: theme.danger, fontWeight: '700' }}>Delete event</Text>
         </Pressable>
       ) : null}

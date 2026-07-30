@@ -97,7 +97,7 @@ function SignatureField({ label, name, dataUrl, dateLabel, date, gold }: any) {
           <span
             style={{
               fontFamily: "'Caveat', 'Snell Roundhand', cursive",
-              fontSize: 28,
+              fontSize: 24,
               color: DOC_COLORS.inkMid
             }}
           >

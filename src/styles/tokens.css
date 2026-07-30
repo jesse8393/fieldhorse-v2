@@ -1,72 +1,75 @@
 :root {
-  /* Brand */
-  --field-gold: #C7A45A;
-  --field-gold-hot: #E4BE6F;
-  --field-gold-bright: #E8B865;
-  --field-gold-deep: #8C6F30;
-  --onyx: #0B0B0B;
-  --onyx-2: #141414;
-  --onyx-card: #1A1A1A;
-  --onyx-border: #262626;
-  --raw-linen: #F2EDE4;
-  --alert-red: #C0392B;
-  --signal-green: #2D7A4F;
+  /* Canonical FieldHorse palette */
+  --gold: #C9963A;
+  --onyx: #141414;
+  --linen: #F2EDE4;
   --steel: #5C5C5C;
-  --steel-lt: #8B8782;
-  --steel-xlt: #C4BFB8;
+  --red: #C0392B;
+  --green: #2D7A4F;
 
-  /* Stage palette — Phase 1C-1: repointed to muted-jewel v3-stage-*
-     tokens. Legacy callers (STAGES in lib/stages.js, .fh-stage-pill--*
-     CSS, every JobCard StagePill / StageTimeline consumer) now resolve
-     to the prototype-aligned stage colors with a single change here.
-     Note: --v3-stage-* is defined in :root below; in light theme these
-     mid-tones still read fine on warm off-white surfaces. */
-  --stage-lead:    var(--v3-stage-lead);     /* #6B7CA8 steel-blue */
-  --stage-quote:   var(--v3-stage-quote);    /* #B07A4A burnished bronze */
-  --stage-job:     var(--v3-stage-active);   /* #4F8C5E moss green */
-  --stage-invoice: var(--v3-stage-won);      /* gold */
-  --stage-closed:  var(--v3-stage-closed);   /* #5C5C5C steel */
-  --stage-lost:    var(--v3-danger);         /* brick red */
+  /* Approved derived surfaces and tints */
+  --onyx-light-1: color-mix(in srgb, var(--onyx) 94%, var(--linen) 6%);
+  --onyx-light-2: color-mix(in srgb, var(--onyx) 90%, var(--linen) 10%);
+  --onyx-light-3: color-mix(in srgb, var(--onyx) 84%, var(--linen) 16%);
+  --gold-10: rgba(201, 150, 58, 0.10);
+  --gold-20: rgba(201, 150, 58, 0.20);
 
-  /* Light theme (default surfaces) */
-  --surface-0: var(--raw-linen);
-  --surface-1: #FFFFFF;
-  --surface-2: #EFE9DE;
-  --surface-elev: #FFFFFFEE;
-  --ink-strong: var(--onyx);
-  --ink-muted: #6B6A66;
-  --ink-inverse: #FAF7F1;
-  --ink-faint: rgba(20, 20, 20, 0.55);
-  --rule: rgba(20, 20, 20, 0.08);
-  --rule-bold: rgba(20, 20, 20, 0.14);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
-  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  /* Legacy color aliases */
+  --field-gold: var(--gold);
+  --field-gold-hot: var(--gold);
+  --field-gold-bright: var(--gold);
+  --field-gold-deep: var(--gold);
+  --field-gold-neon: var(--gold);
+  --onyx-2: var(--onyx-light-1);
+  --onyx-card: var(--onyx-light-2);
+  --onyx-border: var(--onyx-light-3);
+  --raw-linen: var(--linen);
+  --alert-red: var(--red);
+  --signal-green: var(--green);
+  --steel-lt: var(--steel);
+  --steel-xlt: var(--steel);
 
-  /* Typography
-     Brand rule: no monospaced typography anywhere. Numerics ride on DM Sans via
-     font-variant-numeric: tabular-nums + font-feature-settings: "tnum" at each callsite.
-     --font-mono is retained as a legacy alias pointing to DM Sans so in-flight references
-     fall back to body font automatically; new code should reference --font-body directly. */
+  /* Surfaces and ink */
+  --surface-0: var(--onyx);
+  --surface-1: var(--onyx-light-1);
+  --surface-2: var(--onyx-light-2);
+  --surface-elev: var(--onyx-light-3);
+  --ink-strong: var(--linen);
+  --ink-muted: var(--steel);
+  --ink-inverse: var(--onyx);
+  --ink-faint: var(--steel);
+  --rule: var(--gold-10);
+  --rule-bold: var(--gold-20);
+
+  /* Stage and status colors */
+  --stage-lead: var(--steel);
+  --stage-quote: var(--gold);
+  --stage-job: var(--green);
+  --stage-invoice: var(--gold);
+  --stage-closed: var(--steel);
+  --stage-lost: var(--red);
+
+  /* Typography */
   --font-display: 'Bebas Neue', 'Helvetica Neue', sans-serif;
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  /* Brand permits exactly two families: DM Sans + Bebas Neue (UI audit
-     #37). The old Instrument Serif accent maps to DM Sans so every
-     .fh-font-serif call site degrades gracefully. */
-  --font-serif: 'DM Sans', system-ui, sans-serif;
+  --font-serif: var(--font-body);
+  --font-mono: var(--font-body);
+  --type-12: 12px;
+  --type-14: 14px;
+  --type-16: 16px;
+  --type-20: 20px;
+  --type-24: 24px;
 
-  /* High-viz money gold — brighter than --field-gold-bright, reserved for $amount
-     numerics only. Bumped saturation + value off the hot gold so money reads
-     like neon against the onyx base. */
-  --field-gold-neon: #F3C65E;
-  --font-mono: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* One control and card radius, with pills reserved for badges */
+  --radius-xs: 10px;
+  --radius-sm: 10px;
+  --radius-md: 10px;
+  --radius-lg: 10px;
+  --radius-xl: 10px;
+  --radius-spec: 10px;
+  --radius-pill: 999px;
 
-  /* Scale — industrial sharpness. Soft corners read toy; sharp read industrial. */
-  --radius-xs: 0px;
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 4px;
-  --radius-xl: 6px;
-  --radius-spec: 2px;
+  /* Locked spacing scale */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -74,13 +77,11 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 48px;
-  --space-8: 64px;
+  --space-8: 48px;
 
-  /* Motion — brand rule: mechanical, not bouncy. Skip spring physics on
-     primary actions; use snap curves (short in, very short out). */
+  /* Motion */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  /* Mechanical snap — think truck door, heavy switch. Fast in, instant stop. */
   --ease-mechanical: cubic-bezier(0.5, 0, 0.2, 1);
   --dur-instant: 60ms;
   --dur-mechanical: 100ms;
@@ -88,408 +89,148 @@
   --dur: 200ms;
   --dur-slow: 360ms;
 
-  /* Raised card elevation — makes feature surfaces sit clearly above the base.
-     Heavier in dark theme (overridden below) so cards don't disappear into onyx. */
-  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.08), 0 12px 28px rgba(0, 0, 0, 0.10);
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 24px rgba(20, 20, 20, 0.32);
+  --shadow-pop: 0 8px 24px rgba(20, 20, 20, 0.48), 0 2px 6px rgba(20, 20, 20, 0.32);
+  --shadow-raised: 0 2px 4px rgba(20, 20, 20, 0.32), 0 12px 28px rgba(20, 20, 20, 0.40);
 
-  /* Z-layers */
+  /* Z layers */
   --z-nav: 40;
   --z-modal: 80;
   --z-toast: 120;
   --z-cmdk: 140;
 
-  /* ============================================================
-     v3 SPEC TOKENS — Phase 1A: prototype-aligned dark tokens.
-     Sourced from /tmp/fh-v3-prototype/.../project/tokens.css.
-     Light theme block ([data-theme='light']) is INTENTIONALLY
-     untouched in this pass.
+  /* Canonical v3 aliases */
+  --v3-bg: var(--onyx);
+  --v3-surface: var(--onyx-light-1);
+  --v3-surface-2: var(--onyx-light-2);
+  --v3-surface-3: var(--onyx-light-3);
+  --v3-surface-page: var(--onyx);
+  --v3-surface-glass: var(--onyx-light-1);
+  --v3-text: var(--linen);
+  --v3-text-secondary: var(--linen);
+  --v3-text-muted: var(--steel);
+  --v3-text-faint: var(--steel);
+  --v3-border: var(--gold-10);
+  --v3-border-mid: var(--gold-10);
+  --v3-border-strong: var(--gold-20);
+  --v3-border-gold: var(--gold-20);
+  --v3-glass-tint: var(--gold-10);
+  --v3-glass-tint-2: var(--gold-20);
 
-     What changed (Phase 1A):
-       - Surfaces shifted slightly warmer (#0B0907 / #141110 / #1C1814 / #252019)
-       - Text moved off pure white to warm linen #F2EDE4
-       - Hairlines retinted from rgba(255,255,255,X) to warm
-         rgba(255, 240, 210, X) at lower alphas (06 / 10 / 18)
-       - Gold cooled from #E5C158 → canonical #C9963A
-       - New stage palette: muted jewel tones (steel-blue / bronze /
-         moss / gold / steel) replacing the bright cool stage colors
-         that were applied via inline literals in prior screens
-       - Shadows simplified to the prototype's restrained 2-layer
-         warm-inset stack
-       - New supporting tokens added: surface-glass, text-faint,
-         border-mid, border-gold, primary-bright, primary-glow,
-         stage-{lead,quote,active,won,closed}, warn
-
-     Backward-compat: every existing v3-* token NAME is preserved
-     (Option B). Production call-sites continue to work; values
-     just resolve to warmer / cooler equivalents.
-     ============================================================ */
-
-  /* ---------- Surfaces — warm onyx ---------- */
-  --v3-bg:           #0B0907;     /* page floor */
-  --v3-surface:      #141110;     /* card */
-  --v3-surface-2:    #1C1814;     /* raised / inner */
-  --v3-surface-3:    #252019;     /* hover / pressed */
-  --v3-surface-page: #100E0C;     /* section group bg (between bg and surface) */
-  --v3-surface-glass: rgba(28, 24, 20, 0.72); /* NEW — backdrop-filter pairing */
-
-  /* ---------- Text — warm linen, not pure white ---------- */
-  --v3-text:           #F2EDE4;
-  --v3-text-secondary: rgba(242, 237, 228, 0.78); /* 5/17 NEW — matches design --ink-2 (secondary body text) */
-  --v3-text-muted:     rgba(242, 237, 228, 0.55);
-  --v3-text-faint:     rgba(242, 237, 228, 0.38); /* NEW — captions, metadata */
-
-  /* ---------- Hairlines — warm-tinted, lower alpha ---------- */
-  --v3-border:        rgba(255, 240, 210, 0.06);
-  --v3-border-mid:    rgba(255, 240, 210, 0.10); /* NEW intermediate */
-  --v3-border-strong: rgba(255, 240, 210, 0.18);
-  --v3-border-gold:   rgba(201, 150, 58, 0.28);  /* 5/17 restore to design spec --hair-gold (was 0.10 from Phase 1A-3 softening) */
-  --v3-glass-tint:    rgba(255, 240, 210, 0.04); /* warm-tinted now */
-  --v3-glass-tint-2:  rgba(255, 240, 210, 0.07); /* stronger wash — inset top-lights, tracks */
-
-  /* ---------- Chrome veil — AppHeader scrim gradient stops ----------
-     Referenced by the header's inline gradient so the top chrome can
-     re-theme. Dark: near-black fade; light: warm-paper fade. */
   --fh-chrome-veil-1: rgba(20, 20, 20, 0.88);
   --fh-chrome-veil-2: rgba(20, 20, 20, 0.72);
   --fh-chrome-veil-0: rgba(20, 20, 20, 0);
+  --fh-canvas: var(--onyx);
 
-  /* ---------- Page canvas — the floor behind every screen ----------
-     Deliberately COOLER than --v3-bg in dark (neutral near-black vs
-     warm onyx) so warm cards pop against it. The .fh-app / .v3-screen
-     floor rules reference this instead of a literal so daylight mode
-     can lift the whole canvas. */
-  --fh-canvas: #070708;
+  --v3-primary: var(--gold);
+  --v3-primary-hot: var(--gold);
+  --v3-primary-bright: var(--gold);
+  --v3-primary-deep: var(--gold);
+  --v3-primary-soft: var(--gold-10);
+  --v3-primary-glow: var(--gold-20);
 
-  /* ---------- Brand gold — cooled to canonical ---------- */
-  --v3-primary:        #C9963A;
-  --v3-primary-hot:    #E4BE6F;
-  --v3-primary-bright: #E8B865; /* NEW — icon glyph gold */
-  --v3-primary-deep:   #8C6F30;
-  --v3-primary-soft:   rgba(201, 150, 58, 0.14);
-  --v3-primary-glow:   rgba(228, 190, 111, 0.22); /* 5/17 restore to design spec --gold-glow (was 0.06 from Phase 1A-3 softening) */
+  --v3-stage-lead: var(--steel);
+  --v3-stage-quote: var(--gold);
+  --v3-stage-active: var(--green);
+  --v3-stage-won: var(--gold);
+  --v3-stage-closed: var(--steel);
 
-  /* ---------- Stage palette — muted jewel (NEW token set) ----------
-     Lead = steel-blue, Quote = burnished bronze, Active = moss green,
-     Won = gold, Closed = steel. Replaces the prior bright-cool stage
-     colors that were applied via inline literals (#60A5FA bright blue,
-     #A78BFA bright purple, #4ADE80 bright green) in screen primitives.
-     Reference these tokens going forward; inline literals stay until
-     migration. */
-  --v3-stage-lead:    #6B7CA8;
-  --v3-stage-quote:   #B07A4A;
-  --v3-stage-active:  #4F8C5E;
-  --v3-stage-won:     var(--v3-primary);
-  --v3-stage-closed:  #5C5C5C;
+  --v3-success: var(--green);
+  --v3-success-bright: var(--green);
+  --v3-success-soft: color-mix(in srgb, var(--green) 20%, transparent);
+  --v3-warn: var(--gold);
+  --v3-warn-soft: var(--gold-10);
+  --v3-danger: var(--red);
+  --v3-danger-bright: var(--red);
+  --v3-danger-soft: color-mix(in srgb, var(--red) 20%, transparent);
+  --v3-on-primary: var(--onyx);
 
-  /* ---------- Semantic — moss good / warm warn / brick alert ---------- */
-  --v3-success:        #4F8C5E;
-  --v3-success-bright: #6FAF7C; /* slightly lifted for tier indicators */
-  --v3-success-soft:   rgba(79, 140, 94, 0.16);
-  --v3-warn:           #D4A042; /* NEW */
-  --v3-warn-soft:      rgba(212, 160, 66, 0.14); /* NEW */
-  --v3-danger:         #C0392B;
-  --v3-danger-bright:  #D85D4A;
-  --v3-danger-soft:    rgba(192, 57, 43, 0.16);
-
-  /* ---------- Text on primary (gold) — high-contrast warm dark ---------- */
-  --v3-on-primary: #1A1208;
-
-  /* ---------- Spec radii ---------- */
-  --v3-radius-card: 18px; /* aligned to prototype --r-lg */
-  --v3-radius-btn:  12px;
+  --v3-radius-card: 10px;
+  --v3-radius-btn: 10px;
   --v3-radius-pill: 999px;
+  --v3-section-radius: 10px;
 
-  /* ---------- Spec spacing (8pt) ---------- */
   --v3-s-1: 4px;
   --v3-s-2: 8px;
-  --v3-s-3: 16px;
-  --v3-s-4: 24px;
-  --v3-s-5: 32px;
-  --v3-s-6: 48px;
-  --v3-s-7: 64px;
+  --v3-s-3: 12px;
+  --v3-s-4: 16px;
+  --v3-s-5: 24px;
+  --v3-s-6: 32px;
+  --v3-s-7: 48px;
 
-  /* ---------- Shadows — layered depth (3-plane: contact / mid / ambient)
-     plus a warm inner top-edge highlight so cards read as lifted
-     glass panels instead of flat rectangles. Billion-dollar polish:
-     a single soft shadow looks cheap; stacking a tight contact
-     shadow + a mid-spread + a wide ambient gives real dimensionality
-     on a dark canvas. ---------- */
-  --v3-shadow:    0 1px 0 rgba(255, 240, 210, 0.05) inset,
-                  0 1px 2px rgba(0, 0, 0, 0.40),
-                  0 6px 16px rgba(0, 0, 0, 0.42),
-                  0 18px 40px rgba(0, 0, 0, 0.30);
-  --v3-shadow-lg: 0 1px 0 rgba(255, 240, 210, 0.07) inset,
-                  0 2px 4px rgba(0, 0, 0, 0.45),
-                  0 14px 36px rgba(0, 0, 0, 0.55),
-                  0 28px 64px rgba(0, 0, 0, 0.40);
-  /* Hero shadow — Phase 1A-3: black depth carries the lift, gold is
-     barely there. Gold ambient 0.10 → 0.05; black depth 56/0.60 →
-     64/0.66. Hero now reads as a smoked-glass panel with a hint of
-     warmth, not a gold-haloed card. */
-  --v3-shadow-hero: 0 1px 0 rgba(255, 240, 210, 0.05) inset,
-                    0 6px 18px rgba(201, 150, 58, 0.05),
-                    0 24px 64px rgba(0, 0, 0, 0.66);
+  --v3-shadow: var(--shadow-card);
+  --v3-shadow-lg: var(--shadow-pop);
+  --v3-shadow-hero: var(--shadow-raised);
+  --v3-gold-glow: 0 0 0 1px var(--gold-20) inset, 0 8px 24px var(--gold-20);
+  --v3-gold-glow-sm: 0 0 0 1px var(--gold-20) inset, 0 4px 12px var(--gold-10);
+  --v3-gold-stroke: linear-gradient(90deg, transparent 0%, var(--gold) 50%, transparent 100%);
+  --v3-track: var(--gold-10);
+  --v3-track-strong: var(--gold-20);
 
-  /* ---------- Gold glows ---------- */
-  --v3-gold-glow:    0 0 0 1px rgba(228, 190, 111, 0.40) inset,
-                     0 8px 24px rgba(201, 150, 58, 0.32);
-  --v3-gold-glow-sm: 0 0 0 1px rgba(228, 190, 111, 0.28) inset,
-                     0 4px 12px rgba(201, 150, 58, 0.24);
-  --v3-gold-stroke:  linear-gradient(90deg,
-                       transparent 0%,
-                       rgba(228, 190, 111, 0.55) 50%,
-                       transparent 100%);
-
-  /* ---------- Tracks — warm-tinted ---------- */
-  --v3-track:        rgba(255, 240, 210, 0.06);
-  --v3-track-strong: rgba(255, 240, 210, 0.10);
-
-  /* ---------- Section primitive — smoked-glass first (Phase 1A-3) ----------
-     Linen wash dropped further so default sections read as black-glass.
-     Border softened to a true hairline. Section shadow gains a touch
-     more black depth so the section still lifts cleanly off the page.
-       --v3-section-bg     gradient stops 0.025/0.005 → 0.018/0.003
-       --v3-section-border 0.10 → 0.07
-       --v3-section-shadow inset 0.05 → 0.04; key shadow 14/0.42 → 16/0.46 */
-  --v3-section-bg: linear-gradient(180deg,
-                     rgba(255, 240, 210, 0.018) 0%,
-                     rgba(255, 240, 210, 0.003) 100%),
-                   var(--v3-surface-page);
-  --v3-section-border: rgba(255, 240, 210, 0.07);
-  --v3-section-shadow: 0 1px 0 rgba(255, 240, 210, 0.04) inset,
-                       0 1px 2px rgba(0, 0, 0, 0.38),
-                       0 16px 36px rgba(0, 0, 0, 0.46);
-  --v3-section-radius: 20px;
-
-  /* Standardized vertical rhythm — used by .v3-stack-* helpers and
-     screen padding so we stop reaching for ad-hoc 24/28/32 values. */
-  --v3-rhythm-screen: 20px;     /* between top-level sections */
-  --v3-rhythm-section: 16px;    /* between rows inside a section */
-  --v3-rhythm-tight: 10px;      /* related items */
-  --v3-rhythm-loose: 32px;      /* major zone breaks (hero → grid) */
-
-  /* Section interior padding (use on .v3-section variants) */
-  --v3-pad-section: 18px;
-  --v3-pad-section-tight: 14px;
-
-  /* Screen edge gutter — single source of truth for L/R page padding.
-     Bumped 16 → 20px to match the existing inline 20px padding used
-     across older v3 screens. Single value (no responsive bump) so
-     section margins read consistently on every viewport. */
-  --v3-gutter: 20px;
+  --v3-section-bg: var(--onyx-light-1);
+  --v3-section-border: var(--gold-10);
+  --v3-section-shadow: var(--shadow-card);
+  --v3-rhythm-screen: 24px;
+  --v3-rhythm-section: 16px;
+  --v3-rhythm-tight: 8px;
+  --v3-rhythm-loose: 32px;
+  --v3-pad-section: 16px;
+  --v3-pad-section-tight: 12px;
+  --v3-gutter: 24px;
 }
 
-/* ============================================================
-   LIGHT THEME — premium warm off-white system
-   Not an inverted dark theme. Real intentional tokens:
-     bg            warm off-white #F8F5EE (raw linen, deeper)
-     surface-page  ivory          #FBF8F1
-     surface       paper          #FFFFFF
-     surface-2     warm card      #F4EFE6
-     surface-3     hover wash     #EDE7DA
-   Text: deep charcoal, not pure black; muted: warm steel
-   Borders: warm rules, not cool grays
-   Gold: muted slightly so it doesn't burn on light bg
-   Shadows: warm low-alpha (warm shadow not blue shadow)
-   ============================================================ */
 [data-theme='light'] {
-  /* v3 surfaces */
-  --v3-bg: #F8F5EE;
-  --v3-surface-page: #FBF8F1;
-  --v3-surface: #FFFFFF;
-  --v3-surface-2: #F4EFE6;
-  --v3-surface-3: #EDE7DA;
-  /* v3 text — secondary + faint were missing here until the 7/4 theme
-     harness caught fh-build mini-card labels rendering linen-on-paper.
-     Every tier needs a light value or consumers silently keep the dark
-     linen and vanish. */
-  --v3-text: #1A1814;
-  --v3-text-secondary: rgba(26, 24, 20, 0.78);
-  --v3-text-muted: #6B6A66;
-  --v3-text-faint: rgba(26, 24, 20, 0.48);
-  --v3-on-primary: #1A1814;
-  /* v3 borders — warm rules */
-  --v3-border: rgba(20, 20, 18, 0.10);
-  --v3-border-mid: rgba(20, 20, 18, 0.14); /* 7/8 — dark block value was linen-on-paper (invisible on light + drops fills). Sits between border 0.10 and border-strong 0.18. */
-  --v3-border-strong: rgba(20, 20, 18, 0.18);
-  /* Gold hairline — dark block's rgba(201,150,58,0.28) washes out on paper.
-     Match the light --v3-gold-stroke tint at a border-weight alpha. */
-  --v3-border-gold: rgba(182, 138, 46, 0.45);
-  /* v3 brand — slightly muted on light so the gold doesn't burn */
-  --v3-primary: #B68A2E;
-  --v3-primary-hot: #D4A640;
-  /* primary-bright is consumed as TEXT color across mobile screens (Bid,
-     Partners, Activity, ContactDetail, HomeActivityCard…). The dark
-     #E8B865 read ~1.7:1 on paper. #8A6A1F ≈ 5.0:1 on #FFFFFF → WCAG AA. */
-  --v3-primary-bright: #8A6A1F;
-  --v3-primary-deep: #6E5320;
-  --v3-primary-soft: rgba(182, 138, 46, 0.10);
-  /* warn is TEXT color (Home stale-lead tone, HealthDonut "At Risk",
-     JobCard). Dark #D4A042 read ~1.9:1 on paper. #9A6410 ≈ 5.0:1 on
-     #FFFFFF → WCAG AA. warn-soft is a background wash only. */
-  --v3-warn: #9A6410;
-  --v3-warn-soft: rgba(200, 140, 40, 0.16);
-  --v3-success: #1F8F4A;
-  --v3-success-bright: #178A3A;
-  --v3-success-soft: rgba(31, 143, 74, 0.10);
-  --v3-danger: #B5301F;
-  --v3-danger-bright: #B5301F;
-  --v3-danger-soft: rgba(181, 48, 31, 0.08);
-  /* Elevation — warm low-alpha shadows (no cool blue) */
-  --v3-shadow: 0 1px 0 rgba(255, 255, 255, 0.50) inset, 0 1px 2px rgba(60, 50, 30, 0.06), 0 8px 24px rgba(60, 50, 30, 0.08);
-  --v3-shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.60) inset, 0 2px 4px rgba(60, 50, 30, 0.08), 0 24px 48px rgba(60, 50, 30, 0.12);
-  --v3-shadow-hero: 0 1px 0 rgba(255, 255, 255, 0.60) inset, 0 2px 4px rgba(60, 50, 30, 0.10), 0 18px 40px rgba(182, 138, 46, 0.18), 0 28px 64px rgba(60, 50, 30, 0.10);
-  /* Section primitive — warm tonal lift */
-  --v3-section-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.70) 0%, rgba(255, 255, 255, 0.30) 100%), var(--v3-surface-page);
-  --v3-section-border: rgba(20, 20, 18, 0.12);
-  --v3-section-shadow: 0 1px 0 rgba(255, 255, 255, 0.60) inset, 0 1px 2px rgba(60, 50, 30, 0.06), 0 12px 28px rgba(60, 50, 30, 0.08);
-  /* Gold glow — subdued on light */
-  --v3-gold-glow: 0 0 0 1px rgba(182, 138, 46, 0.22), 0 8px 22px rgba(182, 138, 46, 0.28), 0 1px 0 rgba(255, 255, 255, 0.50) inset;
-  --v3-gold-glow-sm: 0 0 0 1px rgba(182, 138, 46, 0.20), 0 4px 12px rgba(182, 138, 46, 0.22);
-  --v3-gold-stroke: linear-gradient(90deg, transparent 0%, rgba(182, 138, 46, 0.45) 50%, transparent 100%);
-  /* Track + glass */
-  --v3-track: rgba(20, 20, 18, 0.06);
-  --v3-track-strong: rgba(20, 20, 18, 0.10);
-  --v3-glass-tint: rgba(255, 255, 255, 0.50);
-  --v3-glass-tint-2: rgba(255, 255, 255, 0.65);
-  --v3-surface-glass: rgba(255, 255, 255, 0.78);
-  /* Chrome veil — warm paper fade for the light header */
-  --fh-chrome-veil-1: rgba(248, 245, 238, 0.92);
-  --fh-chrome-veil-2: rgba(248, 245, 238, 0.78);
-  --fh-chrome-veil-0: rgba(248, 245, 238, 0);
-  /* Page canvas — warm paper floor */
-  --fh-canvas: #F8F5EE;
+  --surface-0: var(--linen);
+  --surface-1: var(--linen);
+  --surface-2: var(--linen);
+  --surface-elev: var(--linen);
+  --ink-strong: var(--onyx);
+  --ink-muted: var(--steel);
+  --ink-inverse: var(--linen);
+  --ink-faint: var(--steel);
 
-  /* Legacy aliases — warm warm warm */
-  --surface-0: var(--v3-bg);
-  --surface-1: var(--v3-surface);
-  --surface-2: var(--v3-surface-2);
-  --surface-elev: var(--v3-surface);
-  --ink-strong: var(--v3-text);
-  --ink-muted: var(--v3-text-muted);
-  --ink-inverse: #FFFFFF;
-  --ink-faint: rgba(20, 20, 18, 0.55);
-  --rule: var(--v3-border);
-  --rule-bold: var(--v3-border-strong);
-  --field-gold: var(--v3-primary);
-  --field-gold-hot: var(--v3-primary-hot);
-  --field-gold-bright: var(--v3-primary);
-  --field-gold-deep: var(--v3-primary-deep);
-  --alert-red: var(--v3-danger);
-  --signal-green: var(--v3-success);
-  --onyx: #1A1814;
-  --onyx-2: var(--v3-surface-2);
-  --onyx-card: var(--v3-surface);
-  --onyx-border: var(--v3-border-strong);
-  /* Card shadows — warm */
-  --shadow-card: 0 1px 2px rgba(60, 50, 30, 0.06), 0 14px 40px rgba(60, 50, 30, 0.08);
-  --shadow-pop: 0 18px 50px rgba(60, 50, 30, 0.12), 0 2px 8px rgba(60, 50, 30, 0.08);
-  --shadow-raised: var(--v3-shadow);
+  --v3-bg: var(--linen);
+  --v3-surface: var(--linen);
+  --v3-surface-2: var(--linen);
+  --v3-surface-3: var(--linen);
+  --v3-surface-page: var(--linen);
+  --v3-surface-glass: var(--linen);
+  --v3-text: var(--onyx);
+  --v3-text-secondary: var(--onyx);
+  --v3-text-muted: var(--steel);
+  --v3-text-faint: var(--steel);
+  --v3-on-primary: var(--onyx);
+  --fh-canvas: var(--linen);
+  --fh-chrome-veil-1: rgba(242, 237, 228, 0.92);
+  --fh-chrome-veil-2: rgba(242, 237, 228, 0.78);
+  --fh-chrome-veil-0: rgba(242, 237, 228, 0);
 }
 
-/* Client cards — the dark-tinted top gradient + espresso avatar chip
-   don't translate to paper. Flat surface + soft gold chip in light. */
-[data-theme='light'] .cl-card {
-  background: var(--v3-surface);
-}
-[data-theme='light'] .cl-card__avatar {
-  background: var(--v3-primary-soft);
-}
-
-/* Light-theme overrides for atmospheric primitives — kill dark-only
-   gradients/glows that don't translate to the warm system. */
-[data-theme='light'] .fh-screen,
-[data-theme='light'] .v3-screen {
-  background:
-    radial-gradient(ellipse 100% 280px at 50% 0%, rgba(182, 138, 46, 0.06), transparent 70%),
-    var(--v3-bg);
-  background-attachment: fixed, scroll;
-}
-[data-theme='light'] .v3-section::after {
-  background: linear-gradient(90deg, transparent 0%, rgba(20, 20, 18, 0.10) 50%, transparent 100%);
-  box-shadow: 0 0 4px rgba(60, 50, 30, 0.06);
-}
-[data-theme='light'] .v3-section--primary::after {
-  background: linear-gradient(90deg, transparent 0%, rgba(182, 138, 46, 0.55) 50%, transparent 100%);
-  box-shadow: 0 0 8px rgba(182, 138, 46, 0.40);
-}
-[data-theme='light'] .v3-section--primary {
-  border-color: rgba(182, 138, 46, 0.40);
-  background:
-    linear-gradient(180deg, rgba(182, 138, 46, 0.06) 0%, rgba(255, 255, 255, 0.30) 60%),
-    var(--v3-surface-page);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.70) inset,
-    0 1px 2px rgba(60, 50, 30, 0.06),
-    0 16px 36px rgba(60, 50, 30, 0.10),
-    0 12px 28px rgba(182, 138, 46, 0.14);
-}
-[data-theme='light'] .v3-section--primary-quiet {
-  border-color: rgba(20, 20, 18, 0.10);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.50) 0%, rgba(255, 255, 255, 0.20) 100%),
-    var(--v3-surface-page);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.60) inset,
-    0 1px 2px rgba(60, 50, 30, 0.05),
-    0 12px 28px rgba(60, 50, 30, 0.06);
-}
-[data-theme='light'] .v3-section--primary-quiet::after {
-  background: linear-gradient(90deg, transparent 0%, rgba(20, 20, 18, 0.08) 50%, transparent 100%);
-  box-shadow: none;
-}
-
-/* Explicit dark theme — set on <html data-theme="dark"> OR via
-   prefers-color-scheme. Legacy tokens (used by older screens like
-   Settings, Bid, Invoices, Analytics, PourWindow, Compose, Importer,
-   Subs) are aliased to v3 values so they pick up the v3 surface
-   ladder + color system without per-file rewrites. */
 [data-theme='dark'] {
-  /* Surfaces — alias to v3 ladder */
   --surface-0: var(--v3-bg);
   --surface-1: var(--v3-surface);
   --surface-2: var(--v3-surface-2);
-  --surface-elev: var(--v3-surface-2);
-  /* Text — alias to v3 text */
+  --surface-elev: var(--v3-surface-3);
   --ink-strong: var(--v3-text);
   --ink-muted: var(--v3-text-muted);
   --ink-inverse: var(--v3-on-primary);
-  --ink-faint: rgba(255, 255, 255, 0.55);
-  /* Rules — alias to v3 borders */
+  --ink-faint: var(--v3-text-faint);
   --rule: var(--v3-border);
   --rule-bold: var(--v3-border-strong);
-  /* Brand accents — alias to v3 colour scale so legacy code reads gold
-     and red at the same saturation as v3 primitives. */
-  --field-gold: var(--v3-primary);
-  --field-gold-hot: var(--v3-primary-hot);
-  --field-gold-bright: var(--v3-primary);
-  --field-gold-deep: var(--v3-primary-deep);
-  --alert-red: var(--v3-danger);
-  --signal-green: var(--v3-success);
-  /* Onyx aliases — used by legacy buttons that paint dark text on gold */
-  --onyx: var(--v3-on-primary);
-  --onyx-2: var(--v3-surface);
-  --onyx-card: var(--v3-surface);
-  --onyx-border: var(--v3-border-strong);
-  /* Shadows — keep punchy v3 stack */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 14px 40px rgba(0, 0, 0, 0.5);
-  --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.35);
-  --shadow-raised: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 2px 6px rgba(0, 0, 0, 0.55), 0 18px 44px rgba(0, 0, 0, 0.45);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --surface-0: var(--onyx);
-    --surface-1: var(--onyx-2);
-    --surface-2: #1E1E1E;
-    --surface-elev: rgba(28, 28, 28, 0.92);
-    --ink-strong: var(--raw-linen);
-    --ink-muted: #9A958C;
-    --ink-inverse: var(--onyx);
-    --ink-faint: rgba(242, 237, 228, 0.55);
-    --rule: rgba(242, 237, 228, 0.08);
-    --rule-bold: rgba(242, 237, 228, 0.18);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 14px 40px rgba(0, 0, 0, 0.5);
-    --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --surface-0: var(--v3-bg);
+    --surface-1: var(--v3-surface);
+    --surface-2: var(--v3-surface-2);
+    --surface-elev: var(--v3-surface-3);
+    --ink-strong: var(--v3-text);
+    --ink-muted: var(--v3-text-muted);
+    --ink-inverse: var(--v3-on-primary);
+    --ink-faint: var(--v3-text-faint);
+    --rule: var(--v3-border);
+    --rule-bold: var(--v3-border-strong);
   }
 }

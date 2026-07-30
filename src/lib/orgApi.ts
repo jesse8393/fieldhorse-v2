@@ -1,4 +1,4 @@
-// orgApi — typed client wrappers for the /api/org-* Netlify functions.
+// orgApi, typed client wrappers for the /api/org-* Netlify functions.
 //
 // All four endpoints accept POST + JSON body. Authenticated endpoints
 // pull the supabase session at call time so the JWT is fresh after
@@ -77,7 +77,7 @@ async function callJson<T>(path: string, body: any, opts: { auth?: boolean } = {
 }
 
 // ────────────────────────────────────────────────────────────
-// public — no auth required
+// public, no auth required
 // ────────────────────────────────────────────────────────────
 
 export function orgInviteInfo(token: string): Promise<{ ok: true; invite: OrgInviteInfo }> {
@@ -141,7 +141,7 @@ export type PendingPunch = {
   notes: string | null
   flagged: boolean
   flag_reason: string | null
-  /** Zero-length shift (out <= in) — not approvable payroll. */
+  /** Zero-length shift (out <= in), not approvable payroll. */
   invalid?: boolean
 }
 

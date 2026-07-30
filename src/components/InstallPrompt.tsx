@@ -1,4 +1,4 @@
-// InstallPrompt — surfaces an "Install" CTA so users don't have to
+// InstallPrompt, surfaces an "Install" CTA so users don't have to
 // hunt for the address-bar icon or the three-dot menu.
 //
 // Three modes:
@@ -38,7 +38,7 @@ function isIos(): boolean {
   const ua = navigator.userAgent
   if (!/iPad|iPhone|iPod/.test(ua)) return false
   // Exclude in-app browsers (FB, Instagram) where Add to Home Screen
-  // isn't available — showing the hint there would be wrong.
+  // isn't available, showing the hint there would be wrong.
   if (/FBAN|FBAV|Instagram|Line\//i.test(ua)) return false
   return true
 }
@@ -60,7 +60,7 @@ function rememberDismiss() {
   try {
     window.localStorage.setItem(DISMISS_KEY, String(Date.now()))
   } catch {
-    // private mode etc — banner just re-shows next session, that's ok
+    // private mode etc, banner just re-shows next session, that's ok
   }
 }
 
@@ -108,7 +108,7 @@ export default function InstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice
       if (outcome === 'dismissed') rememberDismiss()
     } catch {
-      // user cancelled the chooser — treat like a dismiss so we don't loop
+      // user cancelled the chooser, treat like a dismiss so we don't loop
       rememberDismiss()
     }
     setDeferredPrompt(null)
@@ -136,14 +136,14 @@ export default function InstallPrompt() {
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        padding: '12px 14px',
+        padding: '12px 12px',
         background: 'rgba(20, 20, 20, 0.96)',
         backdropFilter: 'saturate(140%) blur(12px)',
         WebkitBackdropFilter: 'saturate(140%) blur(12px)',
-        border: '1px solid rgba(200, 161, 84, 0.35)',
-        borderRadius: 14,
-        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
-        color: 'var(--ink-strong, #f5f3ee)',
+        border: '1px solid rgba(201, 150, 58, 0.35)',
+        borderRadius: 10,
+        boxShadow: '0 20px 50px rgba(20, 20, 20, 0.45)',
+        color: 'var(--ink-strong, #F2EDE4)',
         maxWidth: 520,
         margin: '0 auto',
       }}
@@ -154,15 +154,15 @@ export default function InstallPrompt() {
           width: 36,
           height: 36,
           borderRadius: 10,
-          background: 'linear-gradient(135deg, rgba(200,161,84,0.25), rgba(200,161,84,0.08))',
-          border: '1px solid rgba(200, 161, 84, 0.4)',
+          background: 'linear-gradient(135deg, rgba(201, 150, 58,0.25), rgba(201, 150, 58,0.08))',
+          border: '1px solid rgba(201, 150, 58, 0.4)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
         }}
       >
-        {isIosMode ? <Share size={18} color="#C8A154" /> : <Download size={18} color="#C8A154" />}
+        {isIosMode ? <Share size={18} color="#C9963A" /> : <Download size={18} color="#C9963A" />}
       </div>
 
       <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
@@ -170,7 +170,7 @@ export default function InstallPrompt() {
         <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
           {isIosMode
             ? 'Tap Share, then "Add to Home Screen"'
-            : 'Add to your home screen for one-tap access.'}
+            : 'Add to your home screen for one tap access.'}
         </div>
       </div>
 
@@ -179,12 +179,12 @@ export default function InstallPrompt() {
           type="button"
           onClick={handleInstall}
           style={{
-            padding: '8px 14px',
-            background: '#C8A154',
+            padding: '8px 12px',
+            background: '#C9963A',
             color: '#141414',
             border: 'none',
             borderRadius: 10,
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: 600,
             cursor: 'pointer',
             flexShrink: 0,
@@ -199,12 +199,12 @@ export default function InstallPrompt() {
         onClick={handleDismiss}
         aria-label="Dismiss install prompt"
         style={{
-          padding: 6,
+          padding: 8,
           background: 'transparent',
-          color: 'var(--ink-strong, #f5f3ee)',
+          color: 'var(--ink-strong, #F2EDE4)',
           opacity: 0.5,
           border: 'none',
-          borderRadius: 8,
+          borderRadius: 10,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',

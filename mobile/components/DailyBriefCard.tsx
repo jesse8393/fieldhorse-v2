@@ -1,4 +1,4 @@
-// mobile/components/DailyBriefCard.tsx — AI morning brief on Home.
+// mobile/components/DailyBriefCard.tsx, AI morning brief on Home.
 // On demand (to control cost/latency), sends a compact summary of today's
 // business state to Claude and shows a tight prioritized brief.
 import { useState } from 'react'
@@ -7,7 +7,7 @@ import { Sparkles, RefreshCw } from 'lucide-react-native'
 import { claudeMessage, claudeText } from '../lib/anthropic'
 import { Card, SectionLabel, theme } from './ui'
 
-const SYSTEM = `You are a contractor's no-nonsense assistant. Given a snapshot of today's business state, write a short morning brief: at most 3 bullet points, each one line, prioritizing the most important actions to take today. Be direct and concrete. Reference the numbers given. No greeting, no fluff, no markdown headers. Start each line with "• ".`
+const SYSTEM = `You are a contractor's direct assistant. Given a snapshot of today's business state, write a short morning brief: at most 3 bullet points, each one line, prioritizing the most important actions to take today. Be direct and concrete. Reference the numbers given. No greeting, no fluff, no markdown headers. Start each line with "• ".`
 
 export function DailyBriefCard({ context }: { context: string }) {
   const [loading, setLoading] = useState(false)
@@ -45,11 +45,11 @@ export function DailyBriefCard({ context }: { context: string }) {
             <Text style={{ color: theme.ink, fontSize: 14, lineHeight: 22 }}>{brief}</Text>
           ) : (
             <Pressable onPress={generate} disabled={loading} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.goldBright}1f`, borderWidth: 1, borderColor: theme.borderGold }}>
+              <View style={{ width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.goldBright}1f`, borderWidth: 1, borderColor: theme.borderGold }}>
                 {loading ? <ActivityIndicator color={theme.goldBright} size="small" /> : <Sparkles color={theme.goldBright} size={18} />}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700' }}>{loading ? 'Thinking…' : 'Get your morning brief'}</Text>
+                <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{loading ? 'Thinking…' : 'Get your morning brief'}</Text>
                 <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }}>AI summary of what matters today</Text>
               </View>
             </Pressable>

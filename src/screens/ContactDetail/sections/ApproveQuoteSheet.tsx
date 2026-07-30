@@ -13,7 +13,7 @@ import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.ts'
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * Approve Quote sheet — Phase 4C-2.
+ * Approve Quote sheet, Phase 4C-2.
  *
  * Operator-side approval flow. Builds an immutable snapshot from the
  * current contact + fh_quote_items + scope/terms/exclusions and calls
@@ -28,7 +28,7 @@ import { Eyebrow } from '../../../components/v3'
  * (default), the existing approveQuote() pipeline helper fires AFTER
  * the RPC succeeds: stage='quote' → 'job', kickoff schedule entry
  * tomorrow 9–5. Snapshot lock is the source of truth; stage advance
- * is a follow-on pipeline action so a network blip on the second
+ * is a later pipeline action so a network blip on the second
  * call doesn't unlock the snapshot.
  *
  * Signature capture (4C-4) and approval-stamped PDF (4C-3) come
@@ -95,7 +95,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   useEffect(() => {
     if (!open) return
     setMethod('verbal')
-    // Pre-fill approved-by with the contact's name so the commit
+    // Fill approved-by with the contact's name so the commit
     // button is enabled out of the gate; operator can edit before
     // submit. Avoids the "placeholder looks filled but submit is
     // disabled" trap from the prior empty-string default.
@@ -151,7 +151,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   const formInvalid = !name.trim() || !method
   const commitDisabled = baseDisabled || formInvalid || submitting
 
-  // Method change controller — clean transition between modes so stale
+  // Method change controller, clean transition between modes so stale
   // signature data never leaks across kinds. Typed mode seeds signatureData
   // with the current name field ONCE on transition (per spec); subsequent
   // edits in either field don't override each other.
@@ -186,7 +186,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
     setSubmitting(true)
     try {
-      // Full branding shape — matches what generateQuote() (4D-2C) reads.
+      // Full branding shape, matches what generateQuote() (4D-2C) reads.
       // The snapshot stores only the 4 customer-visible fields below; the
       // wider object is also passed to generateQuote at certificate time
       // so the approved PDF carries the contractor's logo/accent/trust.
@@ -238,7 +238,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         }
       }
 
-      // Normalize signature payload — non-signature methods send null
+      // Normalize signature payload, non-signature methods send null
       // for both fields regardless of any stale local state. Empty
       // typed strings collapse to null so SQL `is null` checks work.
       const isSigMethod = method === 'signature_drawn' || method === 'signature_typed'
@@ -275,7 +275,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         throw new Error('Approval could not be saved. Please try again.')
       }
 
-      // Hard readback guard — the RPC's "success" claim is not enough.
+      // Hard readback guard, the RPC's "success" claim is not enough.
       // A second authenticated SELECT must find the row in
       // fh_quote_versions filtered by id + user_id. This catches any
       // case where supabase-js / PostgREST returned a phantom row that
@@ -303,7 +303,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         throw new Error('The approval was sent, but we couldn\'t confirm it saved. Please try again.')
       }
 
-      // Approval-stamped PDF archive (Phase 4C-3) — generate the
+      // Approval-stamped PDF archive (Phase 4C-3), generate the
       // approved variant, upload to job-files, insert fh_job_files row,
       // and update fh_quote_versions.pdf_file_id. Wrapped: any failure
       // becomes a toast suffix but does NOT roll back the approval. The
@@ -322,7 +322,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           archiveNote = ' · PDF save failed'
           console.warn('[approve-quote] archive failed:', archiveResult.error)
         } else if (!archiveResult.linked) {
-          // File row exists in Files tab — operator-visible success.
+          // File row exists in Files tab, operator-visible success.
           // Internal version-link gap is a developer concern; suppress
           // from user-facing toast per copy spec.
           archiveNote = ' · Saved to Files'
@@ -337,7 +337,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
       // Stage advance only runs after the approval record is persisted
       // by a real SELECT. Failure here logs but does not unwind the
-      // approval — proposal_status is already 'approved' on the server.
+      // approval, proposal_status is already 'approved' on the server.
       // Stage advance proceeds independently of PDF archive outcome.
       let stageNote = ''
       if (moveToJob) {
@@ -358,7 +358,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       )
 
       // Write a contractor inbox notification (migration 008). Tap-
-      // through lands on the job. Best-effort — never breaks the
+      // through lands on the job. Best-effort, never breaks the
       // approval flow on RLS / missing-table.
       try {
         await supabase.from('fh_notifications').insert({
@@ -384,10 +384,10 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     }
   }
 
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
   const fieldStyle: import('react').CSSProperties = {
-    padding: '11px 14px',
-    borderRadius: 12,
+    padding: '12px 12px',
+    borderRadius: 10,
     background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
@@ -414,13 +414,13 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               Lock the approved quote.
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
             Creates a permanent record of what <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this customer'}</strong> agreed to. Future edits to items or terms won't change this snapshot.
           </DrawerDescription>
@@ -429,18 +429,18 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         <form
           ref={formRef}
           onSubmit={(e) => { e.preventDefault(); handleCommit() }}
-          style={formStyle({ gap: 14 })}
+          style={formStyle({ gap: 12 })}
         >
           {err && (
             <div role="alert" style={{
               display: 'flex', alignItems: 'flex-start', gap: 8,
-              padding: '10px 12px', borderRadius: 10,
-              background: 'rgba(179, 58, 58, 0.10)',
-              border: '1px solid rgba(179, 58, 58, 0.40)',
+              padding: '12px 12px', borderRadius: 10,
+              background: 'rgba(192, 57, 43, 0.10)',
+              border: '1px solid rgba(192, 57, 43, 0.40)',
               color: 'var(--ink-strong)',
               fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45
             }}>
-              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #b3493b)', marginTop: 2, flexShrink: 0 }} />
+              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #C0392B)', marginTop: 2, flexShrink: 0 }} />
               <span style={{ flex: 1 }}>{err}</span>
               <button
                 type="button"
@@ -459,13 +459,13 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
           {/* SUMMARY card */}
           <div style={{
-            padding: '12px 14px', borderRadius: 12,
+            padding: '12px 12px', borderRadius: 10,
             background: 'var(--surface-2)', border: '1px solid var(--rule)',
-            display: 'flex', flexDirection: 'column', gap: 6
+            display: 'flex', flexDirection: 'column', gap: 8
           }}>
             <div style={{
               display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-              gap: 10, flexWrap: 'wrap'
+              gap: 12, flexWrap: 'wrap'
             }}>
               <span style={{
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
@@ -475,14 +475,14 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                 {contact?.job_title ? ` · ${contact.job_title}` : ''}
               </span>
               <span style={{
-                fontFamily: 'var(--font-display)', fontSize: 18, lineHeight: 1,
+                fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1,
                 color: 'var(--ink-strong)', fontVariantNumeric: 'tabular-nums'
               }}>
                 {money(totals.base)}
               </span>
             </div>
             <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 11,
+              fontFamily: 'var(--font-body)', fontSize: 12,
               color: 'var(--ink-muted)'
             }}>
               {loadingItems
@@ -491,7 +491,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
             </div>
             {contact?.proposal_status === 'sent' && contact?.quote_sent_at && (
               <div style={{
-                fontFamily: 'var(--font-body)', fontSize: 11,
+                fontFamily: 'var(--font-body)', fontSize: 12,
                 color: 'var(--ink-muted)'
               }}>
                 Sent {relativeAgo(contact.quote_sent_at)}
@@ -502,32 +502,32 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           {/* Lock notice */}
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
-            padding: '10px 12px', borderRadius: 10,
+            padding: '12px 12px', borderRadius: 10,
             background: 'var(--v3-glass-tint-2)',
             border: '1px solid var(--v3-border-strong)'
           }}>
             <Lock size={14} aria-hidden="true" style={{ color: 'var(--ink-strong)', marginTop: 2, flexShrink: 0 }} />
             <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
+              fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45,
               color: 'var(--ink-strong)'
             }}>
-              Different from sending the PDF. Use this when the customer says yes — line items, scope, and terms freeze at this moment.
+              Different from sending the PDF. Use this when the customer says yes, line items, scope, and terms freeze at this moment.
             </span>
           </div>
 
           {expiresExpired && (
             <div style={{
               display: 'flex', alignItems: 'flex-start', gap: 8,
-              padding: '10px 12px', borderRadius: 10,
-              background: 'rgba(179, 58, 58, 0.10)',
-              border: '1px solid rgba(179, 58, 58, 0.40)'
+              padding: '12px 12px', borderRadius: 10,
+              background: 'rgba(192, 57, 43, 0.10)',
+              border: '1px solid rgba(192, 57, 43, 0.40)'
             }}>
-              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #b3493b)', marginTop: 2, flexShrink: 0 }} />
+              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #C0392B)', marginTop: 2, flexShrink: 0 }} />
               <span style={{
-                fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
+                fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45,
                 color: 'var(--ink-strong)'
               }}>
-                This quote expired on {shortDate(contact?.quote_expires_at)}. You can still approve — just confirm the customer is OK with the original price.
+                This quote expired on {shortDate(contact?.quote_expires_at)}. You can still approve, just confirm the customer is OK with the original price.
               </span>
             </div>
           )}
@@ -535,7 +535,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           {/* METHOD chips */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>How was it approved?</span>
-            <div role="radiogroup" aria-label="How was it approved?" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div role="radiogroup" aria-label="How was it approved?" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {METHODS.map((opt) => {
                 const on = method === opt.value
                 const dis = !!opt.disabled
@@ -550,8 +550,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                     title={opt.hint || undefined}
                     onClick={() => { if (!dis) handleMethodChange(opt.value) }}
                     style={{
-                      padding: '7px 12px',
-                      borderRadius: 999,
+                      padding: '8px 12px',
+                      borderRadius: 10,
                       border: on
                         ? '1px solid rgba(201,150,58,0.4)'
                         : '1px solid var(--rule)',
@@ -577,7 +577,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
             </div>
             {METHODS.find((m) => m.value === 'esign_link')?.hint && (
               <span style={{
-                fontFamily: 'var(--font-body)', fontSize: 11,
+                fontFamily: 'var(--font-body)', fontSize: 12,
                 color: 'var(--ink-faint, var(--ink-muted))', lineHeight: 1.45
               }}>
                 {METHODS.find((m: any) => m.value === 'esign_link')?.hint}
@@ -591,12 +591,12 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               value={signatureData}
               onChange={setSignatureData}
               label="Customer signature"
-              hint="Optional — use this when the customer signs in person."
+              hint="Optional, use this when the customer signs in person."
               height={150}
             />
           )}
           {method === 'signature_typed' && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Customer signature</span>
               <input
                 type="text"
@@ -607,17 +607,17 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                 style={fieldStyle}
               />
               <span style={{
-                fontSize: 11, lineHeight: 1.45,
+                fontSize: 12, lineHeight: 1.45,
                 color: 'var(--ink-faint, var(--ink-muted))',
                 fontFamily: 'var(--font-body)'
               }}>
-                Optional — use this when the customer signs in person.
+                Optional, use this when the customer signs in person.
               </span>
             </label>
           )}
 
           {/* NAME */}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Approved by *</span>
             <input
               type="text"
@@ -632,7 +632,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           </label>
 
           {/* EMAIL (optional) */}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Email (optional)</span>
             <input
               type="email"
@@ -646,7 +646,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           </label>
 
           {/* NOTE */}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Note (optional)</span>
             <textarea
               rows={2}
@@ -660,8 +660,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
           {/* MOVE TO JOB */}
           <label style={{
-            display: 'flex', alignItems: 'flex-start', gap: 10,
-            padding: '10px 12px', borderRadius: 10,
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+            padding: '12px 12px', borderRadius: 10,
             background: 'var(--surface-2)', border: '1px solid var(--rule)',
             cursor: submitting ? 'wait' : 'pointer'
           }}>
@@ -672,7 +672,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               onChange={(e) => setMoveToJob(e.target.checked)}
               style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--field-gold-bright)' }}
             />
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span style={{
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 color: 'var(--ink-strong)'
@@ -680,7 +680,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                 Move to Job and schedule kickoff
               </span>
               <span style={{
-                fontFamily: 'var(--font-body)', fontSize: 11, lineHeight: 1.45,
+                fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45,
                 color: 'var(--ink-muted)'
               }}>
                 Advances stage to Job and adds a kickoff to your calendar tomorrow 9–5. Uncheck if you're approving paperwork before the start date is set.
@@ -690,9 +690,9 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
           {totals.baseCount === 0 && !loadingItems && (
             <div style={{
-              padding: '10px 12px', borderRadius: 10,
+              padding: '12px 12px', borderRadius: 10,
               background: 'var(--surface-2)', border: '1px dashed var(--rule)',
-              fontFamily: 'var(--font-body)', fontSize: 11.5, lineHeight: 1.45,
+              fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45,
               color: 'var(--ink-muted)'
             }}>
               Add at least one base line item on the Quote tab before approving.
@@ -700,17 +700,17 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           )}
 
           {/* Actions */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12, marginTop: 4 }}>
             <button
               type="button"
               onClick={() => onClose?.()}
               disabled={submitting}
               style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '12px 14px', borderRadius: 12,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--surface-2)', border: '1px solid var(--rule)',
                 color: 'var(--ink-strong)',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                 cursor: submitting ? 'wait' : 'pointer'
               }}
             >
@@ -723,10 +723,10 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               disabled={commitDisabled}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '12px 14px', borderRadius: 12, border: 'none',
+                padding: '12px 12px', borderRadius: 10, border: 'none',
                 background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                 color: 'var(--onyx)',
-                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                 cursor: commitDisabled ? 'not-allowed' : 'pointer',
                 boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                 opacity: commitDisabled ? 0.55 : 1
@@ -761,7 +761,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
  */
 async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userId }: any) {
   try {
-    // Approval shape — keys match what the v3 ApprovalBlock /
+    // Approval shape, keys match what the v3 ApprovalBlock /
     // drawApprovalSection consume (Phase 4b). The new draw helper
     // gates on approval.mode === 'approved' to decide whether to
     // stamp the signature image / name + date over the blank lines;
@@ -770,7 +770,7 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
     //
     // Legacy camelCase keys (versionNumber, signatureKind, etc.) are
     // retained on the same object for the older certificate-page
-    // metadata renderer that's been replaced — keeping them costs
+    // metadata renderer that's been replaced, keeping them costs
     // nothing and survives any consumer that still reads them.
     const isDrawn = confirmed.signature_kind === 'drawn'
     const isTyped = confirmed.signature_kind === 'typed'
@@ -779,17 +779,17 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
       mode: 'approved',
       clientName: confirmed.approved_by_name,
       clientSignatureDataUrl: isDrawn ? confirmed.signature_data : null,
-      // Typed signatures stamp as italic name + date — pass the typed
+      // Typed signatures stamp as italic name + date, pass the typed
       // text through clientName when it differs from the printed name.
       // (drawApprovalSection renders italic name only when dataUrl is
       // null, so this is safe for both branches.)
       clientApprovedAt: confirmed.approved_at,
-      // Contractor side stays blank — the contractor's countersign
+      // Contractor side stays blank, the contractor's countersign
       // happens out-of-band today; the field remains an empty line on
       // the cert for them to physically sign when handing over.
       contractorSignatureDataUrl: null,
       contractorApprovedAt: null,
-      // Legacy fields — preserved for any reader still on the old shape.
+      // Legacy fields, preserved for any reader still on the old shape.
       versionNumber: confirmed.version_number,
       quoteNumber: snapshot?.quote_number || null,
       method: confirmed.approval_method,
@@ -859,7 +859,7 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
     // Bare .update() returns no error for 0-row matches (PostgREST 204
     // No Content), so we re-select the row and compare pdf_file_id
     // against the file id. This catches any case where the UPDATE
-    // silently no-ops without raising — RLS edge cases, stale auth
+    // silently no-ops without raising, RLS edge cases, stale auth
     // state, filter mismatches.
     const { error: linkErr } = await supabase
       .from('fh_quote_versions')
@@ -868,7 +868,7 @@ async function archiveApprovedPdf({ confirmed, snapshot, company, contact, userI
       .eq('user_id', userId)
     if (linkErr) {
       console.warn('[approve-quote] pdf_file_id link errored:', linkErr)
-      // File archived OK, link errored — still return ok+!linked.
+      // File archived OK, link errored, still return ok+!linked.
       return { ok: true, linked: false, fileId: rowId, linkError: linkErr }
     }
 

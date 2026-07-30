@@ -1,8 +1,8 @@
-// Team — /team. Org member roster + invite management.
+// Team, /team. Org member roster + invite management.
 //
 // Authenticated; visible to all org members so foremen/crew can see
 // who else is on the team. Invite + revoke buttons are role-gated by
-// canManageTeam (owner/admin only) — the backend re-checks the same
+// canManageTeam (owner/admin only), the backend re-checks the same
 // gate, so hiding the UI is a courtesy, not security.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -23,16 +23,16 @@ import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../components/v3'
 
 function fmtJoined(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function fmtExpires(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   const days = Math.round((t - Date.now()) / 86_400_000)
   if (days < 0) return 'expired'
   if (days === 0) return 'today'
@@ -50,7 +50,7 @@ export default function Team() {
   const [invites, setInvites] = useState<OrgInvitePending[]>([])
   const [inviteOpen, setInviteOpen] = useState(false)
 
-  // In-flight guard — overlapping triggers (membership resolve +
+  // In-flight guard, overlapping triggers (membership resolve +
   // retries) used to fire the same failing query up to 9 times.
   const inFlight = useRef(false)
   const load = useCallback(async () => {
@@ -75,7 +75,7 @@ export default function Team() {
   }, [])
 
   useEffect(() => {
-    // Only call once the membership context has resolved — avoids a
+    // Only call once the membership context has resolved, avoids a
     // 403 from the backend during the brief signed-in-but-no-membership
     // window.
     if (!membershipLoading) load()
@@ -123,7 +123,7 @@ export default function Team() {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Your role</div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', textTransform: 'capitalize' }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', textTransform: 'capitalize' }}>
               {role || 'No membership'}
             </p>
             {canInviteMembers && (
@@ -139,10 +139,10 @@ export default function Team() {
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Active members" value={loading ? '—' : String(activeCount)} accent />
-            <MiniMetric label="Owners + admins" value={loading ? '—' : String(ownerCount + members.filter((m) => m.role === 'admin').length)} />
-            <MiniMetric label="Foremen + crew" value={loading ? '—' : String(fieldCount)} />
-            <MiniMetric label="Pending invites" value={loading ? '—' : String(invites.length)} tone={!loading && invites.length > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Active members" value={loading ? '\u2003' : String(activeCount)} accent />
+            <MiniMetric label="Owners + admins" value={loading ? '\u2003' : String(ownerCount + members.filter((m) => m.role === 'admin').length)} />
+            <MiniMetric label="Foremen + crew" value={loading ? '\u2003' : String(fieldCount)} />
+            <MiniMetric label="Pending invites" value={loading ? '\u2003' : String(invites.length)} tone={!loading && invites.length > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
@@ -177,10 +177,10 @@ export default function Team() {
             {!loading && members.map((m) => (
               <div key={m.id} className="fh-build-table__row is-team">
                 <strong className="fh-build-truncate" title={m.name || ''}>
-                  {m.name || (m.is_self ? 'You' : '—')}
+                  {m.name || (m.is_self ? 'You' : '\u2003')}
                   {m.is_self && <Eyebrow tone="gold" style={{ marginLeft: 8 }}>You</Eyebrow>}
                 </strong>
-                <span className="fh-build-truncate fh-build-rel" title={m.email || ''}>{m.email || '—'}</span>
+                <span className="fh-build-truncate fh-build-rel" title={m.email || ''}>{m.email || '\u2003'}</span>
                 <span style={{ textTransform: 'capitalize' }}><span className={`fh-build-dot is-${roleTone(m.role)}`}>{m.role}</span></span>
                 <span className="fh-build-rel">{fmtJoined(m.joined_at)}</span>
                 <MemberActions
@@ -202,7 +202,7 @@ export default function Team() {
                   <span>No outstanding invitations</span>
                 </>
               ) : (
-                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {invites.map((inv) => (
                     <div key={inv.id} className="fh-build-invite-row">
                       <div className="fh-build-invite-row__main">
@@ -237,7 +237,7 @@ export default function Team() {
               )}
             </section>
 
-            {/* Customer-facing copy only — this rail used to show the
+            {/* Customer facing copy only, this rail used to show the
                 internal sprint plan ("Phase B", "ship in /crew next")
                 and raw route paths (UI audit #19). */}
             <section className="fh-build-rail-card">
@@ -249,7 +249,7 @@ export default function Team() {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Subs / vendors</div>
               <strong data-empty>Tracked separately</strong>
-              <span>One-off vendors and subcontractors have their own page. This page is your recurring team.</span>
+              <span>Occasional vendors and subcontractors have their own page. This page is your recurring team.</span>
               <button type="button" className="fh-build-rail-card__action" onClick={() => navigate('/subs')}>
                 Open subs <ChevronRight size={13} />
               </button>
@@ -279,7 +279,7 @@ const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, adm
 
 /* Per-member management: change role (to a tier below yours) or remove.
    Only shown when the caller can manage the team AND outranks the member
-   — mirrors the server guards in org-member-role/remove. */
+  , mirrors the server guards in org-member-role/remove. */
 function MemberActions({ member, callerRole, canManage, onChanged }: any) {
   const confirm = useConfirm()
   const [busy, setBusy] = useState(false)
@@ -303,7 +303,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
       onChanged?.()
     } catch (e: any) {
       toastError("Couldn't save rate", e?.message || 'Try again')
-      // The server rejected it (e.g. rate ≥ 10000) — snap the field back
+      // The server rejected it (e.g. rate ≥ 10000), snap the field back
       // to the member's real rate so the screen doesn't read as if the
       // rejected value was saved.
       setRate(current != null ? String(current) : '')
@@ -313,7 +313,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
   const targetTier = ROLE_TIER[member.role] ?? 0
   const manageable = canManage && !member.is_self && targetTier < callerTier
   if (!manageable) {
-    return <span style={{ color: 'var(--v3-text-faint)', fontSize: 11 }}>{member.is_self ? '—' : ''}</span>
+    return <span style={{ color: 'var(--v3-text-faint)', fontSize: 12 }}>{member.is_self ? '\u2003' : ''}</span>
   }
   const roleOptions = ORG_ROLES.filter((r) => (ROLE_TIER[r] ?? 0) < callerTier)
 
@@ -343,9 +343,9 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }} title="Crew hourly rate — feeds job labor cost">
-        <span style={{ color: 'var(--v3-text-muted, rgba(245,242,234,.5))', fontSize: 11 }}>$</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Crew hourly rate, feeds job labor cost">
+        <span style={{ color: 'var(--v3-text-muted, rgba(242, 237, 228,.5))', fontSize: 12 }}>$</span>
         <input
           type="number"
           inputMode="decimal"
@@ -356,19 +356,19 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
           onChange={(e) => setRate(e.target.value)}
           onBlur={saveRate}
           onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
-          placeholder="—"
+          placeholder="\u2003"
           aria-label={`Hourly rate for ${member.name || member.email || 'member'}`}
           className="fh-build-select"
-          style={{ width: 56, fontSize: 11, padding: '3px 6px' }}
+          style={{ width: 56, fontSize: 12, padding: '4px 8px' }}
         />
-        <span style={{ color: 'var(--v3-text-muted, rgba(245,242,234,.5))', fontSize: 10 }}>/hr</span>
+        <span style={{ color: 'var(--v3-text-muted, rgba(242, 237, 228,.5))', fontSize: 12 }}>/hr</span>
       </span>
       <select
         value={member.role}
         disabled={busy}
         onChange={(e) => changeRole(e.target.value as OrgRole)}
         className="fh-build-select"
-        style={{ fontSize: 11, padding: '3px 6px' }}
+        style={{ fontSize: 12, padding: '4px 8px' }}
         aria-label="Change role"
       >
         <option value={member.role} style={{ textTransform: 'capitalize' }}>{member.role}</option>
@@ -382,7 +382,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
         disabled={busy}
         aria-label="Remove member"
         title="Remove member"
-        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'rgba(232,90,87,0.8)' }}
+        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'rgba(192, 57, 43,0.8)' }}
       >
         <Trash2 size={13} />
       </button>
@@ -393,7 +393,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
 function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | null; onClose: () => void; onSent: () => void }) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<OrgRole>('crew')
-  // Only roles strictly below the caller's tier are invitable — mirrors
+  // Only roles strictly below the caller's tier are invitable, mirrors
   // the server guard in org-invite-create.js so an admin can't mint an
   // owner (or another admin) from the UI.
   const callerTier = ROLE_TIER[callerRole || ''] ?? 0
@@ -421,7 +421,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
       await navigator.clipboard.writeText(text)
       toastSuccess('Link copied')
     } catch {
-      toastError('Copy failed — long-press to copy')
+      toastError('Copy failed, touch and hold to copy')
     }
   }
 
@@ -432,7 +432,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
       aria-label="Invite teammate"
       style={{
         position: 'fixed', inset: 0, zIndex: 90,
-        background: 'rgba(0,0,0,.55)',
+        background: 'rgba(20, 20, 20,.55)',
         display: 'grid', placeItems: 'center',
       }}
       onClick={onClose}
@@ -443,14 +443,14 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
           width: '100%', maxWidth: 440,
           margin: '0 16px',
           padding: 24,
-          borderRadius: 12,
-          background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
+          borderRadius: 10,
+          background: 'linear-gradient(180deg, rgba(20, 20, 20,.95), rgba(20, 20, 20,.98))',
           border: '1px solid var(--v3-border-mid)',
-          boxShadow: '0 22px 60px rgba(0,0,0,.50)',
+          boxShadow: '0 22px 60px rgba(20, 20, 20,.50)',
         }}
       >
         <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>Invite teammate</div>
-        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: 'var(--v3-text)' }}>
+        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
           Add someone to the field.
         </h2>
 
@@ -461,9 +461,9 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
             </p>
             <div style={{
               marginTop: 12,
-              padding: '10px 12px',
-              borderRadius: 6,
-              background: 'rgba(0,0,0,.40)',
+              padding: '12px 12px',
+              borderRadius: 10,
+              background: 'rgba(20, 20, 20,.40)',
               border: '1px solid rgba(201,150,58,.30)',
               fontSize: 12,
               fontFamily: 'var(--font-body)',
@@ -495,9 +495,9 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
                   placeholder="teammate@company.com"
                   style={{
                     width: '100%',
-                    padding: '10px 12px 10px 34px',
-                    borderRadius: 6,
-                    background: 'rgba(0,0,0,.30)',
+                    padding: '12px 12px 12px 32px',
+                    borderRadius: 10,
+                    background: 'rgba(20, 20, 20,.30)',
                     border: '1px solid var(--v3-border-mid)',
                     color: 'var(--v3-text)',
                     fontFamily: 'var(--font-body)',
@@ -522,7 +522,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
             </label>
 
             {error && (
-              <div style={{ marginBottom: 14, padding: 10, borderRadius: 6, background: 'rgba(216,93,74,.10)', border: '1px solid rgba(216,93,74,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
+              <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
                 {error}
               </div>
             )}

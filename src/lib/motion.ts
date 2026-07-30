@@ -1,13 +1,13 @@
 // Shared motion variants. Wraps framer-motion's useReducedMotion so every
 // screen automatically falls flat when the user has Reduce Motion enabled,
-// without disabling the entrance fades — opacity stays at 1 (already
+// without disabling the entrance fades, opacity stays at 1 (already
 // visible), and spring offsets are zero.
 //
-// Phase 3C — animation freeze defense:
+// Phase 3C, animation freeze defense:
 //   The parent .v3-screen wrapper now stays at opacity:1 in BOTH variants.
 //   It used to start at opacity:0 with no fixed-duration transition, which
 //   meant a Suspense / hot-reload / tab-background race could leave the
-//   parent stuck at opacity:0 — children invisible regardless of their
+//   parent stuck at opacity:0, children invisible regardless of their
 //   own animations, the entire screen black until a scroll/wheel event
 //   re-kicked the rAF loop. Children still stagger in via the `item`
 //   variant (their own opacity 0 → 1 with a fixed-duration tween), so

@@ -5,12 +5,12 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * Scheduled section — read-only display of fh_schedule entries for this job.
- * Tapping a row jumps to /schedule?d=YYYY-MM-DD so the operator lands on the
+ * Scheduled section, read-only display of fh_schedule entries for this job.
+ * Tapping a row jumps to /schedule?d=year month day so the operator lands on the
  * exact day in the calendar UI (and can drag/edit there).
  *
  * Schedule items come from useJobData (no internal fetch). To add a new
- * event, the parent's onOpenAddEvent prop opens AddEventSheet pre-filled
+ * event, the parent's onOpenAddEvent prop opens AddEventSheet filled
  * with this contact_id.
  */
 export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }: any) {
@@ -24,7 +24,7 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
@@ -35,12 +35,12 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
           whileTap={{ scale: 0.97 }}
           onClick={() => { hapticTap(); onOpenAddEvent?.() }}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '6px 12px', borderRadius: 999,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '8px 12px', borderRadius: 10,
             background: 'var(--v3-primary-soft)',
             border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
             color: 'var(--v3-primary)',
-            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             cursor: 'pointer',
             WebkitTapHighlightColor: 'transparent'
           }}
@@ -52,15 +52,15 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
 
       {scheduleItems.length === 0 ? (
         <div style={{
-          padding: '20px 18px', borderRadius: 14,
+          padding: '24px 16px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center', lineHeight: 1.5
+          fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
           Nothing scheduled for this job. Tap <strong>Schedule event</strong> above to add the first one.
         </div>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {scheduleItems.map((e: any) => {
             const d = new Date(e.start_at)
             const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
@@ -75,7 +75,7 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
                   style={{
                     width: '100%',
                     display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 12,
+                    padding: '12px 12px', borderRadius: 10,
                     background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
                     textAlign: 'left', cursor: 'pointer',
                     color: 'var(--v3-text)', opacity: isPast ? 0.65 : 1,
@@ -83,7 +83,7 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
                   }}
                 >
                   <span aria-hidden="true" style={{
-                    flexShrink: 0, width: 36, height: 36, borderRadius: 11,
+                    flexShrink: 0, width: 36, height: 36, borderRadius: 10,
                     background: 'var(--v3-primary-soft)',
                     border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
                     color: 'var(--v3-primary)',
@@ -100,9 +100,9 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
                     </div>
                     <div style={{
                       marginTop: 3,
-                      fontFamily: 'var(--font-body)', fontSize: 11,
+                      fontFamily: 'var(--font-body)', fontSize: 12,
                       color: 'var(--v3-text-muted)',
-                      display: 'inline-flex', gap: 6, alignItems: 'center',
+                      display: 'inline-flex', gap: 8, alignItems: 'center',
                       fontVariantNumeric: 'tabular-nums'
                     }}>
                       {dateStr}

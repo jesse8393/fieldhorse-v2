@@ -1,7 +1,7 @@
-// DetailListRail — desktop master-detail list rail (≥1200px).
+// DetailListRail, desktop master-detail list rail (1440px and wider).
 //
 // Sits to the left of the job/lead/quote detail so the operator can flip
-// between records without bouncing back to the board — the email-client
+// between records without bouncing back to the board, the email-client
 // pattern. The URL stays the single source of truth: every row is a plain
 // navigate() to the exact same routes the list screens use, and the rail
 // derives its surface (jobs / leads / quotes) from the current pathname.

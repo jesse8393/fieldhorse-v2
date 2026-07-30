@@ -24,8 +24,8 @@ export function renderPayBlock(payLink, payInstructions, amountLabel, safe) {
   if (!url && !instr) return ''
   const safeUrl = safePayUrl(url)
   const button = safeUrl
-    ? `<a href="${safe(safeUrl)}" style="display:inline-block;background:linear-gradient(135deg,#d4af37,#b7872d);color:#1f1f1f;font-size:14px;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:8px;">Pay${amountLabel ? ` ${safe(amountLabel)}` : ''} now</a>`
+    ? `<a href="${safe(safeUrl)}" style="display:inline-block;background:#C9963A;color:#141414;font-size:14px;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:10px;">Pay${amountLabel ? ` ${safe(amountLabel)}` : ''} now</a>`
     : ''
-  const note = instr ? `<p style="margin:${button ? '12px' : '0'} 0 0;font-size:13px;color:#5d5d57;">${safe(instr)}</p>` : ''
-  return `<tr><td style="padding:4px 32px 20px;" align="center">${button}${note}</td></tr>`
+  const note = instr ? `<p style="margin:${button ? '12px' : '0'} 0 0;font-size:14px;color:#5C5C5C;">${safe(instr)}</p>` : ''
+  return `<tr><td style="padding:4px 32px 24px;" align="center">${button}${note}</td></tr>`
 }

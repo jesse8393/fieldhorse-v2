@@ -6,7 +6,7 @@ import { fetchCoverPhotosByJob } from './photos.ts'
 import { fetchAllRows } from './queries.ts'
 import type { Database } from './database.types.ts'
 
-// Local-calendar YYYY-MM-DD (NOT UTC) so evening follow-ups don't read
+// Local-calendar year month day (NOT UTC) so evening follow-ups don't read
 // as due a day early. Mirrors src/lib/dates.ts todayYmd.
 function localYmd(d: Date) {
   const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0')
@@ -111,8 +111,6 @@ export type HomeJobHealth = {
   stage: string
   schedule: string
   scheduleTone: DashboardTone
-  report: string
-  reportTone: DashboardTone
   billing: string
   billingTone: DashboardTone
   risk: string
@@ -158,7 +156,7 @@ export type HomeDashboardSource = {
   now: Date
   contacts: ContactRow[]
   overdueSchedules: Pick<ScheduleRow, 'contact_id'>[]
-  // ALL payments for the scope, not just this week's — paid state,
+  // ALL payments for the scope, not just this week's, paid state,
   // "chase invoice", and job-health outstanding need full history.
   payments: PaymentRow[]
   todaySchedules: ScheduleWithContact[]
@@ -221,8 +219,8 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   const overdueContactIds = new Set(source.overdueSchedules.map((row) => row.contact_id).filter(Boolean) as string[])
   const behind = contacts.filter((contact) => contact.stage === 'job' && overdueContactIds.has(contact.id))
 
-  // All-time paid per contact. The dashboard used to fetch ONLY this
-  // week's payments and treat them as all payments — so a job paid in
+  // All time paid per contact. The dashboard used to fetch ONLY this
+  // week's payments and treat them as all payments, so a job paid in
   // full last month read "Chase invoice · $25,000 owed" and Job Health
   // showed "Outstanding" until a payment happened to land inside the
   // current calendar week.
@@ -241,7 +239,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     return contract - (payByContact.get(contact.id) || 0)
   }
 
-  // Collected this week — keyed on paid_on (the date the money actually
+  // Collected this week, keyed on paid_on (the date the money actually
   // arrived), falling back to created_at for legacy rows without one.
   const weekStartMs = startOfWeek(now).getTime()
   const weekTotal = source.payments.reduce((sum, payment) => {
@@ -299,7 +297,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   for (const contact of contacts) {
     const awaitingPayment = contact.stage === 'invoice' || (contact.stage === 'job' && contact.completed_at)
     if (!awaitingPayment) continue
-    // Only chase money that's actually owed — a fully (or over-) paid
+    // Only chase money that's actually owed, a fully (or over-) paid
     // job is done, no matter when its payments landed.
     const owed = balanceFor(contact)
     if (owed <= 0.5) continue
@@ -315,7 +313,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       dueIso: updated.toISOString(),
       dueKind: 'invoiced',
       title: `Chase invoice for ${contact.name || 'job'}`,
-      // The remaining balance, not the full contract — a $25K job with
+      // The remaining balance, not the full contract, a $25K job with
       // $20K collected is owed $5K, and that's the number to chase.
       detail: `$${Math.round(owed).toLocaleString()} owed`,
       urgencyLabel: 'Invoice pending',
@@ -342,7 +340,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       dueIso: due.toISOString(),
       dueKind: 'overdue',
       title: `Call ${contact.name || 'lead'}`,
-      detail: overdueDays === 0 ? 'Follow-up due today' : `Follow-up ${overdueDays}d overdue`,
+      detail: overdueDays === 0 ? 'Follow up due today' : `Follow up ${overdueDays}d overdue`,
       urgencyLabel: overdueDays === 0 ? 'Due today' : 'Overdue',
       urgencyTone: overdueDays >= 2 ? 'danger' : 'warn',
       urgency: 1 + Math.max(0, 5 - overdueDays),
@@ -494,7 +492,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       const amount = Number(contact.amount || 0) + (coByContact.get(contact.id) || 0)
       const outstanding = amount > 0 ? balanceFor(contact) : 0
       const workDone = !!contact.completed_at || contact.stage === 'invoice'
-      // Same "real balance" threshold as rollups/statements — sub-50¢
+      // Same "real balance" threshold as rollups/statements, sub-50¢
       // dust never drives a warning.
       const owes = outstanding > 0.5
       const billingTone: DashboardTone =
@@ -509,8 +507,6 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
         stage: workDone && owes ? 'Invoicing' : 'Active',
         schedule: isBehind ? 'Behind' : 'On track',
         scheduleTone,
-        report: '-',
-        reportTone: 'neutral' as DashboardTone,
         billing:
           workDone && owes ? 'Outstanding'
           : amount === 0 ? 'Not set'
@@ -575,7 +571,7 @@ export async function fetchHomeDashboard(
 
   // ALL payments for the scope, paged past PostgREST's 1000-row cap.
   // A week-scoped fetch here made every downstream consumer treat
-  // "payments since Sunday" as "all payments ever" — wrong paid state
+  // "payments since Sunday" as "all payments ever", wrong paid state
   // on every job paid before this week.
   const paymentsPromise = fetchAllRows<PaymentRow>((from, to) =>
     (orgId
@@ -633,7 +629,7 @@ export async function fetchHomeDashboard(
   ] = await Promise.all([
     // Scope contacts the same way as every sibling query (org, else user).
     // Left unscoped this pulled the whole RLS-visible table to the phone AND
-    // mixed in partner-shared rows the other signals exclude — inflating the
+    // mixed in partner-shared rows the other signals exclude, inflating the
     // pipeline total and not scaling.
     (orgId
       ? supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status').eq('org_id', orgId)

@@ -10,7 +10,7 @@ import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { Eyebrow } from './v3'
 
-// Mobile-native search overlay — replaces CommandPalette on phone widths
+// Mobile-native search overlay, replaces CommandPalette on phone widths
 // (the cmdk popover renders clipped on iOS Safari + Chrome behind the
 // keyboard / status-bar; see AppHeader comment for the old workaround).
 //
@@ -138,7 +138,7 @@ export default function MobileSearchOverlay() {
           transition={{ duration: 0.18 }}
           style={{
             position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(8, 7, 5, 0.86)',
+            background: 'rgba(20, 20, 20, 0.86)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
             display: 'flex', flexDirection: 'column'
@@ -162,7 +162,7 @@ export default function MobileSearchOverlay() {
             }}
           >
             {/* Sticky search header. The padding shorthand has to
-                merge the safe-area-inset-top inline — declaring
+                merge the safe-area-inset-top inline, declaring
                 paddingTop above a padding shorthand is a no-op
                 because the shorthand wins, which buried the close
                 button + input under the iOS status bar / Dynamic
@@ -214,7 +214,7 @@ export default function MobileSearchOverlay() {
                   placeholder="Search jobs, clients, notes, events, files…"
                   style={{
                     width: '100%', boxSizing: 'border-box',
-                    padding: '11px 14px 11px 36px',
+                    padding: '12px 12px 12px 32px',
                     background: 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border-strong)',
                     borderRadius: 10,
@@ -232,7 +232,7 @@ export default function MobileSearchOverlay() {
               style={{
                 flex: 1, minHeight: 0,
                 overflowY: 'auto', overflowX: 'hidden',
-                padding: '4px 14px calc(env(safe-area-inset-bottom, 0px) + 28px)'
+                padding: '4px 12px calc(env(safe-area-inset-bottom, 0px) + 28px)'
               }}
             >
               {!query.trim() && <IdleHint />}
@@ -257,10 +257,10 @@ export default function MobileSearchOverlay() {
 function IdleHint() {
   return (
     <div style={{
-      padding: '40px 18px',
+      padding: '32px 16px',
       textAlign: 'center',
       color: 'var(--v3-text-muted)',
-      fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.5
+      fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.5
     }}>
       Type to search jobs, clients, notes, events, and files.
     </div>
@@ -270,10 +270,10 @@ function IdleHint() {
 function EmptyState({ text }: any) {
   return (
     <div style={{
-      padding: '32px 18px',
+      padding: '32px 16px',
       textAlign: 'center',
       color: 'var(--v3-text-muted)',
-      fontFamily: 'var(--font-body)', fontSize: 13
+      fontFamily: 'var(--font-body)', fontSize: 14
     }}>
       {text}
     </div>
@@ -282,21 +282,21 @@ function EmptyState({ text }: any) {
 
 function ResultsList({ results, onGo }: any) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
       {GROUP_ORDER.map((groupKey) => {
         const items = results[groupKey] || []
         if (items.length === 0) return null
         const meta = KIND_META[GROUP_TO_KIND[groupKey]]
         return (
           <section key={groupKey}>
-            <Eyebrow as="div" style={{ padding: '0 6px 6px' }}>
+            <Eyebrow as="div" style={{ padding: '0 8px 8px' }}>
               {meta.heading}
             </Eyebrow>
             <ul
               role="list"
               style={{
                 listStyle: 'none', margin: 0, padding: 0,
-                display: 'flex', flexDirection: 'column', gap: 6
+                display: 'flex', flexDirection: 'column', gap: 8
               }}
             >
               {items.map((it: any) => (
@@ -321,10 +321,10 @@ function ResultRow({ item, onGo }: any) {
         style={{
           width: '100%',
           display: 'flex', alignItems: 'center', gap: 12,
-          padding: '11px 12px',
+          padding: '12px 12px',
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
-          borderRadius: 12,
+          borderRadius: 10,
           color: 'var(--v3-text)',
           cursor: 'pointer',
           textAlign: 'left',
@@ -335,7 +335,7 @@ function ResultRow({ item, onGo }: any) {
         <span
           aria-hidden="true"
           style={{
-            width: 32, height: 32, borderRadius: 8,
+            width: 32, height: 32, borderRadius: 10,
             background: 'var(--v3-primary-soft)',
             border: '1px solid var(--v3-border-gold)',
             color: 'var(--v3-primary-bright)',
@@ -345,7 +345,7 @@ function ResultRow({ item, onGo }: any) {
         >
           <Icon size={15} />
         </span>
-        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span
             style={{
               fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,

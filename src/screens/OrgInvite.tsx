@@ -1,4 +1,4 @@
-// OrgInvite — /invite/:token landing.
+// OrgInvite, /invite/:token landing.
 //
 // Mirrors the /partner-invite/:token flow. Public route (no auth
 // required to LOAD the page; the user is bounced to /login if they
@@ -72,9 +72,9 @@ export default function OrgInvite() {
 
   return (
     <div className="fh-build-page" data-build-screen="OrgInvite" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-      <main style={{ width: '100%', maxWidth: 460, padding: '40px 28px' }}>
-        <div className="fh-build-card" style={{ padding: 28 }}>
-          <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>
+      <main style={{ width: '100%', maxWidth: 460, padding: '32px 24px' }}>
+        <div className="fh-build-card" style={{ padding: 24 }}>
+          <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #C9963A)' }}>
             Team invite
           </div>
 
@@ -177,14 +177,14 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick:
       style={{
         display: 'block', width: '100%', marginTop: 18,
         padding: '12px 16px',
-        borderRadius: 8,
-        background: 'var(--v3-primary, #c9963a)',
-        color: '#0c0d0f',
+        borderRadius: 10,
+        background: 'var(--v3-primary, #C9963A)',
+        color: '#141414',
         border: 'none',
         fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)',
         fontWeight: 800,
         fontSize: 14,
-        letterSpacing: '.04em',
+        letterSpacing: 0,
         cursor: 'pointer',
       }}
     >
@@ -196,8 +196,8 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick:
 const titleStyle: React.CSSProperties = {
   margin: '10px 0 8px',
   fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)',
-  fontSize: 32,
-  letterSpacing: '.005em',
+  fontSize: 24,
+  letterSpacing: 0,
   color: 'var(--v3-text)',
   lineHeight: 1.1,
 }
@@ -213,13 +213,13 @@ const hiStyle: React.CSSProperties = { color: 'var(--v3-text)', fontWeight: 700 
 
 const secondaryBtnStyle: React.CSSProperties = {
   display: 'block', width: '100%', marginTop: 8,
-  padding: '10px 16px',
-  borderRadius: 8,
+  padding: '12px 16px',
+  borderRadius: 10,
   background: 'transparent',
   color: 'var(--v3-text-muted)',
   border: '1px solid var(--v3-border-mid)',
   fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)',
   fontWeight: 700,
-  fontSize: 13,
+  fontSize: 14,
   cursor: 'pointer',
 }

@@ -1,7 +1,7 @@
-// SnowForecastBuild — desktop /pour-window in the Build direction.
+// SnowForecastBuild, desktop /pour-window in the Build direction.
 //
 // Drop-in replacement for the PourWindow mobile flow at >=900px.
-// Built around weather-sensitive day cards, current work-window
+// Built around weather-sensitive day cards, current work window
 // signals, and per-trade status. Same weather data, same handlers,
 // new visual chrome.
 
@@ -67,11 +67,11 @@ function tone(status: string | undefined) {
 }
 
 function fmtDay(iso: string) {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   try {
     const d = new Date(iso + 'T12:00:00')
     return d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
-  } catch { return '—' }
+  } catch { return '\u2003' }
 }
 
 function fmtDate(iso: string) {
@@ -138,12 +138,12 @@ export default function SnowForecastBuild(props: Props) {
               <Sun size={16} className="fh-build-sun" />
             </>
           ) : (
-            <span>—</span>
+            <span>:</span>
           )}
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onPinLocation}>
-          <MapPin size={15} /> {hasCoords ? 'Re-pin' : 'Pin location'}
+          <MapPin size={15} /> {hasCoords ? 'Pin again' : 'Pin location'}
         </button>
       </header>
 
@@ -156,7 +156,7 @@ export default function SnowForecastBuild(props: Props) {
 
           <div className={`fh-build-focus fh-build-window-card is-${windowTone}`}>
             <div className="fh-build-eyebrow">Current work window</div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
               {windowLabel}
             </p>
             {currentWindow?.reasons && currentWindow.reasons.length > 0 && (
@@ -166,15 +166,15 @@ export default function SnowForecastBuild(props: Props) {
             )}
             {!hasCoords && (
               <p style={{ marginTop: 8, color: 'var(--v3-primary-bright)' }}>
-                Pin a location for accurate work-window signals.
+                Pin a location for accurate work window signals.
               </p>
             )}
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Temperature" value={tMax != null ? `${Math.round(tMax)}°` : '—'} accent />
-            <MiniMetric label="Wind" value={wind != null ? `${Math.round(wind)} mph` : '—'} tone={(wind ?? 0) >= 20 ? 'warn' : undefined} />
-            <MiniMetric label="Humidity" value={humidity != null ? `${Math.round(humidity)}%` : '—'} />
+            <MiniMetric label="Temperature" value={tMax != null ? `${Math.round(tMax)}°` : '\u2003'} accent />
+            <MiniMetric label="Wind" value={wind != null ? `${Math.round(wind)} mph` : '\u2003'} tone={(wind ?? 0) >= 20 ? 'warn' : undefined} />
+            <MiniMetric label="Humidity" value={humidity != null ? `${Math.round(humidity)}%` : '\u2003'} />
             <MiniMetric label="Rain now" value={rain > 0 ? `${rain.toFixed(2)}″` : '0″'} tone={rain > 0 ? 'warn' : undefined} />
           </div>
         </section>
@@ -190,7 +190,7 @@ export default function SnowForecastBuild(props: Props) {
           <div className="fh-build-forecast-main">
             <section className="fh-build-card">
               <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">7-day outlook</div>
+                <div className="fh-build-eyebrow">7 day outlook</div>
                 {onGoToSchedule && (
                   <button type="button" onClick={onGoToSchedule}>
                     <CalendarDays size={11} /> Open Schedule
@@ -213,8 +213,8 @@ export default function SnowForecastBuild(props: Props) {
                         <span className="fh-build-forecast-day__date">{fmtDate(d.time)}</span>
                       </div>
                       <div className="fh-build-forecast-day__temp">
-                        <strong>{d.tMax != null ? `${Math.round(d.tMax)}°` : '—'}</strong>
-                        <span>{d.tMin != null ? `${Math.round(d.tMin)}°` : '—'}</span>
+                        <strong>{d.tMax != null ? `${Math.round(d.tMax)}°` : '\u2003'}</strong>
+                        <span>{d.tMin != null ? `${Math.round(d.tMin)}°` : '\u2003'}</span>
                       </div>
                       <div className="fh-build-forecast-day__row">
                         <Droplets size={11} />
@@ -244,7 +244,7 @@ export default function SnowForecastBuild(props: Props) {
               </div>
               {tradeRows.length === 0 ? (
                 <div className="fh-build-table__empty">
-                  {hasCoords ? 'No trade data available.' : 'Pin a location to see trade-specific signals.'}
+                  {hasCoords ? 'No trade data available.' : 'Pin a location to see specific trade signals.'}
                 </div>
               ) : tradeRows.map((t: any) => {
                 const tt = tone(t.status)
@@ -253,7 +253,7 @@ export default function SnowForecastBuild(props: Props) {
                     <strong style={{ textTransform: 'capitalize' }}>{t.trade}</strong>
                     <span className={`fh-build-dot is-${tt}`}>{t.label || t.status || 'Unknown'}</span>
                     <span className="fh-build-truncate fh-build-rel" title={(t.reasons || []).join(' · ')}>
-                      {(t.reasons || []).slice(0, 2).join(' · ') || '—'}
+                      {(t.reasons || []).slice(0, 2).join(' · ') || '\u2003'}
                     </span>
                   </div>
                 )
@@ -264,7 +264,7 @@ export default function SnowForecastBuild(props: Props) {
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Best work window</div>
-              <strong>{bestDay ? fmtDay(bestDay.time) : '—'}</strong>
+              <strong>{bestDay ? fmtDay(bestDay.time) : '\u2003'}</strong>
               <span>{bestDay ? fmtDate(bestDay.time) : 'No clear days ahead'}</span>
               {bestDay && <div className="fh-build-spark is-gold" />}
             </section>
@@ -278,17 +278,17 @@ export default function SnowForecastBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Temperature</div>
-              <strong>{tMax != null ? `${Math.round(tMax)}°F` : '—'}</strong>
+              <strong>{tMax != null ? `${Math.round(tMax)}°F` : '\u2003'}</strong>
               <span>{tMax != null && (tMax > 90 || tMax < 40) ? 'Outside comfort range' : 'In comfort range'}</span>
               <div className="fh-build-rail-card__spark">
                 <Thermometer size={14} />
-                <span>{tMax != null ? (tMax > 80 ? 'hot' : tMax < 50 ? 'cool' : 'mild') : '—'}</span>
+                <span>{tMax != null ? (tMax > 80 ? 'hot' : tMax < 50 ? 'cool' : 'mild') : '\u2003'}</span>
               </div>
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Wind</div>
-              <strong>{wind != null ? `${Math.round(wind)} mph` : '—'}</strong>
+              <strong>{wind != null ? `${Math.round(wind)} mph` : '\u2003'}</strong>
               <span>{(wind ?? 0) >= 20 ? 'Lift work risky' : 'Within limits'}</span>
             </section>
 
@@ -298,7 +298,7 @@ export default function SnowForecastBuild(props: Props) {
                 {noGoDays >= 3 ? 'Reschedule outdoor crews' : windowTone === 'good' ? 'Push schedule forward' : 'Hold + reassess'}
               </strong>
               <span>
-                {noGoDays} of next 7 days marked no-go
+                {noGoDays} of next 7 days marked unavailable
               </span>
               {onGoToSchedule && (
                 <button type="button" className="fh-build-rail-card__action" onClick={onGoToSchedule}>

@@ -1,11 +1,11 @@
-// mobile/app/(tabs)/_layout.tsx — the 5-tab bottom nav, mirroring the
+// mobile/app/(tabs)/_layout.tsx, the 5-tab bottom nav, mirroring the
 // web BottomNav (Home / Jobs / Clients / Schedule / More) with the
 // gold-on-onyx brand. expo-router Tabs gives a native tab bar with
 // real safe-area + haptics, replacing the web's fixed-position nav.
 import { Tabs } from 'expo-router'
 import { Home, Briefcase, Users, Calendar, MoreHorizontal } from 'lucide-react-native'
 
-const GOLD = '#E8B865'
+const GOLD = '#C9963A'
 const MUTED = 'rgba(242,237,228,0.55)'
 
 export default function TabsLayout() {
@@ -16,10 +16,10 @@ export default function TabsLayout() {
         tabBarActiveTintColor: GOLD,
         tabBarInactiveTintColor: MUTED,
         tabBarStyle: {
-          backgroundColor: '#100E0C',
-          borderTopColor: 'rgba(255,240,210,0.06)'
+          backgroundColor: '#141414',
+          borderTopColor: 'rgba(242, 237, 228,0.06)'
         },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '700', letterSpacing: 0 }
       }}
     >
       <Tabs.Screen

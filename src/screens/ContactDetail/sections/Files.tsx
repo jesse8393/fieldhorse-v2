@@ -19,7 +19,7 @@ function fmtSize(n: any) {
 }
 
 /**
- * Files section — fh_job_files where kind='file'. Same upload flow as Photos
+ * Files section, fh_job_files where kind='file'. Same upload flow as Photos
  * but list rendering instead of grid + opens via signed URL in new tab.
  */
 export default function FilesSection({ jobId, userId }: any) {
@@ -125,9 +125,9 @@ export default function FilesSection({ jobId, userId }: any) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <Eyebrow>
           {rows.length} {rows.length === 1 ? 'file' : 'files'}
         </Eyebrow>
@@ -137,13 +137,13 @@ export default function FilesSection({ jobId, userId }: any) {
           onClick={pick}
           disabled={uploading}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px', borderRadius: 10, border: 'none',
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-            letterSpacing: '0.06em',
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+            letterSpacing: 0,
             cursor: uploading ? 'wait' : 'pointer',
-            boxShadow: '0 6px 18px rgba(212, 175, 55, 0.28)',
+            boxShadow: '0 6px 18px rgba(201, 150, 58, 0.28)',
             opacity: uploading ? 0.7 : 1
           }}
         >
@@ -157,23 +157,23 @@ export default function FilesSection({ jobId, userId }: any) {
       {loading && <SkeletonList rows={2} card={false} />}
       {!loading && rows.length === 0 && (
         <div style={{
-          padding: '32px 20px', borderRadius: 14,
+          padding: '32px 24px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center', lineHeight: 1.5,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10
+          fontSize: 14, textAlign: 'center', lineHeight: 1.5,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <Paperclip size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>No files yet. Permits, contracts, plans — upload anything that supports the job.</div>
+          <div>No files yet. Permits, contracts, plans, upload anything that supports the job.</div>
         </div>
       )}
 
       {!loading && rows.length > 0 && (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rows.map((r) => (
             <li key={r.id} style={{
               display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 14px', borderRadius: 12,
+              padding: '12px 12px', borderRadius: 10,
               background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
             }}>
               <span aria-hidden="true" style={{
@@ -201,7 +201,7 @@ export default function FilesSection({ jobId, userId }: any) {
                 </div>
                 <div style={{
                   marginTop: 2,
-                  fontFamily: 'var(--font-body)', fontSize: 11,
+                  fontFamily: 'var(--font-body)', fontSize: 12,
                   color: 'var(--v3-text-muted)',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
@@ -213,7 +213,7 @@ export default function FilesSection({ jobId, userId }: any) {
                 onClick={() => open(r)}
                 aria-label="Download"
                 style={{
-                  width: 32, height: 32, borderRadius: 9,
+                  width: 32, height: 32, borderRadius: 10,
                   background: 'transparent', border: '1px solid var(--v3-border)',
                   color: 'var(--v3-text-muted)', cursor: 'pointer',
                   display: 'grid', placeItems: 'center'
@@ -226,7 +226,7 @@ export default function FilesSection({ jobId, userId }: any) {
                 onClick={() => remove(r)}
                 aria-label="Delete file"
                 style={{
-                  width: 32, height: 32, borderRadius: 9,
+                  width: 32, height: 32, borderRadius: 10,
                   background: 'transparent', border: 'none',
                   color: 'var(--v3-text-muted)', cursor: 'pointer',
                   display: 'grid', placeItems: 'center'

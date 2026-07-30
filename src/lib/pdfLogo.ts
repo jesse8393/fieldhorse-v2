@@ -1,26 +1,26 @@
-// PDF logo embed helper — Phase 4D-2B.
+// PDF logo embed helper, Phase 4D-2B.
 //
 // Loads a contractor's logo from a Supabase signed URL and converts it
 // into a jsPDF-ready PNG data URL. Used by generateQuote() (Phase 4D-2C)
-// and generateInvoice() (Phase 4D-2D) to brand customer-facing PDFs
+// and generateInvoice() (Phase 4D-2D) to brand customer facing PDFs
 // with the contractor's mark.
 //
-// Strategy — single path for all formats:
+// Strategy, single path for all formats:
 //   1. fetch() the signed URL with an AbortController timeout
 //   2. blob → object URL (same-origin)
 //   3. <img> with crossOrigin="anonymous"
 //   4. drawImage() onto an offscreen canvas, scaled to maxDimension
-//   5. canvas.toDataURL('image/png') — taint-safe because data was
+//   5. canvas.toDataURL('image/png'), taint-safe because data was
 //      ingested via fetch() (already in our origin's memory)
 //
 // Supports PNG and SVG (the canonical upload formats), plus JPEG and
 // WebP defensively. Returns null on any failure so the caller can
-// fall back to a typographic wordmark — logo never blocks a PDF.
+// fall back to a typographic wordmark, logo never blocks a PDF.
 //
 // Cache: module-level Map keyed by `${maxDimension}:${url}`. Stores
 // promises (so concurrent calls share one fetch) and the resolved value
 // is { dataUrl, format, width, height } | null. Negative results are
-// cached for the session — a transient failure won't retry on every
+// cached for the session, a transient failure won't retry on every
 // Preview / Download / Send. Operators can refresh to retry.
 
 export type LogoDescriptor = { dataUrl: string; format: 'PNG'; width: number; height: number }
@@ -64,7 +64,7 @@ async function doLoad(url: string, maxDimension: number, timeoutMs: number): Pro
     canvas.height = targetH
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    // High-quality scaling — better-than-default smoothing for the
+    // High-quality scaling, better-than-default smoothing for the
     // common "square brand mark scaled down to 80mm wide" case.
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
@@ -135,7 +135,7 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 /**
  * Test helper / hot-reload safety. Clears the in-memory cache so a
  * fresh upload is fetched again. Not used in production; exposed only
- * for unit tests or future re-fetch UX. Safe to leave shipped — it
+ * for unit tests or future re-fetch UX. Safe to leave shipped, it
  * does nothing unless explicitly called.
  */
 export function clearLogoCache() {
@@ -144,7 +144,7 @@ export function clearLogoCache() {
 
 /**
  * Same loader, semantic alias for project photos. The implementation is
- * already content-agnostic — it just needs a URL that returns image
+ * already content-agnostic, it just needs a URL that returns image
  * bytes. Exporting a separate name so call sites read clearly:
  *   loadLogoForPdf(...)  for the contractor's brand mark
  *   loadImageForPdf(...) for project photos / hero images

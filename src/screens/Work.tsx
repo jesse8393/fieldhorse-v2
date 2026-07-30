@@ -1,4 +1,4 @@
-// src/screens/Work.tsx — THE list. (IA collapse, round 2)
+// src/screens/Work.tsx, THE list. (IA collapse, round 2)
 //
 // User verdict on the four-desk model: "Jobs leads quotes invoices…
 // it all sucks and is too complicated. Still is too much."
@@ -11,7 +11,7 @@
 //   - one search bar
 //   - one row of stage chips (All · Leads · Quotes · Active · Done,
 //     Lost only when it exists)
-//   - ONE card design for every deal — spine + name + title + $ +
+//   - ONE card design for every deal, spine + name + title + $ +
 //     stage pill + follow-up chip when due + one ⋯ menu
 //   - tap a card → the stage-aware detail, where the single big CTA
 //     already lives (Convert to quote / Approve / Send invoice)
@@ -36,7 +36,7 @@ import {
   DropdownMenuItem, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
-// Lazy — react-day-picker (~tens of KB) only loads when someone opens the
+// Lazy, react-day-picker (~tens of KB) only loads when someone opens the
 // follow-up date picker. Work is the hot list route (its chunk is warmed
 // on sidebar hover for 5 paths), so keep the calendar off the critical path.
 const Calendar = lazy(() => import('@/components/ui/calendar').then((m) => ({ default: m.Calendar })))
@@ -60,7 +60,7 @@ type ChipId = 'all' | 'leads' | 'quotes' | 'active' | 'done' | 'lost'
 
 const CHIPS: { id: ChipId; label: string; match: (c: JobRow) => boolean }[] = [
   // 'All' really means all: it used to exclude lost, so its count (26)
-  // never matched the sum of the stage chips (28) — flagged by the UI
+  // never matched the sum of the stage chips (28), flagged by the UI
   // audit (#11) as "data does not agree with itself".
   { id: 'all',    label: 'All',    match: () => true },
   { id: 'leads',  label: 'Leads',  match: (c) => c.stage === 'lead' },
@@ -78,13 +78,13 @@ function followUpMeta(c: Pick<JobRow, 'follow_up_on'>): { label: string; tone: '
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000)
-  if (diffDays < 0) return { label: `Follow-up ${-diffDays}d overdue`, tone: 'danger' }
+  if (diffDays < 0) return { label: `Follow up ${-diffDays}d overdue`, tone: 'danger' }
   if (diffDays === 0) return { label: 'Follow up today', tone: 'warn' }
   if (diffDays === 1) return { label: 'Follow up tomorrow', tone: 'muted' }
   return { label: `Follow up ${due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, tone: 'muted' }
 }
 
-// Detail route per stage — canonical mapping imported from stages.ts.
+// Detail route per stage, canonical mapping imported from stages.ts.
 
 export default function Work() {
   const { user } = useAuth()
@@ -95,13 +95,13 @@ export default function Work() {
   // Role gate: the revenue stages (leads, quotes) and the sell actions
   // (Mark won/lost) belong to the money roles. Crew/foreman previously
   // couldn't reach /leads or /quotes at all; now that everything funnels
-  // through /work, gate those surfaces in-view instead — they see only
+  // through /work, gate those surfaces in-view instead, they see only
   // the active/done work they're actually on, with no deal $ or pipeline
   // moves. Fail CLOSED while membership resolves: the list hydrates
   // instantly from IDB cache, so defaulting to money-visible would flash
   // '$ in play', Leads/Quotes rows, and dollar amounts to a crew member
   // on every cold open until membership resolved. Owners simply see the
-  // money view a beat later — the correct trade.
+  // money view a beat later, the correct trade.
   const { canCreateFinancialDocs, loading: membershipLoading } = useMembership()
   const isMoneyRole = !membershipLoading && canCreateFinancialDocs
   const [searchParams, setSearchParams] = useSearchParams()
@@ -127,7 +127,7 @@ export default function Work() {
   // Deep links: ?stage=<chip> selects a chip; ?new=1 opens the create
   // sheet (optionally ?asStage=job from Home's "New Job" tile).
   // ?stage stays IN the URL so the active filter survives refresh and
-  // is shareable/bookmarkable (UI audit #30) — only the one-shot
+  // is shareable/bookmarkable (UI audit #30), only the one-shot
   // new/asStage params are consumed.
   useEffect(() => {
     const requested = searchParams.get('stage')
@@ -182,7 +182,7 @@ export default function Work() {
     }
     // Server hits already matched the WHOLE book via a wildcard ilike that
     // normalizes punctuation ('615-555-1234' ~ '(615) 555-1234'). Do NOT
-    // re-run a raw .includes() over them — that discarded exactly the
+    // re-run a raw .includes() over them, that discarded exactly the
     // punctuation-normalized hits the server search found. Union them in
     // applying only the chip filter + dedupe. Dedupe against the rows
     // we're KEEPING, so a cached row the naive filter dropped but the
@@ -193,9 +193,9 @@ export default function Work() {
       const extra = serverHits.filter((h) => !seen.has(h.id) && activeChip.match(h))
       rows = localRows.concat(extra)
     }
-    // Follow-ups due float to the top; inside each band, newest first.
+    // Follow ups due float to the top; inside each band, newest first.
     // Decorate-sort-undecorate: parse each row's dates ONCE (O(n)) instead
-    // of up to 4× per comparison (O(n log n) parses) — matters on long lists.
+    // of up to 4× per comparison (O(n log n) parses), matters on long lists.
     const decorated = rows.map((c) => ({
       c,
       fu: c.follow_up_on ? new Date(c.follow_up_on).getTime() : Infinity,
@@ -242,7 +242,7 @@ export default function Work() {
     await queryClient.invalidateQueries({ queryKey: jobsKey(user?.id) })
   }, [queryClient, user?.id])
 
-  // Optimistic single-column moves — the card responds the instant the
+  // Optimistic single-column moves, the card responds the instant the
   // thumb lifts; refresh() reconciles (and rolls back on error).
   const patchJobsCache = useCallback((id: string, patch: Partial<JobRow>) => {
     queryClient.setQueryData(jobsKey(user?.id), (prev: unknown) =>
@@ -272,8 +272,8 @@ export default function Work() {
   // Accepts a preset offset in days, an exact Date from the calendar
   // picker, or null to clear.
   const setFollowUp = useCallback(async (c: JobRow, when: number | Date | null) => {
-    // Format a Date to a LOCAL YYYY-MM-DD. toISOString would render the
-    // UTC day, shifting the stored date for anyone not on UTC — which
+    // Format a Date to a LOCAL year month day. toISOString would render the
+    // UTC day, shifting the stored date for anyone not on UTC, which
     // made "Follow up tomorrow" land two days out for evening US users.
     const localYmd = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -283,7 +283,7 @@ export default function Work() {
     } else if (when instanceof Date) {
       value = localYmd(when)
     } else {
-      // Preset offset: add the days to LOCAL midnight, then format local —
+      // Preset offset: add the days to LOCAL midnight, then format local :
       // so the result is always exactly `when` calendar days from today.
       const d = new Date()
       d.setHours(0, 0, 0, 0)
@@ -291,14 +291,14 @@ export default function Work() {
       value = localYmd(d)
     }
     patchJobsCache(c.id, { follow_up_on: value } as Partial<JobRow>)
-    toastSuccess(value ? 'Follow-up set' : 'Follow-up cleared', value ? `${c.name || 'Deal'} · ${followUpMeta({ follow_up_on: value })?.label || value}` : '')
+    toastSuccess(value ? 'Follow up set' : 'Follow up cleared', value ? `${c.name || 'Deal'} · ${followUpMeta({ follow_up_on: value })?.label || value}` : '')
     const { error } = await supabase
       .from('fh_contacts')
       .update({ follow_up_on: value })
       .eq('id', c.id)
       .eq('user_id', c.user_id)
     if (error) {
-      toastError("Couldn't set follow-up", error.message)
+      toastError("Couldn't set follow up", error.message)
     }
     await refresh()
   }, [patchJobsCache, refresh])
@@ -325,10 +325,10 @@ export default function Work() {
       animate="show"
       style={{ position: 'relative', paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))' }}
     >
-      {/* HEADER — one title, one honest stat line. No cockpit panels:
+      {/* HEADER, one title, one honest stat line. No cockpit panels:
           Home already owns "what should I do next"; this screen's job
           is the list. */}
-      <motion.div className="fh-work__head" variants={item} style={{ padding: '12px 20px 8px' }}>
+      <motion.div className="fh-work__head" variants={item} style={{ padding: '12px 24px 8px' }}>
         <h1 className="jobs-title">
           Work <span style={{ color: 'var(--v3-primary-bright)' }}>&amp; Deals</span>
         </h1>
@@ -347,7 +347,7 @@ export default function Work() {
               {summary.due > 0 && (
                 <>
                   <span className="dot-sep">·</span>
-                  <span className="jobs-stats__alert"><b>{summary.due}</b> need a follow-up</span>
+                  <span className="jobs-stats__alert"><b>{summary.due}</b> need a follow up</span>
                 </>
               )}
             </>
@@ -356,7 +356,7 @@ export default function Work() {
       </motion.div>
 
       {/* SEARCH */}
-      <motion.div className="fh-work__search" variants={item} style={{ padding: '12px 20px 10px' }}>
+      <motion.div className="fh-work__search" variants={item} style={{ padding: '12px 24px 12px' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={16} style={{ position: 'absolute', left: 14, color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
@@ -368,30 +368,30 @@ export default function Work() {
             placeholder="Search names, numbers, addresses..."
             style={{
               width: '100%', boxSizing: 'border-box',
-              padding: '12px 14px 12px 40px', borderRadius: 12,
+              padding: '12px 12px 12px 32px', borderRadius: 10,
               background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-              color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13,
+              color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14,
               outline: 'none'
             }}
           />
         </div>
         {/* Whole-book search failed (offline / server error): results
-            below are the cached recent window only — say so instead of
+            below are the cached recent window only, say so instead of
             letting old deals silently look deleted. */}
         {searchDegraded && search.trim().length >= 2 && (
           <div role="status" style={{
-            marginTop: 6, fontSize: 11, fontFamily: 'var(--font-body)',
-            color: 'var(--v3-primary)', display: 'flex', alignItems: 'center', gap: 6
+            marginTop: 6, fontSize: 12, fontFamily: 'var(--font-body)',
+            color: 'var(--v3-primary)', display: 'flex', alignItems: 'center', gap: 8
           }}>
             <Sparkles size={11} aria-hidden="true" />
-            Showing recent deals only — full-history search is unreachable right now.
+            Showing recent deals only, full history search is unreachable right now.
           </div>
         )}
       </motion.div>
 
-      {/* STAGE CHIPS — the whole pipeline in one row. */}
-      <motion.div className="fh-work__chips" variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Stage filters">
+      {/* STAGE CHIPS, the whole pipeline in one row. */}
+      <motion.div className="fh-work__chips" variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Stage filters">
           {visibleChips.filter((c) => c.id !== 'lost' || lostCount > 0).map((c) => (
             <FilterPill
               key={c.id}
@@ -408,7 +408,7 @@ export default function Work() {
 
       {/* LIST */}
       {loadError && filtered.length > 0 && (
-        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 14px' }}>
+        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
           <DataErrorState
             compact
             title="Could not refresh"
@@ -440,7 +440,7 @@ export default function Work() {
         <motion.div className="fh-work__list fh-work__list--empty" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
           <div className="v3-empty">
             <Sparkles size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
               {chip !== 'all' || search ? 'Nothing matches that view.' : 'No work yet.'}
             </div>
             <div style={{ fontSize: 12, marginBottom: 10 }}>
@@ -522,7 +522,7 @@ export default function Work() {
 }
 
 /* ============================================================
-   DealCard — THE card. Every stage, one shape:
+   DealCard, THE card. Every stage, one shape:
      [spine] Name                        $24.4K
              Job title · via source      [Stage pill]
              [follow-up chip when due]              [⋯]
@@ -537,7 +537,7 @@ type DealCardProps = {
   // won/lost). Field roles get follow-up actions but no stage moves.
   canSell: boolean
   // Handlers take the contact as an arg (rather than closing over it in
-  // the parent) so their identity is stable across renders — that's what
+  // the parent) so their identity is stable across renders, that's what
   // lets React.memo below skip the untouched cards on every keystroke.
   onOpen: (c: JobRow) => void
   onHover: (c: JobRow) => void
@@ -547,12 +547,12 @@ type DealCardProps = {
   onFollowUp: (c: JobRow, when: number | Date | null) => void
 }
 
-// React.memo — DealCard used to re-render all ~40 mounted cards on every
+// React.memo, DealCard used to re-render all ~40 mounted cards on every
 // search keystroke because the parent passed fresh inline-arrow callbacks
 // each render. With stable handlers (above) + memo, only cards whose own
 // props (contact ref / isNew / busy / canSell) actually change re-render.
 const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
-  // Calendar popover for "Pick a date…" — anchored to the ⋯ button so
+  // Calendar popover for "Pick a date…", anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)
   const meta = STAGE_META[c.stage || 'lead'] || STAGE_META.lead
@@ -562,10 +562,10 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
   const isTerminal = c.stage === 'lost' || c.stage === 'closed'
   // Sell actions require both a sellable stage AND a money role.
   const canSell = mayMoveStage && (c.stage === 'lead' || c.stage === 'quote')
-  // Reopen also moves a stage — money roles only.
+  // Reopen also moves a stage, money roles only.
   const canReopen = mayMoveStage && isTerminal
-  // Follow-up actions show on any non-terminal deal (all roles). If a
-  // terminal deal offers no reopen (field role), the ⋯ menu is empty —
+  // Follow up actions show on any non-terminal deal (all roles). If a
+  // terminal deal offers no reopen (field role), the ⋯ menu is empty :
   // hide the trigger entirely rather than open an empty sheet.
   const hasActions = !isTerminal || canReopen
   const pillLabel = c.stage === 'quote' && (c.proposal_status === 'sent' || c.proposal_status === 'viewed')
@@ -577,14 +577,14 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
     swipeActions.push({
       icon: <PhoneIcon size={18} />,
       label: `Call ${c.name || 'deal'}`,
-      color: 'rgba(46, 204, 113, 0.22)',
+      color: 'rgba(45, 122, 79, 0.22)',
       fg: 'var(--v3-success-bright)',
       onClick: () => { window.location.href = `tel:${phone}` }
     })
     swipeActions.push({
       icon: <MsgIcon size={18} />,
       label: `Text ${c.name || 'deal'}`,
-      color: 'rgba(212, 175, 55, 0.18)',
+      color: 'rgba(201, 150, 58, 0.18)',
       fg: 'var(--v3-primary)',
       onClick: () => { window.location.href = `sms:${phone}` }
     })
@@ -601,8 +601,8 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
         style={{
           position: 'relative',
           display: 'flex', alignItems: 'center', gap: 12,
-          padding: '13px 12px 13px 20px',
-          borderRadius: 14,
+          padding: '12px 12px 12px 24px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: isNew
             ? '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)'
@@ -617,40 +617,40 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
           background: meta.color, borderRadius: '0 3px 3px 0', pointerEvents: 'none'
         }} />
 
-        {/* Body — the whole area is the tap target */}
+        {/* Body, the whole area is the tap target */}
         <button
           type="button"
           onClick={() => { hapticTap(); onOpen(c) }}
           style={{
             flex: 1, minWidth: 0,
-            display: 'flex', flexDirection: 'column', gap: 5,
+            display: 'flex', flexDirection: 'column', gap: 4,
             background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
             textAlign: 'left', WebkitTapHighlightColor: 'transparent'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
             <span style={{
-              fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 15,
-              color: 'var(--v3-text)', letterSpacing: '-0.005em',
+              fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 14,
+              color: 'var(--v3-text)', letterSpacing: 0,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
             }}>
               {c.name || 'Unnamed'}
             </span>
             {est && (
               <span style={{
-                flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 17,
+                flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 16,
                 lineHeight: 1, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums'
               }}>
                 {est}
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
             <span style={{
-              fontSize: 11.5, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
+              fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
             }}>
-              {c.job_title || c.job_type || c.address || '—'}
+              {c.job_title || c.job_type || c.address || '\u2003'}
               {c.referred_by ? ` · via ${c.referred_by}` : ''}
             </span>
             <StatusPill color={meta.color} label={pillLabel} style={{ flexShrink: 0 }} />
@@ -668,7 +668,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
           )}
         </button>
 
-        {/* ⋯ — the only control on the card. The calendar Popover and
+        {/* ⋯, the only control on the card. The calendar Popover and
             the dropdown share this button: PopoverAnchor→Trigger→button
             composes via asChild (the ui/ wrappers forward refs), so the
             calendar opens exactly where the menu just closed. */}
@@ -682,7 +682,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
               hidden={!hasActions}
               disabled={busy || !hasActions}
               style={{
-                flexShrink: 0, width: 36, height: 36, borderRadius: 9,
+                flexShrink: 0, width: 36, height: 36, borderRadius: 10,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 background: 'transparent', border: '1px solid var(--v3-border)',
                 color: 'var(--v3-text-muted)', cursor: busy ? 'wait' : 'pointer',
@@ -714,7 +714,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
                 </DropdownMenuItem>
                 {c.follow_up_on && (
                   <DropdownMenuItem onSelect={() => onFollowUp(c, null)}>
-                    Clear follow-up
+                    Clear follow up
                   </DropdownMenuItem>
                 )}
               </>

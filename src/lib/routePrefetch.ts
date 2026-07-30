@@ -1,9 +1,9 @@
-// routePrefetch — speed pass: warm lazy route chunks on nav hover.
+// routePrefetch, speed pass: warm lazy route chunks on nav hover.
 //
 // Every route below is lazy-loaded in App.tsx; the first visit normally
 // pays a chunk download + parse on click. Hovering a sidebar link is a
 // strong intent signal, so we fire the same dynamic import() the router
-// would — Vite dedupes identical specifiers into the same chunk, so this
+// would, Vite dedupes identical specifiers into the same chunk, so this
 // adds zero bundle weight and the router finds the module already cached.
 //
 // Fire-and-forget: failures are ignored (the router import will retry
@@ -11,7 +11,7 @@
 
 const ROUTE_CHUNKS: Record<string, () => Promise<unknown>> = {
   '/work':        () => import('../screens/Work.tsx'),
-  // Legacy board paths redirect to /work — warm the Work chunk.
+  // Legacy board paths redirect to /work, warm the Work chunk.
   '/leads':       () => import('../screens/Work.tsx'),
   '/quotes':      () => import('../screens/Work.tsx'),
   '/pipeline':    () => import('../screens/Work.tsx'),

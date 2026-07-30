@@ -6,7 +6,7 @@ import InvoiceSection from '../sections/Invoice.tsx'
 import InvoiceDrawsSection from '../sections/InvoiceDrawsSection.tsx'
 
 /**
- * FINANCIALS tab — sub-tab router for cost + revenue surfaces.
+ * FINANCIALS tab, sub-tab router for cost + revenue surfaces.
  *
  * Sub-tabs: Subs · Expenses · Invoice
  *
@@ -37,7 +37,7 @@ export default function FinancialsTab({
   const defaultSub = balance > 0.5 ? 'invoice' : 'subs'
   const [sub, setSub] = useState(defaultSub)
 
-  // No count badge on the Invoice tab — it used to show payments.length,
+  // No count badge on the Invoice tab, it used to show payments.length,
   // so four recorded payments rendered "Invoice · 4" implying four
   // invoices existed.
   const subTabsWithCounts = useMemo(() => SUB_TABS.map((t) => {

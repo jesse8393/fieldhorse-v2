@@ -3,7 +3,7 @@
 // Duplicate detection + merge transaction for fh_clients. Clients are
 // considered a possible duplicate when their normalized phone matches
 // (digits-only, ignoring leading "1") OR their normalized email matches
-// (lowercased + trimmed). Names alone are too noisy — two different
+// (lowercased + trimmed). Names alone are too noisy, two different
 // John Smiths could legitimately exist; two clients sharing the same
 // phone almost certainly should not.
 //
@@ -12,7 +12,7 @@
 // pointing at the loser is rewritten to point at the survivor. Finally
 // the loser row is deleted. The fh_clients_aggregate trigger on
 // fh_contacts then auto-recomputes the survivor's active/lifetime
-// aggregates — we don't have to call recompute manually.
+// aggregates, we don't have to call recompute manually.
 //
 // Single user_id check protects against cross-tenant merges. Caller
 // must pass the authed user_id; we trust no client-supplied ids.
@@ -43,7 +43,7 @@ function normEmail(v: string | null | undefined) {
 // Group an array of client rows into duplicate clusters. A cluster is
 // returned only when it contains 2+ rows and they share at least one of
 // (normalized phone, normalized email). Each row may belong to at most
-// one cluster — first match wins. Output is sorted with the largest
+// one cluster, first match wins. Output is sorted with the largest
 // clusters first so the UI lists the biggest cleanups at the top.
 export function findDuplicateClusters(clients: Client[]): DuplicateCluster[] {
   if (!Array.isArray(clients) || clients.length < 2) return []
@@ -151,7 +151,7 @@ export async function mergeClients({ userId, survivor, losers }: { userId: strin
     .select('id')
   if (reErr) throw reErr
 
-  // 2) Build the survivor patch — fill blanks from losers, oldest-first
+  // 2) Build the survivor patch, fill blanks from losers, oldest-first
   // so a hand-edited address on the original beats a newer auto-imported
   // duplicate.
   const ordered = [...losers].sort((a, b) => {

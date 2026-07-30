@@ -9,13 +9,13 @@
 //
 // Math conventions used here + in the per-draw PDF call:
 //   contractTotal     = contact.amount + sum(approved change orders)
-//   previouslyPaid    = sum(fh_payments) (current snapshot — kept
+//   previouslyPaid    = sum(fh_payments) (current snapshot, kept
 //                         simple; per-invoice payment allocation is a
 //                         future enhancement)
 //   thisInvoice       = the draw's amount
 //   balanceRemaining  = contractTotal − previouslyPaid (as of now)
 //
-// Cash jobs / small projects don't need to touch this — the existing
+// Cash jobs / small projects don't need to touch this, the existing
 // single-invoice flow on the Invoice sub-tab stays exactly as it was.
 
 import { useEffect, useState } from 'react'
@@ -29,6 +29,7 @@ import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
+import { countNoun } from '../../../lib/format.ts'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -45,7 +46,7 @@ function shortDate(iso: any) {
 }
 
 // Store the due date at LOCAL end-of-day so an invoice only reads
-// "past due" AFTER the due date has fully passed — not for the entire
+// "past due" AFTER the due date has fully passed, not for the entire
 // due day (which a midnight timestamp compared with `< now` would do).
 function isoFromDateInput(s: any) {
   if (!s) return null
@@ -56,7 +57,7 @@ function isoFromDateInput(s: any) {
 }
 
 // Read the stored timestamp back as a LOCAL calendar date for the
-// <input type="date"> — using UTC (toISOString) shifts the day in
+// <input type="date">, using UTC (toISOString) shifts the day in
 // UTC+ timezones and walks the due date back on every re-edit.
 function dateInputFromIso(iso: any) {
   return toYmd(iso)
@@ -73,7 +74,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const [busyId, setBusyId] = useState<any>(null)
   const isOwner = contact && contact.user_id === userId
 
-  // Resolved contract total = contact.amount + approved change-order
+  // Resolved contract total = contact.amount + approved change order
   // adjustments. Mirrors the math in InvoiceTemplate so on-screen +
   // PDF balance summaries match.
   const approvedCOAdjustment = (changeOrders || [])
@@ -145,7 +146,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
   // Auto-create draws from the proposal's payment terms. Uses the
   // ProposalTemplate default schedule (50 / 40 / 10) unless the
-  // contractor has overridden it elsewhere — that override path isn't
+  // contractor has overridden it elsewhere, that override path isn't
   // wired yet, so v1 always uses the canonical default. Each draw's
   // title comes from the schedule's label; amount = pct × contractTotal
   // (which already includes approved change orders).
@@ -180,7 +181,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         const row = schedule[i]
         const pct = Number(row.pct || 0)
         // Each draw rounds independently EXCEPT the last, which takes
-        // the remainder — otherwise per-draw rounding drifts and the
+        // the remainder, otherwise per-draw rounding drifts and the
         // schedule doesn't reconcile to the contract total. Round to
         // CENTS, not whole dollars: a $3,000.50 contract must produce
         // draws that sum to exactly $3,000.50, or the schedule printed
@@ -193,7 +194,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           contact_id: contact.id,
           user_id: userId,
           sequence_number: 0, // trigger assigns next
-          title: `${pct}% — ${row.label}`,
+          title: `${pct}%, ${row.label}`,
           amount,
           status: 'draft',
           notes: row.sub || null
@@ -202,8 +203,8 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         createdCount++
       }
       toastSuccess(
-        `Generated ${createdCount} draws`,
-        `Pre-filled from ${schedule.map((s) => `${s.pct}%`).join(' / ')} payment terms`
+        `Generated ${createdCount} ${countNoun(createdCount, 'draw')}`,
+        `Filled from ${schedule.map((s) => `${s.pct}%`).join(' / ')} payment terms`
       )
       await fetchDraws()
     } catch (e: any) {
@@ -278,7 +279,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
   // Shared per-draw PDF builder. Used by both Download (local save)
   // and Send (upload to job-files + POST to /api/send-invoice). The
-  // job_title slot carries "Draw N of M — {label}" so the invoice
+  // job_title slot carries "Draw N of M, {label}" so the invoice
   // letterhead title reflects which draw the customer is receiving.
   async function buildDrawPdf(draw: any) {
     const allActiveDraws = draws.filter((d) => d.status !== 'void')
@@ -294,7 +295,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         address: contact.address,
         phone: contact.phone,
         email: contact.email,
-        job_title: `${drawTitle} — ${contact.job_title || 'Construction services'}`
+        job_title: `${drawTitle}, ${contact.job_title || 'Construction services'}`
       },
       lineItems: [
         {
@@ -311,7 +312,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       currentInvoice: draw,
       invoices: draws,
       payments,
-      // RAW contract amount — generateInvoice folds approved COs in from
+      // RAW contract amount, generateInvoice folds approved COs in from
       // the changeOrders array itself, so passing the CO-inclusive
       // contractTotal here would double-count them in the balance box.
       contractTotal: Number(contact?.amount || 0),
@@ -321,7 +322,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     } as any)
   }
 
-  // Build a single-draw PDF — reuses generateInvoice with this draw's
+  // Build a single-draw PDF, reuses generateInvoice with this draw's
   // amount routed to thisInvoice + balanceRemaining computed from the
   // current paid total. Lets each draw print its own letterhead with
   // "Draw N of M" stamped in the title.
@@ -379,7 +380,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
       if (upErr) throw new Error(`Couldn't save the draw PDF: ${upErr.message}`)
 
-      // Audit row — best-effort, never blocks the send.
+      // Audit row, best-effort, never blocks the send.
       try {
         await supabase.from('fh_job_files').insert({
           id: rowId,
@@ -411,10 +412,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       const sendBody = await sendRes.json().catch(() => ({}))
 
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
-        // Same fallback InvoiceDetail uses — download so the operator
+        // Same fallback InvoiceDetail uses, download so the operator
         // can email manually while they set up Resend env.
         toastError(
-          "Email NOT sent — sender isn't configured",
+          "Email NOT sent, sender isn't configured",
           'Downloaded the PDF so you can email it manually.'
         )
         downloadPdf(result)
@@ -428,7 +429,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
       // Flip the draw to 'sent' so the row badge updates immediately.
       // Skip if the draw is already paid (don't downgrade a paid draw
-      // back to sent just because the contractor re-sent the PDF).
+      // back to sent just because the contractor sent again the PDF).
       if (draw.status !== 'paid') {
         await supabase
           .from('fh_invoices')
@@ -445,7 +446,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   }
 
   if (!isOwner) {
-    // Partner view — read-only list (read policy permits this).
+    // Partner view, read-only list (read policy permits this).
     if (draws.length === 0) return null
     return (
       <Shell>
@@ -489,7 +490,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         />
       )}
       {loading ? (
-        <div style={{ padding: 18, textAlign: 'center', color: 'var(--v3-text-muted)', fontSize: 12 }}>
+        <div style={{ padding: 16, textAlign: 'center', color: 'var(--v3-text-muted)', fontSize: 12 }}>
           Loading…
         </div>
       ) : (
@@ -520,7 +521,7 @@ function Shell({ children }: any) {
       style={{
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
-        borderRadius: 14,
+        borderRadius: 10,
         overflow: 'hidden'
       }}
     >
@@ -547,21 +548,21 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
           </span>
         )}
       </Eyebrow>
-      <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
+      <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
         {canGenerate && (
           <button
             type="button"
             onClick={onGenerate}
             disabled={generating}
-            title="Pre-fill three draws from the proposal's 50 / 40 / 10 payment terms"
+            title="Fill three draws from the proposal's 50 / 40 / 10 payment terms"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '6px 10px', borderRadius: 8,
+              padding: '8px 12px', borderRadius: 10,
               background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
               color: 'var(--v3-primary-bright)',
-              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-              letterSpacing: '0.04em',
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              letterSpacing: 0,
               cursor: generating ? 'wait' : 'pointer',
               opacity: generating ? 0.7 : 1
             }}
@@ -575,10 +576,10 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
             onClick={onAdd}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '6px 10px', borderRadius: 8,
+              padding: '8px 12px', borderRadius: 10,
               background: 'transparent', border: '1px solid var(--v3-border-strong)',
               color: 'var(--v3-text)',
-              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
               cursor: 'pointer'
             }}
           >
@@ -598,20 +599,20 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
   const cells = [
     { label: 'Contract total', value: money(contractTotal) },
     { label: 'Drawn so far',   value: money(drawsIssued) },
-    { label: 'Paid to date',   value: money(previouslyPaid), color: 'var(--v3-success-bright, #4ade80)' },
+    { label: 'Paid to date',   value: money(previouslyPaid), color: 'var(--v3-success-bright, #2D7A4F)' },
     { label: 'Unbilled',       value: money(unbilled),       color: 'var(--v3-primary-bright)' }
   ]
   return (
     <div className="fh-draws-summary" style={{
       display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-      gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--v3-border)',
-      background: 'rgba(0, 0, 0, 0.18)'
+      gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--v3-border)',
+      background: 'rgba(20, 20, 20, 0.18)'
     }}>
       {cells.map((c) => (
         <div key={c.label} className="fh-draws-summary__cell">
           <div className="fh-draws-summary__label" style={{
-            fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-            letterSpacing: '0.14em', color: 'var(--v3-text-muted)',
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+            letterSpacing: 0, color: 'var(--v3-text-muted)',
             textTransform: 'uppercase'
           }}>
             {c.label}
@@ -634,8 +635,8 @@ function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave
   if (draws.length === 0) {
     return (
       <div style={{
-        padding: '28px 16px', textAlign: 'center',
-        color: 'var(--v3-text-muted)', fontSize: 13, fontFamily: 'var(--font-body)'
+        padding: '24px 16px', textAlign: 'center',
+        color: 'var(--v3-text-muted)', fontSize: 14, fontFamily: 'var(--font-body)'
       }}>
         <FileText size={20} aria-hidden="true" style={{ opacity: 0.55, marginBottom: 6 }} />
         <div>No draws yet. Add one to start progress billing this contract.</div>
@@ -673,11 +674,11 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
   const isOverdue = draw.status === 'overdue'
 
   return (
-    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 14, padding: '14px 16px', alignItems: 'flex-start' }}>
+    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
-        fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-        letterSpacing: '0.04em', color: 'var(--v3-primary-bright)',
-        fontVariantNumeric: 'tabular-nums', paddingTop: 2
+        fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+        letterSpacing: 0, color: 'var(--v3-primary-bright)',
+        fontVariantNumeric: 'tabular-nums', paddingTop: 4
       }}>
         Draw #{draw.sequence_number}
       </div>
@@ -689,12 +690,12 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
         }}>
           {draw.title || `Draw ${draw.sequence_number}`}
         </div>
-        <div style={{ marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11, color: 'var(--v3-text-muted)' }}>
+        <div style={{ marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-text-muted)' }}>
           {draw.issued_at && <span>Issued {shortDate(draw.issued_at)}</span>}
           {draw.due_at && <span>Due {shortDate(draw.due_at)}</span>}
           {draw.notes && <span style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {draw.notes}</span>}
         </div>
-        <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+        <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
           {isPaid && <Tag tone="green">PAID</Tag>}
           {isVoid && <Tag tone="muted">VOID</Tag>}
           {isOverdue && <Tag tone="red">OVERDUE</Tag>}
@@ -702,7 +703,7 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
           {!isPaid && !isVoid && !isOverdue && draw.status === 'sent'  && <Tag tone="gold">SENT</Tag>}
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         <div style={{
           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
           color: isVoid ? 'var(--v3-text-muted)' : 'var(--v3-text)',
@@ -764,7 +765,7 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
   function set(k: any, v: any) { setForm((prev) => ({ ...prev, [k]: v })) }
 
   async function submit() {
-    // NaN fails BOTH `<= 0` and `> 0` — check the valid case, not the
+    // NaN fails BOTH `<= 0` and `> 0`, check the valid case, not the
     // invalid one, so garbage input can't slip through as $0.
     const amt = Number(form.amount)
     if (!Number.isFinite(amt) || amt <= 0) {
@@ -778,7 +779,7 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
 
   return (
     <div className="fh-draws-editor" style={{ padding: 16, background: 'var(--v3-surface-2)', borderTop: isNew ? 'none' : '1px solid var(--v3-border)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 12 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={labelStyle}>Title</span>
           <input
@@ -792,23 +793,23 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={labelStyle}>Amount</span>
           <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 10, top: 9, color: 'var(--v3-text-muted)', fontSize: 13 }}>$</span>
+            <span style={{ position: 'absolute', left: 10, top: 9, color: 'var(--v3-text-muted)', fontSize: 14 }}>$</span>
             <input
               type="text"
               inputMode="decimal"
               value={form.amount}
-              // Strip everything but digits/decimal — same rule as
+              // Strip everything but digits/decimal, same rule as
               // V3PaymentSheet/SendInvoiceSheet. Without it, typing
               // "1,500" (or pasting "$1,500") passed validation as NaN
               // and persisted a $0 draw.
               onChange={(e) => set('amount', e.target.value.replace(/[^0-9.]/g, ''))}
               placeholder={unbilled > 0 ? String(unbilled) : '0'}
-              style={{ ...inputStyle, paddingLeft: 20 }}
+              style={{ ...inputStyle, paddingLeft: 24 }}
             />
           </div>
         </label>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={labelStyle}>Issued</span>
           <input
@@ -834,11 +835,11 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
           rows={2}
           value={form.notes}
           onChange={(e) => set('notes', e.target.value)}
-          placeholder="Remit-to / ACH instructions"
+          placeholder="Remittance / ACH instructions"
           style={{ ...inputStyle, resize: 'vertical' }}
         />
       </label>
-      <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         {['draft','sent','paid','overdue'].map((s) => (
           <button
             key={s}
@@ -868,12 +869,12 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
 function Tag({ tone, children }: any) {
   const palette = ({
     muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
-    green: { bg: 'rgba(74, 222, 128, 0.12)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74, 222, 128, 0.30)' },
-    gold:  { bg: 'rgba(228, 190, 111, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(228, 190, 111, 0.30)' },
-    red:   { bg: 'rgba(232, 90, 87, 0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232, 90, 87, 0.30)' }
+    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79, 0.30)' },
+    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(201, 150, 58, 0.30)' },
+    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-bright, #C9963A)', br: 'rgba(192, 57, 43, 0.30)' }
   } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
-    <Eyebrow style={{ padding: '3px 7px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
+    <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
       {children}
     </Eyebrow>
   )
@@ -889,11 +890,11 @@ function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
       title={title}
       {...rest}
       style={{
-        width: 26, height: 26, borderRadius: 6,
+        width: 26, height: 26, borderRadius: 10,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
-        border: `1px solid ${danger ? 'rgba(232, 90, 87, 0.35)' : 'var(--v3-border-strong)'}`,
-        color: danger ? 'var(--v3-danger-bright, #f5a294)' : 'var(--v3-text)',
+        border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
+        color: danger ? 'var(--v3-danger-bright, #C9963A)' : 'var(--v3-text)',
         cursor: disabled ? 'wait' : 'pointer',
         opacity: disabled ? 0.6 : 1
       }}
@@ -904,38 +905,38 @@ function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
 }
 
 const labelStyle = {
-  fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-  letterSpacing: '0.14em', color: 'var(--v3-text-muted)', textTransform: 'uppercase'
+  fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+  letterSpacing: 0, color: 'var(--v3-text-muted)', textTransform: 'uppercase'
 }
 const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
-  padding: '9px 12px', borderRadius: 8,
+  padding: '8px 12px', borderRadius: 10,
   background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)',
-  color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none'
+  color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none'
 }
 const chipStyle = {
-  padding: '6px 12px', borderRadius: 999,
+  padding: '8px 12px', borderRadius: 10,
   background: 'transparent', border: '1px solid var(--v3-border-strong)',
-  color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+  color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
   cursor: 'pointer'
 }
 const chipActiveStyle = {
-  background: 'rgba(228, 190, 111, 0.15)',
+  background: 'rgba(201, 150, 58, 0.15)',
   borderColor: 'var(--v3-primary)',
   color: 'var(--v3-primary-bright)'
 }
 const primaryBtnStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '8px 14px', borderRadius: 8,
+  display: 'inline-flex', alignItems: 'center', gap: 8,
+  padding: '8px 12px', borderRadius: 10,
   border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
   background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
-  color: '#1a1208',
+  color: '#141414',
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-  letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer'
+  letterSpacing: 0, textTransform: 'uppercase', cursor: 'pointer'
 }
 const ghostBtnStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '8px 12px', borderRadius: 8,
+  display: 'inline-flex', alignItems: 'center', gap: 8,
+  padding: '8px 12px', borderRadius: 10,
   background: 'transparent', border: '1px solid var(--v3-border-strong)',
   color: 'var(--v3-text)',
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer'

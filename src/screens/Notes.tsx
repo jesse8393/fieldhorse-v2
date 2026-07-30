@@ -27,17 +27,17 @@ const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
 
 /* ============================================================
-   FIELDHORSE NOTES — v3 COMMAND HUB
+   FIELDHORSE NOTES, v3 COMMAND HUB
    Top-down structure:
      1. Header (eyebrow + Notes, fast. + voice toggle)
-     2. CAPTURE — premium textarea inside .v3-section, gold-accented.
+     2. CAPTURE, premium textarea inside .v3-section, gold-accented.
         Job link select / AI parse / Save in one row. AI summary + error
         states expand inline.
-     3. RECENT ACTIVITY — chronological feed of latest notes as cards.
+     3. RECENT ACTIVITY, chronological feed of latest notes as cards.
         Title (parsed summary or first line) → preview body → metadata.
-     4. LINKED TO JOBS — notes with a contact_id, grouped by job. Each
+     4. LINKED TO JOBS, notes with a contact_id, grouped by job. Each
         group is a sub-zone with the job name as a header.
-     5. ACTION ITEMS — aggregated parsed.action_items across all notes.
+     5. ACTION ITEMS, aggregated parsed.action_items across all notes.
         Placeholder copy if no parsed data yet.
    All sections use the .v3-section primitive (depth + framing).
    ============================================================ */
@@ -151,7 +151,7 @@ export default function Notes() {
     setSaving(false)
     if (error) {
       // resilientInsert only surfaces a non-network error here (dead zones
-      // queue instead) — a real failure the user must see, not a silent
+      // queue instead), a real failure the user must see, not a silent
       // no-op that looks like the note was saved.
       toastError("Couldn't save note", error.message || 'Try again')
       return
@@ -205,7 +205,7 @@ export default function Notes() {
   // Recent Activity = top 6 chronologically, regardless of linkage
   const recent = useMemo(() => notes.slice(0, 6), [notes])
 
-  // Cockpit summary stats — derived from already-loaded notes; no extra
+  // Cockpit summary stats, derived from already-loaded notes; no extra
   // queries. recent24 = notes created in the last 24h; parsedCount =
   // notes with any parsed signal; riskCount = notes flagged with any
   // parsed risk. The risk count is the urgent/triage read.
@@ -296,7 +296,7 @@ export default function Notes() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
     >
       {/* ─────────── COCKPIT PANEL ───────────
           Black-glass summary card. Surfaces total / 24h / AI-parsed /
@@ -305,12 +305,12 @@ export default function Notes() {
       <motion.div
         variants={item}
         className="v3-section v3-section--primary-quiet"
-        style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 18px' }}
+        style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 16px' }}
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Field Notes</span>
-            <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)' }}>
+            <h1 style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}>
               Notes, fast.
             </h1>
             <div className="v3-caption" style={{ marginTop: 6 }}>
@@ -320,7 +320,7 @@ export default function Notes() {
           <VoiceButton listening={listening} onStart={startVoice} onStop={stopVoice} />
         </div>
 
-        {/* Stat row — only render once we've loaded (notes can be empty
+        {/* Stat row, only render once we've loaded (notes can be empty
             but loading=true initially, in which case skip the row). */}
         {!loading && (cockpitStats.total > 0 || cockpitStats.recent24 > 0) && (
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginTop: 14, flexWrap: 'wrap' }}>
@@ -351,11 +351,11 @@ export default function Notes() {
           borderColor: listening
             ? 'rgba(192, 57, 43, 0.40)'
             : focused
-              ? 'rgba(212, 175, 55, 0.32)'
+              ? 'rgba(201, 150, 58, 0.32)'
               : 'var(--v3-section-border)',
           transition: 'border-color 200ms ease, box-shadow 200ms ease',
           boxShadow: focused
-            ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 1px 2px rgba(0, 0, 0, 0.30), 0 6px 20px rgba(0, 0, 0, 0.35)'
+            ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 1px 2px rgba(20, 20, 20, 0.30), 0 6px 20px rgba(20, 20, 20, 0.35)'
             : 'var(--v3-section-shadow)'
         }}
       >
@@ -365,7 +365,7 @@ export default function Notes() {
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={listening ? 'Listening — speak freely…' : 'Capture a note from the jobsite. AI parses it for action items, risks, materials.'}
+          placeholder={listening ? 'Listening, speak freely…' : 'Capture a note from the jobsite. AI parses it for action items, risks, materials.'}
           rows={5}
           style={{
             width: '100%',
@@ -375,7 +375,7 @@ export default function Notes() {
             border: 'none',
             color: 'var(--v3-text)',
             fontFamily: 'var(--font-body)',
-            fontSize: 15,
+            fontSize: 14,
             lineHeight: 1.55,
             outline: 'none',
             padding: 0
@@ -384,14 +384,14 @@ export default function Notes() {
 
         {/* Listening pulse */}
         {listening && (
-          <div aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 14, marginTop: 6 }}>
+          <div aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 14, marginTop: 6 }}>
             {[0, 1, 2, 3, 4].map((i) => (
               <span
                 key={i}
                 style={{
                   width: 3,
                   height: 10,
-                  borderRadius: 2,
+                  borderRadius: 10,
                   background: 'var(--v3-danger)',
                   animation: `fh-pulse-dot 900ms ${i * 110}ms infinite ease-in-out`
                 }}
@@ -407,7 +407,7 @@ export default function Notes() {
           gap: 8,
           flexWrap: 'wrap',
           marginTop: 14,
-          paddingTop: 14,
+          paddingTop: 12,
           borderTop: '1px solid var(--v3-border)'
         }}>
           <select
@@ -417,13 +417,13 @@ export default function Notes() {
             style={{
               flex: '1 1 180px',
               minWidth: 160,
-              padding: '10px 12px',
+              padding: '12px 12px',
               borderRadius: 10,
               background: 'var(--v3-surface-2)',
               border: '1px solid var(--v3-border-strong)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
-              fontSize: 13,
+              fontSize: 14,
               outline: 'none',
               cursor: 'pointer'
             }}
@@ -439,14 +439,14 @@ export default function Notes() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '10px 13px',
+              gap: 8,
+              padding: '12px 12px',
               borderRadius: 10,
               background: !draft.trim() || parsing ? 'var(--v3-surface-2)' : 'var(--v3-primary-soft)',
               border: !draft.trim() || parsing ? '1px solid var(--v3-border)' : '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
               color: !draft.trim() || parsing ? 'var(--v3-text-muted)' : 'var(--v3-primary)',
               fontFamily: 'var(--font-body)',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 600,
               cursor: !draft.trim() || parsing ? 'default' : 'pointer',
               opacity: !draft.trim() || parsing ? 0.7 : 1,
@@ -477,18 +477,18 @@ export default function Notes() {
             role="alert"
             style={{
               marginTop: 12,
-              padding: '12px 14px',
-              borderRadius: 12,
+              padding: '12px 12px',
+              borderRadius: 10,
               background: 'var(--v3-danger-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
-              fontSize: 12.5,
+              fontSize: 12,
               lineHeight: 1.5
             }}
           >
             <span style={{ fontWeight: 700, color: 'var(--v3-danger-bright)' }}>AI parse unavailable. </span>
-            <span style={{ color: 'var(--v3-text-muted)' }}>{parseError} You can still save the note as-is.</span>
+            <span style={{ color: 'var(--v3-text-muted)' }}>{parseError} You can still save the note as entered.</span>
           </div>
         )}
 
@@ -502,13 +502,13 @@ export default function Notes() {
               transition={{ duration: 0.2 }}
               style={{
                 marginTop: 14,
-                padding: 14,
-                borderRadius: 14,
+                padding: 12,
+                borderRadius: 10,
                 background: 'var(--v3-surface-2)',
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 25%, transparent)'
               }}
             >
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <Sparkles size={12} color="var(--v3-primary)" />
                 <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>AI Summary</span>
               </div>
@@ -519,7 +519,7 @@ export default function Notes() {
               <ParsedList title="Risks" items={parsed.risks} Icon={AlertTriangle} tone="warn" />
               <ParsedList title="Materials" items={parsed.materials_needed} Icon={Package} />
               {parsed.follow_up_date && (
-                <p style={{ margin: '10px 0 0', fontSize: 12, fontFamily: 'var(--font-body)', color: 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <p style={{ margin: '10px 0 0', fontSize: 12, fontFamily: 'var(--font-body)', color: 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <Calendar size={12} />
                   Follow up: <strong style={{ color: 'var(--v3-primary)' }}>{parsed.follow_up_date}</strong>
                 </p>
@@ -538,21 +538,21 @@ export default function Notes() {
         <SectionHeader label="Recent Activity" />
 
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
             {[0, 1, 2].map((i) => (
-              <div key={i} className="v3-skeleton" style={{ height: 76, borderRadius: 14, opacity: 1 - i * 0.2 }} />
+              <div key={i} className="v3-skeleton" style={{ height: 76, borderRadius: 10, opacity: 1 - i * 0.2 }} />
             ))}
           </div>
         ) : recent.length === 0 ? (
           <div className="v3-empty" style={{ marginTop: 4 }}>
             <Activity size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
               Nothing logged yet.
             </div>
-            <div style={{ fontSize: 12 }}>Use the capture above. Voice or type — both work.</div>
+            <div style={{ fontSize: 12 }}>Use the capture above. Voice or type, both work.</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
             <AnimatePresence>
               {recent.map((n, i) => (
                 <NoteCard
@@ -581,10 +581,10 @@ export default function Notes() {
         >
           <SectionHeader label="Linked to Jobs" />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 4 }}>
             {linkedGroups.map((g) => (
               <div key={g.contactId}>
-                {/* Job group header — tappable, navigates to the job */}
+                {/* Job group header, tappable, navigates to the job */}
                 <button
                   type="button"
                   onClick={() => { hapticTap(); navigate(`/jobs/${g.contactId}`) }}
@@ -593,9 +593,9 @@ export default function Notes() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '12px 12px',
                     marginBottom: 8,
-                    borderRadius: 12,
+                    borderRadius: 10,
                     background: 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border)',
                     color: 'var(--v3-text)',
@@ -603,9 +603,9 @@ export default function Notes() {
                     fontFamily: 'var(--font-body)'
                   }}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                     <span style={{
-                      width: 28, height: 28, borderRadius: 8,
+                      width: 28, height: 28, borderRadius: 10,
                       background: 'var(--v3-surface-2)',
                       border: '1px solid var(--v3-border-strong)',
                       display: 'grid', placeItems: 'center', flexShrink: 0
@@ -671,7 +671,7 @@ export default function Notes() {
         {actionItems.length === 0 ? (
           <div className="v3-empty" style={{ marginTop: 4 }}>
             <ClipboardCheck size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
               No action items yet.
             </div>
             <div style={{ fontSize: 12, lineHeight: 1.5 }}>
@@ -679,7 +679,7 @@ export default function Notes() {
             </div>
           </div>
         ) : (
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             {actionItems.map((a, i) => {
               const c = contacts.find((x) => x.id === a.contactId)
               return (
@@ -688,8 +688,8 @@ export default function Notes() {
                   style={{
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: 10,
-                    padding: '10px 12px',
+                    gap: 12,
+                    padding: '12px 12px',
                     borderRadius: 10,
                     background: 'var(--v3-surface)',
                     border: '1px solid var(--v3-border)'
@@ -698,7 +698,7 @@ export default function Notes() {
                   <span style={{
                     flexShrink: 0,
                     marginTop: 2,
-                    width: 16, height: 16, borderRadius: 4,
+                    width: 16, height: 16, borderRadius: 10,
                     background: 'var(--v3-primary-soft)',
                     border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
                     display: 'grid', placeItems: 'center'
@@ -707,7 +707,7 @@ export default function Notes() {
                   </span>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{
-                      fontSize: 13,
+                      fontSize: 14,
                       color: 'var(--v3-text)',
                       fontFamily: 'var(--font-body)',
                       lineHeight: 1.45,
@@ -716,7 +716,7 @@ export default function Notes() {
                       {a.text}
                     </div>
                     {c?.name && (
-                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
                         From {c.name}
                       </div>
                     )}
@@ -732,7 +732,7 @@ export default function Notes() {
 }
 
 /* ============================================================
-   VoiceButton — capture-on/off toggle. Listening state turns the
+   VoiceButton, capture-on/off toggle. Listening state turns the
    button danger-red so the operator can spot it from the corner.
    ============================================================ */
 function VoiceButton({ listening, onStart, onStop }: any) {
@@ -747,21 +747,21 @@ function VoiceButton({ listening, onStart, onStop }: any) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        padding: '11px 14px',
-        borderRadius: 12,
+        padding: '12px 12px',
+        borderRadius: 10,
         border: listening
           ? '1px solid color-mix(in srgb, var(--v3-danger) 50%, transparent)'
           : '1px solid var(--v3-border-strong)',
         background: listening ? 'var(--v3-danger-soft)' : 'var(--v3-surface)',
         color: listening ? 'var(--v3-danger-bright)' : 'var(--v3-text)',
         fontFamily: 'var(--font-body)',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 700,
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
         boxShadow: listening
           ? '0 0 0 4px color-mix(in srgb, var(--v3-danger) 12%, transparent)'
-          : '0 1px 0 var(--v3-glass-tint) inset, 0 4px 12px rgba(0, 0, 0, 0.20)'
+          : '0 1px 0 var(--v3-glass-tint) inset, 0 4px 12px rgba(20, 20, 20, 0.20)'
       }}
     >
       {listening ? <MicOff size={16} /> : <Mic size={16} />}
@@ -771,7 +771,7 @@ function VoiceButton({ listening, onStart, onStop }: any) {
 }
 
 /* ============================================================
-   NoteCard — single note as a card (not a row). Hierarchy:
+   NoteCard, single note as a card (not a row). Hierarchy:
      1. Title (parsed summary OR first non-empty line, max 80ch)
      2. Body preview (only if distinct from title; 3-line clamp)
      3. Footer metadata: linked job chip / action-item count / time
@@ -807,7 +807,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
     {
       icon: <ArchiveIcon size={18} />,
       label: 'Archive note',
-      color: 'rgba(46, 204, 113, 0.18)',
+      color: 'rgba(45, 122, 79, 0.18)',
       fg: 'var(--v3-success-bright)',
       onClick: onArchive
     },
@@ -835,11 +835,11 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
         style={{
           position: 'relative',
           overflow: 'hidden',
-          padding: '14px 14px 14px 18px',
-          borderRadius: 14,
+          padding: '12px 12px 12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(20, 20, 20, 0.30)',
           cursor: onTap ? 'pointer' : 'default',
           WebkitTapHighlightColor: 'transparent',
           transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
@@ -854,7 +854,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           e.currentTarget.style.background = 'var(--v3-surface)'
         }}
       >
-        {/* Spine — left edge accent */}
+        {/* Spine, left edge accent */}
         <span
           aria-hidden="true"
           style={{
@@ -863,18 +863,18 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
             width: 3,
             borderRadius: '0 3px 3px 0',
             background: spine,
-            boxShadow: hasParsed && !hasRisk ? '0 0 8px rgba(212, 175, 55, 0.30)' : 'none'
+            boxShadow: hasParsed && !hasRisk ? '0 0 8px rgba(201, 150, 58, 0.30)' : 'none'
           }}
         />
 
         {/* Header row: title + (AI badge) + timestamp */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <h3
               style={{
                 margin: 0,
                 fontFamily: 'var(--font-body)',
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: 600,
                 color: 'var(--v3-text)',
                 lineHeight: 1.35,
@@ -890,15 +890,15 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 3,
-                  padding: '2px 7px',
-                  borderRadius: 999,
+                  gap: 4,
+                  padding: '4px 8px',
+                  borderRadius: 10,
                   background: 'var(--v3-primary-soft)',
                   border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
                   color: 'var(--v3-primary)',
                   fontFamily: 'var(--font-display)',
-                  fontSize: 9,
-                  letterSpacing: '0.08em'
+                  fontSize: 12,
+                  letterSpacing: 0
                 }}>
                   <Sparkles size={9} />
                   AI
@@ -918,13 +918,13 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               color: 'var(--v3-text-muted)'
             }}>
               <Clock size={11} />
               {when}
             </span>
-            {/* Visible delete affordance — the SwipeableRow swipe-left
+            {/* Visible delete affordance, the SwipeableRow swipe-left
                 gesture is preserved as the iOS-native power-user path,
                 but a tappable trash icon makes deletion discoverable
                 for users who don't think to swipe. Stops propagation so
@@ -941,7 +941,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                 style={{
                   width: 32, height: 32,
                   display: 'grid', placeItems: 'center',
-                  borderRadius: 8,
+                  borderRadius: 10,
                   background: 'transparent',
                   border: '1px solid transparent',
                   color: 'var(--v3-text-muted)',
@@ -968,11 +968,11 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           </span>
         </div>
 
-        {/* Body preview — clamped to 3 lines */}
+        {/* Body preview, clamped to 3 lines */}
         {showBodyBelow && (
           <p style={{
             margin: '6px 0 0',
-            fontSize: 13,
+            fontSize: 14,
             color: 'var(--v3-text-muted)',
             fontFamily: 'var(--font-body)',
             lineHeight: 1.5,
@@ -990,13 +990,13 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
         {(!hideJobChip && contact?.name) || actionCount > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {!hideJobChip && contact?.name && (
-              <Eyebrow style={{ gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)' }}>
+              <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)' }}>
                 <Briefcase size={10} color="var(--v3-primary)" />
                 {contact.name}
               </Eyebrow>
             )}
             {actionCount > 0 && (
-              <Eyebrow tone="success" style={{ gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-success-soft)', border: '1px solid color-mix(in srgb, var(--v3-success) 30%, transparent)' }}>
+              <Eyebrow tone="success" style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-success-soft)', border: '1px solid color-mix(in srgb, var(--v3-success) 30%, transparent)' }}>
                 <ClipboardCheck size={10} />
                 {actionCount} {actionCount === 1 ? 'action' : 'actions'}
               </Eyebrow>
@@ -1009,7 +1009,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
 }
 
 /* ============================================================
-   ParsedList — used inside the inline AI Summary card. One row
+   ParsedList, used inside the inline AI Summary card. One row
    per item type (action_items, risks, materials).
    ============================================================ */
 function ParsedList({ title, items, Icon, tone }: any) {
@@ -1025,7 +1025,7 @@ function ParsedList({ title, items, Icon, tone }: any) {
         {Icon ? <Icon size={11} /> : null}
         {title}
       </Eyebrow>
-      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
+      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 14, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
         {items.map((it: any, i: any) => <li key={i} style={{ marginBottom: 2 }}>{it}</li>)}
       </ul>
     </div>
@@ -1033,7 +1033,7 @@ function ParsedList({ title, items, Icon, tone }: any) {
 }
 
 /* ============================================================
-   CockpitStat / CockpitDivider — compact triage display for the
+   CockpitStat / CockpitDivider, compact triage display for the
    summary panel. Display number over a small uppercase label.
    tone "gold" for AI count, "alert" for non-zero risks.
    ============================================================ */
@@ -1044,10 +1044,10 @@ function CockpitStat({ label, value, tone = 'default' }: any) {
       ? 'var(--v3-danger-bright)'
       : 'var(--v3-text)'
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
       <span style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+        fontSize: 20, lineHeight: 1, letterSpacing: 0,
         color,
         fontVariantNumeric: 'tabular-nums'
       }}>
@@ -1065,7 +1065,7 @@ function CockpitDivider() {
 }
 
 /* ============================================================
-   formatRelativeTime — "Just now", "2h ago", "Yesterday",
+   formatRelativeTime, "Just now", "2h ago", "Yesterday",
    "Apr 24" / "Apr 24, 2025" depending on age. Used in NoteCard.
    ============================================================ */
 function formatRelativeTime(iso: any) {

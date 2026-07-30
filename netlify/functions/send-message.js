@@ -230,18 +230,18 @@ function renderMessageHtml({ body, senderLine, companyName }) {
   const bodyHtml = paragraphs.map((p) => `<p style="margin:0 0 14px;">${p}</p>`).join('')
   return `<!doctype html>
 <html lang="en">
-<body style="margin:0;padding:0;background:#f7f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f1f1f;line-height:1.55;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f7f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e7e5e0;overflow:hidden;">
-        <tr><td style="padding:28px 32px 8px;">
-          <div style="font-size:15px;color:#1f1f1f;">${bodyHtml}</div>
+      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
+        <tr><td style="padding:32px 32px 8px;">
+          <div style="font-size:16px;color:#141414;">${bodyHtml}</div>
         </td></tr>
-        <tr><td style="padding:8px 32px 28px;">
-          <p style="margin:0;font-size:14px;color:#5d5d57;">Reply directly to this email to reach ${safe(senderLine)}.</p>
+        <tr><td style="padding:8px 32px 32px;">
+          <p style="margin:0;font-size:14px;color:#5C5C5C;">Reply directly to this email to reach ${safe(senderLine)}.</p>
         </td></tr>
       </table>
-      ${companyName ? `<p style="margin:14px 0 0;font-size:11px;color:#9a9a93;letter-spacing:0.08em;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
+      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
     </td></tr>
   </table>
 </body>

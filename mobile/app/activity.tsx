@@ -1,4 +1,4 @@
-// mobile/app/activity.tsx — unified activity timeline across the business.
+// mobile/app/activity.tsx, unified activity timeline across the business.
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -10,7 +10,7 @@ import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
 const META: Record<FeedKind, { tint: string; Icon: any }> = {
   payment: { tint: theme.success, Icon: DollarSign },
   lead: { tint: theme.goldBright, Icon: UserPlus },
-  invoice: { tint: '#5BA8E8', Icon: FileText },
+  invoice: { tint: '#5C5C5C', Icon: FileText },
   change_order: { tint: '#C9963A', Icon: ClipboardList },
   note: { tint: theme.inkMuted, Icon: StickyNote }
 }
@@ -41,7 +41,7 @@ export default function ActivityScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
         <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Activity" title="What's happening" />
 
         {isLoading ? (
@@ -52,24 +52,24 @@ export default function ActivityScreen() {
           <View style={{ marginTop: 16 }}>
             {groups.map((g) => (
               <View key={g.day} style={{ marginBottom: 22 }}>
-                <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>{g.day}</Text>
-                <View style={{ gap: 10 }}>
+                <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 12 }}>{g.day}</Text>
+                <View style={{ gap: 12 }}>
                   {g.items.map((it) => {
                     const m = META[it.kind]
                     return (
                       <Card key={it.id}>
-                        <Pressable onPress={() => it.contactId && router.push(`/jobs/${it.contactId}`)} style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 13 }}>
-                          <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: `${m.tint}1f`, borderWidth: 1, borderColor: `${m.tint}44` }}>
+                        <Pressable onPress={() => it.contactId && router.push(`/jobs/${it.contactId}`)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 }}>
+                          <View style={{ width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${m.tint}1f`, borderWidth: 1, borderColor: `${m.tint}44` }}>
                             <m.Icon color={m.tint} size={18} />
                           </View>
                           <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700', flex: 1 }} numberOfLines={1}>{it.title}</Text>
+                              <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700', flex: 1 }} numberOfLines={1}>{it.title}</Text>
                               {it.amount != null ? (
-                                <Text style={{ color: m.tint, fontSize: 15, fontWeight: '800', marginLeft: 8 }}>{it.kind === 'payment' ? '+' : ''}{money(it.amount)}</Text>
+                                <Text style={{ color: m.tint, fontSize: 14, fontWeight: '800', marginLeft: 8 }}>{it.kind === 'payment' ? '+' : ''}{money(it.amount)}</Text>
                               ) : null}
                             </View>
-                            <Text style={{ color: theme.inkMuted, fontSize: 12.5, marginTop: 2 }} numberOfLines={1}>
+                            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
                               {it.contactName || 'Unassigned'}{it.sub ? ` · ${it.sub}` : ''} · {timeOf(it.date)}
                             </Text>
                           </View>

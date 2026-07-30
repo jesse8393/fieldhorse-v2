@@ -1,5 +1,5 @@
 // First-class invoices (pipeline v2). One fh_invoices row per invoice,
-// N per job — deposit, progress draws, final balance. This module is
+// N per job, deposit, progress draws, final balance. This module is
 // the single home for create / PDF / send / settle so the job screen,
 // the Financials tab, and the Invoices screen all drive the same
 // plumbing. Extracted from InvoiceDrawsSection (which now consumes it)
@@ -56,7 +56,9 @@ export function contractTotals({ contact, payments = [], changeOrders = [], invo
     contractTotal,
     paid,
     invoiced,
+    rawBalance: contractTotal - paid,
     balance: Math.max(0, contractTotal - paid),
+    credit: Math.max(0, paid - contractTotal),
     unbilled: Math.max(0, contractTotal - invoiced)
   }
 }
@@ -121,13 +123,13 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
   insurance?: any
 }) {
   // generateInvoice folds approved COs into the balance summary itself
-  // (it receives `changeOrders`), so pass the RAW contract amount here —
+  // (it receives `changeOrders`), so pass the RAW contract amount here :
   // passing the CO-inclusive contractTotals().contractTotal double-counts.
   const { paid } = contractTotals({ contact, payments, changeOrders })
   const contractTotal = Number(contact?.amount || 0)
   const title = invoice.title?.trim() || `Invoice #${invoice.sequence_number}`
-  // Customer-facing "what is this for". Falls back to the job title.
-  // No address here — the recipient block already prints it, and in
+  // Customer facing "what is this for". Falls back to the job title.
+  // No address here, the recipient block already prints it, and in
   // the table it just wraps into noise.
   const description = (invoice as any).description?.trim()
     || contact.job_title
@@ -141,9 +143,9 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
       address: contact.address,
       phone: contact.phone,
       email: contact.email,
-      job_title: `${title} — ${contact.job_title || 'Construction services'}`
+      job_title: `${title}, ${contact.job_title || 'Construction services'}`
     },
-    // pdf.js maps line-item `description` → the narrow bold
+    // pdf.js maps line item `description` → the narrow bold
     // Product/Service column and `notes` → the wide Description column.
     // Title goes narrow, the human-readable description goes wide so it
     // only wraps when it actually runs out of room.
@@ -154,7 +156,7 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
       : '',
     dueDateIso: invoice.due_at || null,
     invoiceId: invoice.id,
-    // The fh_invoices row this PDF bills — gives the PDF the same real
+    // The fh_invoices row this PDF bills, gives the PDF the same real
     // sequence number, issue date, and due date the web link shows, so
     // the emailed PDF and the public page never disagree.
     currentInvoice: invoice,
@@ -198,7 +200,7 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
     .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
   if (upErr) return { ok: false, reason: 'error', message: `Couldn't save the invoice PDF: ${upErr.message}` }
 
-  // Audit row — best-effort, never blocks the send.
+  // Audit row, best-effort, never blocks the send.
   try {
     await supabase.from('fh_job_files').insert({
       id: rowId,
@@ -240,7 +242,7 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
     return { ok: false, reason: 'error', message: `Resend rejected${status}: ${detail}` }
   }
 
-  // Don't downgrade a paid invoice just because the PDF was re-sent.
+  // Don't downgrade a paid invoice just because the PDF was sent again.
   if (invoice.status !== 'paid') {
     await supabase
       .from('fh_invoices')
@@ -250,7 +252,7 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
   return { ok: true, filename: result.filename, recipient }
 }
 
-// Suggested next invoice for a job — drives the SendInvoiceSheet
+// Suggested next invoice for a job, drives the SendInvoiceSheet
 // prefill. Final balance when the work's complete or everything else
 // is billed; otherwise a progress draw of the unbilled remainder.
 export function suggestNextInvoice({ contact, payments = [], changeOrders = [], invoices = [] }: {
@@ -261,13 +263,13 @@ export function suggestNextInvoice({ contact, payments = [], changeOrders = [], 
 }) {
   const totals = contractTotals({ contact, payments, changeOrders, invoices })
   const sequence = (invoices || []).filter((i) => i?.status !== 'void').length + 1
-  // Cent-tolerant compare — unbilled and balance are independently
+  // Cent-tolerant compare, unbilled and balance are independently
   // summed floats, so strict === mislabeled the final invoice whenever
   // FP dust crept in.
   const isFinal = !!(contact as any)?.completed_at || (totals.unbilled > 0.005 && Math.abs(totals.unbilled - totals.balance) < 0.005 && sequence > 1)
   // Suggest ONLY unbilled money, rounded to cents (whole-dollar
   // rounding left invoice sets that never reconciled to the contract).
-  // When everything is already invoiced, suggest $0 — the old
+  // When everything is already invoiced, suggest $0, the old
   // `unbilled || balance` fallthrough prefilled a duplicate invoice for
   // the full outstanding balance the moment unbilled hit exactly 0.
   const amount = totals.unbilled > 0.005 ? Math.round(totals.unbilled * 100) / 100 : 0

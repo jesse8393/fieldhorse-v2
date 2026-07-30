@@ -1,4 +1,4 @@
-// Tasks — /tasks. Cross-job task dashboard for owners / admins /
+// Tasks, /tasks. Cross-job task dashboard for owners / admins /
 // managers. Lists every open fh_job_todos row in the caller's org,
 // grouped by urgency:
 //
@@ -12,7 +12,7 @@
 // RLS on fh_job_todos is already org-scoped (auth_user_org_ids() per
 // migration 034) so this screen reads directly without an edge
 // function. Members write/update through the same policy. Hiding the
-// route from foreman/crew is the only role gate — they see their own
+// route from foreman/crew is the only role gate, they see their own
 // open tasks on /crew, which is the right surface for those roles.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -63,9 +63,9 @@ function bucketFor(dueAt: string | null): Bucket {
 }
 
 function fmtDue(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   const sod = startOfToday().getTime()
   const eod = endOfToday().getTime()
   if (t < sod) {
@@ -240,7 +240,7 @@ export default function Tasks() {
             </div>
           </section>
           <div className="fh-build-table__empty">
-            Your role ({role || 'unknown'}) can't see every task. Open <button type="button" className="fh-build-inline-link" onClick={() => navigate('/crew')}>your crew home</button> instead — that's your own task list.
+            Your role ({role || 'unknown'}) can't see every task. Open <button type="button" className="fh-build-inline-link" onClick={() => navigate('/crew')}>your crew home</button> instead, that's your own task list.
           </div>
         </main>
       </div>
@@ -305,10 +305,10 @@ export default function Tasks() {
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Total open" value={loading ? '—' : String(kpi.total)} accent />
-            <MiniMetric label="Overdue" value={loading ? '—' : String(kpi.overdue)} tone={!loading && kpi.overdue > 0 ? 'bad' : undefined} />
-            <MiniMetric label="Due today" value={loading ? '—' : String(kpi.today)} tone={!loading && kpi.today > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Unassigned" value={loading ? '—' : String(kpi.unassigned)} tone={!loading && kpi.unassigned > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Total open" value={loading ? '\u2003' : String(kpi.total)} accent />
+            <MiniMetric label="Overdue" value={loading ? '\u2003' : String(kpi.overdue)} tone={!loading && kpi.overdue > 0 ? 'bad' : undefined} />
+            <MiniMetric label="Due today" value={loading ? '\u2003' : String(kpi.today)} tone={!loading && kpi.today > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Unassigned" value={loading ? '\u2003' : String(kpi.unassigned)} tone={!loading && kpi.unassigned > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
@@ -328,7 +328,7 @@ export default function Tasks() {
                 type="button"
                 onClick={() => setComposerOpen(true)}
                 className="fh-build-select"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '8px 12px' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px' }}
               >
                 <Plus size={13} /> New task
               </button>
@@ -348,7 +348,7 @@ export default function Tasks() {
         )}
 
         {!loading && filteredTasks.length === 0 && (
-          <div className="fh-build-table__empty">All clear — nothing waiting on the team.</div>
+          <div className="fh-build-table__empty">All clear, nothing waiting on the team.</div>
         )}
 
         {!loading && BUCKETS.map((b) => {
@@ -394,7 +394,7 @@ export default function Tasks() {
                         value={t.assigned_to || ''}
                         onChange={(e) => reassignTask(t.id, e.target.value || null)}
                         className="fh-build-select"
-                        style={{ fontSize: 11, padding: '3px 6px', maxWidth: 140 }}
+                        style={{ fontSize: 12, padding: '4px 8px', maxWidth: 140 }}
                         aria-label="Assign to"
                         title={assigneeLabel}
                       >
@@ -410,7 +410,7 @@ export default function Tasks() {
                       </span>
                     )}
                     <span className={b.key === 'overdue' ? 'fh-build-num' : 'fh-build-rel'} style={{ color: b.key === 'overdue' ? 'var(--v3-danger-bright)' : undefined, fontWeight: b.key === 'overdue' ? 700 : undefined }}>
-                      {t.due_at ? <><Calendar size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{fmtDue(t.due_at)}</> : '—'}
+                      {t.due_at ? <><Calendar size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{fmtDue(t.due_at)}</> : '\u2003'}
                     </span>
                     <span style={{ display: 'inline-flex', gap: 4 }}>
                       <button
@@ -444,7 +444,7 @@ export default function Tasks() {
   )
 }
 
-/* Inline new-task composer — text + job (required) + optional assignee
+/* Inline new-task composer, text + job (required) + optional assignee
    and due date. */
 function TaskComposer({ jobs, members, onCancel, onCreate }: any) {
   const [text, setText] = useState('')
@@ -466,9 +466,9 @@ function TaskComposer({ jobs, members, onCancel, onCreate }: any) {
     setBusy(false)
   }
 
-  const field: import('react').CSSProperties = { padding: '9px 11px', borderRadius: 10, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-mid)', color: 'var(--v3-text)', fontFamily: 'inherit', fontSize: 13, outline: 'none' }
+  const field: import('react').CSSProperties = { padding: '8px 12px', borderRadius: 10, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-mid)', color: 'var(--v3-text)', fontFamily: 'inherit', fontSize: 14, outline: 'none' }
   return (
-    <div className="fh-build-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="fh-build-card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="What needs doing?" style={field} autoFocus />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
         <select value={jobId} onChange={(e) => setJobId(e.target.value)} style={field} aria-label="Job">
@@ -483,7 +483,7 @@ function TaskComposer({ jobs, members, onCancel, onCreate }: any) {
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button type="button" onClick={onCancel} disabled={busy} style={{ ...field, cursor: 'pointer', background: 'transparent' }}>Cancel</button>
-        <button type="button" onClick={submit} disabled={!canSave} style={{ ...field, cursor: canSave ? 'pointer' : 'not-allowed', background: 'var(--v3-primary, #c9963a)', color: '#1a1712', fontWeight: 700, opacity: canSave ? 1 : 0.5, border: 'none' }}>
+        <button type="button" onClick={submit} disabled={!canSave} style={{ ...field, cursor: canSave ? 'pointer' : 'not-allowed', background: 'var(--v3-primary, #C9963A)', color: '#141414', fontWeight: 700, opacity: canSave ? 1 : 0.5, border: 'none' }}>
           {busy ? 'Adding…' : 'Add task'}
         </button>
       </div>

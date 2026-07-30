@@ -1,4 +1,4 @@
-// SnowClientsBuild — desktop /clients in the Build direction.
+// SnowClientsBuild, desktop /clients in the Build direction.
 //
 // Drop-in for SnowClients at >=900px. Same props, same handlers.
 // Treats clients as a relationship desk, not a contact list.
@@ -60,9 +60,9 @@ type Props = {
 }
 
 function relTime(iso: any) {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   const diff = Date.now() - t
   if (diff < 60_000) return 'just now'
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
@@ -77,7 +77,7 @@ const FILTERS: { key: string; label: string }[] = [
   { key: 'recent', label: 'Recent' },
 ]
 
-// One enriched row per client — rollup + status derived once so the
+// One enriched row per client, rollup + status derived once so the
 // sort accessors and the render read the same values.
 type ClientRow = {
   client: any
@@ -122,7 +122,7 @@ export default function SnowClientsBuild(props: Props) {
     duplicateCount, onOpenClient, onNewClient, onReviewDuplicates,
   } = props
 
-  // Derived right-rail metrics — memoized so they don't re-scan the whole
+  // Derived right-rail metrics, memoized so they don't re-scan the whole
   // roster (with a Date parse per row) on every unrelated re-render.
   const { newThisMonth, needsFollowUp } = useMemo(() => {
     const now = Date.now()
@@ -151,7 +151,7 @@ export default function SnowClientsBuild(props: Props) {
       : stale
         ? { label: 'Cooling', tone: 'warn', rank: 1 }
         : { label: 'Active', tone: 'good', rank: 2 }
-    const nextAction = ro.outstanding > 0 ? 'Chase invoice' : stale && isActive ? 'Follow up' : isActive ? 'On track' : 'Re-engage'
+    const nextAction = ro.outstanding > 0 ? 'Chase invoice' : stale && isActive ? 'Follow up' : isActive ? 'On track' : 'Contact again'
     return { client: r, status, lastTouch, outstanding: ro.outstanding, activeCount: ro.activeCount, nextAction }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [filtered, rollupFor])
@@ -217,7 +217,7 @@ export default function SnowClientsBuild(props: Props) {
             <MiniMetric label="Total clients" value={rows.length.toLocaleString()} />
             <MiniMetric label="Active relationships" value={String(screenStats.activeAccounts)} accent />
             <MiniMetric label="Outstanding AR" value={money(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Needs follow-up" value={String(needsFollowUp)} tone={needsFollowUp > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Needs follow up" value={String(needsFollowUp)} tone={needsFollowUp > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
@@ -295,7 +295,7 @@ export default function SnowClientsBuild(props: Props) {
                   <span className={`fh-build-dot is-${status.tone}`}>{status.label}</span>
                   <span className="fh-build-rel">{relTime(r.last_activity_at)}</span>
                   <span className="fh-build-num" style={{ color: outstanding > 0 ? 'var(--v3-primary, #c9963a)' : undefined, fontWeight: outstanding > 0 ? 700 : 500 }}>
-                    {outstanding > 0 ? moneyFull(outstanding) : '—'}
+                    {outstanding > 0 ? moneyFull(outstanding) : '\u2003'}
                   </span>
                   <span className="fh-build-num">{activeCount}</span>
                   <span className="fh-build-truncate fh-build-rel">{nextAction}</span>
@@ -325,7 +325,7 @@ export default function SnowClientsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Needs follow-up</div>
+              <div className="fh-build-eyebrow">Needs follow up</div>
               <strong style={{ color: needsFollowUp > 0 ? 'var(--v3-primary-bright)' : undefined }}>{needsFollowUp}</strong>
               <span>cooled 30+ days</span>
               {needsFollowUp > 0 && <div className="fh-build-spark is-gold" />}
@@ -334,7 +334,7 @@ export default function SnowClientsBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Lifetime value</div>
               <strong>{money(totalLifetime || 0)}</strong>
-              <span>booked revenue all-time</span>
+              <span>booked revenue all time</span>
             </section>
 
             <section className="fh-build-rail-card">

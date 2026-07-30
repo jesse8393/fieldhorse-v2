@@ -17,6 +17,22 @@
 }
 
 @media (min-width: 900px) {
+  .fh-build-content-grid--home {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fh-build-content-grid--home > .fh-build-today,
+  .fh-build-content-grid--home > .fh-build-owner,
+  .fh-build-content-grid--home > .fh-build-revenue,
+  .fh-build-content-grid--home > .fh-build-health {
+    grid-column: 1;
+    min-height: 0;
+  }
+
+  .fh-build-content-grid--home > .fh-build-today {
+    min-height: 0;
+  }
+
   /* Invoices table. minmax floor on the name track: at narrow card
      widths the old bare 1.4fr resolved to 0px, the fixed tracks plus
      gaps consumed the whole row, and the CLIENT/JOB cell (the one
@@ -34,11 +50,52 @@
   .fh-build-invoices-table {
     container-type: inline-size;
   }
+
+  .fh-build-issued-table {
+    container-type: inline-size;
+  }
+
+  .fh-build-table__head.is-issued-invoices,
+  .fh-build-table__row.is-issued-invoices {
+    grid-template-columns:
+      minmax(180px, 1.5fr)
+      minmax(120px, 1fr)
+      90px
+      90px
+      164px;
+    column-gap: 12px;
+    min-width: 680px;
+  }
+
+  .fh-build-issued-job {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fh-build-issued-job:disabled {
+    cursor: default;
+  }
+
+  .fh-build-issued-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
   @container (max-width: 789px) {
     .fh-build-table__head.is-invoices,
     .fh-build-table__row.is-invoices {
       grid-template-columns: minmax(150px, 1.6fr) 84px 44px 92px 92px 108px;
-      column-gap: 10px;
+      column-gap: 12px;
       min-width: 0;
     }
     .fh-build-table__head.is-invoices > :nth-child(5),
@@ -60,10 +117,10 @@
     border-bottom: 1px solid var(--v3-glass-tint-2);
   }
   .fh-build-cal__week span {
-    padding: 10px 12px;
-    font-size: 10px;
+    padding: 12px 12px;
+    font-size: 12px;
     font-weight: 850;
-    letter-spacing: .16em;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: var(--v3-text-muted);
     text-align: left;
@@ -82,11 +139,11 @@
     border-top: 1px solid var(--v3-glass-tint-2);
     border-right: 1px solid var(--v3-glass-tint-2);
     min-height: 104px;
-    padding: 8px 10px;
+    padding: 8px 12px;
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 6px;
+    gap: 8px;
     text-align: left;
     cursor: pointer;
     color: var(--v3-text);
@@ -99,7 +156,7 @@
   .fh-build-cal__num {
     font-family: var(--font-display);
     font-size: 14px;
-    letter-spacing: .04em;
+    letter-spacing: 0;
     color: var(--v3-text-muted);
     line-height: 1;
   }
@@ -109,23 +166,23 @@
     justify-content: center;
     width: 24px;
     height: 24px;
-    border-radius: 999px;
-    background: linear-gradient(135deg, var(--field-gold-bright, #e5c158), var(--field-gold-deep, #c9963a));
-    color: var(--onyx, #17130c);
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--field-gold-bright, #C9963A), var(--field-gold-deep, #C9963A));
+    color: var(--onyx, #141414);
     font-weight: 700;
   }
   .fh-build-cal__day.has-events .fh-build-cal__num { color: var(--v3-text); }
   .fh-build-cal__chips {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
     min-width: 0;
   }
   .fh-build-cal__chip {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.35;
-    padding: 2px 7px;
-    border-radius: 6px;
+    padding: 4px 8px;
+    border-radius: 10px;
     background: color-mix(in srgb, var(--v3-primary) 14%, transparent);
     border: 1px solid color-mix(in srgb, var(--v3-primary) 26%, transparent);
     color: var(--v3-text);
@@ -134,9 +191,9 @@
     text-overflow: ellipsis;
   }
   .fh-build-cal__more {
-    font-size: 10.5px;
+    font-size: 12px;
     color: var(--v3-text-muted);
-    padding-left: 2px;
+    padding-left: 4px;
   }
 }
 
@@ -145,15 +202,15 @@
   appearance: none;
   align-self: flex-start;
   margin-top: 2px;
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent);
   background: color-mix(in srgb, var(--v3-primary) 12%, transparent);
-  color: var(--v3-primary-bright, #e5c158);
+  color: var(--v3-primary-bright, #C9963A);
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: 0;
   cursor: pointer;
   transition: background 120ms ease;
 }
@@ -175,22 +232,22 @@
   display: inline-block;
   height: 12px;
   width: 72px;
-  border-radius: 6px;
+  border-radius: 10px;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.06) 25%,
-    rgba(255, 255, 255, 0.14) 50%,
-    rgba(255, 255, 255, 0.06) 75%
+    rgba(242, 237, 228, 0.06) 25%,
+    rgba(242, 237, 228, 0.14) 50%,
+    rgba(242, 237, 228, 0.06) 75%
   );
   background-size: 200% 100%;
   animation: fhSkelShimmer 1.4s ease-in-out infinite;
   vertical-align: middle;
 }
 .fh-build-skel--money  { height: 34px; width: 190px; border-radius: 10px; }
-.fh-build-skel--stat   { height: 20px; width: 40px;  border-radius: 7px;  }
-.fh-build-skel--metric { height: 16px; width: 64px;  border-radius: 6px;  }
+.fh-build-skel--stat   { height: 20px; width: 40px;  border-radius: 10px;  }
+.fh-build-skel--metric { height: 16px; width: 64px;  border-radius: 10px;  }
 .fh-build-skel--sub    { height: 10px; width: 84px;  }
-.fh-build-skel--chip   { height: 24px; width: 96px;  border-radius: 999px; }
+.fh-build-skel--chip   { height: 24px; width: 96px;  border-radius: 10px; }
 .fh-build-skel--line   { height: 11px; width: 60%;   }
 @media (prefers-reduced-motion: reduce) {
   .fh-build-skel { animation: none; opacity: 0.6; }
@@ -205,18 +262,18 @@
   background:
     linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint)),
     var(--v3-glass-tint);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 12px;
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
 .fh-crm-flow__stage-skel > span {
   display: block;
   color: var(--v3-text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.10em;
+  letter-spacing: 0;
 }

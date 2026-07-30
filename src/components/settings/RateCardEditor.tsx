@@ -116,7 +116,7 @@ export default function RateCardEditor() {
 
   async function revert(row: any) {
     if (!overrides[row.key]) {
-      // No override to delete — just clear local draft.
+      // No override to delete, just clear local draft.
       setDraft((dd: any) => {
         const next = { ...dd }
         delete next[row.key]
@@ -169,7 +169,7 @@ export default function RateCardEditor() {
   if (loading) {
     return (
       <div style={{
-        padding: 14, borderRadius: 12,
+        padding: 12, borderRadius: 10,
         background: 'var(--surface-2)', border: '1px solid var(--rule)',
         color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12
       }}>
@@ -190,7 +190,7 @@ export default function RateCardEditor() {
       </p>
 
       <div style={{
-        borderRadius: 14,
+        borderRadius: 10,
         background: 'var(--surface-1, var(--surface-2))',
         border: '1px solid var(--rule)',
         overflow: 'hidden'
@@ -211,40 +211,40 @@ export default function RateCardEditor() {
             <div
               key={row.key}
               style={{
-                padding: '12px 14px',
+                padding: '12px 12px',
                 borderTop: i === 0 ? 'none' : '1px solid var(--rule)',
                 display: 'grid',
                 gridTemplateColumns: '1fr',
                 gap: 8
               }}
             >
-              {/* Row 1 — label + badges */}
+              {/* Row 1, label + badges */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{
                   flex: 1, minWidth: 0,
-                  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                   color: 'var(--ink-strong)',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                 }}>
                   {row.current?.label || TRADE_LABELS[row.key] || row.key}
                 </span>
                 {isCustom && (
-                  <Eyebrow style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }}>
+                  <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }}>
                     Custom
                   </Eyebrow>
                 )}
                 {isOverride && !isCustom && (
-                  <Eyebrow style={{ padding: '1px 7px', borderRadius: 999, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright, var(--field-gold, #d4af37))' }}>
+                  <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright, var(--field-gold, #C9963A))' }}>
                     Customized
                   </Eyebrow>
                 )}
               </div>
 
-              {/* Row 2 — unit / low / high inputs */}
+              {/* Row 2, unit / low / high inputs */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: '90px 1fr 1fr auto',
-                gap: 6,
+                gap: 8,
                 alignItems: 'center'
               }}>
                 <select
@@ -309,7 +309,7 @@ export default function RateCardEditor() {
               {/* Seed hint when overridden */}
               {showSeed && (
                 <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: 10,
+                  fontFamily: 'var(--font-body)', fontSize: 12,
                   color: 'var(--ink-faint, var(--ink-muted))',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
@@ -324,13 +324,13 @@ export default function RateCardEditor() {
       {/* Add custom trade */}
       {adding ? (
         <div style={{
-          padding: '10px 12px',
-          borderRadius: 12,
+          padding: '12px 12px',
+          borderRadius: 10,
           background: 'var(--surface-2)',
           border: '1px solid var(--rule)',
           display: 'grid',
           gridTemplateColumns: '1fr auto auto',
-          gap: 6,
+          gap: 8,
           alignItems: 'center'
         }}>
           <input
@@ -347,10 +347,10 @@ export default function RateCardEditor() {
             disabled={!newLabel.trim()}
             style={{
               padding: '8px 12px', borderRadius: 10, border: 'none',
-              background: 'var(--field-gold, #c9963a)',
-              color: 'var(--on-gold, #1a1004)',
-              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
+              background: 'var(--field-gold, #C9963A)',
+              color: 'var(--on-gold, #141414)',
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              letterSpacing: 0, textTransform: 'uppercase',
               cursor: newLabel.trim() ? 'pointer' : 'wait',
               opacity: newLabel.trim() ? 1 : 0.5
             }}
@@ -371,14 +371,14 @@ export default function RateCardEditor() {
           type="button"
           onClick={() => { hapticTap(); setAdding(true) }}
           style={{
-            padding: '10px 12px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             border: '1px dashed var(--rule)',
             background: 'transparent',
             color: 'var(--ink-muted)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
             cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', gap: 6,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
             alignSelf: 'flex-start'
           }}
         >
@@ -390,13 +390,13 @@ export default function RateCardEditor() {
 }
 
 const cellInput: import('react').CSSProperties = {
-  padding: '8px 10px',
+  padding: '8px 12px',
   borderRadius: 10,
   background: 'var(--surface-2)',
   border: '1px solid var(--rule)',
   color: 'var(--ink-strong)',
   fontFamily: 'var(--font-body)',
-  fontSize: 13,
+  fontSize: 14,
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
@@ -405,13 +405,13 @@ const cellInput: import('react').CSSProperties = {
 
 const cellSelect: import('react').CSSProperties = {
   ...cellInput,
-  padding: '7px 8px',
+  padding: '8px 8px',
   cursor: 'pointer'
 }
 
 function iconBtn(tone: any, busy: any) {
   const palette = tone === 'primary'
-    ? { bg: 'var(--field-gold, #c9963a)', fg: 'var(--on-gold, #1a1004)', border: 'rgba(201,150,58,0.4)' }
+    ? { bg: 'var(--field-gold, #C9963A)', fg: 'var(--on-gold, #141414)', border: 'rgba(201,150,58,0.4)' }
     : { bg: 'var(--surface-2)', fg: 'var(--ink-muted)', border: 'var(--rule)' }
   return {
     width: 32, height: 32, borderRadius: 10,

@@ -1,4 +1,4 @@
-// mobile/app/notifications.tsx — notifications feed.
+// mobile/app/notifications.tsx, notifications feed.
 // Pushed from More. Lists fh_notifications newest-first; tapping marks a
 // row read (and follows its link if it points at a job), and a header
 // action marks everything read.
@@ -41,12 +41,12 @@ export default function NotificationsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
         <ScreenHeader
           backLabel="More" onBack={() => router.back()} eyebrow="Notifications" title="Activity"
           right={unread > 0 ? (
             <Pressable onPress={() => user && markAll(user.id)} hitSlop={8}>
-              <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '700' }}>Mark all read</Text>
+              <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Mark all read</Text>
             </Pressable>
           ) : undefined}
         />
@@ -59,17 +59,17 @@ export default function NotificationsScreen() {
             <Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 12 }}>You're all caught up.</Text>
           </View>
         ) : (
-          <View style={{ gap: 10, marginTop: 20 }}>
+          <View style={{ gap: 12, marginTop: 20 }}>
             {items.map((n) => {
               const isUnread = !n.read_at
               return (
                 <Pressable key={n.id} onPress={() => onPress(n)}>
                   <Card glow={isUnread} accent={isUnread ? theme.goldBright : undefined}>
-                    <View style={{ flexDirection: 'row', gap: 10, padding: 16, paddingLeft: 18 }}>
+                    <View style={{ flexDirection: 'row', gap: 12, padding: 16, paddingLeft: 16 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{n.title}</Text>
                         {n.body ? <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={2}>{n.body}</Text> : null}
-                        <Text style={{ color: theme.inkFaint, fontSize: 10, marginTop: 4 }}>{timeAgo(n.created_at)}</Text>
+                        <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 4 }}>{timeAgo(n.created_at)}</Text>
                       </View>
                     </View>
                   </Card>

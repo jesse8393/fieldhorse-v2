@@ -4,19 +4,19 @@
 //
 // Supabase `date` columns (fh_payments.paid_on, fh_expenses.expense_date,
 // fh_closeouts.warranty_start_date, fh_contacts.follow_up_on, etc.) store
-// a bare "YYYY-MM-DD" with no timezone. The bug this module exists to kill:
+// a bare "year month day" with no timezone. The bug this module exists to kill:
 // `new Date("2026-06-01")` parses as UTC midnight, which is the PREVIOUS
-// day in every US timezone — so a payment logged June 1 prints "May 31"
+// day in every US timezone, so a payment logged June 1 prints "May 31"
 // on the customer's invoice, revenue mis-buckets on month boundaries, and
 // "today" defaults computed via `toISOString().slice(0,10)` roll over to
 // tomorrow after ~5-8pm local.
 //
 // Rule: treat a date-only value as a calendar date in the VIEWER's local
 // timezone. Parse with the multi-arg Date constructor (local), and derive
-// "today" from local getFullYear/Month/Date — never from toISOString().
+// "today" from local getFullYear/Month/Date, never from toISOString().
 
 /**
- * Parse a date-only string ("YYYY-MM-DD") as local midnight. Passes
+ * Parse a date-only string ("year month day") as local midnight. Passes
  * through Date objects and full ISO timestamps unchanged (those already
  * carry an instant). Returns null on empty/invalid input.
  */
@@ -35,7 +35,7 @@ export function parseDateOnly(value: string | Date | null | undefined): Date | n
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-/** Today's calendar date in the local timezone as "YYYY-MM-DD". */
+/** Today's calendar date in the local timezone as "year month day". */
 export function todayYmd(now: Date = new Date()): string {
   const y = now.getFullYear()
   const m = String(now.getMonth() + 1).padStart(2, '0')
@@ -43,7 +43,7 @@ export function todayYmd(now: Date = new Date()): string {
   return `${y}-${m}-${d}`
 }
 
-/** A Date's local calendar date as "YYYY-MM-DD" (for <input type="date">). */
+/** A Date's local calendar date as "year month day" (for <input type="date">). */
 export function toYmd(value: string | Date | null | undefined): string {
   const d = parseDateOnly(value)
   if (!d) return ''
@@ -53,7 +53,7 @@ export function toYmd(value: string | Date | null | undefined): string {
 /**
  * Add whole months to a date-only value, clamping to the last valid day
  * of the target month so Jan 31 + 1 month = Feb 28/29, not Mar 3.
- * Returns "YYYY-MM-DD" or null.
+ * Returns "year month day" or null.
  */
 export function addMonthsYmd(value: string | Date | null | undefined, months: number): string | null {
   const start = parseDateOnly(value)

@@ -22,7 +22,7 @@ function mimeOk(type: any) {
 }
 
 /**
- * BrandLogoPicker — Phase 16 branding control.
+ * BrandLogoPicker, Phase 16 branding control.
  *
  * - Private supabase bucket `company-logos` (migration 005).
  * - 1 MB cap, PNG / SVG only, per spec.
@@ -55,11 +55,11 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       return
     }
     if (file.size > MAX_BYTES) {
-      toastError('Logo too large — keep it under 1 MB')
+      toastError('Logo too large, keep it under 1 MB')
       if (inputRef.current) inputRef.current.value = ''
       return
     }
-    // Decode check (skip for SVG — img tag decodes it natively at render time)
+    // Decode check (skip for SVG, img tag decodes it natively at render time)
     if (file.type === 'image/png') {
       const probe = new window.Image()
       const probeUrl = URL.createObjectURL(file)
@@ -70,7 +70,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       }
       probe.onerror = () => {
         URL.revokeObjectURL(probeUrl)
-        toastError("Couldn't read image — try another file")
+        toastError("Couldn't read image, try another file")
       }
       probe.src = probeUrl
     } else {
@@ -128,7 +128,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
   const displayedLogo = hasPending ? previewUrl : logoUrl
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Eyebrow style={{ color: 'var(--ink-muted)' }}>
         Company logo
       </Eyebrow>
@@ -136,8 +136,8 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       {/* Simulated dark header preview */}
       <div
         style={{
-          padding: '14px 16px',
-          borderRadius: 14,
+          padding: '12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid var(--rule)',
           display: 'flex',
@@ -149,7 +149,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
           overflow: 'hidden'
         }}
       >
-        <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 9, letterSpacing: '0.04em', opacity: 0.72 }}>FH</span>
+        <span style={{ width: 26, height: 26, borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, opacity: 0.72 }}>FH</span>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 36 }}>
           {displayedLogo ? (
             <img loading="lazy"src={displayedLogo}
@@ -157,20 +157,20 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               style={{ maxHeight: 36, maxWidth: '70%', objectFit: 'contain' }}
             />
           ) : companyName ? (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>{companyName}</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>{companyName}</span>
           ) : fullName ? (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-strong)' }}>{fullName}</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-strong)' }}>{fullName}</span>
           ) : (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.14em' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0 }}>
               <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
               <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
             </span>
           )}
         </div>
-        <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--rule)' }} />
+        <span style={{ width: 28, height: 28, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }} />
       </div>
 
-      <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
+      <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
         Transparent PNG works best. Renders on a dark header. Max 1&nbsp;MB · PNG or SVG.
       </p>
 
@@ -183,7 +183,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       />
 
       {!hasPending ? (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <motion.button
             type="button"
             whileTap={{ scale: 0.97 }}
@@ -197,13 +197,13 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               justifyContent: 'center',
               gap: 8,
               padding: '12px 16px',
-              borderRadius: 12,
+              borderRadius: 10,
               border: 'none',
               background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
               color: 'var(--onyx)',
               fontFamily: 'var(--font-display)',
-              fontSize: 13,
-              letterSpacing: '0.14em',
+              fontSize: 14,
+              letterSpacing: 0,
               cursor: busy ? 'default' : 'pointer',
               boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
               opacity: busy ? 0.6 : 1
@@ -222,9 +222,9 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6,
-                padding: '12px 14px',
-                borderRadius: 12,
+                gap: 8,
+                padding: '12px 12px',
+                borderRadius: 10,
                 background: 'var(--surface-2)',
                 border: '1px solid var(--rule)',
                 color: 'var(--ink-muted)',
@@ -240,7 +240,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
           )}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <button
             type="button"
             onClick={resetPicker}
@@ -249,13 +249,13 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '12px 14px',
-              borderRadius: 12,
+              padding: '12px 12px',
+              borderRadius: 10,
               background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               color: 'var(--ink-strong)',
               fontFamily: 'var(--font-body)',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
               cursor: busy ? 'default' : 'pointer'
             }}
@@ -272,14 +272,14 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              padding: '12px 14px',
-              borderRadius: 12,
+              padding: '12px 12px',
+              borderRadius: 10,
               border: 'none',
               background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
               color: 'var(--onyx)',
               fontFamily: 'var(--font-display)',
-              fontSize: 13,
-              letterSpacing: '0.14em',
+              fontSize: 14,
+              letterSpacing: 0,
               cursor: busy ? 'default' : 'pointer',
               boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
               opacity: busy ? 0.6 : 1

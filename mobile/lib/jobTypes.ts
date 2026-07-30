@@ -1,4 +1,4 @@
-// Single source of truth for job type options — mirrors web src/lib/jobTypes.ts.
+// Single source of truth for job type options, mirrors web src/lib/jobTypes.ts.
 export type JobType = { value: string; label: string }
 
 export const JOB_TYPES: JobType[] = [

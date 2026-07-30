@@ -47,14 +47,16 @@ describe('computeJobHealth', () => {
     expect(overdue.breakdown?.schedule).toBe('overdue')
   })
 
-  it('caps the payment ratio at 100% (overpayment does not inflate)', () => {
+  it('flags overpayment without inflating the score', () => {
     const h = computeJobHealth({
       contact: { amount: 1000, milestones: [] },
       payments: [{ amount: 5000 }],
       scheduleItems: []
     })
-    // 0 milestones + payment capped at 30 + on-track 20 = 50
+    expect(h.label).toBe('Overpaid')
+    expect(h.tier).toBe('risk')
     expect(h.breakdown?.payments?.pct).toBe(100)
+    expect(h.breakdown?.payments?.credit).toBe(4000)
     expect(h.score).toBe(50)
   })
 

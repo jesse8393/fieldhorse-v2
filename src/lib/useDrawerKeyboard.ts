@@ -8,7 +8,7 @@
 // drawerRef.style.height + drawerRef.style.bottom directly to lift
 // the drawer above the keyboard. We previously tried to do the same
 // thing here via React's style prop, which silently overwrote Vaul's
-// direct DOM writes on every re-render — the two handlers fought,
+// direct DOM writes on every re-render, the two handlers fought,
 // the drawer ended up tiny with one input visible and a big dead
 // zone below.
 //
@@ -17,7 +17,7 @@
 //     padding for focused inputs.
 //   - drawerStyle: only the IMMUTABLE bits (maxWidth, overflow,
 //     flex column for header + form layout). No height or bottom
-//     overrides — Vaul owns those.
+//     overrides, Vaul owns those.
 //   - formStyle: overflow + scroll-padding-bottom so when the
 //     keyboard appears, scrollIntoView lands focused inputs in the
 //     non-occluded area.
@@ -60,16 +60,16 @@ export function useDrawerKeyboard(open: boolean) {
     overflowX: 'hidden'
     // Intentionally no height/min-height/max-height/display rules.
     // Vaul owns sizing and keyboard repositioning via direct
-    // style.height + style.bottom writes — any CSS we add here
+    // style.height + style.bottom writes, any CSS we add here
     // either fights with those writes or constrains the keyboard
     // shrink so the drawer extends behind the keyboard.
   }
 
   function formStyle(extra: CSSProperties = {}): CSSProperties {
     return {
-      paddingTop: 6,
-      paddingLeft: 20,
-      paddingRight: 20,
+      paddingTop: 8,
+      paddingLeft: 24,
+      paddingRight: 24,
       paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
       display: 'flex',
       flexDirection: 'column',

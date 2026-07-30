@@ -1,5 +1,5 @@
-// mobile/app/settings.tsx — business profile.
-// Pushed from More. Edits the profiles row (brand, customer-facing details,
+// mobile/app/settings.tsx, business profile.
+// Pushed from More. Edits the profiles row (brand, customer facing details,
 // trades, brand accent, service area, session) that brands quotes/invoices
 // and powers the Home weather pill + Pour Window. Saves via useUpdateProfile.
 import { useEffect, useState } from 'react'
@@ -21,13 +21,13 @@ const TRADES = [
   { key: 'demo', label: 'Demolition' }, { key: 'outdoor', label: 'Landscaping' }
 ]
 
-const ACCENTS = ['#E4BE6F', '#E85A57', '#4F8C5E', '#6B7CA8', '#B07A4A', '#9B6BC4', '#3FA6A0', '#D98736']
+const ACCENTS = ['#C9963A', '#C0392B', '#2D7A4F', '#5C5C5C', '#C9963A', '#5C5C5C', '#2D7A4F', '#C9963A']
 
 const ESTIMATE_TEMPLATES = [
-  { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark-accent layout.', swatch: ['#1A1814', '#C8A154', '#FFFFFF'] },
-  { key: 'slate',     name: 'Slate',     blurb: 'Gray header, From/For, itemized.', swatch: ['#3F4651', '#FFFFFF', '#ECECEC'] },
-  { key: 'mint',      name: 'Mint',      blurb: 'Green ESTIMATE wordmark.', swatch: ['#4F7A63', '#EAF1ED', '#FFFFFF'] },
-  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, scope + breakdown.', swatch: ['#EDE6DA', '#9A7B4F', '#2B2620'] }
+  { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark accent layout.', swatch: ['#141414', '#C9963A', '#F2EDE4'] },
+  { key: 'slate',     name: 'Slate',     blurb: 'Gray header, From/For, itemized.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
+  { key: 'mint',      name: 'Mint',      blurb: 'Green ESTIMATE wordmark.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
+  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, scope + breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] }
 ]
 
 function Field({ label, value, onChange, ...rest }: {
@@ -35,12 +35,12 @@ function Field({ label, value, onChange, ...rest }: {
 } & Record<string, unknown>) {
   return (
     <>
-      <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
         placeholderTextColor={theme.inkFaint}
-        style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, marginBottom: 16, fontSize: 15 }}
+        style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink, marginBottom: 16, fontSize: 14 }}
         {...(rest as object)}
       />
     </>
@@ -49,7 +49,7 @@ function Field({ label, value, onChange, ...rest }: {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Text style={{ color: theme.goldBright, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 28, marginBottom: 14 }}>{children}</Text>
+    <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginTop: 28, marginBottom: 14 }}>{children}</Text>
   )
 }
 
@@ -175,9 +175,9 @@ export default function SettingsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 120, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 120, paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
         <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Settings" title="Business profile" />
-        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6 }}>This brands your quotes, invoices, and customer-facing documents.</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6 }}>This brands your quotes, invoices, and customer facing documents.</Text>
 
         {isLoading ? (
           <ActivityIndicator color={theme.goldBright} style={{ marginTop: 24 }} />
@@ -187,7 +187,7 @@ export default function SettingsScreen() {
             <Field label="Company name" value={name} onChange={setName} placeholder="Parker Construction" />
             <Field label="Your name" value={fullName} onChange={setFullName} placeholder="Owner / contact name" />
 
-            <SectionTitle>Customer-facing details</SectionTitle>
+            <SectionTitle>Customer facing details</SectionTitle>
             <Field label="Phone" value={phone} onChange={setPhone} keyboardType="phone-pad" placeholder="(555) 555-5555" />
             <Field label="Email" value={email} onChange={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@company.com" />
             <Field label="Website" value={website} onChange={setWebsite} autoCapitalize="none" placeholder="company.com" />
@@ -201,7 +201,7 @@ export default function SettingsScreen() {
               {ACCENTS.map((c) => {
                 const on = accent.toLowerCase() === c.toLowerCase()
                 return (
-                  <Pressable key={c} onPress={() => setAccent(c)} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: c, borderWidth: on ? 3 : 1, borderColor: on ? theme.ink : theme.border }} />
+                  <Pressable key={c} onPress={() => setAccent(c)} style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: c, borderWidth: on ? 3 : 1, borderColor: on ? theme.ink : theme.border }} />
                 )
               })}
             </View>
@@ -210,7 +210,7 @@ export default function SettingsScreen() {
             <Text style={{ color: theme.inkMuted, fontSize: 12, lineHeight: 17, marginBottom: 12 }}>
               The design used when you preview or share an estimate. Your logo and details fill in automatically.
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
               {ESTIMATE_TEMPLATES.map((t) => {
                 const on = template === t.key
                 return (
@@ -218,21 +218,21 @@ export default function SettingsScreen() {
                     key={t.key}
                     onPress={() => setTemplate(t.key)}
                     style={{
-                      width: '47%', flexGrow: 1, padding: 12, borderRadius: 14,
-                      backgroundColor: on ? 'rgba(232,184,101,0.12)' : theme.surface,
+                      width: '47%', flexGrow: 1, padding: 12, borderRadius: 10,
+                      backgroundColor: on ? 'rgba(201, 150, 58,0.12)' : theme.surface,
                       borderWidth: on ? 2 : 1, borderColor: on ? theme.goldBright : theme.borderMid
                     }}
                   >
                     <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
                       {t.swatch.map((c, i) => (
-                        <View key={i} style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: c, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' }} />
+                        <View key={i} style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: c, borderWidth: 1, borderColor: 'rgba(20, 20, 20,0.12)' }} />
                       ))}
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{t.name}</Text>
-                      {on ? <Text style={{ color: theme.goldBright, fontSize: 9, fontWeight: '800', letterSpacing: 1 }}>SELECTED</Text> : null}
+                      {on ? <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>SELECTED</Text> : null}
                     </View>
-                    <Text style={{ color: theme.inkMuted, fontSize: 11, lineHeight: 15, marginTop: 2 }}>{t.blurb}</Text>
+                    <Text style={{ color: theme.inkMuted, fontSize: 12, lineHeight: 15, marginTop: 2 }}>{t.blurb}</Text>
                   </Pressable>
                 )
               })}
@@ -246,26 +246,26 @@ export default function SettingsScreen() {
                   <Pressable
                     key={t.key}
                     onPress={() => toggleTrade(t.key)}
-                    style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.surface }}
+                    style={{ paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.surface }}
                   >
-                    <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 13, fontWeight: '700' }}>{t.label}</Text>
+                    <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }}>{t.label}</Text>
                   </Pressable>
                 )
               })}
             </View>
-            <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 10 }}>Drives your AI estimates and the Pour Window work-window.</Text>
+            <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 10 }}>Drives your AI estimates and the Pour Window work window.</Text>
 
             <SectionTitle>Where you work</SectionTitle>
             <Pressable
               onPress={pinLocation}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, padding: 16 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, padding: 16 }}
             >
-              <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.goldBright}1f`, borderWidth: 1, borderColor: theme.borderGold }}>
+              <View style={{ width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.goldBright}1f`, borderWidth: 1, borderColor: theme.borderGold }}>
                 {pinning ? <ActivityIndicator color={theme.goldBright} size="small" /> : <MapPin color={theme.goldBright} size={18} />}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700' }}>{cityName || 'Set your service area'}</Text>
-                <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }}>{cityName ? 'Tap to re-pin to your current location' : 'Tap to use your current location'}</Text>
+                <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{cityName || 'Set your service area'}</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }}>{cityName ? 'Tap to pin again to your current location' : 'Tap to use your current location'}</Text>
               </View>
             </Pressable>
             <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 10 }}>Powers your Home weather pill and the Pour Window forecast.</Text>
@@ -275,20 +275,20 @@ export default function SettingsScreen() {
             </View>
 
             <SectionTitle>Your session</SectionTitle>
-            <Text style={{ color: theme.inkMuted, fontSize: 13 }}>Signed in as <Text style={{ color: theme.ink, fontWeight: '700' }}>{user?.email || '—'}</Text></Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 14 }}>Signed in as <Text style={{ color: theme.ink, fontWeight: '700' }}>{user?.email || '\u2003'}</Text></Text>
             <Pressable onPress={() => router.push('/reset-password')} style={{ marginTop: 16, alignItems: 'center' }} hitSlop={8}>
               <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Change password</Text>
             </Pressable>
             <Pressable
               onPress={confirmSignOut}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, marginTop: 16, borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 12, marginTop: 16, borderWidth: 1, borderColor: 'rgba(192, 57, 43,0.3)', backgroundColor: 'rgba(192, 57, 43,0.10)' }}
             >
               <LogOut color={theme.danger} size={16} />
               <Text style={{ color: theme.danger, fontWeight: '700' }}>Sign out</Text>
             </Pressable>
 
             <SectionTitle>Legal</SectionTitle>
-            <View style={{ flexDirection: 'row', gap: 18 }}>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
               <Pressable onPress={() => Linking.openURL('https://fieldhorse.io/privacy')} hitSlop={8}>
                 <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Privacy Policy</Text>
               </Pressable>
@@ -300,12 +300,12 @@ export default function SettingsScreen() {
             <Pressable
               onPress={confirmDeleteAccount}
               disabled={deleting}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, marginTop: 24, opacity: deleting ? 0.6 : 1 }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 12, marginTop: 24, opacity: deleting ? 0.6 : 1 }}
             >
               {deleting ? <ActivityIndicator color={theme.danger} size="small" /> : <Trash2 color={theme.danger} size={15} />}
-              <Text style={{ color: theme.danger, fontWeight: '700', fontSize: 13 }}>{deleting ? 'Deleting…' : 'Delete account'}</Text>
+              <Text style={{ color: theme.danger, fontWeight: '700', fontSize: 14 }}>{deleting ? 'Deleting…' : 'Delete account'}</Text>
             </Pressable>
-            <Text style={{ color: theme.inkFaint, fontSize: 11, textAlign: 'center', marginTop: 4 }}>Permanently deletes your account and all data.</Text>
+            <Text style={{ color: theme.inkFaint, fontSize: 12, textAlign: 'center', marginTop: 4 }}>Permanently deletes your account and all data.</Text>
           </>
         )}
       </ScrollView>

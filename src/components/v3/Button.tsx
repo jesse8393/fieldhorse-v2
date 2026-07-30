@@ -1,21 +1,23 @@
-// Button — THE action button. Kit wave 1 (redesign W3): this primitive
+// Button, THE action button. Kit wave 1 (redesign W3): this primitive
 // existed as a stub with no CSS and zero adopters while Overview
 // (SecondaryAction), Leads (LeadAction), and Invoices (InvoiceAction +
 // three inline PaymentCard buttons) each hand-rolled the same control.
 // The .v3-btn family in global.css is now the single source of truth;
 // those local clones are gone. Variants:
-//   primary   — gold gradient, the one main action on a surface
-//   secondary — quiet surface chip (the default look of most actions)
-//   ghost     — borderless-feeling tertiary
-//   danger    — destructive
-//   success   — green morph (e.g. Send → "Sent ✓")
+//   primary  , gold gradient, the one main action on a surface
+//   secondary, quiet surface chip (the default look of most actions)
+//   ghost    , borderless-feeling tertiary
+//   danger   , destructive
+//   success  , green morph (e.g. Send → "Sent ✓")
 import { forwardRef } from 'react'
 import type { ButtonHTMLAttributes, ComponentType } from 'react'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'
+type ButtonVariant = 'solid' | 'outline' | 'ghost' | 'primary' | 'secondary' | 'danger' | 'success'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANT: Record<ButtonVariant, string> = {
+  solid: 'v3-btn v3-btn--primary',
+  outline: 'v3-btn v3-btn--secondary',
   primary: 'v3-btn v3-btn--primary',
   secondary: 'v3-btn v3-btn--secondary',
   ghost: 'v3-btn v3-btn--ghost',
@@ -39,7 +41,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
-    variant = 'primary',
+    variant = 'solid',
     size = 'md',
     leftIcon: LeftIcon,
     rightIcon: RightIcon,
@@ -52,7 +54,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   ref
 ) {
   const cls = [
-    VARIANT[variant] || VARIANT.primary,
+    VARIANT[variant] || VARIANT.solid,
     SIZE[size] || '',
     fullWidth ? 'v3-btn--full' : '',
     iconOnly ? 'v3-btn--icon-only' : '',

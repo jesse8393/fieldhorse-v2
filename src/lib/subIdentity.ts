@@ -1,4 +1,4 @@
-// Sub identity keying — ONE normalization shared by the Subs list
+// Sub identity keying, ONE normalization shared by the Subs list
 // rollup and the Sub detail fetch.
 //
 // The old rule keyed on the raw `phone || name` string, so the same

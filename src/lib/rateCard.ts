@@ -7,7 +7,7 @@
 //
 // Consumers should call loadUserRateCard(userId) to get the merged map.
 // Falling back to RATE_CARD as a constant is fine for unauthenticated
-// or pre-load surfaces, but anything customer-facing should use the
+// or pre-load surfaces, but anything customer facing should use the
 // merged version so the contractor's edits actually flow through.
 
 import { supabase } from './supabase.ts'
@@ -121,7 +121,7 @@ export async function upsertRate({ userId, tradeKey, patch }: { userId: string |
   if (error) throw error
 }
 
-// Delete a tenant override — the trade reverts to the seed default.
+// Delete a tenant override, the trade reverts to the seed default.
 // For custom (non-seed) trades, deleting removes them from the editor
 // entirely.
 export async function resetRate({ userId, tradeKey }: { userId: string | undefined; tradeKey: string | undefined }) {

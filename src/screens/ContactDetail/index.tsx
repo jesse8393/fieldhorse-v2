@@ -18,7 +18,7 @@ const SkeletonList = SkeletonList_ as any
 import ActionSheet from '../../components/ActionSheet.tsx'
 import AddEventSheet from '../../components/AddEventSheet.tsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
-// Lazy — sheets only mount on operator action (Mark Complete /
+// Lazy, sheets only mount on operator action (Mark Complete /
 // Record Payment respectively).
 const MarkCompleteSheet = lazy(() => import('../../components/MarkCompleteSheet.tsx'))
 const V3PaymentSheet = lazy(() => import('../../components/V3PaymentSheet.tsx'))
@@ -30,9 +30,10 @@ import {
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
 import { resolveNextAction } from './lib/jobNextAction.ts'
+import { computeJobHealth } from './lib/jobHealth.ts'
 import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
 import OverviewTab from './tabs/Overview.tsx'
-// Lazy — non-default tabs + sections + ApproveQuoteSheet only render
+// Lazy, non-default tabs + sections + ApproveQuoteSheet only render
 // when the operator picks them. Saves ~290KB of code from the initial
 // ContactDetail route chunk. Overview stays eager because it's the
 // default tab (and would otherwise flash a suspense fallback on every
@@ -49,17 +50,17 @@ const ApproveQuoteSheet = lazy(() => import('./sections/ApproveQuoteSheet.tsx'))
 const SnowJobDetailBuild = lazy(() => import('../../components/desktop/SnowJobDetailBuild.tsx'))
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
-// Tab fallback for Suspense — replaces fallback={null}, which made tab
+// Tab fallback for Suspense, replaces fallback={null}, which made tab
 // taps look broken (active state animates, then blank space for the
 // 100-500ms the lazy chunk takes to load). Now shows three muted bars
 // so the user gets immediate "loading something" feedback the moment
 // they tap.
 function TabFallback() {
   return (
-    <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 10 }} aria-busy="true" aria-label="Loading">
-      <span style={{ width: '60%', maxWidth: 240, height: 12, borderRadius: 4, background: 'var(--v3-glass-tint-2)' }} />
-      <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
-      <span style={{ width: '100%', height: 60, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.32 }} />
+    <div style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }} aria-busy="true" aria-label="Loading">
+      <span style={{ width: '60%', maxWidth: 240, height: 12, borderRadius: 10, background: 'var(--v3-glass-tint-2)' }} />
+      <span style={{ width: '100%', height: 60, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
+      <span style={{ width: '100%', height: 60, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.32 }} />
     </div>
   )
 }
@@ -88,14 +89,14 @@ type JobActionIntentMeta = {
 const JOB_ACTION_INTENTS = {
   follow_up: {
     eyebrow: 'Next action',
-    title: 'Follow-up due',
+    title: 'Follow up due',
     detail: 'Confirm scope, timing, and the next step before this deal cools off.',
     primaryLabel: 'Open overview',
     tab: 'overview',
   },
   quote_followup: {
     eyebrow: 'Quote signal',
-    title: 'Quote follow-up',
+    title: 'Quote follow up',
     detail: 'This quote has gone quiet after engagement. Review the proposal before calling or messaging.',
     primaryLabel: 'Review quote',
     tab: 'quote',
@@ -165,14 +166,14 @@ function ActionIntentBanner({
         gap: 12,
         flexWrap: 'wrap',
         marginBottom: 12,
-        padding: '12px 12px 12px 14px',
-        borderRadius: 12,
+        padding: '12px 12px 12px 12px',
+        borderRadius: 10,
         border: '1px solid var(--v3-border-strong)',
         background: 'linear-gradient(180deg, var(--v3-glass-tint), transparent 54%), var(--v3-surface-2)',
-        boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
+        boxShadow: '0 16px 40px rgba(20, 20, 20,0.18)',
       }}
     >
-      <div style={{ minWidth: 0, flex: '1 1 260px', display: 'grid', gap: 3 }}>
+      <div style={{ minWidth: 0, flex: '1 1 260px', display: 'grid', gap: 4 }}>
         <Eyebrow tone="gold">{meta.eyebrow}</Eyebrow>
         <strong style={{ color: 'var(--v3-text)', fontSize: 14, lineHeight: 1.2 }}>{meta.title}</strong>
         <span style={{ color: 'var(--v3-text-muted)', fontSize: 12, lineHeight: 1.45 }}>{meta.detail}</span>
@@ -185,12 +186,12 @@ function ActionIntentBanner({
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 7,
+            gap: 8,
             minHeight: 36,
             padding: '8px 12px',
             borderRadius: 10,
-            border: '1px solid rgba(215, 181, 109, 0.42)',
-            background: 'rgba(215, 181, 109, 0.13)',
+            border: '1px solid rgba(201, 150, 58, 0.42)',
+            background: 'rgba(201, 150, 58, 0.13)',
             color: 'var(--v3-primary)',
             fontFamily: 'var(--font-body)',
             fontSize: 12,
@@ -226,7 +227,7 @@ function ActionIntentBanner({
 }
 
 /**
- * ContactDetail — v3 parent shell. Composes the data hook + chrome + tab router
+ * ContactDetail, v3 parent shell. Composes the data hook + chrome + tab router
  * + modals. Tab content lives in ./tabs/. Section CRUD lives in ./sections/.
  *
  * Tab state is URL-synced (?tab=overview|details|financials|files) so
@@ -244,7 +245,7 @@ export default function ContactDetail() {
     contact, subs, expenses, payments, inspections, notes,
     scheduleItems, scheduleCount, todos, clientSummary,
     insurance, changeOrders, stageTransitions,
-    paid, balance, loading, fetchAll, patch
+    paid, balance, credit, loading, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
   const routeHome = location.pathname.startsWith('/leads')
@@ -265,12 +266,16 @@ export default function ContactDetail() {
   // Cockpit "Next action" row consumes the same due-aware resolver as
   // the Overview hero so the two never disagree (Phase 2H-5). The row's
   // "Done" button is purpose-built for fh_job_todos completion, so we
-  // only surface todo-kind resolved actions here — when the resolver
+  // only surface todo-kind resolved actions here, when the resolver
   // picks a schedule/milestone/stage default the row hides and the
   // operator sees the canonical next action on the Overview tab.
   const nextAction = useMemo(
     () => resolveNextAction({ contact, scheduleItems, todos }),
     [contact, scheduleItems, todos]
+  )
+  const jobHealth = useMemo(
+    () => computeJobHealth({ contact, payments, scheduleItems }),
+    [contact, payments, scheduleItems]
   )
   const nextTodo = useMemo(() => {
     if (!nextAction || nextAction.kind !== 'todo') return null
@@ -299,7 +304,7 @@ export default function ContactDetail() {
 
   // Tab state. Local state is the source of truth for the rendered
   // panel; the URL (?tab=) is a synced mirror for deep links and
-  // refresh-persistence. Previously the URL was the only source —
+  // refresh-persistence. Previously the URL was the only source :
   // audit found the Quote tab needed two clicks because the panel
   // waited on the searchParams round-trip. Local-first makes the
   // first click switch immediately; the URL catches up after.
@@ -330,19 +335,19 @@ export default function ContactDetail() {
   // override so the URL wins again.
   useEffect(() => { setLocalTab(null) }, [tabParam])
 
-  // Modals — own state, parent dispatches
+  // Modals, own state, parent dispatches
   const [eventOpen, setEventOpen] = useState(false)
   const [payModalOpen, setPayModalOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteErr, setDeleteErr] = useState('')
-  // Approve Quote sheet — lifted to root so the Overview NextAction CTA
+  // Approve Quote sheet, lifted to root so the Overview NextAction CTA
   // and the Quote tab ApproveBand both open the same sheet without
   // duplicating state. Phase 4C-2.
   const [approveOpen, setApproveOpen] = useState(false)
   const [completeOpen, setCompleteOpen] = useState(false)
-  // Send-invoice sheet (pipeline v2) — the job screen's one-tap billing
+  // Send-invoice sheet (pipeline v2), the job screen's one tap billing
   // action. Opened by the stage CTA, Overview quick action, and the
   // next-action resolver's 'sendInvoice' suggestion.
   const [invoiceOpen, setInvoiceOpen] = useState(false)
@@ -404,7 +409,7 @@ export default function ContactDetail() {
   // Loading skeleton
   if (loading) {
     return (
-      <div style={{ padding: '20px', minHeight: '100%', background: 'var(--v3-bg)' }}>
+      <div style={{ padding: '24px', minHeight: '100%', background: 'var(--v3-bg)' }}>
         <SkeletonBlock w="40%" h={14} />
         <div style={{ height: 12 }} />
         <SkeletonBlock w="70%" h={48} />
@@ -417,13 +422,13 @@ export default function ContactDetail() {
   // Not found
   if (!contact) {
     return (
-      <div style={{ padding: '40px 20px', minHeight: '100%', background: 'var(--v3-bg)', textAlign: 'center' }}>
+      <div style={{ padding: '32px 24px', minHeight: '100%', background: 'var(--v3-bg)', textAlign: 'center' }}>
         <button
           type="button"
           onClick={() => navigate(routeHome)}
           style={{
             background: 'none', border: 'none', color: 'var(--v3-primary)',
-            fontWeight: 700, fontSize: 13, cursor: 'pointer', padding: '8px 14px'
+            fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: '8px 12px'
           }}
         >
           ← Back to {routeHome === '/quotes' ? 'quotes' : routeHome === '/leads' ? 'leads' : 'jobs'}
@@ -433,12 +438,12 @@ export default function ContactDetail() {
     )
   }
 
-  // Phase 8 — desktop dispatch. At >=900px every tab (including Quote)
+  // Phase 8, desktop dispatch. At >=900px every tab (including Quote)
   // renders through DesktopJobDetail so the back button + eyebrow +
   // tab nav stay visually consistent. The Quote tab's 2-pane workspace
   // (.v3-screen--quote-active wrapper) is preserved; DesktopJobDetail
   // hides its right context rail when tab === 'quote' so the Quote
-  // builder gets full width. 5/17 chrome unification — fixes the 5/13
+  // builder gets full width. 5/17 chrome unification, fixes the 5/13
   // audit's "two design systems on one page" finding where switching
   // to Quote on desktop swapped the entire chrome.
   // Mobile <900px continues to use the Header + StageTimeline +
@@ -446,11 +451,11 @@ export default function ContactDetail() {
   // the wrapper level so both branches can dispatch them.
   const useDesktopShell = isDesktop
 
-  // Per-stage primary action — gives the mobile deal screen the same
+  // Per-stage primary action, gives the mobile deal screen the same
   // "what do I do next at this stage" CTA the desktop shell already has
   // (DesktopJobDetail's nextActionFor). Closed/lost are terminal → null.
   // "Build quote" on a lead also transitions the stage to 'quote' so the
-  // deal actually advances — otherwise clicking it just jumps tabs and
+  // deal actually advances, otherwise clicking it just jumps tabs and
   // the lead never leaves the lead stage.
   async function onBuildQuote() {
     if (!contact) return
@@ -473,10 +478,10 @@ export default function ContactDetail() {
     await fetchAll()
   }
 
-  // Job-stage CTA: the user's #1 ask — invoice straight from the job.
+  // Job-stage CTA: the user's #1 ask, invoice straight from the job.
   // While money is still owed the primary action is Send invoice; once
   // the balance is collected the job is ready for its closeout.
-  // ('invoice' is the legacy alias of 'job' — same treatment.)
+  // ('invoice' is the legacy alias of 'job', same treatment.)
   const stageCta: { label: string; onClick: () => void } | null =
     contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
     : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
@@ -495,7 +500,7 @@ export default function ContactDetail() {
     >
       {useDesktopShell ? (
         (() => {
-          // Compute truthful rail signals — null when there's no
+          // Compute truthful rail signals, null when there's no
           // data to honestly answer the signal.
           const today = Date.now()
           const upcoming = (scheduleItems || []).filter((e: any) => {
@@ -512,10 +517,12 @@ export default function ContactDetail() {
               : upcoming.length === 0 && past.length > 0
                 ? { label: 'No upcoming events', tone: 'warn' }
                 : { label: `${upcoming.length} upcoming`, tone: 'good' }
-          // Reports / billing — render "Not tracked" rather than fake numbers.
+          // Reports / billing, render "Not tracked" rather than fake numbers.
           const reportsMissing: number | null = null
           const billingStatus: { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } | null =
-            (payments || []).length === 0 && Number(contact.amount || 0) === 0
+            Number(credit || 0) > 0.5
+              ? { label: `${money(credit)} credit due`, tone: 'warn' }
+            : (payments || []).length === 0 && Number(contact.amount || 0) === 0
               ? null
               : Number(balance || 0) > 0
                 ? { label: 'Outstanding', tone: 'warn' }
@@ -523,10 +530,10 @@ export default function ContactDetail() {
                   ? { label: 'Paid', tone: 'good' }
                   : { label: 'Not started', tone: 'neutral' }
 
-          // Change-order totals for the rail card. Sum approved
+          // Change order totals for the rail card. Sum approved
           // separately from pending so the rail can flag in-flight
           // amendments without lumping them into approved revenue.
-          // Negative amounts are credits — they net into the totals
+          // Negative amounts are credits, they net into the totals
           // the same way they do in the existing invoice template
           // (ChangeOrdersBlock + InvoiceBalanceBlock).
           const changeOrderTotals = (() => {
@@ -559,10 +566,12 @@ export default function ContactDetail() {
               onEdit={handleEditClick}
               onDelete={() => setDeleteOpen(true)}
               onAddEvent={() => setEventOpen(true)}
+              primaryAction={tab === 'overview' ? null : stageCta}
               isEditing={isEditing}
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
               billingStatus={billingStatus}
+              health={jobHealth}
               changeOrderTotals={changeOrderTotals}
               paid={paid}
               outstanding={balance}
@@ -676,7 +685,7 @@ export default function ContactDetail() {
         })()
       ) : (
       <>
-      {/* HEADER — back / title / more, then action row, then stage timeline */}
+      {/* HEADER, back / title / more, then action row, then stage timeline */}
       <Header
         contact={contact}
         clientSummary={clientSummary}
@@ -702,7 +711,7 @@ export default function ContactDetail() {
       <StageTimeline currentStage={contact.stage ?? undefined} />
 
       {actionIntentMeta && (
-        <div style={{ padding: '0 20px 8px' }}>
+        <div style={{ padding: '0 24px 8px' }}>
           <ActionIntentBanner
             meta={actionIntentMeta}
             onPrimary={handleActionIntentPrimary}
@@ -711,9 +720,9 @@ export default function ContactDetail() {
         </div>
       )}
 
-      {/* STAGE PRIMARY ACTION — one clear next step per stage */}
-      {stageCta && (
-        <div style={{ padding: '4px 20px 8px' }}>
+      {/* STAGE PRIMARY ACTION, one clear next step per stage */}
+      {stageCta && tab !== 'overview' && (
+        <div style={{ padding: '4px 24px 8px' }}>
           <motion.button
             type="button"
             whileTap={{ scale: 0.99 }}
@@ -721,9 +730,9 @@ export default function ContactDetail() {
             style={{
               width: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              padding: '12px 16px', borderRadius: 12, border: 'none',
+              padding: '12px 16px', borderRadius: 10, border: 'none',
               background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-              fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
+              fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: 0,
               cursor: 'pointer', boxShadow: 'var(--v3-gold-glow)',
               WebkitTapHighlightColor: 'transparent'
             }}
@@ -941,7 +950,7 @@ export default function ContactDetail() {
         <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
           Removing <strong>{contact?.name || 'this job'}</strong> cascades to everything attached.
         </p>
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <DeleteCascadeRow label="Subs" count={subs.length} />
           <DeleteCascadeRow label="Expenses" count={expenses.length} />
           <DeleteCascadeRow label="Payments" count={payments.length} />
@@ -949,7 +958,7 @@ export default function ContactDetail() {
           <DeleteCascadeRow label="Schedule items" count={scheduleCount} />
           <DeleteCascadeRow label="Notes" count={notes.length} detail="detached + archived" />
         </ul>
-        <Eyebrow as="p" tone="alert" style={{ margin: 0, fontSize: 11 }}>
+        <Eyebrow as="p" tone="alert" style={{ margin: 0, fontSize: 12 }}>
           This cannot be undone.
         </Eyebrow>
       </ActionSheet>
@@ -958,7 +967,7 @@ export default function ContactDetail() {
 }
 
 /* ============================================================
-   HEADER — back / title / stage / client / action row / more menu
+   HEADER, back / title / stage / client / action row / more menu
    ============================================================ */
 
 function Header({
@@ -980,14 +989,14 @@ function Header({
     : null
 
   return (
-    <div style={{ padding: '8px 20px 12px' }}>
+    <div style={{ padding: '8px 24px 12px' }}>
       {/* Top row: back · spacer · more */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
         <IconButton onClick={onBack} ariaLabel={`Back to ${String(backLabel).toLowerCase()}`}>
           <ChevronLeft size={18} aria-hidden="true" />
         </IconButton>
 
-        {/* Action row — Call, Text, Edit, More */}
+        {/* Action row, Call, Text, Edit, More */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {phoneHref ? (
             <PhoneAction href={phoneHref} ariaLabel={`Call ${contact.name || 'contact'}`}>
@@ -1038,22 +1047,22 @@ function Header({
         </div>
       </div>
 
-      {/* Cockpit — eyebrow client / serif title / job_title / metrics / next action */}
+      {/* Cockpit, eyebrow client / serif title / job_title / metrics / next action */}
       <div style={{
-        padding: '12px 14px',
-        borderRadius: 16,
-        // Top-tint rides the surface ladder (was literal #1b1816 — in
+        padding: '12px 12px',
+        borderRadius: 10,
+        // Top-tint rides the surface ladder (was literal #141414, in
         // daylight it smeared a dark gradient across the paper card).
         background: 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 72%)',
         border: '1px solid var(--v3-border)',
-        boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
+        boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
       }}>
         {clientLabel && (isOwnerView && contact.client_id ? (
           <button
             type="button"
             onClick={() => onClientNav(contact.client_id)}
             style={{
-              padding: '4px 6px',
+              padding: '4px 8px',
               marginLeft: -6,
               background: 'transparent',
               border: 'none',
@@ -1067,7 +1076,7 @@ function Header({
             </Eyebrow>
           </button>
         ) : (
-          <Eyebrow as="span" aria-label="Shared job — client visible only to owner">
+          <Eyebrow as="span" aria-label="Shared job, client visible only to owner">
             <Users size={10} aria-hidden="true" />
             {clientLabel}
           </Eyebrow>
@@ -1075,9 +1084,9 @@ function Header({
 
         <h1 style={{
           margin: clientLabel ? '4px 0 0' : 0,
-          fontSize: 'clamp(22px, 6vw, 28px)',
+          fontSize: 24,
           lineHeight: 1.1,
-          letterSpacing: '-0.015em',
+          letterSpacing: 0,
           fontWeight: 600,
           color: 'var(--v3-text)'
         }}>
@@ -1100,9 +1109,9 @@ function Header({
             display: 'grid',
             gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr' : '1fr',
             alignItems: 'end',
-            gap: 10,
+            gap: 12,
             marginTop: 10,
-            paddingTop: 10,
+            paddingTop: 12,
             borderTop: '1px solid var(--v3-border)'
           }}>
             <CockpitMetric label="Value" tone="gold" size="lg">
@@ -1124,20 +1133,20 @@ function Header({
         {nextTodo && (
           <div style={{
             marginTop: 10,
-            padding: '8px 10px 8px 12px',
+            padding: '8px 12px 8px 12px',
             borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border)',
             display: 'flex',
             alignItems: 'center',
-            gap: 10
+            gap: 12
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <Eyebrow tone="gold">Next action</Eyebrow>
               <div style={{
                 marginTop: 2,
                 fontFamily: 'var(--font-body)',
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 600,
                 color: 'var(--v3-text)',
                 lineHeight: 1.3,
@@ -1154,19 +1163,19 @@ function Header({
               onClick={() => onTodoDone?.(nextTodo.id)}
               style={{
                 flexShrink: 0,
-                padding: '6px 10px',
-                borderRadius: 8,
+                padding: '8px 12px',
+                borderRadius: 10,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
                 background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 700,
-                letterSpacing: '0.08em',
+                letterSpacing: 0,
                 textTransform: 'uppercase',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.10), 0 3px 8px rgba(201, 150, 58, 0.16)'
+                boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.10), 0 3px 8px rgba(201, 150, 58, 0.16)'
               }}
             >
               Done
@@ -1178,7 +1187,7 @@ function Header({
   )
 }
 
-/* Compact money formatter — $46K / $1.2M for cockpit metrics. Falls back to
+/* Compact money formatter, $46K / $1.2M for cockpit metrics. Falls back to
    full dollars under 1k. */
 function kMoney(n: any) {
   const v = Number(n || 0)
@@ -1197,7 +1206,7 @@ function CockpitMetric({ label, tone = 'default', size = 'lg', children }: any) 
 }
 
 /**
- * NextTodoDueChip — read-only due-status chip rendered under the
+ * NextTodoDueChip, read-only due-status chip rendered under the
  * cockpit Next-Action text. Returns null when iso is null/undefined
  * so rows without a due date stay clean. Tones mirror the v3 pattern:
  *   danger  → overdue
@@ -1225,21 +1234,21 @@ function NextTodoDueChip({ iso }: any) {
           color: 'var(--v3-text-muted)'
         }
   return (
-    <Eyebrow style={{ marginTop: 4, padding: '2px 8px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color, whiteSpace: 'nowrap' }}>
+    <Eyebrow style={{ marginTop: 4, padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color, whiteSpace: 'nowrap' }}>
       Due · {status.label}
     </Eyebrow>
   )
 }
 
 /* ============================================================
-   ICON BUTTONS — header chrome
+   ICON BUTTONS, header chrome
    ============================================================ */
 
 function iconButtonStyle({ disabled = false, tone }: any = {}) {
   return {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 10,
     display: 'grid',
     placeItems: 'center',
     background: tone === 'primary' ? 'var(--v3-primary-soft)' : 'var(--v3-surface)',
@@ -1270,7 +1279,7 @@ function IconButton({ children, onClick, disabled, ariaLabel, ariaPressed, tone 
 }
 
 /**
- * PhoneAction — plain <a> with setTimeout fallback. The audit-batch-6 fix:
+ * PhoneAction, plain <a> with setTimeout fallback. The audit-batch-6 fix:
  * framer-motion + Vaul drawer was eating clicks on iOS Safari for tel:/sms:.
  * Plain anchor + manual location.href fallback ensures the OS handler fires.
  */
@@ -1306,14 +1315,14 @@ function DeleteCascadeRow({ label, count, detail = 'deleted' }: any) {
       padding: '8px 12px',
       background: 'var(--v3-surface-2)',
       border: '1px solid var(--v3-border)',
-      borderRadius: 8
+      borderRadius: 10
     }}>
       <Eyebrow>
         {label}
       </Eyebrow>
       <span style={{
         fontFamily: 'var(--font-body)',
-        fontSize: 13,
+        fontSize: 14,
         color: 'var(--v3-text)',
         fontVariantNumeric: 'tabular-nums'
       }}>

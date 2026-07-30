@@ -25,7 +25,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   // True the moment THIS form kicks off a signup. The session lands via
   // the auth subscription and re-renders Login BEFORE the async handler
-  // reaches its navigate('/onboarding') — so the render-redirect below
+  // reaches its navigate('/onboarding'), so the render-redirect below
   // used to win the race and bounce brand-new accounts through '/'
   // (a visible flash of the dashboard shell, then a second hop into
   // onboarding). With the flag, the very first post-signup render goes
@@ -91,7 +91,7 @@ export default function Login() {
         const { data, error } = await signUp(email, password)
         if (error) throw error
         if (!data.session) {
-          // Email-confirmation flow — no session yet, no redirect.
+          // Email-confirmation flow, no session yet, no redirect.
           setJustSignedUp(false)
           setNotice('Check your email to confirm, then sign in.')
           setMode('signin')
@@ -113,7 +113,7 @@ export default function Login() {
   const firstName = profile?.full_name?.trim().split(/\s+/)[0]
   // Voice: premium business owner, not field operator. "Welcome back."
   // for returning users, "Built for builders." for new accounts. Once
-  // the profile name is known we personalize the sign-in line.
+  // the profile name is known we personalize the sign in line.
   const headline = isSignIn
     ? (firstName ? `Welcome back, ${firstName}.` : 'Welcome back.')
     : 'Built for builders.'
@@ -136,7 +136,7 @@ export default function Login() {
         overflow: 'hidden'
       }}
     >
-      {/* Subtle warm radial behind the card — not aurora, not grid. Just
+      {/* Subtle warm radial behind the card, not aurora, not grid. Just
           a single soft gold halo to add depth without atmosphere. */}
       <div
         aria-hidden="true"
@@ -144,7 +144,7 @@ export default function Login() {
           position: 'absolute',
           inset: 0,
           pointerEvents: 'none',
-          background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(229, 193, 88, 0.06), transparent 70%)'
+          background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201, 150, 58, 0.06), transparent 70%)'
         }}
       />
 
@@ -155,26 +155,26 @@ export default function Login() {
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 400 }}
       >
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, letterSpacing: '0.14em', lineHeight: 1 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
             <span style={{ color: 'var(--v3-primary)' }}>FIELD</span>
             <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
           </div>
           <h1
             id="fh-login-title"
             className="v3-h1"
-            style={{ fontSize: 'clamp(24px, 6vw, 30px)', marginTop: 24, lineHeight: 1.15 }}
+            style={{ fontSize: 24, marginTop: 24, lineHeight: 1.15 }}
           >
             {headline}
           </h1>
           <p
             className="v3-caption"
-            style={{ marginTop: 8, fontSize: 13, lineHeight: 1.45 }}
+            style={{ marginTop: 8, fontSize: 14, lineHeight: 1.45 }}
           >
             {subline}
           </p>
         </div>
 
-        {/* Card — v3 surface + premium gold top-edge stroke */}
+        {/* Card, v3 surface + premium gold top-edge stroke */}
         <form
           onSubmit={onSubmit}
           noValidate
@@ -182,12 +182,12 @@ export default function Login() {
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            gap: 14,
-            padding: 22,
-            borderRadius: 18,
+            gap: 12,
+            padding: 24,
+            borderRadius: 10,
             background: 'var(--v3-surface)',
             border: '1px solid var(--v3-border-strong)',
-            boxShadow: '0 1px 0 var(--v3-border-mid) inset, 0 4px 14px rgba(0, 0, 0, 0.30), 0 16px 40px rgba(0, 0, 0, 0.32)',
+            boxShadow: '0 1px 0 var(--v3-border-mid) inset, 0 4px 14px rgba(20, 20, 20, 0.30), 0 16px 40px rgba(20, 20, 20, 0.32)',
             overflow: 'hidden'
           }}
         >
@@ -199,7 +199,7 @@ export default function Login() {
               left: '14%',
               right: '14%',
               height: 1,
-              background: 'linear-gradient(90deg, transparent 0%, rgba(229, 193, 88, 0.55) 50%, transparent 100%)',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(201, 150, 58, 0.55) 50%, transparent 100%)',
               pointerEvents: 'none'
             }}
           />
@@ -210,7 +210,7 @@ export default function Login() {
             </p>
           )}
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span className="v3-eyebrow fh-auth-label" style={{ color: 'var(--v3-text)', opacity: 1 }}>Email</span>
             <div style={{ position: 'relative' }}>
               <Mail size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
@@ -226,9 +226,9 @@ export default function Login() {
                 placeholder="you@company.com"
                 style={{
                   width: '100%',
-                  padding: '12px 14px 12px 38px',
-                  borderRadius: 12,
-                  background: '#1c1814',
+                  padding: '12px 12px 12px 32px',
+                  borderRadius: 10,
+                  background: '#141414',
                   border: '1px solid var(--v3-border-strong)',
                   color: 'var(--v3-text)',
                   fontSize: 14,
@@ -240,7 +240,7 @@ export default function Login() {
             </div>
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span className="v3-eyebrow fh-auth-label" style={{ color: 'var(--v3-text)', opacity: 1 }}>Password</span>
             <div style={{ position: 'relative' }}>
               <Lock size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
@@ -256,9 +256,9 @@ export default function Login() {
                 placeholder="••••••••"
                 style={{
                   width: '100%',
-                  padding: '12px 14px 12px 38px',
-                  borderRadius: 12,
-                  background: '#1c1814',
+                  padding: '12px 12px 12px 32px',
+                  borderRadius: 10,
+                  background: '#141414',
                   border: '1px solid var(--v3-border-strong)',
                   color: 'var(--v3-text)',
                   fontSize: 14,
@@ -287,17 +287,17 @@ export default function Login() {
             whileTap={{ scale: 0.98 }}
             style={{
               marginTop: 6,
-              padding: '13px 18px',
-              borderRadius: 12,
+              padding: '12px 16px',
+              borderRadius: 10,
               background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
               color: 'var(--v3-on-primary)',
               fontFamily: 'var(--font-body)',
               fontSize: 14,
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
               cursor: submitDisabled ? 'default' : 'pointer',
-              boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 var(--v3-border-strong) inset',
+              boxShadow: '0 0 0 3px rgba(201, 150, 58, 0.16), 0 6px 18px rgba(201, 150, 58, 0.32), 0 1px 0 var(--v3-border-strong) inset',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

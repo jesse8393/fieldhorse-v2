@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Drawer as VaulDrawer } from 'vaul'
 import { cn } from '@/lib/utils'
 
-// shouldScaleBackground defaults to FALSE — Vaul's true-by-default
+// shouldScaleBackground defaults to FALSE, Vaul's true-by-default
 // background-scale effect requires a data-vaul-drawer-wrapper attribute
 // on the app root, which we don't set. Without that, on desktop the
 // Drawer can silently fail to open when triggered programmatically
@@ -38,7 +38,7 @@ const DrawerContent = React.forwardRef<any, any>(({ className, children, ...prop
       )}
       {...props}
     >
-      <div className="ui:mx-auto ui:mt-3 ui:h-1 ui:w-9 ui:rounded-full ui:bg-[var(--v3-border-strong)]" />
+      <div className="ui:mx-auto ui:mt-3 ui:h-1 ui:w-9 ui:rounded-[10px] ui:bg-[var(--v3-border-strong)]" />
       {children}
     </VaulDrawer.Content>
   </DrawerPortal>
@@ -52,7 +52,7 @@ const DrawerFooter = ({ className, ...props }: any) => (
   <div className={cn('ui:mt-auto ui:flex ui:flex-col ui:gap-2 ui:p-4', className)} {...props} />
 )
 const DrawerTitle = React.forwardRef<any, any>(({ className, ...props }, ref) => (
-  <VaulDrawer.Title ref={ref} className={cn('ui:text-lg ui:font-semibold ui:leading-none ui:tracking-tight ui:text-foreground', className)} {...props} />
+  <VaulDrawer.Title ref={ref} className={cn('ui:text-xl ui:font-semibold ui:leading-none ui:tracking-[0px] ui:text-foreground', className)} {...props} />
 ))
 DrawerTitle.displayName = 'DrawerTitle'
 const DrawerDescription = React.forwardRef<any, any>(({ className, ...props }, ref) => (

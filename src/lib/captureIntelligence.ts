@@ -1,6 +1,6 @@
 // src/lib/captureIntelligence.ts
 //
-// Universal Capture — the AI router behind the global "+" button.
+// Universal Capture, the AI router behind the global "+" button.
 // One input (spoken, typed, or OCR'd) goes in; one structured action
 // comes out: a note, todo, payment, expense, schedule event, or new
 // lead, optionally matched to an existing job. The operator always
@@ -8,7 +8,7 @@
 // parsed intent as an editable card).
 //
 // Claude does the language work; normalizeIntent() is the trust
-// boundary — everything the model returns is re-validated against
+// boundary, everything the model returns is re-validated against
 // whitelists and the live job roster before the UI offers to save it.
 
 import { claudeMessage, extractJson } from './anthropic.ts'
@@ -34,7 +34,7 @@ export type RosterEntry = {
 
 export type CaptureIntent = {
   kind: CaptureKind
-  // One-line, human-readable description of what will happen —
+  // One-line, human-readable description of what will happen :
   // rendered as the confirm card headline.
   summary: string
   // Matched fh_contacts id, validated against the roster (null = none).
@@ -62,7 +62,7 @@ export type CaptureIntent = {
 // Kept free of timestamps / per-user content so repeat calls share a
 // stable prefix (prompt-cache hygiene; volatile context rides in the
 // user message instead).
-const CAPTURE_SYSTEM = `You are the capture router inside a contractor's CRM. The contractor speaks or types one rough thought from the field. Decide what they want recorded and return ONLY a JSON object — no prose, no markdown.
+const CAPTURE_SYSTEM = `You are the capture router inside a contractor's CRM. The contractor speaks or types one rough thought from the field. Decide what they want recorded and return ONLY a JSON object, no prose, no markdown.
 
 Pick exactly one "kind":
 - "payment"  money RECEIVED from a client ("got the deposit", "they paid", "picked up a check")
@@ -79,26 +79,26 @@ JSON shape (omit fields that don't apply):
   "job_id": "id from the JOBS list if the input clearly refers to one, else null",
   "confidence": 0.0-1.0,
   "text": "cleaned-up body for note/todo (fix dictation artifacts, keep the contractor's words)",
-  "due_at": "YYYY-MM-DD",
+  "due_at": "year month day",
   "amount": number,
   "method": "check|cash|card|transfer|other",
   "payment_kind": "deposit|progress|final|retainage|other",
   "description": "expense description",
   "category": "Materials|Fuel|Permits|Equipment|Other",
-  "expense_date": "YYYY-MM-DD",
+  "expense_date": "year month day",
   "title": "schedule event title or lead job title",
-  "start_at": "YYYY-MM-DDTHH:MM (local time, no timezone suffix)",
-  "end_at": "YYYY-MM-DDTHH:MM",
+  "start_at": "year month dayTHH:MM (local time, no timezone suffix)",
+  "end_at": "year month dayTHH:MM",
   "name": "lead's name",
   "phone": "lead's phone",
   "email": "lead's email",
   "address": "lead's address",
-  "follow_up_on": "YYYY-MM-DD"
+  "follow_up_on": "year month day"
 }
 
 Rules:
 - Resolve relative dates ("tomorrow", "Friday") against TODAY from the user message.
-- Match job_id loosely by client name, job title, or address — but only when it's clearly one job; otherwise null.
+- Match job_id loosely by client name, job title, or address, but only when it's clearly one job; otherwise null.
 - A payment or expense without a stated amount: omit "amount" (the operator fills it in).
 - Schedule events default to 1 hour when no end time is given.
 - Never invent phone numbers, emails, amounts, or names that aren't in the input.`
@@ -106,21 +106,21 @@ Rules:
 function rosterBlock(roster: RosterEntry[]) {
   if (!roster.length) return 'JOBS: (none)'
   const lines = roster.slice(0, 80).map((r) => {
-    const title = r.job_title ? ` — ${r.job_title}` : ''
+    const title = r.job_title ? `, ${r.job_title}` : ''
     return `${r.id} :: ${r.name || 'Unnamed'}${title} (${r.stage || 'job'})`
   })
-  return `JOBS (id :: client — job title (stage)):\n${lines.join('\n')}`
+  return `JOBS (id :: client, job title (stage)):\n${lines.join('\n')}`
 }
 
 /**
- * routeCapture — one round trip: rough input → validated CaptureIntent.
+ * routeCapture, one round trip: rough input → validated CaptureIntent.
  * Throws on network/AI failure; callers degrade to a plain note.
  */
 export async function routeCapture({ text, roster, now = new Date() }: { text: string; roster: RosterEntry[]; now?: Date }): Promise<CaptureIntent> {
   const today = todayYmd(now)
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
   const res = await claudeMessage({
-    // Intent routing is correctness-sensitive (it writes money rows) —
+    // Intent routing is correctness-sensitive (it writes money rows) :
     // run it on the strongest model rather than the app-wide default.
     model: 'claude-fable-5',
     system: CAPTURE_SYSTEM,
@@ -128,7 +128,7 @@ export async function routeCapture({ text, roster, now = new Date() }: { text: s
       role: 'user',
       content: `TODAY: ${today} (${weekday})\n${rosterBlock(roster)}\n\nINPUT: ${text}`
     }],
-    // fable-5 thinking is always on and shares the max_tokens budget —
+    // fable-5 thinking is always on and shares the max_tokens budget :
     // 600 risked truncating the JSON mid-object. Low effort keeps the
     // simple intent-routing fast enough for the capture UX.
     maxTokens: 1500,
@@ -142,7 +142,7 @@ export async function routeCapture({ text, roster, now = new Date() }: { text: s
 }
 
 /* ============================================================
-   normalizeIntent — pure validation layer (unit-tested).
+   normalizeIntent, pure validation layer (unit-tested).
    Never trust model output: clamp enums, coerce numbers, check
    job_id against the roster, sanity-check dates.
    ============================================================ */
@@ -214,7 +214,7 @@ export function normalizeIntent(raw: any, roster: RosterEntry[]): CaptureIntent 
     case 'expense': {
       intent.amount = cleanAmount(raw.amount)
       intent.description = str(raw.description, 200) || str(raw.text, 200) || 'Expense'
-      // Categories are Capitalized in the DB check — match case-insensitively.
+      // Categories are Capitalized in the DB check, match case-insensitively.
       intent.category = pick(raw.category, EXPENSE_CATEGORIES, 'Other')
       intent.expense_date = cleanDate(raw.expense_date) || todayYmd()
       break
@@ -249,7 +249,7 @@ export function normalizeIntent(raw: any, roster: RosterEntry[]): CaptureIntent 
 
 function defaultSummary(kind: CaptureKind) {
   switch (kind) {
-    case 'todo': return 'Add a to-do'
+    case 'todo': return 'Add a task'
     case 'payment': return 'Log a payment'
     case 'expense': return 'Log an expense'
     case 'schedule': return 'Schedule an event'
@@ -260,7 +260,7 @@ function defaultSummary(kind: CaptureKind) {
 
 export const CAPTURE_KIND_META: Record<CaptureKind, { label: string; verb: string }> = {
   note:     { label: 'Note',     verb: 'Save note' },
-  todo:     { label: 'To-do',    verb: 'Add to-do' },
+  todo:     { label: 'Task',    verb: 'Add task' },
   payment:  { label: 'Payment',  verb: 'Log payment' },
   expense:  { label: 'Expense',  verb: 'Log expense' },
   schedule: { label: 'Schedule', verb: 'Add to schedule' },

@@ -1,7 +1,7 @@
 // src/screens/ContactDetail/sections/ActivityLog.tsx
 //
 // Per-job activity timeline. Composes events from existing data
-// (notes, payments, schedule, change orders, contact metadata) — no
+// (notes, payments, schedule, change orders, contact metadata), no
 // new schema. Pure presentation; the parent passes already-loaded
 // arrays.
 //
@@ -32,8 +32,8 @@ const ICONS: Record<string, any> = {
 const TONE_COLORS: Record<string, any> = {
   neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', dot: 'var(--v3-text-muted)' },
   gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', dot: 'var(--v3-primary)' },
-  green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74, 222, 128, 0.10)', dot: 'var(--v3-success-bright, #4ade80)' },
-  red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232, 90, 87, 0.10)', dot: 'var(--v3-danger-bright, #f5a294)' }
+  green:   { fg: 'var(--v3-success-bright, #2D7A4F)', bg: 'rgba(45, 122, 79, 0.10)', dot: 'var(--v3-success-bright, #2D7A4F)' },
+  red:     { fg: 'var(--v3-danger-bright, #C9963A)', bg: 'rgba(192, 57, 43, 0.10)', dot: 'var(--v3-danger-bright, #C9963A)' }
 }
 
 function relTime(d: any) {
@@ -84,7 +84,7 @@ export default function ActivityLog({
       style={{
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
-        borderRadius: 14,
+        borderRadius: 10,
         overflow: 'hidden'
       }}
     >
@@ -126,7 +126,7 @@ export default function ActivityLog({
                 display: 'grid',
                 gridTemplateColumns: '32px 1fr auto',
                 gap: 12,
-                paddingBottom: 14,
+                paddingBottom: 12,
                 alignItems: 'flex-start',
                 position: 'relative'
               }}
@@ -135,7 +135,7 @@ export default function ActivityLog({
               <span
                 aria-hidden="true"
                 style={{
-                  width: 16, height: 16, borderRadius: '50%',
+                  width: 16, height: 16, borderRadius: 10,
                   background: tone.bg,
                   border: `1.5px solid ${tone.dot}`,
                   display: 'inline-grid', placeItems: 'center',
@@ -147,7 +147,7 @@ export default function ActivityLog({
               </span>
               <div style={{ minWidth: 0 }}>
                 <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+                  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
                   color: 'var(--v3-text)', lineHeight: 1.35
                 }}>
                   {e.title}
@@ -155,7 +155,7 @@ export default function ActivityLog({
                 {e.sub && (
                   <div style={{
                     marginTop: 2,
-                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    fontFamily: 'var(--font-body)', fontSize: 12,
                     color: 'var(--v3-text-muted)', lineHeight: 1.4,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                   }}>
@@ -164,12 +164,12 @@ export default function ActivityLog({
                 )}
               </div>
               <span style={{
-                fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600,
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
                 color: 'var(--v3-text-faint, var(--v3-text-muted))',
-                letterSpacing: '0.04em',
+                letterSpacing: 0,
                 whiteSpace: 'nowrap',
                 fontVariantNumeric: 'tabular-nums',
-                paddingTop: 2
+                paddingTop: 4
               }}>
                 {relTime(e.when)}
               </span>
@@ -184,12 +184,12 @@ export default function ActivityLog({
           onClick={() => setExpanded(true)}
           style={{
             display: 'block', width: '100%',
-            padding: '10px 16px',
+            padding: '12px 16px',
             borderTop: '1px solid var(--v3-border)',
             background: 'transparent', border: 'none',
             color: 'var(--v3-primary-bright)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: '0.04em', cursor: 'pointer',
+            letterSpacing: 0, cursor: 'pointer',
             textAlign: 'center'
           }}
         >

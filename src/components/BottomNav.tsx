@@ -9,20 +9,20 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
 import { canHover } from '../lib/hover.ts'
 
-// IA collapse (redesign W2): the thumb bar is the contractor's verbs —
+// IA collapse (redesign W2): the thumb bar is the contractor's verbs :
 // Home, Sell (Leads), Work (Jobs), Get Paid (Money). Money replaced
 // Schedule in the bar: "who owes me" is the owner's #1 daily anxiety
 // and previously had NO fast path (buried in More). Schedule stays one
-// tap away — top of the Work group in the drawer, the Home quick-action
-// tile, and Today-on-site's "View schedule" link.
-// `match` keeps a tab lit on routes other than its own `to` — the Work
+// tap away, top of the Work group in the drawer, the Home quick-action
+// tile, and Today-on site's "View schedule" link.
+// `match` keeps a tab lit on routes other than its own `to`, the Work
 // tab stays active while any deal detail (/leads/:id, /quotes/:id,
 // /jobs/:id) is open, mirroring the desktop sidebar. Without it the
 // bottom bar goes dark the moment you open a deal.
 const PRIMARY: { to: string; label: string; icon: string; end?: boolean; match?: (p: string) => boolean }[] = [
   { to: '/', label: 'Home', icon: 'home', end: true },
   // IA round 2: Leads + Jobs (and the Quotes/Pipeline boards behind
-  // them) collapsed into ONE Work list — which frees a bar slot, so
+  // them) collapsed into ONE Work list, which frees a bar slot, so
   // Schedule comes back. Four verbs, five thumbs: Home, Work,
   // Schedule, Money.
   { to: '/work', label: 'Work', icon: 'jobs', match: (p) => p === '/work' || p.startsWith('/leads') || p.startsWith('/quotes') || p.startsWith('/jobs') },
@@ -30,8 +30,8 @@ const PRIMARY: { to: string; label: string; icon: string; end?: boolean; match?:
   { to: '/invoices', label: 'Money', icon: 'dollar' }
 ]
 
-/* More-drawer navigation, grouped by what a contractor DOES — Sell /
-   Work / Get paid / Office — instead of one flat 21-row list. Mirrors
+/* More-drawer navigation, grouped by what a contractor DOES, Sell /
+   Work / Get paid / Office, instead of one flat 21-row list. Mirrors
    the desktop sidebar's groups so the mental model is identical on
    both form factors.
 
@@ -194,7 +194,7 @@ export default function BottomNav() {
             aria-label="More tools"
           >
             <div className="fh-drawer__grip" aria-hidden="true" />
-            {/* HEADER — small FH wordmark + close. Was an h1 + eyebrow
+            {/* HEADER, small FH wordmark + close. Was an h1 + eyebrow
                 that ate too much vertical space; the drawer is for
                 navigation, not branding. */}
             <header
@@ -202,11 +202,11 @@ export default function BottomNav() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 10,
-                padding: '4px 18px 12px'
+                gap: 12,
+                padding: '4px 16px 12px'
               }}
             >
-              {/* V3-SYSTEM-1A: drawer is for navigation, not branding —
+              {/* V3-SYSTEM-1A: drawer is for navigation, not branding :
                   demote the gold "FIELD" so it reads as a quiet header,
                   not a screaming wordmark. Both halves now muted text. */}
               <span
@@ -216,7 +216,7 @@ export default function BottomNav() {
                   gap: 0,
                   fontFamily: 'var(--font-display)',
                   fontSize: 16,
-                  letterSpacing: '0.14em',
+                  letterSpacing: 0,
                   lineHeight: 1,
                   color: 'var(--v3-text-muted)'
                 }}
@@ -232,7 +232,7 @@ export default function BottomNav() {
                   flexShrink: 0,
                   width: 32,
                   height: 32,
-                  borderRadius: 999,
+                  borderRadius: 10,
                   border: '1px solid var(--v3-border-strong)',
                   background: 'transparent',
                   color: 'var(--v3-text-muted)',
@@ -246,7 +246,7 @@ export default function BottomNav() {
               </button>
             </header>
 
-            {/* BODY — flat nav list. Tighter rows, no per-row dividers.
+            {/* BODY, flat nav list. Tighter rows, no per-row dividers.
                 Spacing alone separates items. */}
             <nav
               style={{
@@ -256,7 +256,7 @@ export default function BottomNav() {
                 // bouncing the page underneath the drawer.
                 overscrollBehavior: 'contain',
                 WebkitOverflowScrolling: 'touch',
-                padding: '4px 10px 12px',
+                padding: '4px 12px 12px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 0,
@@ -271,7 +271,7 @@ export default function BottomNav() {
                       className="v3-eyebrow"
                       style={{
                         color: 'var(--v3-text-muted)',
-                        padding: gi === 0 ? '2px 10px 4px' : '14px 10px 4px'
+                        padding: gi === 0 ? '4px 12px 4px' : '12px 12px 4px'
                       }}
                     >
                       {g.label}
@@ -284,15 +284,15 @@ export default function BottomNav() {
               ))}
             </nav>
 
-            {/* ACCOUNT BLOCK — single inline row at the bottom.
+            {/* ACCOUNT BLOCK, single inline row at the bottom.
                 email · theme toggle (icon button) · sign out (icon button)
                 Replaces the prior bulky two-card foot. */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
-                padding: '12px 18px calc(14px + env(safe-area-inset-bottom, 0px))',
+                gap: 12,
+                padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
                 borderTop: '1px solid var(--v3-border)',
                 background: 'transparent'
               }}
@@ -303,7 +303,7 @@ export default function BottomNav() {
                   minWidth: 0,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 2
+                  gap: 4
                 }}
               >
                 <span
@@ -316,7 +316,7 @@ export default function BottomNav() {
                   <span
                     style={{
                       fontFamily: 'var(--font-body)',
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: 600,
                       color: 'var(--v3-text)',
                       whiteSpace: 'nowrap',
@@ -338,7 +338,7 @@ export default function BottomNav() {
                   flexShrink: 0,
                   width: 36,
                   height: 36,
-                  borderRadius: 999,
+                  borderRadius: 10,
                   border: '1px solid var(--v3-border-strong)',
                   background: 'var(--v3-surface)',
                   color: 'var(--v3-primary)',
@@ -360,7 +360,7 @@ export default function BottomNav() {
                   flexShrink: 0,
                   width: 36,
                   height: 36,
-                  borderRadius: 999,
+                  borderRadius: 10,
                   border: '1px solid var(--v3-border-strong)',
                   background: 'var(--v3-surface)',
                   color: 'var(--v3-text-muted)',
@@ -438,10 +438,10 @@ export default function BottomNav() {
 }
 
 /* ============================================================
-   NavRow — premium navigation row.
+   NavRow, premium navigation row.
    Tight 44px row, 28px gold icon tile, label, chevron.
    Hover paints a rounded surface-2 wash so the whole row reads
-   as a tappable target. No per-row dividers — spacing alone
+   as a tappable target. No per-row dividers, spacing alone
    separates items in the new compact drawer.
    ============================================================ */
 function NavRow({ item, onTap }: any) {
@@ -455,7 +455,7 @@ function NavRow({ item, onTap }: any) {
         alignItems: 'center',
         gap: 12,
         width: '100%',
-        padding: '8px 10px',
+        padding: '8px 12px',
         background: 'transparent',
         border: 'none',
         borderRadius: 10,
@@ -484,7 +484,7 @@ function NavRow({ item, onTap }: any) {
           flexShrink: 0,
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: 10,
           display: 'grid',
           placeItems: 'center',
           background: 'var(--v3-surface-2)',
@@ -500,7 +500,7 @@ function NavRow({ item, onTap }: any) {
         fontSize: 14,
         fontWeight: 500,
         color: 'var(--v3-text)',
-        letterSpacing: '-0.005em'
+        letterSpacing: 0
       }}>
         {item.label}
       </span>

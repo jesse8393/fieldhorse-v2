@@ -2,7 +2,7 @@
 //
 // Partner-roster helpers for the InvitePartnerSheet "past partners"
 // suggestion strip. RLS already scopes fh_job_partners to the inviter,
-// so the query needs no extra owner filter — we just dedupe by email
+// so the query needs no extra owner filter, we just dedupe by email
 // and prefer the most recent name/role for each partner.
 
 import { supabase } from './supabase.ts'

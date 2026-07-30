@@ -4,16 +4,16 @@ import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * Quote terms section — customer-facing prose blocks + expiration.
+ * Quote terms section, customer facing prose blocks + expiration.
  *
  * Phase 4B-2: live working-draft fields backing migration 012's
  * scope_text / terms_text / exclusions_text / quote_expires_at on
  * fh_contacts. Autosave on blur via the parent's `patch` helper
  * (optimistic + user_id-guarded). No Send / Preview / Download
- * actions yet — those land in 4B-3 and 4B-4.
+ * actions yet, those land in 4B-3 and 4B-4.
  *
  * Hydrates from `contact.*` and re-syncs whenever the underlying
- * row changes (id flip on navigation, server-side updated_at bump
+ * row changes (id flip on navigation, on the server updated_at bump
  * from background refetch). Local edits are not clobbered between
  * the operator typing and blurring because the effect keys on
  * `id` + `updated_at`, not on every render.
@@ -33,7 +33,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
 
   // Publish the latest local state into a parent-owned ref on every
   // change. Quote.jsx's buildPdf reads from this ref so unblurred
-  // textarea content reaches the PDF reliably — independent of any
+  // textarea content reaches the PDF reliably, independent of any
   // blur-timing race. No re-render side effect (refs don't subscribe).
   useEffect(() => {
     if (!valuesRef) return
@@ -64,7 +64,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
   return (
     <section
       className="v3-section v3-section--primary-quiet"
-      style={{ margin: 0, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}
+      style={{ margin: 0, padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       <div>
         <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
@@ -73,9 +73,9 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
         </span>
         <h2 style={{
           margin: '6px 0 0',
-          fontSize: 'clamp(20px, 5vw, 26px)',
+          fontSize: 24,
           lineHeight: 1.1,
-          letterSpacing: '-0.015em',
+          letterSpacing: 0,
           fontWeight: 600,
           color: 'var(--v3-text)'
         }}>
@@ -84,7 +84,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
         <p style={{
           margin: '8px 0 0',
           fontFamily: 'var(--font-body)',
-          fontSize: 11,
+          fontSize: 12,
           lineHeight: 1.5,
           color: 'var(--v3-text-muted)'
         }}>
@@ -97,13 +97,13 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
           value={scope}
           onChange={(e) => setScope(e.target.value)}
           onBlur={() => saveText('scope_text', scope, contact?.scope_text)}
-          placeholder="Demo and replace the existing 480 sf composite deck. Re-frame as needed, install code-compliant flashing, finish with the customer-selected Trex Transcend boards."
+          placeholder="Demo and replace the existing 480 sf composite deck. Frame again as needed, install code compliant flashing, and finish with Trex Transcend boards selected by the customer."
           rows={6}
           style={textareaStyle}
         />
       </FieldLabel>
 
-      <FieldLabel label="Exclusions" hint="What's NOT included. Spelling these out prevents change-order surprises.">
+      <FieldLabel label="Exclusions" hint="What's NOT included. Spelling these out prevents change order surprises.">
         <textarea
           value={exclusions}
           onChange={(e) => setExclusions(e.target.value)}
@@ -114,7 +114,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
         />
       </FieldLabel>
 
-      <FieldLabel label="Payment terms" hint="Deposit, progress payments, warranty, change-order policy.">
+      <FieldLabel label="Payment terms" hint="Deposit, progress payments, warranty, change order policy.">
         <textarea
           value={terms}
           onChange={(e) => setTerms(e.target.value)}
@@ -140,7 +140,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
 
 function FieldLabel({ label, hint, children }: any) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <Eyebrow>
         {label}
       </Eyebrow>
@@ -148,7 +148,7 @@ function FieldLabel({ label, hint, children }: any) {
       {hint && (
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 11, lineHeight: 1.45,
+          fontSize: 12, lineHeight: 1.45,
           color: 'var(--v3-text-faint, var(--v3-text-muted))'
         }}>
           {hint}
@@ -160,7 +160,7 @@ function FieldLabel({ label, hint, children }: any) {
 
 const textareaStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
-  padding: '11px 13px',
+  padding: '12px 12px',
   borderRadius: 10,
   background: 'var(--v3-surface-2)',
   border: '1px solid var(--v3-border)',

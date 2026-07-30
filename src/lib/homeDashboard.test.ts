@@ -91,7 +91,7 @@ describe('buildHomeDashboardBundle', () => {
     expect(bundle.dealsAtRisk.followUps).toBe(1)
   })
 
-  it('routes quote and change-order actions to their exact job tabs', () => {
+  it('routes quote and change order actions to their exact job tabs', () => {
     const bundle = buildHomeDashboardBundle(baseSource({
       contacts: [{
         id: 'quote-1',
@@ -174,7 +174,7 @@ describe('buildHomeDashboardBundle', () => {
       // now = Thursday 2026-06-18; week starts Sunday 2026-06-14.
       payments: [
         { contact_id: 'a', amount: 3000, created_at: '2026-06-16T12:00:00.000Z', paid_on: '2026-06-16' },
-        // Logged this week but backdated to last month — not this week's money.
+        // Logged this week but backdated to last month, not this week's money.
         { contact_id: 'b', amount: 900, created_at: '2026-06-16T12:00:00.000Z', paid_on: '2026-05-02' },
         { contact_id: 'c', amount: 500, created_at: '2026-04-01T12:00:00.000Z', paid_on: '2026-04-01' },
       ],

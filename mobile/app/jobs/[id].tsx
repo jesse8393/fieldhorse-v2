@@ -1,4 +1,4 @@
-// mobile/app/jobs/[id].tsx — Job detail.
+// mobile/app/jobs/[id].tsx, Job detail.
 // Stack route pushed from the Jobs list / Home recent jobs. Shows the
 // contact header (amount / paid / balance), client contact actions,
 // a Log Payment flow, and the payments + schedule lists. Reuses the
@@ -37,20 +37,20 @@ import { PaymentSheet } from '../../components/PaymentSheet'
 import { parseExpenseFromImage } from '../../lib/docIntelligence'
 
 const INVOICE_TINT: Record<string, string> = {
-  draft: '#5C5C5C', sent: '#6B7CA8', paid: '#4F8C5E', overdue: '#7d2a1f', void: '#5C5C5C'
+  draft: '#5C5C5C', sent: '#5C5C5C', paid: '#2D7A4F', overdue: '#C0392B', void: '#5C5C5C'
 }
 
 const CO_TINT: Record<string, string> = {
-  draft: '#C9963A', sent: '#6B7CA8', approved: '#4F8C5E', rejected: '#7d2a1f', void: '#5C5C5C'
+  draft: '#C9963A', sent: '#5C5C5C', approved: '#2D7A4F', rejected: '#C0392B', void: '#5C5C5C'
 }
 
 const INSP_TINT: Record<string, string> = {
-  pending: '#C9963A', pass: '#4F8C5E', fail: '#7d2a1f'
+  pending: '#C9963A', pass: '#2D7A4F', fail: '#C0392B'
 }
 
 const STAGE_TINT: Record<string, string> = {
-  lead: '#6B7CA8', quote: '#B07A4A', job: '#4F8C5E',
-  invoice: '#C9963A', closed: '#5C5C5C', lost: '#7d2a1f'
+  lead: '#5C5C5C', quote: '#C9963A', job: '#2D7A4F',
+  invoice: '#C9963A', closed: '#5C5C5C', lost: '#C0392B'
 }
 
 const STAGES = ['lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
@@ -479,7 +479,7 @@ export default function JobDetailScreen() {
     const { error, id } = await uploadPhoto({ userId: user.id, jobId: contact.id, uri })
     setPhotoBusy(false)
     if (error) { Alert.alert("Couldn't upload photo", error.message); return }
-    // Auto-caption in the background — never blocks the upload.
+    // Auto-caption in the background, never blocks the upload.
     if (id && base64) {
       captionPhoto({ rowId: id, jobId: contact.id, imageBase64: base64, mediaType: 'image/jpeg' })
     }
@@ -578,7 +578,7 @@ export default function JobDetailScreen() {
 
   if (isPending) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center"><ActivityIndicator color="#E8B865" /></View>
+      <View className="flex-1 bg-bg items-center justify-center"><ActivityIndicator color="#C9963A" /></View>
     )
   }
   if (!contact) {
@@ -595,43 +595,43 @@ export default function JobDetailScreen() {
   return (
     <View className="flex-1">
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
         <View className="flex-row items-center justify-between mb-4">
           <Pressable onPress={() => router.back()} className="flex-row items-center" style={{ gap: 4 }}>
-            <ChevronLeft color="#E8B865" size={20} />
+            <ChevronLeft color="#C9963A" size={20} />
             <Text className="text-gold-bright font-bold">Jobs</Text>
           </Pressable>
           <Pressable onPress={openEdit} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Pencil color="#E8B865" size={16} />
+            <Pencil color="#C9963A" size={16} />
             <Text className="text-gold-bright font-bold">Edit</Text>
           </Pressable>
         </View>
 
-        <Text className="text-ink text-3xl font-bold" numberOfLines={2}>{contact.name || 'Untitled'}</Text>
-        <Text className="text-xs font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>{contact.stage}</Text>
+        <Text className="text-ink text-2xl font-bold" numberOfLines={2}>{contact.name || 'Untitled'}</Text>
+        <Text className="text-xs font-bold uppercase tracking-[0px] mt-1" style={{ color: tint }}>{contact.stage}</Text>
         {contact.job_title || contact.job_type ? (
           <Text className="text-ink-muted text-sm mt-1">{contact.job_title || contact.job_type}</Text>
         ) : null}
 
         {/* Money summary */}
-        <View className="flex-row mt-5" style={{ gap: 10 }}>
+        <View className="flex-row mt-5" style={{ gap: 12 }}>
           <Stat label="Contract" value={money(totals.amount)} />
-          <Stat label="Paid" value={money(totals.paid)} tone="#4ade80" />
-          <Stat label="Balance" value={money(totals.balance)} tone="#E8B865" />
+          <Stat label="Paid" value={money(totals.paid)} tone="#2D7A4F" />
+          <Stat label="Balance" value={money(totals.balance)} tone="#C9963A" />
         </View>
 
         {/* Quote builder */}
         <Pressable
           onPress={() => router.push(`/quote/${contact.id}`)}
-          className="flex-row items-center justify-center rounded-2xl py-3 mt-3 border border-[rgba(232,184,101,0.3)]"
-          style={{ gap: 6, backgroundColor: 'rgba(232,184,101,0.10)' }}
+          className="flex-row items-center justify-center rounded-[10px] py-3 mt-3 border border-[rgba(201, 150, 58,0.3)]"
+          style={{ gap: 8, backgroundColor: 'rgba(201, 150, 58,0.10)' }}
         >
-          <FileText color="#E8B865" size={16} />
+          <FileText color="#C9963A" size={16} />
           <Text className="text-gold-bright font-bold">Build estimate</Text>
         </Pressable>
 
         {/* Stage progression */}
-        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-6 mb-2">Stage</Text>
+        <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-6 mb-2">Stage</Text>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
           {STAGES.map((s) => {
             const active = contact.stage === s
@@ -641,17 +641,17 @@ export default function JobDetailScreen() {
                 key={s}
                 onPress={() => changeStage(s)}
                 disabled={!!stageSaving}
-                className="rounded-full px-3.5 py-2 border flex-row items-center"
+                className="rounded-[10px] px-4 py-2 border flex-row items-center"
                 style={{
-                  gap: 6,
-                  borderColor: active ? chipTint : 'rgba(255,240,210,0.12)',
+                  gap: 8,
+                  borderColor: active ? chipTint : 'rgba(242, 237, 228,0.12)',
                   backgroundColor: active ? chipTint : 'transparent'
                 }}
               >
-                {stageSaving === s ? <ActivityIndicator size="small" color="#1A120A" /> : null}
+                {stageSaving === s ? <ActivityIndicator size="small" color="#141414" /> : null}
                 <Text
-                  className="text-xs font-bold uppercase tracking-wider"
-                  style={{ color: active ? '#1A120A' : '#9b948a' }}
+                  className="text-xs font-bold uppercase tracking-[0px]"
+                  style={{ color: active ? '#141414' : '#C9963A' }}
                 >
                   {s}
                 </Text>
@@ -663,22 +663,22 @@ export default function JobDetailScreen() {
         {contact.stage !== 'closed' && contact.stage !== 'lost' ? (
           <Pressable
             onPress={() => setCompleteOpen(true)}
-            className="rounded-2xl py-3.5 mt-3 items-center flex-row justify-center border"
-            style={{ gap: 8, borderColor: 'rgba(79,140,94,0.4)', backgroundColor: 'rgba(79,140,94,0.12)' }}
+            className="rounded-[10px] py-4 mt-3 items-center flex-row justify-center border"
+            style={{ gap: 8, borderColor: 'rgba(45, 122, 79,0.4)', backgroundColor: 'rgba(45, 122, 79,0.12)' }}
           >
-            <Flag color="#5BB97A" size={16} />
-            <Text className="font-bold" style={{ color: '#5BB97A' }}>Mark complete</Text>
+            <Flag color="#2D7A4F" size={16} />
+            <Text className="font-bold" style={{ color: '#2D7A4F' }}>Mark complete</Text>
           </Pressable>
         ) : null}
 
         {/* Client link */}
-        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Client</Text>
+        <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-7 mb-2">Client</Text>
         <Pressable
           onPress={() => setClientPickOpen(true)}
-          className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
+          className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)] flex-row items-center justify-between"
         >
-          <View className="flex-row items-center flex-1" style={{ gap: 10 }}>
-            <User color="#E8B865" size={16} />
+          <View className="flex-row items-center flex-1" style={{ gap: 12 }}>
+            <User color="#C9963A" size={16} />
             <Text className="text-ink text-base font-semibold" numberOfLines={1}>
               {linkedClient ? (linkedClient.name || 'Unnamed client') : 'No client linked'}
             </Text>
@@ -687,7 +687,7 @@ export default function JobDetailScreen() {
         </Pressable>
 
         {/* Todos */}
-        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">
+        <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-7 mb-3">
           Punch list{todos.length ? ` · ${todos.filter((t) => t.done).length}/${todos.length}` : ''}
         </Text>
         <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
@@ -698,27 +698,27 @@ export default function JobDetailScreen() {
             returnKeyType="done"
             placeholder="Add a task…"
             placeholderTextColor="rgba(242,237,228,0.4)"
-            className="flex-1 bg-surface border border-[rgba(255,240,210,0.10)] rounded-xl px-4 py-3 text-ink"
+            className="flex-1 bg-surface border border-[rgba(242, 237, 228,0.10)] rounded-[10px] px-4 py-3 text-ink"
           />
-          <Pressable onPress={submitTodo} className="rounded-xl items-center justify-center" style={{ width: 46, height: 46, backgroundColor: '#E8B865' }}>
-            <Plus color="#1A120A" size={20} strokeWidth={2.6} />
+          <Pressable onPress={submitTodo} className="rounded-[10px] items-center justify-center" style={{ width: 46, height: 46, backgroundColor: '#C9963A' }}>
+            <Plus color="#141414" size={20} strokeWidth={2.6} />
           </Pressable>
         </View>
         {todos.length > 0 ? (
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 8 }}>
             {todos.map((t) => (
               <Pressable
                 key={t.id}
                 onPress={() => contact && toggleTodo({ id: t.id, jobId: contact.id, done: !t.done })}
                 onLongPress={() => contact && deleteTodo({ id: t.id, jobId: contact.id })}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
-                style={{ gap: 10 }}
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center"
+                style={{ gap: 12 }}
               >
-                {t.done ? <CheckSquare color="#4F8C5E" size={18} /> : <Square color="#9b948a" size={18} />}
+                {t.done ? <CheckSquare color="#2D7A4F" size={18} /> : <Square color="#C9963A" size={18} />}
                 <Text
                   className="flex-1 text-sm"
-                  style={{ color: t.done ? '#9b948a' : '#F2EDE4', textDecorationLine: t.done ? 'line-through' : 'none' }}
+                  style={{ color: t.done ? '#C9963A' : '#F2EDE4', textDecorationLine: t.done ? 'line-through' : 'none' }}
                   numberOfLines={2}
                 >
                   {t.text}
@@ -730,9 +730,9 @@ export default function JobDetailScreen() {
 
         {/* Photos */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Photos</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Photos</Text>
           <Pressable onPress={addPhoto} disabled={photoBusy} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            {photoBusy ? <ActivityIndicator size="small" color="#E8B865" /> : <Camera color="#E8B865" size={14} />}
+            {photoBusy ? <ActivityIndicator size="small" color="#C9963A" /> : <Camera color="#C9963A" size={14} />}
             <Text className="text-gold-bright text-xs font-bold">Add</Text>
           </Pressable>
         </View>
@@ -744,10 +744,10 @@ export default function JobDetailScreen() {
               <Pressable key={ph.id} onLongPress={() => confirmDeletePhoto(ph.id, ph.path)} delayLongPress={350} style={{ width: 120 }}>
                 <Image
                   source={{ uri: ph.url }}
-                  style={{ width: 120, height: 120, borderRadius: 14, backgroundColor: '#1B1816' }}
+                  style={{ width: 120, height: 120, borderRadius: 10, backgroundColor: '#141414' }}
                 />
                 {ph.caption ? (
-                  <Text className="text-ink-muted text-[11px] mt-1.5" numberOfLines={2}>{ph.caption}</Text>
+                  <Text className="text-ink-muted text-xs mt-1.5" numberOfLines={2}>{ph.caption}</Text>
                 ) : null}
               </Pressable>
             ))}
@@ -756,33 +756,33 @@ export default function JobDetailScreen() {
 
         {/* Files */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Files</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Files</Text>
           <Pressable onPress={pickFile} disabled={fileBusy} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            {fileBusy ? <ActivityIndicator size="small" color="#E8B865" /> : <Paperclip color="#E8B865" size={14} />}
+            {fileBusy ? <ActivityIndicator size="small" color="#C9963A" /> : <Paperclip color="#C9963A" size={14} />}
             <Text className="text-gold-bright text-xs font-bold">Upload</Text>
           </Pressable>
         </View>
         {files.length === 0 ? (
           <Text className="text-ink-muted text-sm">No files yet. Attach contracts, permits, or PDFs.</Text>
         ) : (
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 8 }}>
             {files.map((f) => (
               <Pressable
                 key={f.id}
                 onPress={() => openFile(f)}
                 onLongPress={() => confirmDeleteFile(f)}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
-                style={{ gap: 10 }}
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center"
+                style={{ gap: 12 }}
               >
-                <FileText color="#E8B865" size={16} />
+                <FileText color="#C9963A" size={16} />
                 <View className="flex-1">
                   <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{f.filename || 'Document'}</Text>
                   <Text className="text-ink-muted text-xs mt-0.5">
                     {fmtSize(f.size_bytes)}{f.uploaded_at ? ` · ${new Date(f.uploaded_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
                   </Text>
                 </View>
-                <Download color="#9b948a" size={16} />
+                <Download color="#C9963A" size={16} />
               </Pressable>
             ))}
           </View>
@@ -790,12 +790,12 @@ export default function JobDetailScreen() {
 
         {/* Contact actions */}
         {(contact.phone || contact.email) && (
-          <View className="flex-row mt-4" style={{ gap: 10 }}>
+          <View className="flex-row mt-4" style={{ gap: 12 }}>
             {contact.phone ? (
-              <Action icon={<Phone color="#E8B865" size={16} />} label="Call" onPress={() => Linking.openURL(`tel:${contact.phone}`)} />
+              <Action icon={<Phone color="#C9963A" size={16} />} label="Call" onPress={() => Linking.openURL(`tel:${contact.phone}`)} />
             ) : null}
             {contact.email ? (
-              <Action icon={<Mail color="#E8B865" size={16} />} label="Email" onPress={() => Linking.openURL(`mailto:${contact.email}`)} />
+              <Action icon={<Mail color="#C9963A" size={16} />} label="Email" onPress={() => Linking.openURL(`mailto:${contact.email}`)} />
             ) : null}
           </View>
         )}
@@ -803,15 +803,15 @@ export default function JobDetailScreen() {
         {/* Log payment */}
         <Pressable
           onPress={() => setPayOpen(true)}
-          className="flex-row items-center justify-center rounded-2xl py-3.5 mt-5"
-          style={{ gap: 6, backgroundColor: '#E8B865' }}
+          className="flex-row items-center justify-center rounded-[10px] py-4 mt-5"
+          style={{ gap: 8, backgroundColor: '#C9963A' }}
         >
-          <Plus color="#1A120A" size={16} />
-          <Text className="text-[#1A120A] font-bold">Log payment</Text>
+          <Plus color="#141414" size={16} />
+          <Text className="text-[#141414] font-bold">Log payment</Text>
         </Pressable>
 
         {/* Payments */}
-        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">Payments</Text>
+        <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-7 mb-3">Payments</Text>
         {payments.length === 0 ? (
           <Text className="text-ink-muted text-sm">No payments logged.</Text>
         ) : (
@@ -821,25 +821,25 @@ export default function JobDetailScreen() {
                 key={p.id}
                 onLongPress={() => confirmDeletePayment(p.id)}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row justify-between items-center"
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row justify-between items-center"
               >
                 <Text className="text-ink-muted text-sm">
-                  {p.paid_on ? new Date(p.paid_on).toLocaleDateString() : '—'} · {p.method || 'payment'}
+                  {p.paid_on ? new Date(p.paid_on).toLocaleDateString() : '\u2003'} · {p.method || 'payment'}
                 </Text>
                 <Text className="text-ink font-bold">{money(Number(p.amount || 0))}</Text>
               </Pressable>
             ))}
-            <Text className="text-ink-muted text-[10px] mt-1">Long-press a payment to delete.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Touch and hold a payment to delete.</Text>
           </View>
         )}
 
         {/* Expenses */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">
             Expenses{totals.spent ? ` · ${money(totals.spent)}` : ''}
           </Text>
           <Pressable onPress={() => setExpOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Plus color="#E8B865" size={14} />
+            <Plus color="#C9963A" size={14} />
             <Text className="text-gold-bright text-xs font-bold">Add</Text>
           </Pressable>
         </View>
@@ -852,40 +852,40 @@ export default function JobDetailScreen() {
                 key={e.id}
                 onLongPress={() => confirmDeleteExpense(e.id)}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row justify-between items-center"
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row justify-between items-center"
               >
                 <View className="flex-1 pr-3">
                   <Text className="text-ink text-sm font-semibold" numberOfLines={1}>
                     {e.category || e.description || 'Expense'}
                   </Text>
                   <Text className="text-ink-muted text-xs mt-0.5">
-                    {e.expense_date ? new Date(e.expense_date).toLocaleDateString() : '—'}
+                    {e.expense_date ? new Date(e.expense_date).toLocaleDateString() : '\u2003'}
                   </Text>
                 </View>
                 <Text className="text-ink font-bold">{money(Number(e.amount || 0))}</Text>
               </Pressable>
             ))}
-            <Text className="text-ink-muted text-[10px] mt-1">Long-press an expense to delete.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Touch and hold an expense to delete.</Text>
           </View>
         )}
 
         {/* Invoices */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Invoices</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Invoices</Text>
           <Pressable onPress={() => setInvOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <FileText color="#E8B865" size={14} />
+            <FileText color="#C9963A" size={14} />
             <Text className="text-gold-bright text-xs font-bold">New</Text>
           </Pressable>
         </View>
         {totals.contractTotal > 0 ? (
-          <View className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)] mb-3">
-            <View className="flex-row flex-wrap" style={{ gap: 18 }}>
+          <View className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)] mb-3">
+            <View className="flex-row flex-wrap" style={{ gap: 16 }}>
               <InsStat label="Contract" value={money(totals.contractTotal)} />
               <InsStat label="Invoiced" value={money(totals.invoiced)} />
               <InsStat label="Paid" value={money(totals.paid)} />
               <InsStat label="Balance" value={money(Math.max(0, totals.contractTotal - totals.paid))} />
             </View>
-            {totals.approvedCO > 0 ? <Text className="text-ink-muted text-[10px] mt-3">Includes {money(totals.approvedCO)} in approved change orders.</Text> : null}
+            {totals.approvedCO > 0 ? <Text className="text-ink-muted text-xs mt-3">Includes {money(totals.approvedCO)} in approved change orders.</Text> : null}
           </View>
         ) : null}
         {invoices.length === 0 ? (
@@ -900,27 +900,27 @@ export default function JobDetailScreen() {
                   onPress={() => cycleInvoiceStatus(inv)}
                   onLongPress={() => confirmDeleteInvoice(inv.id)}
                   delayLongPress={350}
-                  className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
+                  className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center justify-between"
                 >
                   <View className="flex-1 pr-3">
                     <Text className="text-ink text-sm font-semibold" numberOfLines={1}>
                       {inv.title || `Invoice #${inv.sequence_number ?? ''}`}
                     </Text>
-                    <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>{inv.status}</Text>
+                    <Text className="text-xs font-bold uppercase tracking-[0px] mt-1" style={{ color: tint }}>{inv.status}</Text>
                   </View>
                   <Text className="text-ink font-bold">{money(Number(inv.amount || 0))}</Text>
                 </Pressable>
               )
             })}
-            <Text className="text-ink-muted text-[10px] mt-1">Tap to advance status · long-press to delete.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Tap to advance status · touch and hold to delete.</Text>
           </View>
         )}
 
         {/* Change orders */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Change orders</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Change orders</Text>
           <Pressable onPress={() => setCoOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Plus color="#E8B865" size={14} />
+            <Plus color="#C9963A" size={14} />
             <Text className="text-gold-bright text-xs font-bold">New</Text>
           </Pressable>
         </View>
@@ -936,11 +936,11 @@ export default function JobDetailScreen() {
                   onPress={() => cycleChangeOrder(co)}
                   onLongPress={() => confirmDeleteChangeOrder(co.id)}
                   delayLongPress={350}
-                  className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
+                  className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center justify-between"
                 >
                   <View className="flex-1 pr-3">
                     <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{co.title}</Text>
-                    <Text className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: tint }}>
+                    <Text className="text-xs font-bold uppercase tracking-[0px] mt-1" style={{ color: tint }}>
                       {co.status}{co.status === 'approved' && (co as any).approved_by_name ? ` · ${(co as any).approved_by_name}` : ''}
                     </Text>
                   </View>
@@ -948,15 +948,15 @@ export default function JobDetailScreen() {
                 </Pressable>
               )
             })}
-            <Text className="text-ink-muted text-[10px] mt-1">Tap to advance status · long-press to delete.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Tap to advance status · touch and hold to delete.</Text>
           </View>
         )}
 
         {/* Inspections */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Inspections</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Inspections</Text>
           <Pressable onPress={() => setInspOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <ClipboardCheck color="#E8B865" size={14} />
+            <ClipboardCheck color="#C9963A" size={14} />
             <Text className="text-gold-bright text-xs font-bold">Add</Text>
           </Pressable>
         </View>
@@ -973,27 +973,27 @@ export default function JobDetailScreen() {
                   onPress={() => cycleInspection(insp)}
                   onLongPress={() => confirmDeleteInspection(insp.id)}
                   delayLongPress={350}
-                  className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
+                  className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center justify-between"
                 >
                   <View className="flex-1 pr-3">
                     <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{insp.trade || 'Inspection'}</Text>
-                    <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>{insp.inspector || '—'}</Text>
+                    <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>{insp.inspector || '\u2003'}</Text>
                   </View>
-                  <Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color: tint }}>{result}</Text>
+                  <Text className="text-xs font-bold uppercase tracking-[0px]" style={{ color: tint }}>{result}</Text>
                 </Pressable>
               )
             })}
-            <Text className="text-ink-muted text-[10px] mt-1">Tap to cycle result · long-press to delete.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Tap to cycle result · touch and hold to delete.</Text>
           </View>
         )}
 
         {/* Mileage */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">
             Mileage{mileageTotal ? ` · ${mileageTotal} mi` : ''}
           </Text>
           <Pressable onPress={() => setMilesOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Car color="#E8B865" size={14} />
+            <Car color="#C9963A" size={14} />
             <Text className="text-gold-bright text-xs font-bold">Log</Text>
           </Pressable>
         </View>
@@ -1006,25 +1006,25 @@ export default function JobDetailScreen() {
                 key={m.id}
                 onLongPress={() => confirmDeleteMileage(m.id)}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center justify-between"
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center justify-between"
               >
                 <View className="flex-1 pr-3">
                   <Text className="text-ink text-sm font-semibold">{m.miles} mi</Text>
                   <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>
-                    {m.drove_on ? new Date(m.drove_on).toLocaleDateString() : '—'}{m.purpose ? ` · ${m.purpose}` : ''}
+                    {m.drove_on ? new Date(m.drove_on).toLocaleDateString() : '\u2003'}{m.purpose ? ` · ${m.purpose}` : ''}
                   </Text>
                 </View>
               </Pressable>
             ))}
-            <Text className="text-ink-muted text-[10px] mt-1">Long-press a trip to delete.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Touch and hold a trip to delete.</Text>
           </View>
         )}
 
         {/* Quote terms */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Quote terms</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Quote terms</Text>
           <Pressable onPress={openQuoteTerms} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Pencil color="#E8B865" size={13} />
+            <Pencil color="#C9963A" size={13} />
             <Text className="text-gold-bright text-xs font-bold">Edit</Text>
           </Pressable>
         </View>
@@ -1033,14 +1033,14 @@ export default function JobDetailScreen() {
           const hasTerms = c?.scope_text || c?.exclusions_text || c?.terms_text
           if (!hasTerms) {
             return (
-              <Pressable onPress={openQuoteTerms} className="bg-[rgba(24,20,17,0.6)] rounded-xl p-4 border border-[rgba(232,184,101,0.12)] flex-row items-center" style={{ gap: 10 }}>
-                <FileText color="#E8B865" size={16} />
-                <Text className="text-ink-muted text-sm flex-1">Add scope, exclusions & payment terms — they flow onto every proposal.</Text>
+              <Pressable onPress={openQuoteTerms} className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)] flex-row items-center" style={{ gap: 12 }}>
+                <FileText color="#C9963A" size={16} />
+                <Text className="text-ink-muted text-sm flex-1">Add scope, exclusions & payment terms, they flow onto every proposal.</Text>
               </Pressable>
             )
           }
           return (
-            <View className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)]" style={{ gap: 12 }}>
+            <View className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)]" style={{ gap: 12 }}>
               {c?.scope_text ? <QuoteTermBlock label="Scope of work" text={c.scope_text} /> : null}
               {c?.exclusions_text ? <QuoteTermBlock label="Exclusions" text={c.exclusions_text} /> : null}
               {c?.terms_text ? <QuoteTermBlock label="Payment terms" text={c.terms_text} /> : null}
@@ -1049,7 +1049,7 @@ export default function JobDetailScreen() {
         })()}
 
         {/* Milestones */}
-        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">
+        <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-7 mb-3">
           Milestones{milestones.length ? ` · ${milestones.filter((m) => m.done).length}/${milestones.length}` : ''}
         </Text>
         <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
@@ -1060,26 +1060,26 @@ export default function JobDetailScreen() {
             returnKeyType="done"
             placeholder="Add a checkpoint…"
             placeholderTextColor="rgba(242,237,228,0.4)"
-            className="flex-1 bg-surface border border-[rgba(255,240,210,0.10)] rounded-xl px-4 py-3 text-ink"
+            className="flex-1 bg-surface border border-[rgba(242, 237, 228,0.10)] rounded-[10px] px-4 py-3 text-ink"
           />
-          <Pressable onPress={addMilestone} className="rounded-xl items-center justify-center" style={{ width: 46, height: 46, backgroundColor: '#E8B865' }}>
-            <Plus color="#1A120A" size={20} strokeWidth={2.6} />
+          <Pressable onPress={addMilestone} className="rounded-[10px] items-center justify-center" style={{ width: 46, height: 46, backgroundColor: '#C9963A' }}>
+            <Plus color="#141414" size={20} strokeWidth={2.6} />
           </Pressable>
         </View>
         {milestones.length > 0 ? (
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 8 }}>
             {milestones.map((m, i) => (
               <Pressable
                 key={`${m.created_at}-${i}`}
                 onPress={() => toggleMilestone(i)}
                 onLongPress={() => removeMilestone(i)}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
-                style={{ gap: 10 }}
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center"
+                style={{ gap: 12 }}
               >
-                {m.done ? <CheckSquare color="#4F8C5E" size={18} /> : <Square color="#9b948a" size={18} />}
-                <Flag color={m.done ? '#4F8C5E' : '#E8B865'} size={13} />
-                <Text className="flex-1 text-sm" style={{ color: m.done ? '#9b948a' : '#F2EDE4', textDecorationLine: m.done ? 'line-through' : 'none' }} numberOfLines={2}>{m.label}</Text>
+                {m.done ? <CheckSquare color="#2D7A4F" size={18} /> : <Square color="#C9963A" size={18} />}
+                <Flag color={m.done ? '#2D7A4F' : '#C9963A'} size={13} />
+                <Text className="flex-1 text-sm" style={{ color: m.done ? '#C9963A' : '#F2EDE4', textDecorationLine: m.done ? 'line-through' : 'none' }} numberOfLines={2}>{m.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -1087,25 +1087,25 @@ export default function JobDetailScreen() {
 
         {/* Insurance claim */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Insurance claim</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Insurance claim</Text>
           <Pressable onPress={openInsurance} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Pencil color="#E8B865" size={13} />
+            <Pencil color="#C9963A" size={13} />
             <Text className="text-gold-bright text-xs font-bold">{insurance ? 'Edit' : 'Add'}</Text>
           </Pressable>
         </View>
         {!insurance ? (
-          <Pressable onPress={openInsurance} className="bg-[rgba(24,20,17,0.6)] rounded-xl p-4 border border-[rgba(232,184,101,0.12)] flex-row items-center" style={{ gap: 10 }}>
-            <ShieldCheck color="#E8B865" size={16} />
-            <Text className="text-ink-muted text-sm flex-1">Track a carrier claim — surfaces RCV / ACV, deductible & supplement.</Text>
+          <Pressable onPress={openInsurance} className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)] flex-row items-center" style={{ gap: 12 }}>
+            <ShieldCheck color="#C9963A" size={16} />
+            <Text className="text-ink-muted text-sm flex-1">Track a carrier claim, surfaces RCV / ACV, deductible & supplement.</Text>
           </Pressable>
         ) : (
-          <Pressable onPress={openInsurance} className="bg-[rgba(24,20,17,0.6)] rounded-2xl p-4 border border-[rgba(232,184,101,0.12)]">
+          <Pressable onPress={openInsurance} className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)]">
             <View className="flex-row items-center" style={{ gap: 8 }}>
-              <ShieldCheck color="#E8B865" size={16} />
+              <ShieldCheck color="#C9963A" size={16} />
               <Text className="text-ink text-base font-semibold flex-1" numberOfLines={1}>{insurance.carrier || 'Carrier'}{insurance.claim_number ? ` · ${insurance.claim_number}` : ''}</Text>
             </View>
             {insurance.adjuster ? <Text className="text-ink-muted text-xs mt-1">{insurance.adjuster}</Text> : null}
-            <View className="flex-row flex-wrap mt-3" style={{ gap: 14 }}>
+            <View className="flex-row flex-wrap mt-3" style={{ gap: 12 }}>
               {insurance.rcv != null ? <InsStat label="RCV" value={money(insurance.rcv)} /> : null}
               {insurance.acv != null ? <InsStat label="ACV" value={money(insurance.acv)} /> : null}
               {insurance.deductible != null ? <InsStat label="Deductible" value={money(insurance.deductible)} /> : null}
@@ -1117,18 +1117,18 @@ export default function JobDetailScreen() {
         )}
 
         {/* Schedule */}
-        <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-3">Schedule</Text>
+        <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-7 mb-3">Schedule</Text>
         {schedule.length === 0 ? (
           <Text className="text-ink-muted text-sm">No events for this job.</Text>
         ) : (
           <View style={{ gap: 8 }}>
             {schedule.map((ev) => (
-              <View key={ev.id} className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center" style={{ gap: 10 }}>
-                <Calendar color="#E8B865" size={16} />
+              <View key={ev.id} className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center" style={{ gap: 12 }}>
+                <Calendar color="#C9963A" size={16} />
                 <View className="flex-1">
                   <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{ev.title || 'Scheduled event'}</Text>
                   <Text className="text-ink-muted text-xs mt-0.5">
-                    {ev.start_at ? new Date(ev.start_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}
+                    {ev.start_at ? new Date(ev.start_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '\u2003'}
                   </Text>
                 </View>
               </View>
@@ -1138,9 +1138,9 @@ export default function JobDetailScreen() {
 
         {/* Subs */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Subcontractors</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Subcontractors</Text>
           <Pressable onPress={() => setSubOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Plus color="#E8B865" size={14} />
+            <Plus color="#C9963A" size={14} />
             <Text className="text-gold-bright text-xs font-bold">Add</Text>
           </Pressable>
         </View>
@@ -1153,34 +1153,34 @@ export default function JobDetailScreen() {
                 key={s.id}
                 onLongPress={() => confirmDeleteSub(s.id)}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)] flex-row items-center"
-                style={{ gap: 10 }}
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center"
+                style={{ gap: 12 }}
               >
-                <Users color="#E8B865" size={16} />
+                <Users color="#C9963A" size={16} />
                 <View className="flex-1">
                   <Text className="text-ink text-sm font-semibold" numberOfLines={1}>{s.name || 'Subcontractor'}</Text>
-                  <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>{s.trade || s.phone || '—'}</Text>
+                  <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>{s.trade || s.phone || '\u2003'}</Text>
                 </View>
                 {s.rate != null ? <Text className="text-ink-muted text-sm">{money(Number(s.rate))}</Text> : null}
               </Pressable>
             ))}
-            <Text className="text-ink-muted text-[10px] mt-1">Long-press a sub to remove.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Touch and hold a sub to remove.</Text>
           </View>
         )}
 
         {/* Job notes (single field) */}
         {contact.notes ? (
           <>
-            <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase mt-7 mb-2">Job notes</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-7 mb-2">Job notes</Text>
             <Text className="text-ink text-sm">{contact.notes}</Text>
           </>
         ) : null}
 
         {/* Activity / notes timeline */}
         <View className="flex-row items-center justify-between mt-7 mb-3">
-          <Text className="text-ink-muted text-[10px] font-bold tracking-[2px] uppercase">Activity</Text>
+          <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase">Activity</Text>
           <Pressable onPress={() => setNoteOpen(true)} className="flex-row items-center" style={{ gap: 4 }} hitSlop={8}>
-            <Plus color="#E8B865" size={14} />
+            <Plus color="#C9963A" size={14} />
             <Text className="text-gold-bright text-xs font-bold">Add note</Text>
           </Pressable>
         </View>
@@ -1193,15 +1193,15 @@ export default function JobDetailScreen() {
                 key={n.id}
                 onLongPress={() => confirmDeleteNote(n.id)}
                 delayLongPress={350}
-                className="bg-[rgba(24,20,17,0.6)] rounded-xl p-3 border border-[rgba(232,184,101,0.12)]"
+                className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)]"
               >
-                <Text className="text-ink text-sm">{n.text || '—'}</Text>
-                <Text className="text-ink-muted text-[10px] mt-1">
+                <Text className="text-ink text-sm">{n.text || '\u2003'}</Text>
+                <Text className="text-ink-muted text-xs mt-1">
                   {n.created_at ? new Date(n.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
                 </Text>
               </Pressable>
             ))}
-            <Text className="text-ink-muted text-[10px] mt-1">Long-press a note to delete.</Text>
+            <Text className="text-ink-muted text-xs mt-1">Touch and hold a note to delete.</Text>
           </View>
         )}
       </ScrollView>
@@ -1211,52 +1211,52 @@ export default function JobDetailScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setEditOpen(false)} />
           <ScrollView
-            className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]"
+            className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]"
             contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }}
             style={{ maxHeight: '85%' }}
           >
             <Text className="text-ink text-xl font-bold mb-5">Edit job</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Name</Text>
             <TextInput
               value={editName}
               onChangeText={setEditName}
               placeholder="Homeowner or company"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Job title</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Job title</Text>
             <TextInput
               value={editTitle}
               onChangeText={setEditTitle}
               placeholder="Kitchen remodel, roof…"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <View className="flex-row mb-4" style={{ gap: 12 }}>
               <View className="flex-1">
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Phone</Text>
+                <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Phone</Text>
                 <TextInput
                   value={editPhone}
                   onChangeText={setEditPhone}
                   keyboardType="phone-pad"
                   placeholder="(555) 555-5555"
                   placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                  className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
                 />
               </View>
               <View className="flex-1">
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Value</Text>
+                <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Value</Text>
                 <TextInput
                   value={editAmount}
                   onChangeText={setEditAmount}
                   keyboardType="decimal-pad"
                   placeholder="$0"
                   placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                  className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
                 />
               </View>
             </View>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Email</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Email</Text>
             <TextInput
               value={editEmail}
               onChangeText={setEditEmail}
@@ -1264,41 +1264,41 @@ export default function JobDetailScreen() {
               autoCapitalize="none"
               placeholder="name@email.com"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Address</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Address</Text>
             <TextInput
               value={editAddress}
               onChangeText={setEditAddress}
               placeholder="Job site address"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Notes</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Notes</Text>
             <TextInput
               value={editNotes}
               onChangeText={setEditNotes}
               multiline
               placeholder="Anything worth remembering"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
               style={{ minHeight: 72, textAlignVertical: 'top' }}
             />
             <Pressable
               onPress={submitEdit}
               disabled={editSaving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: editSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              className="rounded-[10px] py-4 items-center"
+              style={{ backgroundColor: editSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}
             >
-              {editSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save changes</Text>}
+              {editSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Save changes</Text>}
             </Pressable>
             <Pressable
               onPress={confirmDeleteJob}
-              className="flex-row items-center justify-center rounded-xl py-3.5 mt-3 border border-[rgba(232,90,87,0.3)]"
-              style={{ gap: 6, backgroundColor: 'rgba(232,90,87,0.10)' }}
+              className="flex-row items-center justify-center rounded-[10px] py-4 mt-3 border border-[rgba(192, 57, 43,0.3)]"
+              style={{ gap: 8, backgroundColor: 'rgba(192, 57, 43,0.10)' }}
             >
-              <Trash2 color="#f5a294" size={16} />
-              <Text className="text-[#f5a294] font-bold">Delete job</Text>
+              <Trash2 color="#C9963A" size={16} />
+              <Text className="text-[#C9963A] font-bold">Delete job</Text>
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -1308,45 +1308,45 @@ export default function JobDetailScreen() {
       <Modal visible={subOpen} transparent animationType="slide" onRequestClose={() => setSubOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setSubOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Add subcontractor</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Name</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Name</Text>
             <TextInput
               value={subName} onChangeText={setSubName} autoFocus
               placeholder="Sub or company" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <View className="flex-row mb-4" style={{ gap: 12 }}>
               <View className="flex-1">
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Trade</Text>
+                <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Trade</Text>
                 <TextInput
                   value={subTrade} onChangeText={setSubTrade}
                   placeholder="Electrical, framing…" placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                  className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
                 />
               </View>
               <View style={{ width: 110 }}>
-                <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Rate</Text>
+                <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Rate</Text>
                 <TextInput
                   value={subRate} onChangeText={setSubRate} keyboardType="decimal-pad"
                   placeholder="$0" placeholderTextColor="rgba(242,237,228,0.4)"
-                  className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                  className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
                 />
               </View>
             </View>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Phone</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Phone</Text>
             <TextInput
               value={subPhone} onChangeText={setSubPhone} keyboardType="phone-pad"
               placeholder="(555) 555-5555" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
             />
             <Pressable
               onPress={submitSub}
               disabled={subSaving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: subSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              className="rounded-[10px] py-4 items-center"
+              style={{ backgroundColor: subSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}
             >
-              {subSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Add sub</Text>}
+              {subSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Add sub</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1356,12 +1356,12 @@ export default function JobDetailScreen() {
       <Modal visible={clientPickOpen} transparent animationType="slide" onRequestClose={() => setClientPickOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setClientPickOpen(false)} />
-          <View className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]" style={{ maxHeight: '70%', paddingBottom: insets.bottom + 12 }}>
+          <View className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]" style={{ maxHeight: '70%', paddingBottom: insets.bottom + 12 }}>
             <Text className="text-ink text-xl font-bold px-6 pt-6 pb-3">Link a client</Text>
             <ScrollView contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 12 }}>
               <Pressable
                 onPress={() => linkClient(null)}
-                className="rounded-xl p-3 border border-[rgba(255,240,210,0.10)]"
+                className="rounded-[10px] p-3 border border-[rgba(242, 237, 228,0.10)]"
               >
                 <Text className="text-ink-muted font-semibold">No client</Text>
               </Pressable>
@@ -1371,8 +1371,8 @@ export default function JobDetailScreen() {
                   <Pressable
                     key={c.id}
                     onPress={() => linkClient(c.id)}
-                    className="rounded-xl p-3 border flex-row items-center justify-between"
-                    style={{ borderColor: active ? '#E8B865' : 'rgba(255,240,210,0.10)' }}
+                    className="rounded-[10px] p-3 border flex-row items-center justify-between"
+                    style={{ borderColor: active ? '#C9963A' : 'rgba(242, 237, 228,0.10)' }}
                   >
                     <Text className="text-ink font-semibold" numberOfLines={1}>{c.name || 'Unnamed client'}</Text>
                     {active ? <Text className="text-gold-bright text-xs font-bold">Linked</Text> : null}
@@ -1380,7 +1380,7 @@ export default function JobDetailScreen() {
                 )
               })}
               {clients.length === 0 ? (
-                <Text className="text-ink-muted text-sm mt-2">No clients yet — create one from the Clients tab.</Text>
+                <Text className="text-ink-muted text-sm mt-2">No clients yet, create one from the Clients tab.</Text>
               ) : null}
             </ScrollView>
           </View>
@@ -1391,7 +1391,7 @@ export default function JobDetailScreen() {
       <Modal visible={noteOpen} transparent animationType="slide" onRequestClose={() => setNoteOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setNoteOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Add note</Text>
             <TextInput
               value={noteText}
@@ -1400,16 +1400,16 @@ export default function JobDetailScreen() {
               autoFocus
               placeholder="What happened on the job?"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
               style={{ minHeight: 96, textAlignVertical: 'top' }}
             />
             <Pressable
               onPress={submitNote}
               disabled={noteSaving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: noteSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              className="rounded-[10px] py-4 items-center"
+              style={{ backgroundColor: noteSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}
             >
-              {noteSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save note</Text>}
+              {noteSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Save note</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1419,33 +1419,33 @@ export default function JobDetailScreen() {
       <Modal visible={invOpen} transparent animationType="slide" onRequestClose={() => setInvOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setInvOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-1">New invoice</Text>
             <Text className="text-ink-muted text-sm mb-5">Balance on this job: {money(totals.balance)}</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Title (optional)</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Title (optional)</Text>
             <TextInput
               value={invTitle}
               onChangeText={setInvTitle}
               placeholder="Deposit, progress draw, final…"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Amount</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Amount</Text>
             <TextInput
               value={invAmount}
               onChangeText={setInvAmount}
               keyboardType="decimal-pad"
               placeholder="$0"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink text-2xl font-bold mb-5"
             />
             <Pressable
               onPress={submitInvoice}
               disabled={invSaving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: invSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              className="rounded-[10px] py-4 items-center"
+              style={{ backgroundColor: invSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}
             >
-              {invSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create invoice</Text>}
+              {invSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Create invoice</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1455,29 +1455,29 @@ export default function JobDetailScreen() {
       <Modal visible={coOpen} transparent animationType="slide" onRequestClose={() => setCoOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setCoOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">New change order</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Title</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Title</Text>
             <TextInput
               value={coTitle} onChangeText={setCoTitle} autoFocus
               placeholder="Added scope, upgrade…" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Amount</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Amount</Text>
             <TextInput
               value={coAmount} onChangeText={setCoAmount} keyboardType="decimal-pad"
               placeholder="$0" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink text-2xl font-bold mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Description (optional)</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Description (optional)</Text>
             <TextInput
               value={coDesc} onChangeText={setCoDesc} multiline
               placeholder="What changed and why" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
               style={{ minHeight: 72, textAlignVertical: 'top' }}
             />
-            <Pressable onPress={submitChangeOrder} disabled={coSaving} className="rounded-xl py-4 items-center" style={{ backgroundColor: coSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}>
-              {coSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Create change order</Text>}
+            <Pressable onPress={submitChangeOrder} disabled={coSaving} className="rounded-[10px] py-4 items-center" style={{ backgroundColor: coSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}>
+              {coSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Create change order</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1487,22 +1487,22 @@ export default function JobDetailScreen() {
       <Modal visible={milesOpen} transparent animationType="slide" onRequestClose={() => setMilesOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setMilesOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Log mileage</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Miles</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Miles</Text>
             <TextInput
               value={milesVal} onChangeText={setMilesVal} keyboardType="decimal-pad" autoFocus
               placeholder="0" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink text-2xl font-bold mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Purpose (optional)</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Purpose (optional)</Text>
             <TextInput
               value={milesPurpose} onChangeText={setMilesPurpose}
               placeholder="Supply run, site visit…" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
             />
-            <Pressable onPress={submitMileage} disabled={milesSaving} className="rounded-xl py-4 items-center" style={{ backgroundColor: milesSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}>
-              {milesSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Log trip</Text>}
+            <Pressable onPress={submitMileage} disabled={milesSaving} className="rounded-[10px] py-4 items-center" style={{ backgroundColor: milesSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}>
+              {milesSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Log trip</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1512,22 +1512,22 @@ export default function JobDetailScreen() {
       <Modal visible={inspOpen} transparent animationType="slide" onRequestClose={() => setInspOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setInspOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Add inspection</Text>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Trade / type</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Trade / type</Text>
             <TextInput
               value={inspTrade} onChangeText={setInspTrade} autoFocus
               placeholder="Framing, electrical, final…" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Inspector (optional)</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Inspector (optional)</Text>
             <TextInput
               value={inspInspector} onChangeText={setInspInspector}
               placeholder="Name or agency" placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
             />
-            <Pressable onPress={submitInspection} disabled={inspSaving} className="rounded-xl py-4 items-center" style={{ backgroundColor: inspSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}>
-              {inspSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Add inspection</Text>}
+            <Pressable onPress={submitInspection} disabled={inspSaving} className="rounded-[10px] py-4 items-center" style={{ backgroundColor: inspSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}>
+              {inspSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Add inspection</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1537,23 +1537,23 @@ export default function JobDetailScreen() {
       <Modal visible={expOpen} transparent animationType="slide" onRequestClose={() => setExpOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setExpOpen(false)} />
-          <View className="bg-surface rounded-t-3xl p-6 border-t border-[rgba(255,240,210,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
+          <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-4">Log an expense</Text>
             <Pressable
               onPress={promptScanReceipt}
               disabled={expScanning}
-              className="flex-row items-center rounded-xl p-3.5 mb-4 border"
-              style={{ gap: 12, borderColor: 'rgba(201,150,58,0.3)', backgroundColor: 'rgba(232,184,101,0.08)', opacity: expScanning ? 0.6 : 1 }}
+              className="flex-row items-center rounded-[10px] p-4 mb-4 border"
+              style={{ gap: 12, borderColor: 'rgba(201,150,58,0.3)', backgroundColor: 'rgba(201, 150, 58,0.08)', opacity: expScanning ? 0.6 : 1 }}
             >
-              <View className="items-center justify-center rounded-xl border" style={{ width: 38, height: 38, borderColor: 'rgba(201,150,58,0.3)', backgroundColor: 'rgba(232,184,101,0.12)' }}>
-                {expScanning ? <ActivityIndicator color="#E8B865" size="small" /> : <Camera color="#E8B865" size={17} />}
+              <View className="items-center justify-center rounded-[10px] border" style={{ width: 38, height: 38, borderColor: 'rgba(201,150,58,0.3)', backgroundColor: 'rgba(201, 150, 58,0.12)' }}>
+                {expScanning ? <ActivityIndicator color="#C9963A" size="small" /> : <Camera color="#C9963A" size={17} />}
               </View>
               <View className="flex-1">
                 <Text className="text-ink font-bold text-sm">{expScanning ? 'Reading receipt…' : 'Scan a receipt'}</Text>
                 <Text className="text-ink-muted text-xs mt-0.5">AI fills amount, category & date</Text>
               </View>
             </Pressable>
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Amount</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Amount</Text>
             <TextInput
               value={expAmount}
               onChangeText={setExpAmount}
@@ -1561,31 +1561,31 @@ export default function JobDetailScreen() {
               placeholder="$0"
               placeholderTextColor="rgba(242,237,228,0.4)"
               autoFocus
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink text-2xl font-bold mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink text-2xl font-bold mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Category</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Category</Text>
             <TextInput
               value={expCategory}
               onChangeText={setExpCategory}
               placeholder="Materials, fuel, permit…"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-4"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
-            <Text className="text-ink-muted text-[11px] font-bold tracking-wider uppercase mb-2">Note (optional)</Text>
+            <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Note (optional)</Text>
             <TextInput
               value={expDesc}
               onChangeText={setExpDesc}
               placeholder="What was it for?"
               placeholderTextColor="rgba(242,237,228,0.4)"
-              className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink mb-5"
+              className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
             />
             <Pressable
               onPress={submitExpense}
               disabled={expSaving}
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: expSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              className="rounded-[10px] py-4 items-center"
+              style={{ backgroundColor: expSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}
             >
-              {expSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save expense</Text>}
+              {expSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Save expense</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1595,12 +1595,12 @@ export default function JobDetailScreen() {
       <Modal visible={insOpen} transparent animationType="slide" onRequestClose={() => setInsOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setInsOpen(false)} />
-          <View className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
+          <View className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
             <View className="flex-row items-center justify-between px-6 pt-6 pb-3">
               <Text className="text-ink text-xl font-bold">Insurance claim</Text>
               {insurance ? (
                 <Pressable onPress={() => { Alert.alert('Remove claim?', 'This deletes the insurance details for this job.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { if (contact) { await deleteInsurance({ id: insurance.id, contactId: contact.id }); setInsOpen(false) } } }]) }} hitSlop={8}>
-                  <Trash2 color="#f5a294" size={18} />
+                  <Trash2 color="#C9963A" size={18} />
                 </Pressable>
               ) : null}
             </View>
@@ -1617,24 +1617,24 @@ export default function JobDetailScreen() {
                 ['mortgage_company', 'Mortgage company', 'Wells Fargo (when applicable)', 'default']
               ] as const).map(([key, label, ph, kb]) => (
                 <View key={key}>
-                  <Text className="text-ink-muted text-[10px] font-bold tracking-[1.5px] uppercase mb-1.5">{label}</Text>
+                  <Text className="text-ink-muted text-xs font-bold tracking-[1.5px] uppercase mb-1.5">{label}</Text>
                   <TextInput
                     value={(insForm as any)[key]}
                     onChangeText={(v) => setInsForm((f) => ({ ...f, [key]: v }))}
                     keyboardType={kb as any}
                     placeholder={ph}
                     placeholderTextColor="rgba(242,237,228,0.4)"
-                    className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                    className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
                   />
                 </View>
               ))}
               <Pressable
                 onPress={saveInsurance}
                 disabled={insSaving}
-                className="rounded-xl py-4 items-center mt-2"
-                style={{ backgroundColor: insSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+                className="rounded-[10px] py-4 items-center mt-2"
+                style={{ backgroundColor: insSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}
               >
-                {insSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save insurance</Text>}
+                {insSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Save insurance</Text>}
               </Pressable>
             </ScrollView>
           </View>
@@ -1645,23 +1645,23 @@ export default function JobDetailScreen() {
       <Modal visible={qtOpen} transparent animationType="slide" onRequestClose={() => setQtOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable className="flex-1" onPress={() => setQtOpen(false)} />
-          <View className="bg-surface rounded-t-3xl border-t border-[rgba(255,240,210,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
+          <View className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
             <Text className="text-ink text-xl font-bold px-6 pt-6 pb-3">Quote terms</Text>
-            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
               {([
                 ['scope', 'Scope of work', "What you'll do, in plain English."],
-                ['exclusions', 'Exclusions', "What's NOT included — prevents change-order surprises."],
-                ['terms', 'Payment terms', 'Deposit, progress payments, warranty, change-order policy.']
+                ['exclusions', 'Exclusions', "What's NOT included, prevents change order surprises."],
+                ['terms', 'Payment terms', 'Deposit, progress payments, warranty, change order policy.']
               ] as const).map(([key, label, hint]) => (
                 <View key={key}>
-                  <Text className="text-ink-muted text-[10px] font-bold tracking-[1.5px] uppercase mb-1">{label}</Text>
+                  <Text className="text-ink-muted text-xs font-bold tracking-[1.5px] uppercase mb-1">{label}</Text>
                   <Text className="text-ink-muted text-xs mb-2">{hint}</Text>
                   <TextInput
                     value={(qtForm as any)[key]}
                     onChangeText={(v) => setQtForm((f) => ({ ...f, [key]: v }))}
                     multiline
                     placeholderTextColor="rgba(242,237,228,0.4)"
-                    className="bg-bg border border-[rgba(255,240,210,0.12)] rounded-xl px-4 py-3 text-ink"
+                    className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
                     style={{ minHeight: 90, textAlignVertical: 'top' }}
                   />
                 </View>
@@ -1669,10 +1669,10 @@ export default function JobDetailScreen() {
               <Pressable
                 onPress={saveQuoteTerms}
                 disabled={qtSaving}
-                className="rounded-xl py-4 items-center mt-2"
-                style={{ backgroundColor: qtSaving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+                className="rounded-[10px] py-4 items-center mt-2"
+                style={{ backgroundColor: qtSaving ? 'rgba(201, 150, 58,0.5)' : '#C9963A' }}
               >
-                {qtSaving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">Save quote terms</Text>}
+                {qtSaving ? <ActivityIndicator color="#141414" /> : <Text className="text-[#141414] font-bold">Save quote terms</Text>}
               </Pressable>
             </ScrollView>
           </View>
@@ -1697,7 +1697,7 @@ export default function JobDetailScreen() {
 }
 
 function fmtSize(bytes: number | null): string {
-  if (!bytes || bytes <= 0) return '—'
+  if (!bytes || bytes <= 0) return '\u2003'
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -1706,7 +1706,7 @@ function fmtSize(bytes: number | null): string {
 function QuoteTermBlock({ label, text }: { label: string; text: string }) {
   return (
     <View>
-      <Text className="text-gold-bright text-[10px] font-bold tracking-[1.5px] uppercase mb-1">{label}</Text>
+      <Text className="text-gold-bright text-xs font-bold tracking-[1.5px] uppercase mb-1">{label}</Text>
       <Text className="text-ink text-sm leading-5">{text}</Text>
     </View>
   )
@@ -1716,16 +1716,16 @@ function InsStat({ label, value }: { label: string; value: string }) {
   return (
     <View>
       <Text className="text-ink text-base font-bold">{value}</Text>
-      <Text className="text-ink-muted text-[10px] font-bold uppercase tracking-wider mt-0.5">{label}</Text>
+      <Text className="text-ink-muted text-xs font-bold uppercase tracking-[0px] mt-0.5">{label}</Text>
     </View>
   )
 }
 
 function Stat({ label, value, tone = '#F2EDE4' }: { label: string; value: string; tone?: string }) {
   return (
-    <View className="flex-1 rounded-2xl p-3.5 border border-[rgba(232,184,101,0.14)]" style={{ backgroundColor: 'rgba(24,20,17,0.6)' }}>
-      <Text className="text-xl font-bold" style={{ color: tone, letterSpacing: -0.3 }} numberOfLines={1}>{value}</Text>
-      <Text className="text-ink-muted text-[10px] font-bold uppercase tracking-wider mt-1">{label}</Text>
+    <View className="flex-1 rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.14)]" style={{ backgroundColor: 'rgba(20, 20, 20,0.6)' }}>
+      <Text className="text-xl font-bold" style={{ color: tone, letterSpacing: 0 }} numberOfLines={1}>{value}</Text>
+      <Text className="text-ink-muted text-xs font-bold uppercase tracking-[0px] mt-1">{label}</Text>
     </View>
   )
 }
@@ -1734,8 +1734,8 @@ function Action({ icon, label, onPress }: { icon: import('react').ReactNode; lab
   return (
     <Pressable
       onPress={onPress}
-      className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
-      style={{ gap: 6, backgroundColor: 'rgba(232,184,101,0.10)' }}
+      className="flex-1 flex-row items-center justify-center rounded-[10px] py-3 border border-[rgba(201, 150, 58,0.3)]"
+      style={{ gap: 8, backgroundColor: 'rgba(201, 150, 58,0.10)' }}
     >
       {icon}
       <Text className="text-gold-bright font-bold">{label}</Text>

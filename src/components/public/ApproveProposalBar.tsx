@@ -1,6 +1,6 @@
 // src/components/public/ApproveProposalBar.tsx
 //
-// Customer-facing approval surface for the /p/:token proposal viewer.
+// Customer facing approval surface for the /p/:token proposal viewer.
 // Cream-paper aesthetic to match the document, not the app chrome.
 // Render under the proposal template. When the customer submits, POSTs
 // to /api/public-link-approve and flips into a thank-you state.
@@ -17,8 +17,8 @@ export default function ApproveProposalBar({
   contractTotal,
   initialName = '',
   onApproved,
-  // 'proposal' (default) or 'change_order' — switches the endpoint and
-  // the customer-facing copy; the signature mechanics are identical.
+  // 'proposal' (default) or 'change_order', switches the endpoint and
+  // the customer facing copy; the signature mechanics are identical.
   variant = 'proposal'
 }: any) {
   const isCO = variant === 'change_order'
@@ -51,10 +51,10 @@ export default function ApproveProposalBar({
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
         const friendly =
-          body?.error === 'already_approved' ? `This ${docLabel} has already been approved — thank you.`
+          body?.error === 'already_approved' ? `This ${docLabel} has already been approved, thank you.`
           : body?.error === 'expired' ? 'This link has expired. Please ask the contractor for a fresh one.'
           : body?.error === 'revoked' ? 'This link has been revoked.'
-          : body?.error === 'empty_proposal' ? 'This proposal is empty — please contact the sender.'
+          : body?.error === 'empty_proposal' ? 'This proposal is empty, please contact the sender.'
           : body?.error === 'gone' ? `This ${docLabel} is no longer open for approval.`
           : body?.message || 'We could not record your approval. Please try again.'
         throw new Error(friendly)
@@ -84,7 +84,7 @@ export default function ApproveProposalBar({
         </p>
         <div style={metaRowStyle}>
           <span>Signed as</span>
-          <strong style={{ color: '#1A1814' }}>{done.name}</strong>
+          <strong style={{ color: '#141414' }}>{done.name}</strong>
           <span style={dotStyle} aria-hidden="true" />
           <span>{formatStamp(done.at)}</span>
         </div>
@@ -104,7 +104,7 @@ export default function ApproveProposalBar({
           : 'Typing your full name below approves the scope, line items, and terms above.'}
         {companyName ? ` ${companyName} will be notified instantly.` : ''}
         {contractTotal != null
-          ? <> The {isCO ? 'updated contract total' : 'approved contract total'} is <strong style={{ color: '#1A1814' }}>{moneyFmt(contractTotal)}</strong>.</>
+          ? <> The {isCO ? 'updated contract total' : 'approved contract total'} is <strong style={{ color: '#141414' }}>{moneyFmt(contractTotal)}</strong>.</>
           : null}
       </p>
 
@@ -140,7 +140,7 @@ export default function ApproveProposalBar({
           checked={authorized}
           disabled={busy}
           onChange={(e) => setAuthorized(e.target.checked)}
-          style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: '#C8A154' }}
+          style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: '#C9963A' }}
         />
         <span>
           I have the authority to approve this {docLabel} on behalf of {contactName || 'the property owner'}, and I agree to the scope and terms shown above. Approving creates a binding record with my name, the date, and my IP address.
@@ -187,48 +187,48 @@ function formatStamp(iso: any) {
 const panelStyle: import('react').CSSProperties = {
   maxWidth: 760,
   margin: '24px auto 0',
-  padding: '28px 28px 24px',
-  borderRadius: 6,
-  background: '#fffaf0',
-  border: '1px solid rgba(200, 161, 84, 0.45)',
-  boxShadow: '0 24px 64px -32px rgba(31, 30, 28, 0.25)',
+  padding: '24px 24px 24px',
+  borderRadius: 10,
+  background: '#F2EDE4',
+  border: '1px solid rgba(201, 150, 58, 0.45)',
+  boxShadow: '0 24px 64px -32px rgba(20, 20, 20, 0.25)',
   fontFamily: "'DM Sans', system-ui, sans-serif",
-  color: '#3A3833'
+  color: '#141414'
 }
 
 const eyebrowStyle: import('react').CSSProperties = {
-  fontSize: 11, fontWeight: 700, letterSpacing: '0.18em',
-  textTransform: 'uppercase', color: '#C8A154', marginBottom: 6
+  fontSize: 12, fontWeight: 700, letterSpacing: 0,
+  textTransform: 'uppercase', color: '#C9963A', marginBottom: 6
 }
 
 const headlineStyle: import('react').CSSProperties = {
   margin: 0,
   fontFamily: "'Cormorant Garamond', Georgia, serif",
-  fontSize: 26, fontWeight: 500, color: '#1A1814',
-  letterSpacing: '-0.005em'
+  fontSize: 24, fontWeight: 500, color: '#141414',
+  letterSpacing: 0
 }
 
 const bodyStyle: import('react').CSSProperties = {
   margin: '10px 0 16px',
-  fontSize: 14, lineHeight: 1.55, color: '#3A3833'
+  fontSize: 14, lineHeight: 1.55, color: '#141414'
 }
 
 const fieldStackStyle: import('react').CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12
+  display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12
 }
 
 const labelStyle: import('react').CSSProperties = {
-  fontSize: 10, fontWeight: 700,
-  letterSpacing: '0.14em', textTransform: 'uppercase',
-  color: '#6B6A66'
+  fontSize: 12, fontWeight: 700,
+  letterSpacing: 0, textTransform: 'uppercase',
+  color: '#5C5C5C'
 }
 
 const inputStyle: import('react').CSSProperties = {
-  padding: '11px 14px',
-  borderRadius: 4,
-  background: '#fffefb',
-  border: '1px solid #d8d2c2',
-  color: '#1A1814',
+  padding: '12px 12px',
+  borderRadius: 10,
+  background: '#F2EDE4',
+  border: '1px solid #F2EDE4',
+  color: '#141414',
   fontFamily: "'DM Sans', system-ui, sans-serif",
   fontSize: 14,
   outline: 'none',
@@ -237,42 +237,42 @@ const inputStyle: import('react').CSSProperties = {
 }
 
 const checkboxRowStyle: import('react').CSSProperties = {
-  display: 'flex', alignItems: 'flex-start', gap: 10,
+  display: 'flex', alignItems: 'flex-start', gap: 12,
   margin: '6px 0 16px',
-  fontSize: 12, lineHeight: 1.5, color: '#3A3833',
+  fontSize: 12, lineHeight: 1.5, color: '#141414',
   cursor: 'pointer'
 }
 
 const buttonStyle: import('react').CSSProperties = {
   display: 'block', width: '100%',
-  padding: '14px 16px',
-  borderRadius: 4, border: 'none',
-  background: 'linear-gradient(135deg, #d4af37 0%, #b7872d 100%)',
-  color: '#1A1814',
+  padding: '12px 16px',
+  borderRadius: 10, border: 'none',
+  background: 'linear-gradient(135deg, #C9963A 0%, #C9963A 100%)',
+  color: '#141414',
   fontFamily: "'DM Sans', system-ui, sans-serif",
   fontSize: 14, fontWeight: 700,
-  letterSpacing: '0.14em', textTransform: 'uppercase',
+  letterSpacing: 0, textTransform: 'uppercase',
   boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
 }
 
 const errorStyle: import('react').CSSProperties = {
-  padding: '10px 12px',
-  borderRadius: 4,
-  background: 'rgba(179, 73, 59, 0.10)',
-  border: '1px solid rgba(179, 73, 59, 0.4)',
-  color: '#7d2a1f',
-  fontSize: 13, lineHeight: 1.4,
+  padding: '12px 12px',
+  borderRadius: 10,
+  background: 'rgba(192, 57, 43, 0.10)',
+  border: '1px solid rgba(192, 57, 43, 0.4)',
+  color: '#C0392B',
+  fontSize: 14, lineHeight: 1.4,
   marginBottom: 12
 }
 
 const metaRowStyle: import('react').CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-  fontSize: 12, color: '#6B6A66',
-  paddingTop: 14, marginTop: 14,
-  borderTop: '1px solid #e8e2d4'
+  fontSize: 12, color: '#5C5C5C',
+  paddingTop: 12, marginTop: 14,
+  borderTop: '1px solid #F2EDE4'
 }
 
 const dotStyle: import('react').CSSProperties = {
-  display: 'inline-block', width: 3, height: 3, borderRadius: '50%',
-  background: '#C8A154'
+  display: 'inline-block', width: 3, height: 3, borderRadius: 10,
+  background: '#C9963A'
 }

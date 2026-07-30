@@ -1,4 +1,4 @@
-// SnowSubsBuild — desktop /subs in the Build direction.
+// SnowSubsBuild, desktop /subs in the Build direction.
 //
 // Drop-in for SnowSubs at >=900px. Treats subs/vendors as a
 // controlled labor network, not a directory.
@@ -46,9 +46,9 @@ type Props = {
 }
 
 function relDate(d: Date | null | undefined) {
-  if (!d) return '—'
+  if (!d) return '\u2003'
   const t = d.getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   const diff = Date.now() - t
   if (diff < 86_400_000) return 'today'
   if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)}d ago`
@@ -58,7 +58,7 @@ function relDate(d: Date | null | undefined) {
 
 // Insurance pill resolver. When `tracked` is false (upstream has no
 // insurance column for this sub) we render "Not tracked" honestly
-// instead of pretending the value is "Unknown" — which used to imply
+// instead of pretending the value is "Unknown", which used to imply
 // the data existed but was missing.
 function insuranceStatus(
   tracked: boolean | undefined,
@@ -81,7 +81,7 @@ export default function SnowSubsBuild(props: Props) {
     onAddSub, onOpenSub,
   } = props
 
-  // Derived metrics — only count insurance signals on subs where the
+  // Derived metrics, only count insurance signals on subs where the
   // field is actually tracked. Untracked rows don't contribute either
   // way (they're neither "expiring" nor "needs review").
   const insuranceIsTracked = filtered.some((s) => s.insuranceTracked === true)
@@ -96,7 +96,7 @@ export default function SnowSubsBuild(props: Props) {
     ? filtered.filter((s) => s.insuranceTracked !== false && !s.insurance_expires_at && (s.jobsCount || 0) > 0).length
     : 0
 
-  // Trade coverage — count of distinct trades present in the filtered list.
+  // Trade coverage, count of distinct trades present in the filtered list.
   // s.trades upstream may be a Set, array, plain object, or a single
   // string depending on the bundle shape; normalize before iterating.
   const tradeCoverage = (() => {
@@ -172,7 +172,7 @@ export default function SnowSubsBuild(props: Props) {
         <section className="fh-build-content-grid fh-build-content-grid--subs">
           <section className="fh-build-card fh-build-table fh-build-subs-table">
             <header className="fh-build-card-head">
-              <div className="fh-build-eyebrow">Vendor network - {filtered.length.toLocaleString()}</div>
+              <div className="fh-build-eyebrow">Vendor network {filtered.length.toLocaleString()}</div>
               <button type="button" onClick={onAddSub}>Add vendor</button>
             </header>
 
@@ -207,7 +207,7 @@ export default function SnowSubsBuild(props: Props) {
                   <strong className="fh-build-truncate" title={s.name || 'Unnamed'}>{s.name || 'Unnamed'}</strong>
                   <span className="fh-build-trade-chips">
                     {trades.length === 0 ? (
-                      <span className="fh-build-rel">—</span>
+                      <span className="fh-build-rel">:</span>
                     ) : trades.map((t: string) => (
                       <span key={t} className="fh-build-chip">{t}</span>
                     ))}
@@ -248,7 +248,7 @@ export default function SnowSubsBuild(props: Props) {
                 </>
               ) : (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>Insurance not tracked yet</span>
                 </>
               )}
@@ -256,7 +256,7 @@ export default function SnowSubsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">On jobs today</div>
-              <strong>—</strong>
+              <strong>:</strong>
               <span>Schedule integration coming</span>
             </section>
 
@@ -269,7 +269,7 @@ export default function SnowSubsBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Owner / admin access</div>
               <strong>Single owner</strong>
-              <span>Multi-user roles not yet configured</span>
+              <span>Team roles not yet configured</span>
             </section>
 
             <section className="fh-build-rail-card">
@@ -281,7 +281,7 @@ export default function SnowSubsBuild(props: Props) {
                 </>
               ) : (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>Enable insurance tracking to surface</span>
                 </>
               )}
@@ -306,7 +306,7 @@ export default function SnowSubsBuild(props: Props) {
 // Silence unused icon import.
 void Hammer
 
-// normalizeTrades — Subs.tsx aggregates each sub's trades into a Set
+// normalizeTrades, Subs.tsx aggregates each sub's trades into a Set
 // (`new Set()`), so passing the grouped object straight into a
 // component that expects an array crashes on .slice / .map. Bundles
 // from older snapshots can also expose trades as a single string or

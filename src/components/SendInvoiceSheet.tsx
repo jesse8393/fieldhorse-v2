@@ -1,6 +1,6 @@
 // src/components/SendInvoiceSheet.tsx
 //
-// Pipeline v2: fire an invoice straight off the job — the action the
+// Pipeline v2: fire an invoice straight off the job, the action the
 // old flow buried behind the Financials tab + draws editor. One sheet:
 // pick what you're billing (deposit / progress / final / custom),
 // confirm the amount (prefilled with the unbilled remainder), pick a
@@ -55,7 +55,7 @@ export default function SendInvoiceSheet({
   const [busy, setBusy] = useState<null | 'send' | 'download' | 'draft'>(null)
 
   // Email resolved from the linked client record (fh_clients) when the
-  // job row itself carries no email — a saved client's email should
+  // job row itself carries no email, a saved client's email should
   // never need re-entering to invoice them.
   const [clientEmail, setClientEmail] = useState('')
   const [kind, setKind] = useState('progress')
@@ -63,8 +63,8 @@ export default function SendInvoiceSheet({
   const [amount, setAmount] = useState('')
   const [dueDays, setDueDays] = useState(14)
   const [notes, setNotes] = useState('')
-  // Customer-facing "what is this bill for". Prefilled from the job's
-  // title + property address — repeat clients with several properties
+  // Customer facing "what is this bill for". Prefilled from the job's
+  // title + property address, repeat clients with several properties
   // need the invoice to say which one this covers. Prints in the line
   // item's Description column on the PDF.
   const [description, setDescription] = useState('')
@@ -126,7 +126,7 @@ export default function SendInvoiceSheet({
 
   function applyPct(pct: number) {
     const base = totals.unbilled > 0 ? totals.unbilled : totals.balance
-    // Cents, not whole dollars — rounding to $1 left invoice sets that
+    // Cents, not whole dollars, rounding to $1 left invoice sets that
     // never reconciled against a contract carrying cents.
     setAmount(String(Math.max(0.01, Math.round(base * pct * 100) / 100)))
   }
@@ -179,7 +179,7 @@ export default function SendInvoiceSheet({
         onDone?.()
         onClose?.()
       } else if (res.reason === 'sender_not_configured') {
-        toastError("Email NOT sent — sender isn't configured", 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.')
+        toastError("Email NOT sent, sender isn't configured", 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.')
         onDone?.()
         onClose?.()
       } else {
@@ -232,11 +232,11 @@ export default function SendInvoiceSheet({
   }
 
   const labelStyle: import('react').CSSProperties = {
-    fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+    fontSize: 12, fontWeight: 700, letterSpacing: 0,
     textTransform: 'uppercase', color: 'var(--ink-muted)'
   }
   const fieldStyle: import('react').CSSProperties = {
-    padding: '11px 14px', borderRadius: 12,
+    padding: '12px 12px', borderRadius: 10,
     background: 'var(--surface-2)', border: '1px solid var(--rule)',
     color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14,
     outline: 'none', width: '100%', boxSizing: 'border-box',
@@ -254,23 +254,23 @@ export default function SendInvoiceSheet({
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               Bill this job.
             </h2>
           </DrawerTitle>
-          <DrawerDescription style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
+          <DrawerDescription style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
             Invoice <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this job'}</strong>
             {existing.filter((d) => d.status !== 'void').length > 0 && (
-              <> — invoice #{sequence} on this job</>
+              <>, invoice #{sequence} on this job</>
             )}.
           </DrawerDescription>
         </DrawerHeader>
 
-        <form ref={formRef} onSubmit={(e) => { e.preventDefault(); handleSend() }} style={formStyle({ gap: 14 })}>
+        <form ref={formRef} onSubmit={(e) => { e.preventDefault(); handleSend() }} style={formStyle({ gap: 12 })}>
           {loading ? (
             <div style={{
-              padding: 16, borderRadius: 12,
+              padding: 16, borderRadius: 10,
               background: 'var(--surface-2)', border: '1px solid var(--rule)',
               color: 'var(--ink-muted)', fontSize: 12, fontFamily: 'var(--font-body)',
               textAlign: 'center'
@@ -282,7 +282,7 @@ export default function SendInvoiceSheet({
               {/* Money snapshot */}
               <div style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
-                padding: '12px 14px', borderRadius: 12,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--surface-2)', border: '1px solid var(--rule)'
               }}>
                 <Stat label="Contract" value={moneyFmt(totals.contractTotal)} />
@@ -293,7 +293,7 @@ export default function SendInvoiceSheet({
               {/* What is this invoice for */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={labelStyle}>What for</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {KIND_CHIPS.map((c) => {
                     const active = kind === c.id
                     return (
@@ -337,11 +337,11 @@ export default function SendInvoiceSheet({
                     onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                     placeholder={totals.unbilled > 0 ? String(Math.round(totals.unbilled * 100) / 100) : '0'}
                     disabled={!!busy}
-                    style={{ ...fieldStyle, paddingLeft: 28 }}
+                    style={{ ...fieldStyle, paddingLeft: 24 }}
                   />
                 </div>
                 {(totals.unbilled > 0 || totals.balance > 0) && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     <button type="button" onClick={() => { hapticTap(); applyPct(1) }} disabled={!!busy} style={chipStyle(false, !!busy)}>
                       Everything unbilled
                     </button>
@@ -355,8 +355,8 @@ export default function SendInvoiceSheet({
                 )}
               </div>
 
-              {/* Description — what the customer reads on the PDF */}
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Description, what the customer reads on the PDF */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={labelStyle}>Description (shows on the invoice)</span>
                 <textarea
                   rows={2}
@@ -371,7 +371,7 @@ export default function SendInvoiceSheet({
               {/* Due window */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={labelStyle}>Due</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {DUE_CHIPS.map((c) => {
                     const active = dueDays === c.id
                     return (
@@ -390,19 +390,19 @@ export default function SendInvoiceSheet({
               </div>
 
               {/* Notes */}
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={labelStyle}>Payment instructions (optional)</span>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Remit-to / check / ACH details"
+                  placeholder="Remittance / check / ACH details"
                   disabled={!!busy}
                   style={{ ...fieldStyle, resize: 'vertical' }}
                 />
               </label>
 
-              {/* Actions — Send is primary; Download and Save draft are
+              {/* Actions, Send is primary; Download and Save draft are
                   the fallbacks for no-email clients / not-ready bills. */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 2 }}>
                 <button
@@ -431,10 +431,10 @@ export default function SendInvoiceSheet({
                 title={recipientEmail ? `Email to ${recipientEmail}` : 'No client email on file'}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '13px 14px', borderRadius: 12, border: 'none',
+                  padding: '12px 12px', borderRadius: 10, border: 'none',
                   background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                   color: 'var(--onyx)',
-                  fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                  fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                   cursor: busy ? 'wait' : 'pointer',
                   boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                   opacity: busy ? 0.6 : 1
@@ -452,8 +452,8 @@ export default function SendInvoiceSheet({
                 onClick={() => { if (!busy) onClose?.() }}
                 disabled={!!busy}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '10px', borderRadius: 12, marginBottom: 4,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '12px', borderRadius: 10, marginBottom: 4,
                   background: 'transparent', border: 'none',
                   color: 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
@@ -473,8 +473,8 @@ export default function SendInvoiceSheet({
 
 function chipStyle(active: boolean, disabled: boolean): import('react').CSSProperties {
   return {
-    padding: '7px 12px',
-    borderRadius: 999,
+    padding: '8px 12px',
+    borderRadius: 10,
     border: active ? '1px solid var(--v3-border-strong)' : '1px solid var(--rule)',
     background: active ? 'var(--v3-glass-tint-2)' : 'var(--surface-2)',
     color: active ? 'var(--ink-strong)' : 'var(--ink-muted)',
@@ -488,12 +488,12 @@ function chipStyle(active: boolean, disabled: boolean): import('react').CSSPrope
 
 function ghostBtnStyle(busy: boolean): import('react').CSSProperties {
   return {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    padding: '11px 12px', borderRadius: 12,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: '12px 12px', borderRadius: 10,
     background: 'var(--surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-    letterSpacing: '0.06em', textTransform: 'uppercase',
+    letterSpacing: 0, textTransform: 'uppercase',
     cursor: busy ? 'wait' : 'pointer',
     opacity: busy ? 0.7 : 1
   }
@@ -501,11 +501,11 @@ function ghostBtnStyle(busy: boolean): import('react').CSSProperties {
 
 function Stat({ label, value, tone = 'default' }: any) {
   const color = tone === 'good'
-    ? 'var(--signal-green, #4ade80)'
+    ? 'var(--signal-green, #2D7A4F)'
     : tone === 'gold'
-      ? 'var(--field-gold-bright, #e4be6f)'
+      ? 'var(--field-gold-bright, #C9963A)'
       : tone === 'danger'
-        ? 'var(--alert-red, #b3493b)'
+        ? 'var(--alert-red, #C0392B)'
         : 'var(--ink-strong)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>

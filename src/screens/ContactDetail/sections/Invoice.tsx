@@ -13,12 +13,12 @@ function money(n: any) {
 }
 
 /**
- * Invoice section — surfaces balance + payment history. The actual "Log
+ * Invoice section, surfaces balance + payment history. The actual "Log
  * Payment" sheet lives in the parent shell (V3PaymentSheet) and is opened
  * via onOpenLogPayment. This section is read-mostly + one CTA.
  *
  * Payment deletion lives here (not on the Overview activity feed anymore)
- * — the payment-history list is where a mislogged payment naturally gets
+ *, the payment-history list is where a mislogged payment naturally gets
  * corrected. Each row confirms before deleting since payments drive the
  * job's paid/balance numbers.
  */
@@ -32,7 +32,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
     if (!paymentId || !userId) return
     const ok = await confirm({
       title: 'Delete this payment?',
-      body: `Removes a ${money(paymentAmount)} payment from this job. This can't be undone — re-log it if you delete by mistake.`,
+      body: `Removes a ${money(paymentAmount)} payment from this job. This can't be undone, re-log it if you delete by mistake.`,
       destructive: true,
       confirmLabel: 'Delete payment'
     })
@@ -51,19 +51,19 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       {/* Balance hero */}
       <div style={{
-        padding: '20px 18px',
-        borderRadius: 16,
+        padding: '24px 16px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: isClosed
           ? '1px solid color-mix(in srgb, var(--v3-success-bright) 30%, transparent)'
           : '1px solid var(--v3-border)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
+        gap: 12,
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -73,9 +73,9 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
         <div>
           <div style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(36px, 9vw, 52px)',
+            fontSize: 24,
             color: isClosed ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
-            lineHeight: 1, letterSpacing: '0.01em',
+            lineHeight: 1, letterSpacing: 0,
             fontVariantNumeric: 'tabular-nums'
           }}>
             {money(isClosed ? amount : balance)}
@@ -92,13 +92,13 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
 
         {/* Progress bar */}
         <div style={{
-          position: 'relative', height: 6, borderRadius: 999,
+          position: 'relative', height: 6, borderRadius: 10,
           background: 'var(--v3-glass-tint-2)', overflow: 'hidden'
         }}>
           <span style={{
             position: 'absolute', inset: 0, width: `${pct}%`,
             background: isClosed ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
-            borderRadius: 999,
+            borderRadius: 10,
             transition: 'width 500ms cubic-bezier(0.2, 0.8, 0.2, 1)'
           }} />
         </div>
@@ -111,12 +111,12 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
             style={{
               marginTop: 4,
               width: '100%',
-              padding: '12px 16px', borderRadius: 12,
+              padding: '12px 16px', borderRadius: 10,
               background: 'var(--v3-primary)', color: 'var(--v3-on-primary)', border: 'none',
-              fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-              letterSpacing: '0.04em', cursor: 'pointer',
-              boxShadow: '0 8px 22px rgba(212, 175, 55, 0.32)',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+              letterSpacing: 0, cursor: 'pointer',
+              boxShadow: '0 8px 22px rgba(201, 150, 58, 0.32)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               WebkitTapHighlightColor: 'transparent'
             }}
           >
@@ -134,7 +134,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
         }}>
           <Eyebrow>Payments</Eyebrow>
           <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 11,
+            fontFamily: 'var(--font-body)', fontSize: 12,
             color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
           }}>
             {payments.length} logged
@@ -143,24 +143,24 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
 
         {payments.length === 0 ? (
           <div style={{
-            padding: '20px 18px', borderRadius: 14,
+            padding: '24px 16px', borderRadius: 10,
             background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
             color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-            fontSize: 13, textAlign: 'center', lineHeight: 1.5
+            fontSize: 14, textAlign: 'center', lineHeight: 1.5
           }}>
             No payments yet. Tap <strong>Log Payment</strong> when funds clear.
           </div>
         ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {payments.map((p: any) => (
               <li key={p.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 14px', borderRadius: 12,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
               }}>
                 <span aria-hidden="true" style={{
-                  flexShrink: 0, width: 32, height: 32, borderRadius: 9,
-                  background: 'rgba(46, 204, 113, 0.14)',
+                  flexShrink: 0, width: 32, height: 32, borderRadius: 10,
+                  background: 'rgba(45, 122, 79, 0.14)',
                   border: '1px solid color-mix(in srgb, var(--v3-success-bright) 30%, transparent)',
                   color: 'var(--v3-success-bright)',
                   display: 'grid', placeItems: 'center'
@@ -177,7 +177,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
                   </div>
                   <div style={{
                     marginTop: 2,
-                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    fontFamily: 'var(--font-body)', fontSize: 12,
                     color: 'var(--v3-text-muted)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
@@ -186,7 +186,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
                 </div>
                 <span style={{
                   flexShrink: 0,
-                  fontFamily: 'var(--font-body)', fontSize: 11,
+                  fontFamily: 'var(--font-body)', fontSize: 12,
                   color: 'var(--v3-text-muted)',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
@@ -198,7 +198,7 @@ export default function InvoiceSection({ contact, payments = [], paid = 0, balan
                     onClick={() => { hapticTap(); deletePayment(p.id, p.amount) }}
                     aria-label={`Delete ${money(p.amount)} payment`}
                     style={{
-                      flexShrink: 0, width: 30, height: 30, borderRadius: 8,
+                      flexShrink: 0, width: 30, height: 30, borderRadius: 10,
                       display: 'grid', placeItems: 'center',
                       background: 'transparent', border: '1px solid var(--v3-border)',
                       color: 'var(--v3-text-muted)', cursor: 'pointer',

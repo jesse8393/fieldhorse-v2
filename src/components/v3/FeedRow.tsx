@@ -11,7 +11,7 @@ const ICONS: Record<string, import('react').ComponentType<any>> = {
   default: Activity
 }
 const TONE: Record<string, { color: string; bg: string }> = {
-  'crew-on-site': { color: 'var(--v3-stage-active)', bg: 'rgba(79, 140, 94, 0.14)' },
+  'crew-on-site': { color: 'var(--v3-stage-active)', bg: 'rgba(45, 122, 79, 0.14)' },
   'photos':       { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
   'invoice':      { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
   'note':         { color: 'var(--v3-text-muted)',   bg: 'var(--v3-glass-tint)' },
@@ -71,7 +71,7 @@ export default function FeedRow({
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        padding: '12px 14px',
+        padding: '12px 12px',
         borderRadius: 'var(--v3-radius-card)',
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border)',
@@ -88,7 +88,7 @@ export default function FeedRow({
           flexShrink: 0,
           width: 36,
           height: 36,
-          borderRadius: 11,
+          borderRadius: 10,
           display: 'grid',
           placeItems: 'center',
           background: tone.bg,
@@ -101,7 +101,7 @@ export default function FeedRow({
         <div
           style={{
             fontFamily: 'var(--font-body)',
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: 600,
             color: 'var(--v3-text)',
             lineHeight: 1.25,
@@ -114,7 +114,7 @@ export default function FeedRow({
         </div>
         <div
           style={{
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--v3-text-muted)',
             marginTop: 3,
             overflow: 'hidden',

@@ -67,13 +67,13 @@ export default function ClientDetail() {
   // Destructive-confirm sheet state for delete client.
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  // "New" chooser sheet — spin up a quote / job / invoice under this client.
+  // "New" chooser sheet, spin up a quote / job / invoice under this client.
   const [newOpen, setNewOpen] = useState(false)
   const [creating, setCreating] = useState(false)
-  // Statement sheet — roll all open invoices into one document.
+  // Statement sheet, roll all open invoices into one document.
   const [statementOpen, setStatementOpen] = useState(false)
 
-  // Derived metrics — the shared rollup, NOT an inline copy. The inline
+  // Derived metrics, the shared rollup, NOT an inline copy. The inline
   // version this replaced excluded closed jobs and approved change
   // orders from "outstanding", so this screen's tile could say $0 while
   // the statement button right below it billed the client $2,000.
@@ -85,7 +85,7 @@ export default function ClientDetail() {
   const outstanding = rollup.outstanding
   const activeCount = rollup.activeCount
 
-  // Statement rollup — the SAME computation the StatementSheet/PDF use,
+  // Statement rollup, the SAME computation the StatementSheet/PDF use,
   // so the "Statement · $X across N properties" button always agrees
   // with the document it opens (previously the button showed
   // `outstanding`/`activeCount`, which use different stage sets and could
@@ -118,7 +118,7 @@ export default function ClientDetail() {
   // Create a new deal under this client at the chosen kind, prefilled
   // with the client's contact info, then jump straight into it. A quote
   // lands on the Quote builder; an "invoice" (materials/quick job, no
-  // quote needed) is a job in v2 — it lands on Financials where the
+  // quote needed) is a job in v2, it lands on Financials where the
   // Send Invoice flow lives; a job lands on Overview.
   async function createDealForClient(stage: 'quote' | 'job' | 'invoice') {
     if (!client?.id || !user?.id || creating) return
@@ -130,7 +130,7 @@ export default function ClientDetail() {
       email: client.email || null,
       address: client.address || null,
       amount: 0,
-      // 'invoice' isn't a stage anymore (pipeline v2) — a quick
+      // 'invoice' isn't a stage anymore (pipeline v2), a quick
       // standalone invoice is a job you bill immediately.
       stage: stage === 'invoice' ? 'job' : stage,
       client_id: client.id
@@ -156,7 +156,7 @@ export default function ClientDetail() {
 
   if (loading) {
     return (
-      <div className="v3-screen" style={{ paddingBottom: 120, padding: '20px 20px 120px', background: 'var(--v3-bg)' }}>
+      <div className="v3-screen" style={{ paddingBottom: 48, padding: '24px 24px 48px', background: 'var(--v3-bg)' }}>
         <SkeletonList rows={4} card={false} />
       </div>
     )
@@ -164,7 +164,7 @@ export default function ClientDetail() {
 
   if (!client) {
     return (
-      <div className="v3-screen" style={{ padding: '20px 20px 120px', background: 'var(--v3-bg)' }}>
+      <div className="v3-screen" style={{ padding: '24px 24px 48px', background: 'var(--v3-bg)' }}>
         <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--v3-primary)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
         <p style={{ color: 'var(--v3-text-muted)', marginTop: 12 }}>Client not found.</p>
       </div>
@@ -174,7 +174,7 @@ export default function ClientDetail() {
   const initial = (client.name || '·').trim().charAt(0).toUpperCase()
 
   // The tab body is the only piece we want to render inside the
-  // desktop Build chrome — everything else (top bar, hero, tabs) is
+  // desktop Build chrome, everything else (top bar, hero, tabs) is
   // already provided by SnowClientDetailBuild. The mobile branch
   // below renders the original chrome + this same body unchanged.
   const tabBody = (
@@ -196,7 +196,7 @@ export default function ClientDetail() {
   )
 
   // Shared overlays (delete confirm, new-deal chooser, statement sheet).
-  // Mounted in BOTH the desktop and mobile branches — they're portaled,
+  // Mounted in BOTH the desktop and mobile branches, they're portaled,
   // so they render correctly wherever they sit in the tree. Previously
   // these lived only in the mobile JSX, so on desktop the Delete / New
   // deal / Statement buttons set state but nothing ever appeared.
@@ -217,7 +217,7 @@ export default function ClientDetail() {
         onCommit={confirmDelete}
       >
         <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running — they just lose the client link.
+          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running, they just lose the client link.
         </p>
       </ActionSheet>
 
@@ -225,12 +225,12 @@ export default function ClientDetail() {
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle>New for {client.name}</DrawerTitle>
-            <DrawerDescription>Start a quote, a quick job, or a standalone invoice — all linked to this client.</DrawerDescription>
+            <DrawerDescription>Start a quote, a quick job, or a standalone invoice, all linked to this client.</DrawerDescription>
           </DrawerHeader>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
             <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
-            <NewDealOption icon={Briefcase} label="New job" sub="Quick job — skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
-            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc — no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
+            <NewDealOption icon={Briefcase} label="New job" sub="Quick job, skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
+            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc, no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
           </div>
         </DrawerContent>
       </Drawer>
@@ -280,11 +280,11 @@ export default function ClientDetail() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
     >
 
-      {/* TOP BAR — back chevron + edit + delete in the chrome row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 20px 10px' }}>
+      {/* TOP BAR, back chevron + edit + delete in the chrome row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 24px 12px' }}>
         <IconBtn onClick={() => navigate('/clients')} ariaLabel="Back to clients">
           <ChevronLeft size={18} />
         </IconBtn>
@@ -303,38 +303,38 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* COCKPIT — black-glass panel: hero + metrics + action row */}
-      <div style={{ padding: '0 20px 14px' }}>
+      {/* COCKPIT, black-glass panel: hero + metrics + action row */}
+      <div style={{ padding: '0 24px 12px' }}>
         <div style={{
-          padding: '12px 14px',
-          borderRadius: 16,
-          background: 'linear-gradient(180deg, #1b1816 0%, var(--v3-surface) 72%)',
+          padding: '12px 12px',
+          borderRadius: 10,
+          background: 'linear-gradient(180deg, #141414 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
+          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
         }}>
-          {/* Hero row — restrained avatar + name + active/company */}
+          {/* Hero row, restrained avatar + name + active/company */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <div aria-hidden="true" style={{
               flexShrink: 0,
               width: 60, height: 60,
-              borderRadius: 16,
+              borderRadius: 10,
               background: 'var(--v3-surface-2)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
               display: 'grid', placeItems: 'center',
               fontFamily: 'var(--font-display)',
-              fontSize: 26,
-              letterSpacing: '0.04em',
+              fontSize: 24,
+              letterSpacing: 0,
               color: 'var(--v3-primary)',
-              boxShadow: 'inset 0 1px 0 rgba(255, 240, 210, 0.05)'
+              boxShadow: 'inset 0 1px 0 rgba(242, 237, 228, 0.05)'
             }}>
               {initial}
             </div>
-            <div style={{ minWidth: 0, flex: 1, paddingTop: 2 }}>
+            <div style={{ minWidth: 0, flex: 1, paddingTop: 4 }}>
               <h1 style={{
                 margin: 0,
-                fontSize: 'clamp(22px, 5.5vw, 28px)',
+                fontSize: 24,
                 lineHeight: 1.08,
-                letterSpacing: '-0.015em',
+                letterSpacing: 0,
                 fontWeight: 600,
                 color: 'var(--v3-text)'
               }}>
@@ -342,12 +342,12 @@ export default function ClientDetail() {
               </h1>
               <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {activeCount > 0 ? (
-                  <Eyebrow tone="success" style={{ gap: 5, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-success-soft)', border: '1px solid rgba(79, 140, 94, 0.40)', fontVariantNumeric: 'tabular-nums' }}>
-                    <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--v3-success-bright)' }} />
+                  <Eyebrow tone="success" style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-success-soft)', border: '1px solid rgba(45, 122, 79, 0.40)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 10, background: 'var(--v3-success-bright)' }} />
                     Active
                   </Eyebrow>
                 ) : (
-                  <Eyebrow style={{ gap: 5, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-strong)' }}>
+                  <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-strong)' }}>
                     Inactive
                   </Eyebrow>
                 )}
@@ -366,15 +366,15 @@ export default function ClientDetail() {
             </div>
           </div>
 
-          {/* Metrics row — surfaces lifetime / outstanding / active */}
+          {/* Metrics row, surfaces lifetime / outstanding / active */}
           {(lifetime > 0 || outstanding > 0 || activeCount > 0) && (
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr 1fr',
               alignItems: 'end',
-              gap: 10,
+              gap: 12,
               marginTop: 12,
-              paddingTop: 10,
+              paddingTop: 12,
               borderTop: '1px solid var(--v3-border)'
             }}>
               <CockpitMetric label="Lifetime" tone="gold" size="lg">
@@ -393,8 +393,8 @@ export default function ClientDetail() {
             </div>
           )}
 
-          {/* Action row — Call · Text · Email · Map (4 equal columns) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 12 }}>
+          {/* Action row, Call · Text · Email · Map (4 equal columns) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12 }}>
             <ActionTile
               icon={Phone}
               label="Call"
@@ -420,8 +420,8 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* PRIMARY — spin up a new quote / job / invoice for this client */}
-      <div style={{ padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* PRIMARY, spin up a new quote / job / invoice for this client */}
+      <div style={{ padding: '0 24px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <motion.button
           type="button"
           whileTap={{ scale: 0.99 }}
@@ -429,9 +429,9 @@ export default function ClientDetail() {
           style={{
             width: '100%',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '13px 16px', borderRadius: 14, border: 'none',
+            padding: '12px 16px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: 0,
             cursor: 'pointer', boxShadow: 'var(--v3-gold-glow)',
             WebkitTapHighlightColor: 'transparent'
           }}
@@ -440,7 +440,7 @@ export default function ClientDetail() {
           New quote or invoice
         </motion.button>
 
-        {/* STATEMENT — roll every open invoice across all this client's
+        {/* STATEMENT, roll every open invoice across all this client's
             properties into one document. Only meaningful when there's a
             balance, so it stays hidden otherwise. */}
         {statementSummary.totalDue > 0 && (
@@ -451,10 +451,10 @@ export default function ClientDetail() {
             style={{
               width: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              padding: '12px 16px', borderRadius: 14,
+              padding: '12px 16px', borderRadius: 10,
               background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
               color: 'var(--v3-text)',
-              fontFamily: 'var(--font-body)', fontSize: 13.5, fontWeight: 700, letterSpacing: '0.02em',
+              fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: 0,
               cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
             }}
           >
@@ -464,7 +464,7 @@ export default function ClientDetail() {
         )}
       </div>
 
-      {/* TABS — v3 segmented underline (Overview · Projects · Files · Notes) */}
+      {/* TABS, v3 segmented underline (Overview · Projects · Files · Notes) */}
       <SegmentedTabs
         value={tab}
         onChange={setTab}
@@ -473,7 +473,7 @@ export default function ClientDetail() {
       />
 
       {/* TAB CONTENT */}
-      <div style={{ padding: '0 20px' }}>
+      <div style={{ padding: '0 24px' }}>
         {tab === 'overview' && (
           isEditing
             ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
@@ -495,7 +495,7 @@ export default function ClientDetail() {
 }
 
 /* ============================================================
-   NewDealOption — one row in the "New for {client}" chooser sheet
+   NewDealOption, one row in the "New for {client}" chooser sheet
    ============================================================ */
 
 function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
@@ -506,9 +506,9 @@ function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
       onClick={() => { if (!disabled) { hapticTap(); onClick?.() } }}
       disabled={disabled}
       style={{
-        display: 'flex', alignItems: 'center', gap: 14,
+        display: 'flex', alignItems: 'center', gap: 12,
         width: '100%', textAlign: 'left',
-        padding: '14px 16px', borderRadius: 14,
+        padding: '12px 16px', borderRadius: 10,
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border-strong)',
         color: 'var(--v3-text)',
@@ -519,7 +519,7 @@ function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
     >
       <span aria-hidden="true" style={{
         flexShrink: 0,
-        width: 40, height: 40, borderRadius: 11,
+        width: 40, height: 40, borderRadius: 10,
         background: 'var(--v3-primary-soft)',
         border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
         color: 'var(--v3-primary)',
@@ -530,7 +530,7 @@ function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{
           display: 'block',
-          fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 700,
+          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
           color: 'var(--v3-text)', lineHeight: 1.2
         }}>
           {label}
@@ -548,7 +548,7 @@ function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
 }
 
 /* ============================================================
-   IconBtn — chrome icon button (back / edit / more / delete)
+   IconBtn, chrome icon button (back / edit / more / delete)
    ============================================================ */
 
 function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }: any) {
@@ -566,7 +566,7 @@ function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }: 
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
       style={{
-        width: 40, height: 40, borderRadius: 12,
+        width: 40, height: 40, borderRadius: 10,
         display: 'grid', placeItems: 'center',
         background: p.bg,
         border: `1px solid ${p.border}`,
@@ -582,7 +582,7 @@ function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }: 
 }
 
 /* ============================================================
-   ActionTile — Call / Text / Email / Map quick-action button.
+   ActionTile, Call / Text / Email / Map quick-action button.
    Plain <a> + setTimeout fallback for iOS Safari (audit-batch-6 pattern).
    ============================================================ */
 
@@ -591,8 +591,8 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
   const baseStyle: import('react').CSSProperties = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     gap: 4,
-    padding: '10px 4px',
-    borderRadius: 12,
+    padding: '12px 4px',
+    borderRadius: 10,
     background: enabled ? 'var(--v3-surface-2)' : 'var(--v3-glass-tint)',
     border: `1px solid ${enabled ? 'var(--v3-border)' : 'var(--v3-border)'}`,
     color: enabled ? 'var(--v3-text)' : 'var(--v3-text-muted)',
@@ -636,7 +636,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
 }
 
 /* ============================================================
-   CockpitMetric — eyebrow + StampNumber column. Mirrors the
+   CockpitMetric, eyebrow + StampNumber column. Mirrors the
    Job Detail cockpit helper so both detail screens share scale.
    ============================================================ */
 
@@ -650,29 +650,29 @@ function CockpitMetric({ label, tone = 'default', size = 'md', children }: any) 
 }
 
 /* ============================================================
-   OverviewRead — Contact Info card + Map block (metrics now
+   OverviewRead, Contact Info card + Map block (metrics now
    live in the cockpit header above)
    ============================================================ */
 
 function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], payments = [], onJump }: any) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 0 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 0 24px' }}>
 
-      {/* PIPELINE DISTRIBUTION — counts + value per stage, jumps to Projects */}
+      {/* PIPELINE DISTRIBUTION, counts + value per stage, jumps to Projects */}
       {jobs.length > 0 && (
         <PipelineDistribution jobs={jobs} payments={payments} onJump={onJump} />
       )}
 
-      {/* CONTACT INFO CARD — phone / email / address as separate rows */}
+      {/* CONTACT INFO CARD, phone / email / address as separate rows */}
       <div style={{
-        padding: '6px 0',
-        borderRadius: 16,
+        padding: '8px 0',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)',
         overflow: 'hidden'
       }}>
-        <div style={{ padding: '14px 18px 8px' }}>
+        <div style={{ padding: '12px 16px 8px' }}>
           <Eyebrow>
             Contact info
           </Eyebrow>
@@ -682,14 +682,14 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
         <ContactRow icon={MapPin} label="Address" value={client.address} multiline isLast />
       </div>
 
-      {/* MAP BLOCK — only render when address present */}
+      {/* MAP BLOCK, only render when address present */}
       {client.address && (
         <div style={{
-          borderRadius: 16,
+          borderRadius: 10,
           overflow: 'hidden',
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
+          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)'
         }}>
           <a
             href={`https://maps.apple.com/?address=${encodeURIComponent(client.address)}`}
@@ -701,7 +701,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
               position: 'relative',
               height: 160,
               background: `
-                linear-gradient(180deg, transparent 0%, transparent 60%, rgba(7, 7, 10, 0.7) 100%),
+                linear-gradient(180deg, transparent 0%, transparent 60%, rgba(20, 20, 20, 0.7) 100%),
                 repeating-linear-gradient(45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
                 repeating-linear-gradient(-45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
                 var(--v3-surface-2)
@@ -720,11 +720,11 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
               gap: 4
             }}>
               <div style={{
-                width: 40, height: 40, borderRadius: '50%',
+                width: 40, height: 40, borderRadius: 10,
                 background: 'var(--v3-primary)',
                 display: 'grid', placeItems: 'center',
                 color: 'var(--v3-on-primary)',
-                boxShadow: '0 8px 24px rgba(212, 175, 55, 0.45)'
+                boxShadow: '0 8px 24px rgba(201, 150, 58, 0.45)'
               }}>
                 <MapPin size={20} aria-hidden="true" />
               </div>
@@ -760,14 +760,14 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
         </div>
       )}
 
-      {/* OPTIONAL — internal notes from the client record */}
+      {/* OPTIONAL, internal notes from the client record */}
       {client.notes && (
         <div style={{
-          padding: '14px 18px',
-          borderRadius: 14,
+          padding: '12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
+          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)'
         }}>
           <Eyebrow as="div" style={{ marginBottom: 8 }}>
             Internal Notes
@@ -792,8 +792,8 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
     <div style={{
       display: 'flex',
       alignItems: multiline ? 'flex-start' : 'center',
-      gap: 14,
-      padding: '14px 18px',
+      gap: 12,
+      padding: '12px 16px',
       borderTop: '1px solid var(--v3-border)',
       borderBottom: isLast ? 'none' : 'none',
       background: 'transparent',
@@ -820,7 +820,7 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
         </Eyebrow>
         <div style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: hasValue ? 600 : 400,
           color: hasValue ? 'var(--v3-text)' : 'var(--v3-text-muted)',
           fontStyle: 'normal',
@@ -855,7 +855,7 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
 }
 
 /* ============================================================
-   OverviewEdit — controlled form, v3 surface
+   OverviewEdit, controlled form, v3 surface
    ============================================================ */
 
 function OverviewEdit({ client, onCommit, onCancel }: any) {
@@ -864,15 +864,15 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
   function set(k: any, v: any) { setForm((f: any) => ({ ...f, [k]: v })) }
   const fieldStyle: import('react').CSSProperties = {
     width: '100%', boxSizing: 'border-box',
-    padding: '11px 14px', borderRadius: 12,
+    padding: '12px 12px', borderRadius: 10,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
     fontSize: 14, outline: 'none'
   }
   const labelStyle: import('react').CSSProperties = {
     fontFamily: 'var(--font-body)',
-    fontSize: 10, fontWeight: 700,
-    letterSpacing: '0.16em', textTransform: 'uppercase',
+    fontSize: 12, fontWeight: 700,
+    letterSpacing: 0, textTransform: 'uppercase',
     color: 'var(--v3-text-muted)'
   }
   async function commit() {
@@ -890,54 +890,54 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
   }
   return (
     <div style={{
-      padding: 18,
-      borderRadius: 16,
+      padding: 16,
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 4px 12px rgba(0, 0, 0, 0.25)',
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 4px 12px rgba(20, 20, 20, 0.25)',
       display: 'flex', flexDirection: 'column', gap: 12,
       margin: '12px 0 24px'
     }}>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span style={labelStyle}>Name</span>
         <input style={fieldStyle} value={form.name || ''} onChange={(e) => set('name', e.target.value)} />
       </label>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span style={labelStyle}>Company</span>
         <input style={fieldStyle} value={form.company_name || ''} onChange={(e) => set('company_name', e.target.value)} />
       </label>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={labelStyle}>Phone</span>
           <input type="tel" inputMode="tel" style={fieldStyle} value={form.phone || ''} onChange={(e) => set('phone', e.target.value)} />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={labelStyle}>Email</span>
           <input type="email" inputMode="email" style={fieldStyle} value={form.email || ''} onChange={(e) => set('email', e.target.value)} />
         </label>
       </div>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span style={labelStyle}>Address</span>
         <textarea rows={2} style={{ ...fieldStyle, resize: 'vertical' }} value={form.address || ''} onChange={(e) => set('address', e.target.value)} />
       </label>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span style={labelStyle}>Notes</span>
         <textarea rows={4} style={{ ...fieldStyle, resize: 'vertical' }} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} />
       </label>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 10, marginTop: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginTop: 4 }}>
         <button type="button" onClick={onCancel} disabled={saving} style={{
-          padding: '12px 14px', borderRadius: 12,
+          padding: '12px 12px', borderRadius: 10,
           background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
           color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-          fontSize: 13, fontWeight: 700, cursor: 'pointer'
+          fontSize: 14, fontWeight: 700, cursor: 'pointer'
         }}>
           Cancel
         </button>
         <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={commit} disabled={saving} style={{
-          padding: '12px 14px', borderRadius: 12, border: 'none',
+          padding: '12px 12px', borderRadius: 10, border: 'none',
           background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-          letterSpacing: '0.04em',
+          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+          letterSpacing: 0,
           cursor: saving ? 'wait' : 'pointer',
           boxShadow: 'var(--v3-gold-glow)',
           opacity: saving ? 0.7 : 1
@@ -950,7 +950,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
 }
 
 /* ============================================================
-   PipelineDistribution — overview mini-card. Counts + value per
+   PipelineDistribution, overview mini-card. Counts + value per
    stage; tapping a row jumps to Projects (parent owns tab state).
    ============================================================ */
 
@@ -986,13 +986,13 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
     <section style={{
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border-strong)',
-      borderRadius: 16,
+      borderRadius: 10,
       overflow: 'hidden',
-      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.2)'
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)'
     }}>
       <header style={{
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-        gap: 8, padding: '14px 18px 8px'
+        gap: 8, padding: '12px 16px 8px'
       }}>
         <Eyebrow>
           Pipeline
@@ -1019,7 +1019,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
                   gridTemplateColumns: '8px 1fr auto',
                   alignItems: 'center',
                   gap: 12,
-                  padding: '11px 18px',
+                  padding: '12px 16px',
                   background: 'transparent',
                   border: 'none',
                   borderTop: '1px solid var(--v3-border)',
@@ -1030,20 +1030,20 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
                 }}
               >
                 <span aria-hidden="true" style={{
-                  width: 8, height: 8, borderRadius: '50%',
+                  width: 8, height: 8, borderRadius: 10,
                   background: c, boxShadow: `0 0 10px ${c}66`
                 }} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{
                     fontFamily: 'var(--font-body)',
-                    fontSize: 13, fontWeight: 600,
+                    fontSize: 14, fontWeight: 600,
                     color: 'var(--v3-text)', lineHeight: 1.2
                   }}>
                     {r.label}
                   </div>
                   <div style={{
                     marginTop: 4,
-                    height: 4, borderRadius: 999,
+                    height: 4, borderRadius: 10,
                     background: 'var(--v3-glass-tint-2)',
                     overflow: 'hidden'
                   }}>
@@ -1051,7 +1051,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
                       width: `${Math.max(pct, 4)}%`,
                       height: '100%',
                       background: c,
-                      borderRadius: 999
+                      borderRadius: 10
                     }} />
                   </div>
                 </div>
@@ -1068,7 +1068,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
                   <div style={{
                     marginTop: 3,
                     fontFamily: 'var(--font-body)',
-                    fontSize: 10, fontWeight: 600,
+                    fontSize: 12, fontWeight: 600,
                     color: 'var(--v3-text-muted)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
@@ -1085,7 +1085,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
 }
 
 /* ============================================================
-   ProjectsList — jobs linked to this client, with stage filter
+   ProjectsList, jobs linked to this client, with stage filter
    chips + per-row paid/balance bar + relative-time stamp.
    ============================================================ */
 
@@ -1113,7 +1113,7 @@ function relTime(input: any) {
 }
 
 /* ============================================================
-   ClientTimeline — one chronological feed across all the client's
+   ClientTimeline, one chronological feed across all the client's
    properties: payments, projects, notes, files. Newest first.
    ============================================================ */
 function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
@@ -1124,16 +1124,16 @@ function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
 
   if (events.length === 0) {
     return (
-      <div className="v3-empty" style={{ padding: '28px 16px', textAlign: 'center' }}>
+      <div className="v3-empty" style={{ padding: '24px 16px', textAlign: 'center' }}>
         <Clock size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>No activity yet</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>No activity yet</div>
         <div style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>Payments, notes, and photos across this client's properties will show up here.</div>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '4px 0 20px' }}>
+    <div style={{ padding: '4px 0 24px' }}>
       {events.map((e: TimelineEvent, i: number) => {
         const meta = TIMELINE_META[e.kind]
         const last = i === events.length - 1
@@ -1150,23 +1150,23 @@ function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
           >
             {/* Rail: dot + connecting line */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 26 }}>
-              <span style={{ width: 26, height: 26, borderRadius: 999, display: 'grid', placeItems: 'center', background: meta.bg, border: `1px solid ${meta.border}`, color: meta.color }}>
+              <span style={{ width: 26, height: 26, borderRadius: 10, display: 'grid', placeItems: 'center', background: meta.bg, border: `1px solid ${meta.border}`, color: meta.color }}>
                 <meta.Icon size={13} />
               </span>
               {!last && <span style={{ flex: 1, width: 1.5, background: 'var(--v3-border)', marginTop: 2, minHeight: 14 }} />}
             </div>
             {/* Body */}
-            <div style={{ flex: 1, minWidth: 0, paddingBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: 13.5, fontWeight: 700, color: 'var(--v3-text)' }}>{e.title}</span>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>{e.title}</span>
                 {e.amount != null && e.amount > 0 && (
-                  <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--v3-success-bright, #4ade80)', fontVariantNumeric: 'tabular-nums' }}>+{money(e.amount)}</span>
+                  <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 800, color: 'var(--v3-success-bright, #2D7A4F)', fontVariantNumeric: 'tabular-nums' }}>+{money(e.amount)}</span>
                 )}
               </div>
               {e.detail && (
                 <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.detail}</div>
               )}
-              <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 3, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <span>{timelineDate(e.atIso)}</span>
                 {e.property && <><span aria-hidden="true">·</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{e.property}</span></>}
               </div>
@@ -1179,7 +1179,7 @@ function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
 }
 
 const TIMELINE_META: Record<string, { Icon: any; color: string; bg: string; border: string }> = {
-  payment: { Icon: DollarSign, color: 'var(--v3-success-bright, #4ade80)', bg: 'color-mix(in srgb, #4ade80 12%, transparent)', border: 'color-mix(in srgb, #4ade80 35%, transparent)' },
+  payment: { Icon: DollarSign, color: 'var(--v3-success-bright, #2D7A4F)', bg: 'color-mix(in srgb, #2D7A4F 12%, transparent)', border: 'color-mix(in srgb, #2D7A4F 35%, transparent)' },
   job:     { Icon: Briefcase,  color: 'var(--v3-primary)', bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
   note:    { Icon: MessageSquare, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' },
   file:    { Icon: ImageIcon, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' }
@@ -1218,10 +1218,10 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
   return (
     <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* Filter chips — dispatch-state pill pattern */}
+      {/* Filter chips, dispatch-state pill pattern */}
       <div role="tablist" aria-label="Project filter" style={{
-        display: 'flex', gap: 6, padding: 3,
-        borderRadius: 999,
+        display: 'flex', gap: 8, padding: 4,
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
         boxShadow: 'inset 0 1px 0 var(--v3-glass-tint)'
@@ -1238,14 +1238,14 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
               onClick={() => { hapticTap(); setFilter(f.id) }}
               style={{
                 flex: 1,
-                padding: '7px 10px',
-                borderRadius: 999,
+                padding: '8px 12px',
+                borderRadius: 10,
                 border: 'none',
                 background: active ? 'var(--v3-primary)' : 'transparent',
                 color: active ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.10em', textTransform: 'uppercase',
+                fontSize: 12, fontWeight: 700,
+                letterSpacing: 0, textTransform: 'uppercase',
                 fontVariantNumeric: 'tabular-nums',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
@@ -1281,12 +1281,12 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                   style={{
                     width: '100%',
                     position: 'relative',
-                    display: 'flex', flexDirection: 'column', gap: 10,
-                    padding: '14px 14px 14px 20px',
-                    borderRadius: 14,
-                    background: '#171511',
+                    display: 'flex', flexDirection: 'column', gap: 12,
+                    padding: '12px 12px 12px 24px',
+                    borderRadius: 10,
+                    background: '#141414',
                     border: '1px solid var(--v3-border-strong)',
-                    boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)',
+                    boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)',
                     textAlign: 'left',
                     cursor: 'pointer',
                     color: 'var(--v3-text)',
@@ -1303,13 +1303,13 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                     boxShadow: `0 0 12px ${c}66`
                   }} />
 
-                  {/* Row 1 — title + amount */}
+                  {/* Row 1, title + amount */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontFamily: 'var(--font-body)',
                         fontSize: 14, fontWeight: 700,
-                        letterSpacing: '-0.005em',
+                        letterSpacing: 0,
                         color: 'var(--v3-text)',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                       }}>
@@ -1318,11 +1318,11 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                       <div style={{
                         marginTop: 3,
                         fontFamily: 'var(--font-body)',
-                        fontSize: 11,
+                        fontSize: 12,
                         color: 'var(--v3-text-muted)',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                       }}>
-                        {j.job_title || j.job_type || '—'}
+                        {j.job_title || j.job_type || '\u2003'}
                       </div>
                     </div>
                     <div style={{ flexShrink: 0, textAlign: 'right' }}>
@@ -1330,7 +1330,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                         fontFamily: 'var(--font-display)',
                         fontSize: 16,
                         color: 'var(--v3-primary)',
-                        letterSpacing: '0.02em',
+                        letterSpacing: 0,
                         fontVariantNumeric: 'tabular-nums',
                         lineHeight: 1
                       }}>
@@ -1342,19 +1342,19 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                     </div>
                   </div>
 
-                  {/* Row 2 — paid bar (only when there's money to track) */}
+                  {/* Row 2, paid bar (only when there's money to track) */}
                   {amount > 0 && billable && (
                     <div>
                       <div style={{
-                        height: 4, borderRadius: 999,
+                        height: 4, borderRadius: 10,
                         background: 'var(--v3-glass-tint-2)',
                         overflow: 'hidden'
                       }}>
                         <div style={{
                           width: `${pct}%`,
                           height: '100%',
-                          background: pct >= 100 ? 'var(--v3-success-bright, #4ade80)' : c,
-                          borderRadius: 999
+                          background: pct >= 100 ? 'var(--v3-success-bright, #2D7A4F)' : c,
+                          borderRadius: 10
                         }} />
                       </div>
                       <div style={{
@@ -1362,22 +1362,22 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         gap: 8,
                         fontFamily: 'var(--font-body)',
-                        fontSize: 10, fontWeight: 600,
-                        letterSpacing: '0.06em',
+                        fontSize: 12, fontWeight: 600,
+                        letterSpacing: 0,
                         color: 'var(--v3-text-muted)',
                         fontVariantNumeric: 'tabular-nums'
                       }}>
                         <span>
                           {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
                         </span>
-                        <span style={{ color: balance > 0 ? 'var(--v3-danger-bright, #f5a294)' : 'var(--v3-success-bright, #4ade80)' }}>
+                        <span style={{ color: balance > 0 ? 'var(--v3-danger-bright, #C9963A)' : 'var(--v3-success-bright, #2D7A4F)' }}>
                           {balance > 0 ? `${money(balance)} due` : 'Paid in full'}
                         </span>
                       </div>
                     </div>
                   )}
 
-                  {/* Row 3 — last-touch stamp */}
+                  {/* Row 3, last-touch stamp */}
                   {stamp && (
                     <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
                       Updated {stamp} ago
@@ -1394,7 +1394,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
 }
 
 /* ============================================================
-   NotesList — communication log across all the client's jobs
+   NotesList, communication log across all the client's jobs
    ============================================================ */
 
 function NotesList({ notes }: any) {
@@ -1408,11 +1408,11 @@ function NotesList({ notes }: any) {
           return (
             <li key={n.id} style={{
               position: 'relative',
-              padding: '14px 14px 14px 20px',
-              borderRadius: 14,
+              padding: '12px 12px 12px 24px',
+              borderRadius: 10,
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border-strong)',
-              boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)',
+              boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)',
               overflow: 'hidden'
             }}>
               <span aria-hidden="true" style={{
@@ -1421,15 +1421,15 @@ function NotesList({ notes }: any) {
                 width: 3,
                 borderRadius: '0 3px 3px 0',
                 background: 'var(--v3-primary)',
-                boxShadow: '0 0 12px rgba(212, 175, 55, 0.45)'
+                boxShadow: '0 0 12px rgba(201, 150, 58, 0.45)'
               }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                 <h4 style={{
                   margin: 0,
                   fontFamily: 'var(--font-body)',
                   fontSize: 14, fontWeight: 700,
                   color: 'var(--v3-text)',
-                  letterSpacing: '-0.005em',
+                  letterSpacing: 0,
                   overflowWrap: 'anywhere'
                 }}>
                   {title}
@@ -1437,7 +1437,7 @@ function NotesList({ notes }: any) {
                 <span style={{
                   flexShrink: 0,
                   fontFamily: 'var(--font-body)',
-                  fontSize: 10,
+                  fontSize: 12,
                   color: 'var(--v3-text-muted)',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
@@ -1454,7 +1454,7 @@ function NotesList({ notes }: any) {
                 }}>{body}</p>
               )}
               {n.fh_contacts?.name && (
-                <Eyebrow tone="gold" style={{ gap: 4, marginTop: 8, padding: '3px 9px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)' }}>
+                <Eyebrow tone="gold" style={{ gap: 4, marginTop: 8, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)' }}>
                   <Briefcase size={10} />
                   {n.fh_contacts.name}
                 </Eyebrow>
@@ -1468,7 +1468,7 @@ function NotesList({ notes }: any) {
 }
 
 /* ============================================================
-   FilesList — files + photos across the client's jobs
+   FilesList, files + photos across the client's jobs
    ============================================================ */
 
 function FilesList({ rows }: any) {
@@ -1490,19 +1490,19 @@ function FilesList({ rows }: any) {
   }
   return (
     <div style={{ padding: '12px 0 24px' }}>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {rows.map((r: any) => (
           <li key={r.id} style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            padding: '12px 14px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             background: 'var(--v3-surface)',
             border: '1px solid var(--v3-border-strong)',
-            boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(0, 0, 0, 0.22)'
+            boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)'
           }}>
             <span aria-hidden="true" style={{
               flexShrink: 0,
-              width: 34, height: 34, borderRadius: 9,
+              width: 34, height: 34, borderRadius: 10,
               background: 'var(--v3-primary-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
               color: 'var(--v3-primary)',
@@ -1518,7 +1518,7 @@ function FilesList({ rows }: any) {
             }}>
               <div style={{
                 fontFamily: 'var(--font-body)',
-                fontSize: 13, fontWeight: 700,
+                fontSize: 14, fontWeight: 700,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
                 {r.filename}
@@ -1526,7 +1526,7 @@ function FilesList({ rows }: any) {
               <div style={{
                 marginTop: 2,
                 fontFamily: 'var(--font-body)',
-                fontSize: 11,
+                fontSize: 12,
                 color: 'var(--v3-text-muted)',
                 fontVariantNumeric: 'tabular-nums'
               }}>

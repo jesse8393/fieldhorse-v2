@@ -1,6 +1,6 @@
 // src/screens/Activity.jsx
 //
-// Global activity feed — every event across every job, in one
+// Global activity feed, every event across every job, in one
 // chronological stream. Pulls the last 50-ish rows from each
 // per-job table (fh_stage_transitions, fh_payments, fh_change_orders,
 // fh_invoices) plus the contact metadata that anchors them, then
@@ -133,8 +133,8 @@ export default function Activity() {
           icon: isApproved ? Check : FileEdit,
           tone: isApproved ? 'green' : 'neutral',
           title: isApproved
-            ? `CO #${co.sequence_number} approved — ${co.title || ''}`
-            : `CO #${co.sequence_number} added — ${co.title || ''}`,
+            ? `CO #${co.sequence_number} approved, ${co.title || ''}`
+            : `CO #${co.sequence_number} added, ${co.title || ''}`,
           sub: `${co.amount >= 0 ? '+' : ''}${money(co.amount)}`
         })
       }
@@ -149,7 +149,7 @@ export default function Activity() {
           kind: 'invoice',
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',
-          title: `Draw #${inv.sequence_number} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? ` — ${inv.title}` : ''}`,
+          title: `Draw #${inv.sequence_number} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `, ${inv.title}` : ''}`,
           sub: money(inv.amount)
         })
       }
@@ -178,7 +178,7 @@ export default function Activity() {
   // skeleton that looks like a hang. Show an honest error + retry instead.
   if (isError) {
     return (
-      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+      <div className="v3-screen" style={{ padding: '24px 24px' }}>
         <DataErrorState
           title="Couldn't load activity"
           message="We couldn't reach your activity feed. Check your connection and retry."
@@ -199,15 +199,15 @@ export default function Activity() {
         background: 'var(--v3-bg)'
       }}
     >
-      <motion.div variants={item} style={{ padding: '12px 20px 8px' }}>
+      <motion.div variants={item} style={{ padding: '12px 24px 8px' }}>
         <Eyebrow as="div" tone="gold">
           <ActivityIcon size={11} aria-hidden="true" />
           Recent
         </Eyebrow>
         <h1 style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 'clamp(28px, 7vw, 38px)',
-          letterSpacing: '-0.005em',
+          fontSize: 24,
+          letterSpacing: 0,
           color: 'var(--v3-text)',
           margin: '6px 0 4px',
           lineHeight: 1.05
@@ -216,24 +216,24 @@ export default function Activity() {
         </h1>
         <p style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 13,
+          fontSize: 14,
           color: 'var(--v3-text-muted)',
           margin: 0,
           lineHeight: 1.45
         }}>
-          Every payment, draw, stage change, and change order — across every job.
+          Every payment, draw, stage change, and change order, across every job.
         </p>
       </motion.div>
 
-      <motion.div variants={item} style={{ padding: '12px 20px 24px' }}>
+      <motion.div variants={item} style={{ padding: '12px 24px 24px' }}>
         {loading && <SkeletonList rows={6} card={false} />}
         {empty && (
           <div style={{
-            padding: '40px 20px', borderRadius: 14,
+            padding: '32px 24px', borderRadius: 10,
             background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
             color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-            fontSize: 13, textAlign: 'center', lineHeight: 1.5,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10
+            fontSize: 14, textAlign: 'center', lineHeight: 1.5,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
           }}>
             <Sparkles size={26} aria-hidden="true" color="var(--v3-text-muted)" />
             <div>Nothing has happened yet. Create a lead, log a payment, or send a proposal to see the timeline fill in.</div>
@@ -253,20 +253,20 @@ export default function Activity() {
           </section>
         ))}
 
-        {/* Load older — show only when a source actually filled its page
+        {/* Load older, show only when a source actually filled its page
             (bundle.hasMore), not when the merged feed happens to exceed
             pageSize (4 sources can sum past it while all are exhausted). */}
         {!loading && !empty && bundle?.hasMore && pageSize < 480 && (
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
             <button
               type="button"
               onClick={() => setPageSize((p) => Math.min(p + 60, 480))}
               disabled={isFetching}
               style={{
-                minHeight: 44, padding: '11px 20px', borderRadius: 12,
+                minHeight: 44, padding: '12px 24px', borderRadius: 10,
                 background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
                 color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-                fontSize: 13, fontWeight: 600, cursor: isFetching ? 'wait' : 'pointer',
+                fontSize: 14, fontWeight: 600, cursor: isFetching ? 'wait' : 'pointer',
                 WebkitTapHighlightColor: 'transparent'
               }}
             >
@@ -284,8 +284,8 @@ function EventRow({ event }: any) {
   const tone = ({
     neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', br: 'var(--v3-border-mid)' },
     gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
-    green:   { fg: 'var(--v3-success-bright, #4ade80)', bg: 'rgba(74,222,128,0.10)', br: 'rgba(74,222,128,0.30)' },
-    red:     { fg: 'var(--v3-danger-bright, #f5a294)', bg: 'rgba(232,90,87,0.10)', br: 'rgba(232,90,87,0.30)' }
+    green:   { fg: 'var(--v3-success-bright, #2D7A4F)', bg: 'rgba(45, 122, 79,0.10)', br: 'rgba(45, 122, 79,0.30)' },
+    red:     { fg: 'var(--v3-danger-bright, #C9963A)', bg: 'rgba(192, 57, 43,0.10)', br: 'rgba(192, 57, 43,0.30)' }
   } as Record<string, any>)[event.tone || 'neutral']
 
   const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
@@ -298,10 +298,10 @@ function EventRow({ event }: any) {
           display: 'grid',
           gridTemplateColumns: '36px 1fr auto',
           gap: 12,
-          padding: '12px 14px',
+          padding: '12px 12px',
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
-          borderRadius: 12,
+          borderRadius: 10,
           textDecoration: 'none',
           color: 'inherit',
           WebkitTapHighlightColor: 'transparent'
@@ -321,7 +321,7 @@ function EventRow({ event }: any) {
         </span>
         <div style={{ minWidth: 0 }}>
           <div style={{
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             color: 'var(--v3-text)', lineHeight: 1.3,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>
@@ -329,7 +329,7 @@ function EventRow({ event }: any) {
           </div>
           <div style={{
             marginTop: 3,
-            fontFamily: 'var(--font-body)', fontSize: 11,
+            fontFamily: 'var(--font-body)', fontSize: 12,
             color: 'var(--v3-text-muted)', lineHeight: 1.4,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>

@@ -59,21 +59,21 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
   const fieldStyle: import('react').CSSProperties = {
     width: '100%',
     boxSizing: 'border-box',
-    padding: '11px 14px',
-    borderRadius: 12,
+    padding: '12px 12px',
+    borderRadius: 10,
     background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
     fontSize: 14,
     outline: 'none',
-    // iOS scroll-into-view clearance — leaves room above for the drawer
+    // iOS scroll-into-view clearance, leaves room above for the drawer
     // header and below for SAVE CLIENT so the focused input never lands
     // crammed under another control after focus-scroll runs.
     scrollMarginTop: 96,
     scrollMarginBottom: 120
   }
-  const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
@@ -89,14 +89,14 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               Add a{' '}
               client.
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
             A client can hold one or many jobs over time. You'll link jobs to this client as they come in.
           </DrawerDescription>
@@ -107,7 +107,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
           onSubmit={submit}
           style={formStyle()}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Name *</span>
             <input
               type="text"
@@ -118,7 +118,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
               style={fieldStyle}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Company</span>
             <input
               type="text"
@@ -128,8 +128,8 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
               style={fieldStyle}
             />
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Phone</span>
               <input
                 type="tel"
@@ -140,7 +140,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
                 style={fieldStyle}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Email</span>
               <input
                 type="email"
@@ -152,7 +152,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
               />
             </label>
           </div>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Address</span>
             <textarea
               rows={2}
@@ -162,7 +162,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
               style={{ ...fieldStyle, resize: 'vertical' }}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Notes</span>
             <textarea
               rows={3}
@@ -173,12 +173,12 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
             />
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
             <button
               type="button"
               onClick={() => onClose?.()}
               disabled={saving}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing: 'border-box' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing: 'border-box' }}
             >
               <X size={14} />
               Cancel
@@ -192,8 +192,8 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                padding: '12px 14px',
-                borderRadius: 12,
+                padding: '12px 12px',
+                borderRadius: 10,
                 border: (saving || !name.trim()) ? '1px solid var(--rule)' : 'none',
                 background: (saving || !name.trim())
                   ? 'var(--surface-2)'
@@ -201,7 +201,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
                 color: (saving || !name.trim()) ? 'var(--ink-muted)' : 'var(--onyx)',
                 fontFamily: 'var(--font-display)',
                 fontSize: 14,
-                letterSpacing: '0.14em',
+                letterSpacing: 0,
                 cursor: (saving || !name.trim()) ? 'not-allowed' : 'pointer',
                 boxShadow: (saving || !name.trim()) ? 'none' : '0 6px 16px rgba(201,150,58,0.3)',
                 minWidth: 0,

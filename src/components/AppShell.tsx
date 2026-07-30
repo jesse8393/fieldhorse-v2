@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster as SonnerToaster } from 'sonner'
 import AppHeader from './AppHeader.tsx'
 import BottomNav from './BottomNav.tsx'
-// Lazy + conditional — DesktopSidebar is hidden by CSS on mobile but
+// Lazy + conditional, DesktopSidebar is hidden by CSS on mobile but
 // still shipped + parsed. Gating on useIsDesktop saves the JS code
 // + parse cost for phone users, who outnumber desktop usage.
 const DesktopSidebar = lazy(() => import('./DesktopSidebar.tsx'))
@@ -17,7 +17,7 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOutboxSync } from '../lib/outbox.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 
-// Route-loading skeleton — matches Onyx bg so split-chunk fetches don't
+// Route-loading skeleton, matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
 //
 // Audit found Client detail + Notes feeling broken because the chunk
@@ -27,13 +27,13 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 // reads as "broken".
 function RouteFallback() {
   return (
-    <div style={{ padding: '20px 20px 80px' }}>
+    <div style={{ padding: '24px 24px 48px' }}>
       <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <span style={{ width: 100, height: 11, borderRadius: 4, background: 'var(--v3-glass-tint-2)' }} />
-        <span style={{ width: '60%', maxWidth: 280, height: 28, borderRadius: 6, background: 'var(--v3-glass-tint-2)', marginBottom: 6 }} />
-        <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
-        <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.4 }} />
-        <span style={{ width: '100%', height: 64, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.28 }} />
+        <span style={{ width: 100, height: 11, borderRadius: 10, background: 'var(--v3-glass-tint-2)' }} />
+        <span style={{ width: '60%', maxWidth: 280, height: 28, borderRadius: 10, background: 'var(--v3-glass-tint-2)', marginBottom: 6 }} />
+        <span style={{ width: '100%', height: 64, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.55 }} />
+        <span style={{ width: '100%', height: 64, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.4 }} />
+        <span style={{ width: '100%', height: 64, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: 0.28 }} />
       </div>
       <span aria-label="Loading" style={{ position: 'absolute', clip: 'rect(0 0 0 0)' }} />
     </div>
@@ -56,20 +56,20 @@ function RouteFallback() {
  *
  * Phase 1 of the Responsive Desktop Command Center promotes Home (`/`)
  * to 'responsive'. Jobs, Clients, Schedule, Job Detail follow in Phase
- * 2/3. Screens stay layout-agnostic — they don't read the mode, they
+ * 2/3. Screens stay layout-agnostic, they don't read the mode, they
  * just render their mobile-first markup and the shell decides how much
  * canvas they get.
  */
 function layoutForPath(pathname: any) {
   // Responsive Desktop Command Center.
-  //   Phase 1: Home (`/`) — multi-column dashboard canvas.
-  //   Phase 2: Jobs (`/jobs`) + Clients (`/clients`) — desktop command
+  //   Phase 1: Home (`/`), multi-column dashboard canvas.
+  //   Phase 2: Jobs (`/jobs`) + Clients (`/clients`), desktop command
   //            header + wide card grid.
   //   Phase 2.5 / 3: All remaining tool routes get the responsive
   //            workspace canvas at >=900px so they stop rendering as a
   //            440px phone column inside a giant desktop shell. Each
   //            screen author can layer dedicated desktop CSS on top of
-  //            their `v3-screen` markup as time permits — until then the
+  //            their `v3-screen` markup as time permits, until then the
   //            wider canvas + sensible gutters is the floor we ship.
   //   Phase 3 (still pending): Job Detail multi-column dashboard.
   //
@@ -117,7 +117,7 @@ function layoutForPath(pathname: any) {
   if (pathname.startsWith('/leads/')) return 'responsive'
   if (pathname.startsWith('/quotes/')) return 'responsive'
   if (pathname.startsWith('/jobs/')) return 'responsive'
-  // Client Detail renders the full-width SnowClientDetailBuild on desktop —
+  // Client Detail renders the full-width SnowClientDetailBuild on desktop :
   // it needs the wide canvas too, or it renders crammed inside the 440px
   // mobile-frame cap (the worst of both). Give it the responsive canvas
   // like every other detail route.
@@ -158,7 +158,7 @@ export default function AppShell() {
   useEffect(() => {
     if (membershipLoading) return
     // A membership FETCH ERROR (offline / transient) leaves role null,
-    // which is indistinguishable from "confirmed not a member" — don't
+    // which is indistinguishable from "confirmed not a member", don't
     // hard-eject an authenticated user to /sub-portal on a network blip.
     // The persisted cache covers reads until membership resolves.
     if (membershipError && role === null) return
@@ -191,14 +191,14 @@ export default function AppShell() {
       data-layout={layoutMode}
       style={{ position: 'relative' }}
     >
-      {/* Skip-to-content link — only visible when keyboard-focused.
+      {/* Skip-to-content link, only visible when keyboard-focused.
           Bumps a11y so keyboard users don't have to tab through every
           header + nav control to reach the screen body. */}
       <a href="#fh-main" className="fh-skip-link">Skip to content</a>
       {/* Removed for v3:
           - <Aurora />          three large gold radial blobs (atmosphere)
           - <GridPattern />     drifting 40px white grid (the "grid texture")
-          - <div .fh-page-corners> four gold corner brackets — the
+          - <div .fh-page-corners> four gold corner brackets, the
             bottom-left bracket was reading as a stray gold "+" once
             legacy gold tokens were aliased to the v3 (brighter) gold.
           v3 page atmosphere is provided by .v3-screen background only. */}
@@ -245,7 +245,7 @@ export default function AppShell() {
       </main>
 
       <BottomNav />
-      {/* Universal Capture — the global "say it / type it / snap it"
+      {/* Universal Capture, the global "say it / type it / snap it"
           entry point. FAB opens the sheet; the sheet also answers
           Cmd/Ctrl+J and the `fh:open-capture` event. */}
       <CaptureFab />

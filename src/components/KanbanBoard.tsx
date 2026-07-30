@@ -15,7 +15,7 @@ import { hapticStageChange, hapticTap } from '../lib/haptics.ts'
 import { Eyebrow } from './v3'
 
 // Stage columns shown left-to-right. "lost" lives off-board (URL-only).
-// Pipeline v2: the Invoice column is gone — invoicing is fh_invoices
+// Pipeline v2: the Invoice column is gone, invoicing is fh_invoices
 // rows on the job, not a stage.
 const COLUMNS = [
   { id: 'lead',    label: 'Lead' },
@@ -33,7 +33,7 @@ function money(n: any) {
 }
 
 function initials(name: any) {
-  if (!name) return '—'
+  if (!name) return '\u2003'
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w: any) => w[0].toUpperCase()).join('')
 }
 
@@ -44,7 +44,7 @@ function KanbanCard({ contact, dragging, onOpen }: any) {
     : {}
   // Tap-to-open: PointerSensor activationConstraint.distance=6 means
   // releases under 6 px of movement never start a drag. Use the
-  // pointerup event (not click — dnd-kit absorbs click) and only
+  // pointerup event (not click, dnd-kit absorbs click) and only
   // navigate if no drag actually occurred.
   function handlePointerUp(e: any) {
     if (isDragging) return
@@ -57,13 +57,13 @@ function KanbanCard({ contact, dragging, onOpen }: any) {
       style={{
         ...style,
         position: 'relative',
-        padding: '11px 12px',
-        borderRadius: 12,
+        padding: '12px 12px',
+        borderRadius: 10,
         background: 'var(--v3-glass-tint)',
         border: '1px solid var(--rule)',
         boxShadow: dragging
-          ? '0 18px 44px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3)'
-          : '0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 24px rgba(0, 0, 0, 0.30)',
+          ? '0 18px 44px rgba(20, 20, 20, 0.45), 0 2px 6px rgba(20, 20, 20, 0.3)'
+          : '0 2px 6px rgba(20, 20, 20, 0.35), 0 12px 24px rgba(20, 20, 20, 0.30)',
         cursor: 'grab',
         userSelect: 'none',
         touchAction: 'none'
@@ -73,15 +73,15 @@ function KanbanCard({ contact, dragging, onOpen }: any) {
       {...attributes}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.14)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 13 }}>
+        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(201,150,58,0.14)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-display)', fontSize: 14 }}>
           {initials(contact.name)}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {contact.name || 'Untitled'}
           </div>
           {(contact.job_title || contact.job_type) && (
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {contact.job_title || contact.job_type}
             </div>
           )}
@@ -109,12 +109,12 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }: any) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
+        gap: 12,
         padding: 12,
-        borderRadius: 16,
+        borderRadius: 10,
         minHeight: 220,
-        background: isOver ? 'rgba(199, 164, 90, 0.06)' : 'var(--v3-glass-tint)',
-        border: isOver ? '1px solid rgba(199, 164, 90, 0.45)' : '1px solid var(--rule)',
+        background: isOver ? 'rgba(201, 150, 58, 0.06)' : 'var(--v3-glass-tint)',
+        border: isOver ? '1px solid rgba(201, 150, 58, 0.45)' : '1px solid var(--rule)',
         transition: 'background 120ms cubic-bezier(0.5, 0, 0.2, 1), border-color 120ms'
       }}
     >
@@ -131,7 +131,7 @@ function KanbanColumn({ id, label, contacts, isOver, onOpen }: any) {
           <KanbanCard key={c.id} contact={c} onOpen={onOpen} />
         ))}
         {contacts.length === 0 && (
-          <div style={{ padding: '20px 8px', textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--ink-faint)', border: '1px dashed var(--rule)', borderRadius: 10 }}>
+          <div style={{ padding: '24px 8px', textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-faint)', border: '1px dashed var(--rule)', borderRadius: 10 }}>
             Empty column
           </div>
         )}
@@ -197,7 +197,7 @@ export default function KanbanBoard({ contacts, onStageChange, onOpen }: any) {
           display: 'grid',
           gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(220px, 1fr))`,
           gap: 12,
-          padding: '4px 20px 20px',
+          padding: '4px 24px 24px',
           overflowX: 'auto'
         }}
       >

@@ -2,7 +2,7 @@
 //
 // Mint, fetch, and revoke fh_public_links rows from any in-app
 // surface (Quote tab, InvoiceDetail, future surfaces). Tokens are
-// 24 chars of url-safe randomness — short enough to fit in a text
+// 24 chars of url-safe randomness, short enough to fit in a text
 // message, long enough to be unguessable.
 
 import { supabase } from './supabase.ts'

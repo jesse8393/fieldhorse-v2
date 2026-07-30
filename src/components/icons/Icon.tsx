@@ -1,4 +1,4 @@
-// Fieldhorse icon system — 24px viewBox, 1.5px stroke, currentColor
+// Fieldhorse icon system, 24px viewBox, 1.5px stroke, currentColor
 // Unified export. <Icon name="home" size={22} />
 
 import type { ReactNode, SVGProps } from 'react'

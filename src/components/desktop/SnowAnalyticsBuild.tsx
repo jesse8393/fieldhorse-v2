@@ -1,4 +1,4 @@
-// SnowAnalyticsBuild — desktop /analytics in the Build direction.
+// SnowAnalyticsBuild, desktop /analytics in the Build direction.
 //
 // Drop-in for SnowAnalytics at >=900px. Executive financial reporting,
 // not generic charts.
@@ -10,7 +10,7 @@ import {
   TrendingDown,
   Target,
 } from 'lucide-react'
-import { money } from '../../lib/format.ts'
+import { countNoun, money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 
@@ -37,7 +37,7 @@ type TopClient = {
   value?: number
 }
 
-// Loosely typed — parent screen passes a wider stats object with some
+// Loosely typed, parent screen passes a wider stats object with some
 // fields nullable. We only read what we need.
 type Stats = Record<string, any> & {
   pipeline?: number | null
@@ -67,8 +67,8 @@ function pct(n: number | null | undefined) {
   // stats.avgMargin and stats.closeRate are already delivered as 0-100
   // percentage values from screens/Analytics.tsx (they multiply by 100
   // before passing). Multiplying again here gave the desktop audit a
-  // "5398% margin" reading — the double-multiplication bug. Fixed by
-  // formatting the value as-is. Mobile uses fmtPct which always
+  // "5398% margin" reading, the double-multiplication bug. Fixed by
+  // formatting the value as entered. Mobile uses fmtPct which always
   // expected 0-100, so the source-of-truth was already correct.
   const v = Number(n || 0)
   return `${Math.round(v)}%`
@@ -152,7 +152,7 @@ export default function SnowAnalyticsBuild(props: Props) {
         </section>
 
         {/* Secondary KPI strip. Invoiced/Collected render "Not
-            connected" when the parent passes null — that's the signal
+            connected" when the parent passes null, that's the signal
             the screen hasn't loaded an invoices/payments array yet
             (vs. an honest $0 from a user with no activity). */}
         <div className="fh-build-kpi-strip">
@@ -214,7 +214,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                     <span style={{ color: 'var(--v3-danger-bright)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <TrendingDown size={12} /> {money(Math.abs(monthOverMonth))} MoM
                     </span>
-                  ) : '—'}
+                  ) : '\u2003'}
                 </span>
               </header>
               <div className="fh-build-trend-chart">
@@ -265,8 +265,12 @@ export default function SnowAnalyticsBuild(props: Props) {
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Strongest signal</div>
-              <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '—'}</strong>
-              <span>{strongestStage ? `${money(strongestStage.value)} in ${strongestStage.count} deals` : 'No data yet'}</span>
+              <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '\u2003'}</strong>
+              <span>
+                {strongestStage
+                  ? `${money(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'deal')}`
+                  : 'No data yet'}
+              </span>
               {strongestStage && <div className="fh-build-spark is-gold" />}
             </section>
 
@@ -287,7 +291,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                       ? undefined
                       : Number(stats.invoiced) > Number(stats.collected) ? 'var(--v3-danger-bright)' : 'var(--v3-success-bright)',
                   }}>
-                    {collectionRate != null ? pct(ratioToPct(collectionRate)) : '—'}
+                    {collectionRate != null ? pct(ratioToPct(collectionRate)) : '\u2003'}
                   </strong>
                   <span>{collectionRate != null ? 'collection rate YTD' : 'Nothing invoiced YTD'}</span>
                   {collectionRate != null && collectionRate < 0.8 && <div className="fh-build-spark is-red" />}
@@ -301,7 +305,7 @@ export default function SnowAnalyticsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Follow-up drag</div>
+              <div className="fh-build-eyebrow">Follow up drag</div>
               <strong>{stats.leads || 0}</strong>
               <span>active leads waiting</span>
             </section>
@@ -329,7 +333,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 function KpiCell({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="fh-build-kpi-cell">
-      <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' } : undefined}>
+      <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' } : undefined}>
         {value}
       </strong>
       <span>{label}</span>

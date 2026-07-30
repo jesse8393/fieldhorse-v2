@@ -64,20 +64,20 @@ export default function ResetPassword() {
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}
       >
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, letterSpacing: '0.14em', lineHeight: 1 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
             <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
             <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
           </div>
           <h1
             className="fh-font-serif"
-            style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', marginTop: 28, marginBottom: 8, fontWeight: 400 }}
+            style={{ fontSize: 24, lineHeight: 1.1, letterSpacing: 0, marginTop: 28, marginBottom: 8, fontWeight: 400 }}
           >
             Reset your
             <br />
             password.
           </h1>
-          <Eyebrow as="div" style={{ marginTop: 12, padding: '3px 10px', borderRadius: 999, background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)', border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)', color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }} />
+          <Eyebrow as="div" style={{ marginTop: 12, padding: '4px 12px', borderRadius: 10, background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)', border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)', color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }}>
+            <span style={{ width: 5, height: 5, borderRadius: 10, background: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }} />
             {ready ? 'Link verified' : 'Verifying'}
           </Eyebrow>
         </div>
@@ -90,14 +90,14 @@ export default function ResetPassword() {
               display: 'flex',
               flexDirection: 'column',
               gap: 12,
-              padding: 20,
-              borderRadius: 18,
+              padding: 24,
+              borderRadius: 10,
               background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               backdropFilter: 'blur(20px)'
             }}
           >
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>New password</Eyebrow>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
@@ -110,12 +110,12 @@ export default function ResetPassword() {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={busy}
                   placeholder="••••••••"
-                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
                 />
               </div>
             </label>
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>Confirm password</Eyebrow>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)', pointerEvents: 'none' }} />
@@ -128,7 +128,7 @@ export default function ResetPassword() {
                   onChange={(e) => setConfirm(e.target.value)}
                   disabled={busy}
                   placeholder="••••••••"
-                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none' }}
                 />
               </div>
             </label>
@@ -146,13 +146,13 @@ export default function ResetPassword() {
               whileTap={{ scale: 0.98 }}
               style={{
                 marginTop: 6,
-                padding: '14px 18px',
-                borderRadius: 12,
+                padding: '12px 16px',
+                borderRadius: 10,
                 background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                 color: 'var(--onyx)',
                 fontFamily: 'var(--font-display)',
-                fontSize: 18,
-                letterSpacing: '0.15em',
+                fontSize: 20,
+                letterSpacing: 0,
                 border: 'none',
                 cursor: busy ? 'default' : 'pointer',
                 boxShadow: '0 8px 24px rgba(201,150,58,0.35)',
@@ -169,18 +169,18 @@ export default function ResetPassword() {
         ) : (
           <div
             style={{
-              padding: 20,
-              borderRadius: 18,
+              padding: 24,
+              borderRadius: 10,
               background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               backdropFilter: 'blur(20px)',
-              fontSize: 13,
+              fontSize: 14,
               color: 'var(--ink-muted)',
               fontFamily: 'var(--font-body)',
               textAlign: 'center'
             }}
           >
-            If nothing happens, the link may have expired. Request a new reset from the sign-in page.
+            If nothing happens, the link may have expired. Request a new reset from the sign in page.
           </div>
         )}
 

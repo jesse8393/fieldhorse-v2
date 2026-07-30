@@ -1,4 +1,4 @@
-// Notifications client — Phase 19 / Audit Move #3.
+// Notifications client, Phase 19 / Audit Move #3.
 //
 // Read + write helpers around fh_notifications (migration 008).
 // The in-app bell consumes these. Push delivery is a separate layer
@@ -45,7 +45,7 @@ export async function markAllRead(userId: string | undefined) {
 
 // Insert a notification for the CURRENT user. Used for self-notifications
 // like "You logged a failed inspection". For cross-user notifications
-// (partner accepted, sub responded), use the server-side notify() in
+// (partner accepted, sub responded), use the on the server notify() in
 // Netlify functions where the service role can write to any inbox.
 export async function notifySelf(userId: string | undefined, { kind, title, body, link, actor_user_id = null }: { kind?: string; title?: string; body?: string | null; link?: string | null; actor_user_id?: string | null }) {
   if (!userId || !kind || !title) return

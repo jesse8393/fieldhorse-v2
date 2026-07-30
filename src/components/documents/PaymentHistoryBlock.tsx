@@ -4,7 +4,7 @@
 // on the invoice template under "Payment history" so the customer can
 // see exactly what they've already paid, when, and via what method.
 //
-// Empty state suppressed by the parent — render the block only when
+// Empty state suppressed by the parent, render the block only when
 // payments.length > 0.
 
 import { DOC_COLORS, typeStyle } from './tokens.ts'
@@ -18,7 +18,7 @@ function methodLabel(m: string | null | undefined) {
 }
 
 // Pretty label for the payment kind tag (migration 022). 'other' and
-// undefined render no tag — keeps a clean row for the common cash-job
+// undefined render no tag, keeps a clean row for the common cash-job
 // case where every payment is just "a payment".
 function kindBadge(k: string | null | undefined) {
   if (!k || k === 'other') return null
@@ -43,7 +43,7 @@ export default function PaymentHistoryBlock({ payments = [] }: { payments?: any[
         display: 'flex',
         flexDirection: 'column',
         border: `1px solid ${DOC_COLORS.rule}`,
-        borderRadius: 6,
+        borderRadius: 10,
         overflow: 'hidden'
       }}
     >
@@ -55,7 +55,7 @@ export default function PaymentHistoryBlock({ payments = [] }: { payments?: any[
             gridTemplateColumns: '110px 1fr auto',
             gap: 16,
             alignItems: 'center',
-            padding: '12px 18px',
+            padding: '12px 16px',
             borderTop: i > 0 ? `1px solid ${DOC_COLORS.rule}` : 'none',
             background: DOC_COLORS.paper
           }}
@@ -87,15 +87,15 @@ export default function PaymentHistoryBlock({ payments = [] }: { payments?: any[
                 <span
                   style={{
                     display: 'inline-flex',
-                    padding: '2px 6px',
-                    borderRadius: 4,
+                    padding: '4px 8px',
+                    borderRadius: 10,
                     background: `color-mix(in srgb, ${kindBadge(p.kind)?.tone} 14%, transparent)`,
                     border: `1px solid color-mix(in srgb, ${kindBadge(p.kind)?.tone} 35%, transparent)`,
                     color: kindBadge(p.kind)?.tone,
                     fontFamily: 'var(--font-body)',
-                    fontSize: 9,
+                    fontSize: 12,
                     fontWeight: 700,
-                    letterSpacing: '0.16em'
+                    letterSpacing: 0
                   }}
                 >
                   {kindBadge(p.kind)?.label}

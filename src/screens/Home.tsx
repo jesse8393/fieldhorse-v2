@@ -29,7 +29,7 @@ import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
-// Lazy — desktop-only variant. Home itself is an eager route (loaded
+// Lazy, desktop-only variant. Home itself is an eager route (loaded
 // with the main bundle) so any static import here ships SnowHome to
 // mobile users too even though they never render it. Lazy keeps the
 // main bundle lean; desktop sees a near-instant suspense flash since
@@ -56,7 +56,7 @@ function emailFirstToken(email: any) {
 function displayNameFrom(profile: any, user: any) {
   // Multi-tenant guard: profile must belong to the current auth user.
   // Without this, a stale profile row left in context during a sign-out
-  // → sign-in transition can leak the prior user's name onto the greeting.
+  // → sign in transition can leak the prior user's name onto the greeting.
   const profileMatchesUser = profile && user && profile.user_id === user!.id
   const full = profileMatchesUser ? profile.full_name?.trim() : ''
   if (full) return full
@@ -64,7 +64,7 @@ function displayNameFrom(profile: any, user: any) {
 }
 
 // Map Open-Meteo weather_code to a short label. Covers the common buckets;
-// rare codes fall through to "—" so we don't lie about the conditions.
+// rare codes fall through to "\u2003" so we don't lie about the conditions.
 function weatherLabel(code: any) {
   if (code == null) return ''
   if (code === 0) return 'Clear'
@@ -153,7 +153,7 @@ export default function Home() {
     return Math.round(pct)
   }, [pipeline, pipelinePrev])
 
-  // Empty while loading — consumers show a shimmer or ellipsis instead
+  // Empty while loading, consumers show a shimmer or ellipsis instead
   // of a printed dash (user-facing copy carries no dashes).
   const tempStr = weather?.current?.temperature_2m != null
     ? `${Math.round(weather.current.temperature_2m)}°`
@@ -177,13 +177,13 @@ export default function Home() {
 
   // Sub-only redirect: an authenticated user with NO org membership
   // is, in practice, somebody who accepted a partner invite (or
-  // signed up without onboarding). Land them on /sub-portal — the
+  // signed up without onboarding). Land them on /sub-portal, the
   // owner dashboard would 403 every query they made.
   if (!membership.loading && !membership.role && !membership.orgId) {
     return <Navigate to="/sub-portal" replace />
   }
 
-  // Phase 10 — desktop dispatch. At >=900px the new
+  // Phase 10, desktop dispatch. At >=900px the new
   // DesktopHomeCommandCenter renders the full command-center layout
   // using the same data this screen already fetches. Below 900px the
   // existing motion.div.v3-screen--home flow renders verbatim.
@@ -232,11 +232,11 @@ export default function Home() {
 
   /* ----- Render -----
      v3 hierarchy refactor (3-tier):
-       TIER 1 — HERO: dominant card on --v3-surface-2 (#1C1C22 elevated),
+       TIER 1, HERO: dominant card on --v3-surface-2 (#141414 elevated),
                  oversized money + sparkline, hover lift, deep shadow
-       TIER 2 — PRIMARY KPIs: compact tiles on --v3-surface (#141418),
+       TIER 2, PRIMARY KPIs: compact tiles on --v3-surface (#141414),
                  muted body + colored accent only, smaller numerics
-       TIER 3 — SECONDARY: Quick Actions (primary tile gets gold halo,
+       TIER 3, SECONDARY: Quick Actions (primary tile gets gold halo,
                  others sit flat) + Live Feed (rows with hover lift)
 
      Asymmetric spacing breaks the rigid grid:
@@ -253,9 +253,9 @@ export default function Home() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120, background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, background: 'var(--v3-bg)' }}
     >
-      {/* ─────────── COMPACT GREETING STRIP — V3-HOME-1 ───────────
+      {/* ─────────── COMPACT GREETING STRIP, V3-HOME-1 ───────────
           Demoted from 36pt serif italic h1 to a single sans 14pt muted
           line so the AppHeader wordmark and the operator command data
           (pipeline + next actions) stay dominant. Date eyebrow stays.
@@ -269,7 +269,7 @@ export default function Home() {
           gap: 16,
           // V3-SYSTEM-1B-1: greeting strip pad 10/16/10 → 8/16/6 so the
           // first card sits ~6px closer to the header.
-          padding: '8px 16px 6px'
+          padding: '8px 16px 8px'
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -281,17 +281,17 @@ export default function Home() {
             {' · '}
             {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </Eyebrow>
-          {/* Hero greeting — ports the design's "Good morning, *Jesse.*" pattern
+          {/* Hero greeting, ports the design's "Good morning, *Jesse.*" pattern
               with the italic gold accent on the first name. font-display so the
               greeting reads as a screen title, not a caption. */}
           <h1 style={{
             margin: '4px 0 0',
             fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(24px, 7vw, 32px)',
+            fontSize: 24,
             lineHeight: 1.1,
-            letterSpacing: '0.01em',
+            letterSpacing: 0,
             color: 'var(--v3-text)',
-            /* Wraps to two lines on narrow phones — never truncate the
+            /* Wraps to two lines on narrow phones, never truncate the
                user's own name ("Good afternoon, Cl…" read as broken). */
             overflowWrap: 'anywhere'
           }}>
@@ -304,7 +304,7 @@ export default function Home() {
         </div>
 
         {hasCoords ? (
-          /* V3-SYSTEM-1B-1: weather pill compacted — pad 10/12 → 6/10,
+          /* V3-SYSTEM-1B-1: weather pill compacted, pad 10/12 → 6/10,
              icon 18 → 16, temp 14 → 13, condition subline dropped (the
              small uppercase line ate ~11px and the temp+icon already
              telegraphs weather). Pill height 44 → 32. */
@@ -314,12 +314,12 @@ export default function Home() {
             whileHover={{ y: -1 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             onClick={() => { hapticTap(); navigate('/pour-window') }}
-            aria-label={condStr ? `Open weather forecast — ${condStr}` : 'Open weather forecast'}
+            aria-label={condStr ? `Open weather forecast, ${condStr}` : 'Open weather forecast'}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              padding: '6px 10px',
+              padding: '8px 12px',
               borderRadius: 'var(--v3-radius-btn)',
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border)',
@@ -329,10 +329,10 @@ export default function Home() {
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <CloudSun size={16} color="#8FB4E3" aria-hidden="true" />
+            <CloudSun size={16} color="#F2EDE4" aria-hidden="true" />
             <span style={{
               fontFamily: 'var(--font-body)',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
               lineHeight: 1
             }}>
@@ -347,8 +347,8 @@ export default function Home() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '11px 14px',
+              gap: 8,
+              padding: '12px 12px',
               minHeight: 40,
               borderRadius: 'var(--v3-radius-btn)',
               background: 'var(--v3-primary-soft)',
@@ -382,26 +382,26 @@ export default function Home() {
         </motion.div>
       ) : null}
 
-      {/* ─────────── PIPELINE REVENUE CARD — V3-HOME-1D ───────────
+      {/* ─────────── PIPELINE REVENUE CARD, V3-HOME-1D ───────────
           Mockup-faithful revenue moment. Eyebrow reframed from
           "Total Pipeline" descriptor to "Today's Revenue Opportunity"
           aspirational header (muted, not gold). Money stays the gold
           anchor with a calm halo. Trend renders as inline colored text
-          — no Pill chip chrome. "Total Pipeline" demoted to a sublabel
+         , no Pill chip chrome. "Total Pipeline" demoted to a sublabel
           beneath the figure. The Won/Active/Lead segmented bar + dotted
           legend is retired in favor of a single muted text caption. A
           1px gold hairline sweep sits under the sublabel as decorative
-          brand luminance — presentation only, not a fake chart.
+          brand luminance, presentation only, not a fake chart.
           Card-top gold accent stripe + View-all link removed: gold is
           scarce here, only the money + the small sweep wear it. */}
       {/* Findings 66 + 69: the outer card is no longer a role="button"
-          wrapper — it contained real <button> breakdown cells, which
+          wrapper, it contained real <button> breakdown cells, which
           violates the button content model (no nested interactive
           controls). It's now a plain container. The "Open pipeline"
           affordance is an explicit inner <button> (the eyebrow + money
           block); the breakdown cells stay as their own sibling buttons.
           The open-pipeline button navigates to '/work' (all stages) so
-          the destination matches the WHOLE-pipeline figure shown — the
+          the destination matches the WHOLE-pipeline figure shown, the
           old '/jobs' redirected to Active-only, a mismatch. */}
       <motion.div
         variants={item}
@@ -418,20 +418,20 @@ export default function Home() {
           // gutter against the next card reads premium instead of
           // dense.
           margin: '0 var(--v3-gutter) 16px',
-          padding: '18px 20px',
-          borderRadius: 18,
-          // Glass-metal depth from V3-HOME-1C — kept verbatim. Inset top
+          padding: '16px 24px',
+          borderRadius: 10,
+          // Glass-metal depth from V3-HOME-1C, kept verbatim. Inset top
           // highlight + inset bottom shadow + crisp outline + soft halo.
           border: '1px solid var(--v3-border-strong)',
           boxShadow: [
             'inset 0 1px 0 var(--v3-glass-tint-2)',
-            'inset 0 -1px 0 rgba(0, 0, 0, 0.18)',
-            '0 1px 2px rgba(0, 0, 0, 0.40)',
-            '0 12px 28px rgba(0, 0, 0, 0.30)'
+            'inset 0 -1px 0 rgba(20, 20, 20, 0.18)',
+            '0 1px 2px rgba(20, 20, 20, 0.40)',
+            '0 12px 28px rgba(20, 20, 20, 0.30)'
           ].join(', ')
         }}
       >
-        {/* Open-pipeline affordance — an explicit button wrapping the
+        {/* Open-pipeline affordance, an explicit button wrapping the
             eyebrow + money block. This is the card's single primary
             control; keyboard access (Enter/Space) comes free from the
             native <button>. The breakdown cells below are siblings, not
@@ -454,17 +454,17 @@ export default function Home() {
             WebkitTapHighlightColor: 'transparent'
           }}
         >
-          {/* Eyebrow — muted ink, slightly looser tracking than the v3
+          {/* Eyebrow, muted ink, slightly looser tracking than the v3
               default to give the longer phrase room. */}
           <span className="v3-eyebrow" style={{
             display: 'block',
             color: 'var(--v3-text-muted)',
-            letterSpacing: '0.16em'
+            letterSpacing: 0
           }}>
             Total Pipeline
           </span>
 
-          {/* Money + trend row — money baseline-aligned with a tiny
+          {/* Money + trend row, money baseline-aligned with a tiny
               gold-bronze $ glyph and an inline arrow+pct trend. No Pill
               chip; trend is just colored text. */}
           <div style={{
@@ -484,9 +484,9 @@ export default function Home() {
             // status. Letter-spacing tightened from -0.012em to -0.018em
             // because larger numbers benefit from more aggressive
             // tracking.
-            fontSize: 38,
+            fontSize: 24,
             fontWeight: 700,
-            letterSpacing: '-0.018em',
+            letterSpacing: 0,
             color: 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums',
             lineHeight: 1.0,
@@ -496,13 +496,13 @@ export default function Home() {
             textShadow: '0 0 14px color-mix(in srgb, var(--v3-primary) 22%, transparent)'
           }}>
             {pipeline == null ? (
-              <span className="v3-skeleton" style={{ width: 160, height: 30, borderRadius: 6 }} />
+              <span className="v3-skeleton" style={{ width: 160, height: 30, borderRadius: 10 }} />
             ) : (
               <>
                 <span style={{
                   // $ glyph scales with the hero number: 22 → 26 to
                   // keep its baseline relationship to the larger digit.
-                  fontSize: 26,
+                  fontSize: 24,
                   fontWeight: 600,
                   marginRight: 1,
                   color: 'color-mix(in srgb, var(--v3-primary) 70%, var(--v3-text-muted))',
@@ -514,16 +514,16 @@ export default function Home() {
               </>
             )}
           </div>
-          {trendPct != null && (
+          {trendPct != null && trendPct !== 0 && (
             <span style={{
               flexShrink: 0,
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1
@@ -538,12 +538,12 @@ export default function Home() {
         </motion.button>
 
         {/* NOTE: a synthesized always-ascending sparkline used to sit here.
-            It rendered "up and to the right" regardless of the real number —
+            It rendered "up and to the right" regardless of the real number :
             it could sweep upward next to a negative trend chip. Removed: the
             honest trend chip above and the real Won/Active/Lead breakdown
             below carry the pipeline story with actual data. */}
 
-        {/* Won / Active / Lead breakdown — ports the design's pipeline-hero__breakdown.
+        {/* Won / Active / Lead breakdown, ports the design's pipeline-hero__breakdown.
             Three cells, colored dot + label + stamp amount + count. Each cell
             is a tap target → Jobs filtered by that stage. */}
         {stageBreakdown != null && (
@@ -556,7 +556,7 @@ export default function Home() {
             gap: 12
           }}>
             <PipelineBreakdownCell
-              dotColor="var(--v3-success-bright, #7BB58E)"
+              dotColor="var(--v3-success-bright, #5C5C5C)"
               label="Won"
               count={stageBreakdown.won}
               tone="success"
@@ -570,7 +570,7 @@ export default function Home() {
               onClick={(e: any) => { e.stopPropagation(); hapticTap(); navigate('/jobs?stage=active') }}
             />
             <PipelineBreakdownCell
-              dotColor="#6B7CA8"
+              dotColor="#5C5C5C"
               label="Lead"
               count={stageBreakdown.lead}
               tone="muted"
@@ -580,12 +580,12 @@ export default function Home() {
         )}
       </motion.div>
 
-      {/* ─────────── QUICK ACTIONS — TOOLBAR ───────────
+      {/* ─────────── QUICK ACTIONS, TOOLBAR ───────────
           Header + 4-tile launcher row on the page surface. Trimmed from
           five to four so each tile gets real width (~83px on a 390px
           phone vs ~59px at 5-up, which cramped the two-word "Voice Note"
-          label). The four are the pipeline-money actions — Add Lead,
-          New Job, Schedule, Invoice — sitting in the first thumb-reach
+          label). The four are the pipeline-money actions, Add Lead,
+          New Job, Schedule, Invoice, sitting in the first thumb-reach
           zone right after the revenue moment. Voice capture wasn't lost:
           it lives on the Notes screen (mic button + ?voice=1), reachable
           from the header Notes shortcut. Desktop uses
@@ -601,7 +601,7 @@ export default function Home() {
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 10,
+            gap: 12,
             marginTop: 4
           }}
         >
@@ -612,7 +612,7 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* ─────────── NEXT ACTIONS — IMMEDIATE WORK ───────────
+      {/* ─────────── NEXT ACTIONS, IMMEDIATE WORK ───────────
           Promoted ABOVE Recent Activity: this is the "what do I do right now"
           list (overdue invoices, follow-ups), so it must come before the
           passive cross-job feed. V3-HOME-2 de-box: the row cards self-frame. */}
@@ -634,13 +634,13 @@ export default function Home() {
                 justifyContent: 'center',
                 minWidth: 18,
                 height: 18,
-                padding: '0 6px',
-                borderRadius: 999,
+                padding: '0 8px',
+                borderRadius: 10,
                 background: 'var(--v3-surface-2)',
                 border: '1px solid var(--v3-border)',
                 color: 'var(--v3-text)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 700,
                 fontVariantNumeric: 'tabular-nums',
                 lineHeight: 1
@@ -673,15 +673,15 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* ─────────── RECENT ACTIVITY — cross-job feed ───────────
+      {/* ─────────── RECENT ACTIVITY, cross-job feed ───────────
           Now below Next Actions: it's reference, not action. Compact 5-row
           card that mirrors /activity on the dashboard surface; auto-hides on
           a brand-new account. "See all" links through to /activity. */}
-      <motion.div variants={item} style={{ padding: '8px 20px 14px' }}>
+      <motion.div variants={item} style={{ padding: '8px 24px 12px' }}>
         <HomeActivityCard />
       </motion.div>
 
-      {/* ─────────── TODAY'S PRIORITIES — KPI strip ───────────
+      {/* ─────────── TODAY'S PRIORITIES, KPI strip ───────────
           V3-HOME-2 un-nest: dropped the bordered wrapper that nested
           three already-bordered tiles inside another box. Tiles render
           directly on the page surface as a clean 3-column KPI strip.
@@ -708,7 +708,7 @@ export default function Home() {
             tone="success"
             icon={PhoneCall}
             value={followUpCount}
-            label="Follow-ups"
+            label={followUpCount === 1 ? 'Follow up' : 'Follow ups'}
             subline={followUpCount != null && followUpCount > 0 ? 'Calls to leads' : null}
             onTap={() => navigate('/leads')}
           />
@@ -716,7 +716,7 @@ export default function Home() {
             tone="lead"
             icon={FileText}
             value={quoteAttentionCount}
-            label="Quotes"
+            label={quoteAttentionCount === 1 ? 'Quote' : 'Quotes'}
             subline={quoteAttentionCount != null && quoteAttentionCount > 0 ? 'Need follow up' : null}
             onTap={() => navigate('/quotes')}
           />
@@ -728,7 +728,7 @@ export default function Home() {
             tone={jobsBehindCount != null && jobsBehindCount > 0 ? 'danger' : 'primary'}
             icon={CalendarClock}
             value={jobsBehindCount}
-            label="Jobs Behind"
+            label={jobsBehindCount === 1 ? 'Job Behind' : 'Jobs Behind'}
             subline={jobsBehindCount != null && jobsBehindCount > 0 ? 'Reschedule' : 'All on track'}
             onTap={() => navigate('/schedule')}
           />
@@ -752,13 +752,13 @@ export default function Home() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
           {todayOnSite == null ? (
             <>
-              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 12 }} />
-              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 12, opacity: 0.65 }} />
+              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 10 }} />
+              <div className="v3-skeleton" style={{ height: 52, width: '100%', borderRadius: 10, opacity: 0.65 }} />
             </>
           ) : todayOnSite.length === 0 ? (
             <div className="v3-empty">
               <CalendarClock size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
                 Nothing scheduled today.
               </div>
               <div style={{ fontSize: 12 }}>Open Schedule to plan crew visits.</div>
@@ -796,12 +796,12 @@ export default function Home() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
           {topPipeline == null ? (
             <>
-              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 12 }} />
-              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 12, opacity: 0.65 }} />
+              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 10 }} />
+              <div className="v3-skeleton" style={{ height: 56, width: '100%', borderRadius: 10, opacity: 0.65 }} />
             </>
           ) : topPipeline.length === 0 ? (
             <div className="v3-empty">
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
                 No active deals.
               </div>
               <div style={{ fontSize: 12 }}>Add your first lead to start the pipeline.</div>
@@ -826,7 +826,7 @@ export default function Home() {
 }
 
 /* ============================================================
-   TodayOnSiteRow — single schedule row in Today on Site.
+   TodayOnSiteRow, single schedule row in Today on Site.
    Time + job/title + stage chip + chevron. Tap → linked job.
    ============================================================ */
 function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
@@ -850,10 +850,10 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
         alignItems: 'center',
         // V3-SYSTEM-1B-3: gap 12 → 10 to claw back ~4px when adding the
         // 32px thumbnail + its gap. Row stays comfortable on a 360px phone.
-        gap: 10,
+        gap: 12,
         width: '100%',
         // V3-SYSTEM-1B-1: row pad 12/14 → 10/12, radius 12 → 10.
-        padding: '10px 12px',
+        padding: '12px 12px',
         borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
@@ -864,20 +864,20 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
         boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset'
       }}
     >
-      {/* Time slot — start–end range when both are known */}
+      {/* Time slot, start–end range when both are known */}
       <div style={{
         flexShrink: 0,
         minWidth: endTime ? 100 : 56,
         textAlign: 'center',
         padding: '4px 8px',
-        borderRadius: 8,
+        borderRadius: 10,
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border)',
         fontFamily: 'var(--font-display)',
-        fontSize: 13,
+        fontSize: 14,
         color: 'var(--v3-text)',
         fontVariantNumeric: 'tabular-nums',
-        letterSpacing: '0.02em',
+        letterSpacing: 0,
         lineHeight: 1.4,
         whiteSpace: 'nowrap'
       }}>
@@ -895,7 +895,7 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
           fontSize: 14,
           fontWeight: 600,
           color: 'var(--v3-text)',
-          letterSpacing: '-0.005em',
+          letterSpacing: 0,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis'
@@ -914,7 +914,7 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
 }
 
 /* ============================================================
-   PipelineDealRow — single deal row inside Pipeline Preview.
+   PipelineDealRow, single deal row inside Pipeline Preview.
    Stage chip on the left + name + amount in Bebas. Hover lifts
    border/background, tap navigates to the contact.
    ============================================================ */
@@ -942,32 +942,32 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         width: '100%',
         // V3-SYSTEM-1B-1: row pad 14/14 → 12/12, radius 14 → 12.
         padding: '12px 12px',
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border-strong)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+        boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(20, 20, 20, 0.30)',
         transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease'
       }}
       onMouseEnter={(e) => {
         if (!canHover) return
-        // Hover stays neutral — black/charcoal/white. Stage color
+        // Hover stays neutral, black/charcoal/white. Stage color
         // shows on the spine + label only (functional). No ambient
         // blue/purple bleed onto the card's halo.
         e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
         e.currentTarget.style.background = 'var(--v3-surface-3)'
-        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 8px 24px rgba(0, 0, 0, 0.40)'
+        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 8px 24px rgba(20, 20, 20, 0.40)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
         e.currentTarget.style.background = 'var(--v3-surface)'
-        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(0, 0, 0, 0.30)'
+        e.currentTarget.style.boxShadow = '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(20, 20, 20, 0.30)'
       }}
     >
-      {/* Stage spine — V3-HOME-1B: thinned 5→3px and shortened 36→20px
+      {/* Stage spine, V3-HOME-1B: thinned 5→3px and shortened 36→20px
           so it reads as a stage cue, not an old colored card outline.
           Stage label below the deal name still carries the explicit
           stage signal in its own color. */}
@@ -975,7 +975,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         flexShrink: 0,
         width: 3,
         height: 20,
-        borderRadius: 2,
+        borderRadius: 10,
         background: `color-mix(in srgb, ${stage.color} 70%, transparent)`
       }} />
       {/* V3-SYSTEM-1B-3: real cover photo (or neutral initial fallback)
@@ -985,10 +985,10 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: 600,
           color: 'var(--v3-text)',
-          letterSpacing: '-0.005em',
+          letterSpacing: 0,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap'
@@ -1002,7 +1002,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
       <div style={{
         flexShrink: 0,
         fontFamily: 'var(--font-display)',
-        fontSize: 26,
+        fontSize: 24,
         color: 'var(--v3-text)',
         fontVariantNumeric: 'tabular-nums',
         lineHeight: 1,
@@ -1018,7 +1018,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
 }
 
 /* ============================================================
-   CompactKpi — Tier-2 KPI tile. Smaller than v3 KpiTile primitive,
+   CompactKpi, Tier-2 KPI tile. Smaller than v3 KpiTile primitive,
    color confined to the value + 1px top accent bar. Hover lift.
    Internal CountUp from the v3 primitive is replaced here with the
    home's own CountUp wiring (already imported above) so we control
@@ -1029,10 +1029,10 @@ const COMPACT_TONE: Record<string, any> = {
   primary: { color: 'var(--v3-primary)' },
   success: { color: 'var(--v3-success-bright)' },
   danger:  { color: 'var(--v3-danger-bright)' },
-  // warn — bronze/amber from the stage-quote token; reads as "needs attention
+  // warn, bronze/amber from the stage-quote token; reads as "needs attention
   // soon" without claiming the urgency of danger.
   warn:    { color: 'var(--v3-stage-quote)' },
-  // lead — steel-blue from the stage-lead token; the closest token-native
+  // lead, steel-blue from the stage-lead token; the closest token-native
   // option to the mockup's lavender for the Quotes tile.
   lead:    { color: 'var(--v3-stage-lead)' }
 }
@@ -1057,14 +1057,14 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
         textAlign: 'left',
         // V3-SYSTEM-1B-1: tile pad 14/12/12 → 12/12/10, radius 14 → 12,
         // minHeight 88 → 72 so the three KPIs read as a quiet strip.
-        padding: '12px 12px 10px',
-        borderRadius: 12,
+        padding: '12px 12px 12px',
+        borderRadius: 10,
         // Lifted-panel treatment: top-lit gradient + layered shadow so
         // the KPI tiles match the Jobs/Home card depth pass instead of
         // reading as flat squares.
         background: 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 70%)',
         border: '1px solid var(--v3-border)',
-        boxShadow: '0 1px 0 rgba(255, 240, 210, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.36), 0 6px 16px rgba(0, 0, 0, 0.30)',
+        boxShadow: '0 1px 0 rgba(242, 237, 228, 0.05) inset, 0 1px 2px rgba(20, 20, 20, 0.36), 0 6px 16px rgba(20, 20, 20, 0.30)',
         color: 'var(--v3-text)',
         cursor: 'pointer',
         minHeight: 72,
@@ -1078,7 +1078,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
       {Icon ? (
         <span aria-hidden="true" style={{
           display: 'inline-grid', placeItems: 'center',
-          width: 24, height: 24, borderRadius: 7,
+          width: 24, height: 24, borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid var(--v3-border-strong)',
           color: t.color,
@@ -1090,7 +1090,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 
       <div style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 22,
+        fontSize: 20,
         color: t.color,
         lineHeight: 1,
         marginBottom: 6,
@@ -1098,7 +1098,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
         fontVariantNumeric: 'tabular-nums'
       }}>
         {value == null ? (
-          <span className="v3-skeleton" style={{ width: 40, height: 18, borderRadius: 4 }} />
+          <span className="v3-skeleton" style={{ width: 40, height: 18, borderRadius: 10 }} />
         ) : isMoney ? (
           <>
             <span style={{
@@ -1122,11 +1122,11 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 
       <div style={{
         fontFamily: 'var(--font-body)',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         color: 'var(--v3-text)',
         lineHeight: 1.3,
-        letterSpacing: '-0.005em'
+        letterSpacing: 0
       }}>
         {label}
       </div>
@@ -1135,7 +1135,7 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
         <div style={{
           marginTop: 3,
           fontFamily: 'var(--font-body)',
-          fontSize: 11,
+          fontSize: 12,
           // V3-SYSTEM-1B-1: subline weight 700 → 500 so the row carries
           // less shout. Three tiles in a row read as quiet captions; only
           // the icon chip + value digit carry the tone-color load.
@@ -1151,13 +1151,13 @@ function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMon
 }
 
 /* ============================================================
-   NextActionRow — per-job CTA shown in the Next Actions section.
+   NextActionRow, per-job CTA shown in the Next Actions section.
    Icon + tone driven by `kind`. Gold left-edge accent; flat row
    that hover-lifts to invite the tap.
    ============================================================ */
 
 // Per-kind icon. The urgency tone (danger/warn/success) drives the row's
-// accent color via URGENCY_TONE below — kind alone no longer picks color
+// accent color via URGENCY_TONE below, kind alone no longer picks color
 // (an old lead can be warn OR danger depending on how cold it's gone).
 const NEXT_ACTION_KIND: Record<string, any> = {
   followup:   { Icon: PhoneCall },
@@ -1191,13 +1191,13 @@ function nextActionPath(action: any) {
 }
 
 // V3-SYSTEM-1B-1: warn no longer uses brand gold (--v3-primary). Stale
-// leads <14d cold now wear the dedicated --v3-warn amber (#D4A042) so
-// gold can stay scarce on Home — reserved for the Pipeline money digits
+// leads <14d cold now wear the dedicated --v3-warn amber (#C9963A) so
+// gold can stay scarce on Home, reserved for the Pipeline money digits
 // and the small hairline sweep. Red urgency stays red, green stays green.
 const URGENCY_TONE: Record<string, any> = {
   danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
-  warn:    { color: 'var(--v3-warn)',           glow: 'rgba(212, 160, 66, 0.40)' },
-  success: { color: 'var(--v3-success-bright)', glow: 'rgba(46, 204, 113, 0.40)' }
+  warn:    { color: 'var(--v3-warn)',           glow: 'rgba(201, 150, 58, 0.40)' },
+  success: { color: 'var(--v3-success-bright)', glow: 'rgba(45, 122, 79, 0.40)' }
 }
 
 function NextActionRow({ action, photoUrl, onTap }: any) {
@@ -1225,12 +1225,12 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
         // V3-HOME-2: row pad 9/12/9/14 → 8/12/8/14, saves ~10px stacked
         // across 5 rows. Tap target stays comfortable (icon + title
         // text already span ~36px tall before the row padding).
-        padding: '8px 12px 8px 14px',
-        borderRadius: 12,
+        padding: '8px 12px 8px 12px',
+        borderRadius: 10,
         // Subtle linear top-light overlay + slightly raised surface mix
         // so each row reads as a metal plate, not a list item.
         background: `
@@ -1238,7 +1238,7 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
           var(--v3-surface)
         `,
         border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint-2), 0 1px 2px rgba(0, 0, 0, 0.25)',
+        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint-2), 0 1px 2px rgba(20, 20, 20, 0.25)',
         color: 'var(--v3-text)',
         textAlign: 'left',
         width: '100%',
@@ -1247,7 +1247,7 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
         overflow: 'hidden'
       }}
     >
-      {/* Left edge accent — urgency-tone color + matching glow. THIS is the
+      {/* Left edge accent, urgency-tone color + matching glow. THIS is the
           critical-vs-optional signal. Operator scan: red bar = drop everything,
           amber = today, green = money in motion. V3-SYSTEM-1B-1: glow blur
           softened 12 → 8 so the spine reads as a hairline cue, not a halo. */}
@@ -1263,7 +1263,7 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
       {/* V3-SYSTEM-1B-3: when a real cover photo exists for the linked
           contact, show it instead of the kind-of-action icon chip. The
           row title already names the action ("Follow up with Jane"), so
-          a photo telegraphs "this is about Jane's job" — a stronger
+          a photo telegraphs "this is about Jane's job", a stronger
           object cue than a generic phone glyph. Without a photo, the
           existing tone-keyed icon chip stays as the kind cue. */}
       {photoUrl ? (
@@ -1276,14 +1276,14 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
             flexShrink: 0,
             width: 32,
             height: 32,
-            borderRadius: 9,
+            borderRadius: 10,
             objectFit: 'cover',
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border-strong)',
             display: 'block'
           }}
           onError={(e) => {
-            // Signed URL expired or blocked — hide so the broken-image
+            // Signed URL expired or blocked, hide so the broken-image
             // glyph doesn't show. Space stays reserved.
             e.currentTarget.style.visibility = 'hidden'
           }}
@@ -1292,7 +1292,7 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
         <span aria-hidden="true" style={{
           flexShrink: 0,
           width: 32, height: 32,
-          borderRadius: 9,
+          borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid var(--v3-border-strong)',
           color: tone.color,
@@ -1306,10 +1306,10 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 700,
           color: 'var(--v3-text)',
-          letterSpacing: '-0.01em',
+          letterSpacing: 0,
           lineHeight: 1.25,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
@@ -1320,7 +1320,7 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
         <div style={{
           marginTop: 1,
           fontFamily: 'var(--font-body)',
-          fontSize: 11,
+          fontSize: 12,
           lineHeight: 1.3,
           color: 'var(--v3-text-muted)',
           fontVariantNumeric: 'tabular-nums'
@@ -1329,7 +1329,7 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
         </div>
       </div>
 
-      {/* Urgency chip — short label that names the urgency in plain words.
+      {/* Urgency chip, short label that names the urgency in plain words.
           Color matches the spine. */}
       {action.urgencyLabel && (
         <StatusPill
@@ -1345,12 +1345,12 @@ function NextActionRow({ action, photoUrl, onTap }: any) {
 }
 
 /* ============================================================
-   RowThumb — V3-SYSTEM-1B-3.
+   RowThumb, V3-SYSTEM-1B-3.
    32×32 cover-photo tile used by Today on Site rows + Pipeline
    Preview rows. Renders a real signed-URL image when one exists,
    otherwise a neutral surface-2 + hairline tile with 1-2 letter
    initials in muted ink. No gold tint, no stage tint, no fake
-   placeholder image — restraint is intentional so the row's
+   placeholder image, restraint is intentional so the row's
    spine + stage label + amount stay the carriers of meaning.
    ============================================================ */
 function RowThumb({ photoUrl, name, size = 32 }: any) {
@@ -1373,7 +1373,7 @@ function RowThumb({ photoUrl, name, size = 32 }: any) {
           display: 'block'
         }}
         onError={(e) => {
-          // Signed URL 403 / network failure — hide rather than show
+          // Signed URL 403 / network failure, hide rather than show
           // a broken-image glyph. The tile space stays reserved so the
           // row layout doesn't shift; next data refresh restores it.
           e.currentTarget.style.visibility = 'hidden'
@@ -1396,7 +1396,7 @@ function RowThumb({ photoUrl, name, size = 32 }: any) {
         placeItems: 'center',
         fontFamily: 'var(--font-display)',
         fontSize: size >= 36 ? 14 : 12,
-        letterSpacing: '0.04em',
+        letterSpacing: 0,
         lineHeight: 1
       }}
     >
@@ -1413,11 +1413,11 @@ function nameInitials(name: any) {
   return (parts[0][0] + parts[1][0]).toUpperCase()
 }
 
-/* StageChip — inline "<count> <label>" tap target inside the pipeline
+/* StageChip, inline "<count> <label>" tap target inside the pipeline
    card breakdown. stopPropagation so the outer card tap (→ /jobs)
    doesn't double-fire when one of the chips is pressed. */
 /* ============================================================
-   PipelineBreakdownCell — one tap-cell inside the pipeline hero's
+   PipelineBreakdownCell, one tap-cell inside the pipeline hero's
    3-up breakdown row. Ported from the v3 design's
    pipeline-hero__breakdown (screens-home.jsx .brk pattern).
 
@@ -1428,7 +1428,7 @@ function nameInitials(name: any) {
    ============================================================ */
 function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
   const valueColor = tone === 'success'
-    ? 'var(--v3-success-bright, #7BB58E)'
+    ? 'var(--v3-success-bright, #5C5C5C)'
     : tone === 'gold'
       ? 'var(--v3-primary)'
       : 'var(--v3-text)'
@@ -1451,7 +1451,7 @@ function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
     >
       <Eyebrow as="div">
         <span aria-hidden="true" style={{
-          width: 8, height: 8, borderRadius: '50%',
+          width: 8, height: 8, borderRadius: 10,
           background: dotColor,
           boxShadow: `0 0 8px ${dotColor}`
         }} />
@@ -1463,16 +1463,16 @@ function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
         lineHeight: 1,
         color: valueColor,
         fontVariantNumeric: 'tabular-nums',
-        letterSpacing: '0.01em'
+        letterSpacing: 0
       }}>
         {count}
       </div>
       <div style={{
         fontFamily: 'var(--font-body)',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 500,
         color: 'var(--v3-text-muted)',
-        letterSpacing: '0.02em'
+        letterSpacing: 0
       }}>
         {count === 1 ? 'deal' : 'deals'}
       </div>
@@ -1493,7 +1493,7 @@ function StageChip({ count, label, stage, navigate }: any) {
         display: 'inline-flex',
         alignItems: 'baseline',
         gap: 4,
-        padding: '2px 4px',
+        padding: '4px 4px',
         margin: '-2px -4px',
         background: 'transparent',
         border: 'none',

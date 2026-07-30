@@ -20,7 +20,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
   }
 
   componentDidUpdate(prevProps: any) {
-    // Reset when the user navigates to a new route — otherwise a
+    // Reset when the user navigates to a new route, otherwise a
     // crashed screen would leave the boundary stuck even after the
     // user clicks away to a healthy route.
     if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
@@ -87,7 +87,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
               marginTop: 14,
               textAlign: 'left',
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              fontSize: 11,
+              fontSize: 12,
               color: 'var(--v3-text-muted)'
             }}
           >
@@ -97,8 +97,8 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
             <pre
               style={{
                 margin: 0,
-                padding: 10,
-                borderRadius: 8,
+                padding: 12,
+                borderRadius: 10,
                 background: 'var(--v3-danger-soft)',
                 border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
                 color: 'var(--v3-danger-bright)',
@@ -110,24 +110,24 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
             </pre>
           </details>
 
-          <div style={{ marginTop: 18, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div style={{ marginTop: 18, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={this.handleHome}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                padding: '11px 18px',
-                borderRadius: 12,
+                padding: '12px 16px',
+                borderRadius: 10,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
                 background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 700,
-                letterSpacing: '0.04em',
+                letterSpacing: 0,
                 cursor: 'pointer',
-                boxShadow: '0 0 0 3px rgba(229, 193, 88, 0.16), 0 4px 12px rgba(229, 193, 88, 0.30), 0 1px 0 var(--v3-border-strong) inset'
+                boxShadow: '0 0 0 3px rgba(201, 150, 58, 0.16), 0 4px 12px rgba(201, 150, 58, 0.30), 0 1px 0 var(--v3-border-strong) inset'
               }}
             >
               Go Home
@@ -138,13 +138,13 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                padding: '11px 18px',
-                borderRadius: 12,
+                padding: '12px 16px',
+                borderRadius: 10,
                 border: '1px solid var(--v3-border-strong)',
                 background: 'var(--v3-surface-2)',
                 color: 'var(--v3-text)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 600,
                 cursor: 'pointer'
               }}

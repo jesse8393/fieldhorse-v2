@@ -1,4 +1,4 @@
-// subApi — typed client wrappers for the /api/sub-* Netlify functions.
+// subApi, typed client wrappers for the /api/sub-* Netlify functions.
 //
 // All endpoints require an authenticated session.
 
@@ -94,7 +94,7 @@ async function callJson<T>(path: string, body: any): Promise<T> {
   return parsed as T
 }
 
-// Profile-editable fields the sub controls. Matches the server-side
+// Profile-editable fields the sub controls. Matches the on the server
 // allowlist in /api/sub-profile-update.
 export type SubProfileUpdate = Partial<{
   phone: string | null
@@ -103,7 +103,7 @@ export type SubProfileUpdate = Partial<{
   trades: string[] | null
   insurance_carrier: string | null
   insurance_policy: string | null
-  insurance_expires_on: string | null   // YYYY-MM-DD
+  insurance_expires_on: string | null   // year month day
   license_number: string | null
   payment_handle: string | null
   payment_method: string | null
@@ -138,7 +138,7 @@ export async function subUploadDoc(file: File, kind: DocKind): Promise<{ storage
   })
 
   // 2) PUT into Supabase Storage via the signed URL. The signed-upload
-  //    URL pattern uses an `upload` PUT — supabase-js abstracts that.
+  //    URL pattern uses an `upload` PUT, supabase-js abstracts that.
   const { error: upErr } = await supabase.storage
     .from(sign.bucket)
     .uploadToSignedUrl(sign.storage_path, sign.token, file, {
@@ -147,7 +147,7 @@ export async function subUploadDoc(file: File, kind: DocKind): Promise<{ storage
     })
   if (upErr) throw upErr
 
-  // 3) Confirm — writes the storage_path onto every matching sub_profile.
+  // 3) Confirm, writes the storage_path onto every matching sub_profile.
   await callJson('/api/sub-doc-confirm', { kind, storage_path: sign.storage_path })
 
   return { storage_path: sign.storage_path }

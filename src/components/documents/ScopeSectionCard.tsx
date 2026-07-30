@@ -1,21 +1,21 @@
 // src/components/documents/ScopeSectionCard.tsx
 //
 // Reusable card for a proposal scope section. Sits on the proposal
-// "Scope of Work" page. One card per trade — e.g. Demolition, Roofing,
+// "Scope of Work" page. One card per trade, e.g. Demolition, Roofing,
 // Exterior, Interior, Concrete, Electrical, Allowances, Exclusions,
 // Warranty. The contractor's existing fh_quote_items.section column
 // drives grouping; this card just renders one group's data.
 //
 // Supports:
 //   - title       (e.g. "Roofing")
-//   - description (free-text paragraph; markdown not parsed — pre-baked)
+//   - description (free-text paragraph; markdown not parsed, pre-baked)
 //   - bullets     (array of strings rendered as a clean dot list)
 //   - items       optional [{ description, qty, unit, rate, amount,
 //                              is_optional, is_excluded, notes }]
 //   - photos      optional [{ url, caption }]  rendered as a small grid
 //   - internalNote (only shown when showInternalNotes=true; never on
-//                     customer-facing exports)
-//   - showPricing (false by default — Scope page leans editorial;
+//                     customer facing exports)
+//   - showPricing (false by default, Scope page leans editorial;
 //                  Pricing Summary page is where the money lives)
 //
 // Drag reorder is intentionally out of scope here (spec said "do not
@@ -41,9 +41,9 @@ export default function ScopeSectionCard({
   return (
     <section
       style={{
-        padding: '18px 20px',
+        padding: '16px 24px',
         border: `1px solid ${DOC_COLORS.rule}`,
-        borderRadius: 6,
+        borderRadius: 10,
         background: DOC_COLORS.paper,
         breakInside: 'avoid'
       }}
@@ -80,7 +80,7 @@ export default function ScopeSectionCard({
             margin: '0 0 10px',
             display: 'flex',
             flexDirection: 'column',
-            gap: 6
+            gap: 8
           }}
         >
           {bullets.map((b: any, i: any) => (
@@ -101,7 +101,7 @@ export default function ScopeSectionCard({
                   display: 'inline-block',
                   width: 4,
                   height: 4,
-                  borderRadius: '50%',
+                  borderRadius: 10,
                   background: DOC_COLORS.gold,
                   marginTop: 6
                 }}
@@ -137,13 +137,13 @@ export default function ScopeSectionCard({
                   display: 'grid',
                   gridTemplateColumns: showPricing ? '1fr auto' : '1fr',
                   gap: 16,
-                  padding: '10px 0',
+                  padding: '12px 0',
                   borderTop: i > 0 ? `1px solid ${DOC_COLORS.rule}` : 'none'
                 }}
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ ...typeStyle('bodyBold'), color: DOC_COLORS.ink }}>
-                    {it.description || '—'}
+                    {it.description || '\u2003'}
                     {it.is_optional && (
                       <span
                         style={{
@@ -198,7 +198,7 @@ export default function ScopeSectionCard({
                   aspectRatio: '4 / 3',
                   background: DOC_COLORS.paperSoft,
                   border: `1px solid ${DOC_COLORS.rule}`,
-                  borderRadius: 4,
+                  borderRadius: 10,
                   overflow: 'hidden'
                 }}
               >
@@ -224,10 +224,10 @@ export default function ScopeSectionCard({
         <div
           style={{
             marginTop: 14,
-            padding: '10px 12px',
+            padding: '12px 12px',
             background: DOC_COLORS.paperSoft,
             border: `1px dashed ${DOC_COLORS.ruleStrong}`,
-            borderRadius: 4,
+            borderRadius: 10,
             ...typeStyle('sub'),
             color: DOC_COLORS.inkMuted
           }}

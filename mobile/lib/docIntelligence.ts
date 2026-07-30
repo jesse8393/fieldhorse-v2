@@ -1,11 +1,11 @@
-// mobile/lib/docIntelligence.ts — parse a lead from a photo via Claude vision.
+// mobile/lib/docIntelligence.ts, parse a lead from a photo via Claude vision.
 // Mirrors the web src/lib/docIntelligence.ts LEAD flow. Takes a base64 data
 // URL (from expo-image-picker), asks Claude to OCR + extract a single lead,
 // and normalizes the result so it slots cleanly into the NewLeadSheet form.
 import { claudeVision } from './anthropic'
 import { JOB_TYPES } from './jobTypes'
 
-const LEAD_SYSTEM = `You are an OCR + extraction engine for a contractor's CRM. You will be shown a single image — usually a handwritten estimate, a scanned printed contract, a business card, a screenshot of an email or text, or a phone photo of a paper bid. Your job is to extract a single contractor lead.
+const LEAD_SYSTEM = `You are an OCR + extraction engine for a contractor's CRM. You will be shown a single image, usually a handwritten estimate, a scanned printed contract, a business card, a screenshot of an email or text, or a phone photo of a paper bid. Your job is to extract a single contractor lead.
 
 Return ONLY one JSON object with these keys, using null for anything you can't read or infer with high confidence:
 
@@ -23,7 +23,7 @@ Return ONLY one JSON object with these keys, using null for anything you can't r
 Rules:
 - Currency: drop $ + commas, return a plain number. Reject negative numbers.
 - If multiple totals appear, pick the grand total. Skip subtotals + tax lines.
-- If there's no recognizable structure, return all nulls — don't hallucinate.
+- If there's no recognizable structure, return all nulls, don't hallucinate.
 - Do not include any prose before or after the JSON.`
 
 function nullableString(v: unknown): string | null {
@@ -68,7 +68,7 @@ function normalizeLead(p: any): ParsedLead {
   return out
 }
 
-const EXPENSE_SYSTEM = `You are an OCR + extraction engine for a contractor's expense tracking. You will be shown a single image — usually a receipt, an invoice, a credit-card slip, or a screenshot of a vendor email. Extract one expense line.
+const EXPENSE_SYSTEM = `You are an OCR + extraction engine for a contractor's expense tracking. You will be shown a single image, usually a receipt, an invoice, a credit-card slip, or a screenshot of a vendor email. Extract one expense line.
 
 Return ONLY one JSON object, using null for anything you can't read with high confidence:
 
@@ -82,7 +82,7 @@ Return ONLY one JSON object, using null for anything you can't read with high co
 Rules:
 - Pick the GRAND TOTAL (or "Total Due" / "Amount Charged"). Skip line items, subtotals, tax-only.
 - Category: lumber/concrete/paint -> Materials; gas/diesel -> Fuel; city/county fees -> Permits; tool rental -> Equipment; else Other.
-- expense_date: ISO YYYY-MM-DD if visible (assume current year if only month/day); null if unreadable.
+- expense_date: ISO year month day if visible (assume current year if only month/day); null if unreadable.
 - No prose, JSON only.`
 
 export type ParsedExpense = {

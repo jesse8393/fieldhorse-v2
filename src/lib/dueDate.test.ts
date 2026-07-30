@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { dateInputToTimestamp, timestampToDateInput, dueStatus } from './dueDate.ts'
 
-// Build a YYYY-MM-DD string for a date N days from local "today".
+// Build a year month day string for a date N days from local "today".
 function localDateStr(offsetDays = 0): string {
   const d = new Date()
   d.setDate(d.getDate() + offsetDays)

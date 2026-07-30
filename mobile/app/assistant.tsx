@@ -1,4 +1,4 @@
-// mobile/app/assistant.tsx — FieldHorse Dispatch: a conversational AI that
+// mobile/app/assistant.tsx, FieldHorse Dispatch: a conversational AI that
 // answers questions about the business AND creates records (leads, jobs,
 // events, clients, notes) from plain language, plus exports data to CSV via
 // the native share sheet. Claude returns a JSON action when the user wants to
@@ -20,16 +20,16 @@ import { ScreenBackground, theme } from '../components/ui'
 
 type Msg = { role: 'user' | 'assistant'; text: string }
 
-const SYSTEM = `You are FieldHorse Dispatch — a sharp, plain-spoken assistant for a contractor working on the go. You do two things:
+const SYSTEM = `You are FieldHorse Dispatch, a sharp, plain-spoken assistant for a contractor working on the go. You do two things:
 
 1) CREATE records. When the user wants to add or schedule something, reply with ONLY a JSON object (no prose, no code fence) in this exact shape:
 {"action":"create_lead"|"create_event"|"create_client"|"add_note","data":{...},"say":"one-line confirmation"}
 Field shapes:
 - create_lead: { "name": string (required), "phone"?, "email"?, "address"?, "job_title"?, "job_type"?, "amount"?: number, "stage"?: "lead"|"quote"|"job", "notes"? }
-- create_event: { "title": string (required), "date"?: "YYYY-MM-DD", "time"?: "HH:MM" 24h, "notes"? }
+- create_event: { "title": string (required), "date"?: "year month day", "time"?: "HH:MM" 24h, "notes"? }
 - create_client: { "name": string (required), "company"?, "phone"?, "email"?, "address"? }
 - add_note: { "text": string (required) }
-If a REQUIRED field is missing, do NOT emit JSON — ask for it in one short sentence.
+If a REQUIRED field is missing, do NOT emit JSON, ask for it in one short sentence.
 
 2) ANSWER questions about the business using the BUSINESS CONTEXT provided below. Keep answers short, direct, numeric. No markdown headers, no fluff.
 
@@ -69,7 +69,7 @@ export default function AssistantScreen() {
 
   const scrollRef = useRef<ScrollView>(null)
   const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', text: "I'm your dispatch. Tell me to add a lead, schedule a visit, log a note — or ask me about your jobs, money owed, or what's cold." }
+    { role: 'assistant', text: "I'm your dispatch. Tell me to add a lead, schedule a visit, log a note, or ask me about your jobs, money owed, or what's cold." }
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -172,42 +172,42 @@ export default function AssistantScreen() {
       <View style={{ flex: 1 }}>
         <ScreenBackground />
         {/* Header */}
-        <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Pressable onPress={() => router.back()} hitSlop={10}><ChevronLeft color={theme.goldBright} size={22} /></Pressable>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
             <Sparkles color={theme.goldBright} size={18} />
-            <Text style={{ color: theme.ink, fontSize: 18, fontWeight: '800' }}>Dispatch</Text>
+            <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800' }}>Dispatch</Text>
           </View>
-          <Pressable onPress={() => exportCsv('jobs')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: theme.borderMid }}>
+          <Pressable onPress={() => exportCsv('jobs')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid }}>
             <Download color={theme.inkMuted} size={13} />
             <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700' }}>Jobs CSV</Text>
           </Pressable>
-          <Pressable onPress={() => exportCsv('clients')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: theme.borderMid }}>
+          <Pressable onPress={() => exportCsv('clients')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid }}>
             <Download color={theme.inkMuted} size={13} />
             <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700' }}>Clients</Text>
           </Pressable>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
+        <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}>
           {messages.map((m, i) => (
-            <View key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '86%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: m.role === 'user' ? theme.goldBright : theme.surface, borderWidth: m.role === 'user' ? 0 : 1, borderColor: theme.border }}>
-              <Text style={{ color: m.role === 'user' ? theme.onGold : theme.ink, fontSize: 15, lineHeight: 21, fontWeight: m.role === 'user' ? '600' : '400' }}>{m.text}</Text>
+            <View key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '86%', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: m.role === 'user' ? theme.goldBright : theme.surface, borderWidth: m.role === 'user' ? 0 : 1, borderColor: theme.border }}>
+              <Text style={{ color: m.role === 'user' ? theme.onGold : theme.ink, fontSize: 14, lineHeight: 21, fontWeight: m.role === 'user' ? '600' : '400' }}>{m.text}</Text>
             </View>
           ))}
           {busy ? <ActivityIndicator color={theme.goldBright} style={{ alignSelf: 'flex-start', marginLeft: 12 }} /> : null}
         </ScrollView>
 
         {/* Input */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: 'rgba(11,9,7,0.92)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: 'rgba(20, 20, 20,0.92)' }}>
           <TextInput
             value={input}
             onChangeText={setInput}
             placeholder="Add a lead for Mike, $40k roof…"
             placeholderTextColor={theme.inkFaint}
             multiline
-            style={{ flex: 1, color: theme.ink, fontSize: 15, maxHeight: 120, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 11 }}
+            style={{ flex: 1, color: theme.ink, fontSize: 14, maxHeight: 120, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 }}
           />
-          <Pressable onPress={send} disabled={!input.trim() || busy} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.goldBright, opacity: !input.trim() || busy ? 0.5 : 1 }}>
+          <Pressable onPress={send} disabled={!input.trim() || busy} style={{ width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.goldBright, opacity: !input.trim() || busy ? 0.5 : 1 }}>
             <Send color={theme.onGold} size={18} />
           </Pressable>
         </View>

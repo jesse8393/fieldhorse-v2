@@ -1,5 +1,5 @@
 /**
- * Small "FH" wordmark — top-left of AppHeader.
+ * Small "FH" wordmark, top-left of AppHeader.
  * Static visual mark only: no tap target, no navigation, no cursor
  * pointer. Exists solely to signal "this app is Fieldhorse" without
  * competing with the user's centered company logo.
@@ -17,7 +17,7 @@ export default function FieldhorseBadge({ size = 18 }: any) {
         lineHeight: 1,
         fontFamily: 'var(--font-display)',
         fontSize: size,
-        letterSpacing: '0.06em',
+        letterSpacing: 0,
         fontWeight: 400,
         userSelect: 'none',
         pointerEvents: 'none'

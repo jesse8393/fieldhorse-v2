@@ -1,7 +1,7 @@
 // src/components/HomeActivityCard.tsx
 //
 // Compact "recent activity" card for Home. Brings the cross-job feed
-// from /activity onto the dashboard surface — top 5 events + a
+// from /activity onto the dashboard surface, top 5 events + a
 // "See all →" link to the full screen.
 //
 // Reuses the same query shape as Activity.jsx (4 parallel fetches +
@@ -172,7 +172,7 @@ export default function HomeActivityCard() {
       style={{
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
-        borderRadius: 14,
+        borderRadius: 10,
         overflow: 'hidden'
       }}
     >
@@ -190,9 +190,9 @@ export default function HomeActivityCard() {
           to="/activity"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             color: 'var(--v3-primary-bright)',
-            textDecoration: 'none', letterSpacing: '0.04em'
+            textDecoration: 'none', letterSpacing: 0
           }}
         >
           See all <ArrowRight size={12} aria-hidden="true" />
@@ -210,8 +210,8 @@ function Row({ event, isLast }: any) {
   const palette = ({
     neutral: { bg: 'var(--v3-glass-tint-2)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
     gold:    { bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', fg: 'var(--v3-primary-bright)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
-    green:   { bg: 'rgba(74,222,128,0.10)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74,222,128,0.30)' },
-    red:     { bg: 'rgba(232,90,87,0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232,90,87,0.30)' }
+    green:   { bg: 'rgba(45, 122, 79,0.10)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79,0.30)' },
+    red:     { bg: 'rgba(192, 57, 43,0.10)', fg: 'var(--v3-danger-bright, #C9963A)', br: 'rgba(192, 57, 43,0.30)' }
   } as Record<string, any>)[event.tone || 'neutral']
   const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
 
@@ -222,8 +222,8 @@ function Row({ event, isLast }: any) {
         style={{
           display: 'grid',
           gridTemplateColumns: '28px 1fr auto',
-          gap: 10,
-          padding: '11px 16px',
+          gap: 12,
+          padding: '12px 16px',
           borderTop: '1px solid var(--v3-border)',
           textDecoration: 'none',
           color: 'inherit',
@@ -231,7 +231,7 @@ function Row({ event, isLast }: any) {
         }}
       >
         <span aria-hidden="true" style={{
-          width: 28, height: 28, borderRadius: 8,
+          width: 28, height: 28, borderRadius: 10,
           background: palette.bg, border: `1px solid ${palette.br}`,
           color: palette.fg,
           display: 'grid', placeItems: 'center', flexShrink: 0
@@ -248,7 +248,7 @@ function Row({ event, isLast }: any) {
           </div>
           <div style={{
             marginTop: 2,
-            fontFamily: 'var(--font-body)', fontSize: 10,
+            fontFamily: 'var(--font-body)', fontSize: 12,
             color: 'var(--v3-text-muted)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>
@@ -256,7 +256,7 @@ function Row({ event, isLast }: any) {
           </div>
         </div>
         <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600,
+          fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
           color: 'var(--v3-text-faint, var(--v3-text-muted))',
           fontVariantNumeric: 'tabular-nums',
           alignSelf: 'center', whiteSpace: 'nowrap'

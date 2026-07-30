@@ -4,7 +4,7 @@ import { Eyebrow } from '../../../components/v3'
 /**
  * Temporary v3 placeholder for tab content scheduled for Drops 3.1–3.3.
  *
- * NOT legacy — this is intentionally inert. The legacy implementations are
+ * NOT legacy, this is intentionally inert. The legacy implementations are
  * preserved in src/screens/ContactDetail.jsx (the old monolith file) and
  * remain accessible via the v2 path during the transition. This stub:
  *   - Renders in v3 surface tokens (no fh-* legacy classes)
@@ -17,8 +17,8 @@ export default function StubTab({ name, upcoming = [] }: any) {
   return (
     <div style={{
       margin: '24px 20px',
-      padding: '40px 24px',
-      borderRadius: 16,
+      padding: '32px 24px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px dashed var(--v3-border-strong)',
       display: 'flex',
@@ -30,7 +30,7 @@ export default function StubTab({ name, upcoming = [] }: any) {
       <div style={{
         width: 48,
         height: 48,
-        borderRadius: 14,
+        borderRadius: 10,
         background: 'var(--v3-primary-soft)',
         border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
         display: 'grid',
@@ -41,14 +41,14 @@ export default function StubTab({ name, upcoming = [] }: any) {
       </div>
       <div>
         <Eyebrow as="div" tone="gold" style={{ marginBottom: 6 }}>
-          {name} — v3 in progress
+          {name}, v3 in progress
         </Eyebrow>
         <h3 style={{
           margin: 0,
           fontFamily: 'var(--font-serif)',
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: 500,
-          letterSpacing: '-0.01em',
+          letterSpacing: 0,
           color: 'var(--v3-text)'
         }}>
           Coming in the next drop.
@@ -56,7 +56,7 @@ export default function StubTab({ name, upcoming = [] }: any) {
         <p style={{
           margin: '8px 0 0',
           fontFamily: 'var(--font-body)',
-          fontSize: 13,
+          fontSize: 14,
           color: 'var(--v3-text-muted)',
           lineHeight: 1.5,
           maxWidth: 360

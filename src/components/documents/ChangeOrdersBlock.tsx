@@ -28,7 +28,7 @@ export default function ChangeOrdersBlock({ changeOrders = [], company }: { chan
         display: 'flex',
         flexDirection: 'column',
         border: `1px solid ${DOC_COLORS.rule}`,
-        borderRadius: 6,
+        borderRadius: 10,
         overflow: 'hidden'
       }}
     >
@@ -43,7 +43,7 @@ export default function ChangeOrdersBlock({ changeOrders = [], company }: { chan
               gridTemplateColumns: '70px 1fr auto',
               gap: 16,
               alignItems: 'flex-start',
-              padding: '14px 18px',
+              padding: '12px 16px',
               borderTop: i > 0 ? `1px solid ${DOC_COLORS.rule}` : 'none',
               background: DOC_COLORS.paper
             }}
@@ -53,7 +53,7 @@ export default function ChangeOrdersBlock({ changeOrders = [], company }: { chan
                 ...typeStyle('stamp'),
                 color: gold,
                 fontVariantNumeric: 'tabular-nums',
-                letterSpacing: '0.04em'
+                letterSpacing: 0
               }}
             >
               CO #{co.sequence_number || (i + 1)}

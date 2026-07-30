@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))
 }
 
-// Phone formatter — render-time only. Store raw digits in the DB so
+// Phone formatter, render-time only. Store raw digits in the DB so
 // search + sms/tel: links keep working; format for display only.
 //   "5551234567"      -> "(555) 123-4567"
 //   "+15551234567"    -> "+1 (555) 123-4567"

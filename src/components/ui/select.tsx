@@ -33,7 +33,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "ui:flex ui:w-fit ui:items-center ui:justify-between ui:gap-2 ui:rounded-md ui:border ui:border-input ui:bg-transparent ui:px-3 ui:py-2 ui:text-sm ui:whitespace-nowrap ui:shadow-xs ui:transition-[color,box-shadow] ui:outline-none ui:focus-visible:border-ring ui:focus-visible:ring-[3px] ui:focus-visible:ring-ring/50 ui:disabled:cursor-not-allowed ui:disabled:opacity-50 ui:aria-invalid:border-destructive ui:aria-invalid:ring-destructive/20 ui:data-[placeholder]:text-muted-foreground ui:data-[size=default]:h-9 ui:data-[size=sm]:h-8 ui:*:data-[slot=select-value]:line-clamp-1 ui:*:data-[slot=select-value]:flex ui:*:data-[slot=select-value]:items-center ui:*:data-[slot=select-value]:gap-2 ui:dark:bg-input/30 ui:dark:hover:bg-input/50 ui:dark:aria-invalid:ring-destructive/40 ui:[&_svg]:pointer-events-none ui:[&_svg]:shrink-0 ui:[&_svg:not([class*=size-])]:size-4 ui:[&_svg:not([class*=text-])]:text-muted-foreground",
+        "ui:flex ui:w-fit ui:items-center ui:justify-between ui:gap-2 ui:rounded-[10px] ui:border ui:border-input ui:bg-transparent ui:px-3 ui:py-2 ui:text-sm ui:whitespace-nowrap ui:shadow-xs ui:transition-[color,box-shadow] ui:outline-none ui:focus-visible:border-ring ui:focus-visible:ring-[3px] ui:focus-visible:ring-ring/50 ui:disabled:cursor-not-allowed ui:disabled:opacity-50 ui:aria-invalid:border-destructive ui:aria-invalid:ring-destructive/20 ui:data-[placeholder]:text-muted-foreground ui:data-[size=default]:h-9 ui:data-[size=sm]:h-8 ui:*:data-[slot=select-value]:line-clamp-1 ui:*:data-[slot=select-value]:flex ui:*:data-[slot=select-value]:items-center ui:*:data-[slot=select-value]:gap-2 ui:dark:bg-input/30 ui:dark:hover:bg-input/50 ui:dark:aria-invalid:ring-destructive/40 ui:[&_svg]:pointer-events-none ui:[&_svg]:shrink-0 ui:[&_svg:not([class*=size-])]:size-4 ui:[&_svg:not([class*=text-])]:text-muted-foreground",
         className
       )}
       {...props}>
@@ -57,7 +57,7 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "ui:relative ui:z-50 ui:max-h-(--radix-select-content-available-height) ui:min-w-[8rem] ui:origin-(--radix-select-content-transform-origin) ui:overflow-x-hidden ui:overflow-y-auto ui:rounded-md ui:border ui:bg-popover ui:text-popover-foreground ui:shadow-md ui:data-[side=bottom]:slide-in-from-top-2 ui:data-[side=left]:slide-in-from-right-2 ui:data-[side=right]:slide-in-from-left-2 ui:data-[side=top]:slide-in-from-bottom-2 ui:data-[state=closed]:animate-out ui:data-[state=closed]:fade-out-0 ui:data-[state=closed]:zoom-out-95 ui:data-[state=open]:animate-in ui:data-[state=open]:fade-in-0 ui:data-[state=open]:zoom-in-95",
+          "ui:relative ui:z-50 ui:max-h-(--radix-select-content-available-height) ui:min-w-[8rem] ui:origin-(--radix-select-content-transform-origin) ui:overflow-x-hidden ui:overflow-y-auto ui:rounded-[10px] ui:border ui:bg-popover ui:text-popover-foreground ui:shadow-md ui:data-[side=bottom]:slide-in-from-top-2 ui:data-[side=left]:slide-in-from-right-2 ui:data-[side=right]:slide-in-from-left-2 ui:data-[side=top]:slide-in-from-bottom-2 ui:data-[state=closed]:animate-out ui:data-[state=closed]:fade-out-0 ui:data-[state=closed]:zoom-out-95 ui:data-[state=open]:animate-in ui:data-[state=open]:fade-in-0 ui:data-[state=open]:zoom-in-95",
           position === "popper" &&
             "ui:data-[side=bottom]:translate-y-1 ui:data-[side=left]:-translate-x-1 ui:data-[side=right]:translate-x-1 ui:data-[side=top]:-translate-y-1",
           className
@@ -84,7 +84,7 @@ function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("ui:px-2 ui:py-1.5 ui:text-xs ui:text-muted-foreground", className)}
+      className={cn("ui:px-2 ui:py-2 ui:text-xs ui:text-muted-foreground", className)}
       {...props} />
   );
 }
@@ -98,7 +98,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "ui:relative ui:flex ui:w-full ui:cursor-default ui:items-center ui:gap-2 ui:rounded-sm ui:py-1.5 ui:pr-8 ui:pl-2 ui:text-sm ui:outline-hidden ui:select-none ui:focus:bg-accent ui:focus:text-accent-foreground ui:data-[disabled]:pointer-events-none ui:data-[disabled]:opacity-50 ui:[&_svg]:pointer-events-none ui:[&_svg]:shrink-0 ui:[&_svg:not([class*=size-])]:size-4 ui:[&_svg:not([class*=text-])]:text-muted-foreground ui:*:[span]:last:flex ui:*:[span]:last:items-center ui:*:[span]:last:gap-2",
+        "ui:relative ui:flex ui:w-full ui:cursor-default ui:items-center ui:gap-2 ui:rounded-[10px] ui:py-2 ui:pr-8 ui:pl-2 ui:text-sm ui:outline-hidden ui:select-none ui:focus:bg-accent ui:focus:text-accent-foreground ui:data-[disabled]:pointer-events-none ui:data-[disabled]:opacity-50 ui:[&_svg]:pointer-events-none ui:[&_svg]:shrink-0 ui:[&_svg:not([class*=size-])]:size-4 ui:[&_svg:not([class*=text-])]:text-muted-foreground ui:*:[span]:last:flex ui:*:[span]:last:items-center ui:*:[span]:last:gap-2",
         className
       )}
       {...props}>

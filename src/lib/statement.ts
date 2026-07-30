@@ -1,6 +1,6 @@
 // src/lib/statement.ts
 //
-// Client statement — one rollup of what a client owes across ALL of
+// Client statement, one rollup of what a client owes across ALL of
 // their properties/jobs. Built for repeat clients (e.g. a property
 // manager with several buildings) who want a single "here's everything
 // I owe you" document instead of one invoice per job.
@@ -14,9 +14,9 @@
 // invoice rows).
 //
 // gatherStatement is a PURE function over jobs + payments the caller
-// already has — no DB round-trip, trivially unit-testable.
+// already has, no DB round-trip, trivially unit-testable.
 
-// pdf.js pulls in jspdf (~390KB) — load it lazily so importing this
+// pdf.js pulls in jspdf (~390KB), load it lazily so importing this
 // module (ClientDetail route graph) doesn't ship the PDF engine on the
 // critical path. downloadPdf is fetched alongside generateStatement.
 const loadPdf = () => import('./pdf.js')
@@ -58,7 +58,7 @@ export type StatementData = {
 // yet; lost is dead. Matches the Invoices screen's job set.
 const BILLING_STAGES = new Set(['job', 'invoice', 'closed'])
 
-/** Sum of APPROVED change orders per contact — the amount that adjusts
+/** Sum of APPROVED change orders per contact, the amount that adjusts
  *  a job's true contract up (or down, for credits). */
 export function approvedCoByContact(
   changeOrders: StatementChangeOrder[] | null | undefined
@@ -72,7 +72,7 @@ export function approvedCoByContact(
 }
 
 /**
- * Roll the client's jobs into statement lines — one row per property
+ * Roll the client's jobs into statement lines, one row per property
  * with a positive balance. Contract = job amount + approved change
  * orders (the same "true contract" the Send-invoice sheet and PDF use),
  * so a signed change order actually raises what's owed here. Pure.
@@ -117,7 +117,7 @@ export async function buildStatementPdf({ company, client, data }: {
   client: any
   data: StatementData
 }) {
-  // generateStatement lives in the untyped pdf.js — its array params
+  // generateStatement lives in the untyped pdf.js, its array params
   // infer as never[], so the typed payload goes through `as any`.
   const { generateStatement } = await loadPdf()
   return generateStatement({

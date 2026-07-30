@@ -1,7 +1,7 @@
 // src/lib/clientTimeline.ts
 //
 // Composes a single chronological activity feed for a client across ALL
-// their properties — payments collected, jobs started, notes logged,
+// their properties, payments collected, jobs started, notes logged,
 // files/photos added. Pure over the data ClientDetail already loads, so
 // it needs no extra queries and is trivially unit-tested.
 
@@ -69,7 +69,7 @@ export function composeClientTimeline(
   const byId = new Map<string, Job>((jobs || []).map((j) => [j.id, j]))
   const events: TimelineEvent[] = []
 
-  // Payments — money in.
+  // Payments, money in.
   ;(payments || []).forEach((p, i) => {
     const at = ms(p.paid_on || p.created_at)
     if (!at) return
@@ -88,7 +88,7 @@ export function composeClientTimeline(
     })
   })
 
-  // Jobs — one "started" event per property.
+  // Jobs, one "started" event per property.
   ;(jobs || []).forEach((j) => {
     const at = ms(j.created_at)
     if (!at) return
@@ -103,7 +103,7 @@ export function composeClientTimeline(
     })
   })
 
-  // Notes — skip pure activity-log rows (system breadcrumbs); keep the
+  // Notes, skip pure activity-log rows (system breadcrumbs); keep the
   // operator's real notes.
   ;(notes || []).forEach((n) => {
     const at = ms(n.created_at)

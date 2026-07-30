@@ -2,7 +2,7 @@
 //
 // Optional block for insurance-restoration jobs (roofing, water, fire,
 // storm). Renders ONLY when the parent passes an `insurance` payload
-// with at least a claim number or carrier — otherwise returns null so
+// with at least a claim number or carrier, otherwise returns null so
 // the template stays clean for cash jobs.
 //
 // Fields (all optional):
@@ -45,9 +45,9 @@ export default function InsuranceModeBlock({ insurance = null, company }: { insu
   return (
     <section
       style={{
-        padding: '20px 22px',
+        padding: '24px 24px',
         border: `1px solid ${gold}`,
-        borderRadius: 6,
+        borderRadius: 10,
         background: DOC_COLORS.paperSoft,
         breakInside: 'avoid'
       }}
@@ -66,7 +66,7 @@ export default function InsuranceModeBlock({ insurance = null, company }: { insu
           margin: 0,
           display: 'grid',
           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gap: '14px 24px'
+          gap: '12px 24px'
         }}
       >
         {fields.map((f) => (

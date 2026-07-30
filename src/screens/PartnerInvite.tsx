@@ -12,7 +12,7 @@ function friendlyError(code: any) {
   if (code === 'invite_revoked') return 'This invite was revoked by the sender.'
   if (code === 'email_mismatch') return 'Sign in with the email this invite was sent to.'
   if (code === 'not_authenticated' || code === 'invalid_token') return 'Please sign in to accept this invite.'
-  // Unknown non-empty backend code — surface a safe generic message
+  // Unknown non-empty backend code, surface a safe generic message
   // instead of leaking the raw identifier (lookup_failed, accept_failed,
   // server_misconfigured, etc.) into the UI.
   return "We couldn't accept this invite. Try again."
@@ -25,7 +25,7 @@ function isFatalError(msg: any) {
 }
 
 /**
- * PartnerInvite — landing page for /partner-invite/:token
+ * PartnerInvite, landing page for /partner-invite/:token
  *
  * Hard requirements (Phase 15.3):
  * - Route is PUBLIC (App.jsx).
@@ -134,10 +134,10 @@ export default function PartnerInvite() {
       // returning past the guard. Without this, a session refresh
       // during the fetch would: cancel the in-flight handlers, leave
       // acceptStartedRef = true, and leave accepting = true forever
-      // — same "stuck spinner" dead end the original bug had.
+      //, same "stuck spinner" dead end the original bug had.
       acceptStartedRef.current = false
     }
-    // Intentionally exclude `accepting` and `infoErr` from deps — they're
+    // Intentionally exclude `accepting` and `infoErr` from deps, they're
     // updated INSIDE this effect and including them would re-trigger the
     // cleanup cancel cascade. Auth + token + navigate are the real inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,9 +147,9 @@ export default function PartnerInvite() {
   const jobTitle = info?.job_title || 'a job'
   const fatal = isFatalError(infoErr)
   const showFatal = fatal
-  // Sign-in block shows for any non-fatal, non-accepting state where we
+  // Sign in block shows for any non-fatal, non-accepting state where we
   // know the user isn't signed in. Auth-loading intentionally still shows
-  // the buttons — the Sign In button goes to /login which handles the
+  // the buttons, the Sign In button goes to /login which handles the
   // loading itself. Paint-something > paint-nothing.
   const showSignIn = !session && !accepting && !fatal
   const showLinking = !!session && accepting && !fatal
@@ -165,7 +165,7 @@ export default function PartnerInvite() {
         justifyContent: 'center',
         padding: 24,
         background: 'var(--surface-0, #141414)',
-        color: 'var(--ink-strong, #f4f1ea)',
+        color: 'var(--ink-strong, #F2EDE4)',
         overflow: 'hidden',
         boxSizing: 'border-box'
       }}
@@ -174,30 +174,30 @@ export default function PartnerInvite() {
       <GridPattern />
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, opacity: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)', fontSize: 36, letterSpacing: '0.14em', lineHeight: 1 }}>
-            <span style={{ color: 'var(--field-gold, #c9963a)' }}>FIELD</span>
-            <span style={{ color: 'var(--ink-strong, #f4f1ea)' }}>HORSE</span>
+          <div style={{ fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
+            <span style={{ color: 'var(--field-gold, #C9963A)' }}>FIELD</span>
+            <span style={{ color: 'var(--ink-strong, #F2EDE4)' }}>HORSE</span>
           </div>
-          <Eyebrow as="div" style={{ marginTop: 20, padding: '3px 10px', borderRadius: 999, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright, #e8b04c)' }}>
+          <Eyebrow as="div" style={{ marginTop: 20, padding: '4px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright, #C9963A)' }}>
             <Users size={11} />
             Partner invite
           </Eyebrow>
           <h1
             className="fh-font-serif"
-            style={{ fontSize: 'clamp(24px, 6.5vw, 32px)', lineHeight: 1.15, letterSpacing: '-0.02em', marginTop: 14, marginBottom: 6, fontWeight: 400, color: 'var(--ink-strong, #f4f1ea)' }}
+            style={{ fontSize: 24, lineHeight: 1.15, letterSpacing: 0, marginTop: 14, marginBottom: 6, fontWeight: 400, color: 'var(--ink-strong, #F2EDE4)' }}
           >
             {inviterName} invited you to{' '}
-            co-manage.
+            manage together.
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted, #8a8577)', lineHeight: 1.5, fontFamily: 'var(--font-body, "DM Sans", sans-serif)' }}>
-            You'll get access to <strong style={{ color: 'var(--ink-strong, #f4f1ea)' }}>{jobTitle}</strong> — notes, schedule, payments, subs, expenses. Nothing else from their account.
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted, #5C5C5C)', lineHeight: 1.5, fontFamily: 'var(--font-body, "DM Sans", sans-serif)' }}>
+            You'll get access to <strong style={{ color: 'var(--ink-strong, #F2EDE4)' }}>{jobTitle}</strong>, notes, schedule, payments, subs, expenses. Nothing else from their account.
           </p>
         </div>
 
         {showFatal && (
           <div
             role="alert"
-            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #c0392b)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
+            style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #C0392B)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
           >
             {infoErr}
           </div>
@@ -206,7 +206,7 @@ export default function PartnerInvite() {
         {showSoftError && (
           <div
             role="alert"
-            style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #c0392b)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}
+            style={{ padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #C0392B)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, marginBottom: 14 }}
           >
             {infoErr}
           </div>
@@ -217,15 +217,15 @@ export default function PartnerInvite() {
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 10,
-              padding: 20,
-              borderRadius: 18,
+              gap: 12,
+              padding: 24,
+              borderRadius: 10,
               background: 'var(--surface-2)',
-              border: '1px solid var(--rule, rgba(255,255,255,0.08))'
+              border: '1px solid var(--rule, rgba(242, 237, 228,0.08))'
             }}
           >
             {loading && (
-              <p style={{ margin: '0 0 4px', textAlign: 'center', fontSize: 11, color: 'var(--ink-muted, #8a8577)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              <p style={{ margin: '0 0 4px', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted, #5C5C5C)', letterSpacing: 0, textTransform: 'uppercase' }}>
                 Checking session…
               </p>
             )}
@@ -236,13 +236,13 @@ export default function PartnerInvite() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                padding: '14px 18px',
-                borderRadius: 12,
-                background: 'linear-gradient(135deg, var(--field-gold-bright, #e8b04c), var(--field-gold-deep, #8c6f30))',
+                padding: '12px 16px',
+                borderRadius: 10,
+                background: 'linear-gradient(135deg, var(--field-gold-bright, #C9963A), var(--field-gold-deep, #5C5C5C))',
                 color: 'var(--onyx, #141414)',
                 fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)',
                 fontSize: 16,
-                letterSpacing: '0.14em',
+                letterSpacing: 0,
                 textDecoration: 'none',
                 boxShadow: '0 8px 24px rgba(201,150,58,0.35)'
               }}
@@ -257,14 +257,14 @@ export default function PartnerInvite() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                padding: '14px 18px',
-                borderRadius: 12,
+                padding: '12px 16px',
+                borderRadius: 10,
                 background: 'var(--surface-2)',
-                border: '1px solid var(--rule, rgba(255,255,255,0.08))',
-                color: 'var(--ink-strong, #f4f1ea)',
+                border: '1px solid var(--rule, rgba(242, 237, 228,0.08))',
+                color: 'var(--ink-strong, #F2EDE4)',
                 fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)',
                 fontSize: 14,
-                letterSpacing: '0.14em',
+                letterSpacing: 0,
                 textDecoration: 'none'
               }}
             >
@@ -274,7 +274,7 @@ export default function PartnerInvite() {
         )}
 
         {showLinking && (
-          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 13, color: 'var(--ink-muted, #8a8577)' }}>
+          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, color: 'var(--ink-muted, #5C5C5C)' }}>
             Linking you to the job…
           </p>
         )}

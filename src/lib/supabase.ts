@@ -24,7 +24,7 @@ export const supabase = createClient<Database>(
 
 // Bearer header for Netlify function calls that require the signed-in
 // user's access token (/api/send-*, /api/claude). Returns {} when no
-// session exists so callers fail server-side with a clean 401 instead
+// session exists so callers fail on the server with a clean 401 instead
 // of throwing here.
 export async function authHeaders(): Promise<Record<string, string>> {
   try {

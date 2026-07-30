@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion'
 import { hapticTap } from '../../lib/haptics.ts'
 
-// QuickAction — single Home tile in the 4-up launcher row.
+// QuickAction, single Home tile in the 4-up launcher row.
 //
 // Visual: ALL tiles share the same surface treatment so the row reads
 // as a uniform launcher. `primary` was previously a full gold gradient
 // across the whole tile (background + border + icon + label), which
-// made the Add Lead tile look like it was stuck in a pressed state —
+// made the Add Lead tile look like it was stuck in a pressed state :
 // "yellow and stuck" per user feedback. Now `primary` only adds a
 // subtle gold accent to the icon tile; the surrounding tile, border,
 // and label are identical to non-primary tiles.
@@ -29,7 +29,7 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 9,
+        gap: 8,
         padding: '16px 8px',
         borderRadius: 'var(--v3-radius-card)',
         background: 'var(--v3-surface-2)',
@@ -45,7 +45,7 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
         style={{
           width: 40,
           height: 40,
-          borderRadius: 13,
+          borderRadius: 10,
           display: 'grid',
           placeItems: 'center',
           background: primary
@@ -64,7 +64,7 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
           fontFamily: 'var(--font-body)',
           fontSize: 12,
           fontWeight: 600,
-          letterSpacing: '-0.005em',
+          letterSpacing: 0,
           textAlign: 'center',
           lineHeight: 1.2,
           color: 'var(--v3-text)'

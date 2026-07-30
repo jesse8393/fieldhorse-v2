@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon, PenLine } from 'lucide-react'
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
-// Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
+// Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on Generate / Download / Send PDF actions.
 async function loadPdf(): Promise<any> {
   return import('../../../lib/pdf.js')
@@ -21,14 +21,14 @@ import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * QUOTE tab — the formal sellable scope. Lead → Quote → Approved Job
+ * QUOTE tab, the formal sellable scope. Lead → Quote → Approved Job
  * → Production/Expenses → Invoice. Quote is the sendable artifact;
  * once approved (Phase 4C) it becomes the locked baseline that
  * Production and Invoice surfaces inherit from.
  *
- * Phase 4A — line-item editor (CRUD + parent refresh).
- * Phase 4B-2 — status pill + scope/terms/exclusions editor.
- * Phase 4B-4 — Preview / Download / Send Quote action bar.
+ * Phase 4A, line item editor (CRUD + parent refresh).
+ * Phase 4B-2, status pill + scope/terms/exclusions editor.
+ * Phase 4B-4, Preview / Download / Send Quote action bar.
  *   • Preview opens a blob URL of the generated PDF; no status change.
  *   • Download saves the PDF locally; no status change.
  *   • Send saves the PDF locally, uploads it to the job-files bucket
@@ -57,7 +57,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
     phone: profile?.company_phone || '',
-    // Prefer the customer-facing company_email (migration 015) over the
+    // Prefer the customer facing company_email (migration 015) over the
     // operator's auth email so proposals show the public address.
     email: profile?.company_email || (profile as any)?.email || '',
     website: profile?.company_website || '',
@@ -70,7 +70,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   }), [profile])
 
   // Base-item count drives the disabled state on the action bar. Keyed
-  // on contact.updated_at — the recalc trigger from migration 011 bumps
+  // on contact.updated_at, the recalc trigger from migration 011 bumps
   // updated_at on every fh_quote_items write, so this auto-refreshes
   // after add / edit / delete / Send without an extra subscription.
   const [baseCount, setBaseCount] = useState(0)
@@ -90,12 +90,12 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     return () => { alive = false }
   }, [contact?.id, contact?.updated_at, userId])
 
-  // Phase 2 — opt-in Document preview using the new ProposalTemplate.
+  // Phase 2, opt-in Document preview using the new ProposalTemplate.
   // 'builder' = existing CRUD editor (default, unchanged UX).
   // 'document' = full HTML preview that mirrors what the customer will
   // see. The Send / Download / Approve actions on the right rail stay
   // available in both modes so the operator can flip between editing
-  // the draft and reviewing the customer-facing render without losing
+  // the draft and reviewing the customer facing render without losing
   // their seat.
   const [docMode, setDocMode] = useState('builder')
   const [docItems, setDocItems] = useState<any[]>([])
@@ -128,7 +128,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
   const [busy, setBusy] = useState<any>(null) // 'preview' | 'download' | 'send' | null
   const disabled = baseCount === 0 || busy !== null
-  // Phase 1 send requires a recipient — the proposal email is attached to
+  // Phase 1 send requires a recipient, the proposal email is attached to
   // the client's email address. Preview and Download don't require this.
   const hasClientEmail = Boolean((contact?.email || '').trim())
   const sendDisabled = disabled || !hasClientEmail
@@ -142,19 +142,19 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
   // Mirror of QuoteTermsSection's local state. The terms editor pushes
   // its current values here on every change; buildPdf reads from this
-  // ref so unblurred textarea content reaches the PDF — independent of
+  // ref so unblurred textarea content reaches the PDF, independent of
   // mobile blur-timing races (P1 fix from V3-QA-1B retest).
   const termsValuesRef = useRef({ scope: '', exclusions: '', terms: '', expires: '' })
 
   // Shared PDF build path. Fetches fresh items so any pending blur
   // saves on QuoteTerms or QuoteItems are reflected. Throws on zero
   // base items so the catch in each handler can surface a friendly
-  // toast — defensive even though the disabled state prevents this.
+  // toast, defensive even though the disabled state prevents this.
   async function buildPdf() {
     if (!contact?.id || !userId) throw new Error('Contact not loaded')
     const { generateQuote } = await loadPdf()
 
-    // Pull latest local state from QuoteTermsSection — published into
+    // Pull latest local state from QuoteTermsSection, published into
     // termsValuesRef on every change (V3-QA-1B fix). Falls back to the
     // contact row's persisted values when no edits are pending.
     const local = termsValuesRef.current || {}
@@ -167,7 +167,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
     // Persist any unblurred edits before rendering, so the approval
     // snapshot also reflects them. Diff vs persisted values; null
-    // out blanks. patch is optimistic — local state matches contact
+    // out blanks. patch is optimistic, local state matches contact
     // immediately; the awaited server-write also queues.
     const norm = (s: any) => {
       const t = String(s || '').trim()
@@ -213,7 +213,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     // photos are loaded.
     const photos: any[] = await loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
 
-    // generateQuote() became async in 4D-2C — it pre-fetches the
+    // generateQuote() became async in 4D-2C, it pre-fetches the
     // contractor's logo + project photos before rendering the cover.
     const result = await generateQuote({
       company,
@@ -271,7 +271,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     }
   }
 
-  // Clear-draft action — wipes all fh_quote_items + scope/exclusions/
+  // Clear-draft action, wipes all fh_quote_items + scope/exclusions/
   // terms/expiration/sent timestamp + resets proposal_status to 'draft'.
   // Safety: BLOCKED when proposal_status='approved' because approval
   // history (fh_quote_versions) is the immutable record of what the
@@ -303,7 +303,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       if (delErr) throw delErr
 
       // Reset draft fields on the contact. Keep stage + name + client
-      // intact — only clear the quote-specific fields. Status reverts
+      // intact, only clear the quote-specific fields. Status reverts
       // to 'draft' if it was 'sent'/'viewed'/'rejected'/'expired'.
       if (patch) {
         await patch({
@@ -352,7 +352,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
   async function handleSend() {
     if (disabled) return
-    // Phase 1 send-by-email — require a client email. The Send button is
+    // Phase 1 send-by-email, require a client email. The Send button is
     // already disabled in this state, so this is a belt-and-suspenders
     // guard for the desktop WorkspaceHead path which doesn't see the
     // hasClientEmail wrapper.
@@ -367,7 +367,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
       // 1. Save to job-files first so the server can pull the PDF by
       // path with service-role privileges. Upload failure aborts the
-      // send — without the PDF on storage the email can't carry it.
+      // send, without the PDF on storage the email can't carry it.
       const blob = result.doc.output('blob')
       const rowId = crypto.randomUUID()
       const path = `${userId}/${contact.id}/${rowId}.pdf`
@@ -388,14 +388,14 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         kind: 'file'
       })
       if (insErr) {
-        // Soft-fail — the file is in storage even if the audit row missed.
+        // Soft-fail, the file is in storage even if the audit row missed.
         console.warn('[quote] fh_job_files row insert failed', insErr)
       }
 
       // 2. Ask the server to send. The server downloads the PDF using
       // the service role, attaches it to a Resend send, and on success
       // flips proposal_status='sent' + quote_sent_at + logs activity.
-      // Status is NOT optimistically updated client-side — we want the
+      // Status is NOT optimistically updated client-side, we want the
       // pill to stay 'draft' until the email actually went out.
       const sendRes = await fetch('/api/send-quote', {
         method: 'POST',
@@ -440,7 +440,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     }
   }
 
-  // Send the proposal PDF for DocuSign e-signature. Same upload path as
+  // Send the proposal PDF for DocuSign electronic signature. Same upload path as
   // handleSend (PDF → job-files), then POSTs to /api/docusign-send. The
   // function degrades gracefully (503 esign_not_configured) until the
   // DOCUSIGN_* env vars are set in Netlify.
@@ -491,19 +491,19 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       if (fetchAll) await fetchAll()
       toastSuccess(`Sent to ${contact.email} for signature`, 'DocuSign will email the signing request.')
     } catch (e: any) {
-      toastError("Couldn't send for e-signature", e?.message || 'Try again')
+      toastError("Couldn't send for electronic signature", e?.message || 'Try again')
     } finally {
       setBusy(null)
     }
   }
 
   return (
-    /* Phase 4 — Estimate workspace.
+    /* Phase 4, Estimate workspace.
        Mobile (<900px): stacks vertically as before. Each section
        carries its existing padding/margin so the mobile layout is
        byte-for-byte identical to pre-Phase-4.
        Desktop (>=900px): the .fh-quote-workspace CSS in global.css
-       reflows the workspace into two panes — left = items + terms
+       reflows the workspace into two panes, left = items + terms
        (the builder), right = context + actions + approve (the
        sticky decision rail). The data + handlers below are
        unchanged. */
@@ -537,8 +537,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: 10,
-          padding: '12px 20px 4px',
+          gap: 12,
+          padding: '12px 24px 4px',
           flexWrap: 'wrap'
         }}>
           <StatusPill status={status} />
@@ -580,7 +580,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       </div>
 
       <aside className="fh-quote-workspace__side">
-        {/* Job + client context — name, address, stage, total, status.
+        {/* Job + client context, name, address, stage, total, status.
             Renders only on desktop (CSS-hidden on mobile because the
             global ContactDetail Header already shows this above
             the tabs). */}
@@ -599,13 +599,15 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           onEsign={handleEsign}
         />
 
-        <ApproveBand
-          contact={contact}
-          baseCount={baseCount}
-          busy={busy}
-          pastQuote={pastQuote}
-          onOpenApprove={onOpenApprove}
-        />
+        {(pastQuote || contact?.proposal_status === 'approved') && (
+          <ApproveBand
+            contact={contact}
+            baseCount={baseCount}
+            busy={busy}
+            pastQuote={pastQuote}
+            onOpenApprove={onOpenApprove}
+          />
+        )}
 
         <ClearDraftBand
           contact={contact}
@@ -619,9 +621,9 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 }
 
 /* ============================================================
-   Phase 2/3 — Quote view toggle + ProposalTemplate preview pane.
+   Phase 2/3, Quote view toggle + ProposalTemplate preview pane.
    Builder mode = existing CRUD editor (untouched). Document mode
-   replaces the builder pane with the customer-facing render so the
+   replaces the builder pane with the customer facing render so the
    contractor can see exactly what's about to ship.
    ============================================================ */
 function QuoteViewToggle({ value, onChange }: any) {
@@ -635,8 +637,8 @@ function QuoteViewToggle({ value, onChange }: any) {
       aria-label="Quote view"
       style={{
         display: 'inline-flex',
-        padding: 2,
-        borderRadius: 999,
+        padding: 4,
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
         flexShrink: 0
@@ -652,16 +654,16 @@ function QuoteViewToggle({ value, onChange }: any) {
             aria-selected={on}
             onClick={() => { if (!on) { hapticTap(); onChange(o.v) } }}
             style={{
-              padding: '6px 12px',
+              padding: '8px 12px',
               minHeight: 32,
-              borderRadius: 999,
+              borderRadius: 10,
               border: 0,
               background: on ? 'var(--v3-primary-soft)' : 'transparent',
               color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.08em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               cursor: on ? 'default' : 'pointer',
               WebkitTapHighlightColor: 'transparent'
@@ -689,7 +691,7 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
 
   // When the quote is approved, pull the most recent approval snapshot
   // so the preview can stamp the captured signature + date onto the
-  // ApprovalBlock. Stays null for draft / sent / expired quotes — the
+  // ApprovalBlock. Stays null for draft / sent / expired quotes, the
   // block then renders blank signature lines.
   const [approval, setApproval] = useState<any>(null)
   useEffect(() => {
@@ -727,11 +729,11 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
         padding: '8px 0 24px',
         // Cream backdrop so the white letter-paper sits visibly on
         // the dark workspace surface without floating.
-        background: '#2a2520',
+        background: '#141414',
         margin: '0 -16px',
         paddingLeft: 12,
         paddingRight: 12,
-        borderRadius: 8
+        borderRadius: 10
       }}
     >
       {loading && (
@@ -740,7 +742,7 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
           textAlign: 'center',
           color: 'var(--v3-text-muted)',
           fontFamily: 'var(--font-body)',
-          fontSize: 13
+          fontSize: 14
         }}>
           Loading preview…
         </div>
@@ -782,17 +784,17 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
 /**
  * Translate flat fh_quote_items rows into the ProposalTemplate's
  * scope-section shape. Sections are derived from the free-text
- * `section` column (preserved order — first-seen wins). Items with
+ * `section` column (preserved order, first-seen wins). Items with
  * is_optional=true split out to `upgrades`; is_excluded=true items
  * become bullet strings under `exclusions`.
  */
 /* ============================================================
-   ClearDraftBand — destructive action to wipe the working draft
+   ClearDraftBand, destructive action to wipe the working draft
    (line items + scope/terms/exclusions/expiration + reset status).
-   Safety: BLOCKED when the quote is approved — approval history in
+   Safety: BLOCKED when the quote is approved, approval history in
    fh_quote_versions is the immutable record and shouldn't appear
    to be wiped by a "clear draft" gesture. Renders nothing when
-   the line-item count is 0 AND status is draft (nothing to clear).
+   the line item count is 0 AND status is draft (nothing to clear).
    ============================================================ */
 function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
   const status = (contact?.proposal_status || 'draft').toLowerCase()
@@ -806,9 +808,9 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
   if (isApproved) {
     return (
       <div style={{
-        display: 'flex', flexDirection: 'column', gap: 6,
-        padding: '12px 14px',
-        borderRadius: 12,
+        display: 'flex', flexDirection: 'column', gap: 8,
+        padding: '12px 12px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)'
       }}>
@@ -818,7 +820,7 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
         <p style={{
           margin: 0,
           fontFamily: 'var(--font-body)',
-          fontSize: 11, lineHeight: 1.5,
+          fontSize: 12, lineHeight: 1.5,
           color: 'var(--v3-text-muted)'
         }}>
           Approved quotes cannot be deleted. Create a revision instead.
@@ -829,9 +831,9 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 10,
-      padding: '12px 14px',
-      borderRadius: 12,
+      display: 'flex', flexDirection: 'column', gap: 12,
+      padding: '12px 12px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)'
     }}>
@@ -841,7 +843,7 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
       <p style={{
         margin: 0,
         fontFamily: 'var(--font-body)',
-        fontSize: 11, lineHeight: 1.5,
+        fontSize: 12, lineHeight: 1.5,
         color: 'var(--v3-text-muted)'
       }}>
         Removes all line items and draft scope, exclusions, terms, and expiration. The job, client, files, and any payments are unaffected.
@@ -855,16 +857,16 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
         style={{
           alignSelf: 'flex-start',
           minHeight: 36,
-          padding: '8px 14px',
+          padding: '8px 12px',
           borderRadius: 10,
           background: 'transparent',
           border: '1px solid color-mix(in srgb, var(--v3-danger-bright) 35%, transparent)',
           color: 'var(--v3-danger-bright)',
           fontFamily: 'var(--font-body)',
-          fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
+          fontSize: 12, fontWeight: 700, letterSpacing: 0,
           cursor: clearing ? 'not-allowed' : 'pointer',
           opacity: clearing ? 0.55 : 1,
-          display: 'inline-flex', alignItems: 'center', gap: 6,
+          display: 'inline-flex', alignItems: 'center', gap: 8,
           WebkitTapHighlightColor: 'transparent',
           touchAction: 'manipulation'
         }}
@@ -877,20 +879,20 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
 }
 
 /* ============================================================
-   WorkspaceHead — desktop-only header strip.
+   WorkspaceHead, desktop-only header strip.
 
-   Reference: desktop-flows-2.jsx DesktopEstimate header row —
+   Reference: desktop-flows-2.jsx DesktopEstimate header row :
    eyebrow ("EST-... · DRAFT v3 · saved 6 min ago"), serif H1 with
    gold-italic accent on the second word, subtitle (client + address +
    target start), Preview + Send buttons on the right.
 
-   We don't have a discrete "EST-" identifier — the contact id +
+   We don't have a discrete "EST-" identifier, the contact id +
    proposal_status is the closest equivalent. saved-ago hint omitted
    (we'd need to track a separate dirty timestamp).
    ============================================================ */
 function WorkspaceHead({ contact, companyName, status, baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onSend }: any) {
   // Use the SAME document number the customer sees on the PDF/public
-  // page (numbers.ts) — the raw first block of the record UUID
+  // page (numbers.ts), the raw first block of the record UUID
   // ("EST · DFAEFF81") leaked a database id as the estimate number
   // (UI audit #21).
   const idShort = contact?.id ? proposalNumber(companyName, contact.id) : 'ESTIMATE'
@@ -942,8 +944,8 @@ function WorkspaceHead({ contact, companyName, status, baseCount, busy, disabled
 }
 
 /* ============================================================
-   ContextCard — desktop-only client + job context card on the
-   workspace side rail. Reads contact + derived status only —
+   ContextCard, desktop-only client + job context card on the
+   workspace side rail. Reads contact + derived status only :
    no fetches, no writes. CSS-hidden on mobile because
    ContactDetail Header already surfaces this info above the tabs.
    ============================================================ */
@@ -957,7 +959,7 @@ function ContextCard({ contact, status }: any) {
     <section className="fh-quote-workspace__context" aria-label="Client context">
       <div className="fh-quote-workspace__context-row">
         <span className="fh-quote-workspace__context-key">Client</span>
-        <span className="fh-quote-workspace__context-val">{contact?.name || '—'}</span>
+        <span className="fh-quote-workspace__context-val">{contact?.name || '\u2003'}</span>
       </div>
       {contact?.address && (
         <div className="fh-quote-workspace__context-row">
@@ -984,12 +986,12 @@ function ContextCard({ contact, status }: any) {
         <span
           className="fh-quote-workspace__context-val"
           style={{ color: status?.tone === 'gold' ? 'var(--v3-primary)'
-            : status?.tone === 'good' ? 'var(--v3-good, #6FB387)'
+            : status?.tone === 'good' ? 'var(--v3-good, #5C5C5C)'
             : status?.tone === 'danger' ? 'var(--v3-danger-bright)'
             : 'var(--v3-text-muted)' }}
         >
           {status?.label || 'Draft'}
-          {status?.sub && <span style={{ display: 'block', fontSize: 10, color: 'var(--v3-text-muted)', marginTop: 2 }}>{status.sub}</span>}
+          {status?.sub && <span style={{ display: 'block', fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>{status.sub}</span>}
         </span>
       </div>
     </section>
@@ -997,7 +999,7 @@ function ContextCard({ contact, status }: any) {
 }
 
 /* ============================================================
-   Approve band — primary "Approve Quote" CTA when status allows.
+   Approve band, primary "Approve Quote" CTA when status allows.
    When status='approved', shows a muted approved badge plus a
    small "Approve a new version" link so re-approval requires an
    intentional tap (no accidental double-approval). Phase 4C-2.
@@ -1006,7 +1008,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
   const status = (contact?.proposal_status || 'draft').toLowerCase()
   const explicitlyApproved = status === 'approved'
   // Either the operator pressed Approve, or the pipeline has already
-  // advanced past quote — in both cases the proposal is effectively
+  // advanced past quote, in both cases the proposal is effectively
   // locked from the customer's POV.
   const isApproved = explicitlyApproved || (pastQuote && status !== 'rejected')
   const canApprove = !isApproved && baseCount > 0 && !busy
@@ -1016,18 +1018,18 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
     const implicit = !explicitlyApproved && pastQuote
     return (
       <div style={{
-        display: 'flex', flexDirection: 'column', gap: 10,
-        padding: '14px 16px',
-        borderRadius: 14,
-        background: 'rgba(72, 130, 95, 0.10)',
-        border: '1px solid rgba(72, 130, 95, 0.40)'
+        display: 'flex', flexDirection: 'column', gap: 12,
+        padding: '12px 16px',
+        borderRadius: 10,
+        background: 'rgba(45, 122, 79, 0.10)',
+        border: '1px solid rgba(45, 122, 79, 0.40)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-good, #6FB387)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-good, #5C5C5C)' }} />
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: '0.10em', textTransform: 'uppercase',
-            color: 'var(--v3-good, #6FB387)'
+            letterSpacing: 0, textTransform: 'uppercase',
+            color: 'var(--v3-good, #5C5C5C)'
           }}>
             {implicit ? 'Approved · job stage' : 'Quote approved'}
           </span>
@@ -1035,7 +1037,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
         <p style={{
           margin: 0,
           fontFamily: 'var(--font-body)',
-          fontSize: 11, lineHeight: 1.5,
+          fontSize: 12, lineHeight: 1.5,
           color: 'var(--v3-text-muted)'
         }}>
           {implicit
@@ -1050,7 +1052,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
             background: 'transparent', border: 'none',
             padding: '4px 0',
             color: 'var(--v3-text-muted)',
-            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
             textDecoration: 'underline', textUnderlineOffset: 3,
             cursor: 'pointer'
           }}
@@ -1063,13 +1065,13 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
 
   const helper = baseCount === 0
     ? 'Add at least one base line item to enable approval.'
-    : 'Saves a permanent record of the customer-approved quote. Different from sending the PDF — use this when the customer says yes.'
+    : 'Saves a permanent record of the customer approved quote. Different from sending the PDF, use this when the customer says yes.'
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 10,
-      padding: '14px 16px',
-      borderRadius: 14,
+      display: 'flex', flexDirection: 'column', gap: 12,
+      padding: '12px 16px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)'
     }}>
@@ -1081,7 +1083,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
       <p style={{
         margin: 0,
         fontFamily: 'var(--font-body)',
-        fontSize: 11, lineHeight: 1.5,
+        fontSize: 12, lineHeight: 1.5,
         color: 'var(--v3-text-muted)'
       }}>
         {helper}
@@ -1095,19 +1097,19 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
         aria-disabled={!canApprove}
         style={{
           minHeight: 44,
-          padding: '12px 14px',
-          borderRadius: 12,
+          padding: '12px 12px',
+          borderRadius: 10,
           border: 'none',
           background: canApprove
             ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
             : 'var(--v3-surface-2)',
           color: canApprove ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
           fontFamily: 'var(--font-body)',
-          fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+          fontSize: 14, fontWeight: 700, letterSpacing: 0,
           cursor: canApprove ? 'pointer' : 'not-allowed',
           opacity: canApprove ? 1 : 0.55,
-          boxShadow: canApprove ? '0 0 0 2px rgba(228, 190, 111, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18)' : 'none',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          boxShadow: canApprove ? '0 0 0 2px rgba(201, 150, 58, 0.10), 0 4px 12px rgba(201, 150, 58, 0.18)' : 'none',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           WebkitTapHighlightColor: 'transparent'
         }}
       >
@@ -1119,18 +1121,18 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
 }
 
 /* ============================================================
-   Action bar — Preview / Download / Send Quote
+   Action bar, Preview / Download / Send Quote
    ============================================================ */
 function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason, onPreview, onDownload, onSend, onShare, onEsign }: any) {
   const helperLine = sendDisabledReason
     ? sendDisabledReason
-    : 'Generates the proposal PDF and emails it directly to the client. Marks the quote as sent on success. This is not the same as Approve — use Approve when the customer says yes.'
+    : 'Generates the proposal PDF and emails it directly to the client. Marks the quote as sent on success. This is not the same as Approve, use Approve when the customer says yes.'
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 10,
-      padding: '14px 16px',
-      borderRadius: 14,
+      display: 'flex', flexDirection: 'column', gap: 12,
+      padding: '12px 16px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)'
     }}>
@@ -1141,7 +1143,7 @@ function ActionBar({ baseCount, busy, disabled, sendDisabled, sendDisabledReason
       <p style={{
         margin: 0,
         fontFamily: 'var(--font-body)',
-        fontSize: 11, lineHeight: 1.5,
+        fontSize: 12, lineHeight: 1.5,
         color: 'var(--v3-text-muted)'
       }}>
         {helperLine}
@@ -1196,16 +1198,16 @@ function SecondaryButton({ icon, label, onClick, disabled }: any) {
       style={{
         flex: '1 1 110px',
         minHeight: 44,
-        padding: '11px 14px',
-        borderRadius: 12,
+        padding: '12px 12px',
+        borderRadius: 10,
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border)',
         color: disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)',
         fontFamily: 'var(--font-body)',
-        fontSize: 13, fontWeight: 600,
+        fontSize: 14, fontWeight: 600,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.55 : 1,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         WebkitTapHighlightColor: 'transparent'
       }}
     >
@@ -1226,19 +1228,19 @@ function PrimaryButton({ icon, label, onClick, disabled }: any) {
       style={{
         flex: '2 1 180px',
         minHeight: 44,
-        padding: '11px 14px',
-        borderRadius: 12,
+        padding: '12px 12px',
+        borderRadius: 10,
         border: 'none',
         background: disabled
           ? 'var(--v3-surface-2)'
           : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
         color: disabled ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
         fontFamily: 'var(--font-body)',
-        fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+        fontSize: 14, fontWeight: 700, letterSpacing: 0,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.55 : 1,
-        boxShadow: disabled ? 'none' : '0 0 0 2px rgba(228, 190, 111, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18)',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        boxShadow: disabled ? 'none' : '0 0 0 2px rgba(201, 150, 58, 0.10), 0 4px 12px rgba(201, 150, 58, 0.18)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         WebkitTapHighlightColor: 'transparent'
       }}
     >
@@ -1249,7 +1251,7 @@ function PrimaryButton({ icon, label, onClick, disabled }: any) {
 }
 
 /* ============================================================
-   Status derivation — pure read of contact columns. proposal_status
+   Status derivation, pure read of contact columns. proposal_status
    default is 'draft' (migration 002); quote_sent_at and
    quote_expires_at are nullable (migration 012). Expiration
    takes precedence over status when expired so the operator
@@ -1278,7 +1280,7 @@ function deriveStatus(contact: any, pastQuote = false) {
   // button was never tapped (manual stage advance, legacy data, etc).
   // Treat as approved so the pill / banner / approve band don't keep
   // claiming "Draft" on a job that's already invoicing or closed.
-  // Rejected stays rejected — that's a terminal "lost" state.
+  // Rejected stays rejected, that's a terminal "lost" state.
   if (pastQuote && raw !== 'approved' && raw !== 'rejected') {
     label = 'Approved'
     tone = 'good'
@@ -1287,7 +1289,7 @@ function deriveStatus(contact: any, pastQuote = false) {
   }
 
   // Expiry only applies to quotes still awaiting a decision. Approved
-  // and rejected are terminal — an approved quote whose expiry date
+  // and rejected are terminal, an approved quote whose expiry date
   // passes is still approved (the customer already committed); flipping
   // it to "Expired · danger" made closed-won jobs look like they fell
   // through (audit FH-QA-009).
@@ -1313,15 +1315,15 @@ function StatusPill({ status }: any) {
         }
       case 'good':
         return {
-          bg: 'rgba(72, 130, 95, 0.14)',
-          border: 'rgba(72, 130, 95, 0.45)',
-          color: 'var(--v3-good, #6FB387)'
+          bg: 'rgba(45, 122, 79, 0.14)',
+          border: 'rgba(45, 122, 79, 0.45)',
+          color: 'var(--v3-good, #5C5C5C)'
         }
       case 'danger':
         return {
-          bg: 'rgba(179, 58, 58, 0.14)',
-          border: 'rgba(179, 58, 58, 0.45)',
-          color: 'var(--v3-danger-bright, #D26A6A)'
+          bg: 'rgba(192, 57, 43, 0.14)',
+          border: 'rgba(192, 57, 43, 0.45)',
+          color: 'var(--v3-danger-bright, #C9963A)'
         }
       default:
         return {
@@ -1334,18 +1336,18 @@ function StatusPill({ status }: any) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-      padding: '0 2px'
+      display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+      padding: '0 4px'
     }}>
-      <Eyebrow style={{ padding: '5px 12px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
+      <Eyebrow style={{ padding: '4px 12px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
         Quote · {status.label}
       </Eyebrow>
       {status.sub && (
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 11,
+          fontSize: 12,
           color: 'var(--v3-text-muted)',
-          letterSpacing: '0.02em'
+          letterSpacing: 0
         }}>
           {status.sub}
         </span>
@@ -1394,7 +1396,7 @@ function shortDate(iso: any) {
  * Each entry returns { url, section_tag, caption } so the renderer can
  * route a tagged photo to its matching scope block. section_tag is
  * sourced from the photo's caption when present (e.g., a caption of
- * "Roofing" tags the photo for the Roofing scope) — a lightweight
+ * "Roofing" tags the photo for the Roofing scope), a lightweight
  * convention that doesn't require a schema change.
  */
 async function loadProjectPhotosForPdf(jobId: any, userId: any) {
@@ -1409,7 +1411,7 @@ async function loadProjectPhotosForPdf(jobId: any, userId: any) {
     .limit(8)
   if (error || !Array.isArray(data) || data.length === 0) return []
 
-  // Sign each path. Failures filter out — the renderer handles missing
+  // Sign each path. Failures filter out, the renderer handles missing
   // photos via placeholders without throwing.
   const signed = await Promise.all(
     data.map(async (row) => {

@@ -1,4 +1,4 @@
-// Document intelligence — Phase 19 / Audit Move #1.
+// Document intelligence, Phase 19 / Audit Move #1.
 //
 // Take a photo of a handwritten estimate, scanned contract, business
 // card, or paste a screenshot of an inbound email. Claude Vision parses
@@ -18,7 +18,7 @@ import { claudeVision, extractJson } from './anthropic.ts'
 
 const EXPENSE_CATEGORIES = ['Materials', 'Fuel', 'Permits', 'Equipment', 'Other']
 
-const LEAD_SYSTEM = `You are an OCR + extraction engine for a contractor's CRM. You will be shown a single image — usually a handwritten estimate, a scanned printed contract, a business card, a screenshot of an email or text, or a phone photo of a paper bid. Your job is to extract a single contractor lead.
+const LEAD_SYSTEM = `You are an OCR + extraction engine for a contractor's CRM. You will be shown a single image, usually a handwritten estimate, a scanned printed contract, a business card, a screenshot of an email or text, or a phone photo of a paper bid. Your job is to extract a single contractor lead.
 
 Return ONLY one JSON object with these keys, using null for anything you can't read or infer with high confidence:
 
@@ -27,27 +27,27 @@ Return ONLY one JSON object with these keys, using null for anything you can't r
   "phone": string or null,          // first phone number you can read
   "email": string or null,
   "address": string or null,        // job site address; street + city if visible
-  "job_title": string or null,      // a short, useful job description e.g. "Kitchen remodel — full gut"
+  "job_title": string or null,      // a short, useful job description e.g. "Kitchen remodel, full gut"
   "job_type": one of [${JOB_TYPES.map(t => `"${t.value}"`).join(', ')}] or null,
   "amount": number or null,         // total dollars, no formatting (42000 not "$42,000")
-  "notes": string or null           // anything else worth capturing — scope notes, timeline, materials, special asks
+  "notes": string or null           // anything else worth capturing, scope notes, timeline, materials, special asks
 }
 
 Rules:
 - Currency: drop $ + commas, return a plain number. Reject negative numbers.
 - If multiple totals appear, pick the grand total. Skip subtotals + tax lines.
-- If there's no recognizable structure, return all nulls — don't hallucinate.
+- If there's no recognizable structure, return all nulls, don't hallucinate.
 - Do not include any prose before or after the JSON.`
 
-const EXPENSE_SYSTEM = `You are an OCR + extraction engine for a contractor's expense tracking. You will be shown a single image — usually a receipt, an invoice, a credit-card slip, or a screenshot of a vendor email. Your job is to extract one expense line.
+const EXPENSE_SYSTEM = `You are an OCR + extraction engine for a contractor's expense tracking. You will be shown a single image, usually a receipt, an invoice, a credit-card slip, or a screenshot of a vendor email. Your job is to extract one expense line.
 
 Return ONLY one JSON object with these keys, using null for anything you can't read with high confidence:
 
 {
-  "description": string or null,        // e.g. "Lumber — 2x4 studs", "Dump fee", "Diesel fill-up"
+  "description": string or null,        // e.g. "Lumber, 2x4 studs", "Dump fee", "Diesel fill-up"
   "amount": number or null,             // total dollars, no formatting
   "category": one of ["Materials", "Fuel", "Permits", "Equipment", "Other"] or null,
-  "expense_date": string or null        // ISO date YYYY-MM-DD if visible on receipt
+  "expense_date": string or null        // ISO date year month day if visible on receipt
 }
 
 Rules:
@@ -100,13 +100,13 @@ export async function compressImageToDataUrl(file: File | null | undefined, maxB
 // re-encode: ALL EXIF metadata is dropped (GPS coordinates, camera
 // make/model, timestamps, orientation tag). The pixel orientation is
 // preserved because modern browsers auto-rotate per EXIF orientation
-// when loading via <img>/createObjectURL — by the time canvas.drawImage
+// when loading via <img>/createObjectURL, by the time canvas.drawImage
 // fires, pixels are already right-side-up, so the dropped orientation
 // tag is functionally irrelevant.
 //
 // Used by the photo upload path so jobsite photos don't ship GPS or
 // device fingerprints into Supabase storage. Larger ceiling than the
-// caption path (which targets Vision payload size) — storage is okay
+// caption path (which targets Vision payload size), storage is okay
 // to keep more detail.
 export async function compressImageToBlob(file: File | null | undefined, maxBytes = 1_500_000, maxDim = 1800): Promise<Blob | null> {
   if (!file) throw new Error('compressImageToBlob: file required')
@@ -184,15 +184,15 @@ export async function parseExpenseFromImage(dataUrl: string) {
   return normalizeExpense(parsed)
 }
 
-const CAPTION_SYSTEM = `You are captioning a single jobsite photo for a contractor's project record. The caption is read later when the photo is searched, scanned, or shown to a homeowner — it must be specific and useful.
+const CAPTION_SYSTEM = `You are captioning a single jobsite photo for a contractor's project record. The caption is read later when the photo is searched, scanned, or shown to a homeowner, it must be specific and useful.
 
 Return ONE plain-text sentence, under 18 words, no quotes, no markdown.
 
 Rules:
-- Lead with what is happening or what was built. Examples: "Footing pour, east wall — slump looks tight, no rebar exposed." / "Demo of upstairs bath complete; subfloor sound, no rot under tub." / "Roof underlayment + drip edge installed before shingle delivery."
+- Lead with what is happening or what was built. Examples: "Footing pour, east wall, slump looks tight, no rebar exposed." / "Demo of upstairs bath complete; subfloor sound, no rot under tub." / "Roof underlayment + drip edge installed before shingle delivery."
 - Note any visible issues (cracks, water, damage, code concerns) when present.
 - Don't guess at addresses, dates, names, or measurements that aren't visible.
-- If the photo isn't a jobsite photo (selfie, screenshot, blank, blurred), say so plainly: "Not a jobsite photo." or "Image too blurred to caption." — do not invent.
+- If the photo isn't a jobsite photo (selfie, screenshot, blank, blurred), say so plainly: "Not a jobsite photo." or "Image too blurred to caption.", do not invent.
 - No prefacing ("This image shows…"), no markdown, no JSON.`
 
 export async function captionPhoto(dataUrl: string): Promise<string | null> {

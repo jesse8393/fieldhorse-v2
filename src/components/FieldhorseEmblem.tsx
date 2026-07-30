@@ -1,15 +1,15 @@
-// FieldhorseEmblem — the canonical brand mark.
+// FieldhorseEmblem, the canonical brand mark.
 //
 // Renders the operator-provided artwork (/public/icon-source.png)
-// as an <img>. The PNG is the source of truth — same file the PWA
+// as an <img>. The PNG is the source of truth, same file the PWA
 // home-screen icons (192/512) and the iOS apple-touch-icon are
-// generated from in scripts/build-icons.mjs — so the in-app badge
+// generated from in scripts/build-icons.mjs, so the in-app badge
 // and the install icon never drift.
 //
 // Props:
-//   size  — pixel side length (defaults to 28 for inline use; pass 96+
+//   size , pixel side length (defaults to 28 for inline use; pass 96+
 //           for hero contexts)
-//   title — accessible name (set null to make decorative)
+//   title, accessible name (set null to make decorative)
 
 import type { CSSProperties } from 'react'
 

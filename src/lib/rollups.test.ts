@@ -114,7 +114,7 @@ describe('wonYTD / profitYTD', () => {
     expect(profitYTD(jobs, null, now)).toBe(900) // a 400 + b 500 + c 0
   })
   it('anchors the win date to the transition log, not updated_at', () => {
-    // c actually won in 2025 — a July 2026 edit bumped its updated_at.
+    // c actually won in 2025, a July 2026 edit bumped its updated_at.
     // With the transition log present, c stays out of 2026's totals.
     const transitions = [
       { contact_id: 'c', to_stage: 'job', transitioned_at: '2025-11-10T09:00:00Z' },
@@ -149,7 +149,7 @@ describe('computeFunnel', () => {
     // contact C: quoted twice (counts once), no decision yet
     { contact_id: 'c', to_stage: 'quote', transitioned_at: day(20) },
     { contact_id: 'c', to_stage: 'quote', transitioned_at: day(5) },
-    // contact D: won outside the window — excluded from counts
+    // contact D: won outside the window, excluded from counts
     { contact_id: 'd', to_stage: 'quote', transitioned_at: day(200) },
     { contact_id: 'd', to_stage: 'job',   transitioned_at: day(150) }
   ]
@@ -157,7 +157,7 @@ describe('computeFunnel', () => {
   it('counts distinct contacts per funnel step inside the window', () => {
     const f = computeFunnel(transitions, contacts, 90, now)
     expect(f.newLeads).toBe(2)
-    expect(f.quoted).toBe(3)   // a, b, c — c only once
+    expect(f.quoted).toBe(3)   // a, b, c, c only once
     expect(f.won).toBe(1)      // a (d is outside window)
     expect(f.lost).toBe(1)     // b
   })

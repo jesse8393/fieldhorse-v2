@@ -21,7 +21,7 @@ type ContactUpdate = Database['public']['Tables']['fh_contacts']['Update']
  *     then invalidates on failure
  *   - the realtime subscription invalidates instead of refetching by hand
  *
- * RLS (owner OR accepted-partner) is the access layer — no JS user_id
+ * RLS (owner OR accepted-partner) is the access layer, no JS user_id
  * filter, matching the prior behavior so partner-shared jobs surface.
  */
 
@@ -87,11 +87,11 @@ async function fetchJobDetail(id: string, userId: string | undefined) {
 }
 
 /**
- * prefetchJobDetail — speed pass: warm the detail cache on hover intent.
+ * prefetchJobDetail, speed pass: warm the detail cache on hover intent.
  *
  * Called from list rows (desktop rail, lead cards) on mouseenter/focus so
  * by the time the click lands, the 11 parallel fetches are already in
- * flight or done — the detail paints instantly from cache. staleTime
+ * flight or done, the detail paints instantly from cache. staleTime
  * keeps repeat hovers within 30s from refiring the whole batch; the
  * detail's own mount query still revalidates in the background per its
  * defaults, so freshness is unchanged.
@@ -116,7 +116,7 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
 
   const d = data || EMPTY
 
-  // Realtime — partner edits to this exact contact row invalidate the
+  // Realtime, partner edits to this exact contact row invalidate the
   // query so the new state pulls in. One channel per detail view.
   useEffect(() => {
     if (!id) return
@@ -136,7 +136,7 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
     [queryClient, id]
   )
 
-  // Optimistic patch — flip the cached contact locally, sync, toast on
+  // Optimistic patch, flip the cached contact locally, sync, toast on
   // success; invalidate to resync on failure.
   const patch = useCallback(async (update: ContactUpdate) => {
     queryClient.setQueryData(['jobDetail', id], (prev: any) =>
@@ -151,11 +151,11 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
     () => d.payments.reduce((s, p) => s + Number(p.amount || 0), 0),
     [d.payments]
   )
-  // Balance must fold in approved change orders — otherwise the money
+  // Balance must fold in approved change orders, otherwise the money
   // stat and the stage CTA ("Send invoice" vs "Mark complete") read the
   // job as fully collected while CO money is still owed.
-  const balance = useMemo(
-    () => contractTotals({ contact: d.contact, payments: d.payments, changeOrders: d.changeOrders }).balance,
+  const moneyTotals = useMemo(
+    () => contractTotals({ contact: d.contact, payments: d.payments, changeOrders: d.changeOrders }),
     [d.contact, d.payments, d.changeOrders]
   )
 
@@ -176,8 +176,9 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
     stageTransitions: d.stageTransitions,
     // derived
     paid,
-    balance,
-    // status — isPending (not isLoading) so the skeleton shows until the
+    balance: moneyTotals.balance,
+    credit: moneyTotals.credit,
+    // status, isPending (not isLoading) so the skeleton shows until the
     // first fetch resolves, including the brief window while auth (userId)
     // is still resolving and the query is disabled. Matches the prior
     // "loading starts true" semantics.

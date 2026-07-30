@@ -6,7 +6,7 @@ import { useProfile } from './contexts/ProfileContext.tsx'
 import { useMediaQuery } from './lib/useMediaQuery.ts'
 import AppShell from './components/AppShell.tsx'
 
-// Eager — must be in main bundle
+// Eager, must be in main bundle
 //   Login: gates everything; can't lazy-load the login screen
 //   Home: the post-auth landing screen; lazy here would flash a spinner
 //         on every cold app open, defeats premium feel
@@ -14,7 +14,7 @@ import Home from './screens/Home.tsx'
 import NotFound from './screens/NotFound.tsx'
 import Login from './screens/Login.tsx'
 
-// Lazy — every other route. Each becomes its own chunk.
+// Lazy, every other route. Each becomes its own chunk.
 // Initial JS bundle drops from ~1.47 MB to ~400 KB on first paint;
 // remaining chunks fetch on-demand as the user navigates.
 const ResetPassword  = lazy(() => import('./screens/ResetPassword.tsx'))
@@ -68,7 +68,7 @@ function RequireOnboarded({ children }: { children: ReactNode }) {
   if (loading) return <AppLoading label="Loading workspace" />
   // Fail open on a profile fetch error (offline cold open / transient
   // failure): an already-authenticated owner must NOT be bounced to
-  // /onboarding just because the profile row couldn't load — the
+  // /onboarding just because the profile row couldn't load, the
   // persisted TanStack cache covers reads. Only redirect when we have a
   // clean, error-free "not onboarded" answer from the server.
   if (error) return children
@@ -102,17 +102,17 @@ function AppLoading({ label }: { label: string }) {
         minHeight: '100vh',
         display: 'grid',
         placeItems: 'center',
-        background: 'var(--v3-bg, #0B0907)',
+        background: 'var(--v3-bg, #141414)',
         color: 'var(--v3-text, #F2EDE4)',
         fontFamily: 'var(--font-body, system-ui, sans-serif)',
         padding: 24
       }}
     >
       <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-        <div style={{ fontFamily: 'var(--font-display, sans-serif)', fontSize: 30, letterSpacing: '0.14em', lineHeight: 1 }}>
+        <div style={{ fontFamily: 'var(--font-display, sans-serif)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
           <span style={{ color: 'var(--v3-primary, #C9963A)' }}>FIELD</span>HORSE
         </div>
-        <div style={{ color: 'var(--v3-text-muted, rgba(242,237,228,.55))', fontSize: 13 }}>
+        <div style={{ color: 'var(--v3-text-muted, rgba(242,237,228,.55))', fontSize: 14 }}>
           {label}
         </div>
       </div>
@@ -121,13 +121,13 @@ function AppLoading({ label }: { label: string }) {
 }
 
 /**
- * ContactDetailRoute — master-detail shell for /leads/:id, /quotes/:id,
+ * ContactDetailRoute, master-detail shell for /leads/:id, /quotes/:id,
  * /jobs/:id.
  *
  * ≥1200px: a persistent list rail renders beside the detail so the
  * operator flips between records without bouncing back to the board.
  * The rail lives OUTSIDE the keyed ContactDetail, so its scroll +
- * search survive record switches. Below 1200px nothing changes — the
+ * search survive record switches. Below 1200px nothing changes, the
  * detail renders full-width exactly as before (the rail isn't even
  * mounted, so phones/tablets pay zero cost).
  *
@@ -137,7 +137,7 @@ function AppLoading({ label }: { label: string }) {
  * state because React kept the instance alive across param changes.
  */
 /**
- * LegacyBoardRedirect — /leads, /quotes, /jobs, /pipeline collapsed
+ * LegacyBoardRedirect, /leads, /quotes, /jobs, /pipeline collapsed
  * into the single /work screen (IA round 2: "jobs leads quotes
  * invoices… it all sucks and is too complicated"). Old links, nav
  * habits, and deep links keep working: the stage/view intent maps to
@@ -164,7 +164,7 @@ function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
 
 function ContactDetailRoute() {
   const { id } = useParams()
-  const isWide = useMediaQuery('(min-width: 1200px)')
+  const isWide = useMediaQuery('(min-width: 1440px)')
   return (
     <div className="fh-detail-split">
       {isWide && (
@@ -231,12 +231,12 @@ export default function App() {
           <Route path="/sub-portal" element={<SubPortal />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
-          {/* Alias routes — these URLs exist in muscle memory / older
+          {/* Alias routes, these URLs exist in muscle memory / older
               links but the screens live elsewhere. Explicit redirects
               beat the silent catch-all bounce to Home. (/leads is a
-              real route now — pipeline v2.) */}
+              real route now, pipeline v2.) */}
           <Route path="/templates" element={<Navigate to={{ pathname: '/settings', hash: '#templates' }} replace />} />
-          {/* Real 404 inside the shell — the old silent bounce to Home
+          {/* Real 404 inside the shell, the old silent bounce to Home
               gave a mistyped/stale link no error signal (UI audit #7). */}
           <Route path="*" element={<NotFound />} />
         </Route>

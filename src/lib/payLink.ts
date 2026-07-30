@@ -3,7 +3,7 @@
 // Coerce a contractor-pasted "pay link" into a safe, clickable URL.
 // Allow-list http(s)/mailto/tel; prepend https:// to a bare host; drop
 // anything with a dangerous scheme (javascript:, data:, vbscript:, …) to
-// '' so it can never reach an href on a customer-facing surface.
+// '' so it can never reach an href on a customer facing surface.
 //
 // Shared by pdf.js (invoice/statement PDFs), PublicDoc (the public page),
 // and Settings (save-time normalization). The Netlify email function

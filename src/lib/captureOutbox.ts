@@ -3,7 +3,7 @@
 // Dead-zone insurance for Universal Capture. When a capture is taken
 // with no signal, the raw text is queued in localStorage; the next time
 // the app is online it lands as a note (with its original timestamp in
-// the body) so nothing said in the field is ever lost. Notes only —
+// the body) so nothing said in the field is ever lost. Notes only :
 // money rows and schedule events need the operator's confirmed intent,
 // which needs the AI round trip.
 
@@ -38,7 +38,7 @@ export function outboxCount(): number {
 }
 
 /**
- * flushOutbox — drain queued captures into fh_notes. Items that fail
+ * flushOutbox, drain queued captures into fh_notes. Items that fail
  * to insert stay queued for the next attempt. Returns how many synced.
  */
 export async function flushOutbox(userId: string): Promise<number> {

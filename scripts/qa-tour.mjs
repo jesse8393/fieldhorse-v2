@@ -24,7 +24,10 @@ const scratch = process.env.QA_OUT || './qa-shots'
 import { mkdirSync } from 'node:fs'
 mkdirSync(scratch, { recursive: true })
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] })
+const browser = await chromium.launch({
+  ...(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}),
+  args: ['--no-sandbox']
+})
 
 
 async function tour(viewport, themeName, tag) {
@@ -54,7 +57,9 @@ async function tour(viewport, themeName, tag) {
     await page.waitForTimeout(900)
     await page.screenshot({ path: `${scratch}/qa-${tag}-${themeName}-${name}.png`, fullPage: false })
   }
-  if (errors.length) console.log(`[${tag}/${themeName}] pageerrors:`, errors.slice(0, 4))
+  if (errors.length) {
+    throw new Error(`[${tag}/${themeName}] page errors:\n${errors.slice(0, 4).join('\n')}`)
+  }
   await ctx.close()
 }
 

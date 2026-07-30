@@ -1,4 +1,4 @@
-// timePunches — DB-backed time tracking.
+// timePunches, DB-backed time tracking.
 //
 // Replaces the localStorage-only model in TimeClockCard. The DB is
 // the source of truth (multi-device safe via the unique-index on
@@ -46,7 +46,7 @@ function rememberActive(id: string | null) {
 }
 
 /** Best-effort geolocation. Resolves with nulls if the browser
- *  refuses or geolocation isn't available — never rejects. */
+ *  refuses or geolocation isn't available, never rejects. */
 async function tryGeolocate(): Promise<{ lat: number | null; lon: number | null; acc: number | null }> {
   if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
     return { lat: null, lon: null, acc: null }
@@ -90,7 +90,7 @@ export async function getActivePunch(userId: string): Promise<TimePunch | null> 
   return (data as TimePunch | null) ?? null
 }
 
-/** Per-job active punch lookup — used by TimeClockCard so the meter
+/** Per-job active punch lookup, used by TimeClockCard so the meter
  *  only restores when the active punch belongs to the job you're
  *  looking at. Returns null if the active punch is on a different job
  *  (the UI should treat that as "not clocked in here"). */
@@ -119,10 +119,10 @@ export async function getActivePunchForContact(
  *
  *  Open-punch guard: if the caller already has an un-clocked-out punch
  *  on the SAME job (double-tap, second tab, stale UI), return THAT
- *  punch instead of inserting a second one — two open punches later
+ *  punch instead of inserting a second one, two open punches later
  *  double-count labor hours in job cost. An open punch on a DIFFERENT
  *  job must NOT be returned (ultrareview x5: doing so mis-attributed
- *  Job A's hours to Job B's cost) — fall through to the insert and let
+ *  Job A's hours to Job B's cost), fall through to the insert and let
  *  the one-active-per-user unique index reject it, which drives the
  *  callers' existing "Already on the clock" error paths. */
 export async function punchIn(opts: {
@@ -188,15 +188,15 @@ export async function punchOut(opts: {
 }
 
 /** The caller's own default hourly rate (org_members self-read row).
- *  Used to snapshot the rate onto a punch at clock-out so historical
+ *  Used to snapshot the rate onto a punch at clock out so historical
  *  shifts keep pricing at the rate that was in effect when they were
- *  worked — without a snapshot, a later raise silently repriced every
+ *  worked, without a snapshot, a later raise silently repriced every
  *  past (even approved) shift on every job. Best-effort: returns null
  *  when no membership/rate exists. When the caller belongs to several
  *  orgs, prefers the membership matching orgId. */
 export async function fetchMyDefaultRate(userId: string, orgId?: string | null): Promise<number | null> {
   // database.types.ts predates migration 057's default_hourly_rate
-  // column — same `as any` cast lib/labor.ts uses for this table.
+  // column, same `as any` cast lib/labor.ts uses for this table.
   const { data, error } = await (supabase.from('org_members') as any)
     .select('org_id, default_hourly_rate')
     .eq('user_id', userId)

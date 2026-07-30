@@ -7,11 +7,11 @@ import { toastError } from '../lib/toast.ts'
 import { Eyebrow } from './v3'
 
 /**
- * DocIntakeButton — the entry surface for document-intelligence flows.
+ * DocIntakeButton, the entry surface for document-intelligence flows.
  *
  * Renders a small gold "Scan doc" button. Tap opens an inline pane with
  * three intake methods:
- *   1. Camera capture  (mobile — uses input[capture=environment])
+ *   1. Camera capture  (mobile, uses input[capture=environment])
  *   2. Photo / file upload
  *   3. Paste from clipboard (Cmd-V on a screenshot)
  *
@@ -21,7 +21,7 @@ import { Eyebrow } from './v3'
  * (lead vs expense vs invoice).
  *
  * Props:
- *   onParse(dataUrl)     async — host runs vision, returns nothing
+ *   onParse(dataUrl)     async, host runs vision, returns nothing
  *                       (host does its own toast + form fill)
  *   label                primary CTA label (default "Scan doc")
  *   description          one-line copy under the input pane
@@ -32,7 +32,7 @@ import { Eyebrow } from './v3'
 export default function DocIntakeButton({
   onParse,
   label = 'Scan doc',
-  description = 'Photo, screenshot, or paste — we\'ll fill the form.'
+  description = 'Photo, screenshot, or paste, we\'ll fill the form.'
 }: any) {
   const [open, setOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -89,15 +89,15 @@ export default function DocIntakeButton({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
+          gap: 8,
           padding: '8px 12px',
           borderRadius: 10,
           background: 'var(--v3-glass-tint-2)',
           border: '1px solid var(--v3-border-strong)',
           color: 'var(--ink-strong)',
           fontFamily: 'var(--font-display)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
+          fontSize: 12,
+          letterSpacing: 0,
           textTransform: 'uppercase',
           cursor: 'pointer'
         }}
@@ -116,9 +116,9 @@ export default function DocIntakeButton({
             transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
             style={{
               marginTop: 10,
-              padding: 14,
-              borderRadius: 14,
-              background: 'linear-gradient(180deg, rgba(30,20,10,0.5), rgba(20,15,10,0.3))',
+              padding: 12,
+              borderRadius: 10,
+              background: 'linear-gradient(180deg, rgba(20, 20, 20,0.5), rgba(20, 20, 20,0.3))',
               border: '1px solid var(--v3-border-strong)',
               position: 'relative',
               overflow: 'hidden'
@@ -129,7 +129,7 @@ export default function DocIntakeButton({
               aria-label="Cancel"
               onClick={() => { setOpen(false); setPreviewUrl('') }}
               disabled={busy}
-              style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 8, background: 'transparent', border: 'none', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+              style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 10, background: 'transparent', border: 'none', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
             >
               <X size={14} />
             </button>
@@ -143,16 +143,16 @@ export default function DocIntakeButton({
             </p>
 
             {previewUrl && (
-              <div style={{ marginBottom: 10, padding: 6, borderRadius: 10, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--rule)' }}>
+              <div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: 'rgba(20, 20, 20,0.4)', border: '1px solid var(--rule)' }}>
                 <img loading="lazy"src={previewUrl}
                   alt="Preview"
-                  style={{ width: '100%', maxHeight: 180, objectFit: 'contain', display: 'block', borderRadius: 6 }}
+                  style={{ width: '100%', maxHeight: 180, objectFit: 'contain', display: 'block', borderRadius: 10 }}
                 />
               </div>
             )}
 
             {busy ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.12em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0 }}>
                 <Loader2 size={14} style={{ animation: 'fh-spin 700ms linear infinite' }} />
                 READING DOC…
               </div>
@@ -210,14 +210,14 @@ function intakeBtn() {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    padding: '11px 14px',
+    gap: 8,
+    padding: '12px 12px',
     borderRadius: 10,
     background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 700,
     cursor: 'pointer',
     minHeight: 44

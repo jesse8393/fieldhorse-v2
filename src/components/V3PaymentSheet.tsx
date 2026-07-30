@@ -1,6 +1,6 @@
 // src/components/V3PaymentSheet.tsx
 //
-// Payment recorder — NOT a card processor. Records what the contractor
+// Payment recorder, NOT a card processor. Records what the contractor
 // already collected (cash / check / ACH / card receipt / other) against
 // the job. Wires logPayment() from pipeline.ts which:
 //   - inserts to fh_payments with the contact's user_id
@@ -8,7 +8,7 @@
 //   - fires the paid-in-full haptic + toast cascade
 //
 // Rebuilt onto the v3 Vaul Drawer chrome (was a bespoke createPortal
-// dialog despite the V3 name — was a stealth offender in the chrome
+// dialog despite the V3 name, was a stealth offender in the chrome
 // audit). Same form fields, same success state, same kbd handling.
 
 import { useEffect, useRef, useState } from 'react'
@@ -55,7 +55,7 @@ const PAYMENT_KINDS = [
   { value: 'other',     label: 'Other' }
 ]
 
-// `invoice` (optional) — an fh_invoices row this payment settles.
+// `invoice` (optional), an fh_invoices row this payment settles.
 // Prefills the amount from the invoice and links the payment via
 // invoice_id so logPayment also flips that invoice to 'paid'.
 export default function V3PaymentSheet({ contact, balance, invoice = null, onClose, onLogged }: any) {
@@ -103,7 +103,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
     setSaving(true)
     try {
       const res = await logPayment(contact, { id: paymentIdRef.current, amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: invoice?.id || null })
-      // logPayment returns { error } instead of throwing on a DB failure —
+      // logPayment returns { error } instead of throwing on a DB failure :
       // surface it, or the sheet would falsely report success.
       if (res && (res as any).error) throw new Error((res as any).error.message || 'save failed')
       hapticTap()
@@ -118,7 +118,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
 
   function requestClose(v: any) {
     if (v) return
-    // Allow dismissal once the success splash is showing — the parent
+    // Allow dismissal once the success splash is showing, the parent
     // will unmount us in ~700ms anyway, but the user shouldn't be locked
     // out of swipe-to-dismiss during that window.
     if (saving && !success) return
@@ -129,7 +129,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
   const numeric = Number(amount) || 0
   const showsAmount = amount !== '' && Number.isFinite(numeric) && numeric > 0
   const overage = numeric > Number(balance || 0)
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={requestClose}>
@@ -145,19 +145,19 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               Log what was paid.
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
             {invoice
-              ? <>Settles <strong style={{ color: 'var(--ink-strong)' }}>{invoice.title || `Invoice #${invoice.sequence_number}`}</strong>{contact?.name ? <> on {contact.name}</> : null}. This is a receipt log — not a card processor.</>
+              ? <>Settles <strong style={{ color: 'var(--ink-strong)' }}>{invoice.title || `Invoice #${invoice.sequence_number}`}</strong>{contact?.name ? <> on {contact.name}</> : null}. This is a receipt log, not a card processor.</>
               : contact?.name
-                ? <>Records a payment against <strong style={{ color: 'var(--ink-strong)' }}>{contact.name}</strong>. This is a receipt log — not a card processor.</>
-                : <>Records a payment against this job. This is a receipt log — not a card processor.</>}
+                ? <>Records a payment against <strong style={{ color: 'var(--ink-strong)' }}>{contact.name}</strong>. This is a receipt log, not a card processor.</>
+                : <>Records a payment against this job. This is a receipt log, not a card processor.</>}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -165,20 +165,20 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
           <div style={{
             flex: 1, display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            padding: '48px 20px',
+            padding: '48px 24px',
             gap: 12
           }}>
             <span aria-hidden="true" style={{
-              width: 56, height: 56, borderRadius: '50%',
-              background: 'rgba(72, 130, 95, 0.14)',
-              border: '1px solid rgba(72, 130, 95, 0.45)',
+              width: 56, height: 56, borderRadius: 10,
+              background: 'rgba(45, 122, 79, 0.14)',
+              border: '1px solid rgba(45, 122, 79, 0.45)',
               display: 'grid', placeItems: 'center',
-              color: 'var(--signal-green, #4ade80)'
+              color: 'var(--signal-green, #2D7A4F)'
             }}>
               <Check size={26} strokeWidth={2.5} />
             </span>
             <div style={{
-              fontFamily: 'var(--font-display)', fontSize: 28,
+              fontFamily: 'var(--font-display)', fontSize: 24,
               color: 'var(--ink-strong)',
               fontVariantNumeric: 'tabular-nums'
             }}>
@@ -187,7 +187,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
             <div style={{
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
               color: 'var(--ink-muted)',
-              letterSpacing: '0.04em'
+              letterSpacing: 0
             }}>
               Recorded · {methodLabel(method)}
             </div>
@@ -196,24 +196,24 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
           <form
             ref={formRef}
             onSubmit={submit}
-            style={formStyle({ gap: 14 })}
+            style={formStyle({ gap: 12 })}
           >
-            {/* AMOUNT — display-font input */}
+            {/* AMOUNT, display-font input */}
             <div>
               <label style={{ ...labelStyle, display: 'block', marginBottom: 8 }} htmlFor="v3-pay-amount">
                 Amount
               </label>
               <div style={{
                 display: 'flex', alignItems: 'baseline', gap: 8,
-                padding: '10px 14px',
-                borderRadius: 14,
+                padding: '12px 12px',
+                borderRadius: 10,
                 background: 'var(--surface-2)',
                 border: '1px solid var(--rule)',
                 scrollMarginTop: 96, scrollMarginBottom: 140
               }}>
                 <span style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: 28,
+                  fontSize: 24,
                   color: showsAmount ? 'var(--ink-strong)' : 'var(--ink-muted)',
                   lineHeight: 1
                 }}>
@@ -233,7 +233,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
                     border: 'none', outline: 'none',
                     color: 'var(--ink-strong)',
                     fontFamily: 'var(--font-display)',
-                    fontSize: 28,
+                    fontSize: 24,
                     lineHeight: 1.1,
                     padding: 0,
                     fontVariantNumeric: 'tabular-nums'
@@ -243,7 +243,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
               <div style={{
                 marginTop: 6,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                fontFamily: 'var(--font-body)', fontSize: 11,
+                fontFamily: 'var(--font-body)', fontSize: 12,
                 color: overage ? 'var(--ink-strong)' : 'var(--ink-muted)',
                 fontVariantNumeric: 'tabular-nums'
               }}>
@@ -259,7 +259,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
                     style={{
                       background: 'transparent', border: 'none',
                       color: 'var(--ink-strong)',
-                      fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+                      fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                       textDecoration: 'underline', textUnderlineOffset: 2,
                       cursor: 'pointer', padding: 0
                     }}
@@ -273,7 +273,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
             {/* METHOD chips */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Method</span>
-              <div role="radiogroup" aria-label="Payment method" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div role="radiogroup" aria-label="Payment method" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {METHODS.map((m) => {
                   const on = method === m.value
                   return (
@@ -296,7 +296,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
             {/* KIND chips */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Kind</span>
-              <div role="radiogroup" aria-label="Payment kind" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div role="radiogroup" aria-label="Payment kind" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {PAYMENT_KINDS.map((k) => {
                   const on = kind === k.value
                   return (
@@ -316,9 +316,9 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
               </div>
             </div>
 
-            {/* REFERENCE — only for check / card / ach */}
+            {/* REFERENCE, only for check / card / ach */}
             {method !== 'cash' && method !== 'other' && (
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={labelStyle}>
                   {method === 'check' ? 'Check number' : method === 'card' ? 'Last 4 / receipt' : 'Reference'}
                 </span>
@@ -334,7 +334,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
             )}
 
             {/* PAID ON */}
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Paid on</span>
               <input
                 type="date"
@@ -347,24 +347,24 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
 
             {/* Honesty note */}
             <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 11, lineHeight: 1.5,
+              fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.5,
               color: 'var(--ink-faint, var(--ink-muted))'
             }}>
-              Records the receipt — doesn't process card or ACH. Log here after you've taken payment.
+              Records the receipt, doesn't process card or ACH. Log here after you've taken payment.
             </div>
 
             {/* Action footer */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12, marginTop: 4 }}>
               <button
                 type="button"
                 onClick={() => requestClose(false)}
                 disabled={saving}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '12px 14px', borderRadius: 12,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '12px 12px', borderRadius: 10,
                   background: 'var(--surface-2)', border: '1px solid var(--rule)',
                   color: 'var(--ink-strong)',
-                  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                   cursor: saving ? 'wait' : 'pointer'
                 }}
               >
@@ -377,10 +377,10 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
                 disabled={saving || !showsAmount}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '12px 14px', borderRadius: 12, border: 'none',
+                  padding: '12px 12px', borderRadius: 10, border: 'none',
                   background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                   color: 'var(--onyx)',
-                  fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                  fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                   cursor: saving || !showsAmount ? 'not-allowed' : 'pointer',
                   boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                   opacity: saving || !showsAmount ? 0.55 : 1
@@ -398,8 +398,8 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
 }
 
 const fieldStyle: import('react').CSSProperties = {
-  padding: '11px 14px',
-  borderRadius: 12,
+  padding: '12px 12px',
+  borderRadius: 10,
   background: 'var(--surface-2)',
   border: '1px solid var(--rule)',
   color: 'var(--ink-strong)',
@@ -414,8 +414,8 @@ const fieldStyle: import('react').CSSProperties = {
 
 function chipStyle(active: any, disabled: any) {
   return {
-    padding: '7px 12px',
-    borderRadius: 999,
+    padding: '8px 12px',
+    borderRadius: 10,
     border: active
       ? '1px solid var(--v3-border-strong)'
       : '1px solid var(--rule)',

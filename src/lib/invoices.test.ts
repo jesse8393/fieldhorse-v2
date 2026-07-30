@@ -14,6 +14,16 @@ describe('contractTotals', () => {
     expect(t.contractTotal).toBe(12000)
     expect(t.balance).toBe(8000)
   })
+
+  it('reports an overpayment as a credit instead of hiding it at zero', () => {
+    const t = contractTotals({
+      contact: { amount: 10000 } as any,
+      payments: [{ amount: 13000 }]
+    })
+    expect(t.rawBalance).toBe(-3000)
+    expect(t.balance).toBe(0)
+    expect(t.credit).toBe(3000)
+  })
 })
 
 describe('suggestNextInvoice', () => {
@@ -43,7 +53,7 @@ describe('suggestNextInvoice', () => {
       payments: [{ amount: 0.1 }, { amount: 0.2 }],
       invoices: [{ amount: 0.1, status: 'paid' }]
     })
-    // unbilled ≈ 0.2, balance ≈ 0 (paid in full) — amount is the unbilled
+    // unbilled ≈ 0.2, balance ≈ 0 (paid in full), amount is the unbilled
     // remainder; the key assertion is no NaN/negative from FP dust.
     expect(Number.isFinite(s.amount)).toBe(true)
     expect(s.amount).toBeGreaterThanOrEqual(0)

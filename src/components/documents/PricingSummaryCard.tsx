@@ -5,7 +5,7 @@
 //   - Upgrade total      (sum of fh_quote_items where is_optional=true)
 //   - Discounts          (negative; suppressed when 0)
 //   - Tax                (suppressed when 0)
-//   - Project Investment hero — large, premium, brand-accent gold
+//   - Project Investment hero, large, premium, brand-accent gold
 //
 // "Project Investment" is the headline; the other rows are subordinated
 // stamps under a hairline. The contractor sees ONE number that matters.
@@ -48,10 +48,10 @@ export default function PricingSummaryCard({
   return (
     <section
       style={{
-        padding: '24px 26px',
+        padding: '24px 24px',
         background: DOC_COLORS.paperSoft,
         border: `1px solid ${DOC_COLORS.ruleStrong}`,
-        borderRadius: 6,
+        borderRadius: 10,
         breakInside: 'avoid'
       }}
     >
@@ -93,7 +93,7 @@ export default function PricingSummaryCard({
       <div
         style={{
           marginTop: 16,
-          paddingTop: 18,
+          paddingTop: 16,
           borderTop: `1px solid ${DOC_COLORS.ruleStrong}`,
           display: 'flex',
           alignItems: 'flex-end',

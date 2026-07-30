@@ -1,5 +1,5 @@
 /**
- * IconButton — canonical 36×36 surface-tile icon button.
+ * IconButton, canonical 36×36 surface-tile icon button.
  *
  * Replaces inline icon-button styles in AppHeader actions, ClientDetail
  * action row, BottomNav drawer close, etc. Matches the prototype's
@@ -7,14 +7,14 @@
  *
  * Variants:
  *   default → surface-1 + muted ink
- *   primary → gold gradient bg + on-primary ink (use sparingly — for
+ *   primary → gold gradient bg + on-primary ink (use sparingly, for
  *             the ONE gold action per screen, not the standard surface)
  *   ghost   → transparent + muted ink + no border
  *   danger  → muted at rest, red on hover (sign-out style)
  *
  * Sizes:
  *   sm → 32px
- *   md → 36px (default — matches prototype)
+ *   md → 36px (default, matches prototype)
  *   lg → 44px (touch-friendly bottom-bar size)
  *
  * Optional `dot` prop renders a tiny gold notification dot in the
@@ -101,7 +101,7 @@ export default function IconButton({
     variant === 'danger'
       ? 'color-mix(in srgb, var(--v3-danger) 50%, transparent)'
       : variant === 'default'
-      ? 'rgba(255, 240, 210, 0.30)'
+      ? 'rgba(242, 237, 228, 0.30)'
       : base.border
 
   return (
@@ -143,9 +143,9 @@ export default function IconButton({
             right: 6,
             width: 6,
             height: 6,
-            borderRadius: '50%',
+            borderRadius: 10,
             background: 'var(--v3-primary-bright)',
-            boxShadow: '0 0 6px rgba(228, 190, 111, 0.6)'
+            boxShadow: '0 0 6px rgba(201, 150, 58, 0.6)'
           }}
         />
       )}

@@ -1,7 +1,7 @@
 // src/screens/ContactDetail/sections/composeActivityEvents.ts
 //
 // Synthesizes a unified, chronological activity feed for one job from
-// the raw arrays that useJobData already loads. NO new schema — the
+// the raw arrays that useJobData already loads. NO new schema, the
 // feed is computed at render time.
 //
 // Event shape (consumed by ActivityLog.jsx):
@@ -71,7 +71,7 @@ export function composeActivityEvents({
 }): ActivityEvent[] {
   const out: ActivityEvent[] = []
 
-  // 1. Job created — anchors the bottom of the feed
+  // 1. Job created, anchors the bottom of the feed
   if (contact?.created_at) {
     out.push({
       id: `created:${contact.id}`,
@@ -83,7 +83,7 @@ export function composeActivityEvents({
     })
   }
 
-  // 2. Quote sent — single event from contact.quote_sent_at
+  // 2. Quote sent, single event from contact.quote_sent_at
   if (contact?.quote_sent_at) {
     out.push({
       id: `quote_sent:${contact.id}`,
@@ -97,7 +97,7 @@ export function composeActivityEvents({
     })
   }
 
-  // 3. Stage milestones — prefer the real fh_stage_transitions table
+  // 3. Stage milestones, prefer the real fh_stage_transitions table
   //    (migration 023) when populated. Falls back to a synthetic "now
   //    at" marker for pre-migration contacts that have no history rows.
   if (stageTransitions && stageTransitions.length > 0) {
@@ -142,14 +142,14 @@ export function composeActivityEvents({
     })
   }
 
-  // 5. Change orders — surface both creation + approval if the dates
+  // 5. Change orders, surface both creation + approval if the dates
   //    differ; same date collapses into a single "approved" event.
   for (const co of changeOrders || []) {
     out.push({
       id: `co:${co.id}`,
       when: new Date(co.created_at),
       kind: 'change_order',
-      title: `CO #${co.sequence_number} added — ${co.title || 'Change order'}`,
+      title: `CO #${co.sequence_number} added, ${co.title || 'Change order'}`,
       sub: `${co.amount >= 0 ? '+' : ''}${money(co.amount)}`,
       tone: 'neutral'
     })
@@ -165,7 +165,7 @@ export function composeActivityEvents({
     }
   }
 
-  // 6. Schedule events — anchored to start_at so they read as
+  // 6. Schedule events, anchored to start_at so they read as
   //    "scheduled for" not "created on"
   for (const s of scheduleItems || []) {
     out.push({
@@ -180,7 +180,7 @@ export function composeActivityEvents({
     })
   }
 
-  // 7. Notes — only the most recent 5 so the feed isn't dominated by
+  // 7. Notes, only the most recent 5 so the feed isn't dominated by
   //    a chatty job. Older notes live on the Notes screen.
   const sortedNotes = (notes || [])
     .slice()

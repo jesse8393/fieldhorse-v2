@@ -1,6 +1,6 @@
 // mobile/lib/sendDocs.ts
 //
-// Platform send for customer-facing documents (proposal now, invoice
+// Platform send for customer facing documents (proposal now, invoice
 // reuses the same plumbing). Mirrors the web Quote.tsx handleSend /
 // InvoiceDetail send flows:
 //   1. render the HTML to a PDF on device (expo-print)
@@ -9,7 +9,7 @@
 //      the PDF with the service role, emails it via Resend, logs
 //      activity, and flips the document status (sent).
 //
-// The same backend the website uses — we just call it from RN.
+// The same backend the website uses, we just call it from RN.
 
 import * as Print from 'expo-print'
 import { supabase } from './supabase'
@@ -17,7 +17,7 @@ import { supabase } from './supabase'
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://fieldhorse.io').replace(/\/+$/, '')
 
 // The send-* Netlify functions require the signed-in user's access
-// token; sender_user_id alone is no longer trusted server-side.
+// token; sender_user_id alone is no longer trusted on the server.
 async function authHeaders(): Promise<Record<string, string>> {
   try {
     const { data } = await supabase.auth.getSession()
@@ -37,7 +37,7 @@ async function uploadPdf(html: string, userId: string, contactId: string, filena
     .from('job-files')
     .upload(path, arrayBuffer, { contentType: 'application/pdf', upsert: false })
   if (upErr) throw new Error(`Couldn't save the PDF: ${upErr.message}`)
-  // Index it in the Files list (best-effort — send still works if this misses).
+  // Index it in the Files list (best-effort, send still works if this misses).
   await supabase.from('fh_job_files').insert({
     user_id: userId,
     job_id: contactId,

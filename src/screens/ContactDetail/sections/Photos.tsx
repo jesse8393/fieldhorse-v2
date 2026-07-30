@@ -38,7 +38,7 @@ const SCOPE_SECTIONS = [
 ]
 
 /**
- * Photos section — fh_job_files where kind='photo'.
+ * Photos section, fh_job_files where kind='photo'.
  *
  * Features (preserved from legacy UploadList):
  *   - Multi-upload from <input type="file" multiple accept="image/*">
@@ -46,7 +46,7 @@ const SCOPE_SECTIONS = [
  *     (path: <userId>/<jobId>/<rowId>.<ext>); insert into fh_job_files.
  *   - Fire-and-forget Claude Vision auto-captioning post-upload
  *     (captionAndPersist). Caption column may be missing (migration 009
- *     not applied) — UPDATE silently no-ops in that case.
+ *     not applied), UPDATE silently no-ops in that case.
  *   - 3-col responsive grid with signed URL thumbnails (1h TTL).
  *   - Lightbox with swipe-between + caption editor.
  *   - Compare mode: select 2 photos, drag the before/after slider.
@@ -146,7 +146,7 @@ export default function PhotosSection({ jobId, userId }: any) {
           kind: 'photo'
         }
         // Dead-zone path: park the compressed blob + row in the outbox
-        // (IndexedDB) and move on — it uploads when signal returns.
+        // (IndexedDB) and move on, it uploads when signal returns.
         if (navigator.onLine === false) {
           const ok = await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
           if (ok) queuedCount += 1
@@ -209,7 +209,7 @@ export default function PhotosSection({ jobId, userId }: any) {
       if (error) return
       setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, caption: cap } : r))
     } catch {
-      // Vision call failed (network/quota) — keep photo, drop caption.
+      // Vision call failed (network/quota), keep photo, drop caption.
     } finally {
       setCaptioningIds((prev) => {
         if (!prev.has(rowId)) return prev
@@ -327,29 +327,29 @@ export default function PhotosSection({ jobId, userId }: any) {
   const lightboxRow = lightboxIdx >= 0 && lightboxIdx < rows.length ? rows[lightboxIdx] : null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <Eyebrow>
           {rows.length} {rows.length === 1 ? 'photo' : 'photos'}
         </Eyebrow>
-        <div style={{ display: 'inline-flex', gap: 6 }}>
+        <div style={{ display: 'inline-flex', gap: 8 }}>
           {rows.length >= 2 && (
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={() => { hapticTap(); compareMode ? exitCompare() : setCompareMode(true) }}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
                 padding: '8px 12px', borderRadius: 10,
                 border: compareMode
                   ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
                   : '1px solid var(--v3-border)',
                 background: compareMode ? 'var(--v3-primary-soft)' : 'transparent',
                 color: compareMode ? 'var(--v3-primary)' : 'var(--v3-text)',
-                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.06em', cursor: 'pointer'
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                letterSpacing: 0, cursor: 'pointer'
               }}
             >
               <GitCompareArrows size={12} aria-hidden="true" />
@@ -362,13 +362,13 @@ export default function PhotosSection({ jobId, userId }: any) {
             onClick={pick}
             disabled={uploading}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', borderRadius: 10, border: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '8px 12px', borderRadius: 10, border: 'none',
               background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-              letterSpacing: '0.06em',
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              letterSpacing: 0,
               cursor: uploading ? 'wait' : 'pointer',
-              boxShadow: '0 6px 18px rgba(212, 175, 55, 0.28)',
+              boxShadow: '0 6px 18px rgba(201, 150, 58, 0.28)',
               opacity: uploading ? 0.7 : 1
             }}
           >
@@ -381,14 +381,14 @@ export default function PhotosSection({ jobId, userId }: any) {
       {/* Compare hint + slider */}
       {compareMode && (
         <div style={{
-          padding: 12, borderRadius: 12,
+          padding: 12, borderRadius: 10,
           background: 'var(--v3-primary-soft)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
           display: 'flex', flexDirection: 'column', gap: 8
         }}>
           <div style={{
-            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-            letterSpacing: '0.06em', color: 'var(--v3-primary)'
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+            letterSpacing: 0, color: 'var(--v3-primary)'
           }}>
             {!compareBefore ? 'Tap the BEFORE photo' :
               !compareAfter ? 'Now tap the AFTER photo' :
@@ -410,11 +410,11 @@ export default function PhotosSection({ jobId, userId }: any) {
       {loading && <SkeletonList rows={2} card={false} />}
       {!loading && rows.length === 0 && (
         <div style={{
-          padding: '32px 20px', borderRadius: 14,
+          padding: '32px 24px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center', lineHeight: 1.5,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10
+          fontSize: 14, textAlign: 'center', lineHeight: 1.5,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <ImageIcon size={28} aria-hidden="true" color="var(--v3-text-muted)" />
           <div>Photos tell the story. Tap <strong>Add Photos</strong> above to start.</div>
@@ -423,7 +423,7 @@ export default function PhotosSection({ jobId, userId }: any) {
 
       {/* Photo grid */}
       {!loading && rows.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {rows.map((r, i) => {
             const url = thumbUrls[r.id]
             const captioning = captioningIds.has(r.id)
@@ -441,7 +441,7 @@ export default function PhotosSection({ jobId, userId }: any) {
                   aspectRatio: '1 / 1',
                   position: 'relative',
                   overflow: 'hidden',
-                  borderRadius: 12,
+                  borderRadius: 10,
                   border: selected
                     ? `2px solid var(--v3-primary)`
                     : '1px solid var(--v3-border)',
@@ -466,10 +466,10 @@ export default function PhotosSection({ jobId, userId }: any) {
                 {selected && (
                   <div style={{
                     position: 'absolute', top: 4, left: 4,
-                    padding: '3px 7px', borderRadius: 6,
+                    padding: '4px 8px', borderRadius: 10,
                     background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-                    fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-                    letterSpacing: '0.1em'
+                    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                    letterSpacing: 0
                   }}>
                     {compareLabel}
                   </div>
@@ -477,10 +477,10 @@ export default function PhotosSection({ jobId, userId }: any) {
                 {captioning && (
                   <div style={{
                     position: 'absolute', bottom: 4, left: 4,
-                    padding: '3px 7px', borderRadius: 6,
-                    background: 'rgba(0, 0, 0, 0.5)', color: 'var(--v3-primary)',
-                    fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-                    letterSpacing: '0.1em',
+                    padding: '4px 8px', borderRadius: 10,
+                    background: 'rgba(20, 20, 20, 0.5)', color: 'var(--v3-primary)',
+                    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                    letterSpacing: 0,
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     backdropFilter: 'blur(4px)'
                   }}>
@@ -488,11 +488,11 @@ export default function PhotosSection({ jobId, userId }: any) {
                     AI…
                   </div>
                 )}
-                {/* Section tag badge — bottom-right when set. Lets the
+                {/* Section tag badge, bottom-right when set. Lets the
                     operator scan the grid and see which photos still
                     need to be tagged to a scope section. */}
                 {r.section_tag && !captioning && (
-                  <Eyebrow as="div" style={{ position: 'absolute', bottom: 4, right: 4, padding: '3px 7px', borderRadius: 6, background: 'color-mix(in srgb, var(--v3-primary) 80%, transparent)', color: 'var(--v3-on-primary, #1a1208)', maxWidth: 'calc(100% - 12px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <Eyebrow as="div" style={{ position: 'absolute', bottom: 4, right: 4, padding: '4px 8px', borderRadius: 10, background: 'color-mix(in srgb, var(--v3-primary) 80%, transparent)', color: 'var(--v3-on-primary, #141414)', maxWidth: 'calc(100% - 12px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {r.section_tag}
                   </Eyebrow>
                 )}
@@ -545,7 +545,7 @@ export default function PhotosSection({ jobId, userId }: any) {
 }
 
 /* ============================================================
-   PhotoLightbox — full-screen image with caption editor + nav
+   PhotoLightbox, full-screen image with caption editor + nav
    ============================================================ */
 
 function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete }: any) {
@@ -594,7 +594,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
+          position: 'fixed', inset: 0, background: 'rgba(20, 20, 20,0.92)',
           backdropFilter: 'blur(8px)', zIndex: 90
         }}
       />
@@ -619,9 +619,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             onClick={onClose}
             aria-label="Close"
             style={{
-              width: 40, height: 40, borderRadius: 12,
+              width: 40, height: 40, borderRadius: 10,
               background: 'var(--v3-border-mid)', border: 'none',
-              color: '#fff', cursor: 'pointer',
+              color: '#F2EDE4', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
             }}
           >
@@ -629,7 +629,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           </button>
           <div style={{
             fontFamily: 'var(--font-body)', fontSize: 12,
-            color: 'rgba(255, 255, 255, 0.7)',
+            color: 'rgba(242, 237, 228, 0.7)',
             fontVariantNumeric: 'tabular-nums'
           }}>
             {row.filename}
@@ -639,9 +639,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             onClick={onDelete}
             aria-label="Delete photo"
             style={{
-              width: 40, height: 40, borderRadius: 12,
+              width: 40, height: 40, borderRadius: 10,
               background: 'rgba(192, 57, 43, 0.18)', border: 'none',
-              color: '#F47366', cursor: 'pointer',
+              color: '#C9963A', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
             }}
           >
@@ -660,11 +660,11 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               alt={row.caption || row.filename}
               style={{
                 maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
-                display: 'block', borderRadius: 8
+                display: 'block', borderRadius: 10
               }}
             />
           ) : (
-            <div style={{ color: '#fff', fontFamily: 'var(--font-body)', fontSize: 13 }}>
+            <div style={{ color: '#F2EDE4', fontFamily: 'var(--font-body)', fontSize: 14 }}>
               Loading…
             </div>
           )}
@@ -676,9 +676,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               aria-label="Previous photo"
               style={{
                 position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                width: 44, height: 44, borderRadius: 999,
+                width: 44, height: 44, borderRadius: 10,
                 background: 'var(--v3-border-mid)', border: 'none',
-                color: '#fff', cursor: 'pointer',
+                color: '#F2EDE4', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
             >
@@ -692,9 +692,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               aria-label="Next photo"
               style={{
                 position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                width: 44, height: 44, borderRadius: 999,
+                width: 44, height: 44, borderRadius: 10,
                 background: 'var(--v3-border-mid)', border: 'none',
-                color: '#fff', cursor: 'pointer',
+                color: '#F2EDE4', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
             >
@@ -703,7 +703,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           )}
         </div>
 
-        {/* Section tag picker — chooses which scope card the photo
+        {/* Section tag picker, chooses which scope card the photo
             attaches to on the proposal. Auto-saves on pick. */}
         <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -716,8 +716,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
                 onClick={clearTag}
                 style={{
                   background: 'transparent', border: 'none',
-                  color: 'rgba(255, 255, 255, 0.55)',
-                  fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+                  color: 'rgba(242, 237, 228, 0.55)',
+                  fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
                   cursor: 'pointer', padding: 0
                 }}
               >
@@ -725,7 +725,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {SCOPE_SECTIONS.map((opt) => {
               const on = !showCustom && sectionTag === opt
               return (
@@ -734,15 +734,15 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
                   type="button"
                   onClick={() => pickSection(opt)}
                   style={{
-                    padding: '6px 11px', borderRadius: 999,
+                    padding: '8px 12px', borderRadius: 10,
                     background: on
                       ? 'color-mix(in srgb, var(--v3-primary) 22%, transparent)'
                       : 'var(--v3-glass-tint-2)',
                     border: on
                       ? '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)'
                       : '1px solid var(--v3-border-mid)',
-                    color: on ? 'var(--v3-primary-bright, #E8B865)' : 'rgba(255, 255, 255, 0.78)',
-                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    color: on ? 'var(--v3-primary-bright, #C9963A)' : 'rgba(242, 237, 228, 0.78)',
+                    fontFamily: 'var(--font-body)', fontSize: 12,
                     fontWeight: on ? 700 : 500,
                     cursor: 'pointer'
                   }}
@@ -755,11 +755,11 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               type="button"
               onClick={() => pickSection('__custom__')}
               style={{
-                padding: '6px 11px', borderRadius: 999,
+                padding: '8px 12px', borderRadius: 10,
                 background: showCustom ? 'var(--v3-border-mid)' : 'transparent',
                 border: '1px dashed var(--v3-border-strong)',
-                color: 'rgba(255, 255, 255, 0.78)',
-                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 500,
+                color: 'rgba(242, 237, 228, 0.78)',
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500,
                 cursor: 'pointer'
               }}
             >
@@ -775,17 +775,17 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
               placeholder="Type a section name (e.g. Stairs)"
               style={{
-                width: '100%', padding: '9px 12px', borderRadius: 10,
+                width: '100%', padding: '8px 12px', borderRadius: 10,
                 background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
-                color: '#fff', fontFamily: 'var(--font-body)',
-                fontSize: 13, outline: 'none'
+                color: '#F2EDE4', fontFamily: 'var(--font-body)',
+                fontSize: 14, outline: 'none'
               }}
             />
           )}
         </div>
 
         {/* Caption editor */}
-        <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ padding: '4px 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Eyebrow tone="gold">
             Caption
           </Eyebrow>
@@ -796,10 +796,10 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             rows={2}
             placeholder="What's in this photo?"
             style={{
-              width: '100%', padding: '10px 12px', borderRadius: 10,
+              width: '100%', padding: '12px 12px', borderRadius: 10,
               background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
-              color: '#fff', fontFamily: 'var(--font-body)',
-              fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 50
+              color: '#F2EDE4', fontFamily: 'var(--font-body)',
+              fontSize: 14, outline: 'none', resize: 'vertical', minHeight: 50
             }}
           />
         </div>
@@ -809,7 +809,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
 }
 
 /* ============================================================
-   BeforeAfterSlider — drag a vertical divider to wipe between two photos
+   BeforeAfterSlider, drag a vertical divider to wipe between two photos
    ============================================================ */
 
 function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any) {
@@ -834,18 +834,18 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         aspectRatio: '4 / 3',
         borderRadius: 10,
         overflow: 'hidden',
-        background: '#000',
+        background: '#141414',
         userSelect: 'none',
         touchAction: 'none',
         cursor: 'ew-resize'
       }}
     >
-      {/* AFTER — full width underneath */}
+      {/* AFTER, full width underneath */}
       <img loading="lazy"src={afterUrl}
         alt={afterLabel || 'After'}
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
       />
-      {/* BEFORE — clipped to pct */}
+      {/* BEFORE, clipped to pct */}
       <div style={{
         position: 'absolute', inset: 0,
         clipPath: `polygon(0 0, ${pct}% 0, ${pct}% 100%, 0 100%)`
@@ -859,16 +859,16 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
       <div style={{
         position: 'absolute', top: 0, bottom: 0, left: `${pct}%`,
         width: 2, background: 'var(--v3-primary)',
-        boxShadow: '0 0 12px rgba(212, 175, 55, 0.7)',
+        boxShadow: '0 0 12px rgba(201, 150, 58, 0.7)',
         transform: 'translateX(-1px)'
       }} />
       <div style={{
         position: 'absolute', top: '50%', left: `${pct}%`,
         transform: 'translate(-50%, -50%)',
-        width: 32, height: 32, borderRadius: 999,
+        width: 32, height: 32, borderRadius: 10,
         background: 'var(--v3-primary)',
         display: 'grid', placeItems: 'center',
-        color: 'var(--v3-on-primary)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        color: 'var(--v3-on-primary)', boxShadow: '0 4px 12px rgba(20, 20, 20,0.4)',
         pointerEvents: 'none'
       }}>
         <GitCompareArrows size={14} aria-hidden="true" />
@@ -876,19 +876,19 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
       {/* Labels */}
       <div style={{
         position: 'absolute', top: 8, left: 8,
-        padding: '3px 8px', borderRadius: 6,
-        background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)',
-        fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-        letterSpacing: '0.12em', color: '#fff'
+        padding: '4px 8px', borderRadius: 10,
+        background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(4px)',
+        fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+        letterSpacing: 0, color: '#F2EDE4'
       }}>
         BEFORE
       </div>
       <div style={{
         position: 'absolute', top: 8, right: 8,
-        padding: '3px 8px', borderRadius: 6,
-        background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)',
-        fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-        letterSpacing: '0.12em', color: '#fff'
+        padding: '4px 8px', borderRadius: 10,
+        background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(4px)',
+        fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+        letterSpacing: 0, color: '#F2EDE4'
       }}>
         AFTER
       </div>
