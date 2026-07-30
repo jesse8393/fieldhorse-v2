@@ -30,6 +30,7 @@ import {
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
 import { resolveNextAction } from './lib/jobNextAction.ts'
+import { computeJobHealth } from './lib/jobHealth.ts'
 import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
 import OverviewTab from './tabs/Overview.tsx'
 // Lazy — non-default tabs + sections + ApproveQuoteSheet only render
@@ -244,7 +245,7 @@ export default function ContactDetail() {
     contact, subs, expenses, payments, inspections, notes,
     scheduleItems, scheduleCount, todos, clientSummary,
     insurance, changeOrders, stageTransitions,
-    paid, balance, loading, fetchAll, patch
+    paid, balance, credit, loading, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
   const routeHome = location.pathname.startsWith('/leads')
@@ -271,6 +272,10 @@ export default function ContactDetail() {
   const nextAction = useMemo(
     () => resolveNextAction({ contact, scheduleItems, todos }),
     [contact, scheduleItems, todos]
+  )
+  const jobHealth = useMemo(
+    () => computeJobHealth({ contact, payments, scheduleItems }),
+    [contact, payments, scheduleItems]
   )
   const nextTodo = useMemo(() => {
     if (!nextAction || nextAction.kind !== 'todo') return null
@@ -515,7 +520,9 @@ export default function ContactDetail() {
           // Reports / billing — render "Not tracked" rather than fake numbers.
           const reportsMissing: number | null = null
           const billingStatus: { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } | null =
-            (payments || []).length === 0 && Number(contact.amount || 0) === 0
+            Number(credit || 0) > 0.5
+              ? { label: `${money(credit)} credit due`, tone: 'warn' }
+            : (payments || []).length === 0 && Number(contact.amount || 0) === 0
               ? null
               : Number(balance || 0) > 0
                 ? { label: 'Outstanding', tone: 'warn' }
@@ -563,6 +570,7 @@ export default function ContactDetail() {
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
               billingStatus={billingStatus}
+              health={jobHealth}
               changeOrderTotals={changeOrderTotals}
               paid={paid}
               outstanding={balance}
@@ -712,7 +720,7 @@ export default function ContactDetail() {
       )}
 
       {/* STAGE PRIMARY ACTION — one clear next step per stage */}
-      {stageCta && (
+      {stageCta && tab !== 'overview' && (
         <div style={{ padding: '4px 20px 8px' }}>
           <motion.button
             type="button"

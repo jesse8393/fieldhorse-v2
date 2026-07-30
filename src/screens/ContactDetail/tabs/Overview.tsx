@@ -202,6 +202,7 @@ export default function OverviewTab({
   const contractValue = Number(contact?.amount || 0) + approvedCo
   const paidNum = Number(paid || 0)
   const remaining = Math.max(0, contractValue - paidNum)
+  const credit = Math.max(0, paidNum - contractValue)
   const billedPct = contractValue > 0 ? Math.min(1, paidNum / contractValue) : 0
   const isExecutionStage = contact?.stage === 'job' || contact?.stage === 'invoice' || contact?.stage === 'closed'
   const showCockpit = contractValue > 0 && isExecutionStage
@@ -233,7 +234,11 @@ export default function OverviewTab({
               <div className="cockpit-headline__amt">{money(contractValue)}</div>
               <div className="cockpit-headline__sub">
                 {contact?.invoice_no ? `Invoice #${contact.invoice_no} · ` : ''}
-                {billedPct >= 1 ? 'Paid in full' : `${Math.round(billedPct * 100)}% collected`}
+                {credit > 0.5
+                  ? `${money(credit)} credit due`
+                  : billedPct >= 1
+                    ? 'Paid in full'
+                    : `${Math.round(billedPct * 100)}% collected`}
               </div>
             </div>
             <div className="cockpit-headline__r">
@@ -251,7 +256,7 @@ export default function OverviewTab({
           </div>
           <div className="cockpit-headline__bar-meta">
             <span><b>{money(paidNum)}</b> collected</span>
-            <span>{money(remaining)} remaining</span>
+            <span>{credit > 0.5 ? `${money(credit)} credit due` : `${money(remaining)} remaining`}</span>
           </div>
         </div>
       )}

@@ -5502,24 +5502,14 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 
   .fh-build-today {
     min-height: 280px;
-    display: grid;
-    grid-template-columns: .75fr 1fr;
   }
 
-  .fh-build-today__image {
     /* Removed external Unsplash dependency (audit M5). The mock used
        a hero project photo here, not a generic interior stock shot —
        and shipping a runtime request to images.unsplash.com from the
        flagship screen is both off-brand and a privacy footgun. Until
        we have a per-operator brand photo to wire in, render an
        on-brand gradient panel. */
-    background:
-      radial-gradient(circle at 30% 20%, rgba(229, 190, 111, 0.10), transparent 60%),
-      linear-gradient(180deg, rgba(20, 18, 14, 0.85) 0%, rgba(8, 7, 5, 0.95) 100%);
-    background-size: cover;
-    background-position: center;
-  }
-
   .fh-build-today__body {
     padding: 24px;
   }
@@ -5705,19 +5695,14 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
        mock's stage-keyed accent bar. Color set via the [data-stage]
        attribute selectors below. Default neutral steel for rows
        missing a stage key. */
-    border-left: 3px solid var(--steel);
-    padding-left: 13px;
   }
-  .fh-build-table__row.is-revenue[data-stage="lead"]    { border-left-color: var(--stage-lead); }
-  .fh-build-table__row.is-revenue[data-stage="quote"]   { border-left-color: var(--stage-quote); }
-  .fh-build-table__row.is-revenue[data-stage="job"]     { border-left-color: var(--stage-job); }
-  .fh-build-table__row.is-revenue[data-stage="invoice"] { border-left-color: var(--stage-invoice); }
-  .fh-build-table__row.is-revenue[data-stage="closed"]  { border-left-color: var(--stage-closed); }
-  .fh-build-table__row.is-revenue[data-stage="lost"]    { border-left-color: var(--stage-lost); }
-
   .fh-build-table__head.is-health,
   .fh-build-table__row.is-health {
-    grid-template-columns: 1.15fr .8fr .8fr .8fr .8fr .7fr 1fr 14px;
+    grid-template-columns: 1.15fr .8fr .8fr .8fr .7fr 1fr 14px;
+  }
+
+  .fh-build-placeholder {
+    color: var(--v3-text-faint);
   }
 
   .fh-build-dot {

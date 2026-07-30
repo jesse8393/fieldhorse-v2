@@ -17,6 +17,8 @@ import {
 import { money, moneyFull } from '../../lib/format.ts'
 import DataErrorState from '../DataErrorState.tsx'
 import MiniMetric from '../MiniMetric.tsx'
+import { StatusPill } from '../v3'
+import { LIST_STAGE_META } from '../../lib/stages.ts'
 
 type Props = {
   firstName: string
@@ -39,7 +41,6 @@ type Props = {
     job: string
     stage: string
     schedule: string; scheduleTone: 'good' | 'warn' | 'bad' | 'neutral'
-    report: string;   reportTone: 'good' | 'warn' | 'bad' | 'neutral'
     billing: string;  billingTone: 'good' | 'warn' | 'bad' | 'neutral'
     risk: string;     riskTone: 'good' | 'warn' | 'bad' | 'neutral'
     next: string
@@ -307,7 +308,6 @@ export default function SnowHomeBuild(props: Props) {
           rows={pipelineRows}
           dealsAtRisk={dealsAtRisk}
           jobsBehind={jobsBehind}
-          invoicingWeek={invoicingWeek}
           nextActions={nextActions}
           onGoToJobs={onGoToJobs}
           onGoToLeads={onGoToLeads}
@@ -316,31 +316,11 @@ export default function SnowHomeBuild(props: Props) {
           onGoToActivity={onGoToActivity}
         />
 
-        <section className="fh-build-content-grid">
-          <PipelineHero
-            pipeline={pipeline}
-            trendUp={trendUp}
-            trendPct={trendPct}
-            rows={pipelineRows}
-            totalOppCount={totalOppCount}
-            activeStageCount={activeStageCount}
-            onGoToJobs={onGoToJobs}
-            onGoToPipeline={onGoToPipeline}
-            onGoToLeads={onGoToLeads}
-            onGoToQuotes={onGoToQuotes}
-          />
-
+        <section className="fh-build-content-grid fh-build-content-grid--home">
           <TodayCard
-            todayOnSite={todayOnSite}
             activeJobsCount={stageBreakdown?.active ?? null}
             onGoToSchedule={onGoToSchedule}
             onNewLead={onNewLead}
-          />
-
-          <RightRail
-            dealsAtRisk={dealsAtRisk}
-            jobsBehind={jobsBehind}
-            invoicingWeek={invoicingWeek}
           />
 
           <OwnerQueue
@@ -374,7 +354,6 @@ function RevenueOperatingLayer({
   rows,
   dealsAtRisk,
   jobsBehind,
-  invoicingWeek,
   nextActions,
   onGoToJobs,
   onGoToLeads,
@@ -426,9 +405,6 @@ function RevenueOperatingLayer({
             <div className="fh-build-eyebrow">Pipeline workflow</div>
             <strong>Lead to cash</strong>
           </div>
-          {invoicingWeek == null
-            ? <Skel variant="sub" width={150} />
-            : <span>{moneyFull(invoicingWeek)} collected this week</span>}
         </div>
         <div className="fh-crm-flow__stages">
           {/* While the dashboard query is in flight the fallback rows
@@ -547,20 +523,15 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
   )
 }
 
-function TodayCard({ todayOnSite, activeJobsCount, onGoToSchedule, onNewLead }: any) {
+function TodayCard({ activeJobsCount, onGoToSchedule, onNewLead }: any) {
   // Crew headcount isn't tracked yet — show '—' rather than a fake number.
   // Jobs in progress comes from the real stage breakdown.
   return (
     <section className="fh-build-card fh-build-today">
-      <div className="fh-build-today__image" />
       <div className="fh-build-today__body">
         <div className="fh-build-eyebrow">Today</div>
 
         <div className="fh-build-today__stats">
-          <div>
-            <strong>{todayOnSite == null ? <Skel variant="stat" /> : todayOnSite.length}</strong>
-            <span>{todayOnSite?.length === 1 ? 'visit today' : 'visits today'}</span>
-          </div>
           <div>
             <strong>{activeJobsCount == null ? <Skel variant="stat" /> : activeJobsCount}</strong>
             <span>jobs in progress</span>
@@ -591,7 +562,7 @@ function TodayCard({ todayOnSite, activeJobsCount, onGoToSchedule, onNewLead }: 
   )
 }
 
-function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
+function RightRail({ dealsAtRisk, jobsBehind }: any) {
   // dealsAtRisk may be a number (legacy), an object { count, value, followUps,
   // quotesAttention }, or null. normalizeDealsAtRisk returns null when not
   // yet loaded — render '—' rather than a fabricated number.
@@ -602,14 +573,14 @@ function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
   const jobsBehindValue = jobsBehind == null ? <Skel variant="metric" width={32} /> : String(jobsBehind)
   const jobsBehindSub =
     jobsBehind == null ? <Skel variant="sub" /> : jobsBehind === 0 ? 'All on track' : 'needs attention'
-  const invoicingValue = invoicingWeek == null ? <Skel variant="metric" /> : moneyFull(invoicingWeek)
-  const invoicingSub = invoicingWeek == null ? <Skel variant="sub" width={56} /> : 'this week'
   const followUpsValue =
     risk?.followUps == null ? <Skel variant="metric" width={32} /> : String(risk.followUps)
   const followUpsSub = risk?.followUps == null ? <Skel variant="sub" /> : 'leads waiting'
   const quotesValue =
     risk?.quotesAttention == null ? <Skel variant="metric" width={32} /> : String(risk.quotesAttention)
-  const quotesSub = risk?.quotesAttention == null ? <Skel variant="sub" /> : 'quotes waiting'
+  const quotesSub = risk?.quotesAttention == null
+    ? <Skel variant="sub" />
+    : `${risk.quotesAttention === 1 ? 'quote' : 'quotes'} waiting`
   return (
     <aside className="fh-build-rail">
       {/* Card names aligned to the approved mock (audit M4):
@@ -617,7 +588,6 @@ function RightRail({ dealsAtRisk, jobsBehind, invoicingWeek }: any) {
           → "Estimates needing action". Other titles already matched. */}
       <RailMetric title="Goals at risk" value={dealsValue} sub={dealsSub} chart="red" />
       <RailMetric title="Jobs behind" value={jobsBehindValue} sub={jobsBehindSub} chart="gold" />
-      <RailMetric title="Collected this week" value={invoicingValue} sub={invoicingSub} />
       <RailMetric title="Follow-ups due" value={followUpsValue} sub={followUpsSub} />
       <RailMetric title="Estimates needing action" value={quotesValue} sub={quotesSub} />
     </aside>
@@ -669,7 +639,9 @@ function OwnerQueue({ rows, loading, onOpenJobAtTab, onViewAll }: any) {
             <span>{index + 1}</span>
             <strong>{row.action}</strong>
             <span>{row.client}</span>
-            <span>{row.amount}</span>
+            <span className={`fh-build-num${row.amount ? '' : ' fh-build-placeholder'}`}>
+              {row.amount || '\u2003'}
+            </span>
             <span className={`fh-build-dot is-${row.statusTone}`}>{row.status}</span>
             <span>{row.due}</span>
             <ChevronRight size={13} />
@@ -699,21 +671,23 @@ function RevenueOpportunities({ rows, loading, onOpenJob, onViewAll }: any) {
       ) : rows.length === 0 ? (
         <EmptyRow label="No active deals yet. Start a new lead to populate this list." />
       ) : (
-        rows.map((row: any) => (
-          <button
-            key={row.id || row.name}
-            type="button"
-            className="fh-build-table__row is-revenue"
-            data-stage={String(row.stageKey || '').toLowerCase()}
-            onClick={() => row.id && onOpenJob(row.id)}
-          >
-            <strong>{row.name}</strong>
-            <span>{row.stage}</span>
-            <span>{row.amount}</span>
-            <span>{row.touch}</span>
-            <span>{row.next}</span>
-          </button>
-        ))
+        rows.map((row: any) => {
+          const stage = LIST_STAGE_META[row.stageKey] || LIST_STAGE_META.lead
+          return (
+            <button
+              key={row.id || row.name}
+              type="button"
+              className="fh-build-table__row is-revenue"
+              onClick={() => row.id && onOpenJob(row.id)}
+            >
+              <strong>{row.name}</strong>
+              <StatusPill label={row.stage} color={stage.color} />
+              <span>{row.amount}</span>
+              <span>{row.touch}</span>
+              <span>{row.next}</span>
+            </button>
+          )
+        })
       )}
 
       <FooterLink label="View all opportunities" onClick={onViewAll} />
@@ -729,7 +703,6 @@ function JobHealthPreview({ rows, loading, onGoToJobs, onOpenJob }: any) {
         <span>Job</span>
         <span>Stage</span>
         <span>Schedule</span>
-        <span>Reports</span>
         <span>Billing</span>
         <span>Risk</span>
         <span>Next Action</span>
@@ -752,7 +725,6 @@ function JobHealthPreview({ rows, loading, onGoToJobs, onOpenJob }: any) {
             <strong>{row.job}</strong>
             <span>{row.stage}</span>
             <span className={`fh-build-dot is-${row.scheduleTone}`}>{row.schedule}</span>
-            <span className={`fh-build-dot is-${row.reportTone}`}>{row.report}</span>
             <span className={`fh-build-dot is-${row.billingTone}`}>{row.billing}</span>
             <span className={`fh-build-dot is-${row.riskTone}`}>{row.risk}</span>
             <span>{row.next}</span>

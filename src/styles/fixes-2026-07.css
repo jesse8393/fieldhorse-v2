@@ -17,6 +17,22 @@
 }
 
 @media (min-width: 900px) {
+  .fh-build-content-grid--home {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fh-build-content-grid--home > .fh-build-today,
+  .fh-build-content-grid--home > .fh-build-owner,
+  .fh-build-content-grid--home > .fh-build-revenue,
+  .fh-build-content-grid--home > .fh-build-health {
+    grid-column: 1;
+    min-height: 0;
+  }
+
+  .fh-build-content-grid--home > .fh-build-today {
+    min-height: 0;
+  }
+
   /* Invoices table. minmax floor on the name track: at narrow card
      widths the old bare 1.4fr resolved to 0px, the fixed tracks plus
      gaps consumed the whole row, and the CLIENT/JOB cell (the one
@@ -34,6 +50,47 @@
   .fh-build-invoices-table {
     container-type: inline-size;
   }
+
+  .fh-build-issued-table {
+    container-type: inline-size;
+  }
+
+  .fh-build-table__head.is-issued-invoices,
+  .fh-build-table__row.is-issued-invoices {
+    grid-template-columns:
+      minmax(180px, 1.5fr)
+      minmax(120px, 1fr)
+      90px
+      90px
+      164px;
+    column-gap: 10px;
+    min-width: 680px;
+  }
+
+  .fh-build-issued-job {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fh-build-issued-job:disabled {
+    cursor: default;
+  }
+
+  .fh-build-issued-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
   @container (max-width: 789px) {
     .fh-build-table__head.is-invoices,
     .fh-build-table__row.is-invoices {

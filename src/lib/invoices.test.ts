@@ -14,6 +14,16 @@ describe('contractTotals', () => {
     expect(t.contractTotal).toBe(12000)
     expect(t.balance).toBe(8000)
   })
+
+  it('reports an overpayment as a credit instead of hiding it at zero', () => {
+    const t = contractTotals({
+      contact: { amount: 10000 } as any,
+      payments: [{ amount: 13000 }]
+    })
+    expect(t.rawBalance).toBe(-3000)
+    expect(t.balance).toBe(0)
+    expect(t.credit).toBe(3000)
+  })
 })
 
 describe('suggestNextInvoice', () => {

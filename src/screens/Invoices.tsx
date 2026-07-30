@@ -534,15 +534,26 @@ export default function Invoices() {
           <SnowInvoices
             rows={rows}
             filtered={filtered}
+            issuedInvoices={shownInvoiceRows}
             totals={totals}
             loading={loading}
             filter={filter as 'outstanding' | 'all'}
             setFilter={(f) => setFilter(f)}
+            sendingId={sendingId}
+            sentId={sentId}
             clientAR={clientAR}
             onOpenJob={(jobId) => navigate(`/jobs/${jobId}?tab=financials`)}
             onOpenClient={(clientId) => navigate(`/clients/${clientId}`)}
             onStatement={(g) => setStatementClient(g)}
             onPayRow={(r) => setPayingRow(r)}
+            onSendInvoice={handleInvoiceSend}
+            onDownloadInvoice={handleInvoiceDownload}
+            onPayInvoice={(r) => setPayingRow({
+              job: r.job,
+              balance: Number(r.invoice.amount || 0),
+              invoice: r.invoice
+            })}
+            onVoidInvoice={handleInvoiceVoid}
           />
         </Suspense>
         <AnimatePresence>

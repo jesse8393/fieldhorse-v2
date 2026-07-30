@@ -91,6 +91,7 @@ describe('resolvePrimaryAction pipeline priority', () => {
       todos: [{ id: 't1', text: 'Measure' }]
     })
     expect(r.kind).toBe('stage')
+    expect(r.ctaLabel).toBe('Convert to quote')
     expect(r.pipelineFn).toBe('startQuote')
   })
 

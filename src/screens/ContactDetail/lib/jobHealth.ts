@@ -27,6 +27,22 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [] }:
     return { score: 0, tier: 'unknown', label: '—', breakdown: null }
   }
 
+  const amount = Number(contact.amount || 0)
+  const paid = payments.reduce((sum, payment) => sum + Number(payment?.amount || 0), 0)
+  const credit = Math.max(0, paid - amount)
+  if (contact.stage !== 'lost' && amount > 0 && credit > 0.5) {
+    return {
+      score: 50,
+      tier: 'risk',
+      label: 'Overpaid',
+      breakdown: {
+        milestones: null,
+        payments: { paid, amount, pct: 100, credit },
+        schedule: null
+      }
+    }
+  }
+
   // Terminal stages override the score: a job that's closed (delivered +
   // signed off) or lost is not "at risk" or "behind" — it's done. The
   // composite formula treats milestones / payments / overdue events as
@@ -58,8 +74,6 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [] }:
   const milestoneRatio = milestones.length > 0 ? milestonesDone / milestones.length : 0
 
   // Financial: paid / contracted (cap at 1 — overpayment doesn't keep adding)
-  const amount = Number(contact.amount || 0)
-  const paid = payments.reduce((s, p) => s + Number(p?.amount || 0), 0)
   const paymentRatio = amount > 0 ? Math.min(1, paid / amount) : 0
 
   // Schedule: any end_at in the past = overdue. Filter excludes rows with

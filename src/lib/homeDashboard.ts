@@ -111,8 +111,6 @@ export type HomeJobHealth = {
   stage: string
   schedule: string
   scheduleTone: DashboardTone
-  report: string
-  reportTone: DashboardTone
   billing: string
   billingTone: DashboardTone
   risk: string
@@ -509,8 +507,6 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
         stage: workDone && owes ? 'Invoicing' : 'Active',
         schedule: isBehind ? 'Behind' : 'On track',
         scheduleTone,
-        report: '-',
-        reportTone: 'neutral' as DashboardTone,
         billing:
           workDone && owes ? 'Outstanding'
           : amount === 0 ? 'Not set'

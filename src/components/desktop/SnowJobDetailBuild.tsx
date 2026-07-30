@@ -31,6 +31,7 @@ type Props = {
   scheduleStatus?: { label: string; tone: 'good' | 'warn' | 'bad' } | null
   reportsMissing?: number | null
   billingStatus?: { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } | null
+  health?: { score: number; tier: string; label: string } | null
   paid?: number | null
   outstanding?: number | null
   changeOrderTotals?: { count: number; pending: number; approved: number; total: number } | null
@@ -59,7 +60,7 @@ export default function SnowJobDetailBuild(props: Props) {
     contact, client, tabs, activeTab, onTabChange,
     onBack, backLabel = 'Jobs', onEdit, onDelete, onAddEvent,
     isEditing,
-    scheduleStatus, reportsMissing, billingStatus, paid, outstanding, changeOrderTotals,
+    scheduleStatus, reportsMissing, billingStatus, health, paid, outstanding, changeOrderTotals,
     children,
   } = props
 
@@ -80,18 +81,13 @@ export default function SnowJobDetailBuild(props: Props) {
 
   // Overall job health — best of available signals; honest "Not tracked"
   // when no data points exist yet.
-  const healthSignals = [
-    scheduleStatus?.tone,
-    reportsMissing != null ? (reportsMissing > 0 ? 'bad' : 'good') : null,
-    billingStatus?.tone,
-  ].filter(Boolean) as ('good' | 'warn' | 'bad' | 'neutral')[]
-  const health = healthSignals.length === 0
-    ? { label: 'Not tracked', tone: 'neutral' as const }
-    : healthSignals.includes('bad')
-      ? { label: 'At risk', tone: 'bad' as const }
-      : healthSignals.includes('warn')
-        ? { label: 'Watch', tone: 'warn' as const }
-        : { label: 'On track', tone: 'good' as const }
+  const healthTone = health?.tier === 'behind' || health?.tier === 'lost'
+    ? 'bad'
+    : health?.tier === 'risk'
+      ? 'warn'
+      : health?.tier === 'good'
+        ? 'good'
+        : 'neutral'
 
   // The rail's "Next action" card was removed — the Overview tab's
   // NextActionCard is the single NEXT ACTION source of truth (audit
@@ -276,17 +272,17 @@ export default function SnowJobDetailBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Job health</div>
               <strong style={{
-                color: health.tone === 'bad' ? 'var(--v3-danger-bright)'
-                     : health.tone === 'warn' ? 'var(--v3-primary-bright)'
-                     : health.tone === 'good' ? 'var(--v3-success-bright)'
+                color: healthTone === 'bad' ? 'var(--v3-danger-bright)'
+                     : healthTone === 'warn' ? 'var(--v3-primary-bright)'
+                     : healthTone === 'good' ? 'var(--v3-success-bright)'
                      : undefined,
               }}>
-                {health.label}
+                {health?.label || 'Not tracked'}
               </strong>
               <span>
-                {health.tone === 'neutral'
+                {healthTone === 'neutral'
                   ? 'No health signals yet'
-                  : `${healthSignals.length} signal${healthSignals.length === 1 ? '' : 's'} tracked`}
+                  : `${health?.score ?? 0}% composite score`}
               </span>
             </section>
 

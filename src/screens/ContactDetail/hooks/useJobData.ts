@@ -154,8 +154,8 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
   // Balance must fold in approved change orders — otherwise the money
   // stat and the stage CTA ("Send invoice" vs "Mark complete") read the
   // job as fully collected while CO money is still owed.
-  const balance = useMemo(
-    () => contractTotals({ contact: d.contact, payments: d.payments, changeOrders: d.changeOrders }).balance,
+  const moneyTotals = useMemo(
+    () => contractTotals({ contact: d.contact, payments: d.payments, changeOrders: d.changeOrders }),
     [d.contact, d.payments, d.changeOrders]
   )
 
@@ -176,7 +176,8 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
     stageTransitions: d.stageTransitions,
     // derived
     paid,
-    balance,
+    balance: moneyTotals.balance,
+    credit: moneyTotals.credit,
     // status — isPending (not isLoading) so the skeleton shows until the
     // first fetch resolves, including the brief window while auth (userId)
     // is still resolving and the query is disabled. Matches the prior

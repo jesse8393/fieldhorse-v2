@@ -13,7 +13,10 @@ import { installMock, session } from './qa-mock.mjs'
 const scratch = process.env.QA_OUT || './qa-shots'
 import { mkdirSync } from 'node:fs'
 mkdirSync(scratch, { recursive: true })
-const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] })
+const browser = await chromium.launch({
+  ...(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}),
+  args: ['--no-sandbox']
+})
 
 async function snap(page, name, theme) {
   await page.waitForTimeout(700)

@@ -56,7 +56,9 @@ export function contractTotals({ contact, payments = [], changeOrders = [], invo
     contractTotal,
     paid,
     invoiced,
+    rawBalance: contractTotal - paid,
     balance: Math.max(0, contractTotal - paid),
+    credit: Math.max(0, paid - contractTotal),
     unbilled: Math.max(0, contractTotal - invoiced)
   }
 }

@@ -45,7 +45,7 @@ export type JobNextAction = {
  *   - idle      → open AddEventSheet
  */
 const STAGE_DEFAULTS: Record<string, Pick<JobNextAction, 'title' | 'ctaLabel' | 'pipelineFn'>> = {
-  lead:    { title: 'Send a quote.',                   ctaLabel: 'Start quote',     pipelineFn: 'startQuote' },
+  lead:    { title: 'Send a quote.',                   ctaLabel: 'Convert to quote', pipelineFn: 'startQuote' },
   quote:   { title: 'Approve the quote and kick off.', ctaLabel: 'Approve quote',   pipelineFn: 'approveQuote' },
   job:     { title: 'Wrap up and invoice.',            ctaLabel: 'Mark complete',   pipelineFn: 'markComplete' },
   // Legacy alias of 'job' (pipeline v2 retired the invoice stage).
