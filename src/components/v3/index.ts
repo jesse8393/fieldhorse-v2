@@ -12,22 +12,22 @@ export { default as NextActionCard } from './NextActionCard.tsx'
 export { default as HealthDonut } from './HealthDonut.tsx'
 export { default as ProgressMeter } from './ProgressMeter.tsx'
 
-/* Phase 1B canonical primitives — added but not yet migrated to. */
+/* Phase 1B canonical primitives, added but not yet migrated to. */
 export { default as Eyebrow } from './Eyebrow.tsx'
 export { default as StampNumber } from './StampNumber.tsx'
 export { default as FilterPill } from './FilterPill.tsx'
 export { default as IconButton } from './IconButton.tsx'
 
-/* Phase 3D — canonical floating action button (portal-rendered to
+/* Phase 3D, canonical floating action button (portal-rendered to
    escape framer-motion containing-block traps). */
 export { default as FloatingActionButton } from './FloatingActionButton.tsx'
 
-/* Account attribution — inline byline chip for shared-job content
+/* Account attribution, inline byline chip for shared-job content
    ("Posted by Parker Construction Co." etc.). Resolves via the
    fh_resolve_account_labels RPC (migration 016). */
 export { default as PostedByChip } from './PostedByChip.tsx'
 
-/* Phase V3-JOBS-1 — unified status badge primitive. One pill family
+/* Phase V3-JOBS-1, unified status badge primitive. One pill family
    for stage (lead/quote/job/invoice/closed/lost), Top Deal, Approved,
    Cold. Replaces the prior mix of inline StagePill + ad-hoc chips. */
 export { default as StatusPill } from './StatusPill.tsx'

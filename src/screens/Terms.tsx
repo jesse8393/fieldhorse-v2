@@ -1,4 +1,4 @@
-// src/screens/Terms.tsx — public terms of service.
+// src/screens/Terms.tsx, public terms of service.
 // Reachable logged-out at /terms. Linked from the mobile app's Settings.
 import LegalLayout, { H2, P, UL } from './LegalLayout.tsx'
 
@@ -20,7 +20,7 @@ export default function Terms() {
 
       <H2>Your content</H2>
       <P>
-        You retain ownership of the data you put into the Service — your jobs,
+        You retain ownership of the data you put into the Service, your jobs,
         clients, documents, and photos. You grant us the limited right to store
         and process that data solely to operate the Service for you. You are
         responsible for having the right to store any customer information you

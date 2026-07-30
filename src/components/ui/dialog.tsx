@@ -29,7 +29,7 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-// forwardRef so consumers (and Radix internals) can attach a ref —
+// forwardRef so consumers (and Radix internals) can attach a ref :
 // without it React fires "Function components cannot be given refs"
 // every time a sheet/drawer is wrapped around a Dialog primitive.
 const DialogOverlay = React.forwardRef<any, any>(function DialogOverlay({
@@ -61,7 +61,7 @@ const DialogContent = React.forwardRef<any, any>(function DialogContent({
         ref={ref}
         data-slot="dialog-content"
         className={cn(
-          "ui:fixed ui:top-[50%] ui:left-[50%] ui:z-50 ui:grid ui:w-full ui:max-w-[calc(100%-2rem)] ui:translate-x-[-50%] ui:translate-y-[-50%] ui:gap-4 ui:rounded-lg ui:border ui:bg-background ui:p-6 ui:shadow-lg ui:duration-200 ui:outline-none ui:data-[state=closed]:animate-out ui:data-[state=closed]:fade-out-0 ui:data-[state=closed]:zoom-out-95 ui:data-[state=open]:animate-in ui:data-[state=open]:fade-in-0 ui:data-[state=open]:zoom-in-95 ui:sm:max-w-lg",
+          "ui:fixed ui:top-[50%] ui:left-[50%] ui:z-50 ui:grid ui:w-full ui:max-w-[calc(100%-2rem)] ui:translate-x-[-50%] ui:translate-y-[-50%] ui:gap-4 ui:rounded-[10px] ui:border ui:bg-background ui:p-6 ui:shadow-lg ui:duration-200 ui:outline-none ui:data-[state=closed]:animate-out ui:data-[state=closed]:fade-out-0 ui:data-[state=closed]:zoom-out-95 ui:data-[state=open]:animate-in ui:data-[state=open]:fade-in-0 ui:data-[state=open]:zoom-in-95 ui:sm:max-w-lg",
           className
         )}
         {...props}>
@@ -126,7 +126,7 @@ const DialogTitle = React.forwardRef<any, any>(function DialogTitle({
     <DialogPrimitive.Title
       ref={ref}
       data-slot="dialog-title"
-      className={cn("ui:text-lg ui:leading-none ui:font-semibold", className)}
+      className={cn("ui:text-xl ui:leading-none ui:font-semibold", className)}
       {...props} />
   );
 })

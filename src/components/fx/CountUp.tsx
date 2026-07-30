@@ -1,7 +1,7 @@
 import { motion, useSpring, useTransform } from 'framer-motion'
 import { useEffect } from 'react'
 
-// Spring-driven count-up. Critically damped — damping > 2*sqrt(stiffness)
+// Spring-driven count-up. Critically damped, damping > 2*sqrt(stiffness)
 // ensures the spring monotonically approaches `to` without overshooting
 // or oscillating. The previous tuning (stiffness 120, damping 20) was
 // underdamped: the number would overshoot the target before settling,

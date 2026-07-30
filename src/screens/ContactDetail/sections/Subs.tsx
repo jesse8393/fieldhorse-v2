@@ -32,7 +32,7 @@ function money(n: any) {
 }
 
 /**
- * Subs section — fh_subs CRUD on the job. Every INSERT and DELETE calls
+ * Subs section, fh_subs CRUD on the job. Every INSERT and DELETE calls
  * recalcCost(contact.id) so cost + margin stay current everywhere they
  * surface (Home KPIs, Job Detail Health, Jobs grid margin pill).
  *
@@ -95,14 +95,14 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
           Subs
         </Eyebrow>
         <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+          fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
           color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums'
         }}>
           {subs.length} {subs.length === 1 ? 'sub' : 'subs'}
@@ -115,13 +115,13 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
         whileTap={{ scale: 0.98 }}
         onClick={() => { hapticTap(); setOpen(true) }}
         style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '11px 16px', borderRadius: 12,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '12px 16px', borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
           color: 'var(--v3-primary)',
-          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-          letterSpacing: '0.04em', cursor: 'pointer',
+          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+          letterSpacing: 0, cursor: 'pointer',
           WebkitTapHighlightColor: 'transparent'
         }}
       >
@@ -131,15 +131,15 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
 
       {subs.length === 0 ? (
         <div style={{
-          padding: '20px 18px', borderRadius: 14,
+          padding: '24px 16px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center', lineHeight: 1.5
+          fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
-          No subs on this job. Add who's running each trade — rates roll into cost + margin live.
+          No subs on this job. Add who's running each trade, rates roll into cost + margin live.
         </div>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <AnimatePresence>
             {subs.map((s: any) => (
               <motion.li
@@ -151,12 +151,12 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                 transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px', borderRadius: 12,
+                  padding: '12px 12px', borderRadius: 10,
                   background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
                 }}
               >
                 <span aria-hidden="true" style={{
-                  flexShrink: 0, width: 32, height: 32, borderRadius: 9,
+                  flexShrink: 0, width: 32, height: 32, borderRadius: 10,
                   background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
                   color: 'var(--v3-primary)',
                   display: 'grid', placeItems: 'center'
@@ -173,11 +173,11 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                   </div>
                   <div style={{
                     marginTop: 2,
-                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    fontFamily: 'var(--font-body)', fontSize: 12,
                     color: 'var(--v3-text-muted)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                   }}>
-                    {s.trade || '—'}{s.phone ? ` · ${formatPhone(s.phone)}` : ''}
+                    {s.trade || '\u2003'}{s.phone ? ` · ${formatPhone(s.phone)}` : ''}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -196,7 +196,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                     onClick={() => remove(s.id)}
                     aria-label="Delete sub"
                     style={{
-                      width: 28, height: 28, borderRadius: 8,
+                      width: 28, height: 28, borderRadius: 10,
                       border: 'none', background: 'transparent',
                       color: 'var(--v3-text-muted)', cursor: 'pointer',
                       display: 'grid', placeItems: 'center'

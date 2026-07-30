@@ -31,7 +31,7 @@ type Props = {
   trendPct: number | null
   stageBreakdown: { won?: number; active?: number; lead?: number; invoice?: number } | null
   // Full per-stage rail (lead/quote/job/invoice/closed/lost with real
-  // counts + $ totals) — preferred over stageBreakdown when present.
+  // counts + $ totals), preferred over stageBreakdown when present.
   stageRail?: Array<{ key: string; count: number; total: number }> | null
   // Job Health Preview rows (Phase 1 §3). Each row already carries
   // the per-column status text + tone keyed to the .fh-build-dot
@@ -46,7 +46,7 @@ type Props = {
     next: string
   }> | null
   // Home.tsx stores dealsAtRisk as a shape: { count, value, followUps,
-  // quotesAttention, … } — older callers expect a plain number. We
+  // quotesAttention, … }, older callers expect a plain number. We
   // accept either and normalize at the render site.
   dealsAtRisk: number | { count?: number; value?: number; [k: string]: any } | null
   jobsBehind: number | null
@@ -66,7 +66,7 @@ type Props = {
   onOpenJob: (id: string) => void
   onOpenJobAtTab: (id: string, tab?: string, intent?: string) => void
   onNewLead: () => void
-  // Optional pass-throughs from Home.tsx — accepted but unused here.
+  // Optional pass-throughs from Home.tsx, accepted but unused here.
   weatherErr?: any
   pinLocation?: () => void
   onGoToBid?: () => void
@@ -96,7 +96,7 @@ function greetingFor(now: Date) {
 /* Cold-load shimmer block. Variant maps to a .fh-build-skel--* class in
    fixes-2026-07.css (money / stat / metric / sub / chip / line). Every
    spot that used to print an em dash or a "Loading" string during the
-   first seconds now renders one of these instead — gray pulse reads as
+   first seconds now renders one of these instead, gray pulse reads as
    loading, never as a confident zero. */
 function Skel({ variant, width }: { variant?: string; width?: number | string }) {
   return (
@@ -130,7 +130,7 @@ function SkelRows({ variantClass }: { variantClass: string }) {
 // Coerces dealsAtRisk into { count, value, followUps, quotesAttention }
 // regardless of upstream shape so the right-rail tile can interpolate
 // primitives safely. Returns null when the data hasn't loaded yet so
-// callers can render '—' instead of guessing a value.
+// callers can render '\u2003' instead of guessing a value.
 function normalizeDealsAtRisk(
   input: number | { count?: number; value?: number; followUps?: number; quotesAttention?: number; [k: string]: any } | null | undefined,
 ): { count: number; value: number; followUps: number | null; quotesAttention: number | null } | null {
@@ -188,14 +188,14 @@ export default function SnowHomeBuild(props: Props) {
   })
 
   // Full per-stage rail (real totals over the deduped contact list)
-  // when the parent provides it — matches the approved mock where
+  // when the parent provides it, matches the approved mock where
   // every stage shows $ + count. Falls back to the 3-bucket
   // approximation for any caller that hasn't wired stageRail yet.
   const pipelineRows = Array.isArray(stageRail) && stageRail.length > 0
     ? buildStageRailRows(stageRail)
     : buildPipelineStages(topPipeline, stageBreakdown)
   // Active opportunities = the ACTIVE_STAGES set (lead+quote+job+invoice)
-  // — closed/lost don't belong in an "active" count even though they're
+  //, closed/lost don't belong in an "active" count even though they're
   // visible columns on the stage rail. Audit H2 caught the subtitle
   // saying "24 active opportunities" by counting every row including
   // the 8 closed and 1 lost.
@@ -288,16 +288,16 @@ export default function SnowHomeBuild(props: Props) {
           <FocusCard onGoToSchedule={onGoToSchedule} />
 
           <div className="fh-build-mini-grid">
-            {/* Labels match what the numbers actually measure — "Crews
+            {/* Labels match what the numbers actually measure, "Crews
                 on site" here vs "Crews active" on Schedule disagreed
                 because both were mislabeled (UI audit #11/#28).
-                "Reports missing" (a hardcoded placeholder dash — the
+                "Reports missing" (a hardcoded placeholder dash, the
                 count was never wired) is replaced by "Open deals",
                 which the stage rail already computes for real. */}
             <MiniMetric label="On site today" value={todayOnSite == null ? <Skel variant="metric" width={28} /> : String(todayOnSite.length)} />
             <MiniMetric label="Open deals" value={stageRail == null && stageBreakdown == null ? <Skel variant="metric" width={28} /> : String(totalOppCount)} />
             <MiniMetric label="Queued actions" value={nextActions == null ? <Skel variant="metric" width={28} /> : String(nextActions.length)} />
-            {/* invoicingWeek is money COLLECTED since Sunday — labeling it
+            {/* invoicingWeek is money COLLECTED since Sunday, labeling it
                 "Ready to invoice" claimed already-received cash was billable. */}
             <MiniMetric label="Collected this week" value={invoicingWeek == null ? <Skel variant="metric" width={56} /> : money(invoicingWeek)} />
           </div>
@@ -408,7 +408,7 @@ function RevenueOperatingLayer({
         </div>
         <div className="fh-crm-flow__stages">
           {/* While the dashboard query is in flight the fallback rows
-              carry zero counts — printing "$0 · 0 deals" per stage read
+              carry zero counts, printing "$0 · 0 deals" per stage read
               as an empty book on every cold load. Shimmer tiles until
               pipeline resolves. */}
           {pipeline == null
@@ -436,7 +436,7 @@ function RevenueOperatingLayer({
 
       <article className="fh-crm-saved">
         <div className="fh-build-eyebrow">Saved views</div>
-        <button type="button" onClick={() => onGoToLeads?.()}>At-risk leads</button>
+        <button type="button" onClick={() => onGoToLeads?.()}>At risk leads</button>
         <button type="button" onClick={() => onGoToJobs?.('active')}>Active jobs</button>
         <button type="button" onClick={() => onGoToInvoices?.()}>Ready to collect</button>
         <button type="button" onClick={() => onGoToActivity?.()}>Activity feed</button>
@@ -502,7 +502,7 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
         )}
       </div>
 
-      {/* While the dashboard query is in flight the count is a raw 0 —
+      {/* While the dashboard query is in flight the count is a raw 0 :
           printing "No active opportunities yet" then would be a
           confident lie for a second. Shimmer until pipeline resolves. */}
       <p className="fh-build-pipeline__copy">
@@ -524,7 +524,7 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
 }
 
 function TodayCard({ activeJobsCount, onGoToSchedule, onNewLead }: any) {
-  // Crew headcount isn't tracked yet — show '—' rather than a fake number.
+  // Crew headcount isn't tracked yet, show '\u2003' rather than a fake number.
   // Jobs in progress comes from the real stage breakdown.
   return (
     <section className="fh-build-card fh-build-today">
@@ -565,7 +565,7 @@ function TodayCard({ activeJobsCount, onGoToSchedule, onNewLead }: any) {
 function RightRail({ dealsAtRisk, jobsBehind }: any) {
   // dealsAtRisk may be a number (legacy), an object { count, value, followUps,
   // quotesAttention }, or null. normalizeDealsAtRisk returns null when not
-  // yet loaded — render '—' rather than a fabricated number.
+  // yet loaded, render '\u2003' rather than a fabricated number.
   const risk = normalizeDealsAtRisk(dealsAtRisk)
   const dealsValue = risk == null ? <Skel variant="metric" /> : moneyFull(risk.value)
   const dealsSub =
@@ -588,7 +588,7 @@ function RightRail({ dealsAtRisk, jobsBehind }: any) {
           → "Estimates needing action". Other titles already matched. */}
       <RailMetric title="Goals at risk" value={dealsValue} sub={dealsSub} chart="red" />
       <RailMetric title="Jobs behind" value={jobsBehindValue} sub={jobsBehindSub} chart="gold" />
-      <RailMetric title="Follow-ups due" value={followUpsValue} sub={followUpsSub} />
+      <RailMetric title="Follow ups due" value={followUpsValue} sub={followUpsSub} />
       <RailMetric title="Estimates needing action" value={quotesValue} sub={quotesSub} />
     </aside>
   )
@@ -719,7 +719,7 @@ function JobHealthPreview({ rows, loading, onGoToJobs, onOpenJob }: any) {
             type="button"
             className="fh-build-table__row is-health"
             // Deep-link to the specific job file when an id is present
-            // — previously every row routed to /jobs (no target).
+            //, previously every row routed to /jobs (no target).
             onClick={() => row.id ? onOpenJob?.(row.id) : onGoToJobs()}
           >
             <strong>{row.job}</strong>
@@ -744,9 +744,9 @@ function EmptyRow({ label }: { label: string }) {
       className="fh-build-table__row"
       style={{
         gridTemplateColumns: '1fr',
-        color: 'rgba(255,255,255,0.55)',
-        fontSize: 13,
-        padding: '18px 16px',
+        color: 'rgba(242, 237, 228,0.55)',
+        fontSize: 14,
+        padding: '16px 16px',
         cursor: 'default',
       }}
     >
@@ -773,7 +773,7 @@ function FooterLink({ label, onClick }: { label: string; onClick?: () => void })
 }
 
 // Full-stage rail rows from the per-stage breakdown Home.tsx computes
-// over the complete contact list. Real $ totals per stage — the mock's
+// over the complete contact list. Real $ totals per stage, the mock's
 // "every stage with $ + count" rail without fabricating stages the
 // data model doesn't have. Lost is dropped from the rail when empty
 // so a healthy book doesn't dedicate a column to zero.
@@ -790,7 +790,7 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
   // Post-H3 the Jobs screen has distinct 'invoice' and 'closed' chips,
   // so each rail column routes to its own filter. (The old invoice→won
   // alias also broke the hero subtitle: ACTIVE_RAIL_KEYS counts the
-  // 'invoice' key, which never appeared because it was remapped —
+  // 'invoice' key, which never appeared because it was remapped :
   // spot-check caught "16 active across 3 stages" under a $138k
   // headline that spans 17 deals across 4 stages.)
   const ROUTE: Record<string, { route: PipelineRoute; filter: string }> = {
@@ -820,7 +820,7 @@ function buildStageRailRows(stageRail: Array<{ key: string; count: number; total
 // Render 3 real funnel buckets (Lead/Active/Won) sourced from
 // stageBreakdown, with $ totals derived from topPipeline rows whose
 // stage falls into each bucket. We intentionally show 3 buckets
-// rather than fabricating 8 named stages — counts are the source of
+// rather than fabricating 8 named stages, counts are the source of
 // truth, amounts are best-effort from the top-deal slice we have.
 function buildPipelineStages(
   topPipeline: any[] | null,
@@ -858,7 +858,7 @@ function buildPipelineStages(
 // ('danger' | 'warn' | 'success') maps to the dot tone the table uses.
 // Amount/due aren't part of the action payload, so we leave them blank
 // rather than invent numbers.
-// Phase 1 §2: render the Owner Queue table to spec — Action column is
+// Phase 1 §2: render the Owner Queue table to spec, Action column is
 // a verb phrase, Client / Job column is the actual record name, Amount
 // is the deal value, Due is a date or "Today" / "Nd ago" label. The
 // `detail` wait-status string (e.g. "Lead waiting 15 days") moves to
@@ -956,9 +956,9 @@ function buildRevenueRows(topPipeline: any[] | null) {
 
 // Job Health requires per-job schedule / report / billing / risk
 // signals that aren't computed on Home yet. Until that data lands,
-// emit zero rows — the table will render its header + empty state
+// emit zero rows, the table will render its header + empty state
 // rather than fabricated rows with placeholder client names.
-// (buildJobHealthRows removed — Job Health rows are now computed in
+// (buildJobHealthRows removed, Job Health rows are now computed in
 // screens/Home.tsx where the contacts + overdue-schedule + payments
 // data lives. Phase 1 §3.)
 

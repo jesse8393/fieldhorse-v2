@@ -1,10 +1,10 @@
 import type { HTMLAttributes, ElementType } from 'react'
 
 /**
- * Eyebrow — canonical small uppercase label.
+ * Eyebrow, canonical small uppercase label.
  *
- * Replaces 50+ inline `<span style={{ fontSize: 10, fontWeight: 700,
- * letterSpacing: '0.18em', textTransform: 'uppercase', color: ... }}>`
+ * Replaces 50+ inline `<span style={{ fontSize: 12, fontWeight: 700,
+ * letterSpacing: 0, textTransform: 'uppercase', color: ... }}>`
  * blocks scattered across screens.
  *
  * Tone variants:
@@ -47,11 +47,11 @@ export default function Eyebrow({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
         fontFamily: 'var(--font-body)',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.10em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         lineHeight: 1,
         color: TONE_COLOR[tone] || TONE_COLOR.default,

@@ -1,4 +1,4 @@
-// Selections section — backed by fh_selections.
+// Selections section, backed by fh_selections.
 //
 // Per-job list of client-facing finish picks (tile, paint, fixtures).
 // Each row carries an options jsonb array; the owner authors the
@@ -178,7 +178,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   const approvedCount = rows.filter((r) => r.status === 'approved' || r.status === 'installed').length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
           Selections
@@ -193,10 +193,10 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
             type="button"
             onClick={() => setComposing(true)}
             style={{
-              padding: '7px 14px', borderRadius: 8, border: 'none',
+              padding: '8px 12px', borderRadius: 10, border: 'none',
               background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-              letterSpacing: '0.04em', cursor: 'pointer',
+              letterSpacing: 0, cursor: 'pointer',
             }}
           >
             + New selection
@@ -216,14 +216,14 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
       ) : rows.length === 0 ? (
         <div style={{
           padding: '24px 16px', textAlign: 'center', color: 'var(--v3-text-muted)',
-          fontFamily: 'var(--font-body)', fontSize: 13,
-          border: '1px dashed var(--v3-border)', borderRadius: 12,
+          fontFamily: 'var(--font-body)', fontSize: 14,
+          border: '1px dashed var(--v3-border)', borderRadius: 10,
         }}>
           <Palette size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary)' }} />
-          No selections yet. Add one for every finish the client needs to pick — tile, paint, fixtures, hardware.
+          No selections yet. Add one for every finish the client needs to pick, tile, paint, fixtures, hardware.
         </div>
       ) : (
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <AnimatePresence initial={false}>
             {rows.map((r) => (
               <SelectionCard
@@ -242,7 +242,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
       )}
 
       {!loading && rows.length > 0 && pendingCount > 0 && (
-        <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', textAlign: 'center', marginTop: 4 }}>
+        <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', textAlign: 'center', marginTop: 4 }}>
           {pendingCount} waiting on the client. Tap a selection to mark it sent or record their pick.
         </div>
       )}
@@ -276,20 +276,20 @@ function SelectionCard({
       exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
       style={{
-        display: 'flex', flexDirection: 'column', gap: 10,
-        padding: '14px 16px', borderRadius: 12,
+        display: 'flex', flexDirection: 'column', gap: 12,
+        padding: '12px 16px', borderRadius: 10,
         background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
       }}
     >
-      {/* Head — title + meta + status + actions */}
+      {/* Head, title + meta + status + actions */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <strong style={{ fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 700, color: 'var(--v3-text)' }}>
+            <strong style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>
               {row.title}
             </strong>
             {row.room && (
-              <span style={{ fontSize: 11, color: 'var(--v3-text-muted)' }}>· {row.room}</span>
+              <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>· {row.room}</span>
             )}
             {row.category && (
               <Eyebrow>
@@ -298,14 +298,14 @@ function SelectionCard({
             )}
           </div>
           {row.description && (
-            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--v3-text-muted)', lineHeight: 1.5 }}>
+            <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--v3-text-muted)', lineHeight: 1.5 }}>
               {row.description}
             </p>
           )}
           {(row.due_at || overdue) && (
-            <div style={{ marginTop: 6, fontSize: 11, color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ marginTop: 6, fontSize: 12, color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               {overdue && <AlertTriangle size={11} />}
-              Due {fmtDate(row.due_at)} {overdue ? '— overdue' : ''}
+              Due {fmtDate(row.due_at)} {overdue ? ': overdue' : ''}
             </div>
           )}
         </div>
@@ -333,21 +333,21 @@ function SelectionCard({
                 key={o.id}
                 style={{
                   position: 'relative',
-                  padding: 10,
+                  padding: 12,
                   borderRadius: 10,
                   border: isPicked
-                    ? '1px solid color-mix(in srgb, var(--v3-success-bright, #73c982) 60%, transparent)'
+                    ? '1px solid color-mix(in srgb, var(--v3-success-bright, #2D7A4F) 60%, transparent)'
                     : '1px solid var(--v3-border)',
                   background: isPicked
-                    ? 'color-mix(in srgb, var(--v3-success-bright, #73c982) 10%, transparent)'
+                    ? 'color-mix(in srgb, var(--v3-success-bright, #2D7A4F) 10%, transparent)'
                     : 'var(--v3-glass-tint)',
-                  display: 'flex', flexDirection: 'column', gap: 6,
+                  display: 'flex', flexDirection: 'column', gap: 8,
                 }}
               >
                 {/* Thumbnail */}
                 <div style={{
-                  aspectRatio: '4 / 3', borderRadius: 6, overflow: 'hidden',
-                  background: 'rgba(0,0,0,.30)', display: 'grid', placeItems: 'center',
+                  aspectRatio: '4 / 3', borderRadius: 10, overflow: 'hidden',
+                  background: 'rgba(20, 20, 20,.30)', display: 'grid', placeItems: 'center',
                 }}>
                   {o.image_url ? (
                     <img loading="lazy"src={o.image_url} alt={o.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -355,7 +355,7 @@ function SelectionCard({
                     <ImageIcon size={20} aria-hidden="true" color="var(--v3-text-faint)" />
                   )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                   <strong style={{ fontSize: 12, fontWeight: 700, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {o.label}
                   </strong>
@@ -366,7 +366,7 @@ function SelectionCard({
                   )}
                 </div>
                 {(o.brand || o.sku) && (
-                  <div style={{ fontSize: 10, color: 'var(--v3-text-muted)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>
                     {[o.brand, o.sku].filter(Boolean).join(' · ')}
                   </div>
                 )}
@@ -376,16 +376,16 @@ function SelectionCard({
                     onClick={() => onPick(o.id)}
                     style={{
                       marginTop: 2,
-                      padding: '6px 10px', borderRadius: 6, border: 'none',
+                      padding: '8px 12px', borderRadius: 10, border: 'none',
                       background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
-                      fontSize: 11, fontWeight: 700, letterSpacing: '.04em',
+                      fontSize: 12, fontWeight: 700, letterSpacing: 0,
                       cursor: 'pointer',
                     }}
                   >
                     Pick this
                   </button>
                 ) : (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--v3-success-bright, #73c982)', fontWeight: 700 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--v3-success-bright, #2D7A4F)', fontWeight: 700 }}>
                     <Check size={12} aria-hidden="true" />
                     Picked
                     {row.decision_by && (
@@ -405,7 +405,7 @@ function SelectionCard({
       )}
 
       {/* Status actions */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {row.status === 'draft' && (
           <button type="button" onClick={() => onSetStatus('sent')} style={chipBtn}><Send size={11} /> Mark sent</button>
         )}
@@ -420,7 +420,7 @@ function SelectionCard({
         )}
       </div>
 
-      {/* Edit mode — options editor */}
+      {/* Edit mode, options editor */}
       {editing && (
         <OptionsEditor
           row={row}
@@ -474,8 +474,8 @@ function SelectionComposer({
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 10,
-      padding: 14, borderRadius: 12,
+      display: 'flex', flexDirection: 'column', gap: 12,
+      padding: 12, borderRadius: 10,
       background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
     }}>
       <input
@@ -498,7 +498,7 @@ function SelectionComposer({
         style={{ ...inputStyle, resize: 'vertical', minHeight: 56 }}
       />
 
-      <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 10, marginTop: 4 }}>
+      <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 12, marginTop: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>Options</span>
           <button type="button" onClick={addOpt} style={chipBtnGhost}><Plus size={11} /> Add option</button>
@@ -562,9 +562,9 @@ function OptionsEditor({
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 10,
+      display: 'flex', flexDirection: 'column', gap: 12,
       marginTop: 4, padding: 12, borderRadius: 10,
-      background: 'rgba(0,0,0,.20)', border: '1px solid var(--v3-border)',
+      background: 'rgba(20, 20, 20,.20)', border: '1px solid var(--v3-border)',
     }}>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={inputStyle} />
       <div style={{ display: 'flex', gap: 8 }}>
@@ -600,29 +600,29 @@ function OptionsEditor({
 
 const inputStyle: React.CSSProperties = {
   flex: '1 1 200px', minWidth: 0,
-  padding: '10px 12px', borderRadius: 8,
-  background: 'var(--v3-surface-2, rgba(0,0,0,.20))',
+  padding: '12px 12px', borderRadius: 10,
+  background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
   border: '1px solid var(--v3-border)',
   color: 'var(--v3-text)',
-  fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none',
+  fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none',
 }
 
 const primaryBtn = (disabled: boolean): React.CSSProperties => ({
-  padding: '9px 16px', borderRadius: 8, border: 'none',
+  padding: '8px 16px', borderRadius: 10, border: 'none',
   background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
-  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: 0,
   opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
 })
 
 const secondaryBtn: React.CSSProperties = {
-  padding: '9px 14px', borderRadius: 8,
+  padding: '8px 12px', borderRadius: 10,
   border: '1px solid var(--v3-border)',
   background: 'transparent', color: 'var(--v3-text-muted)',
-  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
 }
 
 const iconBtnStyle: React.CSSProperties = {
-  width: 28, height: 28, borderRadius: 8,
+  width: 28, height: 28, borderRadius: 10,
   border: 'none', background: 'transparent',
   color: 'var(--v3-text-muted)', cursor: 'pointer',
   display: 'grid', placeItems: 'center',
@@ -630,20 +630,20 @@ const iconBtnStyle: React.CSSProperties = {
 
 const chipBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
-  padding: '5px 10px', borderRadius: 999,
+  padding: '4px 12px', borderRadius: 10,
   background: 'color-mix(in srgb, var(--v3-primary) 12%, transparent)',
   border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
   color: 'var(--v3-primary)',
-  fontSize: 11, fontWeight: 700, letterSpacing: '.04em', cursor: 'pointer',
+  fontSize: 12, fontWeight: 700, letterSpacing: 0, cursor: 'pointer',
 }
 
 const chipBtnGhost: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
-  padding: '5px 10px', borderRadius: 999,
+  padding: '4px 12px', borderRadius: 10,
   background: 'transparent',
   border: '1px solid var(--v3-border)',
   color: 'var(--v3-text-muted)',
-  fontSize: 11, fontWeight: 700, letterSpacing: '.04em', cursor: 'pointer',
+  fontSize: 12, fontWeight: 700, letterSpacing: 0, cursor: 'pointer',
 }
 
 // quiet unused-import lints

@@ -31,13 +31,13 @@ export default function ProgressMeter({
 
   return (
     <div style={{
-      padding: '18px 18px 16px',
-      borderRadius: 16,
+      padding: '16px 16px 16px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 10
+      gap: 12
     }}>
       <div style={{
         display: 'flex',
@@ -47,7 +47,7 @@ export default function ProgressMeter({
       }}>
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 600,
           color: 'var(--v3-text)'
         }}>
@@ -72,7 +72,7 @@ export default function ProgressMeter({
         style={{
           position: 'relative',
           height,
-          borderRadius: 999,
+          borderRadius: 10,
           background: 'var(--v3-glass-tint-2)',
           overflow: 'hidden'
         }}
@@ -82,7 +82,7 @@ export default function ProgressMeter({
           inset: 0,
           width: `${safe}%`,
           background: color,
-          borderRadius: 999,
+          borderRadius: 10,
           transition: 'width 500ms cubic-bezier(0.2, 0.8, 0.2, 1)'
         }} />
       </div>
@@ -97,7 +97,7 @@ export default function ProgressMeter({
           {caption && (
             <span style={{
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               color: 'var(--v3-text-muted)',
               fontVariantNumeric: 'tabular-nums'
             }}>

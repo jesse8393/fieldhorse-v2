@@ -1,7 +1,7 @@
 // src/components/documents/numbers.ts
 //
 // Proposal / invoice number generators. Shared between the HTML
-// preview and the jsPDF export so the customer-facing document number
+// preview and the jsPDF export so the customer facing document number
 // is identical no matter how it's surfaced.
 //
 // Format
@@ -16,7 +16,7 @@
 //
 // SEQ is the last 4 chars of the source row id (uppercased) so a
 // re-generated PDF for the same record gives a stable, repeatable
-// number — important when the contractor sends a revision and the
+// number, important when the contractor sends a revision and the
 // customer is comparing.
 
 const SKIP_WORDS = new Set(['the', 'of', 'and', '&', 'a', 'an'])
@@ -74,10 +74,10 @@ export function invoiceNumber(companyName: string | null | undefined, seed: stri
 }
 
 /**
- * Sequence-aware invoice number — the form a real business uses.
+ * Sequence-aware invoice number, the form a real business uses.
  *
  * fh_invoices.sequence_number is unique only PER JOB (per contact_id),
- * so a bare "PCC-INV-003" collides across every job — each job restarts
+ * so a bare "PCC-INV-003" collides across every job, each job restarts
  * at 001. To keep numbers unique across the whole company we prefix a
  * short, stable per-job discriminator drawn from the contact id
  * (the `seed`): "PCC-4F2A-03". Same job + same draw always yields the

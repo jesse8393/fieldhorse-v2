@@ -1,4 +1,6 @@
-// Designed empty state — SVG illustration, Bebas title, DM Sans subtitle,
+import Button from './v3/Button.tsx'
+
+// Designed empty state, SVG illustration, Bebas title, DM Sans subtitle,
 // optional engraved gold CTA. Use anywhere the list has nothing to show.
 
 const ICONS: Record<string, any> = {
@@ -84,9 +86,9 @@ export default function EmptyState({
       <h3 className="fh-emptystate__title">{title}</h3>
       {sub && <p className="fh-emptystate__sub">{sub}</p>}
       {action && onAction && (
-        <button type="button" className="fh-btn fh-btn--primary fh-emptystate__cta" onClick={onAction}>
+        <Button type="button" className="fh-emptystate__cta" onClick={onAction}>
           {action}
-        </button>
+        </Button>
       )}
     </div>
   )

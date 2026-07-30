@@ -7,7 +7,7 @@ import { queryClient } from '../lib/queryClient.ts'
 
 // Sign-out must also purge the local data stores, or the next person on
 // a shared device inherits the whole book (ultrareview): the persisted
-// TanStack cache (IndexedDB — jobs/leads/clients with names, phones,
+// TanStack cache (IndexedDB, jobs/leads/clients with names, phones,
 // amounts) and any in-flight lead draft (localStorage). Best-effort:
 // storage failures must never block the sign-out itself.
 async function purgeLocalData() {
@@ -57,8 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
       // A SIGNED_OUT event (token expiry, remote revocation, sign-out in
-      // another tab) — or any transition from an established session to
-      // null — must purge the local book too, not just the app's own
+      // another tab), or any transition from an established session to
+      // null, must purge the local book too, not just the app's own
       // signOut(). Guard the initial null so we never purge before anyone
       // signed in. Best-effort + async-safe (purgeLocalData swallows its
       // own errors).

@@ -1,6 +1,6 @@
 // src/components/documents/InvoiceTemplate.tsx
 //
-// Customer-facing HTML preview of a contractor invoice, built to the
+// Customer facing HTML preview of a contractor invoice, built to the
 // standard of the best SaaS invoices (Stripe/Ramp): the amount due and
 // due date are the first thing on the page, the billing schedule shows
 // every draw with its paid/due status, and the contract position
@@ -9,7 +9,7 @@
 // Composes:
 //   1. DocumentShell       (letterhead + real invoice number + dates)
 //   2. Hero band           (AMOUNT DUE · due date · collection progress)
-//   3. Line items          (only when real items exist — no filler table)
+//   3. Line items          (only when real items exist, no filler table)
 //   4. Billing schedule    (fh_invoices draws w/ PAID/DUE, current row marked)
 //   5. Contract position   (contract → change orders → paid → balance)
 //   6. Payment history     (every payment: date, method, reference)
@@ -28,7 +28,7 @@ import { parseDateOnly } from '../../lib/dates.ts'
 import { invoiceNumber, invoiceNumberFromSequence } from './numbers.ts'
 
 const DEFAULT_PAYMENT_COPY = 'Please remit payment by the due date above. Payments are applied to the project balance.'
-const DEFAULT_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order. Past-due balances may accrue at 1.5% per month.'
+const DEFAULT_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order. Past due balances may accrue at 1.5% per month.'
 
 export default function InvoiceTemplate({
   company = {},
@@ -46,7 +46,7 @@ export default function InvoiceTemplate({
   notes,
   insurance = null,
   changeOrders = [],
-  invoices = [],          // fh_invoices draw rows — billing schedule
+  invoices = [],          // fh_invoices draw rows, billing schedule
   currentInvoice = null,  // the fh_invoices row this document bills
   photos = []
 }: any) {
@@ -72,7 +72,7 @@ export default function InvoiceTemplate({
     : Math.max(0, adjustedContractTotal - paid)
   const amountDue = thisInvoice != null ? Number(thisInvoice) : balance
   const isPaid = String(status).toLowerCase() === 'paid' || balance < 0.5
-  // due_at can be a date-only string — parse LOCAL (the codebase rule,
+  // due_at can be a date-only string, parse LOCAL (the codebase rule,
   // see format.ts) and don't flag "Past due" until the due DAY has
   // fully passed; the raw UTC parse flipped the chip red the evening
   // before the due date in every US timezone.
@@ -104,7 +104,7 @@ export default function InvoiceTemplate({
       docType="Invoice"
       number={number}
       metaRows={[
-        { label: 'Issued', value: longDate(issuedAt) || '—' },
+        { label: 'Issued', value: longDate(issuedAt) || '\u2003' },
         dueDate && { label: 'Due', value: longDate(dueDate), strong: true }
       ].filter(Boolean)}
       status={statusToChip(status, isOverdue)}
@@ -124,7 +124,7 @@ export default function InvoiceTemplate({
       }
       footer={DEFAULT_DISCLAIMER}
     >
-      {/* Line items — only when the invoice actually has them. A fake
+      {/* Line items, only when the invoice actually has them. A fake
           one-row "Qty 1 × contract" table communicates nothing. */}
       {rows.length > 0 && (
         <section>
@@ -133,7 +133,7 @@ export default function InvoiceTemplate({
         </section>
       )}
 
-      {/* Billing schedule — the draw plan with live status. */}
+      {/* Billing schedule, the draw plan with live status. */}
       {scheduleRows.length > 0 && (
         <section>
           <SectionLabel>Billing schedule</SectionLabel>
@@ -162,7 +162,7 @@ export default function InvoiceTemplate({
         </section>
       )}
 
-      {/* Contract position — one reconciliation the customer can check. */}
+      {/* Contract position, one reconciliation the customer can check. */}
       <section>
         <SectionLabel>Contract position</SectionLabel>
         <ContractPosition
@@ -187,9 +187,9 @@ export default function InvoiceTemplate({
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 20,
+          gap: 24,
           borderTop: `1px solid ${DOC_COLORS.rule}`,
-          paddingTop: 20
+          paddingTop: 24
         }}
       >
         <Detail label="How to pay">
@@ -201,14 +201,14 @@ export default function InvoiceTemplate({
       {/* Insurance */}
       <InsuranceModeBlock insurance={insurance} company={company} />
 
-      {/* Project photos — quiet "here's the work" footnote. */}
+      {/* Project photos, quiet "here's the work" footnote. */}
       {photos.length > 0 && (
         <section>
           <SectionLabel>Project photos</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
             {photos.slice(0, 4).map((p: any, i: any) => p?.url && (
               <figure key={i} style={{ margin: 0 }}>
-                <div style={{ width: '100%', aspectRatio: '4 / 3', background: '#e8e2d4', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: '100%', aspectRatio: '4 / 3', background: '#F2EDE4', borderRadius: 10, overflow: 'hidden' }}>
                   <img
                     src={p.url}
                     alt={p.caption || p.section_tag || 'Project photo'}
@@ -217,7 +217,7 @@ export default function InvoiceTemplate({
                   />
                 </div>
                 {(p.caption || p.section_tag) && (
-                  <figcaption style={{ marginTop: 4, fontFamily: DOC_FONTS.body, fontSize: 10, color: DOC_COLORS.inkMuted, lineHeight: 1.35 }}>
+                  <figcaption style={{ marginTop: 4, fontFamily: DOC_FONTS.body, fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.35 }}>
                     {p.caption || p.section_tag}
                   </figcaption>
                 )}
@@ -237,23 +237,23 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
   return (
     <section
       style={{
-        padding: '18px 22px',
+        padding: '16px 24px',
         background: DOC_COLORS.paperSoft,
         border: `1px solid ${DOC_COLORS.rule}`,
-        borderRadius: 6
+        borderRadius: 10
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 24, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 4 }}>
             {isPaid ? 'Balance' : 'Amount due'}
           </div>
           <div
             style={{
               fontFamily: DOC_FONTS.serif,
-              fontSize: 40,
+              fontSize: 24,
               fontWeight: 500,
-              letterSpacing: '-0.02em',
+              letterSpacing: 0,
               lineHeight: 1,
               color: isPaid ? DOC_COLORS.signalGreen : DOC_COLORS.ink,
               fontVariantNumeric: 'tabular-nums'
@@ -262,7 +262,7 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
             {isPaid ? 'Paid in full' : money(amountDue)}
           </div>
         </div>
-        <div style={{ textAlign: 'right', fontSize: 11.5, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
+        <div style={{ textAlign: 'right', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
           {!isPaid && dueDate && (
             <div>
               Due <span style={{ color: isOverdue ? DOC_COLORS.alertRed : DOC_COLORS.ink, fontWeight: 700 }}>{longDate(dueDate)}</span>
@@ -282,13 +282,13 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
           aria-valuenow={Math.round(pct * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
-          style={{ marginTop: 14, height: 4, borderRadius: 999, background: DOC_COLORS.rule, overflow: 'hidden' }}
+          style={{ marginTop: 14, height: 4, borderRadius: 10, background: DOC_COLORS.rule, overflow: 'hidden' }}
         >
           <div
             style={{
               width: `${pct * 100}%`,
               height: '100%',
-              borderRadius: 999,
+              borderRadius: 10,
               background: isPaid ? DOC_COLORS.signalGreen : brand
             }}
           />
@@ -300,7 +300,7 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
 
 function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 12.5 }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 12 }}>
       <thead>
         <tr>
           {['Invoice', 'Issued', 'Due', 'Amount', 'Status'].map((h, i) => (
@@ -309,11 +309,11 @@ function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) 
               scope="col"
               style={{
                 textAlign: i >= 3 ? 'right' : 'left',
-                padding: '0 0 7px',
+                padding: '0 0 8px',
                 borderBottom: `2px solid ${DOC_COLORS.ink}`,
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 700,
-                letterSpacing: '0.16em',
+                letterSpacing: 0,
                 textTransform: 'uppercase',
                 color: DOC_COLORS.inkMuted
               }}
@@ -335,22 +335,22 @@ function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) 
                 </span>
                 {inv.title && <span style={{ color: DOC_COLORS.inkMuted }}> · {inv.title}</span>}
                 {isCurrent && (
-                  <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: brand }}>
+                  <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: brand }}>
                     This invoice
                   </span>
                 )}
               </td>
               <td style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{shortDate(inv.issued_at || inv.created_at)}</td>
-              <td style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{paid ? '—' : shortDate(inv.due_at) || '—'}</td>
+              <td style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{paid ? '\u2003' : shortDate(inv.due_at) || '\u2003'}</td>
               <td style={{ ...cell(), textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                 {money(Number(inv.amount || 0), { cents: true })}
               </td>
               <td style={{ ...cell(), textAlign: 'right' }}>
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 700,
-                    letterSpacing: '0.14em',
+                    letterSpacing: 0,
                     textTransform: 'uppercase',
                     color: paid ? DOC_COLORS.signalGreen : DOC_COLORS.inkMid
                   }}
@@ -368,7 +368,7 @@ function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) 
 
 function cell() {
   return {
-    padding: '9px 12px 9px 0',
+    padding: '8px 12px 8px 0',
     borderBottom: `1px solid ${DOC_COLORS.rule}`,
     verticalAlign: 'top' as const,
     lineHeight: 1.45
@@ -394,8 +394,8 @@ function ContractPosition({ contractTotal, coAdjustment, paid, balance, brand }:
     <div
       style={{
         border: `1px solid ${DOC_COLORS.rule}`,
-        borderRadius: 6,
-        padding: '6px 18px 14px',
+        borderRadius: 10,
+        padding: '8px 16px 12px',
         maxWidth: 420,
         marginLeft: 'auto'
       }}
@@ -404,13 +404,13 @@ function ContractPosition({ contractTotal, coAdjustment, paid, balance, brand }:
         <tbody>
           {rows.map((r) => (
             <tr key={r.label}>
-              <td style={{ padding: '7px 0', fontSize: 12.5, color: DOC_COLORS.inkMuted, borderBottom: `1px solid ${DOC_COLORS.rule}` }}>
+              <td style={{ padding: '8px 0', fontSize: 12, color: DOC_COLORS.inkMuted, borderBottom: `1px solid ${DOC_COLORS.rule}` }}>
                 {r.label}
               </td>
               <td
                 style={{
-                  padding: '7px 0',
-                  fontSize: 12.5,
+                  padding: '8px 0',
+                  fontSize: 12,
                   fontWeight: r.strong ? 700 : 600,
                   color: r.green ? DOC_COLORS.signalGreen : DOC_COLORS.ink,
                   textAlign: 'right',
@@ -424,14 +424,14 @@ function ContractPosition({ contractTotal, coAdjustment, paid, balance, brand }:
           ))}
         </tbody>
       </table>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: DOC_COLORS.ink }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 12 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.ink }}>
           Balance remaining
         </span>
         <span
           style={{
             fontFamily: DOC_FONTS.body,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: 700,
             color: balance > 0.5 ? DOC_COLORS.ink : DOC_COLORS.signalGreen,
             fontVariantNumeric: 'tabular-nums'
@@ -449,9 +449,9 @@ function SectionLabel({ children }: any) {
     <div
       style={{
         fontFamily: DOC_FONTS.body,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.18em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         color: DOC_COLORS.ink,
         marginBottom: 10
@@ -465,7 +465,7 @@ function SectionLabel({ children }: any) {
 function Detail({ label, children }: any) {
   return (
     <div>
-      <div style={{ fontFamily: DOC_FONTS.body, fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: DOC_COLORS.inkFaint, marginBottom: 5 }}>
+      <div style={{ fontFamily: DOC_FONTS.body, fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkFaint, marginBottom: 5 }}>
         {label}
       </div>
       <div style={{ fontFamily: DOC_FONTS.body, fontSize: 12, color: DOC_COLORS.inkMid, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 
 /**
- * Job Health donut — circular progress with center number + tier label.
+ * Job Health donut, circular progress with center number + tier label.
  *
  *   ╭───────╮
  *   │  ╱   ╲│
@@ -38,8 +38,8 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
 
   return (
     <div style={{
-      padding: '18px 18px 16px',
-      borderRadius: 16,
+      padding: '16px 16px 16px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)',
       display: 'flex',
@@ -49,9 +49,9 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
     }}>
       <span style={{
         fontFamily: 'var(--font-body)',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.16em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         color: 'var(--v3-text-muted)'
       }}>
@@ -100,7 +100,7 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
         }}>
           <span style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 30,
+            fontSize: 24,
             color: tier.color,
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums'
@@ -110,9 +110,9 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
           <span style={{
             marginTop: 4,
             fontFamily: 'var(--font-body)',
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: 700,
-            letterSpacing: '0.14em',
+            letterSpacing: 0,
             textTransform: 'uppercase',
             color: tier.color
           }}>

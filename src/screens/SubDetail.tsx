@@ -21,7 +21,7 @@ import DataErrorState from '../components/DataErrorState.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 
-// SubDetail — vendor profile surface at /subs/:key.
+// SubDetail, vendor profile surface at /subs/:key.
 //
 // :key is the same lowercased phone-or-name rollup key the Subs
 // directory builds (see Subs.jsx). The page joins three things:
@@ -35,7 +35,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 // rolled-up name + phone, then re-fetches.
 
 const PAYMENT_METHODS = [
-  { value: '',         label: '— Not set —' },
+  { value: '',         label: ': Not set :' },
   { value: 'check',    label: 'Check' },
   { value: 'ach',      label: 'ACH / Direct deposit' },
   { value: 'zelle',    label: 'Zelle' },
@@ -46,7 +46,7 @@ const PAYMENT_METHODS = [
 ]
 
 const DOC_SLOTS = [
-  { id: 'w9',      label: 'W-9',                 path: 'w9_path',      hint: 'Required for 1099 reporting' },
+  { id: 'w9',      label: 'W9',                 path: 'w9_path',      hint: 'Required for 1099 reporting' },
   { id: 'coi',     label: 'Certificate of Insurance', path: 'coi_path', hint: 'COI / liability cert' },
   { id: 'license', label: 'License',             path: 'license_path', hint: 'Trade or contractor license' }
 ]
@@ -163,10 +163,10 @@ export default function SubDetail() {
     }
 
     return (
-      <div style={{ padding: '24px 20px' }}>
-        <div className="v3-skeleton" style={{ height: 28, width: 220, borderRadius: 6, marginBottom: 12 }} />
-        <div className="v3-skeleton" style={{ height: 120, width: '100%', borderRadius: 14, marginBottom: 12 }} />
-        <div className="v3-skeleton" style={{ height: 200, width: '100%', borderRadius: 14 }} />
+      <div style={{ padding: '24px 24px' }}>
+        <div className="v3-skeleton" style={{ height: 28, width: 220, borderRadius: 10, marginBottom: 12 }} />
+        <div className="v3-skeleton" style={{ height: 120, width: '100%', borderRadius: 10, marginBottom: 12 }} />
+        <div className="v3-skeleton" style={{ height: 200, width: '100%', borderRadius: 10 }} />
       </div>
     )
   }
@@ -183,10 +183,10 @@ export default function SubDetail() {
     }
 
     return (
-      <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <BackButton onClick={() => { hapticTap(); navigate('/subs') }} />
         <div className="v3-empty">
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
             {error}
           </div>
           <div style={{ fontSize: 12 }}>Try again, or check the Sub Directory.</div>
@@ -195,7 +195,7 @@ export default function SubDetail() {
     )
   }
 
-  // Nothing matches — neither a profile nor any per-job sub rows.
+  // Nothing matches, neither a profile nor any per-job sub rows.
   // Treat as a clean miss; route them back to the directory.
   if (!profile && subRows.length === 0) {
     if (isDesktop) {
@@ -209,11 +209,11 @@ export default function SubDetail() {
     }
 
     return (
-      <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <BackButton onClick={() => { hapticTap(); navigate('/subs') }} />
         <div className="v3-empty">
           <Hammer size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
             Sub not found.
           </div>
           <div style={{ fontSize: 12 }}>This sub isn't in the directory yet.</div>
@@ -245,21 +245,21 @@ export default function SubDetail() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
     >
       {/* Top bar */}
-      <motion.div variants={item} style={{ padding: '8px 20px 4px' }}>
+      <motion.div variants={item} style={{ padding: '8px 24px 4px' }}>
         <BackButton onClick={() => { hapticTap(); navigate('/subs') }} />
       </motion.div>
 
       {/* Cockpit */}
-      <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
+      <motion.div variants={item} style={{ padding: '8px 24px 12px' }}>
         <div style={{
-          padding: '14px 16px',
-          borderRadius: 16,
+          padding: '12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 8px 22px rgba(20, 20, 20, 0.40)'
         }}>
           <Eyebrow tone="gold">
             <Hammer size={11} aria-hidden="true" />
@@ -268,9 +268,9 @@ export default function SubDetail() {
           <h1 style={{
             margin: '6px 0 0',
             fontFamily: 'var(--font-body)',
-            fontSize: 'clamp(22px, 6vw, 28px)',
+            fontSize: 24,
             lineHeight: 1.05,
-            letterSpacing: '-0.015em',
+            letterSpacing: 0,
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
@@ -282,7 +282,7 @@ export default function SubDetail() {
             <div style={{
               marginTop: 10,
               display: 'flex',
-              gap: 10,
+              gap: 12,
               flexWrap: 'wrap',
               fontSize: 12,
               color: 'var(--v3-text-muted)',
@@ -290,14 +290,14 @@ export default function SubDetail() {
             }}>
               {displayPhone && (
                 <a href={`tel:${displayPhone}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--v3-text)', textDecoration: 'none', fontWeight: 600 }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--v3-text)', textDecoration: 'none', fontWeight: 600 }}>
                   <Phone size={11} />
                   {formatPhone(displayPhone)}
                 </a>
               )}
               {profile?.email && (
                 <a href={`mailto:${profile.email}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--v3-text)', textDecoration: 'none', fontWeight: 600 }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--v3-text)', textDecoration: 'none', fontWeight: 600 }}>
                   <Mail size={11} />
                   {profile.email}
                 </a>
@@ -326,7 +326,7 @@ export default function SubDetail() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
               <Eyebrow>Trades</Eyebrow>
               <StampNumber size="xl" style={{ display: 'block', lineHeight: 0.95 }}>
-                {totals.trades.length || '—'}
+                {totals.trades.length || '\u2003'}
               </StampNumber>
               <Eyebrow as="div" style={{ marginTop: 2 }}>
                 {totals.lastWorked ? `Last: ${fmtRelativeDate(totals.lastWorked)}` : 'No work yet'}
@@ -336,12 +336,12 @@ export default function SubDetail() {
         </div>
       </motion.div>
 
-      {/* No profile yet — surface a single Create CTA */}
+      {/* No profile yet, surface a single Create CTA */}
       {!profile && (
-        <motion.div variants={item} style={{ padding: '0 20px 12px' }}>
+        <motion.div variants={item} style={{ padding: '0 24px 12px' }}>
           <div style={{
-            padding: '14px 16px',
-            borderRadius: 14,
+            padding: '12px 16px',
+            borderRadius: 10,
             background: 'var(--v3-surface)',
             border: '1px dashed color-mix(in srgb, var(--v3-primary) 36%, transparent)',
             display: 'flex',
@@ -349,11 +349,11 @@ export default function SubDetail() {
             gap: 12
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--v3-text)' }}>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>
                 No vendor profile yet
               </div>
               <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 3, lineHeight: 1.4 }}>
-                Add insurance, banking, W-9 and license info so it's all in one place next time you call them.
+                Add insurance, banking, W9 and license info so it's all in one place next time you call them.
               </div>
             </div>
             <motion.button
@@ -363,18 +363,18 @@ export default function SubDetail() {
               disabled={creating}
               style={{
                 flexShrink: 0,
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                minHeight: 40, padding: '0 14px 0 12px',
-                borderRadius: 999,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                minHeight: 40, padding: '0 12px 0 12px',
+                borderRadius: 10,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
                 background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.16em', textTransform: 'uppercase',
+                fontSize: 12, fontWeight: 700,
+                letterSpacing: 0, textTransform: 'uppercase',
                 cursor: creating ? 'default' : 'pointer',
                 opacity: creating ? 0.6 : 1,
-                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)',
+                boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)',
                 WebkitTapHighlightColor: 'transparent'
               }}
             >
@@ -385,7 +385,7 @@ export default function SubDetail() {
         </motion.div>
       )}
 
-      {/* Profile editor — only when a profile row exists */}
+      {/* Profile editor, only when a profile row exists */}
       {profile && (
         <ProfileEditor
           profile={profile}
@@ -393,7 +393,7 @@ export default function SubDetail() {
         />
       )}
 
-      {/* Job history — read-only */}
+      {/* Job history, read-only */}
       {subRows.length > 0 && (
         <motion.div variants={item} className="v3-section" style={{ margin: '0 20px 28px' }}>
           <SectionHeader label="Job history" />
@@ -401,10 +401,10 @@ export default function SubDetail() {
             listStyle: 'none',
             padding: 0,
             margin: '4px 0 0',
-            display: 'flex', flexDirection: 'column', gap: 2,
+            display: 'flex', flexDirection: 'column', gap: 4,
             background: 'var(--v3-surface)',
             border: '1px solid var(--v3-border)',
-            borderRadius: 14,
+            borderRadius: 10,
             overflow: 'hidden'
           }}>
             {subRows.map((r, i) => {
@@ -415,8 +415,8 @@ export default function SubDetail() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: 10,
-                    padding: '12px 14px',
+                    gap: 12,
+                    padding: '12px 12px',
                     borderBottom: i < subRows.length - 1 ? '1px solid var(--v3-border)' : 'none',
                     fontFamily: 'var(--font-body)',
                     fontSize: 12
@@ -429,7 +429,7 @@ export default function SubDetail() {
                         {c.name}
                       </span>
                       {c.job_title && (
-                        <span style={{ color: 'var(--v3-text-muted)', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ color: 'var(--v3-text-muted)', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {c.job_title}
                         </span>
                       )}
@@ -440,11 +440,11 @@ export default function SubDetail() {
                   <span style={{
                     flexShrink: 0,
                     fontFamily: 'var(--font-display)',
-                    fontSize: 13,
+                    fontSize: 14,
                     color: 'var(--v3-text)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '—'}
+                    {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}
                   </span>
                 </li>
               )
@@ -622,7 +622,7 @@ function SubDetailDesktop({
 
             <section className="fh-build-card fh-build-table">
               <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">Job history - {subRows.length.toLocaleString()}</div>
+                <div className="fh-build-eyebrow">Job history {subRows.length.toLocaleString()}</div>
                 <span style={{ color: 'var(--v3-text-muted)', fontSize: 12 }}>
                   {totals.lastWorked ? `Last worked ${fmtRelativeDate(totals.lastWorked)}` : 'No work logged'}
                 </span>
@@ -662,7 +662,7 @@ function SubDetailDesktop({
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Compliance</div>
-              <strong style={{ color: insuranceTone === 'bad' ? 'var(--v3-danger-bright)' : insuranceTone === 'warn' ? '#e0a141' : undefined }}>
+              <strong style={{ color: insuranceTone === 'bad' ? 'var(--v3-danger-bright)' : insuranceTone === 'warn' ? '#C9963A' : undefined }}>
                 {insuranceLabel}
               </strong>
               <span>
@@ -691,7 +691,7 @@ function SubDetailDesktop({
                   ? [profile.w9_path, profile.coi_path, profile.license_path].filter(Boolean).length
                   : '-'} / 3
               </strong>
-              <span>W-9, COI, and license tracked in the editor.</span>
+              <span>W9, COI, and license tracked in the editor.</span>
             </section>
           </aside>
         </section>
@@ -749,7 +749,7 @@ function SubDetailStatePage({
 }
 
 /* ============================================================
-   ProfileEditor — five sections of editable vendor data.
+   ProfileEditor, five sections of editable vendor data.
    Local form state, single Save button, optimistic toast.
    ============================================================ */
 function ProfileEditor({ profile, onSaved }: any) {
@@ -876,7 +876,7 @@ function ProfileEditor({ profile, onSaved }: any) {
           />
         </Row>
         <Eyebrow as="div" style={{ marginTop: 4, color: 'var(--v3-text-muted)' }}>
-          Lightweight only — never store full account or routing numbers here.
+          Lightweight only, never store full account or routing numbers here.
         </Eyebrow>
       </Section>
 
@@ -888,14 +888,14 @@ function ProfileEditor({ profile, onSaved }: any) {
         <textarea
           value={form.notes}
           onChange={(e) => setField('notes', e.target.value)}
-          placeholder="Anything to remember — scheduling quirks, crew sizes, preferred suppliers…"
+          placeholder="Anything to remember, scheduling quirks, crew sizes, preferred suppliers…"
           rows={4}
           style={{
             width: '100%', boxSizing: 'border-box',
-            padding: '12px 14px', borderRadius: 12,
+            padding: '12px 12px', borderRadius: 10,
             background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
             color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-            fontSize: 13, outline: 'none', resize: 'vertical',
+            fontSize: 14, outline: 'none', resize: 'vertical',
             lineHeight: 1.4
           }}
         />
@@ -915,17 +915,17 @@ function ProfileEditor({ profile, onSaved }: any) {
           disabled={saving || !dirty || !form.name.trim()}
           style={{
             width: '100%',
-            padding: '14px 16px', borderRadius: 14,
+            padding: '12px 16px', borderRadius: 10,
             border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
             background: dirty
               ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
               : 'var(--v3-surface-2)',
             color: dirty ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-            letterSpacing: '0.06em', textTransform: 'uppercase',
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+            letterSpacing: 0, textTransform: 'uppercase',
             cursor: saving || !dirty ? 'default' : 'pointer',
             opacity: saving ? 0.7 : 1,
-            boxShadow: dirty ? '0 0 0 2px rgba(228, 190, 111, 0.14), 0 8px 18px rgba(0, 0, 0, 0.45)' : 'none'
+            boxShadow: dirty ? '0 0 0 2px rgba(201, 150, 58, 0.14), 0 8px 18px rgba(20, 20, 20, 0.45)' : 'none'
           }}
         >
           {saving ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
@@ -936,7 +936,7 @@ function ProfileEditor({ profile, onSaved }: any) {
 }
 
 /* ============================================================
-   DocumentsSection — three doc slots (W-9, COI, License). Each
+   DocumentsSection, three doc slots (W9, COI, License). Each
    slot uploads to sub-docs/<user>/<profile>/<slot>.<ext> and
    stores the path in the profile row. View opens a 60-sec
    signed URL.
@@ -1024,20 +1024,20 @@ function DocumentsSection({ profile, onChanged }: any) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                padding: '12px 14px',
-                borderRadius: 12,
+                padding: '12px 12px',
+                borderRadius: 10,
                 background: 'var(--v3-surface-2)',
                 border: '1px solid var(--v3-border-strong)'
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 13, color: 'var(--v3-text)' }}>
+                  <span style={{ fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 14, color: 'var(--v3-text)' }}>
                     {slot.label}
                   </span>
                   <StatusPill onFile={onFile} />
                 </div>
-                <div style={{ marginTop: 3, fontSize: 11, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+                <div style={{ marginTop: 3, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
                   {slot.hint}
                 </div>
               </div>
@@ -1054,7 +1054,7 @@ function DocumentsSection({ profile, onChanged }: any) {
                 style={{ display: 'none' }}
               />
 
-              <div style={{ display: 'inline-flex', gap: 6, flexShrink: 0 }}>
+              <div style={{ display: 'inline-flex', gap: 8, flexShrink: 0 }}>
                 {onFile && (
                   <IconButton title="View" onClick={() => { hapticTap(); handleView(currentPath) }}>
                     <ExternalLink size={14} />
@@ -1097,11 +1097,11 @@ function BackButton({ onClick }: any) {
       onClick={onClick}
       style={{
         alignSelf: 'flex-start',
-        display: 'inline-flex', alignItems: 'center', gap: 6,
+        display: 'inline-flex', alignItems: 'center', gap: 8,
         padding: '8px 12px 8px 8px', borderRadius: 10,
         background: 'transparent', border: '1px solid var(--v3-border)',
         color: 'var(--v3-text)', cursor: 'pointer',
-        fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+        fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
         WebkitTapHighlightColor: 'transparent'
       }}
     >
@@ -1118,11 +1118,11 @@ function Section({ icon, label, children }: any) {
       <SectionHeader label={label} />
       <div style={{
         marginTop: 6,
-        padding: 14,
-        borderRadius: 14,
+        padding: 12,
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
-        display: 'flex', flexDirection: 'column', gap: 10
+        display: 'flex', flexDirection: 'column', gap: 12
       }}>
         {children}
       </div>
@@ -1132,7 +1132,7 @@ function Section({ icon, label, children }: any) {
 
 function Field({ label, value, onChange, type = 'text', inputMode, placeholder, hint, required }: any) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       <Eyebrow>
         {label}{required && <span style={{ color: 'var(--v3-primary)', marginLeft: 3 }}>*</span>}
       </Eyebrow>
@@ -1144,14 +1144,14 @@ function Field({ label, value, onChange, type = 'text', inputMode, placeholder, 
         placeholder={placeholder}
         style={{
           width: '100%', boxSizing: 'border-box',
-          padding: '11px 12px', borderRadius: 10,
+          padding: '12px 12px', borderRadius: 10,
           background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
           color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-          fontSize: 13, outline: 'none'
+          fontSize: 14, outline: 'none'
         }}
       />
       {hint && (
-        <span style={{ fontSize: 10, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+        <span style={{ fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
           {hint}
         </span>
       )}
@@ -1161,7 +1161,7 @@ function Field({ label, value, onChange, type = 'text', inputMode, placeholder, 
 
 function SelectField({ label, value, onChange, options }: any) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       <Eyebrow>
         {label}
       </Eyebrow>
@@ -1170,10 +1170,10 @@ function SelectField({ label, value, onChange, options }: any) {
         onChange={(e) => onChange(e.target.value)}
         style={{
           width: '100%', boxSizing: 'border-box',
-          padding: '11px 12px', borderRadius: 10,
+          padding: '12px 12px', borderRadius: 10,
           background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
           color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-          fontSize: 13, outline: 'none', appearance: 'none'
+          fontSize: 14, outline: 'none', appearance: 'none'
         }}
       >
         {options.map((o: any) => (
@@ -1186,7 +1186,7 @@ function SelectField({ label, value, onChange, options }: any) {
 
 function Row({ children }: any) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
       {children}
     </div>
   )
@@ -1197,18 +1197,18 @@ function ExpiryNote({ days }: any) {
   const soon = !expired && days <= 30
   if (!expired && !soon) {
     return (
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
         <CheckCircle2 size={12} color="currentColor" />
         Renews in {days} days
       </div>
     )
   }
   return (
-    <Eyebrow as="div" style={{ padding: '6px 10px', borderRadius: 8, background: expired
-        ? 'color-mix(in srgb, var(--v3-danger, #c84a4a) 16%, transparent)'
+    <Eyebrow as="div" style={{ padding: '8px 12px', borderRadius: 10, background: expired
+        ? 'color-mix(in srgb, var(--v3-danger, #C0392B) 16%, transparent)'
         : 'var(--v3-primary-soft)', border: `1px solid ${expired
-        ? 'color-mix(in srgb, var(--v3-danger, #c84a4a) 50%, transparent)'
-        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`, color: expired ? 'var(--v3-danger-bright, #ff8b8b)' : 'var(--v3-primary)' }}>
+        ? 'color-mix(in srgb, var(--v3-danger, #C0392B) 50%, transparent)'
+        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`, color: expired ? 'var(--v3-danger-bright, #C9963A)' : 'var(--v3-primary)' }}>
       <AlertTriangle size={12} />
       {expired ? `Expired ${Math.abs(days)}d ago` : `Expires in ${days}d`}
     </Eyebrow>
@@ -1217,7 +1217,7 @@ function ExpiryNote({ days }: any) {
 
 function StatusPill({ onFile }: any) {
   return (
-    <Eyebrow style={{ padding: '2px 7px', borderRadius: 999, background: onFile ? 'var(--v3-primary-soft)' : 'var(--v3-surface)', border: `1px solid ${onFile
+    <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: onFile ? 'var(--v3-primary-soft)' : 'var(--v3-surface)', border: `1px solid ${onFile
         ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
         : 'var(--v3-border)'}`, color: onFile ? 'var(--v3-primary)' : 'var(--v3-text-muted)' }}>
       {onFile ? 'On file' : 'Missing'}
@@ -1238,7 +1238,7 @@ function IconButton({ children, onClick, disabled, primary, danger, title }: any
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         borderRadius: 10,
         border: `1px solid ${danger
-          ? 'color-mix(in srgb, var(--v3-danger, #c84a4a) 40%, transparent)'
+          ? 'color-mix(in srgb, var(--v3-danger, #C0392B) 40%, transparent)'
           : primary
           ? 'color-mix(in srgb, var(--v3-primary) 50%, transparent)'
           : 'var(--v3-border-strong)'}`,
@@ -1250,7 +1250,7 @@ function IconButton({ children, onClick, disabled, primary, danger, title }: any
         color: primary
           ? 'var(--v3-on-primary)'
           : danger
-          ? 'var(--v3-danger-bright, #ff8b8b)'
+          ? 'var(--v3-danger-bright, #C9963A)'
           : 'var(--v3-text)',
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.5 : 1,

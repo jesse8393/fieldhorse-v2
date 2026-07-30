@@ -63,8 +63,8 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
 
   const fieldStyle = {
     width: '100%',
-    padding: '12px 14px',
-    borderRadius: 12,
+    padding: '12px 12px',
+    borderRadius: 10,
     background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
@@ -72,7 +72,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
     fontSize: 14,
     outline: 'none'
   }
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!(!v && saving)) onOpenChange(v) }}>
@@ -85,14 +85,14 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               Log{' '}
               miles.
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
             Every mile is ${IRS_RATE}/mi deducted at tax time (IRS 2026 rate).
           </DrawerDescription>
@@ -102,7 +102,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
           onSubmit={submit}
           className="fh-vaul-form"
           style={{
-            padding: '6px 20px 20px',
+            padding: '8px 24px 24px',
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
@@ -116,8 +116,8 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
             overscrollBehavior: 'contain'
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Date</span>
               <input
                 type="date"
@@ -126,7 +126,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
                 style={fieldStyle}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Miles</span>
               <input
                 type="number"
@@ -141,7 +141,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
             </label>
           </div>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Purpose</span>
             <input
               type="text"
@@ -152,7 +152,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
             />
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Link to job (optional)</span>
             <select
               value={contactId}
@@ -167,20 +167,20 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
           </label>
 
           {milesNum > 0 && (
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 12, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '12px 12px', borderRadius: 10, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)' }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>Deduction</Eyebrow>
-              <span className="fh-text-gradient-gold" style={{ fontFamily: 'var(--font-display)', fontSize: 22, letterSpacing: '0.01em' }}>
+              <span className="fh-text-gradient-gold" style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0 }}>
                 ${deduction.toFixed(2)}
               </span>
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
               disabled={saving}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
             >
               <X size={14} />
               Cancel
@@ -194,14 +194,14 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                padding: '12px 14px',
-                borderRadius: 12,
+                padding: '12px 12px',
+                borderRadius: 10,
                 border: 'none',
                 background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                 color: 'var(--onyx)',
                 fontFamily: 'var(--font-display)',
                 fontSize: 14,
-                letterSpacing: '0.14em',
+                letterSpacing: 0,
                 cursor: canSave ? 'pointer' : 'default',
                 boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                 opacity: canSave ? 1 : 0.6

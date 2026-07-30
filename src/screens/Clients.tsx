@@ -12,7 +12,7 @@ import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
 import { findDuplicateClusters } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.tsx'
-// Lazy — sheet only mounts when the operator opens the merge flow.
+// Lazy, sheet only mounts when the operator opens the merge flow.
 const MergeDuplicatesSheet = lazy(() => import('../components/MergeDuplicatesSheet.tsx'))
 import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
 const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
@@ -59,11 +59,11 @@ export default function Clients() {
   // rollups refresh. Replaces the old load() refetch.
   const load = invalidateClients
 
-  // Map<client_id, { lifetime, outstanding, activeCount, ... }> — built
+  // Map<client_id, { lifetime, outstanding, activeCount, ... }>, built
   // once per (jobs|payments) change. Per-row lookup is O(1).
   const rollupMap = useMemo(() => rollupByClient(jobs, payments, changeOrders), [jobs, payments, changeOrders])
 
-  // Duplicate detection — runs every time the client roster changes.
+  // Duplicate detection, runs every time the client roster changes.
   // Match policy lives in lib/clientMerge.ts (phone or email normalized).
   const duplicateClusters = useMemo(() => findDuplicateClusters(rows), [rows])
   const duplicateCount = useMemo(
@@ -95,7 +95,7 @@ export default function Clients() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, q, filter, rollupMap])
 
-  // Bounded render window that grows on scroll — the client book can run to
+  // Bounded render window that grows on scroll, the client book can run to
   // thousands of rows; keep the DOM small without changing the row design.
   const { visible: visibleClients, sentinelRef: clientsSentinelRef, hasMore: clientsHasMore } = useInfiniteRender(
     filtered,
@@ -110,7 +110,7 @@ export default function Clients() {
   }, [rows, rollupMap])
 
   // Screen-level outstanding aggregate + counts. Derived from the same
-  // rollupMap that powers per-tile stats — single source of truth.
+  // rollupMap that powers per-tile stats, single source of truth.
   const screenStats = useMemo(() => {
     let outstanding = 0
     let activeAccounts = 0
@@ -137,7 +137,7 @@ export default function Clients() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, rollupMap])
 
-  // The single highest-lifetime client in the filtered set — surfaces
+  // The single highest-lifetime client in the filtered set, surfaces
   // a small "TOP" gold rib when the list has enough scale to warrant it
   // and the top has a non-zero lifetime. Mirrors the featuredId pattern
   // used on Jobs.
@@ -156,21 +156,21 @@ export default function Clients() {
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
-  // A failed load must not fall through to the "No accounts yet" empty state —
+  // A failed load must not fall through to the "No accounts yet" empty state :
   // that would tell a contractor with a full book of business it's empty.
   if (isError) {
     return (
-      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+      <div className="v3-screen" style={{ padding: '24px 24px' }}>
         <DataErrorState
           title="Couldn't load clients"
-          message="We couldn't reach your client list. Check your connection and retry — nothing was lost."
+          message="We couldn't reach your client list. Check your connection and retry, nothing was lost."
           onRetry={() => invalidateClients()}
         />
       </div>
     )
   }
 
-  // Phase 7 — desktop-first composition. At >=900px DesktopClientsDirectory
+  // Phase 7, desktop-first composition. At >=900px DesktopClientsDirectory
   // renders the real KPI strip + list+detail directory using the same
   // rows / jobs / rollups / handlers the mobile branch consumes. Below
   // 900px the existing motion.div.v3-screen--clients flow renders verbatim.
@@ -223,15 +223,15 @@ export default function Clients() {
   }
 
   return (
-    <motion.div className="v3-screen v3-screen--clients" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}>
-      {/* COCKPIT — black-glass panel: title eyebrow + state chip + KPI strip */}
-      <motion.div className="fh-clients__cockpit" variants={item} style={{ padding: '8px 20px 12px' }}>
+    <motion.div className="v3-screen v3-screen--clients" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}>
+      {/* COCKPIT, black-glass panel: title eyebrow + state chip + KPI strip */}
+      <motion.div className="fh-clients__cockpit" variants={item} style={{ padding: '8px 24px 12px' }}>
         <div style={{
-          padding: '14px 16px',
-          borderRadius: 16,
-          background: 'linear-gradient(180deg, #1b1816 0%, var(--v3-surface) 72%)',
+          padding: '12px 16px',
+          borderRadius: 10,
+          background: 'linear-gradient(180deg, #141414 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 8px 22px rgba(0, 0, 0, 0.42), 0 20px 44px rgba(0, 0, 0, 0.28)'
+          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
         }}>
           {/* Header row: section eyebrow + state chip */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -251,7 +251,7 @@ export default function Clients() {
             </button>
           </div>
 
-          {/* KPI strip — Lifetime billed | Outstanding (when populated) */}
+          {/* KPI strip, Lifetime billed | Outstanding (when populated) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: screenStats.outstanding > 0 ? '1fr 1px 1fr' : '1fr',
@@ -285,18 +285,18 @@ export default function Clients() {
         </div>
       </motion.div>
 
-      {/* Search + filter row — unified gutter, FilterPill primitive */}
-      <motion.div className="fh-clients__filters" variants={item} style={{ padding: '0 20px 12px' }}>
+      {/* Search + filter row, unified gutter, FilterPill primitive */}
+      <motion.div className="fh-clients__filters" variants={item} style={{ padding: '0 24px 12px' }}>
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, company, phone, email…"
-            style={{ width: '100%', padding: '11px 12px 11px 34px', borderRadius: 12, background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
           />
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
           {[
             { id: 'all', label: 'All', count: filterCounts.all },
             { id: 'active', label: 'Active', count: filterCounts.active },
@@ -315,18 +315,18 @@ export default function Clients() {
         </div>
       </motion.div>
 
-      {/* DUPLICATES BANNER — only when clusters detected. Tapping opens
+      {/* DUPLICATES BANNER, only when clusters detected. Tapping opens
           the merge sheet. */}
       {!loading && duplicateClusters.length > 0 && (
-        <motion.div variants={item} style={{ padding: '0 20px 12px' }}>
+        <motion.div variants={item} style={{ padding: '0 24px 12px' }}>
           <button
             type="button"
             onClick={() => { hapticMedium(); setMergeOpen(true) }}
             style={{
               width: '100%',
               display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 14px',
-              borderRadius: 14,
+              padding: '12px 12px',
+              borderRadius: 10,
               background: 'color-mix(in srgb, var(--v3-primary) 10%, var(--v3-surface))',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)',
               color: 'var(--v3-text)',
@@ -346,14 +346,14 @@ export default function Clients() {
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                 color: 'var(--v3-text)', lineHeight: 1.2
               }}>
                 {duplicateCount} possible {duplicateCount === 1 ? 'duplicate' : 'duplicates'} found
               </div>
               <div style={{
                 marginTop: 2,
-                fontFamily: 'var(--font-body)', fontSize: 11,
+                fontFamily: 'var(--font-body)', fontSize: 12,
                 color: 'var(--v3-text-muted)'
               }}>
                 {duplicateClusters.length} {duplicateClusters.length === 1 ? 'cluster' : 'clusters'} sharing a phone or email
@@ -366,7 +366,7 @@ export default function Clients() {
         </motion.div>
       )}
 
-      {/* GRID LAYOUT — 1/2/3 col responsive (320px min). Each client is a
+      {/* GRID LAYOUT, 1/2/3 col responsive (320px min). Each client is a
           tall vertical tile, not a wide row. */}
       <motion.div
         className="fh-clients__list"
@@ -378,20 +378,20 @@ export default function Clients() {
         {loading && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="v3-skeleton" style={{ height: 64, borderRadius: 12 }} />
+              <div key={i} className="v3-skeleton" style={{ height: 64, borderRadius: 10 }} />
             ))}
           </div>
         )}
         {!loading && rows.length === 0 && (
           <div style={{
-            padding: '32px 24px', borderRadius: 16,
+            padding: '32px 24px', borderRadius: 10,
             background: 'var(--v3-surface)',
             border: '1px dashed var(--v3-border-strong)',
             textAlign: 'center', color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
           }}>
             <div style={{
-              width: 44, height: 44, borderRadius: 12,
+              width: 44, height: 44, borderRadius: 10,
               background: 'var(--v3-surface-2)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
               display: 'grid', placeItems: 'center',
@@ -411,11 +411,11 @@ export default function Clients() {
               background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
               color: 'var(--v3-on-primary)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-              padding: '10px 16px', borderRadius: 10,
+              padding: '12px 16px', borderRadius: 10,
               fontWeight: 700, fontSize: 12,
-              letterSpacing: '0.06em', textTransform: 'uppercase',
+              letterSpacing: 0, textTransform: 'uppercase',
               cursor: 'pointer',
-              boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+              boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
             }}>
               Add your first client
             </button>
@@ -426,7 +426,7 @@ export default function Clients() {
             No clients match that search.
           </div>
         )}
-        {/* FEATURED TOP CLIENT — gold-rib hero card from design handoff
+        {/* FEATURED TOP CLIENT, gold-rib hero card from design handoff
             (styles-workflows.css .cl-card--top). Only rendered when the
             top earner is meaningfully ahead of the pack and we're on the
             "all" filter so it never competes with an active search/filter. */}
@@ -435,7 +435,7 @@ export default function Clients() {
           if (!top) return null
           const r = rollupFor(top.id)
           const lastActivity = top.last_activity_at ? new Date(top.last_activity_at) : null
-          const lastRel = lastActivity ? formatRelative(lastActivity) : '—'
+          const lastRel = lastActivity ? formatRelative(lastActivity) : '\u2003'
           const initials = (top.name || '·').trim().split(/\s+/).slice(0, 2).map(s => s.charAt(0).toUpperCase()).join('')
           return (
             <div className="cl-card cl-card--top">
@@ -456,13 +456,13 @@ export default function Clients() {
                   <div className="cl-strip-cell">
                     <div className="cl-strip-cell__lbl">Active</div>
                     <div className={`cl-strip-cell__val${r.activeCount > 0 ? ' cl-strip-cell__val--gold' : ''}`}>
-                      {r.activeCount > 0 ? `${r.activeCount} ${r.activeCount === 1 ? 'job' : 'jobs'}` : '—'}
+                      {r.activeCount > 0 ? `${r.activeCount} ${r.activeCount === 1 ? 'job' : 'jobs'}` : '\u2003'}
                     </div>
                   </div>
                   <div className="cl-strip-cell">
                     <div className="cl-strip-cell__lbl">Owes</div>
                     <div className={`cl-strip-cell__val${r.outstanding > 0 ? ' cl-strip-cell__val--alert' : ''}`}>
-                      {r.outstanding > 0 ? money(r.outstanding) : '—'}
+                      {r.outstanding > 0 ? money(r.outstanding) : '\u2003'}
                     </div>
                   </div>
                   <div className="cl-strip-cell">
@@ -474,7 +474,7 @@ export default function Clients() {
             </div>
           )
         })()}
-        {/* Single black-glass list container with hairline dividers — premium
+        {/* Single black-glass list container with hairline dividers, premium
             iOS list pattern. Each row is a tap target into /clients/:id;
             the heavier per-card chrome (lifetime stamp, contact row,
             stat chips) lives on the detail screen now. */}
@@ -482,12 +482,12 @@ export default function Clients() {
           <div
             role="list"
             style={{
-              borderRadius: 16,
+              borderRadius: 10,
               background: 'var(--v3-surface-glass)',
               backdropFilter: 'blur(14px) saturate(1.1)',
               WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
               border: '1px solid var(--v3-border)',
-              boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+              boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(20, 20, 20, 0.40)',
               overflow: 'hidden'
             }}
           >
@@ -552,7 +552,7 @@ export default function Clients() {
 }
 
 /* ============================================================
-   ClientRow — compact list row inside the rounded black-glass
+   ClientRow, compact list row inside the rounded black-glass
    container. ~64px tall. Premium iOS list pattern.
 
      ┌────────────────────────────────────────────────────┐
@@ -562,12 +562,12 @@ export default function Clients() {
      │ ...next row...                                        │
      └─────────────────────────────────────────────────────┘
 
-   Subline is a single synthesized status string — order of preference:
+   Subline is a single synthesized status string, order of preference:
      1. "Owes $X · N+ days"            (overdue, danger tone)
      2. "N active jobs · $X outstanding" (active money in motion, gold)
      3. "N active jobs"                  (work in flight, neutral)
      4. company_name                     (relationship-only fallback)
-     5. "—"                              (truly empty record)
+     5. "\u2003"                              (truly empty record)
 
    Contact actions (call / text / email / map) live on the client
    detail screen; surfacing them on every list row was clutter the
@@ -597,7 +597,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
       return { text: `${r.activeCount} active ${r.activeCount === 1 ? 'job' : 'jobs'}`, tone: 'muted' }
     }
     if (c.company_name) return { text: c.company_name, tone: 'muted' }
-    return { text: '—', tone: 'muted' }
+    return { text: '\u2003', tone: 'muted' }
   }, [c.company_name, r.activeCount, r.outstanding])
 
   const sublineColor =
@@ -610,7 +610,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
   // on touch, and AnimatePresence layout cost was a measurable hit on
   // mid-range iPhones. Plain button + cheap whileTap is enough.
   // The featured TOP CLIENT card above the list already highlights the
-  // top earner — re-highlighting the same row in the list with gold
+  // top earner, re-highlighting the same row in the list with gold
   // background + gold avatar + "TOP" pill made it look like a stuck
   // "selected" state ("yellow and stuck" per user). All rows now share
   // the same neutral treatment; the featured card carries the emphasis.
@@ -624,7 +624,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
         alignItems: 'center',
         gap: 12,
         width: '100%',
-        padding: '12px 14px',
+        padding: '12px 12px',
         background: 'transparent',
         border: 'none',
         borderBottom: isLast ? 'none' : '1px solid var(--v3-border)',
@@ -646,20 +646,20 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
         display: 'grid', placeItems: 'center',
         fontFamily: 'var(--font-display)',
         fontSize: 14,
-        letterSpacing: '0.04em',
+        letterSpacing: 0,
         color: 'var(--v3-text-muted)'
       }}>
         {(c.name || '·').trim().charAt(0).toUpperCase()}
       </div>
 
       {/* Name + synthesized subline */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <span style={{
             fontFamily: 'var(--font-body)',
             fontSize: 14, fontWeight: 600,
             color: 'var(--v3-text)',
-            letterSpacing: '-0.005em',
+            letterSpacing: 0,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             minWidth: 0
           }}>
@@ -668,7 +668,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
         </div>
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: subline.tone === 'muted' ? 500 : 700,
           color: sublineColor,
           fontVariantNumeric: 'tabular-nums',
@@ -691,14 +691,14 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
           fontSize: 16, lineHeight: 1,
           color: 'var(--v3-text)',
           fontVariantNumeric: 'tabular-nums',
-          letterSpacing: '0.01em'
+          letterSpacing: 0
         }}>
           {money(r.lifetime)}
         </div>
         <div style={{
           marginTop: 4,
           fontFamily: 'var(--font-body)',
-          fontSize: 10,
+          fontSize: 12,
           color: 'var(--v3-text-muted)',
           fontVariantNumeric: 'tabular-nums'
         }}>
@@ -716,7 +716,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
 }
 
 /* ============================================================
-   ClientsStateChip — small premium status pill in the cockpit
+   ClientsStateChip, small premium status pill in the cockpit
    top-right. Mirrors Money Owed's BalanceStateChip pattern.
      overdue → danger-tinted "N owe balance" (any client overdue)
      active  → gold-tinted   "N active" (active jobs, no overdue)
@@ -742,7 +742,7 @@ function ClientsStateChip({ stats, totalAccounts }: any) {
     label = `${totalAccounts} ${totalAccounts === 1 ? 'account' : 'accounts'}`
   }
   return (
-    <Eyebrow style={{ padding: '3px 9px', borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
+    <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
       {label}
     </Eyebrow>
   )

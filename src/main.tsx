@@ -19,7 +19,7 @@ import './styles/v3.css'
 // Loaded LAST so cascade-equal rules win. See file header for context.
 import './styles/mobile-keyboard-fix.css'
 
-// Build stamp — emits <meta name="fh-build" content="SHA · ISO"> on
+// Build stamp, emits <meta name="fh-build" content="SHA · ISO"> on
 // every load so a live audit can confirm which commit is deployed
 // (audit L1). Defines come from vite.config.js. Falls back to "dev"
 // when running outside the Vite build.
@@ -81,8 +81,8 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 //
 // IndexedDB, not localStorage (scaling pass): localStorage caps at ~5MB
 // and serializes the WHOLE cache synchronously on the main thread every
-// write — visible jank once the book has thousands of rows. idb-keyval is
-// async and effectively unbounded. One-time cleanup drops the old
+// write, visible jank once the book has thousands of rows. idb-keyval is
+// async and effectively unbounded. One time cleanup drops the old
 // localStorage blob so it stops eating the quota.
 try { localStorage.removeItem('fh-query-cache') } catch { /* non-fatal */ }
 const queryPersister = createAsyncStoragePersister({
@@ -115,7 +115,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             maxAge: 7 * 24 * 60 * 60 * 1000,
             buster: typeof __FH_BUILD_SHA__ === 'string' ? __FH_BUILD_SHA__ : 'dev',
             dehydrateOptions: {
-              // Don't persist per-keystroke search results — every
+              // Don't persist per-keystroke search results, every
               // ['jobSearch', pattern] entry carries up to 100 rows and
               // there's one per pattern typed; they'd bloat the blob and
               // are worthless offline (the cached list already covers

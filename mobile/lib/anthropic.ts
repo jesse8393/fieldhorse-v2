@@ -1,8 +1,8 @@
-// mobile/lib/anthropic.ts — Claude API client for the native app.
+// mobile/lib/anthropic.ts, Claude API client for the native app.
 //
 // Mirrors the web src/lib/anthropic.ts, but native has no same-origin
 // "/api/claude", so we post to the deployed Netlify function over an
-// absolute URL. The function keeps the Anthropic key server-side and
+// absolute URL. The function keeps the Anthropic key on the server and
 // sets CORS, so the anon mobile client can call it directly.
 //
 // Base URL is configurable via EXPO_PUBLIC_API_BASE_URL (defaults to the

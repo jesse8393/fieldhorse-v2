@@ -9,7 +9,7 @@ import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.
 import { hapticTap } from '../lib/haptics.ts'
 
 // Map notification kind → icon + accent color. Add cases as new kinds
-// are introduced server-side; default falls back to Inbox + steel.
+// are introduced on the server; default falls back to Inbox + steel.
 const KIND_META: Record<string, any> = {
   partner_accepted:   { Icon: Users,           color: 'var(--ink-strong)' },
   inspection_logged:  { Icon: ClipboardCheck,  color: 'var(--signal-green)' },
@@ -33,7 +33,7 @@ export default function NotificationsBell() {
 
   // Single source of truth: badge count derives from rows so the
   // bell badge can't say "1" while the drawer says "All caught up."
-  // Audit caught the divergence — used to be two parallel state vars.
+  // Audit caught the divergence, used to be two parallel state vars.
   const unread = useMemo(() => rows.filter((r) => !r.read_at).length, [rows])
 
   // Pull inbox on mount + whenever auth user changes. Realtime
@@ -52,7 +52,7 @@ export default function NotificationsBell() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  // Realtime — any change to the recipient's inbox refreshes both the
+  // Realtime, any change to the recipient's inbox refreshes both the
   // count badge and (if open) the drawer list.
   useEffect(() => {
     if (!user) return
@@ -78,14 +78,14 @@ export default function NotificationsBell() {
   async function handleTap(row: any) {
     hapticTap()
     if (!row.read_at && user) {
-      // Optimistic update — badge falls automatically since it's
+      // Optimistic update, badge falls automatically since it's
       // derived from rows.
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, read_at: new Date().toISOString() } : r))
       await markRead(row.id, user.id)
     }
     if (row.link) {
       // Route through handleOpenChange so the rest of the list is
-      // marked seen too — leaving via one item shouldn't keep the
+      // marked seen too, leaving via one item shouldn't keep the
       // other five badged.
       handleOpenChange(false)
       navigate(row.link)
@@ -99,7 +99,7 @@ export default function NotificationsBell() {
     await markAllRead(user.id)
   }
 
-  // Opening the inbox counts as seeing it — standard inbox semantics.
+  // Opening the inbox counts as seeing it, standard inbox semantics.
   // While the drawer is up the unread styling still shows what's new,
   // but closing it marks everything read so the badge and "N new"
   // header stop nagging about weeks-old items nobody taps one by one.
@@ -115,17 +115,17 @@ export default function NotificationsBell() {
     <>
       <button
         type="button"
-        aria-label={unread > 0 ? `Notifications — ${unread} unread` : 'Notifications'}
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
         onClick={() => { hapticTap(); setOpen(true) }}
         className="fh-header-search-btn"
         style={{
-          // Matches the search + notes trio in AppHeader at 44/r11/16 —
+          // Matches the search + notes trio in AppHeader at 44/r11/16 :
           // the full minimum touch target. Unread dot stays 14×14 and
           // sits 3px in from the top-right corner.
           width: 44,
           height: 44,
           minWidth: 44,
-          borderRadius: 11,
+          borderRadius: 10,
           background: 'var(--v3-glass-tint)',
           border: '1px solid var(--v3-border-mid)',
           backdropFilter: 'blur(8px)',
@@ -150,13 +150,13 @@ export default function NotificationsBell() {
               minWidth: 14,
               height: 14,
               padding: '0 4px',
-              borderRadius: 7,
+              borderRadius: 10,
               background: 'var(--alert-red)',
-              color: '#fff',
+              color: '#F2EDE4',
               fontFamily: 'var(--font-display)',
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               lineHeight: '14px',
               textAlign: 'center',
               boxShadow: '0 0 0 2px var(--surface-1)'
@@ -173,7 +173,7 @@ export default function NotificationsBell() {
           style={{ maxWidth: '100%', overflowX: 'hidden' }}
         >
           <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <Eyebrow as="div">
                   <Inbox size={12} />
@@ -182,7 +182,7 @@ export default function NotificationsBell() {
                 <DrawerTitle asChild>
                   <h2
                     className="fh-font-serif"
-                    style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, fontStyle: 'normal', color: 'var(--ink-strong)' }}
+                    style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, fontStyle: 'normal', color: 'var(--ink-strong)' }}
                   >
                     {unread > 0 ? <>{unread} new <em style={{ fontStyle: 'normal', fontWeight: 600 }}>notifications.</em></> : <>All <em style={{ fontStyle: 'normal', fontWeight: 600 }}>caught up.</em></>}
                   </h2>
@@ -192,7 +192,7 @@ export default function NotificationsBell() {
                 <button
                   type="button"
                   onClick={handleMarkAll}
-                  style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
                   <Check size={12} />
                   Mark all read
@@ -206,19 +206,19 @@ export default function NotificationsBell() {
             </DrawerDescription>
           </DrawerHeader>
 
-          <div style={{ padding: '6px 20px 24px', maxHeight: '60dvh', overflowY: 'auto' }}>
+          <div style={{ padding: '8px 24px 24px', maxHeight: '60dvh', overflowY: 'auto' }}>
             {loading && rows.length === 0 && (
               <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted)' }}>Loading…</div>
             )}
             {!loading && rows.length === 0 && (
-              <div style={{ padding: '32px 16px', borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No notifications yet.</div>
+              <div style={{ padding: '32px 16px', borderRadius: 10, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No notifications yet.</div>
                 <div style={{ fontSize: 12 }}>Quiet inbox. Check back after partners or subs respond.</div>
               </div>
             )}
 
             {rows.length > 0 && (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {rows.map((r) => {
                   const meta = metaFor(r.kind)
                   const I = meta.Icon
@@ -233,9 +233,9 @@ export default function NotificationsBell() {
                           textAlign: 'left',
                           display: 'flex',
                           alignItems: 'flex-start',
-                          gap: 10,
-                          padding: '12px 14px 12px 18px',
-                          borderRadius: 12,
+                          gap: 12,
+                          padding: '12px 12px 12px 16px',
+                          borderRadius: 10,
                           // User feedback: gold-tinted unread rows read as
                           // yellow noise on the inbox. The colored left
                           // stripe + bold title already signal "unread"
@@ -262,22 +262,22 @@ export default function NotificationsBell() {
                               width: 3,
                               borderRadius: '0 3px 3px 0',
                               background: meta.color,
-                              // meta.color is a var() ref — hex-alpha
+                              // meta.color is a var() ref, hex-alpha
                               // concatenation ('…99') is invalid CSS and
                               // silently drops. color-mix keeps the glow.
                               boxShadow: `0 0 8px color-mix(in srgb, ${meta.color} 60%, transparent)`
                             }}
                           />
                         )}
-                        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: `color-mix(in srgb, ${meta.color} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${meta.color} 27%, transparent)`, color: meta.color }}>
+                        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, display: 'grid', placeItems: 'center', background: `color-mix(in srgb, ${meta.color} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${meta.color} 27%, transparent)`, color: meta.color }}>
                           <I size={14} />
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                            <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: isUnread ? 700 : 600, color: 'var(--ink-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: isUnread ? 700 : 600, color: 'var(--ink-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {r.title}
                             </span>
-                            <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
+                            <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
                               {fmtAge(r.created_at)}
                             </span>
                           </div>

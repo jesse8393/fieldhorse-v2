@@ -6,10 +6,10 @@
 //
 // Schema: fh_change_orders (migration 019).
 //
-// Sequence numbering is server-side (BEFORE INSERT trigger picks
+// Sequence numbering is on the server (BEFORE INSERT trigger picks
 // max+1 per contact_id) so multiple concurrent inserts can't collide.
 // Approved COs bump the contract total used by the invoice's balance
-// summary — the math lives in InvoiceTemplate; this surface only
+// summary, the math lives in InvoiceTemplate; this surface only
 // captures + manages the data.
 
 import { useState } from 'react'
@@ -93,7 +93,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       if (res.error) throw res.error
       toastSuccess(payload.id ? 'Change order updated' : 'Change order added', `CO #${res.data?.sequence_number || ''}`.trim())
 
-      // Notification on NEW change orders only — updates / approvals
+      // Notification on NEW change orders only, updates / approvals
       // don't ping the bell to avoid noise on every minor edit. The
       // approval-side notification can be wired separately if useful.
       // Best-effort; never blocks the save.
@@ -131,7 +131,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
     })
   }
 
-  // Mint a public sign-off link for this CO, flip it to 'sent', and
+  // Mint a public approval link for this CO, flip it to 'sent', and
   // hand the link to the share sheet (SMS is the field default) with
   // clipboard fallback. The customer signs by typed name; approval
   // lands back here via realtime/refresh and folds into the next
@@ -153,7 +153,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         onChange?.()
       }
       const sign = Number(co.amount) >= 0 ? '+' : '−'
-      const shareText = `Change order #${co.sequence_number} — ${co.title} (${sign}${money(Math.abs(Number(co.amount) || 0))}). Review and sign here: ${link.url}`
+      const shareText = `Change order #${co.sequence_number}, ${co.title} (${sign}${money(Math.abs(Number(co.amount) || 0))}). Review and sign here: ${link.url}`
       if (navigator.share) {
         try {
           await navigator.share({ title: `Change order #${co.sequence_number}`, text: shareText })
@@ -163,9 +163,9 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         }
       }
       await navigator.clipboard.writeText(link.url)
-      toastSuccess('Sign-off link copied', 'Text it to the customer — they sign right on the page')
+      toastSuccess('Approval link copied', 'Text it to the customer, they sign right on the page')
     } catch (e: any) {
-      toastError("Couldn't create sign-off link", e?.message || 'Try again.')
+      toastError("Couldn't create approval link", e?.message || 'Try again.')
     }
   }
 
@@ -226,7 +226,7 @@ function SectionShell({ children }: any) {
     <div style={{
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)',
-      borderRadius: 14,
+      borderRadius: 10,
       overflow: 'hidden'
     }}>
       {children}
@@ -258,12 +258,12 @@ function SectionHeader({ count, canAdd, onAdd }: any) {
           style={{
             marginLeft: 'auto',
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '6px 10px',
-            borderRadius: 8,
+            padding: '8px 12px',
+            borderRadius: 10,
             background: 'transparent',
             border: '1px solid var(--v3-border-strong)',
             color: 'var(--v3-text)',
-            fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
             cursor: 'pointer'
           }}
         >
@@ -318,28 +318,28 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
   const isCredit = amt < 0
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 14, padding: '12px 16px', alignItems: 'flex-start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
-        fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
-        letterSpacing: '0.04em', color: 'var(--v3-primary-bright)',
-        fontVariantNumeric: 'tabular-nums', paddingTop: 2
+        fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
+        letterSpacing: 0, color: 'var(--v3-primary-bright)',
+        fontVariantNumeric: 'tabular-nums', paddingTop: 4
       }}>
         CO #{co.sequence_number}
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{
-          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
           color: isVoid ? 'var(--v3-text-muted)' : 'var(--v3-text)',
           textDecoration: isVoid ? 'line-through' : 'none'
         }}>
           {co.title}
         </div>
         {co.description && (
-          <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)', whiteSpace: 'pre-wrap' }}>
+          <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)', whiteSpace: 'pre-wrap' }}>
             {co.description}
           </div>
         )}
-        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {isDraft && <Tag tone="muted">DRAFT</Tag>}
           {isApproved && <Tag tone="green">APPROVED{co.approved_at ? ` · ${shortDate(co.approved_at)}` : ''}</Tag>}
           {isVoid && <Tag tone="muted">VOID</Tag>}
@@ -347,10 +347,10 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
           {co.status === 'rejected' && <Tag tone="red">REJECTED</Tag>}
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         <div style={{
           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-          color: isVoid ? 'var(--v3-text-muted)' : isCredit ? 'var(--v3-success-bright, #4ade80)' : 'var(--v3-text)',
+          color: isVoid ? 'var(--v3-text-muted)' : isCredit ? 'var(--v3-success-bright, #2D7A4F)' : 'var(--v3-text)',
           fontVariantNumeric: 'tabular-nums',
           textDecoration: isVoid ? 'line-through' : 'none',
           whiteSpace: 'nowrap'
@@ -414,28 +414,28 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
 
   return (
     <div style={{ padding: 16, background: 'var(--v3-surface-2)', borderTop: isNew ? 'none' : '1px solid var(--v3-border)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 12 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={labelStyle}>Title</span>
           <input
             type="text"
             value={form.title}
             onChange={(e) => set('title', e.target.value)}
-            placeholder="Rot at SW corner — replace ~8' bottom plate"
+            placeholder="Rot at SW corner, replace ~8' bottom plate"
             style={inputStyle}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={labelStyle}>Amount</span>
           <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 10, top: 9, color: 'var(--v3-text-muted)', fontSize: 13 }}>$</span>
+            <span style={{ position: 'absolute', left: 10, top: 9, color: 'var(--v3-text-muted)', fontSize: 14 }}>$</span>
             <input
               type="text"
               inputMode="decimal"
               value={form.amount}
               onChange={(e) => set('amount', e.target.value)}
               placeholder="0"
-              style={{ ...inputStyle, paddingLeft: 20 }}
+              style={{ ...inputStyle, paddingLeft: 24 }}
             />
           </div>
         </label>
@@ -450,7 +450,7 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
           style={{ ...inputStyle, resize: 'vertical' }}
         />
       </label>
-      <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         {['draft', 'sent', 'approved', 'rejected'].map((s) => (
           <button
             key={s}
@@ -466,7 +466,7 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
         ))}
       </div>
       {form.status === 'approved' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={labelStyle}>Approved by</span>
             <input
@@ -484,7 +484,7 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
               onChange={(e) => set('approval_method', e.target.value || null)}
               style={inputStyle}
             >
-              <option value="">—</option>
+              <option value="">:</option>
               <option value="verbal">Verbal</option>
               <option value="text">Text</option>
               <option value="email">Email</option>
@@ -510,12 +510,12 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
 function Tag({ tone, children }: any) {
   const palette = ({
     muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
-    green: { bg: 'rgba(74, 222, 128, 0.12)', fg: 'var(--v3-success-bright, #4ade80)', br: 'rgba(74, 222, 128, 0.30)' },
-    gold:  { bg: 'rgba(228, 190, 111, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(228, 190, 111, 0.30)' },
-    red:   { bg: 'rgba(232, 90, 87, 0.10)', fg: 'var(--v3-danger-bright, #f5a294)', br: 'rgba(232, 90, 87, 0.30)' }
+    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79, 0.30)' },
+    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(201, 150, 58, 0.30)' },
+    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-bright, #C9963A)', br: 'rgba(192, 57, 43, 0.30)' }
   } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
-    <Eyebrow style={{ padding: '3px 7px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
+    <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
       {children}
     </Eyebrow>
   )
@@ -530,11 +530,11 @@ function IconBtn({ children, onClick, tone, title, ...rest }: any) {
       title={title}
       {...rest}
       style={{
-        width: 26, height: 26, borderRadius: 6,
+        width: 26, height: 26, borderRadius: 10,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
-        border: `1px solid ${danger ? 'rgba(232, 90, 87, 0.35)' : 'var(--v3-border-strong)'}`,
-        color: danger ? 'var(--v3-danger-bright, #f5a294)' : 'var(--v3-text)',
+        border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
+        color: danger ? 'var(--v3-danger-bright, #C9963A)' : 'var(--v3-text)',
         cursor: 'pointer'
       }}
     >
@@ -544,38 +544,38 @@ function IconBtn({ children, onClick, tone, title, ...rest }: any) {
 }
 
 const labelStyle = {
-  fontFamily: 'var(--font-body)', fontSize: 9, fontWeight: 700,
-  letterSpacing: '0.14em', color: 'var(--v3-text-muted)', textTransform: 'uppercase'
+  fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+  letterSpacing: 0, color: 'var(--v3-text-muted)', textTransform: 'uppercase'
 }
 const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
-  padding: '9px 12px', borderRadius: 8,
+  padding: '8px 12px', borderRadius: 10,
   background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)',
-  color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none'
+  color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none'
 }
 const chipStyle = {
-  padding: '6px 12px', borderRadius: 999,
+  padding: '8px 12px', borderRadius: 10,
   background: 'transparent', border: '1px solid var(--v3-border-strong)',
-  color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+  color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
   cursor: 'pointer'
 }
 const chipActiveStyle = {
-  background: 'rgba(228, 190, 111, 0.15)',
+  background: 'rgba(201, 150, 58, 0.15)',
   borderColor: 'var(--v3-primary)',
   color: 'var(--v3-primary-bright)'
 }
 const primaryBtnStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '8px 14px', borderRadius: 8,
+  display: 'inline-flex', alignItems: 'center', gap: 8,
+  padding: '8px 12px', borderRadius: 10,
   border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
   background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
-  color: '#1a1208',
+  color: '#141414',
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-  letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer'
+  letterSpacing: 0, textTransform: 'uppercase', cursor: 'pointer'
 }
 const ghostBtnStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '8px 12px', borderRadius: 8,
+  display: 'inline-flex', alignItems: 'center', gap: 8,
+  padding: '8px 12px', borderRadius: 10,
   background: 'transparent', border: '1px solid var(--v3-border-strong)',
   color: 'var(--v3-text)',
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer'

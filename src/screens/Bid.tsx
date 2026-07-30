@@ -22,7 +22,7 @@ import { useConfirm } from '../components/ConfirmSheet.tsx'
 // just in case any of the output is shown to a customer downstream.
 const SYSTEM = `You are an estimating assistant for a contractor's business. Given a scope description, return JSON with: line_items (array of {name, qty, unit, rate_low, rate_high, notes}), total_low, total_high, contingency_pct, assumptions (array), risks (array). Use rates from the provided rate card when possible. Tailor line items to the job_type category provided (new build, renovation, addition, kitchen, bath, concrete, outdoor living, insurance, roofing). Never mention any platform, app, or tool by name in your output. Return ONLY JSON.`
 
-// Trades shown in the chip picker — driven by the seed. The user's
+// Trades shown in the chip picker, driven by the seed. The user's
 // custom keys still flow through into the prompt + manual-fill rows
 // via the merged rate card; we just don't surface them as suggested
 // pre-checks because they're user-specific.
@@ -126,11 +126,11 @@ export default function Bid() {
   // Push the AI bid into a real quote: creates a new fh_contacts row at
   // stage='quote' with the recommended price as contact.amount, then
   // inserts one fh_quote_items row per AI line item (rate = high end of
-  // the range, so the operator can dial back rather than up — easier
+  // the range, so the operator can dial back rather than up, easier
   // negotiation pattern). Navigates to /jobs/:id?tab=quote so the
   // contractor lands in the editor ready to refine before sending.
   //
-  // Single-shot insert per item — concurrent inserts are fine, the
+  // Single-shot insert per item, concurrent inserts are fine, the
   // recalc trigger from migration 011 keeps fh_contacts.amount in
   // sync with the sum of base items.
   async function pushToJob() {
@@ -143,7 +143,7 @@ export default function Bid() {
 
       // ONE price everywhere. The header used to carry the recommended
       // (with-margin) price while the quote items summed the raw
-      // high-end rates — two different totals for the same bid on the
+      // high-end rates, two different totals for the same bid on the
       // same screen ($9,673 up top, $8,620 in the builder). Scale every
       // line rate so the items sum EXACTLY to the recommended price;
       // the last item absorbs the rounding remainder.
@@ -172,7 +172,7 @@ export default function Bid() {
         .from('fh_contacts')
         .insert({
           user_id: user.id,
-          // The bid summary, not a generic label — a pipeline full of
+          // The bid summary, not a generic label, a pipeline full of
           // rows all named "New estimate" is unscannable. The real
           // client attaches on the quote screen.
           name: jobTitle,
@@ -191,7 +191,7 @@ export default function Bid() {
       if (cErr) throw cErr
 
       // 2. Insert one fh_quote_items row per AI line item. Use the
-      //    high end of the rate range as the rate — gives the
+      //    high end of the rate range as the rate, gives the
       //    contractor room to negotiate down rather than scrambling
       //    to add charges later.
       const items = scaledItems.map((r: any, idx: number) => ({
@@ -229,7 +229,7 @@ export default function Bid() {
   }
 
   // Save the current bid output as a reusable template. Naming is
-  // a quick in-page prompt — the operator types the template name
+  // a quick in-page prompt, the operator types the template name
   // inline and hits save. Cancel resets the prompt without writing.
   async function saveAsTemplate() {
     if (!bid || !total || !user?.id || savingTemplate) return
@@ -259,7 +259,7 @@ export default function Bid() {
     }
   }
 
-  // Load a saved template into the current bid state — skips the AI
+  // Load a saved template into the current bid state, skips the AI
   // round trip entirely. The operator can refine + push to a job
   // from there as if they'd just generated it.
   function loadTemplate(t: any) {
@@ -300,7 +300,7 @@ export default function Bid() {
       `Raw range: ${money(total.low)} – ${money(total.high)}`,
       '',
       'Line items:',
-      ...(bid.line_items || []).map((li: any) => `  • ${li.name}${li.notes ? ` — ${li.notes}` : ''} (${li.qty || 1} ${li.unit}: ${money((li.rate_low || 0) * (li.qty || 1))} – ${money((li.rate_high || 0) * (li.qty || 1))})`),
+      ...(bid.line_items || []).map((li: any) => `  • ${li.name}${li.notes ? `, ${li.notes}` : ''} (${li.qty || 1} ${li.unit}: ${money((li.rate_low || 0) * (li.qty || 1))} – ${money((li.rate_high || 0) * (li.qty || 1))})`),
       ...(bid.assumptions?.length ? ['', 'Assumptions:', ...bid.assumptions.map((a: any) => `  • ${a}`)] : []),
       ...(bid.risks?.length ? ['', 'Risks:', ...bid.risks.map((r: any) => `  • ${r}`)] : [])
     ]
@@ -320,10 +320,10 @@ export default function Bid() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
     >
       {isDesktop && <BuildTopbar />}
-      {/* HEADER — working-tool, no serif italic. Dropped per the design
+      {/* HEADER, working-tool, no serif italic. Dropped per the design
           direction: editorial type belongs on hero/marketing surfaces,
           not on a tool the operator uses to build a bid. Desktop H1
           uses the same Bebas Neue display style as Jobs/Clients/
@@ -331,7 +331,7 @@ export default function Bid() {
       <motion.div
         variants={item}
         style={{
-          padding: '12px var(--v3-gutter) 14px',
+          padding: '12px var(--v3-gutter) 12px',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
@@ -341,10 +341,10 @@ export default function Bid() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <span className={isDesktop ? 'fh-build-good' : undefined} style={isDesktop ? undefined : {
             fontFamily: 'var(--font-body)',
-            fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
+            fontSize: 12, fontWeight: 700,
+            letterSpacing: 0, textTransform: 'uppercase',
             color: 'var(--v3-primary)',
-            display: 'inline-flex', alignItems: 'center', gap: 6
+            display: 'inline-flex', alignItems: 'center', gap: 8
           }}>
             <Calculator size={11} aria-hidden="true" />
             Estimates
@@ -352,9 +352,9 @@ export default function Bid() {
           <h1 className={isDesktop ? 'fh-build-title' : undefined} style={isDesktop ? undefined : {
             margin: '6px 0 0',
             fontFamily: 'var(--font-body)',
-            fontSize: 'clamp(20px, 5.5vw, 26px)',
+            fontSize: 24,
             lineHeight: 1.2,
-            letterSpacing: '-0.01em',
+            letterSpacing: 0,
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
@@ -363,7 +363,7 @@ export default function Bid() {
           <p style={{
             margin: '6px 0 0',
             fontFamily: 'var(--font-body)',
-            fontSize: 12.5,
+            fontSize: 12,
             lineHeight: 1.5,
             color: 'var(--v3-text-muted)'
           }}>
@@ -372,14 +372,14 @@ export default function Bid() {
         </div>
       </motion.div>
 
-      {/* TEMPLATES RAIL — surfaces saved estimate templates above the
+      {/* TEMPLATES RAIL, surfaces saved estimate templates above the
           scope input so the operator can load a previous bid as a
           starting point instead of typing or re-running the AI. Only
           renders when at least one template exists. */}
       {templates.length > 0 && (
         <motion.div
           variants={item}
-          style={{ padding: '0 var(--v3-gutter) 10px' }}
+          style={{ padding: '0 var(--v3-gutter) 12px' }}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
             <Eyebrow>
@@ -394,17 +394,17 @@ export default function Bid() {
               style={{
                 background: 'transparent', border: 'none',
                 color: 'var(--v3-primary-bright)',
-                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.04em', cursor: 'pointer', padding: 0
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                letterSpacing: 0, cursor: 'pointer', padding: 0
               }}
             >
               {pickerOpen ? 'Hide' : 'Browse all'}
             </button>
           </div>
           {pickerOpen ? (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {templates.map((t) => (
-                <li key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center', padding: '10px 12px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
+                <li key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center', padding: '12px 12px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
                   <button
                     type="button"
                     onClick={() => loadTemplate(t)}
@@ -412,13 +412,13 @@ export default function Bid() {
                       background: 'transparent', border: 'none', padding: 0,
                       textAlign: 'left', cursor: 'pointer',
                       color: 'var(--v3-text)', minWidth: 0,
-                      display: 'flex', flexDirection: 'column', gap: 2
+                      display: 'flex', flexDirection: 'column', gap: 4
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {t.name}
                     </span>
-                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>
                       {((t.line_items || []) as any[]).length} item{((t.line_items || []) as any[]).length === 1 ? '' : 's'}
                       {t.total_high ? ` · ${money(t.total_high)}` : ''}
                       {t.job_type ? ` · ${capitalize(t.job_type)}` : ''}
@@ -428,12 +428,12 @@ export default function Bid() {
                     type="button"
                     onClick={() => loadTemplate(t)}
                     style={{
-                      padding: '6px 10px', borderRadius: 8,
+                      padding: '8px 12px', borderRadius: 10,
                       background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                       color: 'var(--v3-primary-bright)',
-                      fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-                      letterSpacing: '0.04em', cursor: 'pointer'
+                      fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                      letterSpacing: 0, cursor: 'pointer'
                     }}
                   >
                     Load
@@ -443,11 +443,11 @@ export default function Bid() {
                     onClick={() => deleteTemplate(t)}
                     aria-label={`Delete template ${t.name}`}
                     style={{
-                      width: 26, height: 26, borderRadius: 6,
+                      width: 26, height: 26, borderRadius: 10,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       background: 'transparent',
-                      border: '1px solid rgba(232, 90, 87, 0.35)',
-                      color: 'var(--v3-danger-bright, #f5a294)', cursor: 'pointer'
+                      border: '1px solid rgba(192, 57, 43, 0.35)',
+                      color: 'var(--v3-danger-bright, #C9963A)', cursor: 'pointer'
                     }}
                   >
                     <Trash2 size={12} aria-hidden="true" />
@@ -456,14 +456,14 @@ export default function Bid() {
               ))}
             </ul>
           ) : (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {templates.slice(0, 6).map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => loadTemplate(t)}
                   style={{
-                    padding: '7px 12px', borderRadius: 999,
+                    padding: '8px 12px', borderRadius: 10,
                     background: 'var(--v3-surface)',
                     border: '1px solid var(--v3-border-strong)',
                     color: 'var(--v3-text)',
@@ -480,7 +480,7 @@ export default function Bid() {
                   type="button"
                   onClick={() => setPickerOpen(true)}
                   style={{
-                    padding: '7px 12px', borderRadius: 999,
+                    padding: '8px 12px', borderRadius: 10,
                     background: 'transparent', border: '1px dashed var(--v3-border-strong)',
                     color: 'var(--v3-text-muted)',
                     fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500,
@@ -495,7 +495,7 @@ export default function Bid() {
         </motion.div>
       )}
 
-      {/* SCOPE INPUT CARD — primary workspace */}
+      {/* SCOPE INPUT CARD, primary workspace */}
       <motion.div
         variants={item}
         className="v3-section"
@@ -503,17 +503,17 @@ export default function Bid() {
       >
         <SectionHeader label="Scope" />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
           {/* Scope textarea */}
           <textarea
             value={scope}
             onChange={(e) => setScope(e.target.value)}
             rows={5}
-            placeholder="1,800 sqft rambler. Demo kitchen + two baths. New cabinets, LVP throughout, tile surrounds, electrical rough-in for island. Permit pulled."
+            placeholder="1,800 sqft rambler. Demo kitchen + two baths. New cabinets, LVP throughout, tile surrounds, electrical rough in for island. Permit pulled."
             style={{
               width: '100%',
-              padding: '12px 14px',
-              borderRadius: 12,
+              padding: '12px 12px',
+              borderRadius: 10,
               background: 'var(--v3-surface-2)',
               border: '1px solid var(--v3-border-strong)',
               color: 'var(--v3-text)',
@@ -530,7 +530,7 @@ export default function Bid() {
           {/* Job type chips */}
           <div>
             <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Job type</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {JOB_TYPES.map((jt) => (
                 <FilterPill
                   key={jt.value}
@@ -547,7 +547,7 @@ export default function Bid() {
           {/* Trades chips */}
           <div>
             <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Trades on job</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {TRADES.map((t) => (
                 <FilterPill
                   key={t}
@@ -567,7 +567,7 @@ export default function Bid() {
               <span className="v3-eyebrow">Target margin</span>
               <span style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 18,
+                fontSize: 20,
                 color: 'var(--v3-primary)',
                 fontVariantNumeric: 'tabular-nums'
               }}>
@@ -586,9 +586,9 @@ export default function Bid() {
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.10em',
+              letterSpacing: 0,
               color: 'var(--v3-text-muted)',
               marginTop: 4
             }}>
@@ -606,8 +606,8 @@ export default function Bid() {
             disabled={!scope.trim() || generating}
             style={{
               marginTop: 4,
-              padding: '13px 18px',
-              borderRadius: 12,
+              padding: '12px 16px',
+              borderRadius: 10,
               border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
               background: !scope.trim() || generating
                 ? 'var(--v3-surface-2)'
@@ -616,11 +616,11 @@ export default function Bid() {
               fontFamily: 'var(--font-body)',
               fontSize: 14,
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               cursor: !scope.trim() || generating ? 'default' : 'pointer',
               boxShadow: !scope.trim() || generating
                 ? 'none'
-                : '0 0 0 3px rgba(229, 193, 88, 0.16), 0 6px 18px rgba(229, 193, 88, 0.32), 0 1px 0 var(--v3-border-strong) inset',
+                : '0 0 0 3px rgba(201, 150, 58, 0.16), 0 6px 18px rgba(201, 150, 58, 0.32), 0 1px 0 var(--v3-border-strong) inset',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -630,28 +630,28 @@ export default function Bid() {
             }}
           >
             {generating ? (
-              <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.25)', borderTopColor: 'var(--v3-on-primary)', animation: 'fh-spin 700ms linear infinite' }} />
+              <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: 10, border: '2px solid rgba(20, 20, 20,0.25)', borderTopColor: 'var(--v3-on-primary)', animation: 'fh-spin 700ms linear infinite' }} />
             ) : (
               <Sparkles size={16} />
             )}
             {generating ? 'Generating estimate…' : 'Generate Estimate'}
           </motion.button>
 
-          {/* Error block — graceful degradation */}
+          {/* Error block, graceful degradation */}
           {err && (
             <div role="alert" style={{
-              padding: '12px 14px',
-              borderRadius: 12,
+              padding: '12px 12px',
+              borderRadius: 10,
               background: 'var(--v3-danger-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
-              fontSize: 12.5,
+              fontSize: 12,
               lineHeight: 1.5
             }}>
               <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
               <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>
-                {err} — your scope is preserved. Fill in line items manually if you need this estimate out the door.
+                {err}, your scope is preserved. Fill in line items manually if you need this estimate out the door.
               </div>
               <button
                 type="button"
@@ -674,7 +674,7 @@ export default function Bid() {
                   })
                 }}
                 style={{
-                  padding: '7px 13px',
+                  padding: '8px 12px',
                   borderRadius: 10,
                   border: '1px solid var(--v3-border-strong)',
                   background: 'var(--v3-surface-2)',
@@ -692,7 +692,7 @@ export default function Bid() {
         </div>
       </motion.div>
 
-      {/* OUTPUT CARD — empty state OR generated estimate */}
+      {/* OUTPUT CARD, empty state OR generated estimate */}
       <AnimatePresence mode="wait">
         {bid && total ? (
           <motion.div
@@ -705,11 +705,11 @@ export default function Bid() {
             style={{ margin: '0 var(--v3-gutter) 28px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Sparkles size={11} />
                 Recommended Price · {marginPct}% margin
               </span>
-              <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={saveAsTemplate}
@@ -718,14 +718,14 @@ export default function Bid() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 5,
-                    padding: '6px 10px',
-                    borderRadius: 8,
+                    gap: 4,
+                    padding: '8px 12px',
+                    borderRadius: 10,
                     border: '1px solid var(--v3-border-strong)',
                     background: 'var(--v3-surface-2)',
                     color: 'var(--v3-text)',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: savingTemplate ? 'wait' : 'pointer',
                     opacity: savingTemplate ? 0.7 : 1
@@ -740,14 +740,14 @@ export default function Bid() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 5,
-                    padding: '6px 10px',
-                    borderRadius: 8,
+                    gap: 4,
+                    padding: '8px 12px',
+                    borderRadius: 10,
                     border: '1px solid var(--v3-border-strong)',
                     background: 'var(--v3-surface-2)',
                     color: 'var(--v3-text)',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer'
                   }}
@@ -759,20 +759,20 @@ export default function Bid() {
                   type="button"
                   onClick={pushToJob}
                   disabled={pushing}
-                  title="Create a new job at stage='quote' with these line items pre-filled, ready to refine + send"
+                  title="Create a new job at stage='quote' with these line items filled, ready to refine + send"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 5,
-                    padding: '6px 12px',
-                    borderRadius: 8,
+                    gap: 4,
+                    padding: '8px 12px',
+                    borderRadius: 10,
                     border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                     background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
-                    color: '#1a1208',
+                    color: '#141414',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 700,
-                    letterSpacing: '0.04em',
+                    letterSpacing: 0,
                     cursor: pushing ? 'wait' : 'pointer',
                     opacity: pushing ? 0.7 : 1
                   }}
@@ -784,22 +784,22 @@ export default function Bid() {
             </div>
 
             {/* Headline price */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
               <motion.div
                 className="v3-money"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1, type: 'spring', stiffness: 240, damping: 22 }}
                 style={{
-                  fontSize: 'clamp(40px, 9vw, 56px)',
+                  fontSize: 24,
                   lineHeight: 0.95,
-                  letterSpacing: '-0.005em',
+                  letterSpacing: 0,
                   color: 'var(--v3-text)'
                 }}
               >
                 <CountUp to={Math.round(total.withMargin)} duration={0.9} prefix="$" formatter={formatThousands} />
               </motion.div>
-              <span className="v3-caption" style={{ fontSize: 11 }}>
+              <span className="v3-caption" style={{ fontSize: 12 }}>
                 Raw range: {money(total.low)} – {money(total.high)}
               </span>
             </div>
@@ -808,13 +808,13 @@ export default function Bid() {
             {bid.summary && (
               <p style={{
                 margin: '12px 0 0',
-                padding: '10px 12px',
+                padding: '12px 12px',
                 borderRadius: 10,
                 background: 'var(--v3-surface-2)',
                 border: '1px solid var(--v3-border)',
                 color: 'var(--v3-text)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 13,
+                fontSize: 14,
                 lineHeight: 1.5
               }}>
                 {bid.summary}
@@ -824,7 +824,7 @@ export default function Bid() {
             {/* Line items */}
             <div style={{
               marginTop: 14,
-              paddingTop: 14,
+              paddingTop: 12,
               borderTop: '1px solid var(--v3-border)'
             }}>
               <SectionHeader label="Line Items" />
@@ -838,9 +838,9 @@ export default function Bid() {
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '1fr auto auto',
-                      gap: 10,
+                      gap: 12,
                       alignItems: 'center',
-                      padding: '10px 12px',
+                      padding: '12px 12px',
                       borderRadius: 10,
                       background: 'var(--v3-surface)',
                       border: '1px solid var(--v3-border)'
@@ -849,14 +849,14 @@ export default function Bid() {
                     <div style={{ minWidth: 0 }}>
                       <div style={{
                         fontFamily: 'var(--font-body)',
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: 600,
                         color: 'var(--v3-text)'
                       }}>
                         {li.name}
                       </div>
                       {li.notes && (
-                        <div style={{ marginTop: 2, fontSize: 11, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
+                        <div style={{ marginTop: 2, fontSize: 12, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
                           {li.notes}
                         </div>
                       )}
@@ -864,7 +864,7 @@ export default function Bid() {
                     <span style={{
                       flexShrink: 0,
                       fontFamily: 'var(--font-body)',
-                      fontSize: 11,
+                      fontSize: 12,
                       color: 'var(--v3-text-muted)',
                       fontVariantNumeric: 'tabular-nums'
                     }}>
@@ -873,7 +873,7 @@ export default function Bid() {
                     <span style={{
                       flexShrink: 0,
                       fontFamily: 'var(--font-display)',
-                      fontSize: 13,
+                      fontSize: 14,
                       color: 'var(--v3-text)',
                       fontVariantNumeric: 'tabular-nums'
                     }}>
@@ -886,9 +886,9 @@ export default function Bid() {
 
             {/* Assumptions */}
             {bid.assumptions?.length > 0 && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--v3-border)' }}>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--v3-border)' }}>
                 <SectionHeader label="Assumptions" />
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.55 }}>
+                <ul style={{ margin: '4px 0 0', paddingLeft: 16, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.55 }}>
                   {bid.assumptions.map((a: any, i: any) => <li key={i} style={{ marginBottom: 4 }}>{a}</li>)}
                 </ul>
               </div>
@@ -898,20 +898,20 @@ export default function Bid() {
             {bid.risks?.length > 0 && (
               <div style={{
                 marginTop: 14,
-                padding: '12px 14px',
+                padding: '12px 12px',
                 borderRadius: 10,
                 background: 'var(--v3-danger-soft)',
                 border: '1px solid color-mix(in srgb, var(--v3-danger) 30%, transparent)'
               }}>
                 <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>Risks</span>
-                <ul style={{ margin: '6px 0 0', paddingLeft: 18, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13, lineHeight: 1.55 }}>
+                <ul style={{ margin: '6px 0 0', paddingLeft: 16, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.55 }}>
                   {bid.risks.map((r: any, i: any) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
                 </ul>
               </div>
             )}
           </motion.div>
         ) : (
-          /* Empty state — polished */
+          /* Empty state, polished */
           <motion.div
             key="empty"
             variants={item}
@@ -919,7 +919,7 @@ export default function Bid() {
             style={{ margin: '0 var(--v3-gutter) 28px' }}
           >
             <div style={{
-              padding: '32px 20px',
+              padding: '32px 24px',
               textAlign: 'center',
               color: 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)'
@@ -928,7 +928,7 @@ export default function Bid() {
                 margin: '0 auto 14px',
                 width: 48,
                 height: 48,
-                borderRadius: 14,
+                borderRadius: 10,
                 background: 'var(--v3-primary-soft)',
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
                 display: 'grid',

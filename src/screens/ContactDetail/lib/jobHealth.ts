@@ -1,5 +1,5 @@
 /**
- * Job Health — composite 0..100 score answering "is this job on track?"
+ * Job Health, composite 0..100 score answering "is this job on track?"
  *
  * Formula (Q1 decision):
  *   milestones %done       × 50  (execution progress)
@@ -13,7 +13,7 @@
  *
  * Caveats deliberately accepted, not bugs:
  *   - Early-stage jobs (lead/quote) naturally score low because milestones
- *     and payments are both 0%. That's accurate — there's nothing to track
+ *     and payments are both 0%. That's accurate, there's nothing to track
  *     yet. The donut reading "Behind" on a fresh lead is informative, not
  *     misleading.
  *   - Schedule overdue is binary (0 or 1) rather than graded by how overdue
@@ -24,7 +24,7 @@
  */
 export function computeJobHealth({ contact, payments = [], scheduleItems = [] }: { contact?: any; payments?: any[]; scheduleItems?: any[] } = {}) {
   if (!contact) {
-    return { score: 0, tier: 'unknown', label: '—', breakdown: null }
+    return { score: 0, tier: 'unknown', label: '\u2003', breakdown: null }
   }
 
   const amount = Number(contact.amount || 0)
@@ -44,7 +44,7 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [] }:
   }
 
   // Terminal stages override the score: a job that's closed (delivered +
-  // signed off) or lost is not "at risk" or "behind" — it's done. The
+  // signed off) or lost is not "at risk" or "behind", it's done. The
   // composite formula treats milestones / payments / overdue events as
   // signals of in-flight risk, but those signals are meaningless once
   // the deal is no longer in flight. Previously, fully-paid completed
@@ -73,7 +73,7 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [] }:
   const milestonesDone = milestones.filter((m: any) => m && m.done).length
   const milestoneRatio = milestones.length > 0 ? milestonesDone / milestones.length : 0
 
-  // Financial: paid / contracted (cap at 1 — overpayment doesn't keep adding)
+  // Financial: paid / contracted (cap at 1, overpayment doesn't keep adding)
   const paymentRatio = amount > 0 ? Math.min(1, paid / amount) : 0
 
   // Schedule: any end_at in the past = overdue. Filter excludes rows with

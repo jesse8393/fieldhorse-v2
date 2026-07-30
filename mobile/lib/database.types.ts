@@ -1,4 +1,4 @@
-// mobile/lib/database.types.ts — copy of the web app database types.
+// mobile/lib/database.types.ts, copy of the web app database types.
 // Both are generated from the same Supabase schema. In the monorepo
 // extraction (next step) this moves to packages/shared and both apps
 // import it. For the spike, a copy keeps mobile self-contained.

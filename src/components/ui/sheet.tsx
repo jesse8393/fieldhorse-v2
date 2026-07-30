@@ -88,7 +88,7 @@ function SheetHeader({
   return (
     <div
       data-slot="sheet-header"
-      className={cn("ui:flex ui:flex-col ui:gap-1.5 ui:p-4", className)}
+      className={cn("ui:flex ui:flex-col ui:gap-2 ui:p-4", className)}
       {...props} />
   );
 }

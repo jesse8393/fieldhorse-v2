@@ -1,4 +1,4 @@
-// DailyLogs section — backed by fh_daily_logs.
+// DailyLogs section, backed by fh_daily_logs.
 //
 // Per-job feed of foreman end-of-day posts: summary, what's next,
 // weather window, crew count, hours worked. Anyone in the org can
@@ -133,7 +133,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     setDraftPhotos([])
   }
 
-  // Open the compose form pre-filled from an existing row. Existing
+  // Open the compose form filled from an existing row. Existing
   // photos are loaded as drafts (flagged so cancel/remove doesn't purge
   // them from storage) using their already-signed URLs for preview.
   function startEdit(r: LogRow) {
@@ -212,7 +212,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
         if (!done) return cur.filter((p) => p.local_id !== ph.local_id)
         return cur.map((p) => (p.local_id === ph.local_id ? done : p))
       })
-      // Revoke the placeholder blob URL — we now have a real one (or none).
+      // Revoke the placeholder blob URL, we now have a real one (or none).
       URL.revokeObjectURL(ph.preview_url)
     }
   }
@@ -223,9 +223,9 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       if (removed?.preview_url?.startsWith('blob:')) URL.revokeObjectURL(removed.preview_url)
       // Only purge objects we uploaded this session. A pre-existing
       // photo (edit mode) is left in storage until save rewrites the
-      // row's photo list — so a cancel can't destroy a saved photo.
+      // row's photo list, so a cancel can't destroy a saved photo.
       if (removed?.storage_path && !removed.existing) {
-        // Best-effort cleanup of the just-uploaded object — silent failure.
+        // Best-effort cleanup of the just-uploaded object, silent failure.
         supabase.storage.from(PHOTO_BUCKET).remove([removed.storage_path]).catch(() => {})
       }
       return cur.filter((p) => p.local_id !== localId)
@@ -305,7 +305,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
           Daily logs
@@ -315,15 +315,15 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             type="button"
             onClick={() => setComposing(true)}
             style={{
-              padding: '7px 14px',
-              borderRadius: 8,
+              padding: '8px 12px',
+              borderRadius: 10,
               border: 'none',
               background: 'var(--v3-primary)',
               color: 'var(--v3-on-primary, #141414)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               cursor: 'pointer',
             }}
           >
@@ -335,8 +335,8 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       {composing && (
         <div
           style={{
-            display: 'flex', flexDirection: 'column', gap: 10,
-            padding: 14, borderRadius: 12,
+            display: 'flex', flexDirection: 'column', gap: 12,
+            padding: 12, borderRadius: 10,
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
           }}
         >
@@ -348,10 +348,10 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             autoFocus
             style={{
               width: '100%',
-              padding: '10px 12px',
-              borderRadius: 8,
+              padding: '12px 12px',
+              borderRadius: 10,
               border: '1px solid var(--v3-border)',
-              background: 'var(--v3-surface-2, rgba(0,0,0,.20))',
+              background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
               fontSize: 14,
@@ -367,10 +367,10 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             rows={2}
             style={{
               width: '100%',
-              padding: '10px 12px',
-              borderRadius: 8,
+              padding: '12px 12px',
+              borderRadius: 10,
               border: '1px solid var(--v3-border)',
-              background: 'var(--v3-surface-2, rgba(0,0,0,.20))',
+              background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
               fontSize: 14,
@@ -405,7 +405,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             />
           </div>
 
-          {/* Photo strip — drafts during compose. Tap a thumb's X to
+          {/* Photo strip, drafts during compose. Tap a thumb's X to
               remove (deletes from storage too). */}
           {draftPhotos.length > 0 && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -415,15 +415,15 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                   style={{
                     position: 'relative',
                     width: 72, height: 72,
-                    borderRadius: 8,
+                    borderRadius: 10,
                     overflow: 'hidden',
-                    background: 'rgba(0,0,0,.3)',
+                    background: 'rgba(20, 20, 20,.3)',
                     border: '1px solid var(--v3-border)',
                   }}
                 >
                   <img loading="lazy"src={p.preview_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: p.uploading ? 0.45 : 1 }} />
                   {p.uploading && (
-                    <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--v3-text)', fontSize: 10, fontWeight: 700 }}>
+                    <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--v3-text)', fontSize: 12, fontWeight: 700 }}>
                       Uploading…
                     </div>
                   )}
@@ -434,9 +434,9 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                       aria-label="Remove photo"
                       style={{
                         position: 'absolute', top: 2, right: 2,
-                        width: 22, height: 22, borderRadius: 999,
-                        border: 'none', background: 'rgba(0,0,0,.65)',
-                        color: '#fff', cursor: 'pointer',
+                        width: 22, height: 22, borderRadius: 10,
+                        border: 'none', background: 'rgba(20, 20, 20,.65)',
+                        color: '#F2EDE4', cursor: 'pointer',
                         display: 'grid', placeItems: 'center',
                       }}
                     >
@@ -495,16 +495,16 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             textAlign: 'center',
             color: 'var(--v3-text-muted)',
             fontFamily: 'var(--font-body)',
-            fontSize: 13,
+            fontSize: 14,
             border: '1px dashed var(--v3-border)',
-            borderRadius: 12,
+            borderRadius: 10,
           }}
         >
           <Sparkles size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary)' }} />
           No daily logs yet. Tap <strong style={{ color: 'var(--v3-text)' }}>+ New log</strong> after a shift to capture what got done.
         </div>
       ) : (
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <AnimatePresence initial={false}>
             {rows.map((r) => (
               <motion.li
@@ -516,30 +516,30 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                 transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
                 style={{
                   display: 'flex', flexDirection: 'column', gap: 8,
-                  padding: '14px 16px',
-                  borderRadius: 12,
+                  padding: '12px 16px',
+                  borderRadius: 10,
                   background: 'var(--v3-surface)',
                   border: '1px solid var(--v3-border)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                    <strong style={{ fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 22, letterSpacing: '.01em', color: 'var(--v3-text)' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                    <strong style={{ fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 20, letterSpacing: 0, color: 'var(--v3-text)' }}>
                       {fmtDay(r.log_date)}
                     </strong>
-                    <span style={{ fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>
                       posted {fmtTime(r.created_at)}
                     </span>
                   </div>
                   {r.user_id === userId && (
-                    <div style={{ display: 'flex', gap: 2 }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
                       <button
                         type="button"
                         onClick={() => startEdit(r)}
                         aria-label="Edit log"
                         title="Edit"
                         style={{
-                          width: 28, height: 28, borderRadius: 8,
+                          width: 28, height: 28, borderRadius: 10,
                           border: 'none', background: 'transparent',
                           color: 'var(--v3-text-muted)', cursor: 'pointer',
                           display: 'grid', placeItems: 'center',
@@ -553,7 +553,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                         aria-label="Delete log"
                         title="Delete"
                         style={{
-                          width: 28, height: 28, borderRadius: 8,
+                          width: 28, height: 28, borderRadius: 10,
                           border: 'none', background: 'transparent',
                           color: 'var(--v3-text-muted)', cursor: 'pointer',
                           display: 'grid', placeItems: 'center',
@@ -571,11 +571,11 @@ export default function DailyLogsSection({ jobId, userId }: any) {
 
                 {r.next_steps && (
                   <div style={{
-                    padding: '8px 10px',
+                    padding: '8px 12px',
                     borderLeft: '2px solid var(--v3-primary)',
                     background: 'color-mix(in srgb, var(--v3-primary) 6%, transparent)',
                     borderRadius: '0 8px 8px 0',
-                    fontSize: 13,
+                    fontSize: 14,
                     color: 'var(--v3-text)',
                     whiteSpace: 'pre-wrap',
                   }}>
@@ -587,7 +587,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                 )}
 
                 {Array.isArray(r.photos) && r.photos.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 8 }}>
                     {(r.photos as any[]).map((p, i) => {
                       const url = p?.storage_path ? photoUrls[p.storage_path] : null
                       return (
@@ -596,16 +596,16 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                           style={{
                             position: 'relative',
                             aspectRatio: '1 / 1',
-                            borderRadius: 8,
+                            borderRadius: 10,
                             overflow: 'hidden',
-                            background: 'rgba(0,0,0,.3)',
+                            background: 'rgba(20, 20, 20,.3)',
                             border: '1px solid var(--v3-border)',
                           }}
                         >
                           {url ? (
                             <img loading="lazy"src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
-                            <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--v3-text-muted)', fontSize: 10 }}>
+                            <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--v3-text-muted)', fontSize: 12 }}>
                               …
                             </div>
                           )}
@@ -616,7 +616,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                 )}
 
                 {(r.weather_text || r.crew_count != null || r.hours_worked != null) && (
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: 'var(--v3-text-muted)', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-text-muted)', alignItems: 'center' }}>
                     {r.weather_text && (
                       <span style={metaChip}><CloudSun size={11} aria-hidden="true" /> {r.weather_text}</span>
                     )}
@@ -639,38 +639,38 @@ export default function DailyLogsSection({ jobId, userId }: any) {
 
 const inputStyle: React.CSSProperties = {
   flex: '1 1 180px',
-  padding: '10px 12px',
-  borderRadius: 8,
+  padding: '12px 12px',
+  borderRadius: 10,
   border: '1px solid var(--v3-border)',
-  background: 'var(--v3-surface-2, rgba(0,0,0,.20))',
+  background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
   color: 'var(--v3-text)',
   fontFamily: 'var(--font-body)',
-  fontSize: 13,
+  fontSize: 14,
   outline: 'none',
 }
 
 const primaryBtn = (disabled: boolean): React.CSSProperties => ({
-  padding: '9px 16px',
-  borderRadius: 8,
+  padding: '8px 16px',
+  borderRadius: 10,
   border: 'none',
   background: 'var(--v3-primary)',
   color: 'var(--v3-on-primary, #141414)',
   fontFamily: 'var(--font-body)',
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 700,
-  letterSpacing: '0.04em',
+  letterSpacing: 0,
   opacity: disabled ? 0.5 : 1,
   cursor: disabled ? 'not-allowed' : 'pointer',
 })
 
 const secondaryBtn: React.CSSProperties = {
-  padding: '9px 14px',
-  borderRadius: 8,
+  padding: '8px 12px',
+  borderRadius: 10,
   border: '1px solid var(--v3-border)',
   background: 'transparent',
   color: 'var(--v3-text-muted)',
   fontFamily: 'var(--font-body)',
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 600,
   cursor: 'pointer',
 }
@@ -678,9 +678,9 @@ const secondaryBtn: React.CSSProperties = {
 const metaChip: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 5,
-  padding: '3px 8px',
-  borderRadius: 999,
+  gap: 4,
+  padding: '4px 8px',
+  borderRadius: 10,
   background: 'var(--v3-glass-tint)',
   border: '1px solid var(--v3-border)',
 }

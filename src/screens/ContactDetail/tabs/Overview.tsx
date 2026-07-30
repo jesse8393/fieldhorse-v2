@@ -23,14 +23,14 @@ import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
 
 /**
- * v3 OVERVIEW tab — the "money screen" of the Job Detail.
+ * v3 OVERVIEW tab, the "money screen" of the Job Detail.
  *
  * Layout:
  *   NextActionCard      | HealthDonut         (tablet+: side-by-side)
  *                                              (mobile:    stacked)
  *   ProgressMeter (full width)
  *   Recent Activity feed (notes ∪ payments ∪ scheduleItems)
- *   TimeClockCard (only when stage in {job, invoice} — preserved from legacy)
+ *   TimeClockCard (only when stage in {job, invoice}, preserved from legacy)
  *
  * NextActionCard owns the primary action per ruleset ("Max 1 primary action
  * per screen"). Its CTA dispatches by `kind` resolved from jobNextAction.ts:
@@ -112,10 +112,10 @@ export default function OverviewTab({
             .eq('id', todoId)
             .eq('user_id', userId)
           if (error) {
-            toastError("Couldn't mark to-do done", error.message)
+            toastError("Couldn't mark task done", error.message)
             await fetchAll() // roll the optimistic flip back
           } else {
-            toastSuccess('To-do complete')
+            toastSuccess('Task complete')
             await fetchAll()
           }
           break
@@ -149,7 +149,7 @@ export default function OverviewTab({
             break
           }
           // Billing intercept (pipeline v2): "Send invoice" opens the
-          // SendInvoiceSheet in the parent rather than mutating stage —
+          // SendInvoiceSheet in the parent rather than mutating stage :
           // invoicing isn't a stage anymore.
           if (nextAction.pipelineFn === 'sendInvoice') {
             hapticStageChange()
@@ -158,7 +158,7 @@ export default function OverviewTab({
           }
           const fn = STAGE_FN_MAP[nextAction.pipelineFn || ""]
           if (fn) {
-            // Heavier haptic on stage boundary — matches haptics.ts convention
+            // Heavier haptic on stage boundary, matches haptics.ts convention
             // that lead→quote→job transitions get hapticStageChange.
             // pipeline.ts fires its own commit haptic; this one announces the
             // boundary BEFORE the network call.
@@ -170,7 +170,7 @@ export default function OverviewTab({
               onOpenQuote?.()
             }
           } else if (nextAction.pipelineFn === 'logPayment') {
-            // Log payment opens the modal in the parent — stays in flight as
+            // Log payment opens the modal in the parent, stays in flight as
             // the operator inputs amount/date/method.
             onOpenLogPayment?.()
           }
@@ -191,7 +191,7 @@ export default function OverviewTab({
     onOpenAddEvent?.()
   }
 
-  // True contract = base amount + approved change orders — the same
+  // True contract = base amount + approved change orders, the same
   // number the header balance, Financials tab, and customer PDF use.
   // Without the CO term this cockpit read "Paid in full / $0 remaining"
   // on a job whose approved CO was still owed.
@@ -208,9 +208,9 @@ export default function OverviewTab({
   const showCockpit = contractValue > 0 && isExecutionStage
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '8px 20px 32px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 24px 32px' }}>
 
-      {/* EDIT FIELDS — only shown when header EDIT toggle is on. Renders ABOVE
+      {/* EDIT FIELDS, only shown when header EDIT toggle is on. Renders ABOVE
           the dashboard so the operator's eye lands on the form. Cancel/Save
           collapses back to the read-only Overview. */}
       {isEditing && (
@@ -222,9 +222,9 @@ export default function OverviewTab({
         />
       )}
 
-      {/* COCKPIT HEADLINE — contract-value hero. Ported from the v3 design
+      {/* COCKPIT HEADLINE, contract-value hero. Ported from the v3 design
           handoff (.cockpit-headline). Only renders once the job has a real
-          contract value AND has moved past quote — before that, the
+          contract value AND has moved past quote, before that, the
           NextActionCard is still the right primary focus. */}
       {showCockpit && (
         <div className="cockpit-headline">
@@ -244,7 +244,7 @@ export default function OverviewTab({
             <div className="cockpit-headline__r">
               <div className="cockpit-headline__lbl">Health</div>
               <div className="cockpit-headline__margin" style={{
-                color: health.score >= 75 ? 'var(--v3-success-bright, #7BB58E)'
+                color: health.score >= 75 ? 'var(--v3-success-bright, #5C5C5C)'
                   : health.score >= 50 ? 'var(--v3-primary)'
                   : 'var(--v3-danger-bright)'
               }}>{health.score}%</div>
@@ -261,9 +261,9 @@ export default function OverviewTab({
         </div>
       )}
 
-      {/* PRIMARY ROW — NextAction (+ HealthDonut on execution stages).
+      {/* PRIMARY ROW, NextAction (+ HealthDonut on execution stages).
           A lead/quote has no scheduled work, so "Health 20% · Behind"
-          is structurally meaningless before the job is active —
+          is structurally meaningless before the job is active :
           audit §D3 ("a deal with no scheduled work cannot be behind").
           Health + Progress only render from stage='job' onward. */}
       {isExecutionStage ? (
@@ -291,7 +291,7 @@ export default function OverviewTab({
         />
       )}
 
-      {/* PROGRESS — milestone completion (execution stages only) */}
+      {/* PROGRESS, milestone completion (execution stages only) */}
       {isExecutionStage && (
         <ProgressMeter
           label="Job Progress"
@@ -303,7 +303,7 @@ export default function OverviewTab({
         />
       )}
 
-      {/* DAILY ACTIONS — the highest-frequency job actions live here, directly
+      {/* DAILY ACTIONS, the highest-frequency job actions live here, directly
           under the status/next-action so they're reachable without scrolling
           past the activity feed. Money actions come first, then time clock,
           then the lower-frequency schedule/partner actions. */}
@@ -339,7 +339,7 @@ export default function OverviewTab({
         </Button>
       </div>
 
-      {/* ACTIVITY — single chronological timeline synthesized from existing
+      {/* ACTIVITY, single chronological timeline synthesized from existing
           arrays (notes, payments, schedule, change orders, stage history,
           contact metadata). This is the one activity feed on the Overview;
           the old compact "Recent Activity" list above it duplicated these
@@ -355,12 +355,12 @@ export default function OverviewTab({
         stageTransitions={stageTransitions}
       />
 
-      {/* Inline grid CSS — mobile-first stack, 1.5fr/1fr at ≥768px */}
+      {/* Inline grid CSS, mobile-first stack, 1.5fr/1fr at ≥768px */}
       <style>{`
         .v3-overview-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 14px;
+          gap: 12px;
         }
         @media (min-width: 768px) {
           .v3-overview-grid {
@@ -383,7 +383,7 @@ const STAGE_FN_MAP: Record<string, any> = {
 }
 
 /* ============================================================
-   EditFieldsCard — controlled form for the editable fh_contacts
+   EditFieldsCard, controlled form for the editable fh_contacts
    fields. Save patches only the diff (matches legacy commit() behavior
    so we don't write fields the user didn't touch). Cancel exits edit
    mode without saving.
@@ -398,7 +398,7 @@ const EDITABLE_FIELDS = [
   { key: 'email',       label: 'Email',       kind: 'email',    placeholder: 'name@example.com',  col: 1 },
   { key: 'address',     label: 'Address',     kind: 'text',     placeholder: 'Job site address',  col: 1 },
   { key: 'job_title',   label: 'Job title',   kind: 'text',     placeholder: 'e.g. Bath remodel', col: 1 },
-  { key: 'scope_text',  label: 'Scope notes', kind: 'textarea', placeholder: 'Scope, timing, constraints, must-haves...', col: 1 },
+  { key: 'scope_text',  label: 'Scope notes', kind: 'textarea', placeholder: 'Scope, timing, constraints, requirements...', col: 1 },
   { key: 'job_type',    label: 'Job type',    kind: 'text',     placeholder: 'e.g. Concrete',     col: 2 },
   { key: 'amount',      label: 'Amount',      kind: 'number',   placeholder: '0',                 col: 1 },
   { key: 'referred_by', label: 'Referred by', kind: 'text',     placeholder: 'Source',            col: 2 },
@@ -413,7 +413,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
     : 'job'
   // Linked fh_clients row used for the "Pull from client" button. Loaded
   // only when contact has a client_id + caller is the owner (RLS on
-  // fh_clients denies partner reads — owner-only by design).
+  // fh_clients denies partner reads, owner-only by design).
   const [linkedClient, setLinkedClient] = useState<any>(null)
   const [hydrating, setHydrating] = useState(false)
   // Pending client_id change tracked separately so the diff at commit()
@@ -446,7 +446,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
-  // Pull from the linked client — fills empty form fields with the
+  // Pull from the linked client, fills empty form fields with the
   // client's values. Never clobbers anything the user has typed on
   // the form. Surfaces only when there's at least one field to fill.
   function hydrateFromClient() {
@@ -515,7 +515,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
 
   // Called when the operator picks (or clears) a client via the
   // ClientPicker below. Auto-hydrates empty form fields with the
-  // picked client's values — same merge policy as NewLeadSheet's
+  // picked client's values, same merge policy as NewLeadSheet's
   // handleClientChange. User-typed values are never clobbered.
   function handleClientLink(picked: any) {
     if (!picked) {
@@ -536,18 +536,18 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
 
   return (
     <div style={{
-      padding: '18px 18px 16px',
-      borderRadius: 16,
+      padding: '16px 16px 16px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-      display: 'flex', flexDirection: 'column', gap: 14
+      display: 'flex', flexDirection: 'column', gap: 12
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow as="div" tone="gold">
           <Pencil size={12} aria-hidden="true" />
           Editing {recordNoun} fields
         </Eyebrow>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {fieldsToFill.length > 0 && (
             <button
               type="button"
@@ -555,13 +555,13 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
               disabled={hydrating}
               title={`Fill ${fieldsToFill.length} empty field${fieldsToFill.length === 1 ? '' : 's'} from the linked client (${linkedClient?.name || 'client'})`}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '6px 11px', borderRadius: 8,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '8px 12px', borderRadius: 10,
                 background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                 color: 'var(--v3-primary-bright)',
-                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.04em', cursor: 'pointer'
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                letterSpacing: 0, cursor: 'pointer'
               }}
             >
               {hydrating ? 'Filling…' : `Use client info · ${fieldsToFill.length}`}
@@ -572,7 +572,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
             onClick={onExitEdit}
             aria-label="Cancel edit"
             style={{
-              width: 32, height: 32, borderRadius: 9,
+              width: 32, height: 32, borderRadius: 10,
               background: 'transparent', border: '1px solid var(--v3-border)',
               color: 'var(--v3-text-muted)', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
@@ -583,11 +583,11 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
         </div>
       </div>
 
-      {/* LINKED CLIENT — controlled ClientPicker. Picks auto-hydrate
+      {/* LINKED CLIENT, controlled ClientPicker. Picks auto-hydrate
           empty fields on the form (same merge policy as NewLeadSheet)
           and commit the new client_id alongside the regular field
           diff. Clearing the picker queues an unlink. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <Eyebrow>Linked client</Eyebrow>
         <ClientPicker
           userId={userId}
@@ -595,10 +595,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
           onChange={handleClientLink}
         />
         <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 11,
+          fontFamily: 'var(--font-body)', fontSize: 12,
           color: 'var(--v3-text-muted)', lineHeight: 1.4
         }}>
-          Picking a client auto-fills any empty fields below. Your typed values are preserved.
+          Picking a client fills any empty fields below. Your typed values are preserved.
         </span>
       </div>
 
@@ -621,10 +621,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
           type="button"
           onClick={onExitEdit}
           style={{
-            padding: '12px', borderRadius: 12,
+            padding: '12px', borderRadius: 10,
             background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
             color: 'var(--v3-text)', cursor: 'pointer',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600
           }}
         >
           Cancel
@@ -635,12 +635,12 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
           onClick={commit}
           disabled={saving}
           style={{
-            padding: '12px', borderRadius: 12, border: 'none',
+            padding: '12px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)',
             color: 'var(--v3-on-primary)',
             cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1,
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-            letterSpacing: '0.04em',
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+            letterSpacing: 0,
             boxShadow: 'var(--v3-gold-glow)',
             WebkitTapHighlightColor: 'transparent'
           }}
@@ -681,14 +681,14 @@ function EditField({ label, value, onChange, kind, placeholder, spanFull }: any)
   const className = spanFull ? 'v3-edit-field--full' : ''
   const sharedInputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
-    padding: '11px 13px', borderRadius: 10,
+    padding: '12px 12px', borderRadius: 10,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
     color: 'var(--v3-text)',
     fontFamily: 'var(--font-body)', fontSize: 14,
     outline: 'none'
   }
   return (
-    <label className={className} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label className={className} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <Eyebrow>{label}</Eyebrow>
       {kind === 'textarea' ? (
         <textarea

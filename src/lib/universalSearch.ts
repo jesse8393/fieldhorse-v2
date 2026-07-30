@@ -1,4 +1,4 @@
-// Universal search — Phase 19 / Audit Move #8.
+// Universal search, Phase 19 / Audit Move #8.
 //
 // One query → results grouped across the 5 main entities:
 //   jobs (fh_contacts), clients (fh_clients), notes (fh_notes),
@@ -15,7 +15,7 @@
 //     to:   internal route e.g. '/jobs/<id>'
 //
 // Pagination: 6 rows per kind. Universal search is for jumping to a
-// known item, not for browsing — go to the dedicated screen for that.
+// known item, not for browsing, go to the dedicated screen for that.
 
 import { supabase } from './supabase.ts'
 import { detailRoute } from './stages.ts'
@@ -63,7 +63,7 @@ export async function universalSearch(query: string | null | undefined, userId: 
 
   const like = pat(q)
 
-  // Parallel — independent queries, no transactional concern.
+  // Parallel, independent queries, no transactional concern.
   // Each .or() searches the most useful columns for that table.
   // Every query carries .eq('user_id', userId) for tenant isolation
   // defense-in-depth alongside RLS.
@@ -149,7 +149,7 @@ export async function universalSearch(query: string | null | undefined, userId: 
     title: f.filename,
     sub: [f.kind === 'photo' ? 'Photo' : 'File', f.fh_contacts?.name].filter(Boolean).join(' · '),
     // A file lives on a job; an orphan (no job_id) shouldn't dump you on
-    // Home — send it to the Jobs list instead.
+    // Home, send it to the Jobs list instead.
     to: f.job_id ? `/jobs/${f.job_id}` : '/jobs'
   }))
 

@@ -1,7 +1,7 @@
 // src/lib/queries.ts
 //
 // Typed TanStack Query hooks layer. First file in the TypeScript +
-// Query migration — replaces the hand-rolled `useEffect` +
+// Query migration, replaces the hand-rolled `useEffect` +
 // `supabase.from().select()` + manual loading/error/refetch pattern
 // that was duplicated across every screen.
 //
@@ -32,7 +32,7 @@ export type Payment = Database['public']['Tables']['fh_payments']['Row']
 
 // The columns the Work list (and desktop rail) actually render. Keeping
 // this a projection instead of `*` cuts each row to a fraction of its
-// full width — fh_contacts carries big text fields (notes, scope,
+// full width, fh_contacts carries big text fields (notes, scope,
 // proposal HTML) that the list never shows.
 export const JOB_LIST_COLUMNS =
   'id, user_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, updated_at, created_at'
@@ -54,7 +54,7 @@ export const queryKeys = {
 }
 
 // PostgREST caps every response at the server's max-rows (Supabase
-// default: 1000) even when no .limit() is set — so the "deliberately
+// default: 1000) even when no .limit() is set, so the "deliberately
 // uncapped" aggregate fetches below were silently losing their oldest
 // rows past 1000 (payments dropped from A/R sums, jobs from rollups).
 // This pages through .range() windows until a short page arrives.
@@ -88,11 +88,11 @@ export function jobsKey(userId: string | undefined) {
 // ---- Jobs ----
 
 async function fetchJobs(): Promise<JobRow[]> {
-  // No JS-layer user_id filter — RLS (owner + partner-read) is the
+  // No JS-layer user_id filter, RLS (owner + partner-read) is the
   // enforcement layer, matching the prior Jobs.load behavior so
   // partner-shared jobs still surface. Partner-shared rows can come
-  // back twice — once as the owner's row, once via the partnership
-  // join — so dedupe by id before returning, mirroring the Home
+  // back twice, once as the owner's row, once via the partnership
+  // join, so dedupe by id before returning, mirroring the Home
   // pipeline dedupe in screens/Home.tsx.
   const { data, error } = await supabase
     .from('fh_contacts')
@@ -113,8 +113,8 @@ async function fetchJobs(): Promise<JobRow[]> {
 }
 
 export function useJobs() {
-  // Derive the user id here (rather than as a param) so every caller —
-  // Work, the desktop DetailListRail — shares the one user-scoped key
+  // Derive the user id here (rather than as a param) so every caller :
+  // Work, the desktop DetailListRail, shares the one user-scoped key
   // without each having to thread the id through.
   const { user } = useAuth()
   return useQuery({
@@ -177,7 +177,7 @@ export function useJobsRealtime(userId: string | undefined, client: QueryClient)
 // rows stay instant and older rows stream in behind them.
 export function useJobSearch(term: string) {
   // PostgREST or() syntax delimits with commas/parens, and % _ \ are
-  // ilike metacharacters — but simply STRIPPING them broke real
+  // ilike metacharacters, but simply STRIPPING them broke real
   // searches (ultrareview x5: "(615) 555-1234" became "615  555-1234",
   // which matches nothing). Instead, collapse every run of punctuation
   // or whitespace into a single % wildcard: the pattern
@@ -252,7 +252,7 @@ async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
         .order('id', { ascending: true })
         .range(from, to)
     ),
-    // Approved change orders adjust each job's true contract — without
+    // Approved change orders adjust each job's true contract, without
     // them the Clients-list "outstanding" understates any job carrying
     // a signed CO (the statement/A-R surfaces already include them).
     fetchAllRows<ClientsBundle['changeOrders'][number]>((from, to) =>
@@ -356,7 +356,7 @@ export function useInvalidateSchedule() {
 
 // Optimistically drop a deleted event from every cached schedule query
 // (range + upcoming) so it vanishes immediately, before the server
-// round-trip — replaces the old setEvents/setUpcoming filters.
+// round-trip, replaces the old setEvents/setUpcoming filters.
 export function useDropScheduleEvent() {
   const client = useQueryClient()
   return (evtId: string) => {
@@ -378,7 +378,7 @@ export type ActivityBundle = {
   changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
   invoices: Database['public']['Tables']['fh_invoices']['Row'][]
   contacts: Pick<Contact, 'id' | 'name' | 'job_title' | 'stage'>[]
-  // True when at least one event source returned a full page — i.e. there
+  // True when at least one event source returned a full page, i.e. there
   // may be older rows a larger page would surface. The merged feed length
   // can exceed pageSize even when every source is exhausted (4 sources ×
   // pageSize), so the merged count is NOT a valid "has more" signal.
@@ -407,7 +407,7 @@ async function fetchActivity(userId: string, pageSize: number): Promise<Activity
     if (result.error) throw result.error
   }
   // "More to load" iff one of the four event sources filled its page.
-  // (contacts is a lookup table, not an event source — exclude it.)
+  // (contacts is a lookup table, not an event source, exclude it.)
   const hasMore = [transitions, payments, changeOrders, invoices]
     .some((r) => (r.data?.length ?? 0) >= pageSize)
   return {
@@ -431,12 +431,12 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
 // ---- Invoices / AR ----
 // Three datasets: jobs in the active money pipeline (with the joined
 // fh_clients fallback fields), every payment (for per-job paid
-// rollups + month-to-date collection pace), and — pipeline v2 — the
+// rollups + month-to-date collection pace), and, pipeline v2, the
 // first-class fh_invoices rows so the screen can list real issued
 // invoices, not just per-job balances. Bundled so the screen keeps a
 // single loading flag, matching its prior behavior.
 
-// Projected — the AR screen renders identity/billing fields only; the
+// Projected, the AR screen renders identity/billing fields only; the
 // wide text columns on fh_contacts (scope, notes, proposal bodies) never
 // appear on this surface.
 export const INVOICE_JOB_COLUMNS =
@@ -473,8 +473,8 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
         .range(from, to)
     ),
     // Deliberately UNCAPPED, and PAGED past PostgREST's max-rows
-    // (default 1000): a cap here silently drops the oldest rows —
-    // exactly the most-overdue receivables — understating outstanding
+    // (default 1000): a cap here silently drops the oldest rows :
+    // exactly the most-overdue receivables, understating outstanding
     // totals and the 60+ aging bucket. A/R math must see every row.
     fetchAllRows<Payment>((from, to) =>
       supabase
@@ -489,13 +489,13 @@ async function fetchInvoicesBundle(userId: string): Promise<InvoicesBundle> {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      // Bound the issued-invoice DISPLAY list — the Invoices screen only
+      // Bound the issued-invoice DISPLAY list, the Invoices screen only
       // renders these rows (invoiceRows), it does NOT compute A/R totals
       // from them (totals derive from the uncapped jobs + payments +
-      // change-orders sets above). So a huge invoice history no longer
+      // change orders sets above). So a huge invoice history no longer
       // ships every row; the 500 most-recent cover the list.
       .limit(500),
-    // Approved change orders adjust each job's true contract — needed so
+    // Approved change orders adjust each job's true contract, needed so
     // "Who owes you" / statements don't understate a job with signed COs.
     fetchAllRows<InvoicesBundle['changeOrders'][number]>((from, to) =>
       supabase
@@ -785,7 +785,7 @@ export type AnalyticsBundle = {
 
 async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
   const [c, m, p, inv, co, cli, st] = await Promise.all([
-    // Explicit projection instead of `*` — fh_contacts carries wide text
+    // Explicit projection instead of `*`, fh_contacts carries wide text
     // columns (notes, scope, proposal HTML) Analytics never touches. This
     // list covers exactly the fields Analytics.tsx reads off a contact:
     // stage/amount/cost for KPIs + margin, the date fields for trends,
@@ -811,7 +811,7 @@ async function fetchAnalyticsBundle(userId: string): Promise<AnalyticsBundle> {
       supabase.from('fh_change_orders').select('*').eq('user_id', userId).order('id', { ascending: true }).range(from, to)
     ),
     supabase.from('fh_clients').select('id, name').eq('user_id', userId),
-    // Funnel source — stage moves with timestamps (mig 023). Bounded at
+    // Funnel source, stage moves with timestamps (mig 023). Bounded at
     // 4000 rows, keeping the NEWEST: the funnel windows on the trailing
     // 90 days, so when history exceeds the cap it's the oldest rows
     // that must drop. (The old ascending+limit kept the oldest 4000 and
@@ -975,7 +975,7 @@ async function fetchSubDetail(key: string, userId: string, orgId?: string | null
   if (subsErr) throw subsErr
   if (profErr && profErr.code !== 'PGRST116') {
     if (profErr.message?.includes('does not exist')) {
-      throw new Error('Sub profile table is missing — run migration 017_sub_profiles.sql in Supabase')
+      throw new Error('Sub profile table is missing, run migration 017_sub_profiles.sql in Supabase')
     }
     throw profErr
   }

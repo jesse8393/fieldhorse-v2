@@ -72,7 +72,7 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
       } else if (res.reason === 'no_email') {
         toast('No email on file', { description: 'Add an email to this client first, or download and send manually.' })
       } else if (res.reason === 'sender_not_configured') {
-        toastInfo('Email not set up — downloaded instead', 'The statement PDF was saved to your device.')
+        toastInfo('Email not set up, downloaded instead', 'The statement PDF was saved to your device.')
         onClose?.()
       } else {
         toast("Couldn't send the statement", { description: res.message || 'Try again' })
@@ -117,27 +117,27 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
         </DrawerHeader>
         <div style={{ padding: '4px 16px max(16px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {data.lines.length === 0 && (
-            <div style={{ color: 'var(--v3-text-muted)', fontSize: 13, padding: '16px 0', textAlign: 'center', lineHeight: 1.5 }}>
+            <div style={{ color: 'var(--v3-text-muted)', fontSize: 14, padding: '16px 0', textAlign: 'center', lineHeight: 1.5 }}>
               Nothing outstanding for this client right now. Statements roll up the balance across every property they owe on.
             </div>
           )}
 
           {data.lines.length > 0 && (
             <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
                 {data.lines.map((l, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '8px 12px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.property}</div>
-                      <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 1 }}>{money(l.paid)} paid of {money(l.contract)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.property}</div>
+                      <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 1 }}>{money(l.paid)} paid of {money(l.contract)}</div>
                     </div>
-                    <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>{money(l.balance)}</span>
+                    <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>{money(l.balance)}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--v3-primary)' }}>Total due</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums' }}>{money(data.totalDue)}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-primary)' }}>Total due</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums' }}>{money(data.totalDue)}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 2 }}>
@@ -145,7 +145,7 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
                   type="button"
                   onClick={handleDownload}
                   disabled={!!busy}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 12, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1, WebkitTapHighlightColor: 'transparent' }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1, WebkitTapHighlightColor: 'transparent' }}
                 >
                   <Download size={15} /> {busy === 'download' ? 'Building…' : 'Download'}
                 </button>
@@ -154,7 +154,7 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
                   onClick={handleEmail}
                   disabled={!!busy}
                   title={recipientEmail ? `Email to ${recipientEmail}` : 'No client email on file'}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 12, background: 'var(--v3-primary)', border: 'none', color: 'var(--v3-on-primary)', fontFamily: 'var(--font-body)', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1, WebkitTapHighlightColor: 'transparent' }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, background: 'var(--v3-primary)', border: 'none', color: 'var(--v3-on-primary)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1, WebkitTapHighlightColor: 'transparent' }}
                 >
                   <Mail size={15} /> {busy === 'email' ? 'Sending…' : 'Email'}
                 </button>
@@ -164,7 +164,7 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
                 type="button"
                 onClick={handleShareLink}
                 disabled={!!busy || !client?.id}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, background: 'transparent', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1, WebkitTapHighlightColor: 'transparent' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, background: 'transparent', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1, WebkitTapHighlightColor: 'transparent' }}
               >
                 <Link2 size={15} /> {busy === 'link' ? 'Preparing…' : 'Copy share link'}
               </button>

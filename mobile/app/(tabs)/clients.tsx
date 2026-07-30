@@ -1,6 +1,6 @@
-// mobile/app/(tabs)/clients.tsx — Clients roster.
+// mobile/app/(tabs)/clients.tsx, Clients roster.
 // Uses the shared useClientsBundle() hook (clients + jobs + payments)
-// and computes per-client lifetime / active-count rollups natively —
+// and computes per-client lifetime / active-count rollups natively :
 // the same rollup math the web Clients screen uses.
 import { useMemo, useState } from 'react'
 import { View, Text, FlatList, TextInput, ActivityIndicator, Pressable } from 'react-native'
@@ -79,18 +79,18 @@ export default function ClientsScreen() {
   return (
     <View style={{ flex: 1, paddingTop: insets.top + 10 }}>
       <ScreenBackground />
-      <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+      <View style={{ paddingHorizontal: 24, paddingBottom: 12 }}>
         <Eyebrow>Clients</Eyebrow>
-        <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', letterSpacing: -0.5 }}>Roster</Text>
+        <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800', letterSpacing: 0 }}>Roster</Text>
       </View>
 
-      <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+      <View style={{ paddingHorizontal: 24, paddingBottom: 12 }}>
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Search clients…"
           placeholderTextColor={theme.inkFaint}
-          style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: theme.ink, fontSize: 15 }}
+          style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink, fontSize: 14 }}
         />
       </View>
 
@@ -100,7 +100,7 @@ export default function ClientsScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100, gap: 10 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 100, gap: 12 }}
           ListHeaderComponent={
             clients.length > 0 ? (
               <View style={{ marginBottom: 4 }}>
@@ -126,11 +126,11 @@ export default function ClientsScreen() {
       <Pressable
         onPress={() => setAddOpen(true)}
         style={{
-          position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 999,
+          position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 10,
           shadowColor: '#C9963A', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12
         }}
       >
-        <LinearGradient colors={['#F0CE86', '#E4BE6F', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>
+        <LinearGradient colors={['#F2EDE4', '#C9963A', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
           <Plus color={theme.onGold} size={26} strokeWidth={2.8} />
         </LinearGradient>
       </Pressable>
@@ -145,10 +145,10 @@ export default function ClientsScreen() {
 function Kpi({ label, value, sub, danger }: { label: string; value: string; sub: string; danger?: boolean }) {
   return (
     <Card style={{ flex: 1 }}>
-      <View style={{ padding: 14 }}>
-        <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' }} numberOfLines={1}>{label}</Text>
-        <Text style={{ color: danger ? theme.danger : theme.goldBright, fontSize: 22, fontWeight: '800', marginTop: 6 }} numberOfLines={1}>{value}</Text>
-        <Text style={{ color: theme.inkFaint, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{sub}</Text>
+      <View style={{ padding: 12 }}>
+        <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }} numberOfLines={1}>{label}</Text>
+        <Text style={{ color: danger ? theme.danger : theme.goldBright, fontSize: 20, fontWeight: '800', marginTop: 6 }} numberOfLines={1}>{value}</Text>
+        <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 1 }} numberOfLines={1}>{sub}</Text>
       </View>
     </Card>
   )
@@ -159,22 +159,22 @@ function ClientCard({ client, roll, onPress }: { client: Client; roll?: Roll; on
   return (
     <Pressable onPress={onPress}>
       <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}>
           <LinearGradient
-            colors={['#2A2118', '#1B1612']}
-            style={{ width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(232,184,101,0.28)' }}
+            colors={['#141414', '#141414']}
+            style={{ width: 46, height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(201, 150, 58,0.28)' }}
           >
-            <Text style={{ color: theme.goldBright, fontSize: 18, fontWeight: '800' }}>{initial}</Text>
+            <Text style={{ color: theme.goldBright, fontSize: 20, fontWeight: '800' }}>{initial}</Text>
           </LinearGradient>
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{client.name || 'Unnamed'}</Text>
             <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>
-              {client.company_name || client.email || client.phone || '—'}
+              {client.company_name || client.email || client.phone || '\u2003'}
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ color: theme.goldBright, fontSize: 16, fontWeight: '800' }}>{money(roll?.lifetime || 0)}</Text>
-            <Text style={{ color: theme.inkMuted, fontSize: 10, marginTop: 2 }}>{roll?.active || 0} active</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{roll?.active || 0} active</Text>
           </View>
         </View>
       </Card>

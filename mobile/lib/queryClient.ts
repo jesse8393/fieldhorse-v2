@@ -1,4 +1,4 @@
-// mobile/lib/queryClient.ts — same defaults as the web client.
+// mobile/lib/queryClient.ts, same defaults as the web client.
 import { QueryClient } from '@tanstack/react-query'
 
 export const queryClient = new QueryClient({

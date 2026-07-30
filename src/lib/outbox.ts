@@ -1,6 +1,6 @@
 // src/lib/outbox.ts
 //
-// Offline write queue — dead-zone insurance for every field write.
+// Offline write queue, dead-zone insurance for every field write.
 //
 // The app's writes go straight to Supabase; on a jobsite with no signal
 // they failed and the data was simply lost. This module gives the app
@@ -13,9 +13,9 @@
 // flush that dies halfway can re-run without double-writing.
 //
 // Entry kinds:
-//   insert — table row insert
-//   update — table .update(patch).match(match)
-//   photo  — storage upload (bucket/path/blob) + fh_job_files row
+//   insert, table row insert
+//   update, table .update(patch).match(match)
+//   photo , storage upload (bucket/path/blob) + fh_job_files row
 //
 // Flush triggers: window 'online', tab becoming visible, and app start
 // (wired in AppShell). Successes toast once per drain.
@@ -99,7 +99,7 @@ async function putEntry(e: OutboxEntry): Promise<boolean> {
   }
 }
 
-const QUEUE_FULL = { message: "Offline storage is full — this didn't save. Reconnect to sync your queued work, then try again." }
+const QUEUE_FULL = { message: "Offline storage is full, this didn't save. Reconnect to sync your queued work, then try again." }
 
 async function deleteEntry(key: string) {
   try {
@@ -136,7 +136,7 @@ export async function outboxSize(): Promise<number> {
 // Supabase-js surfaces transport failures as "TypeError: Failed to
 // fetch" (Chrome), "Load failed" (iOS Safari), "NetworkError…"
 // (Firefox). Anything with an HTTP status is a real server answer and
-// must NOT be queued — retrying a 400 forever helps nobody.
+// must NOT be queued, retrying a 400 forever helps nobody.
 export function isNetworkError(err: any): boolean {
   if (!err) return false
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
@@ -221,7 +221,7 @@ async function drainEntry(e: OutboxEntry): Promise<boolean> {
       .upsert(e.row, { onConflict: 'id', ignoreDuplicates: true })
     return !error || !isNetworkError(error)
     // Non-network errors drop the entry: the row is malformed or RLS
-    // rejected it — it will never succeed, keeping it would jam the queue.
+    // rejected it, it will never succeed, keeping it would jam the queue.
   }
   if (e.kind === 'update' && e.table && e.match && e.patch) {
     const { error } = await db.from(e.table).update(e.patch).match(e.match)
@@ -235,20 +235,20 @@ async function drainEntry(e: OutboxEntry): Promise<boolean> {
       // Network failure → keep the entry and retry on the next trigger.
       if (isNetworkError(upErr)) return false
       // Non-network failure (413 too large / RLS / missing bucket): the
-      // object never landed, so DON'T write the fh_job_files row — that
+      // object never landed, so DON'T write the fh_job_files row, that
       // would orphan a DB row pointing at storage that doesn't exist.
       // Treat as permanent (like the insert branch): drop the entry.
-      console.warn('[fieldhorse] outbox photo upload failed permanently — dropping entry', upErr)
+      console.warn('[fieldhorse] outbox photo upload failed permanently, dropping entry', upErr)
       return true
     }
     // Upload succeeded ("already exists" upsert conflicts count as
-    // success) — only NOW write the DB row that points at the object.
+    // success), only NOW write the DB row that points at the object.
     const { error } = await db
       .from('fh_job_files')
       .upsert(e.row, { onConflict: 'id', ignoreDuplicates: true })
     return !error || !isNetworkError(error)
   }
-  return true // unknown/corrupt entry — drop it
+  return true // unknown/corrupt entry, drop it
 }
 
 /** Drain the queue oldest-first. Stops at the first network failure. */
@@ -257,7 +257,7 @@ export async function flushOutbox(): Promise<number> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 0
   flushing = true
   let synced = 0
-  // Contacts whose cost rollup must be recomputed after draining —
+  // Contacts whose cost rollup must be recomputed after draining :
   // an expense/sub that synced from the outbox otherwise leaves
   // fh_contacts.cost (and margin) stale until an unrelated recalc.
   const recalcContacts = new Map<string, string>() // contactId → userId
@@ -270,7 +270,7 @@ export async function flushOutbox(): Promise<number> {
       } catch (err) {
         ok = !isNetworkError(err)
       }
-      if (!ok) break // still offline — try again on the next trigger
+      if (!ok) break // still offline, try again on the next trigger
       if (e.kind === 'insert' && (e.table === 'fh_expenses' || e.table === 'fh_subs') && e.row?.contact_id && e.row?.user_id) {
         recalcContacts.set(e.row.contact_id, e.row.user_id)
       }

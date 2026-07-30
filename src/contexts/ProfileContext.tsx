@@ -26,7 +26,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // Tracks the auth user a fetch was started for. An in-flight fetch
-  // for user A can resolve after a fast sign-out→sign-in to user B;
+  // for user A can resolve after a fast sign-out→sign in to user B;
   // without this guard the stale response would overwrite B's profile
   // (the closure check below compares against its own stale user).
   const activeUserIdRef = useRef<string | null>(null)
@@ -55,7 +55,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
     // Multi-tenant guard: only accept the row if it actually belongs to
     // the current auth user. Prevents a stale cross-user profile from
-    // leaking into state during a fast sign-out→sign-in transition.
+    // leaking into state during a fast sign-out→sign in transition.
     setProfile(data && data.user_id === user.id ? data : null)
     setLoading(false)
   }, [user?.id])

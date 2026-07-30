@@ -1,16 +1,16 @@
 // src/components/InvitePartnerSheet.tsx
 //
-// v3 rebuild — same partner-invite flow, but rebuilt around the
+// v3 rebuild, same partner-invite flow, but rebuilt around the
 // cockpit / serif-headline / commit-button pattern shared with
 // NewClientSheet, NewLeadSheet, MergeDuplicatesSheet so it stops
 // looking like a leftover from an earlier design pass.
 //
 // New surface (vs. the old version):
-//   - Partner-name field on top — used to greet them in the email and
+//   - Partner-name field on top, used to greet them in the email and
 //     stored on fh_job_partners for the inviter's roster.
-//   - Role chip selector (Foreman / Sub / Estimator / Other) — wraps
+//   - Role chip selector (Foreman / Sub / Estimator / Other), wraps
 //     into the email body and the partner record.
-//   - "Recent partners" suggestion strip — tap a chip to autofill name
+//   - "Recent partners" suggestion strip, tap a chip to autofill name
 //     + email + role from someone you've invited before, sourced from
 //     lib/partners.loadPastPartners().
 //
@@ -30,7 +30,7 @@ import { authHeaders } from '../lib/supabase.ts'
 import { Eyebrow } from './v3'
 
 function friendlyInviteError(code: any) {
-  if (code === 'server_misconfigured') return "Server isn't set up — missing Supabase keys in Netlify env."
+  if (code === 'server_misconfigured') return "Server isn't set up, missing Supabase keys in Netlify env."
   if (code === 'forbidden_or_not_found') return "Can't invite on a job that isn't yours."
   if (code === 'db_insert_failed') return 'Database rejected the invite.'
   if (code === 'job_lookup_failed') return "Couldn't look up the job."
@@ -112,7 +112,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         const code = data?.error || `http_${res.status}`
         const friendly = friendlyInviteError(code)
         const detail = data?.detail || data?.hint
-        throw new Error(detail ? `${friendly} — ${detail}` : friendly)
+        throw new Error(detail ? `${friendly}, ${detail}` : friendly)
       }
       setRecipientEmail(trimmed)
       if (data?.sent) {
@@ -120,7 +120,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
         onOpenChange(false)
       } else if (data?.invite_url) {
         if (data?.sender_not_configured) {
-          setSendFallbackReason('Email sender is not configured yet — share the link manually below.')
+          setSendFallbackReason('Email sender is not configured yet, share the link manually below.')
         } else if (data?.send_failed) {
           const detail = data?.detail || 'Unknown provider error'
           const status = data?.provider_status ? ` (HTTP ${data.provider_status})` : ''
@@ -172,7 +172,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
       copyTimer.current = setTimeout(() => setCopied(false), 2000)
       toastSuccess('Link copied', 'Paste it into a text or email.')
     } else {
-      toastError("Couldn't copy automatically", 'Long-press the link above to copy it manually.')
+      toastError("Couldn't copy automatically", 'Touch and hold the link above to copy it manually.')
     }
   }
 
@@ -181,7 +181,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     if (!navigator.share) { copyLink(); return }
     try {
       const greeting = name.trim() ? `${name.trim()},\n\n` : ''
-      const body = `${greeting}Co-manage ${contactName || 'this job'} with me:\n\n${readyUrl}`
+      const body = `${greeting}Manage ${contactName || 'this job'} with me:\n\n${readyUrl}`
       await navigator.share({
         title: 'Partner invite',
         text: body,
@@ -194,10 +194,10 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     }
   }
 
-  const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
   const fieldStyle: import('react').CSSProperties = {
-    padding: '11px 14px',
-    borderRadius: 12,
+    padding: '12px 12px',
+    borderRadius: 10,
     background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
@@ -224,17 +224,17 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               {readyUrl ? <>Invite ready.</> : <>Invite a partner.</>}
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
           >
             {readyUrl
-              ? <>Send this link to {name.trim() || 'your partner'}. It gives them access to <strong style={{ color: 'var(--ink-strong)' }}>{contactName || 'this job'}</strong> only — nothing else from your account.</>
-              : <>They'll get a link to join <strong style={{ color: 'var(--ink-strong)' }}>{contactName || 'this job'}</strong>. They'll only see this specific job — not your other contacts, rates, or data.</>
+              ? <>Send this link to {name.trim() || 'your partner'}. It gives them access to <strong style={{ color: 'var(--ink-strong)' }}>{contactName || 'this job'}</strong> only, nothing else from your account.</>
+              : <>They'll get a link to join <strong style={{ color: 'var(--ink-strong)' }}>{contactName || 'this job'}</strong>. They'll only see this specific job, not your other contacts, rates, or data.</>
             }
           </DrawerDescription>
         </DrawerHeader>
@@ -263,7 +263,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
               <RecentPartnersStrip partners={pastPartners} onPick={pickPast} />
             )}
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Partner name</span>
               <div style={{ position: 'relative' }}>
                 <UserPlus size={16} style={iconStyle} />
@@ -274,12 +274,12 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Mike Reilly"
-                  style={{ ...fieldStyle, padding: '11px 14px 11px 40px' }}
+                  style={{ ...fieldStyle, padding: '12px 12px 12px 32px' }}
                 />
               </div>
             </label>
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Partner email *</span>
               <div style={{ position: 'relative' }}>
                 <Mail size={16} style={iconStyle} />
@@ -292,14 +292,14 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="mike@example.com"
-                  style={{ ...fieldStyle, padding: '11px 14px 11px 40px' }}
+                  style={{ ...fieldStyle, padding: '12px 12px 12px 32px' }}
                 />
               </div>
             </label>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Role on this job</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {PARTNER_ROLES.map((r) => {
                   const active = role === r
                   return (
@@ -309,8 +309,8 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                       onClick={() => { hapticTap(); setRole(active ? '' : r) }}
                       disabled={sending}
                       style={{
-                        padding: '7px 12px',
-                        borderRadius: 999,
+                        padding: '8px 12px',
+                        borderRadius: 10,
                         border: active
                           ? '1px solid var(--v3-border-strong)'
                           : '1px solid var(--rule)',
@@ -334,17 +334,17 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12, marginTop: 6 }}>
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
                 disabled={sending}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '12px 14px', borderRadius: 12,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '12px 12px', borderRadius: 10,
                   background: 'var(--surface-2)', border: '1px solid var(--rule)',
                   color: 'var(--ink-strong)',
-                  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                   cursor: sending ? 'wait' : 'pointer'
                 }}
               >
@@ -357,10 +357,10 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                 disabled={sending}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '12px 14px', borderRadius: 12, border: 'none',
+                  padding: '12px 12px', borderRadius: 10, border: 'none',
                   background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                   color: 'var(--onyx)',
-                  fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                  fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                   cursor: sending ? 'wait' : 'pointer',
                   boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                   opacity: sending ? 0.6 : 1
@@ -387,14 +387,14 @@ const iconStyle: import('react').CSSProperties = {
 
 function RecentPartnersStrip({ partners, onPick }: any) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <Eyebrow style={{ color: 'var(--ink-muted)' }}>
         Recent partners
       </Eyebrow>
       <div style={{
         display: 'flex', flexWrap: 'nowrap', gap: 8,
         overflowX: 'auto', WebkitOverflowScrolling: 'touch',
-        paddingBottom: 2
+        paddingBottom: 4
       }}>
         {partners.map((p: any) => (
           <button
@@ -406,7 +406,7 @@ function RecentPartnersStrip({ partners, onPick }: any) {
               maxWidth: 220,
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '8px 12px',
-              borderRadius: 999,
+              borderRadius: 10,
               background: 'var(--surface-2)',
               border: '1px solid var(--rule)',
               color: 'var(--ink-strong)',
@@ -416,12 +416,12 @@ function RecentPartnersStrip({ partners, onPick }: any) {
             }}
           >
             <span aria-hidden="true" style={{
-              width: 22, height: 22, borderRadius: '50%',
+              width: 22, height: 22, borderRadius: 10,
               background: 'var(--v3-glass-tint-2)',
               color: 'var(--ink-strong)',
               display: 'grid', placeItems: 'center',
               fontFamily: 'var(--font-display)',
-              fontSize: 11, letterSpacing: '0.04em',
+              fontSize: 12, letterSpacing: 0,
               flexShrink: 0
             }}>
               {(p.name || p.email).charAt(0).toUpperCase()}
@@ -453,7 +453,7 @@ function RecentPartnersStrip({ partners, onPick }: any) {
 function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onCopy, onShare, onClose }: any) {
   return (
     <div style={{
-      padding: '6px 20px max(20px, calc(20px + env(safe-area-inset-bottom)))',
+      padding: '8px 24px max(24px, calc(20px + env(safe-area-inset-bottom)))',
       display: 'flex', flexDirection: 'column', gap: 12,
       boxSizing: 'border-box', maxWidth: '100%', minWidth: 0,
       overflowY: 'auto', flex: 1, minHeight: 0
@@ -462,7 +462,7 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
         <div
           role="status"
           style={{
-            padding: '10px 12px',
+            padding: '12px 12px',
             borderRadius: 10,
             background: 'var(--v3-glass-tint-2)',
             border: '1px solid var(--v3-border-strong)',
@@ -473,7 +473,7 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
         >
           {sendFallbackReason}
           {recipientEmail && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-muted)' }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-muted)' }}>
               Recipient: {recipientEmail}
             </div>
           )}
@@ -481,8 +481,8 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
       )}
       <div
         style={{
-          padding: '12px 14px',
-          borderRadius: 12,
+          padding: '12px 12px',
+          borderRadius: 10,
           background: 'var(--surface-2)',
           border: '1px solid var(--rule)',
           fontFamily: 'var(--font-mono, ui-monospace, monospace)',
@@ -496,18 +496,18 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
       >
         {readyUrl}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={onCopy}
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '12px 14px', borderRadius: 12,
+            padding: '12px 12px', borderRadius: 10,
             background: copied ? 'rgba(45,122,79,0.14)' : 'var(--surface-2)',
             border: copied ? '1px solid rgba(45,122,79,0.4)' : '1px solid var(--rule)',
             color: copied ? 'var(--signal-green)' : 'var(--ink-strong)',
-            fontFamily: 'var(--font-display)', fontSize: 13, letterSpacing: '0.12em',
+            fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
             cursor: 'pointer'
           }}
         >
@@ -520,10 +520,10 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
           onClick={onShare}
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '12px 14px', borderRadius: 12, border: 'none',
+            padding: '12px 12px', borderRadius: 10, border: 'none',
             background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
             color: 'var(--onyx)',
-            fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+            fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
             cursor: 'pointer',
             boxShadow: '0 6px 16px rgba(201,150,58,0.3)'
           }}
@@ -536,7 +536,7 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
         type="button"
         onClick={onClose}
         style={{
-          padding: '10px 14px', borderRadius: 12,
+          padding: '12px 12px', borderRadius: 10,
           background: 'transparent', border: '1px solid var(--rule)',
           color: 'var(--ink-muted)',
           fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,

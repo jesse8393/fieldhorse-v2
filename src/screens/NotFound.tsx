@@ -1,4 +1,4 @@
-// NotFound — real 404 view for unmatched routes.
+// NotFound, real 404 view for unmatched routes.
 //
 // The old catch-all silently redirected to Home and rewrote the URL,
 // so a mistyped or stale link gave no signal that anything went wrong
@@ -12,7 +12,7 @@ export default function NotFound() {
   return (
     <div className="fh-build-page" data-build-screen="NotFound">
       <main className="fh-build-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60dvh' }}>
-        <section style={{ textAlign: 'center', maxWidth: 420, padding: '32px 20px' }}>
+        <section style={{ textAlign: 'center', maxWidth: 420, padding: '32px 24px' }}>
           <Compass size={28} aria-hidden="true" style={{ color: 'var(--v3-text-muted)', marginBottom: 12 }} />
           <div className="fh-build-eyebrow">Page not found</div>
           <h1 className="fh-build-title" style={{ margin: '8px 0 10px' }}>NOTHING HERE.</h1>

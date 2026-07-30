@@ -5,7 +5,7 @@ import FilesSection from '../sections/Files.tsx'
 import MessagesSection from '../sections/Messages.tsx'
 
 /**
- * FILES tab — sub-tab router for media + comms.
+ * FILES tab, sub-tab router for media + comms.
  *
  * Sub-tabs: Photos · Files · Messages
  *

@@ -14,8 +14,8 @@ const STORAGE_KEY = 'fh:theme'
 
 // PWA status-bar / browser-chrome color per theme. Matches --v3-bg.
 const THEME_COLOR: Record<Theme, string> = {
-  dark: '#0B0907',
-  light: '#F8F5EE'
+  dark: '#141414',
+  light: '#F2EDE4'
 }
 
 function initial(): Theme {

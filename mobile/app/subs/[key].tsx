@@ -1,4 +1,4 @@
-// mobile/app/subs/[key].tsx — subcontractor vendor profile.
+// mobile/app/subs/[key].tsx, subcontractor vendor profile.
 // :key is encodeURIComponent(phone||name lowercased). Create-on-demand
 // fh_sub_profiles, edit contact / insurance / business / payment / notes,
 // insurance-expiry badge, and read-only job history. Doc uploads defer.
@@ -83,7 +83,7 @@ export default function SubDetailScreen() {
   if (isPending) return <View style={{ flex: 1 }}><ScreenBackground /><ActivityIndicator color={theme.goldBright} style={{ marginTop: insets.top + 80 }} /></View>
   if (!data) return (
     <View style={{ flex: 1 }}><ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 24 }}>
         <ScreenHeader backLabel="Subs" onBack={() => router.back()} eyebrow="Vendor profile" title="Not found" />
       </ScrollView>
     </View>
@@ -94,32 +94,32 @@ export default function SubDetailScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + (profile ? 96 : 24), paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + (profile ? 96 : 24), paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
         <ScreenHeader backLabel="Subs" onBack={() => router.back()} eyebrow="Vendor profile" title={data.displayName} />
 
         {/* contact + KPI */}
         <Card glow style={{ marginTop: 16, marginBottom: 18 }}>
-          <View style={{ padding: 18 }}>
+          <View style={{ padding: 16 }}>
             <View style={{ flexDirection: 'row', gap: 16 }}>
               {data.displayPhone ? (
-                <Pressable onPress={() => Linking.openURL(`tel:${data.displayPhone}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Phone color={theme.goldBright} size={13} /><Text style={{ color: theme.ink, fontSize: 13, fontWeight: '600' }}>{data.displayPhone}</Text>
+                <Pressable onPress={() => Linking.openURL(`tel:${data.displayPhone}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Phone color={theme.goldBright} size={13} /><Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }}>{data.displayPhone}</Text>
                 </Pressable>
               ) : null}
               {profile?.email ? (
-                <Pressable onPress={() => Linking.openURL(`mailto:${profile.email}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Mail color={theme.goldBright} size={13} /><Text style={{ color: theme.ink, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{profile.email}</Text>
+                <Pressable onPress={() => Linking.openURL(`mailto:${profile.email}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Mail color={theme.goldBright} size={13} /><Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{profile.email}</Text>
                 </Pressable>
               ) : null}
             </View>
             <View style={{ flexDirection: 'row', marginTop: 16 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.goldBright, fontSize: 22, fontWeight: '800' }}>${data.billed.toLocaleString()}</Text>
-                <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 2 }}>Billed across {data.jobs.length} job{data.jobs.length === 1 ? '' : 's'}</Text>
+                <Text style={{ color: theme.goldBright, fontSize: 20, fontWeight: '800' }}>${data.billed.toLocaleString()}</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginTop: 2 }}>Billed across {data.jobs.length} job{data.jobs.length === 1 ? '' : 's'}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.ink, fontSize: 22, fontWeight: '800' }}>{data.trades.length}</Text>
-                <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 2 }}>{data.trades.join(' · ') || 'No trade set'}</Text>
+                <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800' }}>{data.trades.length}</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginTop: 2 }}>{data.trades.join(' · ') || 'No trade set'}</Text>
               </View>
             </View>
           </View>
@@ -127,11 +127,11 @@ export default function SubDetailScreen() {
 
         {!profile ? (
           <Card style={{ marginBottom: 18 }}>
-            <View style={{ padding: 20, alignItems: 'center' }}>
+            <View style={{ padding: 24, alignItems: 'center' }}>
               <IdCard color={theme.goldBright} size={26} />
-              <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700', marginTop: 10 }}>No vendor profile yet</Text>
-              <Text style={{ color: theme.inkMuted, fontSize: 13, textAlign: 'center', marginTop: 4, lineHeight: 19 }}>Create one to track insurance, license, EIN and payment details for this sub.</Text>
-              <Pressable onPress={onCreate} disabled={saving} style={{ marginTop: 16, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.goldBright, opacity: saving ? 0.5 : 1 }}>
+              <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700', marginTop: 10 }}>No vendor profile yet</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 14, textAlign: 'center', marginTop: 4, lineHeight: 19 }}>Create one to track insurance, license, EIN and payment details for this sub.</Text>
+              <Pressable onPress={onCreate} disabled={saving} style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, backgroundColor: theme.goldBright, opacity: saving ? 0.5 : 1 }}>
                 <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>{saving ? 'Creating…' : 'Create profile'}</Text>
               </Pressable>
             </View>
@@ -150,7 +150,7 @@ export default function SubDetailScreen() {
             <Section title="Insurance" icon={<ShieldCheck color={theme.goldBright} size={13} />} badge={exp ? { txt: exp.txt, tint: exp.tint } : undefined}>
               <Field label="Carrier" value={form.insurance_carrier} onChange={set('insurance_carrier')} />
               <Field label="Policy #" value={form.insurance_policy} onChange={set('insurance_policy')} />
-              <Field label="Expires (YYYY-MM-DD)" value={form.insurance_expires_on} onChange={set('insurance_expires_on')} placeholder="2026-12-31" />
+              <Field label="Expires (year month day)" value={form.insurance_expires_on} onChange={set('insurance_expires_on')} placeholder="2026-12-31" />
             </Section>
 
             <Section title="Business">
@@ -165,13 +165,13 @@ export default function SubDetailScreen() {
 
             <Section title="Documents">
               <DocRow label="COI (insurance)" onFile={!!profile.coi_path} />
-              <DocRow label="W-9" onFile={!!profile.w9_path} />
+              <DocRow label="W9" onFile={!!profile.w9_path} />
               <DocRow label="License" onFile={!!profile.license_path} />
-              <Text style={{ color: theme.inkMuted, fontSize: 11, marginTop: 8 }}>Upload documents from the web app for now.</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 8 }}>Upload documents from the web app for now.</Text>
             </Section>
 
             <Section title="Notes">
-              <TextInput value={form.notes} onChangeText={set('notes')} multiline placeholder="Anything worth remembering…" placeholderTextColor={theme.inkMuted} style={{ color: theme.ink, fontSize: 15, lineHeight: 21, minHeight: 70, textAlignVertical: 'top', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 12, padding: 12 }} />
+              <TextInput value={form.notes} onChangeText={set('notes')} multiline placeholder="Anything worth remembering…" placeholderTextColor={theme.inkMuted} style={{ color: theme.ink, fontSize: 14, lineHeight: 21, minHeight: 70, textAlignVertical: 'top', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, padding: 12 }} />
             </Section>
           </>
         )}
@@ -179,17 +179,17 @@ export default function SubDetailScreen() {
         {/* Job history */}
         {data.jobs.length > 0 ? (
           <>
-            <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginTop: 8, marginBottom: 10 }}>Job history</Text>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginTop: 8, marginBottom: 10 }}>Job history</Text>
             <View style={{ gap: 8 }}>
               {data.jobs.map((j) => (
                 <Pressable key={j.id} onPress={() => j.contactId && router.push(`/jobs/${j.contactId}`)} disabled={!j.contactId}>
                   <Card>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 14 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 12 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{j.contactName || '(Directory entry)'}</Text>
                         {j.jobTitle ? <Text style={{ color: theme.inkMuted, fontSize: 12 }} numberOfLines={1}>{j.jobTitle}</Text> : null}
                       </View>
-                      <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{j.rate > 0 ? `$${j.rate.toLocaleString()}` : '—'}</Text>
+                      <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{j.rate > 0 ? `$${j.rate.toLocaleString()}` : '\u2003'}</Text>
                     </View>
                   </Card>
                 </Pressable>
@@ -200,9 +200,9 @@ export default function SubDetailScreen() {
       </ScrollView>
 
       {profile ? (
-        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: 'rgba(11,9,7,0.92)', borderTopWidth: 1, borderTopColor: theme.border }}>
-          <Pressable onPress={onSave} disabled={!dirty || saving} style={{ alignItems: 'center', paddingVertical: 14, borderRadius: 12, backgroundColor: theme.goldBright, opacity: !dirty || saving ? 0.5 : 1 }}>
-            <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 15 }}>{saving ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}</Text>
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: 'rgba(20, 20, 20,0.92)', borderTopWidth: 1, borderTopColor: theme.border }}>
+          <Pressable onPress={onSave} disabled={!dirty || saving} style={{ alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: theme.goldBright, opacity: !dirty || saving ? 0.5 : 1 }}>
+            <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>{saving ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -213,16 +213,16 @@ export default function SubDetailScreen() {
 function Section({ title, icon, badge, children }: { title: string; icon?: React.ReactNode; badge?: { txt: string; tint: string }; children: React.ReactNode }) {
   return (
     <View style={{ marginBottom: 18 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         {icon}
-        <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>{title}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>{title}</Text>
         {badge ? (
-          <View style={{ marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: `${badge.tint}55`, backgroundColor: `${badge.tint}1f` }}>
-            <Text style={{ color: badge.tint, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{badge.txt.toUpperCase()}</Text>
+          <View style={{ marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: `${badge.tint}55`, backgroundColor: `${badge.tint}1f` }}>
+            <Text style={{ color: badge.tint, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>{badge.txt.toUpperCase()}</Text>
           </View>
         ) : null}
       </View>
-      <Card><View style={{ padding: 14, gap: 12 }}>{children}</View></Card>
+      <Card><View style={{ padding: 12, gap: 12 }}>{children}</View></Card>
     </View>
   )
 }
@@ -230,20 +230,20 @@ function Section({ title, icon, badge, children }: { title: string; icon?: React
 function Field({ label, value, onChange, keyboard, placeholder }: { label: string; value: string; onChange: (v: string) => void; keyboard?: 'phone-pad' | 'email-address'; placeholder?: string }) {
   return (
     <View>
-      <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 5 }}>{label}</Text>
       <TextInput value={value} onChangeText={onChange} keyboardType={keyboard} autoCapitalize={keyboard === 'email-address' ? 'none' : 'sentences'} placeholder={placeholder} placeholderTextColor={theme.inkFaint}
-        style={{ color: theme.ink, fontSize: 15, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 }} />
+        style={{ color: theme.ink, fontSize: 14, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12 }} />
     </View>
   )
 }
 
 function DocRow({ label, onFile }: { label: string; onFile: boolean }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <FileText color={onFile ? theme.success : theme.inkMuted} size={15} />
       <Text style={{ color: theme.ink, fontSize: 14, flex: 1 }}>{label}</Text>
-      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: onFile ? `${theme.success}55` : theme.borderMid, backgroundColor: onFile ? `${theme.success}1f` : 'transparent' }}>
-        <Text style={{ color: onFile ? theme.success : theme.inkMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{onFile ? 'ON FILE' : 'MISSING'}</Text>
+      <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: onFile ? `${theme.success}55` : theme.borderMid, backgroundColor: onFile ? `${theme.success}1f` : 'transparent' }}>
+        <Text style={{ color: onFile ? theme.success : theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>{onFile ? 'ON FILE' : 'MISSING'}</Text>
       </View>
     </View>
   )

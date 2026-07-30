@@ -5,7 +5,7 @@ import { STAGE_MAP, margin, marginTier } from '../../lib/stages.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import StatusPill from './StatusPill.tsx'
 
-// Cold threshold (V3-JOBS-1) — a contact in lead or quote stage with no
+// Cold threshold (V3-JOBS-1), a contact in lead or quote stage with no
 // updated_at activity for at least 7 days reads as cold. Mirrors the
 // Home Next-Actions cold-lead threshold so the two surfaces stay aligned.
 const COLD_DAYS = 7
@@ -45,12 +45,12 @@ function money(n: number | string | null | undefined) {
 }
 
 function initials(name: string | null | undefined) {
-  if (!name) return '—'
+  if (!name) return '\u2003'
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
 }
 
 function MarginBadge({ pct, hasCost }: { pct: number; hasCost?: boolean }) {
-  // No cost data → hide the row entirely. The previous "Margin —"
+  // No cost data → hide the row entirely. The previous "Margin :"
   // placeholder added visual noise without conveying anything.
   if (!hasCost) return null
   const tier = marginTier(pct)
@@ -62,7 +62,7 @@ function MarginBadge({ pct, hasCost }: { pct: number; hasCost?: boolean }) {
   return (
     <span style={{
       fontFamily: 'var(--font-body)',
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: 700,
       color,
       fontVariantNumeric: 'tabular-nums',
@@ -73,13 +73,13 @@ function MarginBadge({ pct, hasCost }: { pct: number; hasCost?: boolean }) {
   )
 }
 
-// V3-JOBS-1: local StagePill removed — replaced app-wide by the
+// V3-JOBS-1: local StagePill removed, replaced app-wide by the
 // shared StatusPill primitive (src/components/v3/StatusPill.tsx)
 // so all status badges (stage / Top Deal / Approved / Cold) share
 // one chip family.
 
 /**
- * v3 JobCard — premium pipeline card.
+ * v3 JobCard, premium pipeline card.
  *
  * Layout (matches mockup):
  *   ┌─────────────────────────────────────────────┐
@@ -92,8 +92,8 @@ function MarginBadge({ pct, hasCost }: { pct: number; hasCost?: boolean }) {
  *   └─────────────────────────────────────────────┘
  *
  * - photo: optional cover image URL. Falls back to stage-tinted initial tile.
- * - 3D tilt removed — perf win, mockup doesn't call for it.
- * - React.memo — kills re-renders when parent list updates unrelated rows.
+ * - 3D tilt removed, perf win, mockup doesn't call for it.
+ * - React.memo, kills re-renders when parent list updates unrelated rows.
  */
 type JobCardProps = {
   contact: any
@@ -124,7 +124,7 @@ const JobCard = memo(function JobCard({
 
   const nextHint = NEXT_ACTION_HINT[contact.stage]
 
-  // Photo banner mode — when a photo is present, render it as a
+  // Photo banner mode, when a photo is present, render it as a
   // full-width 140px cover banner at the top of the card instead of
   // a 56x56 thumbnail in the body row. Mockup-tier: photo earns
   // its space when present.
@@ -136,7 +136,7 @@ const JobCard = memo(function JobCard({
       className={`fh-job-card${hasPhotoBanner ? ' fh-job-card--with-photo' : ''}${featured ? ' fh-job-card--featured' : ''}`}
       onClick={onOpen ? () => { hapticTap(); onOpen(contact) } : undefined}
       // Card-tap feedback (scale + cursor) only fires when there's an
-      // actual onOpen handler — otherwise the user sees the press
+      // actual onOpen handler, otherwise the user sees the press
       // animation but nothing happens, which reads as broken.
       disabled={!onOpen}
       initial={isNew ? { opacity: 0, scale: 0.94 } : { opacity: 0, y: 8 }}
@@ -151,8 +151,8 @@ const JobCard = memo(function JobCard({
         y: -4,
         backgroundColor: 'var(--v3-surface-3)',
         // V3-JOBS-1: featured cards drop the gold halo on hover.
-        // Gold border alone marks the Top Deal — halo was decoration.
-        boxShadow: '0 24px 56px rgba(0, 0, 0, 0.65), 0 6px 18px rgba(0, 0, 0, 0.40)'
+        // Gold border alone marks the Top Deal, halo was decoration.
+        boxShadow: '0 24px 56px rgba(20, 20, 20, 0.65), 0 6px 18px rgba(20, 20, 20, 0.40)'
       }}
       style={{
         position: 'relative',
@@ -163,14 +163,14 @@ const JobCard = memo(function JobCard({
         boxSizing: 'border-box',
         // Photo banner sits flush at the top, so banner mode skips
         // top padding. Spine moves to the left edge of the card body.
-        padding: hasPhotoBanner ? '0 18px 18px' : '18px 18px 18px 22px',
+        padding: hasPhotoBanner ? '0 16px 16px' : '16px 16px 16px 24px',
         borderRadius: 'var(--v3-radius-card)',
-        // Subtle vertical gradient — top edge a touch lighter than the
+        // Subtle vertical gradient, top edge a touch lighter than the
         // base so the card reads as a lifted glass panel catching light
         // from above, not a flat black rectangle. Featured cards get a
         // faint warm wash.
         background: featured
-          ? 'linear-gradient(180deg, #1f1a12 0%, #141110 60%)'
+          ? 'linear-gradient(180deg, #141414 0%, #141414 60%)'
           : 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 70%)',
         // V3-JOBS-1: card border demoted to matte hairline (matches
         // V3-HOME-1 pass). Featured cards keep a functional gold border
@@ -185,7 +185,7 @@ const JobCard = memo(function JobCard({
         overflow: 'hidden',
         // Layered depth: warm inner top-edge highlight + tight contact
         // shadow + mid spread + wide ambient. Reads as dimensional.
-        boxShadow: '0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.40), 0 6px 16px rgba(0, 0, 0, 0.40), 0 18px 40px rgba(0, 0, 0, 0.28)'
+        boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 6px 16px rgba(20, 20, 20, 0.40), 0 18px 40px rgba(20, 20, 20, 0.28)'
       }}
     >
       {/* Photo cover banner (only when photo present). Renders flush
@@ -209,11 +209,11 @@ const JobCard = memo(function JobCard({
             loading="lazy"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
-          {/* Bottom gradient — keeps overlays + name below readable */}
+          {/* Bottom gradient, keeps overlays + name below readable */}
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(180deg, transparent 40%, rgba(11, 10, 8, 0.85) 100%)',
+            background: 'linear-gradient(180deg, transparent 40%, rgba(20, 20, 20, 0.85) 100%)',
             pointerEvents: 'none'
           }} />
           {/* Initial chip overlay */}
@@ -224,17 +224,17 @@ const JobCard = memo(function JobCard({
             minWidth: 26,
             height: 26,
             padding: '0 8px',
-            borderRadius: 8,
+            borderRadius: 10,
             background: `linear-gradient(135deg, ${stageColor}EE, ${stageColor}CC)`,
             color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-display)',
-            fontSize: 13,
-            letterSpacing: '0.04em',
+            fontSize: 14,
+            letterSpacing: 0,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             lineHeight: 1,
-            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.40)'
+            boxShadow: '0 4px 10px rgba(20, 20, 20, 0.40)'
           }}>
             {initials(contact.name)}
           </span>
@@ -244,17 +244,17 @@ const JobCard = memo(function JobCard({
               position: 'absolute',
               right: 10,
               top: 10,
-              padding: '4px 10px',
-              borderRadius: 999,
+              padding: '4px 12px',
+              borderRadius: 10,
               background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
               color: 'var(--v3-on-primary)',
               fontFamily: 'var(--font-body)',
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: 800,
-              letterSpacing: '0.16em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               lineHeight: 1.2,
-              boxShadow: '0 0 0 2px rgba(229, 193, 88, 0.18), 0 4px 10px rgba(229, 193, 88, 0.35), 0 1px 0 var(--v3-border-strong) inset'
+              boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.18), 0 4px 10px rgba(201, 150, 58, 0.35), 0 1px 0 var(--v3-border-strong) inset'
             }}>
               Top Deal
             </span>
@@ -262,7 +262,7 @@ const JobCard = memo(function JobCard({
         </div>
       )}
 
-      {/* Stage-color spine — V3-JOBS-1: softened from 4px×full-height
+      {/* Stage-color spine, V3-JOBS-1: softened from 4px×full-height
           gradient to 3px×~28mm flat at 70% tone. Mirrors the Home
           Pipeline Preview row treatment so list surfaces stay
           consistent. Stage signal still present, no longer reads
@@ -282,7 +282,7 @@ const JobCard = memo(function JobCard({
           The matte hairline border + spine + bottom progress bar
           carry the visual rhythm without the extra ornament. */}
 
-      {/* TOP DEAL chip for non-banner cards — placed at the top of the
+      {/* TOP DEAL chip for non-banner cards, placed at the top of the
           name column inline so it never collides with the amount on
           the right. Renders below as part of the name block, not as
           an absolutely-positioned corner overlay. */}
@@ -298,7 +298,7 @@ const JobCard = memo(function JobCard({
             stageColor={stageColor}
           />
         )}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {/* V3-JOBS-1: Top Deal chip moved into the unified status
               row at the bottom (rendered via StatusPill). The inline
               gold-gradient chip above the name is retired in favor
@@ -307,7 +307,7 @@ const JobCard = memo(function JobCard({
             fontFamily: 'var(--font-body)',
             fontSize: 14,
             fontWeight: 700,
-            letterSpacing: '-0.01em',
+            letterSpacing: 0,
             color: 'var(--v3-text)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -336,9 +336,9 @@ const JobCard = memo(function JobCard({
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-body)',
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.12em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               color: 'var(--v3-primary)',
               whiteSpace: 'nowrap',
@@ -358,9 +358,9 @@ const JobCard = memo(function JobCard({
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-body)',
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.12em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               color: 'var(--v3-primary)',
               lineHeight: 1.4
@@ -376,17 +376,17 @@ const JobCard = memo(function JobCard({
           flexDirection: 'column',
           alignItems: 'flex-end',
           gap: 4,
-          paddingTop: 1
+          paddingTop: 4
         }}>
           <div style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 26,
-            letterSpacing: '-0.005em',
+            fontSize: 24,
+            letterSpacing: 0,
             color: Number(contact.amount || 0) > 0 ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
             fontVariantNumeric: 'tabular-nums',
             lineHeight: 1,
             textShadow: Number(contact.amount || 0) > 0
-              ? '0 2px 12px rgba(229, 193, 88, 0.32)'
+              ? '0 2px 12px rgba(201, 150, 58, 0.32)'
               : 'none'
           }}>
             {money(contact.amount)}
@@ -395,16 +395,16 @@ const JobCard = memo(function JobCard({
         </div>
       </div>
 
-      {/* NEXT ACTION HINT — stage-driven hint that mirrors what JobDetail's
+      {/* NEXT ACTION HINT, stage-driven hint that mirrors what JobDetail's
           NextActionCard would surface. Helps the operator scan the list and
           see "what's blocking this job?" without opening it. */}
       {nextHint && (
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '5px 10px',
-          borderRadius: 8,
+          gap: 8,
+          padding: '4px 12px',
+          borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
           alignSelf: 'flex-start',
@@ -413,9 +413,9 @@ const JobCard = memo(function JobCard({
           <ArrowUpRight size={11} color="var(--v3-primary)" aria-hidden="true" />
           <span style={{
             fontFamily: 'var(--font-body)',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 700,
-            letterSpacing: '0.04em',
+            letterSpacing: 0,
             color: 'var(--v3-primary)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -429,10 +429,10 @@ const JobCard = memo(function JobCard({
       {/* Bottom row: unified status pills (mockup-canonical stage
           chip + V3-JOBS-1 added Top Deal / Approved / Cold) on the
           left, Stage X/5 numeric on the right.  All chips now share
-          the StatusPill family — same shape, padding, font; only
+          the StatusPill family, same shape, padding, font; only
           tone color differs. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <StatusPill tone={stageToneFor(contact.stage)} label={STAGE_MAP[contact.stage]?.label || contact.stage} />
           {featured && (
             <StatusPill tone="topDeal" />
@@ -446,9 +446,9 @@ const JobCard = memo(function JobCard({
         </div>
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: 700,
-          letterSpacing: '0.06em',
+          letterSpacing: 0,
           color: 'var(--v3-text-muted)',
           fontVariantNumeric: 'tabular-nums'
         }}>
@@ -456,13 +456,13 @@ const JobCard = memo(function JobCard({
         </span>
       </div>
 
-      {/* Progress bar — V3-JOBS-1: removed the stage-color glow ring;
+      {/* Progress bar, V3-JOBS-1: removed the stage-color glow ring;
           flat 4px filled track only. Mockup-canonical thin progress
           signal stays. */}
       <div style={{
         position: 'relative',
         height: 4,
-        borderRadius: 999,
+        borderRadius: 10,
         background: 'var(--v3-track)',
         overflow: 'hidden'
       }}>
@@ -471,7 +471,7 @@ const JobCard = memo(function JobCard({
           inset: 0,
           width: `${progressPct}%`,
           background: stageColor,
-          borderRadius: 999,
+          borderRadius: 10,
           transition: 'width 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
         }} />
       </div>
@@ -508,7 +508,7 @@ function PhotoOrInitialTile({ photoUrl, name, stageColor }: { photoUrl?: string 
           flexShrink: 0,
           width: SIZE,
           height: SIZE,
-          borderRadius: 12,
+          borderRadius: 10,
           overflow: 'hidden',
           background: 'var(--v3-surface-2)',
           border: '1px solid var(--v3-border)',
@@ -521,20 +521,20 @@ function PhotoOrInitialTile({ photoUrl, name, stageColor }: { photoUrl?: string 
           loading="lazy"
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
-        {/* Initial chip overlay — keeps card scan-able even with photo */}
+        {/* Initial chip overlay, keeps card scan-able even with photo */}
         <span style={{
           position: 'absolute',
           left: 4,
           top: 4,
           minWidth: 22,
           height: 22,
-          padding: '0 6px',
-          borderRadius: 6,
+          padding: '0 8px',
+          borderRadius: 10,
           background: `linear-gradient(135deg, ${stageColor}EE, ${stageColor}CC)`,
           color: 'var(--v3-on-primary)',
           fontFamily: 'var(--font-display)',
-          fontSize: 11,
-          letterSpacing: '0.04em',
+          fontSize: 12,
+          letterSpacing: 0,
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -552,12 +552,12 @@ function PhotoOrInitialTile({ photoUrl, name, stageColor }: { photoUrl?: string 
         flexShrink: 0,
         width: SIZE,
         height: SIZE,
-        borderRadius: 12,
+        borderRadius: 10,
         display: 'grid',
         placeItems: 'center',
         fontFamily: 'var(--font-display)',
-        fontSize: 22,
-        letterSpacing: '0.04em',
+        fontSize: 20,
+        letterSpacing: 0,
         background: `linear-gradient(135deg, ${stageColor}33, ${stageColor}11)`,
         color: stageColor,
         border: `1px solid ${stageColor}33`

@@ -1,4 +1,4 @@
-// mobile/app/reset-password.tsx — set a new password.
+// mobile/app/reset-password.tsx, set a new password.
 //
 // Native equivalent of the web ResetPassword screen. Reached from
 // Settings ("Change password") or after following a recovery link while
@@ -37,11 +37,11 @@ export default function ResetPasswordScreen() {
     <View style={{ flex: 1 }}>
       <ScreenBackground />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40, paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
           <ScreenHeader backLabel="Settings" onBack={() => router.back()} eyebrow="Account" title="Change password" />
           <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6, marginBottom: 22 }}>Choose a new password for your account.</Text>
 
-          <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>New password</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>New password</Text>
           <TextInput
             value={password}
             onChangeText={setPassword}
@@ -49,10 +49,10 @@ export default function ResetPasswordScreen() {
             autoCapitalize="none"
             placeholder="••••••••"
             placeholderTextColor="rgba(242,237,228,0.4)"
-            style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(255,240,210,0.12)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink, marginBottom: 18 }}
+            style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(242, 237, 228,0.12)', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink, marginBottom: 18 }}
           />
 
-          <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Confirm password</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Confirm password</Text>
           <TextInput
             value={confirm}
             onChangeText={setConfirm}
@@ -61,11 +61,11 @@ export default function ResetPasswordScreen() {
             placeholder="••••••••"
             placeholderTextColor="rgba(242,237,228,0.4)"
             onSubmitEditing={submit}
-            style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(255,240,210,0.12)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink, marginBottom: 18 }}
+            style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(242, 237, 228,0.12)', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink, marginBottom: 18 }}
           />
 
-          {error ? <Text style={{ color: '#f5a294', fontSize: 14, marginBottom: 16 }}>{error}</Text> : null}
-          {notice ? <Text style={{ color: '#7fc99a', fontSize: 14, marginBottom: 16 }}>{notice}</Text> : null}
+          {error ? <Text style={{ color: '#C9963A', fontSize: 14, marginBottom: 16 }}>{error}</Text> : null}
+          {notice ? <Text style={{ color: '#5C5C5C', fontSize: 14, marginBottom: 16 }}>{notice}</Text> : null}
 
           <GoldButton label="Update password" onPress={submit} loading={busy} />
         </ScrollView>

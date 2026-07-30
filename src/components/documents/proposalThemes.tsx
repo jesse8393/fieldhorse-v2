@@ -1,10 +1,10 @@
 // src/components/documents/proposalThemes.tsx
 //
-// Selectable customer-facing estimate designs. Each theme is a complete
+// Selectable customer facing estimate designs. Each theme is a complete
 // letter-paper render of the same normalized `view` produced by
 // ProposalTemplate, so the contractor can pick the look that fits their
-// brand (Settings → Estimate template) and every surface — in-app
-// preview and the public /p/:token page — renders it identically.
+// brand (Settings → Estimate template) and every surface, in-app
+// preview and the public /p/:token page, renders it identically.
 //
 // Themes here all share three principles that distinguish them from the
 // legacy 'classic' layout:
@@ -12,7 +12,7 @@
 //   2. The contractor's own uploaded logo, top of document
 //   3. A distinct visual identity (header treatment, table, totals)
 //
-// The distinctive part of each theme is its header + parties + line-item
+// The distinctive part of each theme is its header + parties + line item
 // table + totals. Supporting sections (scope prose, payment terms,
 // exclusions, photos, insurance, change orders, signature) are rendered
 // by the shared <SupportingSections> block so the themes stay focused
@@ -61,7 +61,7 @@ const PAGE_MIN_H = 1056
 const PAD = 56
 
 /* ─── Page wrapper ─── */
-function Page({ background = '#FFFFFF', color = '#1A1814', children }: any) {
+function Page({ background = '#F2EDE4', color = '#141414', children }: any) {
   return (
     <article
       style={{
@@ -72,8 +72,8 @@ function Page({ background = '#FFFFFF', color = '#1A1814', children }: any) {
         background,
         color,
         fontFamily: DOC_FONTS.body,
-        boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 24px 48px -24px rgba(0,0,0,0.25)',
-        borderRadius: 4,
+        boxShadow: '0 1px 0 rgba(20, 20, 20,0.04), 0 24px 48px -24px rgba(20, 20, 20,0.25)',
+        borderRadius: 10,
         overflow: 'hidden',
         position: 'relative'
       }}
@@ -98,10 +98,10 @@ function LogoMark({ company, maxHeight = 64, align = 'left' }: any) {
   }
   return (
     <div style={{
-      width: maxHeight, height: maxHeight, borderRadius: 6,
-      background: '#1A1814', color: '#fff', display: 'grid', placeItems: 'center',
+      width: maxHeight, height: maxHeight, borderRadius: 10,
+      background: '#141414', color: '#F2EDE4', display: 'grid', placeItems: 'center',
       fontFamily: DOC_FONTS.display, fontSize: maxHeight * 0.36, fontWeight: 600,
-      letterSpacing: '0.06em', marginLeft: align === 'right' ? 'auto' : 0
+      letterSpacing: 0, marginLeft: align === 'right' ? 'auto' : 0
     }}>
       {monogram}
     </div>
@@ -124,16 +124,16 @@ function fmtLongDate(d: any) {
 /* ─── Shared supporting sections (scope prose, terms, exclusions,
    photos, insurance, change orders, signature). Accent-tinted so it
    reads as part of each theme. ─── */
-function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }: any) {
+function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414' }: any) {
   const { scopeText, paymentTerms, warrantyText, exclusions = [], photos = [], insurance, changeOrders = [], company, recipient, approval, upgrades = [], status } = view
   const Label = ({ children }: any) => (
-    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: accent, marginBottom: 6 }}>
+    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: accent, marginBottom: 6 }}>
       {children}
     </div>
   )
   const showInsurance = insurance && (insurance.mode === 'insurance' || insurance.claimNumber || insurance.carrier)
   const visibleCOs = (changeOrders || []).filter((co: any) => co?.status && co.status !== 'void')
-  // Stamp a signature ONLY when a real approval record exists — a typed
+  // Stamp a signature ONLY when a real approval record exists, a typed
   // name, a signature image, or a recorded approval timestamp. Status
   // alone must never fabricate a cursive "signature" (the public link
   // marks a proposal 'approved' without returning the approval payload).
@@ -143,11 +143,11 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
     && (approval?.clientName || approval?.clientSignatureDataUrl || approvedAt))
   const isApproved = stamped || String(status || '').toLowerCase() === 'approved'
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, marginTop: 30 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, marginTop: 30 }}>
       {scopeText && scopeText.trim() && (
         <section>
           <Label>Scope of Work</Label>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: mid, whiteSpace: 'pre-wrap' }}>{scopeText.trim()}</p>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: mid, whiteSpace: 'pre-wrap' }}>{scopeText.trim()}</p>
         </section>
       )}
 
@@ -156,7 +156,7 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
           <Label>Project photos</Label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>
             {photos.slice(0, 6).map((p: any, i: number) => p?.url && (
-              <div key={i} style={{ width: '100%', aspectRatio: '4 / 3', background: '#e8e2d4', borderRadius: 4, overflow: 'hidden' }}>
+              <div key={i} style={{ width: '100%', aspectRatio: '4 / 3', background: '#F2EDE4', borderRadius: 10, overflow: 'hidden' }}>
                 <img src={p.url} alt={p.caption || 'Project photo'} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
             ))}
@@ -167,10 +167,10 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
       {upgrades.length > 0 && (
         <section>
           <Label>Optional upgrades</Label>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <tbody>
               {upgrades.flatMap((g: any) => g.items).map((it: any, i: number) => (
-                <tr key={i} style={{ borderBottom: '1px solid #ECECEC' }}>
+                <tr key={i} style={{ borderBottom: '1px solid #F2EDE4' }}>
                   <td style={{ ...tdL, color: mid }}>{it.description}</td>
                   <td style={{ ...tdR, color: mid }}>{qtyLabel(it)}</td>
                   <td style={{ ...tdR, color: mid }}>{money(it.rate, { cents: true })}</td>
@@ -192,7 +192,7 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
 
       <section>
         <Label>Payment terms</Label>
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: mid }}>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: mid }}>
           {paymentTerms || '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'}
         </p>
       </section>
@@ -200,14 +200,14 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
       {warrantyText && warrantyText.trim() && (
         <section>
           <Label>Warranty</Label>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: mid }}>{warrantyText.trim()}</p>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: mid }}>{warrantyText.trim()}</p>
         </section>
       )}
 
       {exclusions.length > 0 && (
         <section>
           <Label>Exclusions</Label>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: mid }}>{exclusions.join(' · ')}</p>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: mid }}>{exclusions.join(' · ')}</p>
         </section>
       )}
 
@@ -216,16 +216,16 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
         <p style={{ margin: '0 0 22px', fontSize: 12, lineHeight: 1.5, color: mid, maxWidth: '62ch' }}>
           By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
           <SignatureLine label="Client signature" name={stamped ? (approval?.clientName || recipient?.name) : null} dataUrl={stamped ? approval?.clientSignatureDataUrl : null} date={stamped ? approvedAt : ''} muted={muted} />
           <SignatureLine label="Contractor signature" name={stamped ? company?.name : null} dataUrl={stamped ? approval?.contractorSignatureDataUrl : null} date={stamped ? approval?.contractorApprovedAt : ''} muted={muted} />
         </div>
         {stamped ? (
-          <p style={{ margin: '14px 0 0', fontSize: 10.5, color: muted, lineHeight: 1.5 }}>
+          <p style={{ margin: '14px 0 0', fontSize: 12, color: muted, lineHeight: 1.5 }}>
             Approved electronically via secure link. Name, date, and network address are recorded with this approval.
           </p>
         ) : isApproved ? (
-          <p style={{ margin: '14px 0 0', fontSize: 10.5, color: accent, fontWeight: 600, lineHeight: 1.5 }}>
+          <p style={{ margin: '14px 0 0', fontSize: 12, color: accent, fontWeight: 600, lineHeight: 1.5 }}>
             {approvedAt ? `Approved electronically on ${fmtDate(approvedAt)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
           </p>
         ) : null}
@@ -237,20 +237,20 @@ function SupportingSections({ view, accent, muted = '#6B6A66', mid = '#3A3833' }
 function SignatureLine({ label, name, dataUrl, date, muted }: any) {
   return (
     <div>
-      <div style={{ height: 52, display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid #1A1814', paddingBottom: 4 }}>
+      <div style={{ height: 52, display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid #141414', paddingBottom: 4 }}>
         {dataUrl
           ? <img loading="lazy"src={dataUrl} alt="Signature" style={{ maxHeight: 46, maxWidth: '100%' }} />
-          : name ? <span style={{ fontFamily: "'Caveat', 'Snell Roundhand', cursive", fontSize: 22, color: muted }}>{name}</span> : null}
+          : name ? <span style={{ fontFamily: "'Caveat', 'Snell Roundhand', cursive", fontSize: 20, color: muted }}>{name}</span> : null}
       </div>
-      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: muted, letterSpacing: '0.06em' }}>
-        <span style={{ fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
+      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 12, color: muted, letterSpacing: 0 }}>
+        <span style={{ fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}>{label}</span>
         <span>Date{date ? `: ${fmtDate(date)}` : ''}</span>
       </div>
     </div>
   )
 }
 
-function TotalsRows({ view, accentText = '#1A1814', boxed }: any) {
+function TotalsRows({ view, accentText = '#141414', boxed }: any) {
   const showTax = Number(view.taxRate || 0) > 0
   const showDiscount = Number(view.discount || 0) > 0
   // Approved change orders fold into view.total (subtotal − discount +
@@ -273,10 +273,10 @@ function TotalsRows({ view, accentText = '#1A1814', boxed }: any) {
       )}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginTop: 8, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.12)',
-        ...(boxed ? { background: boxed, padding: '10px 12px', borderTop: 'none', borderRadius: 3 } : {})
+        marginTop: 8, paddingTop: 12, borderTop: '1px solid rgba(20, 20, 20,0.12)',
+        ...(boxed ? { background: boxed, padding: '12px 12px', borderTop: 'none', borderRadius: 10 } : {})
       }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: accentText }}>Total</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: accentText }}>Total</span>
         <span style={{ fontSize: 16, fontWeight: 700, color: accentText, fontVariantNumeric: 'tabular-nums' }}>{money(view.total, { cents: true })}</span>
       </div>
     </>
@@ -284,41 +284,41 @@ function TotalsRows({ view, accentText = '#1A1814', boxed }: any) {
 }
 function Totline({ label, value }: any) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
-      <span style={{ color: '#6B6A66' }}>{label}</span>
-      <span style={{ fontVariantNumeric: 'tabular-nums', color: '#1A1814' }}>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 14 }}>
+      <span style={{ color: '#5C5C5C' }}>{label}</span>
+      <span style={{ fontVariantNumeric: 'tabular-nums', color: '#141414' }}>{value}</span>
     </div>
   )
 }
 
 /* ============================================================
-   SLATE — gray header bar, FROM/FOR, detailed dark line-item table.
+   SLATE, gray header bar, FROM/FOR, detailed dark line item table.
    ============================================================ */
 export function SlateProposal({ view }: { view: ProposalView }) {
   const { company, recipient } = view
-  const bar = '#3F4651'
+  const bar = '#5C5C5C'
   return (
     <Page>
       <div style={{ marginBottom: 28 }}>
         <LogoMark company={company} maxHeight={64} />
       </div>
 
-      <div style={{ background: bar, color: '#fff', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '14px 20px', margin: `0 -${PAD - 0}px`, paddingLeft: PAD, paddingRight: PAD }}>
+      <div style={{ background: bar, color: '#F2EDE4', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 24px', margin: `0 -${PAD - 0}px`, paddingLeft: PAD, paddingRight: PAD }}>
         <MetaCell label="Estimate No." value={view.number} />
-        <MetaCell label="Issue Date" value={fmtDate(view.issuedAt) || '—'} />
-        <MetaCell label="Valid Until" value={fmtDate(view.expiresAt) || '—'} />
+        <MetaCell label="Issue Date" value={fmtDate(view.issuedAt) || '\u2003'} />
+        <MetaCell label="Valid Until" value={fmtDate(view.expiresAt) || '\u2003'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 0 24px', borderBottom: '1px solid #E2E2E2' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 0 24px', borderBottom: '1px solid #F2EDE4' }}>
         <PartyCol label="From" name={company?.name} lines={addressLines(company)} />
         <PartyCol label="For" name={recipient?.name} lines={addressLines(recipient)} />
       </div>
 
-      {view.projectTitle && <ProjectHeading title={view.projectTitle} color="#1A1814" />}
+      {view.projectTitle && <ProjectHeading title={view.projectTitle} color="#141414" />}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 18, fontSize: 13 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 18, fontSize: 14 }}>
         <thead>
-          <tr style={{ borderBottom: '2px solid #1A1814' }}>
+          <tr style={{ borderBottom: '2px solid #141414' }}>
             <th style={thL}>Description</th>
             <th style={thR}>Quantity</th>
             <th style={thR}>Unit Price</th>
@@ -327,7 +327,7 @@ export function SlateProposal({ view }: { view: ProposalView }) {
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #ECECEC' }}>
+            <tr key={i} style={{ borderBottom: '1px solid #F2EDE4' }}>
               <td style={tdL}>{it.description}</td>
               <td style={tdR}>{qtyLabel(it)}</td>
               <td style={tdR}>{money(it.rate, { cents: true })}</td>
@@ -347,57 +347,57 @@ export function SlateProposal({ view }: { view: ProposalView }) {
 }
 
 /* ============================================================
-   MINT — large green ESTIMATE wordmark, green table + total row.
+   MINT, large green ESTIMATE wordmark, green table + total row.
    ============================================================ */
 export function MintProposal({ view }: { view: ProposalView }) {
   const { company, recipient } = view
-  const green = '#4F7A63'
-  const greenSoft = '#EAF1ED'
+  const green = '#5C5C5C'
+  const greenSoft = '#F2EDE4'
   return (
     <Page>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 16 }}>
         <div style={{ minWidth: 0, maxWidth: '62%' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#1A1814' }}>{company?.name || '—'}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#141414' }}>{company?.name || '\u2003'}</div>
           {addressLines(company).map((l, i) => (
-            <div key={i} style={{ fontSize: 12, color: '#6B6A66', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
+            <div key={i} style={{ fontSize: 12, color: '#5C5C5C', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
           ))}
         </div>
         <LogoMark company={company} maxHeight={70} align="right" />
       </div>
 
       <div style={{ textAlign: 'right', margin: '14px 0 26px' }}>
-        <span style={{ fontFamily: DOC_FONTS.display, fontSize: 52, letterSpacing: '0.06em', color: green, fontWeight: 700 }}>ESTIMATE</span>
+        <span style={{ fontFamily: DOC_FONTS.display, fontSize: 24, letterSpacing: 0, color: green, fontWeight: 700 }}>ESTIMATE</span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 26 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: green, marginBottom: 4 }}>To</div>
-          <div style={{ fontSize: 16, color: '#1A1814', marginBottom: 4 }}>{recipient?.name || '—'}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: green, marginBottom: 4 }}>To</div>
+          <div style={{ fontSize: 16, color: '#141414', marginBottom: 4 }}>{recipient?.name || '\u2003'}</div>
           {addressLines(recipient).map((l, i) => (
-            <div key={i} style={{ fontSize: 12, color: '#6B6A66', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
+            <div key={i} style={{ fontSize: 12, color: '#5C5C5C', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
           ))}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <MintMeta label="Estimate #" value={view.number} green={green} />
-          <MintMeta label="Estimate date" value={fmtDate(view.issuedAt) || '—'} green={green} />
-          <MintMeta label="Valid until" value={fmtDate(view.expiresAt) || '—'} green={green} />
+          <MintMeta label="Estimate date" value={fmtDate(view.issuedAt) || '\u2003'} green={green} />
+          <MintMeta label="Valid until" value={fmtDate(view.expiresAt) || '\u2003'} green={green} />
         </div>
       </div>
 
       {view.projectTitle && <ProjectHeading title={view.projectTitle} color={green} />}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontSize: 13 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontSize: 14 }}>
         <thead>
-          <tr style={{ background: green, color: '#fff' }}>
-            <th style={{ ...thR, color: '#fff', padding: '10px 12px', width: '12%' }}>Qty</th>
-            <th style={{ ...thL, color: '#fff', padding: '10px 12px' }}>Description</th>
-            <th style={{ ...thR, color: '#fff', padding: '10px 12px', width: '20%' }}>Unit Price</th>
-            <th style={{ ...thR, color: '#fff', padding: '10px 12px', width: '20%' }}>Amount</th>
+          <tr style={{ background: green, color: '#F2EDE4' }}>
+            <th style={{ ...thR, color: '#F2EDE4', padding: '12px 12px', width: '12%' }}>Qty</th>
+            <th style={{ ...thL, color: '#F2EDE4', padding: '12px 12px' }}>Description</th>
+            <th style={{ ...thR, color: '#F2EDE4', padding: '12px 12px', width: '20%' }}>Unit Price</th>
+            <th style={{ ...thR, color: '#F2EDE4', padding: '12px 12px', width: '20%' }}>Amount</th>
           </tr>
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #ECECEC' }}>
+            <tr key={i} style={{ borderBottom: '1px solid #F2EDE4' }}>
               <td style={{ ...tdR, paddingLeft: 12 }}>{qtyLabel(it)}</td>
               <td style={tdL}>{it.description}</td>
               <td style={tdR}>{money(it.rate, { cents: true })}</td>
@@ -417,30 +417,30 @@ export function MintProposal({ view }: { view: ProposalView }) {
 }
 
 /* ============================================================
-   EDITORIAL — sand/serif, Job Title + ESTIMATE wordmark, Cost Breakdown.
+   EDITORIAL, sand/serif, Job Title + ESTIMATE wordmark, Cost Breakdown.
    ============================================================ */
 export function EditorialProposal({ view }: { view: ProposalView }) {
   const { company, recipient } = view
-  const sand = '#EDE6DA'
-  const tan = '#9A7B4F'
-  const ink = '#2B2620'
+  const sand = '#F2EDE4'
+  const tan = '#C9963A'
+  const ink = '#141414'
   return (
     <Page background={sand} color={ink}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           {view.projectTitle && (
-            <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 26, color: ink, marginBottom: 2 }}>{view.projectTitle}</div>
+            <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 24, color: ink, marginBottom: 2 }}>{view.projectTitle}</div>
           )}
-          <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 64, lineHeight: 1, color: tan, letterSpacing: '0.04em' }}>ESTIMATE</div>
+          <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 24, lineHeight: 1, color: tan, letterSpacing: 0 }}>ESTIMATE</div>
         </div>
         <LogoMark company={company} maxHeight={72} align="right" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, margin: '34px 0 28px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, margin: '34px 0 28px' }}>
         <EditCol label="" lines={[company?.name, ...addressLines(company)]} tan={tan} />
         <EditCol label="" lines={[recipient?.name, ...addressLines(recipient)]} tan={tan} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <EditMeta label="Date" value={fmtDate(view.issuedAt) || '—'} tan={tan} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <EditMeta label="Date" value={fmtDate(view.issuedAt) || '\u2003'} tan={tan} />
           <EditMeta label="Estimate #" value={view.number} tan={tan} />
           <EditMeta label="Est. Total" value={money(view.total)} tan={tan} />
         </div>
@@ -448,13 +448,13 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
 
       {view.scopeText && view.scopeText.trim() && (
         <section style={{ marginBottom: 26 }}>
-          <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 18, color: tan, marginBottom: 8, letterSpacing: '0.04em' }}>SCOPE OF WORK</div>
-          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#4A443B', whiteSpace: 'pre-wrap' }}>{view.scopeText.trim()}</p>
+          <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, marginBottom: 8, letterSpacing: 0 }}>SCOPE OF WORK</div>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.7, color: '#5C5C5C', whiteSpace: 'pre-wrap' }}>{view.scopeText.trim()}</p>
         </section>
       )}
 
-      <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 18, color: tan, marginBottom: 8, letterSpacing: '0.04em' }}>COST BREAKDOWN</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, marginBottom: 8, letterSpacing: 0 }}>COST BREAKDOWN</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
           <tr style={{ borderBottom: `1px solid ${tan}` }}>
             <th style={{ ...thL, color: ink }}>Service</th>
@@ -465,7 +465,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid rgba(154,123,79,0.25)' }}>
+            <tr key={i} style={{ borderBottom: '1px solid rgba(201, 150, 58,0.25)' }}>
               <td style={{ ...tdL, color: ink }}>{it.description}</td>
               <td style={{ ...tdR, color: ink }}>{qtyLabel(it)}</td>
               <td style={{ ...tdR, color: ink }}>{money(it.rate, { cents: true })}</td>
@@ -476,11 +476,11 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
       </table>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 24, marginTop: 18 }}>
-        <span style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, letterSpacing: '0.06em' }}>TOTAL</span>
-        <span style={{ fontFamily: DOC_FONTS.serif, fontSize: 22, color: ink, fontVariantNumeric: 'tabular-nums' }}>{money(view.total, { cents: true })}</span>
+        <span style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, letterSpacing: 0 }}>TOTAL</span>
+        <span style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: ink, fontVariantNumeric: 'tabular-nums' }}>{money(view.total, { cents: true })}</span>
       </div>
 
-      <SupportingSections view={view} accent={tan} mid="#4A443B" muted="#8A7A60" />
+      <SupportingSections view={view} accent={tan} mid="#5C5C5C" muted="#5C5C5C" />
     </Page>
   )
 }
@@ -489,7 +489,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
 function MetaCell({ label, value }: any) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.85 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', opacity: 0.85 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{value}</div>
     </div>
   )
@@ -498,7 +498,7 @@ function MintMeta({ label, value, green }: any) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: green }}>{label}</span>
-      <span style={{ fontSize: 12, color: '#1A1814', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <span style={{ fontSize: 12, color: '#141414', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     </div>
   )
 }
@@ -506,16 +506,16 @@ function EditMeta({ label, value, tan }: any) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
       <span style={{ fontSize: 12, color: tan }}>{label}</span>
-      <span style={{ fontSize: 12, color: '#2B2620', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <span style={{ fontSize: 12, color: '#141414', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     </div>
   )
 }
 function EditCol({ lines, tan }: any) {
   const arr = (lines || []).filter(Boolean)
   return (
-    <div style={{ minWidth: 0, paddingRight: 10 }}>
+    <div style={{ minWidth: 0, paddingRight: 12 }}>
       {arr.map((l: string, i: number) => (
-        <div key={i} style={{ fontSize: 12, lineHeight: 1.5, color: i === 0 ? '#2B2620' : '#6B6258', fontWeight: i === 0 ? 700 : 400, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
+        <div key={i} style={{ fontSize: 12, lineHeight: 1.5, color: i === 0 ? '#141414' : '#5C5C5C', fontWeight: i === 0 ? 700 : 400, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
       ))}
     </div>
   )
@@ -523,9 +523,9 @@ function EditCol({ lines, tan }: any) {
 function PartyCol({ label, name, lines }: any) {
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#1A1814', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 13, color: '#3A3833', lineHeight: 1.55, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-        <div style={{ fontWeight: 700, color: '#1A1814' }}>{name || '—'}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: '#141414', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 14, color: '#141414', lineHeight: 1.55, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+        <div style={{ fontWeight: 700, color: '#141414' }}>{name || '\u2003'}</div>
         {lines.map((l: string, i: number) => <div key={i}>{l}</div>)}
       </div>
     </div>
@@ -534,8 +534,8 @@ function PartyCol({ label, name, lines }: any) {
 function ProjectHeading({ title, color }: any) {
   return (
     <div style={{ marginTop: 24 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6B6A66', marginBottom: 4 }}>Project</div>
-      <div style={{ fontSize: 22, fontWeight: 600, color }}>{title}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: '#5C5C5C', marginBottom: 4 }}>Project</div>
+      <div style={{ fontSize: 20, fontWeight: 600, color }}>{title}</div>
     </div>
   )
 }
@@ -554,9 +554,9 @@ function qtyLabel(it: ProposalLineItem) {
   return `${q}${it.unit ? ` ${it.unit}` : ''}`
 }
 
-const thL: any = { textAlign: 'left', padding: '10px 8px 10px 0', fontSize: 12, fontWeight: 700, letterSpacing: '0.02em' }
-const thR: any = { textAlign: 'right', padding: '10px 0 10px 8px', fontSize: 12, fontWeight: 700, letterSpacing: '0.02em' }
-const tdL: any = { textAlign: 'left', padding: '12px 8px 12px 0', verticalAlign: 'top', color: '#1A1814', lineHeight: 1.45 }
-const tdR: any = { textAlign: 'right', padding: '12px 0 12px 8px', verticalAlign: 'top', color: '#1A1814', fontVariantNumeric: 'tabular-nums' }
+const thL: any = { textAlign: 'left', padding: '12px 8px 12px 0', fontSize: 12, fontWeight: 700, letterSpacing: 0 }
+const thR: any = { textAlign: 'right', padding: '12px 0 12px 8px', fontSize: 12, fontWeight: 700, letterSpacing: 0 }
+const tdL: any = { textAlign: 'left', padding: '12px 8px 12px 0', verticalAlign: 'top', color: '#141414', lineHeight: 1.45 }
+const tdR: any = { textAlign: 'right', padding: '12px 0 12px 8px', verticalAlign: 'top', color: '#141414', fontVariantNumeric: 'tabular-nums' }
 
 export { fmtLongDate }

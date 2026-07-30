@@ -7,7 +7,7 @@
 //   40% Due At Material Delivery or Midpoint
 //   10% Due Upon Substantial Completion
 //
-// Per-document overrides come through the `schedule` prop — pass an
+// Per-document overrides come through the `schedule` prop, pass an
 // array of { pct, label, sub? } and the block renders that instead.
 // Each row stamps the percent + dollar amount derived from `total`,
 // so the customer sees real money next to each milestone rather than
@@ -19,7 +19,7 @@ import { money } from './format.ts'
 export const DEFAULT_PAYMENT_SCHEDULE = [
   { pct: 50, label: 'Deposit due upon approval',         sub: 'Before crew mobilizes' },
   { pct: 40, label: 'Due at material delivery / midpoint', sub: 'Materials staged on site' },
-  { pct: 10, label: 'Due upon substantial completion',    sub: 'After punch list sign-off' }
+  { pct: 10, label: 'Due upon substantial completion',    sub: 'After punch list approval' }
 ]
 
 export default function PaymentTermsBlock({
@@ -39,7 +39,7 @@ export default function PaymentTermsBlock({
         display: 'flex',
         flexDirection: 'column',
         border: `1px solid ${DOC_COLORS.rule}`,
-        borderRadius: 6,
+        borderRadius: 10,
         overflow: 'hidden'
       }}
     >
@@ -54,7 +54,7 @@ export default function PaymentTermsBlock({
               gridTemplateColumns: '64px 1fr auto',
               gap: 16,
               alignItems: 'center',
-              padding: '14px 18px',
+              padding: '12px 16px',
               borderTop: i > 0 ? `1px solid ${DOC_COLORS.rule}` : 'none',
               background: DOC_COLORS.paper
             }}
@@ -63,8 +63,8 @@ export default function PaymentTermsBlock({
               style={{
                 ...typeStyle('stamp'),
                 color: gold,
-                fontSize: 18,
-                letterSpacing: '0.02em'
+                fontSize: 20,
+                letterSpacing: 0
               }}
             >
               {pct}%

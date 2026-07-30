@@ -86,7 +86,7 @@ i,
 .dt-jobs__h1 em,
 .dt-home__h1 em {
   color: var(--field-gold, #C9963A);
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
 }
 
 /* ================================================================
@@ -110,7 +110,7 @@ i,
 
    !important is required throughout because Radix Dialog's utility
    classes (ui:fixed ui:top-[50%] ui:left-[50%] ui:z-50 ui:bg-background
-   ui:rounded-lg ui:border) carry equal specificity; without it our
+   ui:rounded-[10px] ui:border) carry equal specificity; without it our
    rules tie and lose to declaration order.
    ================================================================ */
 .fh-command-dialog {
@@ -131,13 +131,13 @@ i,
   max-width: min(calc(100% - 24px), 560px) !important;
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
   background: var(--surface-1, #141414) !important;
-  color: var(--ink-strong, #f4f1e8) !important;
-  border: 1px solid color-mix(in srgb, var(--field-gold-bright, #d4a042) 22%, rgba(255, 255, 255, 0.08)) !important;
-  border-radius: 14px !important;
+  color: var(--ink-strong, #F2EDE4) !important;
+  border: 1px solid color-mix(in srgb, var(--field-gold-bright, #C9963A) 22%, rgba(242, 237, 228, 0.08)) !important;
+  border-radius: 10px !important;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 24px 60px rgba(0, 0, 0, 0.55),
-    0 12px 24px rgba(0, 0, 0, 0.42) !important;
+    0 1px 0 rgba(242, 237, 228, 0.04) inset,
+    0 24px 60px rgba(20, 20, 20, 0.55),
+    0 12px 24px rgba(20, 20, 20, 0.42) !important;
 }
 
 /* Lift the scrim alongside the panel so it sits above the sticky
@@ -155,38 +155,38 @@ i,
 .fh-command-dialog [data-slot="command"],
 .fh-command-dialog [data-slot="command-list"] {
   background: transparent !important;
-  color: var(--ink-strong, #f4f1e8) !important;
+  color: var(--ink-strong, #F2EDE4) !important;
 }
 .fh-command-dialog [data-slot="command-input-wrapper"] {
   background: transparent !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-bottom: 1px solid rgba(242, 237, 228, 0.06) !important;
 }
 .fh-command-dialog [data-slot="command-input"] {
   background: transparent !important;
-  color: var(--ink-strong, #f4f1e8) !important;
-  caret-color: var(--field-gold-bright, #d4a042) !important;
+  color: var(--ink-strong, #F2EDE4) !important;
+  caret-color: var(--field-gold-bright, #C9963A) !important;
   font-size: 16px !important; /* >=16px keeps iOS from zooming on focus */
 }
 .fh-command-dialog [data-slot="command-input"]::placeholder {
-  color: var(--ink-muted, rgba(244, 241, 232, 0.55)) !important;
+  color: var(--ink-muted, rgba(242, 237, 228, 0.55)) !important;
 }
 .fh-command-dialog [data-slot="command-group"] [cmdk-group-heading] {
-  color: var(--ink-muted, rgba(244, 241, 232, 0.55)) !important;
-  letter-spacing: 0.14em;
+  color: var(--ink-muted, rgba(242, 237, 228, 0.55)) !important;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 .fh-command-dialog [data-slot="command-item"] {
-  color: var(--ink-strong, #f4f1e8) !important;
+  color: var(--ink-strong, #F2EDE4) !important;
 }
 .fh-command-dialog [data-slot="command-item"][data-selected="true"] {
-  background: color-mix(in srgb, var(--field-gold-bright, #d4a042) 14%, transparent) !important;
-  color: var(--ink-strong, #f4f1e8) !important;
+  background: color-mix(in srgb, var(--field-gold-bright, #C9963A) 14%, transparent) !important;
+  color: var(--ink-strong, #F2EDE4) !important;
 }
 .fh-command-dialog [data-slot="command-separator"] {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: rgba(242, 237, 228, 0.06) !important;
 }
 .fh-command-dialog [data-slot="command-empty"] {
-  color: var(--ink-muted, rgba(244, 241, 232, 0.55)) !important;
+  color: var(--ink-muted, rgba(242, 237, 228, 0.55)) !important;
 }
 
 /* ================================================================
@@ -210,14 +210,14 @@ i,
 }
 
 .fh-asheet--v2 .fh-voice-hero {
-  padding: 10px 12px !important;
-  gap: 6px !important;
+  padding: 12px 12px !important;
+  gap: 8px !important;
 }
 .fh-asheet--v2 .fh-voice-hero__head {
   margin-bottom: 0 !important;
 }
 .fh-asheet--v2 .fh-voice-hero__desc {
-  font-size: 11px !important;
+  font-size: 12px !important;
   margin: 2px 0 4px !important;
   line-height: 1.35 !important;
   color: var(--ink-muted) !important;
@@ -233,7 +233,7 @@ i,
 }
 .fh-asheet--v2 .fh-voice-hero__transcript {
   min-height: 32px !important;
-  padding: 8px 10px !important;
+  padding: 8px 12px !important;
   font-size: 12px !important;
 }
 
@@ -243,12 +243,12 @@ i,
 .fh-asheet--v2 .fh-asheet-field select,
 .fh-asheet--v2 .fh-asheet-field textarea,
 .fh-asheet--v2 .fh-asheet-select {
-  padding: 10px 12px !important;
+  padding: 12px 12px !important;
   font-size: 14px !important;
   border-radius: 10px !important;
 }
 .fh-asheet--v2 .fh-asheet-money__input {
-  padding: 10px 12px !important;
+  padding: 12px 12px !important;
   font-size: 14px !important;
 }
 
@@ -256,9 +256,9 @@ i,
    as inactive. Disabled state untouched — still muted. */
 .fh-asheet--v2 .fh-asheet__commit:not(:disabled) {
   box-shadow:
-    0 0 0 2px rgba(228, 190, 111, 0.16),
+    0 0 0 2px rgba(201, 150, 58, 0.16),
     0 8px 22px rgba(201, 150, 58, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+    inset 0 1px 0 rgba(242, 237, 228, 0.18) !important;
 }
 
 /* ================================================================
@@ -276,7 +276,7 @@ i,
    on the two sheets touched in this pass.
    ================================================================ */
 [data-vaul-drawer] .fh-vaul-form {
-  padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px)) !important;
+  padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px)) !important;
 }
 [data-vaul-drawer][data-vaul-drawer-direction="bottom"] {
   max-height: 92dvh;

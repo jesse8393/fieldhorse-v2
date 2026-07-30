@@ -21,7 +21,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "ui:flex ui:h-full ui:w-full ui:flex-col ui:overflow-hidden ui:rounded-md ui:bg-popover ui:text-popover-foreground",
+        "ui:flex ui:h-full ui:w-full ui:flex-col ui:overflow-hidden ui:rounded-[10px] ui:bg-popover ui:text-popover-foreground",
         className
       )}
       {...props} />
@@ -66,7 +66,7 @@ function CommandInput({
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "ui:flex ui:h-10 ui:w-full ui:rounded-md ui:bg-transparent ui:py-3 ui:text-sm ui:outline-hidden ui:placeholder:text-muted-foreground ui:disabled:cursor-not-allowed ui:disabled:opacity-50",
+          "ui:flex ui:h-10 ui:w-full ui:rounded-[10px] ui:bg-transparent ui:py-3 ui:text-sm ui:outline-hidden ui:placeholder:text-muted-foreground ui:disabled:cursor-not-allowed ui:disabled:opacity-50",
           className
         )}
         {...props} />
@@ -108,7 +108,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        "ui:overflow-hidden ui:p-1 ui:text-foreground ui:[&_[cmdk-group-heading]]:px-2 ui:[&_[cmdk-group-heading]]:py-1.5 ui:[&_[cmdk-group-heading]]:text-xs ui:[&_[cmdk-group-heading]]:font-medium ui:[&_[cmdk-group-heading]]:text-muted-foreground",
+        "ui:overflow-hidden ui:p-1 ui:text-foreground ui:[&_[cmdk-group-heading]]:px-2 ui:[&_[cmdk-group-heading]]:py-2 ui:[&_[cmdk-group-heading]]:text-xs ui:[&_[cmdk-group-heading]]:font-medium ui:[&_[cmdk-group-heading]]:text-muted-foreground",
         className
       )}
       {...props} />
@@ -135,7 +135,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "ui:relative ui:flex ui:cursor-default ui:items-center ui:gap-2 ui:rounded-sm ui:px-2 ui:py-1.5 ui:text-sm ui:outline-hidden ui:select-none ui:data-[disabled=true]:pointer-events-none ui:data-[disabled=true]:opacity-50 ui:data-[selected=true]:bg-accent ui:data-[selected=true]:text-accent-foreground ui:[&_svg]:pointer-events-none ui:[&_svg]:shrink-0 ui:[&_svg:not([class*=size-])]:size-4 ui:[&_svg:not([class*=text-])]:text-muted-foreground",
+        "ui:relative ui:flex ui:cursor-default ui:items-center ui:gap-2 ui:rounded-[10px] ui:px-2 ui:py-2 ui:text-sm ui:outline-hidden ui:select-none ui:data-[disabled=true]:pointer-events-none ui:data-[disabled=true]:opacity-50 ui:data-[selected=true]:bg-accent ui:data-[selected=true]:text-accent-foreground ui:[&_svg]:pointer-events-none ui:[&_svg]:shrink-0 ui:[&_svg:not([class*=size-])]:size-4 ui:[&_svg:not([class*=text-])]:text-muted-foreground",
         className
       )}
       {...props} />
@@ -150,7 +150,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        "ui:ml-auto ui:text-xs ui:tracking-widest ui:text-muted-foreground",
+        "ui:ml-auto ui:text-xs ui:tracking-[0px] ui:text-muted-foreground",
         className
       )}
       {...props} />

@@ -15,14 +15,14 @@ import { FilterPill, Eyebrow } from '../components/v3'
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
   { id: 'email', label: 'Email', tone: 'Short subject line + 3-paragraph body. Professional. Signed off with the contractor name.', Icon: Mail },
-  { id: 'voice', label: 'Voicemail', tone: 'Under 25 seconds spoken. Natural phrasing. Call-to-action clear.', Icon: Mic }
+  { id: 'voice', label: 'Voicemail', tone: 'Under 25 seconds spoken. Natural phrasing. Clear next step.', Icon: Mic }
 ]
 
 const INTENTS = [
   'First outreach to new lead',
   'Follow up after quote sent',
   'Reminder for scheduled job',
-  'Change-order explanation',
+  'Change order explanation',
   'Invoice overdue nudge',
   'Thank you after job close',
   'Weather delay notice'
@@ -73,7 +73,7 @@ export default function Compose() {
       const res = await claudeMessage({
         // White-label: the AI is the contractor's own messaging
         // assistant from the customer's perspective. No app-attributable
-        // phrasing in the system prompt — the recipient never knows a
+        // phrasing in the system prompt, the recipient never knows a
         // platform exists. Sender identity comes from the contractor's
         // profile.company_name with a neutral fallback.
         system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
@@ -111,21 +111,21 @@ export default function Compose() {
     if (channel === 'email' && contact.email) window.location.href = `mailto:${contact.email}?body=${encodeURIComponent(draft)}`
   }
 
-  // Real server-side email send via Resend (POST /api/send-message).
+  // Real on the server email send via Resend (POST /api/send-message).
   // Mirrors the multi-tenant sender pattern used by send-quote +
   // send-invoice: From = "<Your Company> via FieldHorse", Reply-To =
   // company_email. Server logs activity to fh_notes on success so the
   // sent message shows up in the job's activity feed.
   //
   // Falls back to the mailto: handoff (sendAction) when the server
-  // returns 503 sender_not_configured — operators on a non-Resend
+  // returns 503 sender_not_configured, operators on a non-Resend
   // deploy can still ship the draft through their mail client.
   async function handleSendEmail() {
     if (!contact?.email || !draft || sending) return
     setSending(true)
     setError('')
     try {
-      // Subject derived from intent + contact context — short and honest.
+      // Subject derived from intent + contact context, short and honest.
       const subjectGuess = contact.job_title
         ? `Re: ${contact.job_title}`
         : intent || `Message from ${profile?.company_name || 'your contractor'}`
@@ -144,8 +144,8 @@ export default function Compose() {
       const data = await res.json().catch(() => ({}))
 
       if (res.status === 503 && data?.error === 'sender_not_configured') {
-        // Friendly fallback — open the mail client with the draft prefilled.
-        toastSuccess('Opening email app', 'Direct send not configured — pasting into your mail client.')
+        // Friendly fallback, open the mail client with the draft prefilled.
+        toastSuccess('Opening email app', 'Direct send not configured, pasting into your mail client.')
         sendAction()
         return
       }
@@ -166,7 +166,7 @@ export default function Compose() {
 
   // Re-run the generator with the same channel/intent/contact/context.
   // Audit complaint: "Only post-generation action is Copy." Regenerate
-  // closes that gap — the operator can spin a fresh take without
+  // closes that gap, the operator can spin a fresh take without
   // walking back through the form.
   function regenerate() {
     hapticMedium()
@@ -184,10 +184,10 @@ export default function Compose() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
     >
       {isDesktop && (
-        // gridColumn:1/-1 — .v3-screen--compose is a 2-col grid
+        // gridColumn:1/-1, .v3-screen--compose is a 2-col grid
         // (360px + 350px) for the cockpit + draft-preview layout.
         // Without the span, the topbar landed in col 1 (squeezing the
         // search to 360px so the placeholder wrapped to two lines) and
@@ -195,44 +195,44 @@ export default function Compose() {
         // full-width spanner pins them above the columned content.
         <div style={{ gridColumn: '1 / -1' }}>
           <BuildTopbar />
-          <div style={{ padding: '12px var(--v3-gutter) 14px' }}>
+          <div style={{ padding: '12px var(--v3-gutter) 12px' }}>
             <div className="fh-build-good">Dispatch</div>
             <h1 className="fh-build-title">SAY IT FAST.</h1>
           </div>
         </div>
       )}
-      {/* INPUT COCKPIT — black-glass panel: header eyebrow + channel pills
+      {/* INPUT COCKPIT, black-glass panel: header eyebrow + channel pills
           + intent + contact + context chips + CTA */}
-      <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
+      <motion.div variants={item} style={{ padding: '8px 24px 12px' }}>
         <div style={{
-          padding: '14px 16px',
-          borderRadius: 16,
+          padding: '12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 8px 22px rgba(20, 20, 20, 0.40)'
         }}>
-          {/* Header — title eyebrow on its own row, recipient pill on the
+          {/* Header, title eyebrow on its own row, recipient pill on the
               row below. The old layout placed both on one flex row with
               flexWrap:wrap, but two uppercase eyebrows with letter-
-              spacing:0.16em collided on iPhone — the "TO · GENERIC"
+              spacing:0.16em collided on iPhone, the "TO · GENERIC"
               clipped against the cockpit edge. Splitting into two rows
               gives each label room to breathe and keeps the recipient
               cue visible regardless of contact-name length. */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
             <Eyebrow tone="gold">
               <PenLine size={11} aria-hidden="true" />
               AI Compose
             </Eyebrow>
-            <Eyebrow as="div" style={{ alignSelf: 'flex-start', maxWidth: '100%', padding: '3px 8px', borderRadius: 999, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', opacity: contact ? 1 : 0.75 }}>
+            <Eyebrow as="div" style={{ alignSelf: 'flex-start', maxWidth: '100%', padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', opacity: contact ? 1 : 0.75 }}>
               <span style={{ color: 'var(--v3-text-muted)' }}>To</span>
               <span aria-hidden="true" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))' }}>·</span>
               <span
                 style={{
                   color: 'var(--v3-text)',
-                  letterSpacing: '0.04em',
+                  letterSpacing: 0,
                   textTransform: 'none',
                   fontWeight: 600,
-                  fontSize: 11,
+                  fontSize: 12,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -245,10 +245,10 @@ export default function Compose() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Channel selector — canonical FilterPill */}
+            {/* Channel selector, canonical FilterPill */}
             <div>
               <Eyebrow as="div" style={{ marginBottom: 6 }}>Channel</Eyebrow>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {CHANNELS.map((ch) => {
                   const I = ch.Icon
                   const isOn = channel === ch.id
@@ -261,7 +261,7 @@ export default function Compose() {
                       ariaLabel={`${ch?.label} channel`}
                       style={{ justifyContent: 'center' }}
                     >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <I size={13} aria-hidden="true" />
                         {ch.label}
                       </span>
@@ -294,7 +294,7 @@ export default function Compose() {
                     const tail = c.job_title || c.job_type || c.stage || ''
                     return (
                       <option key={c.id} value={c.id}>
-                        {c.name}{tail ? ` — ${tail}` : ''}
+                        {c.name}{tail ? `, ${tail}` : ''}
                       </option>
                     )
                   })}
@@ -306,20 +306,20 @@ export default function Compose() {
                   rows={3}
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
-                  placeholder="Anything to highlight — price change, delay reason, specific material…"
+                  placeholder="Anything to highlight, price change, delay reason, specific material…"
                   style={{ ...selectStyle, resize: 'vertical', minHeight: 72, fontFamily: 'var(--font-body)' }}
                 />
               </Field>
             </div>
 
-            {/* Real AI-context transparency chips — show what facts the model
+            {/* Real AI-context transparency chips, show what facts the model
                 will actually see. Only renders when a contact is selected. */}
             {contact && (
               <div>
                 <Eyebrow as="div" style={{ marginBottom: 6 }}>
                   AI will use
                 </Eyebrow>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   <ContextChip>{contact.name}</ContextChip>
                   {(contact.job_title || contact.job_type) && (
                     <ContextChip>{contact.job_title || contact.job_type}</ContextChip>
@@ -339,22 +339,22 @@ export default function Compose() {
               onClick={() => { hapticMedium(); generate() }}
               disabled={loading}
               style={{
-                padding: '12px 18px',
-                borderRadius: 12,
+                padding: '12px 16px',
+                borderRadius: 10,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                 background: loading
                   ? 'var(--v3-surface-2)'
                   : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                 color: loading ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 700,
-                letterSpacing: '0.06em',
+                letterSpacing: 0,
                 textTransform: 'uppercase',
                 cursor: loading ? 'default' : 'pointer',
                 boxShadow: loading
                   ? 'none'
-                  : '0 0 0 2px rgba(228, 190, 111, 0.14), 0 6px 18px rgba(201, 150, 58, 0.30)',
+                  : '0 0 0 2px rgba(201, 150, 58, 0.14), 0 6px 18px rgba(201, 150, 58, 0.30)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -364,7 +364,7 @@ export default function Compose() {
               }}
             >
               {loading ? (
-                <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.25)', borderTopColor: 'var(--v3-on-primary)', animation: 'fh-spin 700ms linear infinite' }} />
+                <span aria-label="Loading" style={{ width: 14, height: 14, borderRadius: 10, border: '2px solid rgba(20, 20, 20,0.25)', borderTopColor: 'var(--v3-on-primary)', animation: 'fh-spin 700ms linear infinite' }} />
               ) : (
                 <Sparkles size={15} />
               )}
@@ -374,13 +374,13 @@ export default function Compose() {
             {/* Error block */}
             {error && !draft && (
               <div role="alert" style={{
-                padding: '12px 14px',
-                borderRadius: 12,
+                padding: '12px 12px',
+                borderRadius: 10,
                 background: 'var(--v3-danger-soft)',
                 border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
                 color: 'var(--v3-text)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 12.5,
+                fontSize: 12,
                 lineHeight: 1.5
               }}>
                 <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
@@ -389,7 +389,7 @@ export default function Compose() {
                   type="button"
                   onClick={() => { setError(''); setDraft(' ') }}
                   style={{
-                    padding: '7px 13px',
+                    padding: '8px 12px',
                     borderRadius: 10,
                     border: '1px solid var(--v3-border-strong)',
                     background: 'var(--v3-surface-2)',
@@ -408,9 +408,9 @@ export default function Compose() {
         </div>
       </motion.div>
 
-      {/* OUTPUT COCKPIT — black-glass panel, draft-as-hero.
+      {/* OUTPUT COCKPIT, black-glass panel, draft-as-hero.
           AnimatePresence mode="wait" was preventing the draft panel from
-          ever mounting after generate succeeded — the empty-state's
+          ever mounting after generate succeeded, the empty-state's
           missing exit animation caused the wait to never resolve. Switched
           to plain conditional render so the draft hero always appears the
           instant `draft` state flips truthy. */}
@@ -421,14 +421,14 @@ export default function Compose() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
-            style={{ padding: '0 20px 28px' }}
+            style={{ padding: '0 24px 24px' }}
           >
             <div style={{
-              padding: '14px 16px',
-              borderRadius: 16,
+              padding: '12px 16px',
+              borderRadius: 10,
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border)',
-              boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+              boxShadow: '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 8px 22px rgba(20, 20, 20, 0.40)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                 <Eyebrow tone="gold">
@@ -440,7 +440,7 @@ export default function Compose() {
                 </Eyebrow>
               </div>
 
-              {/* Draft hero — channel-appropriate rendering. Ported from the
+              {/* Draft hero, channel-appropriate rendering. Ported from the
                   v3 design (screens-compose-nav.jsx cmp2-hero variants):
                     sms   → iPhone-style chat bubble with phone bar + recipient
                     email → envelope-style card with FROM / TO / SUBJECT rows
@@ -453,14 +453,14 @@ export default function Compose() {
                 intent={intent}
               />
 
-              {/* Action row — 5/17 Compose-end-to-end port.
+              {/* Action row, 5/17 Compose-end-to-end port.
                   Per the design's CTA bar (screens-compose-nav.jsx)
                   and the 5/13 audit complaint that "Compose dead-ends
                   at Copy", three actions on the row:
 
-                    Regenerate    — spin a fresh take, same prompt
-                    Copy          — secondary, always available
-                    Send (PRIMARY) — channel-aware:
+                    Regenerate   , spin a fresh take, same prompt
+                    Copy         , secondary, always available
+                    Send (PRIMARY), channel-aware:
                       email + contact email → POST /api/send-message
                           (real Resend send; falls back to mailto: on
                           503 sender_not_configured)
@@ -468,7 +468,7 @@ export default function Compose() {
                           (no SMS provider wired yet; Twilio is a
                           future branch)
                       voice                 → disabled "Voicemail
-                          script" pill — operator reads the script
+                          script" pill, operator reads the script
                           aloud after copying
 
                   Send button labels: Send email / Open SMS / Script.
@@ -491,8 +491,8 @@ export default function Compose() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: '10px 14px',
+                    gap: 8,
+                    padding: '12px 12px',
                     minHeight: 40,
                     borderRadius: 10,
                     background: 'var(--v3-surface-2)',
@@ -514,8 +514,8 @@ export default function Compose() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: '10px 14px',
+                    gap: 8,
+                    padding: '12px 12px',
                     minHeight: 40,
                     borderRadius: 10,
                     background: 'var(--v3-surface-2)',
@@ -539,8 +539,8 @@ export default function Compose() {
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
-                      padding: '10px 14px',
+                      gap: 8,
+                      padding: '12px 12px',
                       minHeight: 40,
                       borderRadius: 10,
                       background: 'var(--v3-surface-2)',
@@ -564,8 +564,8 @@ export default function Compose() {
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
-                      padding: '10px 14px',
+                      gap: 8,
+                      padding: '12px 12px',
                       minHeight: 40,
                       borderRadius: 10,
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
@@ -580,13 +580,13 @@ export default function Compose() {
                       fontFamily: 'var(--font-body)',
                       fontSize: 12,
                       fontWeight: 700,
-                      letterSpacing: '0.06em',
+                      letterSpacing: 0,
                       textTransform: 'uppercase',
                       cursor: (sending || !contact?.email) ? 'not-allowed' : 'pointer',
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: (sending || !contact?.email)
                         ? 'none'
-                        : '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)',
+                        : '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)',
                       opacity: !contact?.email ? 0.6 : 1
                     }}
                   >
@@ -594,7 +594,7 @@ export default function Compose() {
                     {sent ? 'Sent' : sending ? 'Sending…' : 'Send email'}
                   </button>
                 ) : (
-                  /* SMS channel — keep the native handoff. No in-app SMS
+                  /* SMS channel, keep the native handoff. No in-app SMS
                      provider yet (Twilio integration is a future branch). */
                   <button
                     type="button"
@@ -604,8 +604,8 @@ export default function Compose() {
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
-                      padding: '10px 14px',
+                      gap: 8,
+                      padding: '12px 12px',
                       minHeight: 40,
                       borderRadius: 10,
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
@@ -616,12 +616,12 @@ export default function Compose() {
                       fontFamily: 'var(--font-body)',
                       fontSize: 12,
                       fontWeight: 700,
-                      letterSpacing: '0.06em',
+                      letterSpacing: 0,
                       textTransform: 'uppercase',
                       cursor: contact?.phone ? 'pointer' : 'not-allowed',
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: contact?.phone
-                        ? '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+                        ? '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
                         : 'none',
                       opacity: !contact?.phone ? 0.6 : 1
                     }}
@@ -634,21 +634,21 @@ export default function Compose() {
             </div>
           </motion.div>
         ) : (
-          /* Empty state — quiet hint, not a chrome panel */
+          /* Empty state, quiet hint, not a chrome panel */
           <motion.div
             key="empty"
             variants={item}
-            style={{ padding: '4px 20px 28px' }}
+            style={{ padding: '4px 24px 24px' }}
           >
             <div style={{
-              padding: '20px 18px',
+              padding: '24px 16px',
               textAlign: 'center',
-              borderRadius: 14,
+              borderRadius: 10,
               background: 'transparent',
               border: '1px dashed var(--v3-border-strong)',
               color: 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
-              fontSize: 12.5,
+              fontSize: 12,
               lineHeight: 1.5
             }}>
               The draft will appear here. Pick a channel + intent above, then tap{' '}
@@ -661,12 +661,12 @@ export default function Compose() {
 }
 
 /* ============================================================
-   Field — labelled input wrapper. Uses v3-eyebrow label style
+   Field, labelled input wrapper. Uses v3-eyebrow label style
    for consistency with the rest of the app's form fields.
    ============================================================ */
 function Field({ label, children }: any) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <span className="v3-eyebrow">{label}</span>
       {children}
     </label>
@@ -674,7 +674,7 @@ function Field({ label, children }: any) {
 }
 
 /* ============================================================
-   ContextChip — small pill displaying ONE real fact the AI
+   ContextChip, small pill displaying ONE real fact the AI
    prompt will actually include. Improvement beyond the prototype:
    prototype's "USED 4 FACTS" chips were hand-typed mocks; ours
    reflect the actual contact fields fed into claudeMessage.
@@ -685,17 +685,17 @@ function ContextChip({ children, tone = 'default' }: any) {
     <span style={{
       display: 'inline-flex',
       alignItems: 'center',
-      padding: '3px 9px',
-      borderRadius: 999,
+      padding: '4px 8px',
+      borderRadius: 10,
       background: isGold ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
       border: `1px solid ${isGold
         ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
         : 'var(--v3-border)'}`,
       color: isGold ? 'var(--v3-primary)' : 'var(--v3-text)',
       fontFamily: 'var(--font-body)',
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: 600,
-      letterSpacing: '-0.005em',
+      letterSpacing: 0,
       lineHeight: 1.3
     }}>
       {children}
@@ -709,7 +709,7 @@ function countWords(s: any) {
 }
 
 /* ============================================================
-   DraftHero — channel-appropriate visualization of the draft.
+   DraftHero, channel-appropriate visualization of the draft.
    Mirrors the v3 design's cmp2-hero pattern (screens-compose-
    nav.jsx) so the operator sees what the client will receive,
    not just plain text on a panel.
@@ -731,7 +731,7 @@ function SmsHero({ draft, contact }: any) {
   const dayStr = now.toLocaleDateString([], { weekday: 'short' }).toUpperCase()
   return (
     <div style={{
-      borderRadius: 14,
+      borderRadius: 10,
       border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))',
       background: 'linear-gradient(180deg, var(--v3-surface-2), var(--v3-surface))',
       overflow: 'hidden'
@@ -741,17 +741,17 @@ function SmsHero({ draft, contact }: any) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '8px 14px',
+        padding: '8px 12px',
         borderBottom: '1px solid var(--v3-border)',
         fontFamily: 'var(--font-display)',
-        fontSize: 11,
-        letterSpacing: '0.02em',
+        fontSize: 12,
+        letterSpacing: 0,
         color: 'var(--v3-text-muted)'
       }}>
         <span>{timeStr}</span>
         <span style={{ display: 'inline-flex', gap: 4, opacity: 0.7 }}>
-          <span style={{ width: 16, height: 8, borderRadius: 2, border: '1px solid currentColor', display: 'inline-block', position: 'relative' }}>
-            <span style={{ position: 'absolute', inset: 1, width: '70%', background: 'currentColor', borderRadius: 1 }} />
+          <span style={{ width: 16, height: 8, borderRadius: 10, border: '1px solid currentColor', display: 'inline-block', position: 'relative' }}>
+            <span style={{ position: 'absolute', inset: 1, width: '70%', background: 'currentColor', borderRadius: 10 }} />
           </span>
         </span>
       </div>
@@ -759,13 +759,13 @@ function SmsHero({ draft, contact }: any) {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '12px 14px',
+        gap: 12,
+        padding: '12px 12px',
         borderBottom: '1px solid var(--v3-border)'
       }}>
         <div aria-hidden="true" style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #2a1f10, #1a1208)',
+          width: 32, height: 32, borderRadius: 10,
+          background: 'linear-gradient(135deg, #141414, #141414)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
           color: 'var(--v3-primary)',
           fontFamily: 'var(--font-display)', fontSize: 12,
@@ -773,19 +773,19 @@ function SmsHero({ draft, contact }: any) {
           flexShrink: 0
         }}>{initials}</div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {contact?.name || 'New recipient'}
           </div>
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
             {contact?.phone || 'No phone on file'}
           </div>
         </div>
       </div>
       {/* Bubble */}
-      <div style={{ padding: '16px 14px 18px' }}>
+      <div style={{ padding: '16px 12px 16px' }}>
         <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 10,
-          letterSpacing: '0.18em', color: 'var(--v3-text-muted)',
+          fontFamily: 'var(--font-display)', fontSize: 12,
+          letterSpacing: 0, color: 'var(--v3-text-muted)',
           textAlign: 'center', marginBottom: 10
         }}>
           {dayStr} · {timeStr}
@@ -793,7 +793,7 @@ function SmsHero({ draft, contact }: any) {
         <div style={{
           maxWidth: '85%',
           marginLeft: 'auto',
-          padding: '10px 14px',
+          padding: '12px 12px',
           borderRadius: '18px 18px 6px 18px',
           background: 'linear-gradient(180deg, var(--v3-primary-hot), var(--v3-primary))',
           color: 'var(--v3-on-primary)',
@@ -835,23 +835,23 @@ function EmailHero({ draft, contact, profile, intent }: any) {
   const subjectGuess = extractedSubject || contact?.job_title || intent || `Message from ${fromName}`
   return (
     <div style={{
-      borderRadius: 14,
+      borderRadius: 10,
       border: '1px solid var(--v3-border-strong)',
       background: 'var(--v3-surface-2)',
       overflow: 'hidden'
     }}>
       <div style={{
-        padding: '12px 14px',
+        padding: '12px 12px',
         borderBottom: '1px solid var(--v3-border)',
         display: 'flex', flexDirection: 'column', gap: 4,
         fontFamily: 'var(--font-body)', fontSize: 12,
         color: 'var(--v3-text-muted)'
       }}>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 12 }}>
           <Eyebrow style={{ width: 44 }}>From</Eyebrow>
           <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>{fromName}{fromAddr ? ` <${fromAddr}>` : ''}</span>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 12 }}>
           <Eyebrow style={{ width: 44 }}>To</Eyebrow>
           <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>
             {contact?.name || 'Recipient'}{contact?.email ? ` <${contact.email}>` : ''}
@@ -859,13 +859,13 @@ function EmailHero({ draft, contact, profile, intent }: any) {
         </div>
         <div style={{
           marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 16,
-          color: 'var(--v3-text)', letterSpacing: '0.005em'
+          color: 'var(--v3-text)', letterSpacing: 0
         }}>
           {subjectGuess}
         </div>
       </div>
       <pre style={{
-        margin: 0, padding: '14px 16px',
+        margin: 0, padding: '12px 16px',
         fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.55,
         color: 'var(--v3-text)',
         whiteSpace: 'pre-wrap', wordBreak: 'break-word',
@@ -880,18 +880,18 @@ function EmailHero({ draft, contact, profile, intent }: any) {
 function VoiceHero({ draft }: any) {
   return (
     <div style={{
-      borderRadius: 14,
+      borderRadius: 10,
       border: '1px solid var(--v3-border-strong)',
       background: 'linear-gradient(180deg, var(--v3-surface-2), var(--v3-surface))',
-      padding: '14px 16px',
-      display: 'flex', flexDirection: 'column', gap: 10
+      padding: '12px 16px',
+      display: 'flex', flexDirection: 'column', gap: 12
     }}>
       <Eyebrow as="div" tone="gold">
         Script · read this aloud
       </Eyebrow>
       <pre style={{
         margin: 0,
-        fontFamily: 'var(--font-body)', fontSize: 15, lineHeight: 1.6,
+        fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.6,
         color: 'var(--v3-text)',
         whiteSpace: 'pre-wrap', wordBreak: 'break-word'
       }}>
@@ -902,13 +902,13 @@ function VoiceHero({ draft }: any) {
 }
 
 const selectStyle: import('react').CSSProperties = {
-  padding: '11px 14px',
-  borderRadius: 12,
+  padding: '12px 12px',
+  borderRadius: 10,
   background: 'var(--v3-surface-2)',
   border: '1px solid var(--v3-border-strong)',
   color: 'var(--v3-text)',
   fontFamily: 'var(--font-body)',
-  fontSize: 13,
+  fontSize: 14,
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box'

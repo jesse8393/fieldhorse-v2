@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { hapticTap } from '../lib/haptics.ts'
 
 /**
- * ConfirmSheet — premium black-glass replacement for window.confirm().
+ * ConfirmSheet, premium black-glass replacement for window.confirm().
  *
  * window.confirm() renders the browser-chrome dialog (the "deploy-
  * preview-9.netlify.app says ..." popup), which:
@@ -32,7 +32,7 @@ const ConfirmContext = createContext<any>(null)
 export function useConfirm() {
   const ctx = useContext(ConfirmContext)
   if (!ctx) {
-    // Defensive fallback so a missing provider doesn't crash the app —
+    // Defensive fallback so a missing provider doesn't crash the app :
     // degrades to window.confirm so the call site still works.
     return ({ title, body }: any) => Promise.resolve(window.confirm(`${title}\n\n${body || ''}`))
   }
@@ -145,7 +145,7 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
             exit={{ opacity: 0 }}
             style={{
               position: 'fixed', inset: 0,
-              background: 'rgba(0, 0, 0, 0.62)',
+              background: 'rgba(20, 20, 20, 0.62)',
               zIndex: 90, touchAction: 'none'
             }}
           />
@@ -170,14 +170,14 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
               border: '1px solid var(--v3-border)',
               borderBottom: 'none',
               zIndex: 91,
-              boxShadow: '0 -20px 60px -12px rgba(0, 0, 0, 0.55)',
-              padding: '10px 20px max(20px, env(safe-area-inset-bottom))',
-              display: 'flex', flexDirection: 'column', gap: 14
+              boxShadow: '0 -20px 60px -12px rgba(20, 20, 20, 0.55)',
+              padding: '12px 24px max(24px, env(safe-area-inset-bottom))',
+              display: 'flex', flexDirection: 'column', gap: 12
             }}
           >
             <div aria-hidden="true" style={{
               width: 44, height: 4, background: 'var(--v3-border-strong)',
-              borderRadius: 999, margin: '0 auto 6px',
+              borderRadius: 10, margin: '0 auto 6px',
               flexShrink: 0
             }} />
             <h3
@@ -185,9 +185,9 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
               style={{
                 margin: 0,
                 fontFamily: 'var(--font-body)',
-                fontSize: 18, fontWeight: 700,
+                fontSize: 20, fontWeight: 700,
                 color: 'var(--v3-text)',
-                letterSpacing: '-0.01em',
+                letterSpacing: 0,
                 lineHeight: 1.3
               }}
             >
@@ -197,7 +197,7 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
               <p style={{
                 margin: 0,
                 fontFamily: 'var(--font-body)',
-                fontSize: 13, lineHeight: 1.5,
+                fontSize: 14, lineHeight: 1.5,
                 color: 'var(--v3-text-muted)'
               }}>
                 {state.body}
@@ -210,7 +210,7 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
                 onClick={() => { hapticTap(); onCancel() }}
                 style={{
                   flex: 1, minHeight: 48,
-                  padding: '12px', borderRadius: 12,
+                  padding: '12px', borderRadius: 10,
                   background: 'transparent',
                   border: '1px solid var(--v3-border)',
                   color: 'var(--v3-text)',
@@ -227,18 +227,18 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
                 onClick={() => { hapticTap(); onConfirm() }}
                 style={{
                   flex: 1, minHeight: 48,
-                  padding: '12px', borderRadius: 12,
+                  padding: '12px', borderRadius: 10,
                   border: 'none',
                   background: state.destructive
                     ? 'var(--v3-danger)'
                     : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                  color: state.destructive ? '#fff' : 'var(--v3-on-primary)',
+                  color: state.destructive ? '#F2EDE4' : 'var(--v3-on-primary)',
                   fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                  letterSpacing: '0.04em',
+                  letterSpacing: 0,
                   cursor: 'pointer',
                   boxShadow: state.destructive
                     ? '0 4px 12px rgba(192, 57, 43, 0.32)'
-                    : '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 var(--v3-border-strong) inset',
+                    : '0 0 0 3px rgba(201, 150, 58, 0.10), 0 4px 12px rgba(201, 150, 58, 0.18), 0 1px 0 var(--v3-border-strong) inset',
                   WebkitTapHighlightColor: 'transparent',
                   touchAction: 'manipulation'
                 }}

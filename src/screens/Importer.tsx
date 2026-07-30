@@ -150,7 +150,7 @@ export default function Importer() {
     applyHeaderMap(next)
   }
 
-  // AI column mapping — for CSVs whose headers the static synonym
+  // AI column mapping, for CSVs whose headers the static synonym
   // matcher can't resolve (QuickBooks, ServiceTitan, custom exports).
   // Sends the headers + 3 sample rows to Claude and asks for a
   // field→header JSON map. Merges over the existing map so already-
@@ -161,7 +161,7 @@ export default function Importer() {
     hapticMedium()
     try {
       const sample = rows.slice(0, 3)
-      const system = `You map spreadsheet columns to a fixed set of CRM fields for a contractor's job/lead import. The target fields are: ${TARGET_FIELDS.map((f) => f.key).join(', ')}. Given the CSV headers and a few sample rows, return ONLY a JSON object whose keys are the target field names and whose values are the EXACT matching CSV header string (or null if no column fits). Map "name" to whichever column best identifies the customer or company. Map "amount" to the column holding the dollar value of the job/deal. Never invent headers — values must be exact strings from the provided header list or null. Return ONLY the JSON object, no prose.`
+      const system = `You map spreadsheet columns to a fixed set of CRM fields for a contractor's job/lead import. The target fields are: ${TARGET_FIELDS.map((f) => f.key).join(', ')}. Given the CSV headers and a few sample rows, return ONLY a JSON object whose keys are the target field names and whose values are the EXACT matching CSV header string (or null if no column fits). Map "name" to whichever column best identifies the customer or company. Map "amount" to the column holding the dollar value of the job/deal. Never invent headers, values must be exact strings from the provided header list or null. Return ONLY the JSON object, no prose.`
       const userContent = `CSV headers: ${JSON.stringify(csvHeaders)}\n\nSample rows:\n${JSON.stringify(sample, null, 2)}`
       const res = await claudeMessage({
         system,
@@ -183,7 +183,7 @@ export default function Importer() {
       const mappedCount = TARGET_FIELDS.filter((f) => next[f.key]).length
       toastSuccess('AI mapped your columns', `${mappedCount} of ${TARGET_FIELDS.length} fields matched`)
     } catch (e: any) {
-      toastError("Couldn't auto-map", e?.message || 'Try the manual mapping below.')
+      toastError("Couldn't map automatically", e?.message || 'Try the manual mapping below.')
     } finally {
       setAiMapping(false)
     }
@@ -209,7 +209,7 @@ export default function Importer() {
     setImporting(false)
     const finalCount = count ?? payload.length
     if (error) {
-      // Failure path previously only set the red banner — no toast, no
+      // Failure path previously only set the red banner, no toast, no
       // haptic, and the one-liner `if (!error) hapticSuccess(); setDone(...)`
       // read like the haptic was conditional on the whole line. Split
       // for symmetry with the success path.
@@ -238,21 +238,21 @@ export default function Importer() {
   const { stagger, item } = useFhMotion()
 
   return (
-    <motion.div className="fh-screen fh-readable-desktop" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+    <motion.div className="fh-screen fh-readable-desktop" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative' }}>
       {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 14px' }}>
+      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '24px 24px 12px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <Eyebrow>
             Import
           </Eyebrow>
-          <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
+          <h1 style={{ margin: '4px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--ink-strong)' }}>
             Import your{' '}
             data.
           </h1>
         </div>
         <div
           aria-hidden="true"
-          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}
+          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}
         >
           <FileSpreadsheet size={20} />
         </div>
@@ -267,7 +267,7 @@ export default function Importer() {
         </header>
 
         {/* Preset selector */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           {Object.keys(PRESETS).map((p) => {
             const on = p === preset
             return (
@@ -302,9 +302,9 @@ export default function Importer() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 10,
-            padding: '32px 20px',
-            borderRadius: 18,
+            gap: 12,
+            padding: '32px 24px',
+            borderRadius: 10,
             border: '2px dashed rgba(201,150,58,0.4)',
             background: 'linear-gradient(135deg, rgba(201,150,58,0.06), rgba(201,150,58,0.02))',
             color: 'var(--ink-strong)',
@@ -312,26 +312,26 @@ export default function Importer() {
             textAlign: 'center'
           }}
         >
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(201,150,58,0.15)', border: '1px solid rgba(201,150,58,0.35)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}>
+          <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(201,150,58,0.15)', border: '1px solid rgba(201,150,58,0.35)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}>
             <Upload size={22} />
           </div>
-          <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink-strong)' }}>
-            {rows.length ? `${rows.length} rows loaded — mapped ${mapped.length}` : 'Drop CSV or tap to pick'}
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)' }}>
+            {rows.length ? `${rows.length} rows loaded, mapped ${mapped.length}` : 'Drop CSV or tap to pick'}
           </span>
           {!rows.length && (
-            <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
-              Columns auto-detected from your {PRESETS[preset].label} export
+            <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
+              Columns detected automatically from your {PRESETS[preset].label} export
             </span>
           )}
           <input type="file" accept=".csv" onChange={onFile} hidden />
         </label>
 
-        {/* Column mapping review — only once a file is loaded. Shows the
+        {/* Column mapping review, only once a file is loaded. Shows the
             resolved field→column map with manual override dropdowns, plus
-            an AI auto-map button for headers the static matcher missed. */}
+            an AI map automatically button for headers the static matcher missed. */}
         {csvHeaders.length > 0 && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>
                 Column mapping
               </Eyebrow>
@@ -341,13 +341,13 @@ export default function Importer() {
                 onClick={aiMap}
                 disabled={aiMapping}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '7px 12px', borderRadius: 999,
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '8px 12px', borderRadius: 10,
                   border: '1px solid rgba(201,150,58,0.4)',
                   background: 'rgba(201,150,58,0.14)',
                   color: 'var(--field-gold-bright)',
-                  fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
-                  letterSpacing: '0.06em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                  letterSpacing: 0, textTransform: 'uppercase',
                   cursor: aiMapping ? 'wait' : 'pointer',
                   opacity: aiMapping ? 0.7 : 1
                 }}
@@ -356,7 +356,7 @@ export default function Importer() {
                 {aiMapping ? 'Mapping…' : 'Smart map with AI'}
               </motion.button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {TARGET_FIELDS.map((f) => {
                 const col = headerMap[f.key] || ''
                 const unmapped = !col
@@ -373,15 +373,15 @@ export default function Importer() {
                       onChange={(e) => setFieldColumn(f.key, e.target.value)}
                       style={{
                         width: '100%', boxSizing: 'border-box',
-                        padding: '8px 10px', borderRadius: 10,
+                        padding: '8px 12px', borderRadius: 10,
                         background: 'var(--surface-2)',
                         border: `1px solid ${unmapped && f.required ? 'rgba(192,57,43,0.4)' : 'var(--rule)'}`,
                         color: unmapped ? 'var(--ink-muted)' : 'var(--ink-strong)',
-                        fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none',
+                        fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none',
                         cursor: 'pointer'
                       }}
                     >
-                      <option value="">— not mapped —</option>
+                      <option value="">: not mapped :</option>
                       {csvHeaders.map((h) => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
@@ -397,18 +397,18 @@ export default function Importer() {
             <Eyebrow style={{ color: 'var(--ink-muted)' }}>
               Preview (first 5)
             </Eyebrow>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
               {mapped.slice(0, 5).map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {m.name}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>
-                      {m.job_title || '—'} · {m.phone || m.email || 'no contact'}
+                    <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+                      {m.job_title || '\u2003'} · {m.phone || m.email || 'no contact'}
                     </div>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.02em', color: 'var(--field-gold-bright)' }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--field-gold-bright)' }}>
                     ${m.amount || 0}
                   </div>
                 </div>
@@ -431,14 +431,14 @@ export default function Importer() {
               style={{
                 marginTop: 14,
                 width: '100%',
-                padding: '12px 18px',
-                borderRadius: 12,
+                padding: '12px 16px',
+                borderRadius: 10,
                 border: 'none',
                 background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                 color: 'var(--onyx)',
                 fontFamily: 'var(--font-display)',
-                fontSize: 15,
-                letterSpacing: '0.14em',
+                fontSize: 14,
+                letterSpacing: 0,
                 cursor: importing ? 'default' : 'pointer',
                 boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
                 display: 'inline-flex',
@@ -462,13 +462,13 @@ export default function Importer() {
               exit={{ opacity: 0 }}
               style={{
                 marginTop: 12,
-                padding: '10px 14px',
-                borderRadius: 12,
+                padding: '12px 12px',
+                borderRadius: 10,
                 background: done.err ? 'rgba(192,57,43,0.12)' : 'rgba(45,122,79,0.14)',
                 border: done.err ? '1px solid rgba(192,57,43,0.35)' : '1px solid rgba(45,122,79,0.35)',
                 color: done.err ? 'var(--alert-red)' : 'var(--signal-green)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 600
               }}
             >
@@ -478,18 +478,18 @@ export default function Importer() {
         </AnimatePresence>
       </motion.section>
 
-      {/* LEAD INTAKE LINK — operator-facing reframe of the webhook flow.
+      {/* LEAD INTAKE LINK, operator-facing reframe of the webhook flow.
           Collapsed by default. Copy stays in business language; the
           example payload is labelled "Example lead details" so it
           reads as guidance, not a JSON spec. */}
       <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
-        <details style={{ borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
+        <details style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
           <summary
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 14px',
+              padding: '12px 12px',
               cursor: 'pointer',
               listStyle: 'none',
               userSelect: 'none'
@@ -504,13 +504,13 @@ export default function Importer() {
             <ChevronDown size={16} color="var(--ink-muted)" className="fh-importer-chev" />
           </summary>
 
-          <div style={{ padding: '4px 14px 16px', borderTop: '1px solid var(--rule)' }}>
+          <div style={{ padding: '4px 12px 16px', borderTop: '1px solid var(--rule)' }}>
             <p style={{ margin: '12px 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-              Use this link to send new leads into FieldHorse from your automations — GoHighLevel, Zapier, Make, your website form, anything that can call a URL. Each lead lands straight in your Pipeline.
+              Use this link to send new leads into FieldHorse from your automations, GoHighLevel, Zapier, Make, your website form, anything that can call a URL. Each lead lands straight in your Pipeline.
             </p>
             {webhookKey ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-                <code style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
+                <code style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {origin}/api/webhook-lead?key={webhookRevealed
                     ? webhookKey
                     : `${'•'.repeat(Math.max(0, webhookKey.length - 5))}${webhookKey.slice(-5)}`}
@@ -519,7 +519,7 @@ export default function Importer() {
                   type="button"
                   onClick={() => setWebhookRevealed((v) => !v)}
                   aria-label={webhookRevealed ? 'Hide intake key' : 'Reveal intake key'}
-                  style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                  style={{ width: 30, height: 30, borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                 >
                   {webhookRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -527,7 +527,7 @@ export default function Importer() {
                   type="button"
                   onClick={copyWebhook}
                   aria-label="Copy intake link"
-                  style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'transparent', color: copiedWebhook ? 'var(--signal-green)' : 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                  style={{ width: 30, height: 30, borderRadius: 10, border: 'none', background: 'transparent', color: copiedWebhook ? 'var(--signal-green)' : 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                 >
                   {copiedWebhook ? <Check size={14} /> : <Copy size={14} />}
                 </button>
@@ -538,14 +538,14 @@ export default function Importer() {
                 whileTap={{ scale: 0.97 }}
                 onClick={ensureWebhookKey}
                 style={{
-                  padding: '10px 16px',
-                  borderRadius: 12,
+                  padding: '12px 16px',
+                  borderRadius: 10,
                   border: 'none',
                   background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                   color: 'var(--onyx)',
                   fontFamily: 'var(--font-display)',
                   fontSize: 14,
-                  letterSpacing: '0.12em',
+                  letterSpacing: 0,
                   cursor: 'pointer',
                   boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                   display: 'inline-flex',
@@ -571,12 +571,12 @@ export default function Importer() {
             <pre
               style={{
                 margin: 0,
-                padding: '12px 14px',
-                borderRadius: 12,
+                padding: '12px 12px',
+                borderRadius: 10,
                 background: 'var(--surface-2)',
                 border: '1px solid var(--rule)',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 11,
+                fontSize: 12,
                 color: 'var(--ink-muted)',
                 lineHeight: 1.5,
                 whiteSpace: 'pre-wrap'

@@ -21,12 +21,12 @@ import { Eyebrow } from '../components/v3'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
 
-// Child tables the demo seed writes keyed by contact_id — deleted first
+// Child tables the demo seed writes keyed by contact_id, deleted first
 // (scoped to the demo contact ids) before the contacts, in case a child FK
 // isn't ON DELETE CASCADE. Mirrors what seedDemoData() inserts.
 // Each child table plus the column that foreign-keys back to the demo
 // contact. Most use `contact_id`; fh_job_todos keys on `job_id` (its FK
-// column name — see migration 006). Using the wrong column silently
+// column name, see migration 006). Using the wrong column silently
 // deletes nothing and, since we only read { count }, swallows the
 // "column does not exist" error.
 const DEMO_CHILD_TABLES: { table: string; fk: string }[] = [
@@ -43,7 +43,7 @@ export default function Settings() {
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
-  // Customer-facing branding fields (migration 015). Empty strings save
+  // Customer facing branding fields (migration 015). Empty strings save
   // as null at submit time so downstream PDF code can use `is null`
   // checks without trim/null-trim ambiguity.
   const [companyPhone, setCompanyPhone] = useState(profile?.company_phone || '')
@@ -54,15 +54,15 @@ export default function Settings() {
   const [insuredText, setInsuredText] = useState(profile?.insured_text || '')
   const [warrantyDefault, setWarrantyDefault] = useState(profile?.warranty_default || '')
   // Bring-your-own pay link (Venmo / Zelle / Square / a Stripe Payment
-  // Link the contractor created themselves) — renders as a "Pay now"
-  // button on invoices, statements, and the customer-facing pages.
+  // Link the contractor created themselves), renders as a "Pay now"
+  // button on invoices, statements, and the customer facing pages.
   const [paymentLink, setPaymentLink] = useState((profile as any)?.payment_link || '')
   const [paymentInstructions, setPaymentInstructions] = useState((profile as any)?.payment_instructions || '')
   // Brand accent hex (validated #RRGGBB by migration 015's CHECK
   // constraint). Drives every gold accent on the customer-visible
-  // surfaces — top rule on each PDF, status pills, eyebrows, hero
+  // surfaces, top rule on each PDF, status pills, eyebrows, hero
   // money numbers. Empty → save as null → downstream pdf.js +
-  // template tokens fall back to the system default (#C8A154).
+  // template tokens fall back to the system default (#C9963A).
   const [brandAccentHex, setBrandAccentHex] = useState(profile?.brand_accent_hex || '')
   // Estimate/proposal design (migration 031). One default per company;
   // drives the HTML preview, the public client page, and the PDF export.
@@ -71,7 +71,7 @@ export default function Settings() {
   // duplicates AND ghost entries (typos, deprecated names like
   // "Painters" / "Drywaller") into profile.services. The chip
   // renderer iterates the canonical SERVICES list so ghost entries
-  // never render as chips — but the counter used to read the raw
+  // never render as chips, but the counter used to read the raw
   // length, producing the audit's "24 picked but only 12 chips"
   // discrepancy. We now also intersect with SERVICES so the count
   // matches what the user can actually see. Persists on next save.
@@ -90,7 +90,7 @@ export default function Settings() {
 
   // Available to everyone (onboarding promises "wipe anytime"). Scoped to
   // demo-seeded rows only (source = 'demo'), so it can never touch real
-  // work — safe to expose without the old dev-only gate.
+  // work, safe to expose without the old dev-only gate.
   const canWipe = true
 
   async function wipeTestData() {
@@ -193,11 +193,11 @@ export default function Settings() {
       return t.length === 0 ? null : t
     }
     // Pay links pasted from an app often drop the scheme ("venmo.com/…").
-    // Prepend https:// so the stored value is a real clickable URL —
+    // Prepend https:// so the stored value is a real clickable URL :
     // unless it's already a deep-link scheme (venmo://, etc.).
     // safePayUrl (shared) allow-lists the scheme so a dangerous link
     // (javascript:, data:, …) is never stored and later rendered as an
-    // href on a customer-facing page.
+    // href on a customer facing page.
     // Validate brand accent before save. Migration 015's CHECK
     // constraint will reject anything off-format with an opaque
     // Postgres error; catching it here lets us surface a friendly
@@ -208,7 +208,7 @@ export default function Settings() {
       if (!/^#[0-9a-fA-F]{6}$/.test(rawAccent)) {
         toastError(
           'Brand color must be a #RRGGBB hex',
-          `"${rawAccent}" doesn't look like a 6-digit hex (e.g. #C8A154). Settings not saved.`
+          `"${rawAccent}" doesn't look like a 6-digit hex (e.g. #C9963A). Settings not saved.`
         )
         setSaving(false)
         return
@@ -277,13 +277,13 @@ export default function Settings() {
   // page. Honor the hash on first paint + on later hash changes.
   //
   // Audit M1 (Jun 10): the single 50ms timeout missed because the
-  // template list above the anchor loads async — at 50ms the element
+  // template list above the anchor loads async, at 50ms the element
   // exists, scrollIntoView lands, but more layout shifts in below
   // and the user ends up back at top. Retry at 50/250/600/1200ms
   // and treat the page as scrolled once scrollY > 0, so settling
   // layout doesn't undo the jump. Also listen for popstate since
   // React Router's programmatic navigate uses pushState (which does
-  // NOT fire hashchange) — the prior code only re-fired the jump on
+  // NOT fire hashchange), the prior code only re-fired the jump on
   // a real <a> click between hash routes.
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -292,7 +292,7 @@ export default function Settings() {
     // Verify-and-retry until the anchor exists AND the jump actually
     // landed. Fixed-schedule timers (50/250/600/1200ms) missed on cold
     // loads because the desktop body is a lazy chunk
-    // (SnowSettingsBuild) + a profile fetch — the #templates anchor
+    // (SnowSettingsBuild) + a profile fetch, the #templates anchor
     // wasn't in the DOM until after the last retry (Jun 10 spot-check:
     // scrollY pinned at 0 with the anchor at 1944px). behavior:'auto'
     // (instant) so the landing check isn't racing a smooth animation.
@@ -304,7 +304,7 @@ export default function Settings() {
       if (el) {
         el.scrollIntoView({ behavior: 'auto', block: 'start' })
         const top = el.getBoundingClientRect().top
-        if (top >= -8 && top < 240) return // landed — stop retrying
+        if (top >= -8 && top < 240) return // landed, stop retrying
       }
       if (Date.now() < deadline) {
         timer = window.setTimeout(() => attemptScroll(deadline), 250)
@@ -325,7 +325,7 @@ export default function Settings() {
     }
   }, [])
 
-  // Real, honest "setup readiness" calculation — only counts fields
+  // Real, honest "setup readiness" calculation, only counts fields
   // that actually map to columns the profile screen exposes. No fake
   // weight to inflate the percentage.
   const profileChecks = [
@@ -350,8 +350,8 @@ export default function Settings() {
 
       {/* BRAND */}
       <Section variants={item} title={<>Your <em>brand.</em></>} sub="Make Fieldhorse feel like your app.">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Eyebrow style={{ color: 'var(--ink-muted)' }}>Display name</Eyebrow>
             <input
               type="text"
@@ -359,19 +359,19 @@ export default function Settings() {
               onChange={(e) => setDisplayName(e.target.value)}
               onBlur={saveDisplayName}
               placeholder="First name or full name"
-              style={{ padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+              style={{ padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
             />
-            <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>Shown on the greeting and avatar initials.</span>
+            <span style={{ fontSize: 12, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>Shown on the greeting and avatar initials.</span>
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Eyebrow style={{ color: 'var(--ink-muted)' }}>Company name</Eyebrow>
             <input
               type="text"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Your company"
-              style={{ padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
+              style={{ padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
             />
           </label>
 
@@ -391,15 +391,15 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* CUSTOMER-FACING DETAILS — Phase 4D-2A. Branding data the
+      {/* CUSTOMER-FACING DETAILS, Phase 4D-2A. Branding data the
           contractor's clients see on quotes, invoices, and approval
           certificates. Saved together via the bottom Save Changes bar. */}
       <Section
         variants={item}
-        title={<>Customer-facing <em>details.</em></>}
-        sub="These details strengthen your proposals, invoices, and approvals when filled in. Only company name is needed to get started — everything else is optional and can be added anytime."
+        title={<>Customer facing <em>details.</em></>}
+        sub="These details strengthen your proposals, invoices, and approvals when filled in. Only company name is needed to get started, everything else is optional and can be added anytime."
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <BrandField label="Company phone">
             <input
               type="tel"
@@ -436,7 +436,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Company address" optional hint="One line or several — used on cover pages.">
+          <BrandField label="Company address" optional hint="One line or several, used on cover pages.">
             <textarea
               rows={2}
               value={companyAddress}
@@ -471,7 +471,7 @@ export default function Settings() {
               rows={3}
               value={warrantyDefault}
               onChange={(e) => setWarrantyDefault(e.target.value)}
-              placeholder="One-year workmanship warranty on all installed labor. Manufacturer warranties pass through to the customer."
+              placeholder="One year workmanship warranty on all installed labor. Manufacturer warranties pass through to the customer."
               style={{ ...brandInputStyle, resize: 'vertical', lineHeight: 1.45 }}
             />
           </BrandField>
@@ -479,7 +479,7 @@ export default function Settings() {
           <BrandField
             label="Brand accent color"
             optional
-            hint="The accent color on your customer documents — proposals, invoices, and statements. Leave blank to use the default."
+            hint="The accent color on your customer documents, proposals, invoices, and statements. Leave blank to use the default."
           >
             <BrandColorEditor
               value={brandAccentHex}
@@ -499,7 +499,7 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* GETTING PAID — bring-your-own pay link. We don't integrate with
+      {/* GETTING PAID, bring-your-own pay link. We don't integrate with
           any processor; the contractor pastes a link they already have
           (Venmo / Zelle / Square / PayPal / their own Stripe Payment
           Link) and it becomes a "Pay now" button everywhere money goes
@@ -507,10 +507,10 @@ export default function Settings() {
       <Section
         variants={item}
         title={<>Getting <em>paid.</em></>}
-        sub="Paste a payment link you already use — Venmo, Zelle, Square, PayPal, or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
+        sub="Paste a payment link you already use, Venmo, Zelle, Square, PayPal, or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <BrandField label="Payment link" optional hint="The page customers land on to pay you. We don't touch the money — it goes straight to your account.">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <BrandField label="Payment link" optional hint="The page customers land on to pay you. We don't touch the money, it goes straight to your account.">
             <input
               type="url"
               inputMode="url"
@@ -522,7 +522,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Payment instructions" optional hint="Shown under the button — checks payable to, mailing address, Zelle email/phone, etc.">
+          <BrandField label="Payment instructions" optional hint="Shown under the button, checks payable to, mailing address, Zelle email/phone, etc.">
             <textarea
               rows={3}
               value={paymentInstructions}
@@ -536,7 +536,7 @@ export default function Settings() {
 
       {/* SERVICES */}
       <Section variants={item} title={<>What you <em>do.</em></>} meta={`${services.length} picked`}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {SERVICES.map((s) => {
             const isOn = services.includes(s)
             return (
@@ -545,8 +545,8 @@ export default function Settings() {
                 type="button"
                 onClick={() => toggleService(s)}
                 style={{
-                  padding: '7px 12px',
-                  borderRadius: 999,
+                  padding: '8px 12px',
+                  borderRadius: 10,
                   border: isOn ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
                   background: isOn ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                   color: isOn ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
@@ -564,14 +564,14 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* RATE CARD — per-tenant overrides for the AI bid engine. Edits
+      {/* RATE CARD, per-tenant overrides for the AI bid engine. Edits
           persist to fh_rate_cards (migration 026); Bid.jsx loads the
           merged view on mount via loadUserRateCard(). */}
       <Section variants={item} title={<>Your <em>rates.</em></>} sub="Override the AI bid defaults or add trades you bid often.">
         <RateCardEditor />
       </Section>
 
-      {/* MARKET PIN — 5/17 audit fix: surface the city name reverse-geocoded
+      {/* MARKET PIN, 5/17 audit fix: surface the city name reverse-geocoded
           from the saved coords ("Murfreesboro, TN") instead of the raw
           LAT/LON pair the audit called out as unfriendly. Raw coords stay
           available as muted secondary text so the operator can still
@@ -584,8 +584,8 @@ export default function Settings() {
             display: 'flex',
             flexDirection: 'column',
             gap: 4,
-            padding: '10px 14px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             background: 'var(--surface-2)',
             border: '1px solid var(--rule)'
           }}>
@@ -594,7 +594,7 @@ export default function Settings() {
             </Eyebrow>
             <span style={{
               fontFamily: 'var(--font-body)',
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: 600,
               color: 'var(--ink-strong)',
               lineHeight: 1.2
@@ -606,12 +606,12 @@ export default function Settings() {
             {profile?.location_lat && (
               <span style={{
                 fontFamily: 'var(--font-body)',
-                fontSize: 10,
+                fontSize: 12,
                 color: 'var(--ink-faint)',
                 fontVariantNumeric: 'tabular-nums',
-                letterSpacing: '0.02em'
+                letterSpacing: 0
               }}>
-                {profile.location_lat.toFixed(3)}, {profile.location_lon?.toFixed(3) || '—'}
+                {profile.location_lat.toFixed(3)}, {profile.location_lon?.toFixed(3) || '\u2003'}
               </span>
             )}
           </div>
@@ -619,7 +619,7 @@ export default function Settings() {
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={pinLocation}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
           >
             <MapPin size={16} />
             {profile?.location_lat ? 'Repin' : 'Pin location'}
@@ -627,7 +627,7 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* APPEARANCE — daylight mode. Restored after the light-theme
+      {/* APPEARANCE, daylight mode. Restored after the light-theme
           parity pass (theme_parity token sweep + chrome veil tokens);
           desktop joined after the fh-build sweep (desktop_parity), so
           the toggle now applies on every viewport. Framed as a field
@@ -635,10 +635,10 @@ export default function Settings() {
       <Section
         variants={item}
         title={<>Built for <em>daylight.</em></>}
-        sub="High-contrast light theme for reading the app in direct sun."
+        sub="High contrast light theme for reading the app in direct sun."
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '4px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <span aria-hidden="true" style={{
               flexShrink: 0, width: 34, height: 34, borderRadius: 10,
               display: 'grid', placeItems: 'center',
@@ -651,10 +651,10 @@ export default function Settings() {
               <SunMedium size={16} />
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--v3-text)' }}>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--v3-text)' }}>
                 Daylight mode
               </div>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
                 Warm paper, readable in direct sun. Applies everywhere.
               </div>
             </div>
@@ -677,18 +677,18 @@ export default function Settings() {
       </Section>
 
       <Section variants={item} title={<>Your <em>session.</em></>}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {user?.email}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>Signed in</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>Signed in</div>
           </div>
           <motion.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={handleSignOut} className="fh-press-instant"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
           >
             <LogOut size={14} />
             Sign out
@@ -706,7 +706,7 @@ export default function Settings() {
           metaTone="red"
         >
           <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12 }}>
-            Clears the example clients, jobs, and activity that were loaded to show you around. Only removes sample data — your own clients and jobs are never touched.
+            Clears the example clients, jobs, and activity that were loaded to show you around. Only removes sample data, your own clients and jobs are never touched.
           </p>
           <div style={{ marginTop: 10 }}>
             {!confirmWipe ? (
@@ -715,7 +715,7 @@ export default function Settings() {
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setConfirmWipe(true)} className="fh-press-instant"
                 disabled={wiping}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
               >
                 <Trash2 size={14} />
                 Remove sample data
@@ -726,7 +726,7 @@ export default function Settings() {
                   type="button"
                   onClick={() => setConfirmWipe(false)}
                   disabled={wiping}
-                  style={{ padding: '10px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -735,7 +735,7 @@ export default function Settings() {
                   whileTap={{ scale: 0.97 }}
                   onClick={wipeTestData}
                   disabled={wiping}
-                  style={{ padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(135deg, #c0392b, #8b1a0d)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.1em', cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
+                  style={{ padding: '12px 12px', borderRadius: 10, background: 'linear-gradient(135deg, #C0392B, #C0392B)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
                 >
                   {wiping ? 'REMOVING…' : 'REMOVE SAMPLE DATA'}
                 </motion.button>
@@ -750,26 +750,27 @@ export default function Settings() {
         </Section>
       )}
 
-      {/* SAVE BAR — fixed strip above the bottom nav. position:sticky
+      {/* SAVE BAR, fixed strip above the bottom nav. position:sticky
           previously didn't actually stick because its containing block
           was the page (not a scroll container with overflow). position:
           fixed against the viewport works. Sits 96 px above the bottom
           edge (= bottom nav height) so it never overlaps the nav. */}
       <div
+        className="fh-settings-save-bar"
         style={{
-          position: 'fixed',
-          left: 0,
-          right: 0,
-          bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
+          position: isDesktop ? 'static' : 'fixed',
+          left: isDesktop ? 'auto' : 0,
+          right: isDesktop ? 'auto' : 0,
+          bottom: isDesktop ? 'auto' : 'calc(96px + env(safe-area-inset-bottom, 0px))',
           zIndex: 'calc(var(--z-nav, 40) - 1)',
           /* Right padding clears the capture FAB column (fixed right:20,
-             56px wide) — the save button used to render underneath it. */
-          padding: '12px 92px 12px 20px',
+             56px wide), the save button used to render underneath it. */
+          padding: isDesktop ? '12px 0 0' : '12px 48px 12px 24px',
           display: 'flex',
           justifyContent: 'flex-end',
-          background: 'linear-gradient(180deg, var(--fh-chrome-veil-0) 0%, var(--fh-chrome-veil-2) 35%, var(--fh-chrome-veil-1) 100%)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
+          background: isDesktop ? 'transparent' : 'linear-gradient(180deg, var(--fh-chrome-veil-0) 0%, var(--fh-chrome-veil-2) 35%, var(--fh-chrome-veil-1) 100%)',
+          backdropFilter: isDesktop ? 'none' : 'blur(10px)',
+          WebkitBackdropFilter: isDesktop ? 'none' : 'blur(10px)',
           pointerEvents: 'none'
         }}
       >
@@ -783,13 +784,15 @@ export default function Settings() {
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            padding: '12px 22px',
-            borderRadius: 12,
+            height: 40,
+            minHeight: 40,
+            padding: '0 16px',
+            borderRadius: 10,
             background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
             color: 'var(--onyx)',
-            fontFamily: 'var(--font-display)',
-            fontSize: 15,
-            letterSpacing: '0.14em',
+            fontFamily: 'var(--font-body)',
+            fontSize: 14,
+            letterSpacing: 0,
             border: 'none',
             cursor: saving ? 'default' : 'pointer',
             boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
@@ -822,13 +825,13 @@ export default function Settings() {
   }
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 120, position: 'relative' }}>
+    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative' }}>
       {/* HEADER */}
-      <motion.div variants={item} style={{ padding: '10px 20px 14px' }}>
+      <motion.div variants={item} style={{ padding: '12px 24px 12px' }}>
         <Eyebrow>
           Profile
         </Eyebrow>
-        <h1 style={{ margin: '4px 0 0', fontSize: 'clamp(22px, 6vw, 30px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 600, color: 'var(--ink-strong)' }}>
+        <h1 style={{ margin: '4px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--ink-strong)' }}>
           Your business,{' '}
           organized.
         </h1>
@@ -874,16 +877,16 @@ function PushRow({ userId }: { userId?: string }) {
     }
   }
 
-  const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)' } as const
+  const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' } as const
 
   if (support === 'needs-install') {
     return (
       <div style={rowStyle}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)' }}>
             Add to Home Screen first
           </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
             iPhone: Share → Add to Home Screen, then open Fieldhorse from the icon and flip this on.
           </div>
         </div>
@@ -904,11 +907,11 @@ function PushRow({ userId }: { userId?: string }) {
   return (
     <div style={rowStyle}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink-strong)' }}>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)' }}>
           Push notifications
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>
-          {enabled ? 'On for this device' : 'Off — approvals and new leads stay silent'}
+        <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+          {enabled ? 'On for this device' : 'Off, approvals and new leads stay silent'}
         </div>
       </div>
       <motion.button
@@ -917,11 +920,11 @@ function PushRow({ userId }: { userId?: string }) {
         onClick={toggle} className="fh-press-instant"
         disabled={busy || !userId}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 10,
+          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10,
           background: enabled ? 'var(--v3-surface-2)' : 'var(--v3-primary-soft)',
           border: enabled ? '1px solid var(--v3-border-strong)' : '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)',
           color: enabled ? 'var(--v3-text-muted)' : 'var(--v3-primary)',
-          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
           opacity: busy ? 0.6 : 1
         }}
       >
@@ -932,7 +935,7 @@ function PushRow({ userId }: { userId?: string }) {
   )
 }
 
-/* Permanent account deletion — wires the existing /api/delete-account
+/* Permanent account deletion, wires the existing /api/delete-account
    endpoint (previously mobile-only) into web Settings. Type-to-confirm
    guards the irreversible wipe; on success we sign the user out. */
 function DeleteAccountRow({ onDone }: { onDone: () => void }) {
@@ -970,7 +973,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        style={{ marginTop: 10, background: 'none', border: 'none', padding: '4px 2px', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+        style={{ marginTop: 10, background: 'none', border: 'none', padding: '4px 4px', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
       >
         Delete my account
       </button>
@@ -978,8 +981,8 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div style={{ marginTop: 10, padding: '12px', borderRadius: 12, background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.35)' }}>
-      <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>Permanently delete your account</div>
+    <div style={{ marginTop: 10, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.35)' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>Permanently delete your account</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
         This erases every contact, job, quote, invoice, payment, photo, and file you own, and closes your login. It can't be undone. Type <strong>DELETE</strong> to confirm.
       </p>
@@ -990,11 +993,11 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
         placeholder="DELETE"
         autoCapitalize="characters"
         disabled={busy}
-        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none', marginBottom: 10 }}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none', marginBottom: 10 }}
       />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={() => { setOpen(false); setConfirmText('') }} disabled={busy} style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-        <button type="button" onClick={doDelete} disabled={busy || confirmText.trim().toUpperCase() !== 'DELETE'} style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'rgba(192,57,43,0.16)', border: '1px solid rgba(192,57,43,0.5)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: busy || confirmText.trim().toUpperCase() !== 'DELETE' ? 0.5 : 1 }}>
+        <button type="button" onClick={() => { setOpen(false); setConfirmText('') }} disabled={busy} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+        <button type="button" onClick={doDelete} disabled={busy || confirmText.trim().toUpperCase() !== 'DELETE'} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.16)', border: '1px solid rgba(192,57,43,0.5)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy || confirmText.trim().toUpperCase() !== 'DELETE' ? 0.5 : 1 }}>
           {busy ? 'Deleting…' : 'Delete forever'}
         </button>
       </div>
@@ -1012,9 +1015,9 @@ function Section({ variants, title, sub, meta, metaTone, children }: any) {
       className="v3-section"
       style={{ margin: '0 var(--v3-gutter) 14px' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sub ? 4 : 10, gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sub ? 4 : 10, gap: 12 }}>
         <h2
-          style={{ margin: 0, fontSize: 18, lineHeight: 1.15, letterSpacing: '-0.01em', fontWeight: 600, color: 'var(--v3-text)' }}
+          style={{ margin: 0, fontSize: 20, lineHeight: 1.15, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}
         >
           {renderSectionTitle(title)}
         </h2>
@@ -1023,12 +1026,12 @@ function Section({ variants, title, sub, meta, metaTone, children }: any) {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              padding: '3px 9px',
-              borderRadius: 999,
+              padding: '4px 8px',
+              borderRadius: 10,
               fontFamily: 'var(--font-body)',
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.1em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               ...metaBg
             }}
@@ -1063,22 +1066,22 @@ function renderSectionTitle(node: any) {
 
 function Meta({ label, value }: any) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', minWidth: 80 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', minWidth: 80 }}>
       <Eyebrow style={{ color: 'var(--ink-muted)' }}>{label}</Eyebrow>
-      <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: '0.02em', color: 'var(--ink-strong)' }}>{value}</span>
+      <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: 'var(--ink-strong)' }}>{value}</span>
     </div>
   )
 }
 
 function BrandField({ label, hint, optional, children }: any) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         <Eyebrow style={{ color: 'var(--ink-muted)' }}>
           {label}
         </Eyebrow>
         {optional && (
-          <Eyebrow style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint, var(--ink-muted))' }}>
+          <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-faint, var(--ink-muted))' }}>
             Optional
           </Eyebrow>
         )}
@@ -1086,7 +1089,7 @@ function BrandField({ label, hint, optional, children }: any) {
       {children}
       {hint && (
         <span style={{
-          fontSize: 11, color: 'var(--ink-faint, var(--ink-muted))',
+          fontSize: 12, color: 'var(--ink-faint, var(--ink-muted))',
           fontFamily: 'var(--font-body)', lineHeight: 1.4
         }}>
           {hint}
@@ -1097,8 +1100,8 @@ function BrandField({ label, hint, optional, children }: any) {
 }
 
 const brandInputStyle: import('react').CSSProperties = {
-  padding: '11px 14px',
-  borderRadius: 12,
+  padding: '12px 12px',
+  borderRadius: 10,
   background: 'var(--surface-2)',
   border: '1px solid var(--rule)',
   color: 'var(--ink-strong)',
@@ -1110,33 +1113,33 @@ const brandInputStyle: import('react').CSSProperties = {
 }
 
 /**
- * Brand color editor — native color picker + hex input + live preview
- * strip showing how the chosen color will render on customer-facing
+ * Brand color editor, native color picker + hex input + live preview
+ * strip showing how the chosen color will render on customer facing
  * surfaces (top rule, status pill, eyebrow, hero money number).
  *
  * Validation is deferred to save() so the editor stays permissive
- * while the operator's typing — the picker + preset palette can only
+ * while the operator's typing, the picker + preset palette can only
  * emit valid hex, but the manual hex input could be mid-type.
  */
 const COLOR_PRESETS = [
-  { hex: '#C8A154', name: 'FieldGold (default)' },
-  { hex: '#1F3A93', name: 'Indigo' },
-  { hex: '#0E7C66', name: 'Forest' },
-  { hex: '#9E2B25', name: 'Brick' },
-  { hex: '#1A1814', name: 'Onyx' }
+  { hex: '#C9963A', name: 'FieldGold (default)' },
+  { hex: '#5C5C5C', name: 'Indigo' },
+  { hex: '#2D7A4F', name: 'Forest' },
+  { hex: '#C0392B', name: 'Brick' },
+  { hex: '#141414', name: 'Onyx' }
 ]
 
 const ESTIMATE_TEMPLATES = [
-  { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark-accent layout grouped by trade.', swatch: ['#1A1814', '#C8A154', '#FFFFFF'] },
-  { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#3F4651', '#FFFFFF', '#ECECEC'] },
-  { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#4F7A63', '#EAF1ED', '#FFFFFF'] },
-  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#EDE6DA', '#9A7B4F', '#2B2620'] }
+  { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark accent layout grouped by trade.', swatch: ['#141414', '#C9963A', '#F2EDE4'] },
+  { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
+  { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
+  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] }
 ]
 
 function EstimateTemplatePicker({ value, onChange }: any) {
   const selected = value || 'classic'
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
       {ESTIMATE_TEMPLATES.map((t) => {
         const on = selected === t.key
         return (
@@ -1148,23 +1151,23 @@ function EstimateTemplatePicker({ value, onChange }: any) {
             style={{
               textAlign: 'left',
               padding: 12,
-              borderRadius: 12,
+              borderRadius: 10,
               cursor: 'pointer',
-              background: on ? 'var(--v3-primary-soft, rgba(200,161,84,0.12))' : 'var(--surface, transparent)',
-              border: on ? '2px solid var(--v3-primary, #C8A154)' : '1px solid var(--rule)',
+              background: on ? 'var(--v3-primary-soft, rgba(201, 150, 58,0.12))' : 'var(--surface, transparent)',
+              border: on ? '2px solid var(--v3-primary, #C9963A)' : '1px solid var(--rule)',
               display: 'flex', flexDirection: 'column', gap: 8
             }}
           >
             <div style={{ display: 'flex', gap: 4 }}>
               {t.swatch.map((c, i) => (
-                <span key={i} style={{ width: 22, height: 22, borderRadius: 5, background: c, border: '1px solid rgba(0,0,0,0.08)' }} />
+                <span key={i} style={{ width: 22, height: 22, borderRadius: 10, background: c, border: '1px solid rgba(20, 20, 20,0.08)' }} />
               ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
-              {on && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--v3-primary, #C8A154)' }}>SELECTED</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
+              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary, #C9963A)' }}>SELECTED</span>}
             </div>
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
           </button>
         )
       })}
@@ -1175,18 +1178,18 @@ function EstimateTemplatePicker({ value, onChange }: any) {
 function BrandColorEditor({ value, onChange, companyName }: any) {
   const v = (value || '').trim()
   const isHex = /^#[0-9a-fA-F]{6}$/.test(v)
-  const previewColor = isHex ? v : '#C8A154'
+  const previewColor = isHex ? v : '#C9963A'
   const usingDefault = !isHex
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Input row: color picker swatch + hex text input + reset */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <label
           aria-label="Pick brand color"
           style={{
             position: 'relative',
-            width: 44, height: 44, borderRadius: 12,
+            width: 44, height: 44, borderRadius: 10,
             background: previewColor,
             border: '1px solid var(--rule)',
             cursor: 'pointer',
@@ -1196,7 +1199,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
         >
           <input
             type="color"
-            value={isHex ? v : '#c8a154'}
+            value={isHex ? v : '#C9963A'}
             onChange={(e) => onChange(e.target.value)}
             style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
           />
@@ -1205,7 +1208,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
           type="text"
           value={v}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="#C8A154"
+          placeholder="#C9963A"
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
@@ -1222,10 +1225,10 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
             type="button"
             onClick={() => onChange('')}
             style={{
-              padding: '8px 10px', borderRadius: 8,
+              padding: '8px 12px', borderRadius: 10,
               background: 'transparent', border: '1px solid var(--rule)',
               color: 'var(--ink-muted)', fontFamily: 'var(--font-body)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer'
+              fontSize: 12, fontWeight: 600, cursor: 'pointer'
             }}
           >
             Reset
@@ -1233,8 +1236,8 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
         )}
       </div>
 
-      {/* Preset palette — common contractor brand colors */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {/* Preset palette, common contractor brand colors */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {COLOR_PRESETS.map((p) => {
           const isOn = isHex && v.toLowerCase() === p.hex.toLowerCase()
           return (
@@ -1245,7 +1248,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
               aria-label={`Use ${p.name}`}
               title={p.name}
               style={{
-                width: 28, height: 28, borderRadius: 8,
+                width: 28, height: 28, borderRadius: 10,
                 background: p.hex,
                 border: isOn ? '2px solid var(--ink-strong)' : '1px solid var(--rule)',
                 cursor: 'pointer',
@@ -1256,20 +1259,20 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
         })}
       </div>
 
-      {/* Live preview — shows how the chosen color renders on the
+      {/* Live preview, shows how the chosen color renders on the
           three most identity-loaded customer-visible surfaces. */}
       <div style={{
         marginTop: 4,
-        padding: '14px 16px',
-        background: '#FBF8F1',
-        border: '1px solid #E8E4D8',
+        padding: '12px 16px',
+        background: '#F2EDE4',
+        border: '1px solid #F2EDE4',
         borderRadius: 10,
-        display: 'flex', flexDirection: 'column', gap: 10
+        display: 'flex', flexDirection: 'column', gap: 12
       }}>
         {/* Top rule */}
-        <div style={{ height: 3, background: previewColor, borderRadius: 99 }} />
+        <div style={{ height: 3, background: previewColor, borderRadius: 10 }} />
         {/* Eyebrow + hero number row */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <Eyebrow as="div" style={{ color: previewColor }}>
               Invoice
@@ -1277,22 +1280,22 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
             <div style={{
               fontFamily: 'var(--font-display)',
               fontSize: 20, fontWeight: 600,
-              letterSpacing: '0.06em',
-              color: '#1A1814', marginTop: 2,
+              letterSpacing: 0,
+              color: '#141414', marginTop: 2,
               textTransform: 'uppercase'
             }}>
               {(companyName || 'My Company').toUpperCase()}
             </div>
           </div>
           {/* Status pill */}
-          <Eyebrow style={{ padding: '4px 9px', borderRadius: 999, background: `color-mix(in srgb, ${previewColor} 16%, white)`, border: `1px solid ${previewColor}`, color: previewColor }}>
+          <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: `color-mix(in srgb, ${previewColor} 16%, white)`, border: `1px solid ${previewColor}`, color: previewColor }}>
             Sample
           </Eyebrow>
         </div>
         {/* Hero money */}
         <div style={{
           fontFamily: 'var(--font-serif, Georgia, serif)',
-          fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em',
+          fontSize: 24, fontWeight: 600, letterSpacing: 0,
           color: previewColor, lineHeight: 1
         }}>
           $24,400
@@ -1301,10 +1304,10 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
 
       {usingDefault && (
         <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 11,
+          fontFamily: 'var(--font-body)', fontSize: 12,
           color: 'var(--ink-faint, var(--ink-muted))'
         }}>
-          Using the FieldHorse default. Pick a preset, paste a hex (e.g. <code>#1F3A93</code>), or tap the swatch to choose your own.
+          Using the FieldHorse default. Pick a preset, paste a hex (e.g. <code>#5C5C5C</code>), or tap the swatch to choose your own.
         </span>
       )}
     </div>

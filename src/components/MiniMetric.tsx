@@ -6,7 +6,7 @@
 //
 // Props:
 //   label   Small caption under the value.
-//   value   Pre-formatted display node. Format upstream — this
+//   value   Pre-formatted display node. Format upstream, this
 //           component is dumb so callers can pick money(), moneyFull(),
 //           plain numbers, or a loading skeleton as appropriate.
 //   accent  When true, paints the value in the brand gold so the tile
@@ -38,8 +38,8 @@ export default function MiniMetric({
         style={{
           color:
             tone === 'bad'  ? 'var(--v3-danger-bright)'
-          : tone === 'warn' ? '#e0a141'
-          : accent          ? 'var(--v3-primary, #c9963a)'
+          : tone === 'warn' ? '#C9963A'
+          : accent          ? 'var(--v3-primary, #C9963A)'
           : undefined,
         }}
       >

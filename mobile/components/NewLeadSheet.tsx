@@ -1,4 +1,4 @@
-// mobile/components/NewLeadSheet.tsx — full add-lead flow in a bottom sheet.
+// mobile/components/NewLeadSheet.tsx, full add-lead flow in a bottom sheet.
 // Mirrors web src/components/NewLeadSheet.tsx: captures name/phone/email/
 // address/job_title/job_type/stage/amount/notes/referred_by, remembers the
 // last job_type, and offers a doc-intake button (camera or library photo of
@@ -115,9 +115,9 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
       <Pressable
         onPress={scan}
         disabled={scanning}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, marginBottom: 18, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}14` }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 10, padding: 12, marginBottom: 18, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}14` }}
       >
-        <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.goldBright}1f`, borderWidth: 1, borderColor: theme.borderGold }}>
+        <View style={{ width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.goldBright}1f`, borderWidth: 1, borderColor: theme.borderGold }}>
           {scanning ? <ActivityIndicator color={theme.goldBright} size="small" /> : <ScanLine color={theme.goldBright} size={18} />}
         </View>
         <View style={{ flex: 1 }}>
@@ -133,26 +133,26 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
         <View style={{ flex: 1 }}><SheetField label="Email" value={email} onChange={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="name@email.com" /></View>
       </View>
       <SheetField label="Job site address" value={address} onChange={setAddress} placeholder="Street, city" />
-      <SheetField label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="Kitchen remodel — full gut" />
+      <SheetField label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="Kitchen remodel, full gut" />
 
-      <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Job type</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Job type</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }} style={{ marginBottom: 14 }}>
         {JOB_TYPES.map((t) => {
           const on = jobType === t.value
           return (
-            <Pressable key={t.value} onPress={() => setJobType(on ? '' : t.value)} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
-              <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 13, fontWeight: '700' }}>{t.label}</Text>
+            <Pressable key={t.value} onPress={() => setJobType(on ? '' : t.value)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
+              <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }}>{t.label}</Text>
             </Pressable>
           )
         })}
       </ScrollView>
 
-      <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Stage</Text>
+      <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Stage</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
         {STAGES.map((s) => {
           const on = stage === s.value
           return (
-            <Pressable key={s.value} onPress={() => setStage(s.value)} style={{ flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
+            <Pressable key={s.value} onPress={() => setStage(s.value)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
               <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }}>{s.label}</Text>
             </Pressable>
           )
@@ -163,7 +163,7 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
       <SheetField label="Notes" value={notes} onChange={setNotes} multiline placeholder="Scope, timeline, materials, special asks…" />
       <SheetField label="Referred by" value={referredBy} onChange={setReferredBy} placeholder="Who sent them?" />
 
-      {err ? <Text style={{ color: theme.danger, fontSize: 13, marginBottom: 12 }}>{err}</Text> : null}
+      {err ? <Text style={{ color: theme.danger, fontSize: 14, marginBottom: 12 }}>{err}</Text> : null}
       <GoldButton label="Create lead" onPress={submit} loading={saving} />
     </BottomSheet>
   )

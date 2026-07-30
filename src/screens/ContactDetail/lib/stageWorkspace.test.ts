@@ -3,7 +3,7 @@ import { tabsForStage, resolveTabForStage } from './stageWorkspace.ts'
 
 describe('tabsForStage', () => {
   it('shows the quote builder while still selling (lead/quote)', () => {
-    // Lead is intentionally minimal — no selections/materials/COs yet,
+    // Lead is intentionally minimal, no selections/materials/COs yet,
     // those land once the deal advances to quote and the operator
     // starts authoring scope.
     expect(tabsForStage('lead')).toEqual(['overview', 'quote', 'details', 'files'])
@@ -26,7 +26,7 @@ describe('tabsForStage', () => {
     expect(tabsForStage('quote')).not.toContain('financials')
   })
 
-  it('hides the Quote tab once invoicing — a materials/quick-job invoice needs no quote', () => {
+  it('hides the Quote tab once invoicing, a materials/quick-job invoice needs no quote', () => {
     expect(tabsForStage('invoice')).not.toContain('quote')
     expect(tabsForStage('closed')).not.toContain('quote')
   })
@@ -37,7 +37,7 @@ describe('tabsForStage', () => {
 
   it('falls back to all tabs for unknown / missing stages', () => {
     // ALL_TABS is the safety net when the stage key is missing or
-    // unrecognized — surface every section so the operator can still
+    // unrecognized, surface every section so the operator can still
     // navigate everywhere instead of getting locked out of features.
     const all = [
       'overview', 'quote', 'details', 'financials', 'files',

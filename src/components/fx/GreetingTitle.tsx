@@ -3,9 +3,9 @@ export default function GreetingTitle({ prefix = 'Morning,', name = 'there' }: {
     <h1
       className="fh-font-serif"
       style={{
-        fontSize: 'clamp(32px, 8vw, 42px)',
+        fontSize: 24,
         lineHeight: 1,
-        letterSpacing: '-0.02em',
+        letterSpacing: 0,
         margin: 0,
         fontWeight: 400
       }}

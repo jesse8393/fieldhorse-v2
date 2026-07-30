@@ -1,4 +1,4 @@
-// SnowScheduleBuild — desktop /schedule in the Build direction.
+// SnowScheduleBuild, desktop /schedule in the Build direction.
 //
 // Drop-in for SnowSchedule at >=900px. Same props, same handlers.
 // View picker + date nav in the hero, agenda-style day cards in the
@@ -95,7 +95,7 @@ export default function SnowScheduleBuild(props: Props) {
     if (view === 'week')  return Array.from({ length: 7 }, (_, i) => addDays(base, i))
     // Month view shows the LABELED calendar month, 1st → last day. It
     // used to render a rolling 28 days from the cursor while the header
-    // said "July 2026" — July 1–24 missing, August dates present (UI
+    // said "July 2026", July 1–24 missing, August dates present (UI
     // audit #9).
     const first = new Date(base.getFullYear(), base.getMonth(), 1)
     const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate()
@@ -205,7 +205,7 @@ export default function SnowScheduleBuild(props: Props) {
 
           <div className="fh-build-mini-grid">
             {/* "Crews active · 4" and "Conflicts · 0" were HARDCODED
-                numbers — Home simultaneously said 0 crews on site (UI
+                numbers, Home simultaneously said 0 crews on site (UI
                 audit #11). Show only metrics computed from real data. */}
             <MiniMetric label="On site today" value={String(todayCount)} accent />
             <MiniMetric label="This week" value={String(weekCount)} />
@@ -225,7 +225,7 @@ export default function SnowScheduleBuild(props: Props) {
             {!loading && days.length === 0 && (
               <div className="fh-build-table__empty">Nothing in range.</div>
             )}
-            {/* MONTH — a real calendar grid. The agenda loop below used
+            {/* MONTH, a real calendar grid. The agenda loop below used
                 to render every day of the month as its own card, so July
                 was 31 stacked "No events scheduled." rows with zero
                 glance value. Seven columns, event chips, today ring;
@@ -329,7 +329,7 @@ export default function SnowScheduleBuild(props: Props) {
               <div className="fh-build-eyebrow">Up next</div>
               {upcoming.length === 0 ? (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>Nothing scheduled</span>
                 </>
               ) : (
@@ -356,7 +356,7 @@ export default function SnowScheduleBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Upcoming</div>
               {upcoming.length <= 1 ? (
-                <span>No follow-on events.</span>
+                <span>No later events.</span>
               ) : (
                 <ul className="fh-build-rail-list">
                   {upcoming.slice(1, 5).map((e) => (

@@ -3,7 +3,7 @@
 // A premium "you've reached the bottom" footer that closes off
 // scrollable screens. Without this, every dashboard ends in a
 // growing black void between the last data card and the bottom
-// nav — the user's "fogginess / billion-dollar look" complaint.
+// nav, the user's "fogginess / billion-dollar look" complaint.
 //
 // Two variants:
 //   - "muted" (default): tiny brand mark + tagline, single-line.
@@ -36,7 +36,7 @@ export default function ScreenCloser({
         // marginTop:auto inside a flex column pushes us to the
         // bottom of the viewport when the screen content is short.
         marginTop: 'auto',
-        padding: '32px 20px 8px',
+        padding: '32px 24px 8px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         gap: 12,
         color: 'var(--v3-text-faint, var(--v3-text-muted))',
@@ -50,10 +50,10 @@ export default function ScreenCloser({
       }} />
 
       <div style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
+        display: 'inline-flex', alignItems: 'center', gap: 8,
         fontFamily: 'var(--font-body)',
-        fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.18em', textTransform: 'uppercase',
+        fontSize: 12, fontWeight: 700,
+        letterSpacing: 0, textTransform: 'uppercase',
         color: 'var(--v3-primary)'
       }}>
         <Sparkles size={11} aria-hidden="true" />
@@ -63,7 +63,7 @@ export default function ScreenCloser({
       {caption && (
         <div style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 11, lineHeight: 1.5,
+          fontSize: 12, lineHeight: 1.5,
           color: 'var(--v3-text-muted)',
           maxWidth: 280
         }}>
@@ -76,15 +76,15 @@ export default function ScreenCloser({
           type="button"
           onClick={onCta}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '9px 16px',
-            borderRadius: 999,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '8px 16px',
+            borderRadius: 10,
             background: 'transparent',
             border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
             color: 'var(--v3-primary)',
             fontFamily: 'var(--font-body)',
-            fontSize: 11, fontWeight: 700,
-            letterSpacing: '0.08em', textTransform: 'uppercase',
+            fontSize: 12, fontWeight: 700,
+            letterSpacing: 0, textTransform: 'uppercase',
             cursor: 'pointer'
           }}
         >

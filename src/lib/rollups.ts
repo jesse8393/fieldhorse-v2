@@ -1,4 +1,4 @@
-// Money rollups — single source of truth for "lifetime / outstanding /
+// Money rollups, single source of truth for "lifetime / outstanding /
 // active" computations across Clients list, Client detail, Home KPIs,
 // and Analytics. Two earlier divergences (Clients-list said $0 lifetime
 // while Client-detail said $62K, Analytics said Won YTD $0 while Jobs
@@ -7,7 +7,7 @@
 
 import { parseDateOnly } from './dates.ts'
 
-// Structural inputs — callers pass full fh_contacts / fh_payments rows
+// Structural inputs, callers pass full fh_contacts / fh_payments rows
 // or partial picks of them, so these list only the fields read here and
 // keep every field optional/nullable.
 type JobRow = {
@@ -37,19 +37,19 @@ export type JobRollup = {
 }
 
 // Pipeline v2: 'invoice' survives in these sets only as the legacy
-// alias of 'job' (pre-migration rows). Every job is a won deal now —
+// alias of 'job' (pre-migration rows). Every job is a won deal now :
 // a converted lead counts as won the moment it becomes a job.
 //
 // BILLING_STAGES includes 'closed': a job moved to Closed with money
 // still owed (the Mark Complete sheet never checks the balance) must
-// keep showing in "outstanding" — statements and the A/R screen count
+// keep showing in "outstanding", statements and the A/R screen count
 // it, so the list rollups must too or the surfaces disagree.
 const BILLING_STAGES = new Set(['job', 'invoice', 'closed'])
 const ACTIVE_PIPELINE_STAGES = new Set(['lead', 'quote', 'job', 'invoice'])
 const WON_STAGES = new Set(['job', 'invoice', 'closed'])
 
 // Sum of APPROVED change orders per contact. Same rule as
-// statement.ts's approvedCoByContact — approved COs adjust the true
+// statement.ts's approvedCoByContact, approved COs adjust the true
 // contract, pending/declined ones don't.
 function coByContact(changeOrders: ChangeOrderRow[] | null | undefined) {
   const m = new Map<string, number>()
@@ -75,20 +75,20 @@ function paidByContact(payments: PaymentRow[] | null | undefined) {
 //
 //   { lifetime, outstanding, activeCount, wonCount, paidTotal }
 //
-// lifetime    — sum of job amounts for WON deals (job/invoice/closed).
+// lifetime   , sum of job amounts for WON deals (job/invoice/closed).
 //               Lost bids and raw leads are money that never existed;
 //               counting them made a client with one $2K job and a $9K
 //               lost bid read "Lifetime $11K".
-// outstanding — sum of (contract - paid) per job for jobs in billing
+// outstanding, sum of (contract - paid) per job for jobs in billing
 //               stages (job/invoice/closed), where contract = amount +
 //               approved change orders. This is the SAME definition the
 //               Invoices screen and client statements use, so all three
 //               surfaces agree. Balances of ≤ $0.50 are ignored, same
 //               as statement.ts, so rounding dust never bills.
-// activeCount — count of jobs in any active pipeline stage.
-// wonCount    — count of won deals: stage in (job, closed) — plus the
+// activeCount, count of jobs in any active pipeline stage.
+// wonCount   , count of won deals: stage in (job, closed), plus the
 //               legacy 'invoice' alias.
-// paidTotal   — sum of all payments received against these jobs.
+// paidTotal  , sum of all payments received against these jobs.
 export function rollupJobs(
   jobs: JobRow[] | null | undefined,
   payments: PaymentRow[] | null | undefined,
@@ -165,7 +165,7 @@ export function rollupByClient(
 
 // Year-to-date filter helper. Pass a date column name (e.g. "updated_at"
 // for jobs or "paid_on" for payments). Used by Analytics for YTD numbers.
-// Date-only values ("YYYY-MM-DD", e.g. paid_on) parse as LOCAL midnight —
+// Date-only values ("year month day", e.g. paid_on) parse as LOCAL midnight :
 // a raw new Date() parse lands them at UTC midnight, which is Dec 31 of
 // last year in every US timezone, silently dropping Jan-1 rows from YTD.
 export function filterYTD<T extends Record<string, unknown>>(rows: T[] | null | undefined, dateField: string, now = new Date()): T[] {
@@ -180,7 +180,7 @@ export function filterYTD<T extends Record<string, unknown>>(rows: T[] | null | 
 
 // Resolve when each contact was WON: the first transition into a won
 // stage from the audit log (migration 023). Jobs edited later keep
-// their true win date — filtering by updated_at re-booked a $50K job
+// their true win date, filtering by updated_at re-booked a $50K job
 // closed last year into this year's totals whenever a typo was fixed.
 function wonAtByContact(transitions: TransitionRow[] | null | undefined) {
   const m = new Map<string, number>()
@@ -208,7 +208,7 @@ function wonThisYear(jobs: JobRow[] | null | undefined, transitions: TransitionR
 }
 
 // Profit YTD = sum of (amount - cost) for jobs won this calendar year.
-// Losses subtract — clamping each job at 0 overstated profit by hiding
+// Losses subtract, clamping each job at 0 overstated profit by hiding
 // every over-budget job. A job with no cost recorded still counts its
 // full amount (cost 0 is indistinguishable from "not tracked" here;
 // Analytics' avg-margin note covers that caveat).

@@ -1,4 +1,4 @@
-// Open-Meteo — no API key needed. Forecast + aggregate work window for all trades.
+// Open-Meteo, no API key needed. Forecast + aggregate work window for all trades.
 
 export const MURFREESBORO = { lat: 35.8456, lon: -86.3903 }
 
@@ -52,7 +52,7 @@ export async function getWeather(lat = MURFREESBORO.lat, lon = MURFREESBORO.lon)
   return res.json()
 }
 
-// Per-trade work-window constraints.
+// Per-trade work window constraints.
 // stop  = hard blocker (safety or quality ruin)
 // warn  = workable but margins tight
 type RuleThresholds = { tempMin?: number; tempMax?: number; rain?: number; wind?: number; humidity?: number }
@@ -176,7 +176,7 @@ export function hourlyStrip(hourly: any, services: string[] = [], hours = 24) {
 
 // Friendly weather_code label. WMO codes.
 export function weatherLabel(code: number | null | undefined) {
-  if (code == null) return '—'
+  if (code == null) return '\u2003'
   if (code === 0) return 'Clear'
   if (code === 1) return 'Mostly clear'
   if (code === 2) return 'Partly cloudy'
@@ -188,11 +188,11 @@ export function weatherLabel(code: number | null | undefined) {
   if (code >= 80 && code <= 82) return 'Rain showers'
   if (code >= 85 && code <= 86) return 'Snow showers'
   if (code >= 95) return 'Thunderstorm'
-  return '—'
+  return '\u2003'
 }
 
 export function pourRating(current: WeatherSnapshot | null | undefined) {
-  if (!current) return { label: '—', tone: 'neutral' }
+  if (!current) return { label: '\u2003', tone: 'neutral' }
   const w = workWindow(current, ['concrete'])
   const tone = w.status === 'stop' ? 'alert' : w.status === 'warn' ? 'warn' : 'ok'
   return { label: w.label, tone }

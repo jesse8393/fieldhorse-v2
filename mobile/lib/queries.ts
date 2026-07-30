@@ -1,11 +1,11 @@
 // mobile/lib/queries.ts
 //
-// RN query hooks — same shapes as the web app's src/lib/queries.ts.
+// RN query hooks, same shapes as the web app's src/lib/queries.ts.
 // The only difference is the supabase import (RN client w/ AsyncStorage)
 // and no cover-photo signing (mobile uses a separate native image flow).
 //
 // In the monorepo extraction these and the web hooks collapse into one
-// packages/shared/queries.ts that both apps import — the queryFns are
+// packages/shared/queries.ts that both apps import, the queryFns are
 // already platform-agnostic; only the client import differs.
 
 import { useEffect } from 'react'
@@ -208,7 +208,7 @@ export function useUpcomingEvents(userId: string | undefined, days = 7) {
 // ---- Job detail ----
 // One job's worth of data for the detail screen: the contact row plus
 // its payments, schedule, subs, and expenses. Mirrors the web
-// useJobData fetch (lighter — no client lookup / change orders yet).
+// useJobData fetch (lighter, no client lookup / change orders yet).
 export type Todo = Database['public']['Tables']['fh_job_todos']['Row']
 export type Note = Database['public']['Tables']['fh_notes']['Row']
 export type Invoice = Database['public']['Tables']['fh_invoices']['Row']
@@ -452,13 +452,13 @@ export function useUploadPhoto() {
 // Fire-and-forget AI caption for a freshly uploaded jobsite photo.
 // Mirrors the web Photos auto-caption: Claude Vision describes the photo
 // in a few words, saved to fh_job_files.caption. Silent on failure
-// (network / quota / vision off) — the photo is unaffected.
+// (network / quota / vision off), the photo is unaffected.
 export function useCaptionPhoto() {
   const client = useQueryClient()
   return async (input: { rowId: string; jobId: string; imageBase64: string; mediaType?: string }) => {
     try {
       const res = await claudeVision({
-        system: 'You caption construction jobsite photos for a contractor. Reply with a short caption only — 4 to 9 words, no quotes, no preamble.',
+        system: 'You caption construction jobsite photos for a contractor. Reply with a short caption only, 4 to 9 words, no quotes, no preamble.',
         prompt: 'Caption this jobsite photo: the work shown or the condition. Keep it under 9 words.',
         imageData: input.imageBase64,
         mediaType: input.mediaType || 'image/jpeg',
@@ -468,7 +468,7 @@ export function useCaptionPhoto() {
       if (!caption) return
       const { error } = await supabase.from('fh_job_files').update({ caption } as any).eq('id', input.rowId)
       if (!error) client.invalidateQueries({ queryKey: ['jobPhotos', input.jobId] })
-    } catch { /* silent — caption is best-effort */ }
+    } catch { /* silent, caption is best-effort */ }
   }
 }
 
@@ -1034,7 +1034,7 @@ export function useCreateJobFromBid() {
         user_id: input.userId,
         contact_id: (contact as any).id,
         section: input.section || 'Scope',
-        description: li.name + (li.notes ? ` — ${li.notes}` : ''),
+        description: li.name + (li.notes ? `, ${li.notes}` : ''),
         qty, unit: li.unit || null, rate, amount: qty * rate,
         is_optional: false, is_excluded: false, sort_order: idx
       }
@@ -1787,7 +1787,7 @@ export function useWeather(lat?: number | null, lon?: number | null) {
 
 // ---- Account deletion (App Store requirement) ----
 // Sends the signed-in user's access token to the delete-account function,
-// which purges their data and removes the auth account server-side.
+// which purges their data and removes the auth account on the server.
 export function useDeleteAccount() {
   return async (): Promise<{ error: { message: string } | null }> => {
     const { data } = await supabase.auth.getSession()

@@ -1,4 +1,4 @@
-// SnowSettingsBuild — desktop chrome wrapper for /settings.
+// SnowSettingsBuild, desktop chrome wrapper for /settings.
 //
 // Presentational only. Receives the existing form section JSX as
 // children and renders it inside the Build topbar + hero + signal
@@ -61,7 +61,7 @@ export default function SnowSettingsBuild(props: Props) {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Setup readiness</div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px' }}>
               {profileCompletePct >= 90 ? 'Looking sharp' : profileCompletePct >= 60 ? 'Almost there' : 'Needs setup'}
             </p>
             <div className="fh-build-progress">
@@ -126,7 +126,7 @@ export default function SnowSettingsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Connected systems</div>
-              <strong>—</strong>
+              <strong>:</strong>
               <span>Integrations not tracked yet</span>
             </section>
 
@@ -142,7 +142,7 @@ export default function SnowSettingsBuild(props: Props) {
                 className="fh-build-account-email"
                 title={userEmail || ''}
               >
-                {userEmail || '—'}
+                {userEmail || '\u2003'}
               </div>
               <span>Signed in</span>
               {onSignOut && (

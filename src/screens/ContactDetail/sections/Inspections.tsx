@@ -22,7 +22,7 @@ const RESULT_META: Record<string, any> = {
 }
 
 /**
- * Inspections section — fh_inspections grouped by trade. Includes the
+ * Inspections section, fh_inspections grouped by trade. Includes the
  * has_inspections toggle (gates the rest of the UI). Logging an inspection
  * fires a self-notification so the bell stays meaningful pre-server-trigger.
  */
@@ -59,31 +59,31 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
-      {/* Toggle row — controls whether this section is "live" for the job */}
+      {/* Toggle row, controls whether this section is "live" for the job */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
-        padding: '14px 16px',
-        borderRadius: 14,
+        padding: '12px 16px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)'
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
             Track inspections
           </div>
           <div style={{
-            marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 11,
+            marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 12,
             color: 'var(--v3-text-muted)', lineHeight: 1.45
           }}>
-            Enable for permit-tracked trades. Logs persist pass / fail / N/A per inspector visit.
+            Enable for permit tracked trades. Logs persist pass / fail / N/A per inspector visit.
           </div>
         </div>
         <Switch
@@ -93,7 +93,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
         />
       </div>
 
-      {/* Trade grid — only shown when enabled */}
+      {/* Trade grid, only shown when enabled */}
       {enabled ? (
         <>
           <Eyebrow as="div">
@@ -116,8 +116,8 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
                   whileTap={{ scale: 0.97 }}
                   onClick={() => { hapticTap(); setActiveTrade(t) }}
                   style={{
-                    display: 'flex', flexDirection: 'column', gap: 6,
-                    padding: '12px 14px', borderRadius: 12,
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                    padding: '12px 12px', borderRadius: 10,
                     background: meta ? meta.soft : 'var(--v3-surface)',
                     border: meta
                       ? `1px solid color-mix(in srgb, ${meta.color} 35%, transparent)`
@@ -128,17 +128,17 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
                     WebkitTapHighlightColor: 'transparent'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Icon size={14} aria-hidden="true" color={meta?.color || 'var(--v3-text-muted)'} />
                     <span style={{
-                      fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-                      letterSpacing: '-0.005em'
+                      fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+                      letterSpacing: 0
                     }}>
                       {t}
                     </span>
                   </div>
                   <div style={{
-                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    fontFamily: 'var(--font-body)', fontSize: 12,
                     color: 'var(--v3-text-muted)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
@@ -160,10 +160,10 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
         </>
       ) : (
         <div style={{
-          padding: '20px 18px', borderRadius: 14,
+          padding: '24px 16px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center', lineHeight: 1.5
+          fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
           Inspection tracking is off for this job. Toggle on above when permits land.
         </div>
@@ -173,7 +173,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
 }
 
 /**
- * InspectionLog drawer — pass / fail / N/A + notes. Wraps shadcn Vaul Drawer.
+ * InspectionLog drawer, pass / fail / N/A + notes. Wraps shadcn Vaul Drawer.
  */
 function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
   const [result, setResult] = useState('pass')
@@ -197,22 +197,22 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
           <DrawerTitle asChild>
             <h2 style={{
               margin: '6px 0 0',
-              fontSize: 'clamp(20px, 5.5vw, 26px)', lineHeight: 1.1,
-              letterSpacing: '-0.015em', fontWeight: 600, color: 'var(--v3-text)'
+              fontSize: 24, lineHeight: 1.1,
+              letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)'
             }}>
               Log {trade || 'inspection'}
             </h2>
           </DrawerTitle>
           <DrawerDescription style={{
             margin: '8px 0 0', fontFamily: 'var(--font-body)',
-            fontSize: 13, color: 'var(--v3-text-muted)', lineHeight: 1.45
+            fontSize: 14, color: 'var(--v3-text-muted)', lineHeight: 1.45
           }}>
             Record the result and any notes from the inspector.
           </DrawerDescription>
         </DrawerHeader>
 
-        <div style={{ padding: '6px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ padding: '8px 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Eyebrow>
               Result
             </Eyebrow>
@@ -226,14 +226,14 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
                     type="button"
                     onClick={() => { hapticTap(); setResult(r) }}
                     style={{
-                      padding: '12px 8px', borderRadius: 12,
+                      padding: '12px 8px', borderRadius: 10,
                       border: on
                         ? `1px solid color-mix(in srgb, ${meta.color} 50%, transparent)`
                         : '1px solid var(--v3-border)',
                       background: on ? meta.soft : 'var(--v3-surface)',
                       color: on ? meta.color : 'var(--v3-text)',
                       fontFamily: 'var(--font-body)',
-                      fontSize: 12, fontWeight: 700, letterSpacing: '0.08em',
+                      fontSize: 12, fontWeight: 700, letterSpacing: 0,
                       textTransform: 'uppercase',
                       cursor: 'pointer'
                     }}
@@ -245,7 +245,7 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
             </div>
           </div>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Eyebrow>
               Notes
             </Eyebrow>
@@ -253,9 +253,9 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Corrections needed, re-inspection date, inspector name…"
+              placeholder="Corrections needed, next inspection date, inspector name…"
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: 12,
+                width: '100%', padding: '12px 12px', borderRadius: 10,
                 background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
                 color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
                 fontSize: 14, outline: 'none', resize: 'vertical'
@@ -263,15 +263,15 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
             />
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
               style={{
-                padding: '12px 14px', borderRadius: 12,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
                 color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer'
+                fontSize: 14, fontWeight: 700, cursor: 'pointer'
               }}
             >
               Cancel
@@ -281,11 +281,11 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
               whileTap={{ scale: 0.97 }}
               onClick={commit}
               style={{
-                padding: '12px 14px', borderRadius: 12, border: 'none',
+                padding: '12px 12px', borderRadius: 10, border: 'none',
                 background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-                letterSpacing: '0.04em', cursor: 'pointer',
-                boxShadow: '0 6px 18px rgba(212, 175, 55, 0.3)'
+                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+                letterSpacing: 0, cursor: 'pointer',
+                boxShadow: '0 6px 18px rgba(201, 150, 58, 0.3)'
               }}
             >
               Save

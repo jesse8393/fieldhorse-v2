@@ -1,9 +1,9 @@
-// mobile/app/_layout.tsx — root layout.
+// mobile/app/_layout.tsx, root layout.
 // Mounts QueryClientProvider (same client config as web), the auth
 // provider, the gesture handler root, and a dark Stack. A redirect gate
 // sends signed-out users to /login and signed-in users into the (tabs)
 // group. Native gives us real safe-area handling for free via
-// SafeAreaProvider — no more env(safe-area-inset) CSS hacks.
+// SafeAreaProvider, no more env(safe-area-inset) CSS hacks.
 import '../global.css'
 import { useEffect } from 'react'
 import { View, ActivityIndicator } from 'react-native'
@@ -33,7 +33,7 @@ function useAuthGate() {
       if (!onLogin) router.replace('/login')
       return
     }
-    // Signed in — wait for the profile before deciding onboarding state.
+    // Signed in, wait for the profile before deciding onboarding state.
     if (profilePending) return
     const onboarded = !!profile?.onboarded_at
     if (!onboarded) {
@@ -50,7 +50,7 @@ function RootNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0B0907', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#141414', alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#C9963A" />
       </View>
     )
@@ -60,7 +60,7 @@ function RootNavigator() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#0B0907' }
+        contentStyle: { backgroundColor: '#141414' }
       }}
     >
       <Stack.Screen name="(tabs)" />
@@ -91,7 +91,7 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0B0907' }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#141414' }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>

@@ -55,7 +55,7 @@ function writeDraft(form: Record<string, any>) {
     } else {
       window.localStorage.removeItem(DRAFT_KEY)
     }
-  } catch { /* quota/private-mode — drafts are best-effort */ }
+  } catch { /* quota/private-mode, drafts are best-effort */ }
 }
 
 function clearDraft() {
@@ -99,21 +99,21 @@ function buildEmptyForm(initialStage = 'lead'): Record<string, any> {
   }
 }
 
-// Per-field character limits — added 5/17 to address the audit's
+// Per-field character limits, added 5/17 to address the audit's
 // concern about runaway / pasted nonsense ending up in production
-// (e.g. "CXVCXVXV"-style strings appearing on customer-facing
+// (e.g. "CXVCXVXV"-style strings appearing on customer facing
 // surfaces). HTML maxLength on the input element AND a programmatic
 // clamp in the set() helper so paste flows are also covered.
 // Values picked to fit real human entries with comfortable room:
-//   name        — full name + suffix
-//   phone       — international format with formatting glyphs
-//   email       — RFC max
-//   address     — long urban address with apt + city + state
-//   company     — long LLC names
-//   job_title   — descriptive job names
-//   notes       — paragraph of context
-//   referred_by — full name + qualifier
-//   amount      — millions with decimal
+//   name       , full name + suffix
+//   phone      , international format with formatting glyphs
+//   email      , RFC max
+//   address    , long urban address with apt + city + state
+//   company    , long LLC names
+//   job_title  , descriptive job names
+//   notes      , paragraph of context
+//   referred_by, full name + qualifier
+//   amount     , millions with decimal
 const FIELD_LIMITS: Record<string, number> = {
   name: 120,
   phone: 40,
@@ -127,7 +127,7 @@ const FIELD_LIMITS: Record<string, number> = {
   amount: 14
 }
 
-const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a new lead. Extract structured data from what they said. Return ONLY a single JSON object with these keys — use null for anything not clearly mentioned:
+const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a new lead. Extract structured data from what they said. Return ONLY a single JSON object with these keys, use null for anything not clearly mentioned:
 {
   "name": string or null,
   "phone": string or null,
@@ -138,7 +138,7 @@ const VOICE_SYSTEM = `You are parsing a voice memo from a contractor logging a n
   "job_type": one of [${JOB_TYPES.map(t => `"${t.value}"`).join(', ')}] or null,
   "amount": number or null (dollars, no formatting),
   "stage": one of ["lead", "quote", "job"] or null,
-  "follow_up_on": string or null (YYYY-MM-DD only if a specific date was mentioned),
+  "follow_up_on": string or null (year month day only if a specific date was mentioned),
   "notes": string or null (anything else worth capturing),
   "referred_by": string or null
 }
@@ -159,7 +159,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
   // Live elapsed-seconds counter for the listening state. Mirrors the
   // RECORDING · 0:42 chip in the v3 design (screens-workflows.jsx
-  // lead-pro-mic__lbl) — tells the operator the mic is alive and how
+  // lead-pro-mic__lbl), tells the operator the mic is alive and how
   // long they've been talking.
   const [voiceElapsed, setVoiceElapsed] = useState(0)
   const recognitionRef = useRef<any>(null)
@@ -193,7 +193,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
 
   // When the sheet re-opens with a different initialStage (e.g. Home
   // "New Job" tile after a prior "Add Lead"), bump the Stage chip to
-  // match so the operator doesn't have to retag. Only fires on open —
+  // match so the operator doesn't have to retag. Only fires on open :
   // user edits to the chip mid-flow are preserved.
   useEffect(() => {
     if (open) {
@@ -222,7 +222,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Persist while typing (best-effort), debounced — JSON.stringify +
+  // Persist while typing (best-effort), debounced, JSON.stringify +
   // synchronous localStorage.setItem per keystroke is main-thread work
   // the field device doesn't need. writeDraft self-clears when the form
   // empties, so backspacing everything also discards the draft.
@@ -250,7 +250,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
   function set(k: any, v: any) {
     // Clamp at per-field length cap (see FIELD_LIMITS above). The
     // maxLength HTML attribute handles typing, but paste flows can
-    // still drop a long string in — clamp programmatically so the
+    // still drop a long string in, clamp programmatically so the
     // form state never holds more than FIELD_LIMITS[k] characters.
     const limit = FIELD_LIMITS[k]
     const safe = (typeof v === 'string' && limit) ? v.slice(0, limit) : v
@@ -265,7 +265,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     }))
   }
 
-  // Document intelligence — Phase 19/#1. Hands the captured/pasted image
+  // Document intelligence, Phase 19/#1. Hands the captured/pasted image
   // to Claude Vision, applies the parsed fields on top of whatever the
   // user already typed (parsed values only fill EMPTY fields so a
   // half-typed form isn't clobbered). Toast tells the user how many
@@ -373,7 +373,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         }))
       }
     } catch (e: any) {
-      setErr('Voice parse failed — fill the fields manually.')
+      setErr('Voice parse failed, fill the fields manually.')
     } finally {
       setVoiceState('idle')
     }
@@ -390,15 +390,15 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     // Match strategy: phone first (most reliable identifier), email
     // second, normalized-name third. Without the name fallback, every
     // lead created without phone/email seeded a brand-new fh_clients
-    // row — that's how the audit found duplicate "MMC Properties" /
+    // row, that's how the audit found duplicate "MMC Properties" /
     // "Jeff Roy" client entries.
-    // Reuse (or create) a client so the job links one — shared with
+    // Reuse (or create) a client so the job links one, shared with
     // Universal Capture via findOrCreateClient. Passing `company` means
     // a typed company name is preserved on the client (fh_contacts has
     // no company column, so it was previously dropped).
     // The client find-or-create needs the network. Offline, skip it (the
     // lead still queues via the outbox and can link a client on a later
-    // edit) — mirrors the Universal Capture lead path in captureActions.
+    // edit), mirrors the Universal Capture lead path in captureActions.
     let resolvedClientId: string | null = client?.id || null
     if (!resolvedClientId && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
       resolvedClientId = await findOrCreateClient(userId, {
@@ -427,7 +427,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
       stage: form.stage || 'lead',
       client_id: resolvedClientId
     }
-    // Route through the outbox — the outbox's rule is "a write never fails
+    // Route through the outbox, the outbox's rule is "a write never fails
     // for lack of signal", so a dead-zone capture queues instead of
     // throwing an error toast. resilientInsert mints the id client-side,
     // so the optimistic close + template application use the same id that
@@ -443,9 +443,9 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     if (form.job_type) writeLastJobType(form.job_type)
     // Apply template milestones (if picked) BEFORE we close, so the
     // checklist is already populated when the user lands on the job. Only
-    // when the insert actually reached the server — offline (queued) the
+    // when the insert actually reached the server, offline (queued) the
     // job row doesn't exist yet to hang milestones off. Failure is
-    // non-fatal — the lead is already saved.
+    // non-fatal, the lead is already saved.
     if (templateSlug && !queued) {
       const tmpl = getTemplate(templateSlug)
       if (tmpl) {
@@ -493,7 +493,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
   // identity. Fields the user has already typed are preserved (spec:
   // "If the user edits a hydrated field, preserve the edited value
   // for the new lead, but keep the existing client link"). Clearing
-  // the picker (next == null) leaves form values in place — the user
+  // the picker (next == null) leaves form values in place, the user
   // can keep typing in manual mode without losing what they had.
   // Defensive aliases (client_name, job_address) cover schemas that
   // surface different column names downstream.
@@ -518,7 +518,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
   const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
   const commitVerb = form.stage === 'lead' ? 'CAPTURE' : form.stage === 'quote' ? 'START' : 'CREATE'
   const drawerDescription = form.stage === 'lead'
-    ? 'Capture the customer, scope, value, and next follow-up once. This record becomes the quote and job later.'
+    ? 'Capture the customer, scope, value, and next follow up once. This record becomes the quote and job later.'
     : form.stage === 'quote'
       ? 'Start from customer and scope so the proposal is ready for line items.'
       : 'Create active work with enough detail to schedule, cost, and invoice.'
@@ -552,13 +552,13 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               {committed ? `${NounCap} captured.` : `New ${stageNoun}.`}
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
             {drawerDescription}
           </DrawerDescription>
@@ -569,7 +569,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
           onSubmit={(e) => { e.preventDefault(); commit() }}
           // flex:1 + minHeight:0 so the form fills the floored sheet
           // height and scrolls INTERNALLY (overflowY:auto) instead of
-          // growing the sheet — that's what lets the keyboard push
+          // growing the sheet, that's what lets the keyboard push
           // without collapsing the drawer.
           style={formStyle({ flex: 1, minHeight: 0 })}
         >
@@ -589,7 +589,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             </div>
           )}
 
-      {/* v3 mic block — horizontal layout: circular gold mic on the left,
+      {/* v3 mic block, horizontal layout: circular gold mic on the left,
           label / title / hint stacked on the right. Replaces the older
           full-width tap-to-speak hero. Title + hint adapt to voice state
           so the operator always knows what's happening without needing
@@ -635,7 +635,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
           </div>
           <div className={`fh-vmic__hint${voiceState === 'denied' || voiceState === 'error' ? ' is-error' : ''}`}>
             {voiceState === 'listening' ? 'Tap mic to stop · transcript appears below' :
-             voiceState === 'parsing'   ? 'Hang tight — applying values to the form…' :
+             voiceState === 'parsing'   ? 'Hang tight, applying values to the form…' :
              voiceState === 'denied'    ? 'Enable mic in browser settings, then tap again.' :
              voiceState === 'error'     ? 'Fill the fields manually below.' :
              'Tap the mic, talk like you would to a coworker.'}
@@ -643,7 +643,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         </div>
       </div>
 
-      {/* Compact transcript rail — only renders when something has been
+      {/* Compact transcript rail, only renders when something has been
           said (or is mid-parse). Mirrors the v3 transcript-rail:
           play glyph + transcript preview + WORDS stamp. */}
       {(transcript || voiceState === 'parsing') && (
@@ -664,18 +664,18 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         </div>
       )}
 
-      {/* Section divider — flips the surface from "voice capture" mode
+      {/* Section divider, flips the surface from "voice capture" mode
           to "edit fields" mode. Mirrors section-lbl from styles-refine. */}
       <div className="fh-vsection">
         <span>{NounCap} details</span>
         <span className="fh-vsection__hint">tap any field to edit</span>
       </div>
 
-      {/* Document intelligence — Phase 19/#1. Photo of a paper bid /
+      {/* Document intelligence, Phase 19/#1. Photo of a paper bid /
           handwritten estimate / inbound email screenshot → Claude Vision
           extracts name/phone/email/address/job_title/job_type/amount/
           notes and fills the empty fields below. */}
-      <div style={{ padding: '0 0 6px' }}>
+      <div style={{ padding: '0 0 8px' }}>
         <DocIntakeButton
           label="Scan a doc"
           description="Photo of a bid, handwritten estimate, business card, or paste an email screenshot. AI fills the form."
@@ -683,7 +683,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         />
       </div>
 
-          {/* Client link — optional, picks an existing fh_clients row or
+          {/* Client link, optional, picks an existing fh_clients row or
               inline-creates one so this new job inherits client_id. */}
           <V3Field label="Client">
             <ClientPicker
@@ -693,7 +693,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           </V3Field>
 
-          {/* Contact — maxLength on each input matches FIELD_LIMITS so the
+          {/* Contact, maxLength on each input matches FIELD_LIMITS so the
               browser blocks typing past the cap. set() also clamps in JS
               so paste flows can't bypass. */}
           <V3Field label={form.stage === 'lead' ? 'Customer' : 'Name'}>
@@ -707,7 +707,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           </V3Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <V3Field label="Phone">
               <input
                 type="tel"
@@ -805,7 +805,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           </V3Field>
 
-          {/* A lead is a simple capture — who they are + what they need.
+          {/* A lead is a simple capture, who they are + what they need.
               Scope detail and pricing belong on the quote, so those fields
               only appear from the quote stage onward. Keeps the lead form
               short (the "a lead should be its own thing" ask). */}
@@ -816,7 +816,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
                 value={form.scope_text}
                 onChange={(e) => set('scope_text', e.target.value)}
                 maxLength={FIELD_LIMITS.scope_text}
-                placeholder="What they want, timing, constraints, measurements, must-haves..."
+                placeholder="What they want, timing, constraints, measurements, requirements..."
                 style={{ ...V3_INPUT, resize: 'vertical', minHeight: 84 }}
               />
             </V3Field>
@@ -825,7 +825,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
           {/* Amount is only entered directly on a quick JOB. A quote's total
               is driven by the line items you build (the recalc trigger sets
               fh_contacts.amount), so typing an amount here would just get
-              overwritten — we omit it and send you to the line-item builder. */}
+              overwritten, we omit it and send you to the line item builder. */}
           {form.stage === 'job' && (
             <V3Field label="Amount">
               <div style={{ position: 'relative' }}>
@@ -841,7 +841,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
                   onChange={(e) => set('amount', e.target.value.replace(/[^\d.]/g, ''))}
                   maxLength={FIELD_LIMITS.amount}
                   placeholder="0"
-                  style={{ ...V3_INPUT, paddingLeft: 30, fontVariantNumeric: 'tabular-nums' }}
+                  style={{ ...V3_INPUT, paddingLeft: 32, fontVariantNumeric: 'tabular-nums' }}
                 />
               </div>
             </V3Field>
@@ -865,17 +865,17 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             />
           </V3Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12, marginTop: 6 }}>
             <button
               type="button"
               onClick={() => onClose?.()}
               disabled={saving}
               style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '12px 14px', borderRadius: 12,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--surface-2)', border: '1px solid var(--rule)',
                 color: 'var(--ink-strong)',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                 cursor: saving ? 'wait' : 'pointer'
               }}
             >
@@ -888,10 +888,10 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               disabled={!form.name.trim() || committed || saving}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '12px 14px', borderRadius: 12, border: 'none',
+                padding: '12px 12px', borderRadius: 10, border: 'none',
                 background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                 color: 'var(--onyx)',
-                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                 cursor: (!form.name.trim() || committed || saving) ? 'not-allowed' : 'pointer',
                 boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                 opacity: (!form.name.trim() || committed || saving) ? 0.55 : 1
@@ -907,10 +907,10 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
   )
 }
 
-// Inline template chip row — renders a "Skip" pseudo-chip + one chip per
+// Inline template chip row, renders a "Skip" pseudo-chip + one chip per
 // matching template, then if a template is picked shows a small footer
 // with the milestone count + description. Visual matches SheetChipRow
-// so it feels like a 7th field, not an add-on.
+// so it feels like a 7th field, not an addition.
 function FollowUpPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
   const presets = [
     { label: 'Tomorrow', value: dateInputValueFromNow(1) },
@@ -919,8 +919,8 @@ function FollowUpPicker({ value, onChange }: { value: string; onChange: (next: s
   ]
 
   return (
-    <V3Field label="Next follow-up">
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <V3Field label="Next follow up">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {presets.map((preset) => (
           <TemplateChip
             key={preset.label}
@@ -949,7 +949,7 @@ function TemplatePickerInline({ templates, value, onChange }: any) {
   const picked = templates.find((t: any) => t.slug === value) || null
   return (
     <V3Field label="Template">
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <TemplateChip
           active={!value}
           onClick={() => onChange('')}
@@ -965,11 +965,11 @@ function TemplatePickerInline({ templates, value, onChange }: any) {
         ))}
       </div>
       {picked && (
-        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 10, letterSpacing: '0.14em', color: 'var(--ink-strong)' }}>
+        <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, color: 'var(--ink-strong)' }}>
             +{picked.todos.length}
           </span>
-          <span style={{ flex: 1, fontFamily: 'var(--font-body)', fontSize: 11.5, color: 'var(--ink-muted)', lineHeight: 1.35 }}>
+          <span style={{ flex: 1, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.35 }}>
             {picked.description}
           </span>
         </div>
@@ -978,20 +978,20 @@ function TemplatePickerInline({ templates, value, onChange }: any) {
   )
 }
 
-/* ─── v3 field primitives — match the inline pattern in NewClientSheet
+/* ─── v3 field primitives, match the inline pattern in NewClientSheet
        so this sheet stops looking foggy/sepia compared to its siblings.
        Inputs are boxed (not underlined), chips use the gold-tinted
        pill rather than the dark+gold gradient from the legacy
        fh-asheet-chip CSS. ─── */
 
 const V3_LABEL = {
-  fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+  fontSize: 12, fontWeight: 700, letterSpacing: 0,
   textTransform: 'uppercase', color: 'var(--ink-muted)'
 }
 
 const V3_INPUT: import('react').CSSProperties = {
-  padding: '11px 14px',
-  borderRadius: 12,
+  padding: '12px 12px',
+  borderRadius: 10,
   background: 'var(--surface-2)',
   border: '1px solid var(--rule)',
   color: 'var(--ink-strong)',
@@ -1006,7 +1006,7 @@ const V3_INPUT: import('react').CSSProperties = {
 
 function V3Field({ label, children }: any) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <span style={V3_LABEL}>{label}</span>
       {children}
     </label>
@@ -1015,9 +1015,9 @@ function V3Field({ label, children }: any) {
 
 function V3ChipRow({ label, value, options, onChange }: any) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <span style={V3_LABEL}>{label}</span>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {options.map((opt: any) => {
           const active = value === opt.value
           return (
@@ -1026,8 +1026,8 @@ function V3ChipRow({ label, value, options, onChange }: any) {
               type="button"
               onClick={() => onChange(opt.value)}
               style={{
-                padding: '7px 12px',
-                borderRadius: 999,
+                padding: '8px 12px',
+                borderRadius: 10,
                 border: active
                   ? '1px solid var(--v3-border-strong)'
                   : '1px solid var(--rule)',
@@ -1058,8 +1058,8 @@ function TemplateChip({ active, onClick, label }: any) {
       type="button"
       onClick={onClick}
       style={{
-        padding: '7px 12px',
-        borderRadius: 999,
+        padding: '8px 12px',
+        borderRadius: 10,
         border: active ? '1px solid var(--v3-border-strong)' : '1px solid var(--rule)',
         background: active ? 'var(--v3-glass-tint-2)' : 'var(--surface-2)',
         color: active ? 'var(--ink-strong)' : 'var(--ink-strong)',

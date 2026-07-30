@@ -32,7 +32,7 @@ export function toast(message: string, options: ToastOptions = {}) {
     accent: options.accent || 'gold',   // gold | green | red | steel | stageId
     duration: options.duration ?? (heavy ? HEAVY_DURATION : DEFAULT_DURATION)
   }
-  // Dev-only — audit L2 caught the same toast logged 4× in production
+  // Dev-only, audit L2 caught the same toast logged 4× in production
   // (the Sonner forward dispatches its own event handlers downstream).
   if ((import.meta as any).env?.DEV) {
     // eslint-disable-next-line no-console
@@ -53,7 +53,7 @@ export const toastError = (message: string, description?: string) => toast(messa
 export const toastInfo = (message: string, description?: string) => toast(message, { description })
 
 /**
- * toastUndo — destructive-action toast with an Undo button.
+ * toastUndo, destructive-action toast with an Undo button.
  *
  * Sonner action toast pattern: success-style toast with a label/onClick.
  * The host call is responsible for the actual undo work (typically
@@ -82,7 +82,7 @@ export function toastUndo(message: string, { description, onUndo, duration = 800
     duration
   }
   window.dispatchEvent(new CustomEvent('fh:toast', { detail }))
-  // Sonner — the action button is the whole point
+  // Sonner, the action button is the whole point
   sonnerToast(message, {
     description,
     duration,

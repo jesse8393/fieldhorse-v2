@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase.ts'
 
 /**
- * Account attribution — resolve a set of user_ids into display labels
+ * Account attribution, resolve a set of user_ids into display labels
  * via the fh_resolve_account_labels RPC (migration 016).
  *
  * The RPC enforces its own auth gate (caller must be self, the inviter,
@@ -28,7 +28,7 @@ async function resolveBatch(missing: string[]) {
   if (error) {
     // eslint-disable-next-line no-console
     console.error('[accountAttribution] resolve failed', error)
-    // Don't poison the cache on error — just leave the user_ids unresolved.
+    // Don't poison the cache on error, just leave the user_ids unresolved.
     return
   }
   const got = new Set<string>()
@@ -37,7 +37,7 @@ async function resolveBatch(missing: string[]) {
     got.add(row.user_id)
   }
   // Anything we asked for and didn't get back is genuinely unreachable
-  // for this caller — cache the negative result so we don't keep asking.
+  // for this caller, cache the negative result so we don't keep asking.
   for (const uid of missing) {
     if (!got.has(uid)) {
       labelCache.set(uid, { label: 'Unknown account', role: 'unknown' })
@@ -46,7 +46,7 @@ async function resolveBatch(missing: string[]) {
 }
 
 /**
- * useAccountLabels — pass an iterable of user_ids, get back a Map<user_id,
+ * useAccountLabels, pass an iterable of user_ids, get back a Map<user_id,
  * { label, role }>. Returns whatever's already cached on first render and
  * fills in the rest async. Stable Map reference between renders when
  * nothing has changed.
@@ -99,7 +99,7 @@ export function useAccountLabels(userIds: Iterable<string | null | undefined> | 
  * "Created by X" with optional role suffix when context calls for it.
  *
  * verb: 'posted' | 'added' | 'created'  (default 'posted')
- * showRole: boolean — append " · Partner" or " · Owner" when not self
+ * showRole: boolean, append " · Partner" or " · Owner" when not self
  */
 export function formatAttribution(entry: AccountLabel | null | undefined, verb = 'posted', showRole = false) {
   const v = verb === 'added' ? 'Added by' : verb === 'created' ? 'Created by' : 'Posted by'

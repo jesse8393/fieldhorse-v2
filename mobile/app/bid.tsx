@@ -1,4 +1,4 @@
-// mobile/app/bid.tsx — AI estimate generator.
+// mobile/app/bid.tsx, AI estimate generator.
 //
 // Native port of the web Bid screen. Takes a scope + job type + trades,
 // asks Claude for a structured estimate (line items + ranges), applies a
@@ -97,7 +97,7 @@ export default function BidScreen() {
     if (bid.summary) lines.push(bid.summary, '')
     for (const li of bid.line_items || []) {
       const qty = Number(li.qty || 1)
-      lines.push(`• ${li.name} — ${qty} ${li.unit || ''} @ ${money(li.rate_low || 0)}–${money(li.rate_high || 0)}`)
+      lines.push(`• ${li.name}, ${qty} ${li.unit || ''} @ ${money(li.rate_low || 0)}–${money(li.rate_high || 0)}`)
     }
     lines.push('', `Recommended price: ${money(total.withMargin)}`, `Range: ${money(total.low)}–${money(total.high)} (${marginPct}% margin)`)
     if (bid.assumptions?.length) lines.push('', 'Assumptions:', ...bid.assumptions.map((a) => `- ${a}`))
@@ -122,16 +122,16 @@ export default function BidScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40, paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
         <ScreenHeader backLabel="Back" onBack={() => router.back()} eyebrow="Estimator" title="AI estimate" />
-        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6, marginBottom: 20 }}>Describe the job — get a line-item estimate you can refine and send.</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6, marginBottom: 20 }}>Describe the job, get a line item estimate you can refine and send.</Text>
 
         <Text style={lbl}>Scope of work</Text>
         <TextInput
           value={scope}
           onChangeText={setScope}
           multiline
-          placeholder="e.g. Demo and replace a 480 sf composite deck, re-frame as needed, install code-compliant flashing and Trex decking."
+          placeholder="e.g. Demo and replace a 480 sf composite deck, re-frame as needed, install code compliant flashing and Trex decking."
           placeholderTextColor="rgba(242,237,228,0.4)"
           style={[input, { minHeight: 100, textAlignVertical: 'top' }]}
         />
@@ -142,7 +142,7 @@ export default function BidScreen() {
             const on = jobType === t
             return (
               <Pressable key={t} onPress={() => setJobType(on ? '' : t)} style={[chip, on && chipOn]}>
-                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 13, fontWeight: '700' }}>{t}</Text>
+                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 14, fontWeight: '700' }}>{t}</Text>
               </Pressable>
             )
           })}
@@ -153,9 +153,9 @@ export default function BidScreen() {
           {Object.keys(RATE_CARD).map((k) => {
             const on = picks.includes(k)
             return (
-              <Pressable key={k} onPress={() => togglePick(k)} style={[chip, on && chipOn, { flexDirection: 'row', gap: 5, alignItems: 'center' }]}>
+              <Pressable key={k} onPress={() => togglePick(k)} style={[chip, on && chipOn, { flexDirection: 'row', gap: 4, alignItems: 'center' }]}>
                 {on ? <Check color={theme.goldBright} size={12} strokeWidth={3} /> : null}
-                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 13, fontWeight: '700' }}>{RATE_CARD[k].label}</Text>
+                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 14, fontWeight: '700' }}>{RATE_CARD[k].label}</Text>
               </Pressable>
             )
           })}
@@ -167,7 +167,7 @@ export default function BidScreen() {
             const on = marginPct === m
             return (
               <Pressable key={m} onPress={() => setMarginPct(m)} style={[chip, on && chipOn, { flex: 1, alignItems: 'center' }]}>
-                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 13, fontWeight: '700' }}>{m}%</Text>
+                <Text style={{ color: on ? theme.goldBright : theme.ink, fontSize: 14, fontWeight: '700' }}>{m}%</Text>
               </Pressable>
             )
           })}
@@ -181,10 +181,10 @@ export default function BidScreen() {
 
         {bid && total ? (
           <View style={{ marginTop: 26 }}>
-            <View style={{ backgroundColor: theme.surface, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: theme.borderGold }}>
-              <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>Recommended price</Text>
-              <Text style={{ color: theme.ink, fontSize: 34, fontWeight: '800', marginTop: 4 }}>{money(total.withMargin)}</Text>
-              <Text style={{ color: theme.inkMuted, fontSize: 13, marginTop: 4 }}>Range {money(total.low)} – {money(total.high)} · {marginPct}% margin</Text>
+            <View style={{ backgroundColor: theme.surface, borderRadius: 10, padding: 16, borderWidth: 1, borderColor: theme.borderGold }}>
+              <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase' }}>Recommended price</Text>
+              <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800', marginTop: 4 }}>{money(total.withMargin)}</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 4 }}>Range {money(total.low)} – {money(total.high)} · {marginPct}% margin</Text>
             </View>
 
             {(bid.line_items || []).length > 0 ? (
@@ -193,7 +193,7 @@ export default function BidScreen() {
                   const qty = Number(li.qty || 1)
                   const amt = qty * Number(li.rate_high ?? li.rate_low ?? 0)
                   return (
-                    <View key={i} style={{ backgroundColor: 'rgba(24,20,17,0.6)', borderRadius: 14, padding: 13, borderWidth: 1, borderColor: theme.borderMid, flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <View key={i} style={{ backgroundColor: 'rgba(20, 20, 20,0.6)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: theme.borderMid, flexDirection: 'row', justifyContent: 'space-between' }}>
                       <View style={{ flex: 1, paddingRight: 12 }}>
                         <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }}>{li.name}</Text>
                         <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{qty} {li.unit || ''} · {money(li.rate_low || 0)}–{money(li.rate_high || 0)}{li.notes ? ` · ${li.notes}` : ''}</Text>
@@ -209,7 +209,7 @@ export default function BidScreen() {
             {bid.risks?.length ? <Bullets title="Risks" items={bid.risks} /> : null}
 
             <View style={{ marginTop: 18, flexDirection: 'row', gap: 12 }}>
-              <Pressable onPress={copyEstimate} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, borderWidth: 1, borderColor: theme.borderMid }}>
+              <Pressable onPress={copyEstimate} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: theme.borderMid }}>
                 {copied ? <Check color={theme.success} size={16} /> : <Copy color={theme.ink} size={16} />}
                 <Text style={{ color: copied ? theme.success : theme.ink, fontWeight: '700' }}>{copied ? 'Copied' : 'Copy'}</Text>
               </Pressable>
@@ -229,13 +229,13 @@ function Bullets({ title, items }: { title: string; items: string[] }) {
     <View style={{ marginTop: 16 }}>
       <Text style={lbl}>{title}</Text>
       {items.map((it, i) => (
-        <Text key={i} style={{ color: theme.inkMuted, fontSize: 13, lineHeight: 19, marginBottom: 2 }}>• {it}</Text>
+        <Text key={i} style={{ color: theme.inkMuted, fontSize: 14, lineHeight: 19, marginBottom: 2 }}>• {it}</Text>
       ))}
     </View>
   )
 }
 
-const lbl = { color: theme.inkMuted, fontSize: 11, fontWeight: '700' as const, letterSpacing: 1, textTransform: 'uppercase' as const, marginBottom: 8 }
-const input = { backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(255,240,210,0.12)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink }
-const chip = { backgroundColor: 'rgba(24,20,17,0.6)', borderWidth: 1, borderColor: theme.borderMid, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 }
-const chipOn = { borderColor: theme.goldBright, backgroundColor: 'rgba(232,184,101,0.14)' }
+const lbl = { color: theme.inkMuted, fontSize: 12, fontWeight: '700' as const, letterSpacing: 0, textTransform: 'uppercase' as const, marginBottom: 8 }
+const input = { backgroundColor: theme.surface, borderWidth: 1, borderColor: 'rgba(242, 237, 228,0.12)', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, color: theme.ink }
+const chip = { backgroundColor: 'rgba(20, 20, 20,0.6)', borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 }
+const chipOn = { borderColor: theme.goldBright, backgroundColor: 'rgba(201, 150, 58,0.14)' }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 /**
- * useMediaQuery — subscribe to a CSS media-query string.
+ * useMediaQuery, subscribe to a CSS media-query string.
  *
  * Returns true if the query currently matches. Updates whenever the
  * match state changes (window resize, device-pixel-ratio change, etc).
@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react'
  * Used by responsive screens (Jobs, Clients, Schedule) to dispatch
  * between a desktop-first composition (>=900px) and the existing
  * mobile composition (<900px). Each screen owns its data fetching
- * and passes real data + handlers into both branches — the hook only
+ * and passes real data + handlers into both branches, the hook only
  * answers "which branch should render?".
  *
  * @param query - e.g. '(min-width: 900px)'

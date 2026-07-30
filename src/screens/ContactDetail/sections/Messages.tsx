@@ -10,12 +10,12 @@ import { PostedByChip, Eyebrow } from '../../../components/v3'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 
 /**
- * Messages section — communication log (fh_notes) tied to this job.
+ * Messages section, communication log (fh_notes) tied to this job.
  * Inline add row + reverse-chronological list.
  *
  * Notes here have category='note' (matches legacy MessagesTab pattern).
  * Other categories (call/text/email logs) come in via the bottom-sheet
- * Text/Email/Call quick actions on Jobs.jsx — same fh_notes table.
+ * Text/Email/Call quick actions on Jobs.jsx, same fh_notes table.
  */
 export default function MessagesSection({ contactId, userId, notes = [], fetchAll }: any) {
   const [draft, setDraft] = useState('')
@@ -79,7 +79,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
@@ -87,7 +87,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
         </Eyebrow>
         {notes.length > 0 && (
           <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 11,
+            fontFamily: 'var(--font-body)', fontSize: 12,
             color: 'var(--v3-text-muted)',
             fontVariantNumeric: 'tabular-nums'
           }}>
@@ -104,7 +104,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
           placeholder="Log a note, call, touchpoint…"
           style={{
             flex: 1, minWidth: 0,
-            padding: '11px 14px', borderRadius: 12,
+            padding: '12px 12px', borderRadius: 10,
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
             color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
             fontSize: 14, outline: 'none'
@@ -117,14 +117,14 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
           disabled={!draft.trim() || saving}
           aria-label="Log note"
           style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '0 16px', borderRadius: 12, border: 'none',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '0 16px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: '0.04em',
+            letterSpacing: 0,
             cursor: draft.trim() && !saving ? 'pointer' : 'default',
             opacity: draft.trim() && !saving ? 1 : 0.5,
-            boxShadow: draft.trim() ? '0 6px 18px rgba(212, 175, 55, 0.28)' : 'none',
+            boxShadow: draft.trim() ? '0 6px 18px rgba(201, 150, 58, 0.28)' : 'none',
             WebkitTapHighlightColor: 'transparent'
           }}
         >
@@ -135,17 +135,17 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
 
       {notes.length === 0 ? (
         <div style={{
-          padding: '32px 20px', borderRadius: 14,
+          padding: '32px 24px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center', lineHeight: 1.5,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10
+          fontSize: 14, textAlign: 'center', lineHeight: 1.5,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <FileText size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>No communications logged. Every touchpoint — call, text, onsite — captured in order.</div>
+          <div>No communications logged. Every touchpoint, call, text, onsite, captured in order.</div>
         </div>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <AnimatePresence>
             {notes.map((n: any, i: any) => (
               <motion.li
@@ -156,8 +156,8 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ delay: Math.min(i * 0.03, 0.2), duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
                 style={{
-                  display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-                  padding: '12px 14px', borderRadius: 12,
+                  display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+                  padding: '12px 12px', borderRadius: 10,
                   background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
                 }}
               >
@@ -170,7 +170,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     {n.text || n.action || 'Note'}
                   </div>
                   <div style={{
-                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    fontFamily: 'var(--font-body)', fontSize: 12,
                     color: 'var(--v3-text-muted)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
@@ -189,7 +189,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     flexShrink: 0,
                     width: 36, height: 36,
                     display: 'grid', placeItems: 'center',
-                    borderRadius: 8,
+                    borderRadius: 10,
                     background: 'transparent',
                     border: '1px solid transparent',
                     color: 'var(--v3-text-muted)',

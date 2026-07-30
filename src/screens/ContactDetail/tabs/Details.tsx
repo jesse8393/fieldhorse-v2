@@ -8,20 +8,20 @@ import InvitePartnerSection from '../sections/InvitePartner.tsx'
 import InsuranceSection from '../sections/InsuranceSection.tsx'
 
 /**
- * DETAILS tab — sub-tab router for the work-plan side of a job.
+ * DETAILS tab, sub-tab router for the work-plan side of a job.
  *
- * Sub-tabs: Milestones · To-dos · Scheduled · Inspections · Partner
+ * Sub-tabs: Milestones · Tasks · Scheduled · Inspections · Partner
  *
  * Inspections sub-tab is always present (the section UI renders the toggle
- * + the dashed empty state when has_inspections is off — no functionality
+ * + the dashed empty state when has_inspections is off, no functionality
  * is hidden behind the flag, just the trade grid).
  *
  * Sub-tab state lives here, not in the parent shell. Switching to FINANCIALS
- * and back resets to the default 'milestones' — matches PWA expectations.
+ * and back resets to the default 'milestones', matches PWA expectations.
  */
 const SUB_TABS = [
   { id: 'milestones',  label: 'Milestones' },
-  { id: 'todos',       label: 'To-dos' },
+  { id: 'todos',       label: 'Tasks' },
   { id: 'scheduled',   label: 'Scheduled' },
   { id: 'inspections', label: 'Inspections' },
   { id: 'insurance',   label: 'Insurance' },

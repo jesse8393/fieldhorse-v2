@@ -173,7 +173,7 @@ export default function Onboarding() {
   const { refresh: refreshMembership } = useMembership()
   const navigate = useNavigate()
 
-  // Onboarding is for fresh signups. Never read from an existing profile —
+  // Onboarding is for fresh signups. Never read from an existing profile :
   // those values belong to a different session/user and leak if prefilled.
   const [companyName, setCompanyName] = useState('')
   const [services, setServices] = useState<any[]>([])
@@ -210,7 +210,7 @@ export default function Onboarding() {
     )
   }
 
-  // First-run seed flag — true means "after profile saves, also seed
+  // First-run seed flag, true means "after profile saves, also seed
   // demo data so the user lands on a stocked Home instead of em-dashes."
   // Settings → Reset everything is the explicit undo path. Default true
   // because the empty-state churn rate is brutal; user can opt out.
@@ -230,11 +230,11 @@ export default function Onboarding() {
       setError(orgErr.message || 'Could not create your workspace')
       return
     }
-    // Membership context fetched before the org existed — refresh it so
+    // Membership context fetched before the org existed, refresh it so
     // Home sees the new owner role instead of bouncing to /sub-portal.
     await refreshMembership()
     // Persist trade LABELS ('Concrete'), not the picker's internal keys
-    // ('concrete') — Settings and every other reader canonicalize
+    // ('concrete'), Settings and every other reader canonicalize
     // against the label vocabulary, so key-cased values were silently
     // dropped and Settings showed 0 services after onboarding picked 2.
     const serviceLabels = services.map(
@@ -258,7 +258,7 @@ export default function Onboarding() {
         hapticSuccess()
         toastSuccess('Workspace ready', `Seeded ${counts.clients} clients, ${counts.jobs} jobs, ${counts.events} events`)
       } catch (ex: any) {
-        // Don't block the user — they still have a clean account, just no demo
+        // Don't block the user, they still have a clean account, just no demo
         toastError("Couldn't seed sample data", ex?.message || 'Continuing with empty workspace.')
       }
     } else {
@@ -269,7 +269,7 @@ export default function Onboarding() {
   }
 
   async function onSubmit(e: any) {
-    // Form's default submit (Enter key) seeds — matches the recommended path.
+    // Form's default submit (Enter key) seeds, matches the recommended path.
     e.preventDefault()
     finish({ withSeed: true })
   }
@@ -292,7 +292,7 @@ export default function Onboarding() {
         <p className="fh-onb__lede">
           Three things to lock in before the work day starts.
         </p>
-        {/* Plain words, not cockpit jargon — "COORDS PENDING · NO LOCK ·
+        {/* Plain words, not cockpit jargon, "COORDS PENDING · NO LOCK ·
             NEW OPERATOR" read like a video game to a contractor filling
             out a signup form. */}
         <p className="fh-hero-coord">
@@ -346,7 +346,7 @@ export default function Onboarding() {
             <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
               What you run.
             </h2>
-            <span className="fh-onb__section-hint">Pick every trade. This configures your rate card and pour-condition rules.</span>
+            <span className="fh-onb__section-hint">Pick every trade. This configures your rate card and pour condition rules.</span>
           </div>
           <div className="fh-svc-grid" role="group" aria-label="Trade services">
             {SERVICES.map((svc) => {
@@ -438,7 +438,7 @@ export default function Onboarding() {
               type="submit"
               className="fh-btn fh-btn--primary fh-onb__submit"
               disabled={!canSubmit || busy}
-              title="Recommended — seeds demo clients, jobs, and a schedule so you can see the whole app working"
+              title="Recommended, seeds demo clients, jobs, and a schedule so you can see the whole app working"
             >
               {busy ? 'Saving…' : 'Start with sample data'}
             </button>
@@ -459,7 +459,7 @@ export default function Onboarding() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 12,
                 fontWeight: 700,
-                letterSpacing: '0.06em',
+                letterSpacing: 0,
                 textTransform: 'uppercase',
                 cursor: (canSubmit && !busy) ? 'pointer' : 'default',
                 opacity: (canSubmit && !busy) ? 1 : 0.5,
@@ -467,7 +467,7 @@ export default function Onboarding() {
                 textUnderlineOffset: 3
               }}
             >
-              Skip — start fresh
+              Skip, start fresh
             </button>
           </div>
           <p className="fh-onb__meta" style={{ marginTop: 14 }}>

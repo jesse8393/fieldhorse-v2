@@ -1,4 +1,4 @@
-// Timesheets — /timesheets. Owner / admin / manager approval flow.
+// Timesheets, /timesheets. Owner / admin / manager approval flow.
 //
 // Lists pending punches (clocked out, not yet approved) for the
 // caller's org. Approve individual rows or use the per-user batch
@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 
-// HH:MM format — see comment in screens/Crew.tsx. Bebas Neue
+// HH:MM format, see comment in screens/Crew.tsx. Bebas Neue
 // (the display font on duration metrics) is uppercase-only, so
 // "1h 30m" rendered as "1H 30M" which read as wrong. Digits +
 // colon survive any case.
@@ -28,15 +28,15 @@ function fmtMinutes(min: number): string {
 function fmtDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-  } catch { return '—' }
+  } catch { return '\u2003' }
 }
 function fmtTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  } catch { return '—' }
+  } catch { return '\u2003' }
 }
 function fmtMoney(n: number | null): string {
-  if (n == null) return '—'
+  if (n == null) return '\u2003'
   return `$${Math.round(n).toLocaleString()}`
 }
 
@@ -108,7 +108,7 @@ export default function Timesheets() {
   }, [punches])
 
   // Refresh the cached job cost for the contacts behind these punch
-  // ids — approval can stamp rates (repricing unrated hours) and
+  // ids, approval can stamp rates (repricing unrated hours) and
   // flag/unflag moves hours in and out of billable labor. Best-effort;
   // the cache also self-heals on the next owner-side recalc.
   function recalcAffected(ids: string[]) {
@@ -141,8 +141,8 @@ export default function Timesheets() {
     }
   }
 
-  // Flag / reject a punch — prompts for a reason, marks it flagged (and
-  // clears any approval server-side). Keeps the row visible so it can be
+  // Flag / reject a punch, prompts for a reason, marks it flagged (and
+  // clears any approval on the server). Keeps the row visible so it can be
   // resolved; the "Flagged" KPI now reflects reality.
   async function flag(id: string) {
     const reason = window.prompt('Reason for flagging this punch? (e.g. GPS mismatch, wrong rate)')
@@ -174,10 +174,10 @@ export default function Timesheets() {
     }
   }
 
-  // KPI snapshot. Flagged punches are excluded from hours/cost — they
+  // KPI snapshot. Flagged punches are excluded from hours/cost, they
   // don't bill the job while disputed (lib/labor.ts skips them), so
   // counting them here made the approval screen disagree with job cost.
-  // Zero-length punches (invalid) count as needing attention too — the
+  // Zero-length punches (invalid) count as needing attention too, the
   // audit found 0:00 shifts sitting approvable with FLAGGED reading 0.
   const unflagged = punches.filter((p) => !p.flagged && !p.invalid)
   const totalMinutes = unflagged.reduce((s, p) => s + p.minutes, 0)
@@ -298,7 +298,7 @@ export default function Timesheets() {
                 <div>
                   <div className="fh-build-eyebrow">{g.name}</div>
                   {g.email && (
-                    <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>
                       {g.email}
                     </div>
                   )}
@@ -313,7 +313,7 @@ export default function Timesheets() {
                     type="button"
                     className="fh-build-primary-btn"
                     // Flagged AND zero-length rows stay OUT of "Approve
-                    // all" — disputed or invalid punches must be resolved
+                    // all", disputed or invalid punches must be resolved
                     // (or explicitly approved) on their own row, not
                     // swept through with the batch.
                     onClick={() => approve(g.rows.filter((r) => !r.flagged && !r.invalid).map((r) => r.id))}
@@ -341,7 +341,7 @@ export default function Timesheets() {
                     <button
                       type="button"
                       onClick={() => navigate(`/jobs/${r.contact_id}`)}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--v3-text)', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--v3-text)', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     >
                       {r.contact_name || 'Open job'} <ChevronRight size={11} />
                     </button>
@@ -355,7 +355,7 @@ export default function Timesheets() {
                     {r.flagged ? (
                       <span className="fh-build-dot is-warn" title={r.flag_reason || ''}>Flagged</span>
                     ) : r.invalid ? (
-                      <span className="fh-build-dot is-bad" title="Clock-out is not after clock-in">Invalid</span>
+                      <span className="fh-build-dot is-bad" title="Clock out is not after clock in">Invalid</span>
                     ) : (
                       <span className="fh-build-dot is-neutral">Pending</span>
                     )}

@@ -1,5 +1,5 @@
 /**
- * StampNumber — canonical Bebas Neue + tabular-nums numeric.
+ * StampNumber, canonical Bebas Neue + tabular-nums numeric.
  *
  * The "money font" pattern used app-wide (Pipeline hero, KPIs,
  * job amounts, balances). Replaces inline `style={{ fontFamily:
@@ -13,7 +13,7 @@
  *   lg  → 28px   KPI tile
  *   xl  → 40px   secondary hero
  *   2xl → 56px   primary hero (Pipeline card, Outstanding balance)
- *   3xl → 72px   maximum — use sparingly
+ *   3xl → 72px   maximum, use sparingly
  *
  * Tone variants:
  *   default → text

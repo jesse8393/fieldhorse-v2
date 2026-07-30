@@ -5,7 +5,7 @@
 // the job's dollars + photo count at close time so the historical record
 // doesn't drift when line items get edited later.
 //
-// Sign-off methods come from the migration's CHECK constraint — keep this
+// Approval methods come from the migration's CHECK constraint, keep this
 // list in sync with the SQL or upserts will reject.
 
 import { supabase } from './supabase.ts'
@@ -53,7 +53,7 @@ export async function loadCloseout({ userId, contactId }: { userId: string | und
   return data || null
 }
 
-// Snapshot helpers — called by the sheet before save so the modal can
+// Snapshot helpers, called by the sheet before save so the modal can
 // show the operator what's about to be locked in.
 export async function snapshotJobTotals({ userId, contactId }: { userId: string | undefined; contactId: string | undefined }) {
   if (!userId || !contactId) return { paid: 0, photoCount: 0, approvedCO: 0 }
@@ -68,7 +68,7 @@ export async function snapshotJobTotals({ userId, contactId }: { userId: string 
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('job_id', contactId),
-    // Approved change orders count toward the final contract — a
+    // Approved change orders count toward the final contract, a
     // certificate that says "Paid in full" while CO money is owed is
     // exactly the error the auto-close path already guards against.
     supabase
@@ -122,7 +122,7 @@ export async function saveCloseout({ userId, contact, payload, advanceStage = tr
     if (tErr) throw tErr
   }
 
-  // Best-effort activity note — surfaces on the Activity tab without
+  // Best-effort activity note, surfaces on the Activity tab without
   // needing a dedicated event composer.
   try {
     const signLine = row.signoff_name

@@ -1,4 +1,4 @@
-// mobile/app/subs.tsx — subcontractor directory rolled up from fh_subs
+// mobile/app/subs.tsx, subcontractor directory rolled up from fh_subs
 // by name/phone, with job history, search + trade filter, and add-sub.
 import { useMemo, useState } from 'react'
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Modal, Alert, Linking } from 'react-native'
@@ -78,32 +78,32 @@ export default function SubsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
         <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Sub Directory" title="Subs"
-          right={<Pressable onPress={() => setAddOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.goldBright }}><Plus color={theme.onGold} size={14} strokeWidth={2.6} /><Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 11, letterSpacing: 0.5 }}>ADD</Text></Pressable>} />
+          right={<Pressable onPress={() => setAddOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: theme.goldBright }}><Plus color={theme.onGold} size={14} strokeWidth={2.6} /><Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 12, letterSpacing: 0 }}>ADD</Text></Pressable>} />
 
         <Card glow style={{ marginTop: 16, marginBottom: 16 }}>
-          <View style={{ flexDirection: 'row', padding: 18 }}>
+          <View style={{ flexDirection: 'row', padding: 16 }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.goldBright, fontSize: 26, fontWeight: '800' }}>{money(totalBilled)}</Text>
-              <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 2 }}>Total billed · {grouped.length} sub{grouped.length === 1 ? '' : 's'}</Text>
+              <Text style={{ color: theme.goldBright, fontSize: 24, fontWeight: '800' }}>{money(totalBilled)}</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginTop: 2 }}>Total billed · {grouped.length} sub{grouped.length === 1 ? '' : 's'}</Text>
             </View>
             <View style={{ width: 1, backgroundColor: theme.border, marginHorizontal: 14 }} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.ink, fontSize: 26, fontWeight: '800' }}>{allTrades.length}</Text>
-              <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 2 }}>Trades covered</Text>
+              <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800' }}>{allTrades.length}</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginTop: 2 }}>Trades covered</Text>
             </View>
           </View>
         </Card>
 
         {/* search */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.borderMid, backgroundColor: theme.surface, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid, backgroundColor: theme.surface, marginBottom: 12 }}>
           <Search color={theme.inkMuted} size={15} />
-          <TextInput value={q} onChangeText={setQ} placeholder="Search name, phone, trade…" placeholderTextColor={theme.inkMuted} style={{ flex: 1, color: theme.ink, fontSize: 14, paddingVertical: 11 }} />
+          <TextInput value={q} onChangeText={setQ} placeholder="Search name, phone, trade…" placeholderTextColor={theme.inkMuted} style={{ flex: 1, color: theme.ink, fontSize: 14, paddingVertical: 12 }} />
         </View>
 
         {allTrades.length > 0 ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
             <TradePill label="All" active={!trade} onPress={() => setTrade('')} />
             {allTrades.map((t) => <TradePill key={t} label={t} active={trade === t} onPress={() => setTrade(t)} />)}
           </View>
@@ -112,11 +112,11 @@ export default function SubsScreen() {
         {isLoading ? (
           <ActivityIndicator color={theme.goldBright} style={{ marginTop: 16 }} />
         ) : grouped.length === 0 ? (
-          <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 8 }}>No subs yet. Add one, or assign subs from a job's Subs section — they show up here automatically.</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 8 }}>No subs yet. Add one, or assign subs from a job's Subs section, they show up here automatically.</Text>
         ) : filtered.length === 0 ? (
           <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 8 }}>No subs match that filter.</Text>
         ) : (
-          <View style={{ gap: 10 }}>
+          <View style={{ gap: 12 }}>
             {filtered.map((g) => <SubCard key={g.key} g={g} contacts={data?.contacts ?? {}} isTop={g.key === topKey} onJob={(id) => router.push(`/jobs/${id}`)} onProfile={() => router.push(`/subs/${encodeURIComponent(g.key)}`)} />)}
           </View>
         )}
@@ -129,7 +129,7 @@ export default function SubsScreen() {
 
 function TradePill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: active ? theme.goldBright : theme.borderMid, backgroundColor: active ? `${theme.goldBright}26` : 'transparent' }}>
+    <Pressable onPress={onPress} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? theme.goldBright : theme.borderMid, backgroundColor: active ? `${theme.goldBright}26` : 'transparent' }}>
       <Text style={{ color: active ? theme.goldBright : theme.inkMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{label}</Text>
     </Pressable>
   )
@@ -140,22 +140,22 @@ function SubCard({ g, contacts, isTop, onJob, onProfile }: { g: Group; contacts:
   const initials = g.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'SB'
   return (
     <Card accent={isTop ? theme.goldBright : undefined}>
-      <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14, paddingLeft: 16 }}>
-        <View style={{ width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.borderGold }}>
-          <Text style={{ color: theme.goldBright, fontWeight: '800', fontSize: 15 }}>{initials}</Text>
+      <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, paddingLeft: 16 }}>
+        <View style={{ width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.borderGold }}>
+          <Text style={{ color: theme.goldBright, fontWeight: '800', fontSize: 14 }}>{initials}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{g.name}</Text>
-            <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}1a` }}>
-              <Text style={{ color: theme.goldBright, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{g.jobsCount} JOB{g.jobsCount === 1 ? '' : 'S'}</Text>
+            <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{g.name}</Text>
+            <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}1a` }}>
+              <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>{g.jobsCount} JOB{g.jobsCount === 1 ? '' : 'S'}</Text>
             </View>
-            {isTop ? <Text style={{ color: theme.goldBright, fontSize: 9, fontWeight: '800', letterSpacing: 1.5 }}>TOP</Text> : null}
+            {isTop ? <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>TOP</Text> : null}
           </View>
           <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={1}>{g.trades.join(' · ') || 'No trade set'}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 }}>
-            {g.totalRate > 0 ? <Text style={{ color: theme.inkMuted, fontSize: 11 }}><Text style={{ color: theme.ink, fontWeight: '700' }}>${g.totalRate.toLocaleString()}</Text> billed</Text> : null}
-            {g.lastWorked ? <Text style={{ color: theme.inkMuted, fontSize: 11 }}>Last: {relDate(g.lastWorked)}</Text> : null}
+            {g.totalRate > 0 ? <Text style={{ color: theme.inkMuted, fontSize: 12 }}><Text style={{ color: theme.ink, fontWeight: '700' }}>${g.totalRate.toLocaleString()}</Text> billed</Text> : null}
+            {g.lastWorked ? <Text style={{ color: theme.inkMuted, fontSize: 12 }}>Last: {relDate(g.lastWorked)}</Text> : null}
           </View>
         </View>
         <ChevronRight color={theme.inkMuted} size={16} style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }} />
@@ -163,28 +163,28 @@ function SubCard({ g, contacts, isTop, onJob, onProfile }: { g: Group; contacts:
 
       {open ? (
         <View style={{ borderTopWidth: 1, borderTopColor: theme.border, paddingHorizontal: 16 }}>
-          <Pressable onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 12 }}>
+          <Pressable onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 }}>
             <IdCard color={theme.goldBright} size={15} />
-            <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '700', flex: 1 }}>View vendor profile</Text>
+            <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700', flex: 1 }}>View vendor profile</Text>
             <ChevronRight color={theme.goldBright} size={14} />
           </Pressable>
           {g.phone ? (
             <Pressable onPress={() => Linking.openURL(`tel:${g.phone}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 }}>
               <Phone color={theme.goldBright} size={14} />
-              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '600' }}>{g.phone}</Text>
+              <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }}>{g.phone}</Text>
             </Pressable>
           ) : null}
           {g.rows.filter((r) => r.contactId).map((r) => {
             const c = r.contactId ? contacts[r.contactId] : null
             return (
-              <Pressable key={r.id} onPress={() => r.contactId && onJob(r.contactId)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 11, borderTopWidth: 1, borderTopColor: theme.border }}>
+              <Pressable key={r.id} onPress={() => r.contactId && onJob(r.contactId)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{c?.name || '(Job not found)'}</Text>
-                  {c?.jobTitle ? <Text style={{ color: theme.inkMuted, fontSize: 11 }} numberOfLines={1}>{c.jobTitle}</Text> : null}
+                  <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{c?.name || '(Job not found)'}</Text>
+                  {c?.jobTitle ? <Text style={{ color: theme.inkMuted, fontSize: 12 }} numberOfLines={1}>{c.jobTitle}</Text> : null}
                 </View>
-                <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '700' }}>{r.rate > 0 ? `$${r.rate.toLocaleString()}` : '—'}</Text>
-                <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface2 }}>
-                  <Text style={{ color: theme.inkMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' }}>{r.status}</Text>
+                <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{r.rate > 0 ? `$${r.rate.toLocaleString()}` : '\u2003'}</Text>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface2 }}>
+                  <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase' }}>{r.status}</Text>
                 </View>
               </Pressable>
             )
@@ -213,26 +213,26 @@ function AddSubModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     setName(''); setTrade(''); setPhone(''); onClose()
   }
 
-  const field = { backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: theme.ink, fontSize: 15 } as const
-  const label = { color: theme.inkMuted, fontSize: 10, fontWeight: '800' as const, letterSpacing: 1.5, textTransform: 'uppercase' as const, marginBottom: 6 }
+  const field = { backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, color: theme.ink, fontSize: 14 } as const
+  const label = { color: theme.inkMuted, fontSize: 12, fontWeight: '800' as const, letterSpacing: 0, textTransform: 'uppercase' as const, marginBottom: 6 }
 
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, paddingBottom: insets.bottom + 20 }}>
-          <Text style={{ color: theme.goldBright, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' }}>New sub</Text>
-          <Text style={{ color: theme.ink, fontSize: 22, fontWeight: '700', marginTop: 4, marginBottom: 18 }}>Add to directory</Text>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(20, 20, 20,0.6)', justifyContent: 'flex-end' }}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={{ backgroundColor: theme.surface2, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 20 }}>
+          <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>New sub</Text>
+          <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '700', marginTop: 4, marginBottom: 18 }}>Add to directory</Text>
           <Text style={label}>Name</Text>
           <TextInput value={name} onChangeText={setName} placeholder="Crew lead or company" placeholderTextColor={theme.inkMuted} style={[field, { marginBottom: 14 }]} autoFocus />
           <Text style={label}>Trade</Text>
           <TextInput value={trade} onChangeText={setTrade} placeholder="Framer, electrician, roofer…" placeholderTextColor={theme.inkMuted} style={[field, { marginBottom: 14 }]} />
           <Text style={label}>Phone</Text>
           <TextInput value={phone} onChangeText={setPhone} placeholder="(615) 555-0000" placeholderTextColor={theme.inkMuted} keyboardType="phone-pad" style={[field, { marginBottom: 20 }]} />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable onPress={onClose} style={{ flex: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: theme.borderMid }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Pressable onPress={onClose} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid }}>
               <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 14 }}>Cancel</Text>
             </Pressable>
-            <Pressable onPress={save} disabled={!name.trim() || saving} style={{ flex: 1.5, alignItems: 'center', paddingVertical: 13, borderRadius: 12, backgroundColor: theme.goldBright, opacity: !name.trim() || saving ? 0.5 : 1 }}>
+            <Pressable onPress={save} disabled={!name.trim() || saving} style={{ flex: 1.5, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: theme.goldBright, opacity: !name.trim() || saving ? 0.5 : 1 }}>
               <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>{saving ? 'Saving…' : 'Add sub'}</Text>
             </Pressable>
           </View>

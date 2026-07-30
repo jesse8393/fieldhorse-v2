@@ -9,18 +9,18 @@ function openPalette() {
   window.dispatchEvent(new CustomEvent('fh:open-palette'))
 }
 
-// Single entry point — dispatches `fh:open-palette`. CommandPalette
+// Single entry point, dispatches `fh:open-palette`. CommandPalette
 // only opens at >=900px width; MobileSearchOverlay only opens at
 // <900px. Both gate themselves so we never get a dual-open. The old
 // mobile-routes-to-/jobs hack was a workaround for the cmdk popover
-// rendering clipped on iOS — superseded by the dedicated mobile
+// rendering clipped on iOS, superseded by the dedicated mobile
 // overlay.
 function openSearch() {
   openPalette()
 }
 
 /**
- * AppHeader — the shared top bar.
+ * AppHeader, the shared top bar.
  *
  * Layout:
  *   [FH badge] · · · [USER COMPANY LOGO / NAME centered] · · · [Notes shortcut]
@@ -58,18 +58,18 @@ export default function AppHeader() {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
-        // Padding longhand ONLY — never use the `padding:` shorthand
+        // Padding longhand ONLY, never use the `padding:` shorthand
         // here. The desktop sidebar offset is applied via the CSS rule
-        // `@media(min-width:900px) .fh-app-header { padding-left: calc(14px + 256px) }`,
+        // `@media(min-width:900px) .fh-app-header { padding-left: calc(12px + 48px) }`,
         // which loses to inline shorthand. The audit on 5/13 found
         // the search/notifications/notes cluster pinned behind the
-        // 256px sidebar because the inline `padding: '6px 14px 4px'`
+        // 256px sidebar because the inline `padding: '8px 12px 4px'`
         // was forcing padding-left:14 over the responsive rule. Keep
         // top/right/bottom inline; let CSS own padding-left.
         paddingTop: 'calc(6px + env(safe-area-inset-top, 0px))',
-        paddingRight: 14,
+        paddingRight: 12,
         paddingBottom: 4,
-        paddingLeft: 14, // mobile default — overridden by desktop CSS rule
+        paddingLeft: 12, // mobile default, overridden by desktop CSS rule
         minHeight: 0,
         background: 'linear-gradient(180deg, var(--fh-chrome-veil-1) 0%, var(--fh-chrome-veil-2) 82%, var(--fh-chrome-veil-0) 100%)',
         backdropFilter: 'blur(14px)',
@@ -77,7 +77,7 @@ export default function AppHeader() {
         pointerEvents: 'auto'
       }}
     >
-      {/* Brand emblem — phone-only. Desktop mounts the wordmark in the
+      {/* Brand emblem, phone-only. Desktop mounts the wordmark in the
           left rail (DesktopSidebar) so the header strip can stay quiet.
           Replaces the prior FieldhorseBadge (FH text wordmark) with the
           glassy gold emblem the user shared. */}
@@ -93,7 +93,7 @@ export default function AppHeader() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6,
+          gap: 8,
           overflow: 'hidden'
         }}
       >
@@ -105,7 +105,7 @@ export default function AppHeader() {
           files in one query, also bound to ⌘K). The bell shows unread
           count badge + opens the inbox drawer. Notes is a quick jump
           to /notes. */}
-      {/* Trio of header actions at 44×44 / r11 with a 16px icon — the
+      {/* Trio of header actions at 44×44 / r11 with a 16px icon, the
           full Apple/Material minimum touch target. The audit flagged the
           earlier 34–36px frames as sub-target; restored to 44 so search,
           notifications, and notes are all comfortably tappable one-handed. */}
@@ -119,7 +119,7 @@ export default function AppHeader() {
             width: 44,
             height: 44,
             minWidth: 44,
-            borderRadius: 11,
+            borderRadius: 10,
             background: 'var(--v3-glass-tint)',
             border: '1px solid var(--v3-border-mid)',
             backdropFilter: 'blur(8px)',
@@ -144,7 +144,7 @@ export default function AppHeader() {
             width: 44,
             height: 44,
             minWidth: 44,
-            borderRadius: 11,
+            borderRadius: 10,
             background: 'var(--v3-glass-tint)',
             border: '1px solid var(--v3-border-mid)',
             backdropFilter: 'blur(8px)',
@@ -166,7 +166,7 @@ export default function AppHeader() {
 
 function BrandSlot({ logoSrc, company, fullName }: any) {
   // Mobile-header-fix: the thin-ribbon trim left the wordmark visibly
-  // weak on iPhone — at clamp(12px, 2.6vw, 14px) on a 390px viewport the
+  // weak on iPhone, at clamp(12px, 2.6vw, 14px) on a 390px viewport the
   // brand max'd at 14px and read as a faint placeholder. Bumped to
   // clamp(15px, 4vw, 18px) so the contractor's name registers as
   // immediate identification without taking over the header strip.
@@ -185,7 +185,7 @@ function BrandSlot({ logoSrc, company, fullName }: any) {
         onError={(e) => {
           // If the signed URL expired or 403s, hide the img and let the
           // fallback text be visible on next render. We can't force a
-          // re-render from here without state, so just blank it — the
+          // re-render from here without state, so just blank it, the
           // parent layout stays stable.
           e.currentTarget.style.display = 'none'
         }}
@@ -194,9 +194,9 @@ function BrandSlot({ logoSrc, company, fullName }: any) {
   }
   const fallbackTextStyle = {
     fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(15px, 4vw, 18px)',
+    fontSize: 24,
     fontWeight: 600,
-    letterSpacing: '0.06em',
+    letterSpacing: 0,
     lineHeight: 1,
     textTransform: 'uppercase',
     whiteSpace: 'nowrap',
@@ -218,18 +218,18 @@ function BrandSlot({ logoSrc, company, fullName }: any) {
       </span>
     )
   }
-  // Final fallback — FIELDHORSE wordmark with the gold-split FIELD/HORSE.
+  // Final fallback, FIELDHORSE wordmark with the gold-split FIELD/HORSE.
   return (
     <span
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(15px, 4.2vw, 19px)',
+        fontSize: 24,
         fontWeight: 600,
-        letterSpacing: '0.08em',
+        letterSpacing: 0,
         lineHeight: 1,
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 2
+        gap: 4
       }}
     >
       <span style={{ color: 'var(--field-gold)' }}>FIELD</span>

@@ -16,7 +16,7 @@ import { toast, hapticMedium, hapticSuccess } from './toast.ts'
 import type { Database } from './database.types.ts'
 
 // The stage helpers only read identity + display fields, never the full
-// row — declare exactly that so projected list rows (JobRow) are valid
+// row, declare exactly that so projected list rows (JobRow) are valid
 // inputs. A full fh_contacts Row remains assignable (superset).
 type Contact = Pick<
   Database['public']['Tables']['fh_contacts']['Row'],
@@ -50,7 +50,7 @@ export async function approveQuote(contact: Contact) {
   return res
 }
 
-// One-tap "Won" from the Leads board — moves to Job with no auto-kickoff
+// One-tap "Won" from the Leads board, moves to Job with no auto-kickoff
 // event (approveQuote is the formal quote-approval path that schedules).
 export async function markWon(contact: Contact) {
   const res = await baseMarkWon(contact)
@@ -88,7 +88,7 @@ export async function reopen(contact: Contact) {
 
 export async function logPayment(contact: Contact, input: { id?: string | null; amount?: number | string | null; method?: string | null; kind?: string | null; reference?: string | null; paid_on?: string | null; invoice_id?: string | null }) {
   const res = await baseLogPayment(contact, input)
-  // Don't fire success UI when the write failed — the caller surfaces the
+  // Don't fire success UI when the write failed, the caller surfaces the
   // error (V3PaymentSheet throws on res.error). Firing a success haptic +
   // "Payment logged" toast here would contradict the caller's error toast.
   if (res && 'error' in res && (res as any).error) {
@@ -98,7 +98,7 @@ export async function logPayment(contact: Contact, input: { id?: string | null; 
   const paid = Number(input.amount || 0)
   // Gate the "Paid in full · moved to Closed" toast on whether stages.ts
   // ACTUALLY auto-closed. Recomputing a base-only contract here would lie
-  // when the base is paid but approved change-order money is still owed
+  // when the base is paid but approved change order money is still owed
   // (stages.ts closes on base + approved COs).
   const closed = !!(res && 'closed' in res && (res as any).closed)
   if (closed) {

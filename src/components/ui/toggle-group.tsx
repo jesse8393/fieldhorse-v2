@@ -29,7 +29,7 @@ function ToggleGroup({
         "--gap": spacing
       }}
       className={cn(
-        "ui:group/toggle-group ui:flex ui:w-fit ui:items-center ui:gap-[--spacing(var(--gap))] ui:rounded-md ui:data-[spacing=default]:data-[variant=outline]:shadow-xs",
+        "ui:group/toggle-group ui:flex ui:w-fit ui:items-center ui:gap-[--spacing(var(--gap))] ui:rounded-[10px] ui:data-[spacing=default]:data-[variant=outline]:shadow-xs",
         className
       )}
       {...props}>
@@ -58,7 +58,7 @@ function ToggleGroupItem({
       className={cn(toggleVariants({
         variant: context.variant || variant,
         size: context.size || size,
-      }), "ui:w-auto ui:min-w-0 ui:shrink-0 ui:px-3 ui:focus:z-10 ui:focus-visible:z-10", "ui:data-[spacing=0]:rounded-none ui:data-[spacing=0]:shadow-none ui:data-[spacing=0]:first:rounded-l-md ui:data-[spacing=0]:last:rounded-r-md ui:data-[spacing=0]:data-[variant=outline]:border-l-0 ui:data-[spacing=0]:data-[variant=outline]:first:border-l", className)}
+      }), "ui:w-auto ui:min-w-0 ui:shrink-0 ui:px-3 ui:focus:z-10 ui:focus-visible:z-10", "ui:data-[spacing=0]:rounded-none ui:data-[spacing=0]:shadow-none ui:data-[spacing=0]:first:rounded-l-[10px] ui:data-[spacing=0]:last:rounded-r-[10px] ui:data-[spacing=0]:data-[variant=outline]:border-l-0 ui:data-[spacing=0]:data-[variant=outline]:first:border-l", className)}
       {...props}>
       {children}
     </ToggleGroupPrimitive.Item>

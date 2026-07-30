@@ -1,4 +1,4 @@
-// mobile/app/invoices/[id].tsx — per-job billing detail (the web
+// mobile/app/invoices/[id].tsx, per-job billing detail (the web
 // InvoiceDetail). :id is a contact id. Contract / paid / balance with a
 // payment history and a Collect Payment flow. PDF/email/public-link defer.
 import { useState } from 'react'
@@ -42,7 +42,7 @@ export default function InvoiceDetailScreen() {
   if (!data) {
     return (
       <View style={{ flex: 1 }}><ScreenBackground />
-        <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 20 }}>
+        <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 24 }}>
           <ScreenHeader backLabel="Invoices" onBack={() => router.back()} eyebrow="Invoice" title="Not found" />
           <Text style={{ color: theme.inkMuted, marginTop: 20 }}>This invoice could not be loaded.</Text>
         </ScrollView>
@@ -93,7 +93,7 @@ export default function InvoiceDetailScreen() {
     try {
       const { url } = await mintPublicLink({ contactId: contact.id, userId: user.id, kind: 'invoice' })
       await Clipboard.setStringAsync(url)
-      Alert.alert('Share link copied', 'Paste it into a text or email — the customer can view and pay online.')
+      Alert.alert('Share link copied', 'Paste it into a text or email, the customer can view and pay online.')
     } catch (e: any) { Alert.alert("Couldn't create link", e?.message || 'Try again.') }
     finally { setBusy(null) }
   }
@@ -118,21 +118,21 @@ export default function InvoiceDetailScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 120, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 120, paddingHorizontal: 24 }}>
         <ScreenHeader backLabel="Invoices" onBack={() => router.back()} eyebrow="Invoice" title={contact.name || 'Invoice'} />
 
         {/* Hero */}
         <Card glow style={{ marginTop: 16, marginBottom: 18 }}>
-          <View style={{ padding: 20 }}>
+          <View style={{ padding: 24 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: `${status.tint}55`, backgroundColor: `${status.tint}1f` }}>
-                <Text style={{ color: status.tint, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 }}>{status.label}</Text>
+              <View style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: `${status.tint}55`, backgroundColor: `${status.tint}1f` }}>
+                <Text style={{ color: status.tint, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>{status.label}</Text>
               </View>
-              {contact.jobTitle ? <Text style={{ color: theme.inkMuted, fontSize: 13 }} numberOfLines={1}>{contact.jobTitle}</Text> : null}
+              {contact.jobTitle ? <Text style={{ color: theme.inkMuted, fontSize: 14 }} numberOfLines={1}>{contact.jobTitle}</Text> : null}
             </View>
-            <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 16 }}>Balance due</Text>
-            <Text style={{ color: theme.ink, fontSize: 42, fontWeight: '800', letterSpacing: -1, marginTop: 2 }}>{money(balance)}</Text>
-            <View style={{ height: 7, borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,240,210,0.06)', marginTop: 14 }}>
+            <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginTop: 16 }}>Balance due</Text>
+            <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800', letterSpacing: 0, marginTop: 2 }}>{money(balance)}</Text>
+            <View style={{ height: 7, borderRadius: 10, overflow: 'hidden', backgroundColor: 'rgba(242, 237, 228,0.06)', marginTop: 14 }}>
               <View style={{ width: `${pctPaid}%`, height: '100%', backgroundColor: theme.success }} />
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
@@ -143,17 +143,17 @@ export default function InvoiceDetailScreen() {
         </Card>
 
         {/* Service line */}
-        <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>Summary</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 10 }}>Summary</Text>
         <Card style={{ marginBottom: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
-            <Text style={{ color: theme.ink, fontSize: 15, flex: 1 }} numberOfLines={2}>{contact.jobTitle || contact.name || 'Contract'}</Text>
+            <Text style={{ color: theme.ink, fontSize: 14, flex: 1 }} numberOfLines={2}>{contact.jobTitle || contact.name || 'Contract'}</Text>
             <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '800' }}>{money(total)}</Text>
           </View>
         </Card>
 
         {/* Progress draws */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>Progress draws{draws.length ? ` · ${draws.length}` : ''}</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>Progress draws{draws.length ? ` · ${draws.length}` : ''}</Text>
           {draws.length === 0 && total > 0 ? (
             <Pressable onPress={onGenerateDraws} disabled={busy === 'draws'}>
               {busy === 'draws' ? <ActivityIndicator color={theme.goldBright} /> : <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '700' }}>Generate 50/40/10</Text>}
@@ -161,19 +161,19 @@ export default function InvoiceDetailScreen() {
           ) : null}
         </View>
         {draws.length === 0 ? (
-          <Text style={{ color: theme.inkMuted, fontSize: 13, marginBottom: 18 }}>
+          <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 18 }}>
             No draws yet. Generate a 50/40/10 schedule from the contract, or bill it all at once with Collect Payment.
           </Text>
         ) : (
           <View style={{ gap: 8, marginBottom: 8 }}>
             {draws.map((d: any) => (
               <Card key={d.id}>
-                <Pressable onPress={() => cycleDraw(d)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+                <Pressable onPress={() => cycleDraw(d)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>{d.title || `Draw ${d.sequence_number}`}</Text>
-                    <Text style={{ color: drawTint(d.status), fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 2 }}>{d.status} · tap to change</Text>
+                    <Text style={{ color: drawTint(d.status), fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase', marginTop: 2 }}>{d.status} · tap to change</Text>
                   </View>
-                  <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '800' }}>{money(Number(d.amount || 0))}</Text>
+                  <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '800' }}>{money(Number(d.amount || 0))}</Text>
                 </Pressable>
               </Card>
             ))}
@@ -185,16 +185,16 @@ export default function InvoiceDetailScreen() {
         )}
 
         {/* Payments */}
-        <Text style={{ color: theme.inkMuted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>Payments{payments.length ? ` · ${payments.length}` : ''}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 10 }}>Payments{payments.length ? ` · ${payments.length}` : ''}</Text>
         {payments.length === 0 ? (
           <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 18 }}>No payments recorded yet.</Text>
         ) : (
-          <View style={{ gap: 10, marginBottom: 18 }}>
+          <View style={{ gap: 12, marginBottom: 18 }}>
             {payments.map((p) => (
               <Card key={p.id} accent={theme.success}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, paddingLeft: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, paddingLeft: 16 }}>
                   <View>
-                    <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700', textTransform: 'capitalize' }}>{p.method || 'Payment'}</Text>
+                    <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700', textTransform: 'capitalize' }}>{p.method || 'Payment'}</Text>
                     <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{p.paidOn ? new Date(p.paidOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}{p.reference ? ` · ${p.reference}` : ''}</Text>
                   </View>
                   <Text style={{ color: theme.success, fontSize: 16, fontWeight: '800' }}>{money(p.amount)}</Text>
@@ -205,26 +205,26 @@ export default function InvoiceDetailScreen() {
         )}
 
         {/* Open job */}
-        <Pressable onPress={() => router.push(`/jobs/${contact.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: theme.borderMid, backgroundColor: 'rgba(255,240,210,0.04)' }}>
+        <Pressable onPress={() => router.push(`/jobs/${contact.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid, backgroundColor: 'rgba(242, 237, 228,0.04)' }}>
           <Briefcase color={theme.goldBright} size={16} />
-          <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '600', flex: 1 }}>Open job</Text>
-          <Text style={{ color: theme.goldBright, fontSize: 13, fontWeight: '700' }}>View</Text>
+          <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600', flex: 1 }}>Open job</Text>
+          <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>View</Text>
         </Pressable>
       </ScrollView>
 
       {/* Sticky action bar */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: 'rgba(11,9,7,0.92)', borderTopWidth: 1, borderTopColor: theme.border, gap: 10 }}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: 'rgba(20, 20, 20,0.92)', borderTopWidth: 1, borderTopColor: theme.border, gap: 12 }}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           <ActionBtn icon={<Eye color={theme.goldBright} size={15} />} label="Preview" onPress={() => setPreviewHtml(buildHtml())} outline />
           <ActionBtn icon={sharing ? <ActivityIndicator color={theme.goldBright} /> : <Share2 color={theme.goldBright} size={15} />} label="Share PDF" onPress={onShare} outline />
           <ActionBtn icon={busy === 'link' ? <ActivityIndicator color={theme.goldBright} /> : <LinkIcon color={theme.goldBright} size={15} />} label="Link" onPress={onCopyLink} outline />
         </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           {contact.email ? (
             <ActionBtn icon={busy === 'send' ? <ActivityIndicator color={theme.ink} /> : <Send color={theme.ink} size={15} />} label="Send invoice" onPress={onSendEmail} outline />
           ) : null}
-          <Pressable onPress={() => setPayOpen(true)} style={{ flex: 1.4, borderRadius: 12, overflow: 'hidden' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, backgroundColor: theme.goldBright }}>
+          <Pressable onPress={() => setPayOpen(true)} style={{ flex: 1.4, borderRadius: 10, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, backgroundColor: theme.goldBright }}>
               <DollarSign color={theme.onGold} size={15} />
               <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Collect Payment</Text>
             </View>
@@ -234,12 +234,12 @@ export default function InvoiceDetailScreen() {
 
       {/* Invoice preview */}
       <Modal visible={!!previewHtml} animationType="slide" onRequestClose={() => setPreviewHtml(null)}>
-        <View style={{ flex: 1, backgroundColor: '#33302b' }}>
-          <View style={{ paddingTop: insets.top + 8, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1A1714' }}>
+        <View style={{ flex: 1, backgroundColor: '#141414' }}>
+          <View style={{ paddingTop: insets.top + 8, paddingBottom: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#141414' }}>
             <Text style={{ color: '#F2EDE4', fontWeight: '700', fontSize: 16 }}>Invoice preview</Text>
             <Pressable onPress={() => setPreviewHtml(null)} hitSlop={12}><X color="#F2EDE4" size={22} /></Pressable>
           </View>
-          {previewHtml ? <WebView originWhitelist={['*']} source={{ html: previewHtml }} style={{ flex: 1, backgroundColor: '#33302b' }} scalesPageToFit /> : null}
+          {previewHtml ? <WebView originWhitelist={['*']} source={{ html: previewHtml }} style={{ flex: 1, backgroundColor: '#141414' }} scalesPageToFit /> : null}
         </View>
       </Modal>
 
@@ -252,9 +252,9 @@ export default function InvoiceDetailScreen() {
 
 function ActionBtn({ icon, label, onPress, outline }: { icon: React.ReactNode; label: string; onPress: () => void; outline?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, paddingVertical: 13, borderWidth: outline ? 1 : 0, borderColor: theme.borderMid, backgroundColor: outline ? 'rgba(255,240,210,0.04)' : 'transparent' }}>
+    <Pressable onPress={onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 12, borderWidth: outline ? 1 : 0, borderColor: theme.borderMid, backgroundColor: outline ? 'rgba(242, 237, 228,0.04)' : 'transparent' }}>
       {icon}
-      <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 14 }}>{label}</Text>
     </Pressable>
   )
 }

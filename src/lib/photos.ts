@@ -9,7 +9,7 @@
 
 import { supabase } from './supabase.ts'
 
-const SIGN_TTL_SECONDS = 3600 // 1 hour — long enough for a session, short enough that leaked URLs expire
+const SIGN_TTL_SECONDS = 3600 // 1 hour, long enough for a session, short enough that leaked URLs expire
 
 /**
  * Fetch the latest cover photo per job for the given user, returning a map

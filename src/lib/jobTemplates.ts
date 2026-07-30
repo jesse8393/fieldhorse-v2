@@ -1,14 +1,14 @@
-// Job templates — Phase 19 / Audit Move #5.
+// Job templates, Phase 19 / Audit Move #5.
 //
 // A template is a named milestone playbook for a common trade pattern.
-// Pick one in NewLeadSheet and the app pre-creates the to-do list for
+// Pick one in NewLeadSheet and the app pre-creates the task list for
 // the new job so the contractor isn't staring at an empty checklist.
 //
 // Scope for v1:
 //   - Milestones only (insert into fh_job_todos)
 //   - One template per common trade pattern; user can also skip
 //   - No pre-seeded planned expenses, no auto-invited subs (deferred)
-//   - applyTemplate() is fire-and-forget AFTER the lead commits — if it
+//   - applyTemplate() is fire-and-forget AFTER the lead commits, if it
 //     fails the lead still exists, just empty checklist
 //
 // Add new templates here. The picker auto-filters by jobType, so any
@@ -26,49 +26,49 @@ export type JobTemplate = {
 export const JOB_TEMPLATES: JobTemplate[] = [
   {
     slug: 'roofing-tearoff',
-    label: 'Roof tear-off + reshingle',
+    label: 'Roof tear off + reshingle',
     jobType: 'Roofing',
-    description: 'Standard 2–3 day reroof. Tear-off, dry-in, install, inspect.',
+    description: 'Standard 2 to 3 day reroof. Tear off, dry in, install, inspect.',
     todos: [
       'Confirm shingle color + brand with homeowner',
       'Measure + order shingles, drip edge, ridge vent',
-      'Schedule dump trailer + delivery for tear-off day',
+      'Schedule dump trailer + delivery for tear off day',
       'Pull permit if required by city',
-      'Tear-off crew on-site, tarp landscaping',
-      'Inspect decking — replace rotten sheathing',
+      'Tear off crew on site, tarp landscaping',
+      'Inspect decking, replace rotten sheathing',
       'Install ice + water shield + synthetic underlayment',
       'Install drip edge + step flashing at walls',
       'Lay shingles, eaves up, staggered pattern',
       'Ridge cap + ridge vent install',
-      'Final cleanup — magnet sweep driveway + yard',
+      'Final cleanup, magnet sweep driveway + yard',
       'Photo set for warranty file + homeowner walk',
       'Collect final payment'
     ]
   },
   {
     slug: 'kitchen-full-gut',
-    label: 'Kitchen — full gut + remodel',
+    label: 'Kitchen, full gut + remodel',
     jobType: 'Kitchen',
     description: 'Demo to finish. Cabinets, counters, appliances, electrical, plumbing.',
     todos: [
       'Final design + selections signed off (cabinets, counters, tile)',
-      'Order cabinets — confirm lead time',
-      'Order countertops once cabinets template-able',
+      'Order cabinets, confirm lead time',
+      'Order countertops once cabinets can be templated',
       'Pull permit (electrical + plumbing)',
       'Demo cabinets, counters, flooring',
       'Rough plumbing relocations',
-      'Rough electrical — outlets, undercabinet, island',
+      'Rough electrical, outlets, undercabinet, island',
       'Drywall patch + skim coat',
       'Paint walls + ceiling before cabinets',
-      'Cabinet install — uppers first, then base',
+      'Cabinet install, uppers first, then base',
       'Counter template + fabrication',
       'Counter install',
       'Backsplash tile + grout',
       'Flooring install',
-      'Plumbing trim — sink, faucet, disposal, dishwasher',
-      'Electrical trim — outlets, lights, switches',
+      'Plumbing trim, sink, faucet, disposal, dishwasher',
+      'Electrical trim, outlets, lights, switches',
       'Appliance install + level',
-      'Final punch + touch-up paint',
+      'Final punch + touch up paint',
       'Homeowner walk + collect final payment'
     ]
   },
@@ -76,14 +76,14 @@ export const JOB_TEMPLATES: JobTemplate[] = [
     slug: 'bath-remodel',
     label: 'Bathroom remodel',
     jobType: 'Bath',
-    description: 'Standard hall bath gut + tile shower. ~3 weeks once material on-site.',
+    description: 'Standard hall bath gut + tile shower. ~3 weeks once material on site.',
     todos: [
       'Final selections signed off (tile, vanity, fixtures)',
       'Order tile + vanity + fixtures',
       'Pull permit',
       'Demo tub/shower, vanity, flooring, drywall',
-      'Rough plumbing — relocate drain if needed',
-      'Rough electrical — fan, lights, outlets',
+      'Rough plumbing, relocate drain if needed',
+      'Rough electrical, fan, lights, outlets',
       'Install tub or shower pan + waterproofing',
       'Cement board + waterproof membrane on shower walls',
       'Tile shower walls + floor',
@@ -91,8 +91,8 @@ export const JOB_TEMPLATES: JobTemplate[] = [
       'Drywall + paint',
       'Flooring install',
       'Vanity + countertop install',
-      'Plumbing trim — toilet, faucet, shower valve',
-      'Electrical trim — fan, lights, switches',
+      'Plumbing trim, toilet, faucet, shower valve',
+      'Electrical trim, fan, lights, switches',
       'Door + trim install',
       'Final caulk + punch',
       'Homeowner walk + collect final payment'
@@ -144,25 +144,25 @@ export const JOB_TEMPLATES: JobTemplate[] = [
   },
   {
     slug: 'insurance-restoration',
-    label: 'Insurance — storm/water restoration',
+    label: 'Insurance, storm/water restoration',
     jobType: 'Insurance',
-    description: 'Adjuster-driven scope. Photo + document everything for the file.',
+    description: 'Insurance driven scope. Photo + document everything for the file.',
     todos: [
       'Initial inspection + photo every elevation',
       'Submit photo + scope to adjuster',
       'Receive approved scope + Xactimate sheet',
       'Sign contract + collect ACV check',
       'Order materials per approved scope',
-      'Begin work — photo before/during/after every line',
+      'Begin work, photo before/during/after every line',
       'Submit invoice + photos for depreciation release',
       'Final inspection + collect depreciation check'
     ]
   },
   {
     slug: 'addition',
-    label: 'Addition (room or second-story)',
+    label: 'Addition (room or second story)',
     jobType: 'Addition',
-    description: 'Permit-heavy. Foundation through punch. Stage payment milestones.',
+    description: 'Permit intensive. Foundation through punch. Stage payment milestones.',
     todos: [
       'Final plans signed off + engineered',
       'Submit permit set to city',
@@ -172,7 +172,7 @@ export const JOB_TEMPLATES: JobTemplate[] = [
       'Foundation walls + waterproofing',
       'Frame floor system',
       'Frame walls + roof',
-      'Roof dry-in (felt + shingles)',
+      'Roof dry in (felt + shingles)',
       'Windows + exterior doors',
       'Rough plumbing',
       'Rough electrical',
@@ -190,7 +190,7 @@ export const JOB_TEMPLATES: JobTemplate[] = [
     slug: 'renovation-light',
     label: 'Light renovation (paint + flooring + trim)',
     jobType: 'Renovation',
-    description: 'No permit. Cosmetic refresh — paint, flooring, trim.',
+    description: 'No permit. Cosmetic refresh, paint, flooring, trim.',
     todos: [
       'Color + flooring selections signed off',
       'Order flooring + paint',
@@ -201,7 +201,7 @@ export const JOB_TEMPLATES: JobTemplate[] = [
       'Remove old flooring',
       'Install new flooring',
       'Reinstall + paint trim',
-      'Final touch-up + clean',
+      'Final touch up + clean',
       'Homeowner walk + collect final payment'
     ]
   }
@@ -218,7 +218,7 @@ export function getTemplate(slug: string | null | undefined): JobTemplate | null
 }
 
 // Apply a template to a freshly-created job. Inserts every milestone as
-// a row in fh_job_todos with done=false. Failure is non-fatal — the lead
+// a row in fh_job_todos with done=false. Failure is non-fatal, the lead
 // still exists, the user just gets an empty checklist.
 export async function applyTemplate(supabase: any, { template, jobId, userId }: { template: JobTemplate | null | undefined; jobId: string | undefined; userId: string | undefined }) {
   if (!template?.todos?.length || !jobId || !userId) return { inserted: 0 }

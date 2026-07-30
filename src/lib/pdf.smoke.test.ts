@@ -1,13 +1,13 @@
 // src/lib/pdf.smoke.test.ts
 //
-// PDF engine smoke tests — written as the safety net for the
+// PDF engine smoke tests, written as the safety net for the
 // jspdf 2.x → 4.x upgrade, kept as a permanent regression guard.
 // Each generator must produce a real multi-byte PDF (%PDF header)
 // without throwing. These don't assert layout; they assert the
 // engine + autoTable still cooperate after dependency bumps.
 
 import { describe, it, expect } from 'vitest'
-// pdf.js is a large untyped legacy module — array params infer as
+// pdf.js is a large untyped legacy module, array params infer as
 // never[], so fixture payloads go through `as any` at the call sites.
 import { generateInvoice, generateQuote, generateCertificate, generateStatement } from './pdf.js'
 
@@ -17,7 +17,7 @@ const company = {
   phone: '(615) 555-0100',
   email: 'admin@parkerconstructioncompany.com',
   license_number: 'TN-123456',
-  warranty_default: 'One-year workmanship warranty on all installed work.'
+  warranty_default: 'One year workmanship warranty on all installed work.'
 }
 
 const contact = {
@@ -48,7 +48,7 @@ describe('pdf engine smoke', () => {
     const result = await generateInvoice({
       company,
       contact,
-      lineItems: [{ description: 'Final balance — Handrail painting', qty: 1, rate: 1380, amount: 1380 }],
+      lineItems: [{ description: 'Final balance, Handrail painting', qty: 1, rate: 1380, amount: 1380 }],
       notes: 'Check or ACH accepted.',
       dueDate: 'Jun 26',
       invoiceId: contact.id,
@@ -102,9 +102,9 @@ describe('pdf engine smoke', () => {
         email: 'ap@mmcproperties.com'
       },
       lines: [
-        { property: 'Summit Townhomes — sidewalk repair', contract: 1880, paid: 500, balance: 1380 },
-        { property: '12 Oak St — driveway', contract: 2500, paid: 0, balance: 2500 },
-        { property: 'Maple Court — curb', contract: 1400, paid: 500, balance: 900 }
+        { property: 'Summit Townhomes, sidewalk repair', contract: 1880, paid: 500, balance: 1380 },
+        { property: '12 Oak St, driveway', contract: 2500, paid: 0, balance: 2500 },
+        { property: 'Maple Court, curb', contract: 1400, paid: 500, balance: 900 }
       ],
       statementId: '6f1c9b1e-0000-4000-8000-000000000099'
     } as any)

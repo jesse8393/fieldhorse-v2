@@ -2,16 +2,16 @@
 //
 // Shared items table for customer documents. Editorial treatment:
 // small-caps column labels over a strong hairline, per-row hairlines,
-// right-aligned tabular-number money — no colored header bars.
+// right-aligned tabular-number money, no colored header bars.
 //
 // Three layouts:
 //
-//   'grouped'   — the proposal workhorse. `groups` prop:
+//   'grouped'  , the proposal workhorse. `groups` prop:
 //                 [{ title, items: [{description, qty, unit, rate, amount}], subtotal }]
 //                 Section name rows break up the itemized rows; each
 //                 section closes with a right-aligned subtotal.
-//   'detailed'  — flat rows with Description | Qty | Rate | Amount.
-//   'sectioned' — legacy roll-up (one lump-sum row per section) kept
+//   'detailed' , flat rows with Description | Qty | Rate | Amount.
+//   'sectioned', legacy roll-up (one lump-sum row per section) kept
 //                 for callers that still pass pre-rolled rows.
 //
 // `rows` shape (detailed/sectioned):
@@ -53,11 +53,11 @@ export default function LineItemsTable({
                   colSpan={showQty ? 4 : 2}
                   style={{
                     paddingTop: gi === 0 ? 14 : 22,
-                    paddingBottom: 6,
+                    paddingBottom: 8,
                     fontFamily: DOC_FONTS.body,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 700,
-                    letterSpacing: '0.14em',
+                    letterSpacing: 0,
                     textTransform: 'uppercase',
                     color: DOC_COLORS.inkMuted
                   }}
@@ -70,10 +70,10 @@ export default function LineItemsTable({
               )),
               items.length > 1 && (
                 <tr key={`g-${gi}-sub`}>
-                  <td colSpan={showQty ? 3 : 1} style={{ padding: '7px 12px 7px 0', textAlign: 'right', fontSize: 11, color: DOC_COLORS.inkFaint }}>
+                  <td colSpan={showQty ? 3 : 1} style={{ padding: '8px 12px 8px 0', textAlign: 'right', fontSize: 12, color: DOC_COLORS.inkFaint }}>
                     {g.title} subtotal
                   </td>
-                  <td style={{ padding: '7px 0', textAlign: 'right', fontSize: 12, fontWeight: 600, color: DOC_COLORS.inkMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '8px 0', textAlign: 'right', fontSize: 12, fontWeight: 600, color: DOC_COLORS.inkMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                     {money(subtotal, { cents: true })}
                   </td>
                 </tr>
@@ -102,13 +102,13 @@ export default function LineItemsTable({
             const amount = Number(r.amount != null ? r.amount : Number(r.qty || 1) * Number(r.rate || 0))
             return (
               <tr key={r.id || r.title}>
-                <Td><span style={{ fontWeight: 700, color: DOC_COLORS.ink }}>{r.title || '—'}</span></Td>
+                <Td><span style={{ fontWeight: 700, color: DOC_COLORS.ink }}>{r.title || '\u2003'}</span></Td>
                 <Td>
                   {descLines.length > 0 ? descLines.map((line: string, i: number) => (
                     <div key={i} style={{ marginTop: i === 0 ? 0 : 5, color: DOC_COLORS.inkMid }}>
                       {line}
                     </div>
-                  )) : <span style={{ color: DOC_COLORS.inkFaint }}>—</span>}
+                  )) : <span style={{ color: DOC_COLORS.inkFaint }}>:</span>}
                 </Td>
                 <Td align="right" mono bold>{money(amount, { cents: true })}</Td>
               </tr>
@@ -119,7 +119,7 @@ export default function LineItemsTable({
     )
   }
 
-  // 'detailed' — flat itemized rows.
+  // 'detailed', flat itemized rows.
   return (
     <table style={tableStyle()}>
       <thead>
@@ -130,7 +130,7 @@ export default function LineItemsTable({
           <ItemRow
             key={r.id || i}
             item={{
-              description: r.title || r.description || '—',
+              description: r.title || r.description || '\u2003',
               detailLines: r.descriptionLines
                 || (r.description && r.title ? String(r.description).split(/\n+/).map((s: string) => s.trim()).filter(Boolean) : []),
               qty: r.qty,
@@ -153,7 +153,7 @@ function tableStyle() {
     width: '100%',
     borderCollapse: 'collapse' as const,
     fontFamily: DOC_FONTS.body,
-    fontSize: 13,
+    fontSize: 14,
     color: DOC_COLORS.ink
   }
 }
@@ -182,9 +182,9 @@ function ItemRow({ item, showQty }: any) {
   return (
     <tr>
       <Td>
-        <span style={{ color: DOC_COLORS.ink }}>{item.description || '—'}</span>
+        <span style={{ color: DOC_COLORS.ink }}>{item.description || '\u2003'}</span>
         {detailLines.map((line: string, i: number) => (
-          <div key={i} style={{ marginTop: 3, fontSize: 11.5, color: DOC_COLORS.inkMuted }}>
+          <div key={i} style={{ marginTop: 3, fontSize: 12, color: DOC_COLORS.inkMuted }}>
             {line}
           </div>
         ))}
@@ -211,9 +211,9 @@ function Th({ children, align = 'left', style }: { children?: import('react').Re
         padding: '0 0 8px',
         borderBottom: `2px solid ${DOC_COLORS.ink}`,
         fontFamily: DOC_FONTS.body,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.16em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         color: DOC_COLORS.inkMuted,
         ...style
@@ -229,12 +229,12 @@ function Td({ children, align = 'left', mono = false, bold = false, muted = fals
     <td
       style={{
         verticalAlign: 'top',
-        padding: align === 'left' ? '10px 12px 10px 0' : '10px 0 10px 12px',
+        padding: align === 'left' ? '12px 12px 12px 0' : '12px 0 12px 12px',
         borderBottom: `1px solid ${DOC_COLORS.rule}`,
         textAlign: align,
         color: muted ? DOC_COLORS.inkMuted : DOC_COLORS.ink,
         fontFamily: DOC_FONTS.body,
-        fontSize: 13,
+        fontSize: 14,
         fontVariantNumeric: mono ? 'tabular-nums' : undefined,
         fontWeight: bold ? 700 : undefined,
         lineHeight: 1.45,

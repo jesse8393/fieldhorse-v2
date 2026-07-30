@@ -1,4 +1,4 @@
-// Demo data seed — Phase 19 / Audit Move #2.
+// Demo data seed, Phase 19 / Audit Move #2.
 //
 // Inserts a realistic-looking starter dataset for a brand-new account so
 // the user immediately sees the app's full surface (clients, jobs across
@@ -40,7 +40,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   const counts = { clients: 0, jobs: 0, events: 0, notes: 0, todos: 0, expenses: 0 }
 
   // ============================================================
-  // 1. CLIENTS — 3 distinct
+  // 1. CLIENTS, 3 distinct
   // ============================================================
   const { data: clients, error: clientsErr } = await supabase
     .from('fh_clients')
@@ -53,7 +53,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
         phone: '615-555-0142',
         email: 'henderson.family@example.com',
         address: '142 Maple Ridge Dr',
-        notes: 'Repeat client. Quality-focused, ok with longer timelines for the right finish.'
+        notes: 'Repeat client. Quality focused, ok with longer timelines for the right finish.'
       },
       {
         user_id: userId,
@@ -63,7 +63,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
         phone: '615-555-0288',
         email: 'ops@mccarthyconstruction.example',
         address: '8800 Industrial Pkwy, Suite 4',
-        notes: 'GC sub-relationship. Pays NET-15. Always wants final walkthrough docs the same day.'
+        notes: 'GC subcontractor relationship. Pays Net 15. Always wants final walkthrough docs the same day.'
       },
       {
         user_id: userId,
@@ -73,7 +73,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
         phone: '615-555-0334',
         email: 'jane.patel@example.com',
         address: '512 Oakdale Ln',
-        notes: 'New referral from the Henderson job. Budget-conscious; flag any creep early.'
+        notes: 'New referral from the Henderson job. Budget conscious; flag any creep early.'
       }
     ])
     .select('id, name')
@@ -84,7 +84,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   const patel = clients.find((c: any) => c.name === 'Jane Patel')
 
   // ============================================================
-  // 2. JOBS (fh_contacts) — 6 across every stage
+  // 2. JOBS (fh_contacts), 6 across every stage
   // ============================================================
   const { data: jobs, error: jobsErr } = await supabase
     .from('fh_contacts')
@@ -123,17 +123,17 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
         user_id: userId,
         source: 'demo',
         client_id: mccarthy.id,
-        name: 'McCarthy office build-out',
+        name: 'McCarthy office build out',
         phone: '615-555-0288',
         email: 'ops@mccarthyconstruction.example',
         address: '8800 Industrial Pkwy, Suite 4',
-        job_title: 'Office tenant build-out',
+        job_title: 'Office tenant build out',
         job_type: 'Renovation',
         amount: 87000,
         cost: 54200,
         stage: 'job',
         completed_at: new Date().toISOString(),
-        notes: 'Final walkthrough complete. Invoice sent. NET-15 expected by 5/9.'
+        notes: 'Final walkthrough complete. Invoice sent. Net 15 expected by 5/9.'
       },
       {
         user_id: userId,
@@ -186,12 +186,12 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   counts.jobs = jobs.length
   const henKitchen = jobs.find((j: any) => j.job_title === 'Kitchen remodel, full gut')
   const henBath = jobs.find((j: any) => j.job_title === 'Primary bath refresh')
-  const mccOffice = jobs.find((j: any) => j.job_title === 'Office tenant build-out')
+  const mccOffice = jobs.find((j: any) => j.job_title === 'Office tenant build out')
   const patelYard = jobs.find((j: any) => j.job_title === 'Front yard redesign')
   const murray = jobs.find((j: any) => j.job_title === 'Detached 2-car garage')
 
   // ============================================================
-  // 3. SCHEDULE — 4 events in the next 7 days
+  // 3. SCHEDULE, 4 events in the next 7 days
   // ============================================================
   const { data: events, error: eventsErr } = await supabase
     .from('fh_schedule')
@@ -199,14 +199,14 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       { user_id: userId, contact_id: henKitchen.id, title: 'Site visit for counter template', start_at: todayAt(9, 0) },
       { user_id: userId, contact_id: murray.id,    title: 'Concrete pour, slab',           start_at: todayAt(13, 0) },
       { user_id: userId, contact_id: mccOffice.id, title: 'Final walkthrough w/ client',    start_at: dayAt(1, 8, 30) },
-      { user_id: userId, contact_id: patelYard.id, title: 'On-site quote review',           start_at: dayAt(3, 10, 0) }
+      { user_id: userId, contact_id: patelYard.id, title: 'Quote review on site',           start_at: dayAt(3, 10, 0) }
     ])
     .select('id')
   if (eventsErr) throw eventsErr
   counts.events = events.length
 
   // ============================================================
-  // 4. NOTES — 3, one with parsed AI structure
+  // 4. NOTES, 3, one with parsed AI structure
   // ============================================================
   const { data: notes, error: notesErr } = await supabase
     .from('fh_notes')
@@ -260,14 +260,14 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   }
 
   // ============================================================
-  // 5. JOB TODOS — 5 on Henderson kitchen, mixed done/not
+  // 5. JOB TODOS, 5 on Henderson kitchen, mixed done/not
   // ============================================================
   const { data: todos, error: todosErr } = await supabase
     .from('fh_job_todos')
     .insert([
       { user_id: userId, job_id: henKitchen.id, text: 'Order cabinets',                          done: true,  completed_at: daysAgo(8) },
       { user_id: userId, job_id: henKitchen.id, text: 'Demo old appliances',                     done: true,  completed_at: daysAgo(6) },
-      { user_id: userId, job_id: henKitchen.id, text: 'Get plumbing rough-in inspection booked', done: false },
+      { user_id: userId, job_id: henKitchen.id, text: 'Get plumbing rough in inspection booked', done: false },
       { user_id: userId, job_id: henKitchen.id, text: 'Confirm tile pick with homeowner',         done: false },
       { user_id: userId, job_id: henKitchen.id, text: 'Schedule electrician for week of 5/5',     done: false }
     ])
@@ -280,7 +280,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   }
 
   // ============================================================
-  // 6. EXPENSES — a few on the McCarthy job for margin realism
+  // 6. EXPENSES, a few on the McCarthy job for margin realism
   // ============================================================
   const { data: expenses, error: expensesErr } = await supabase
     .from('fh_expenses')

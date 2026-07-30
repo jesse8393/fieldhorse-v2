@@ -28,7 +28,7 @@ function money(n: any) {
 }
 
 /**
- * Expenses section — fh_expenses CRUD. Every mutation calls recalcCost so
+ * Expenses section, fh_expenses CRUD. Every mutation calls recalcCost so
  * the job's cost number stays accurate across the app.
  */
 export default function ExpensesSection({ contact, expenses = [], userId, fetchAll }: any) {
@@ -42,8 +42,8 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
   const [saving, setSaving] = useState(false)
   const total = expenses.reduce((s: any, e: any) => s + Number(e.amount || 0), 0)
 
-  // Crew clock-ins for this job (other org members' punches). Computed,
-  // not stored — the rows live in fh_time_punches, the dollars land in
+  // Crew clock ins for this job (other org members' punches). Computed,
+  // not stored, the rows live in fh_time_punches, the dollars land in
   // contact.cost via recalcCost. Shown so the operator can see WHY the
   // job's cost is higher than the expense list alone.
   const [crewLabor, setCrewLabor] = useState<CrewLabor | null>(null)
@@ -109,14 +109,14 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
           Expenses
         </Eyebrow>
         <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 11,
+          fontFamily: 'var(--font-body)', fontSize: 12,
           color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
         }}>
           Total{' '}
@@ -126,27 +126,27 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
         </span>
       </div>
 
-      {/* Crew labor — clock-in time from team members, priced at their
+      {/* Crew labor, clock in time from team members, priced at their
           punch rate. Counted into job cost automatically. */}
       {crewLabor && crewLabor.punches > 0 && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-          padding: '10px 12px', borderRadius: 12,
+          padding: '12px 12px', borderRadius: 10,
           background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)'
         }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, color: 'var(--v3-text)' }}>
               Crew labor · {crewLabor.hours.toFixed(1)}h
             </div>
-            <div style={{ fontSize: 10.5, color: 'var(--v3-text-muted)', marginTop: 2 }}>
-              {crewLabor.punches} clock-in{crewLabor.punches === 1 ? '' : 's'}
+            <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>
+              {crewLabor.punches} clock in{crewLabor.punches === 1 ? '' : 's'}
               {crewLabor.unratedHours > 0.05
-                ? ` · ${crewLabor.unratedHours.toFixed(1)}h missing a rate — set rates in Timesheets`
+                ? ` · ${crewLabor.unratedHours.toFixed(1)}h missing a rate, set rates in Timesheets`
                 : ' · counted in job cost'}
             </div>
           </div>
           <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
             color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
           }}>
             {money(crewLabor.cost)}
@@ -159,13 +159,13 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
         whileTap={{ scale: 0.98 }}
         onClick={() => { hapticTap(); setOpen(true) }}
         style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '11px 16px', borderRadius: 12,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '12px 16px', borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
           color: 'var(--v3-primary)',
-          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-          letterSpacing: '0.04em', cursor: 'pointer',
+          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+          letterSpacing: 0, cursor: 'pointer',
           WebkitTapHighlightColor: 'transparent'
         }}
       >
@@ -175,15 +175,15 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
 
       {expenses.length === 0 ? (
         <div style={{
-          padding: '20px 18px', borderRadius: 14,
+          padding: '24px 16px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center', lineHeight: 1.5
+          fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
-          No expenses yet. Materials, fuel, permits — log as you go so margin stays real.
+          No expenses yet. Materials, fuel, permits, log as you go so margin stays real.
         </div>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <AnimatePresence>
             {expenses.map((e: any) => (
               <motion.li
@@ -195,12 +195,12 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
                 transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px', borderRadius: 12,
+                  padding: '12px 12px', borderRadius: 10,
                   background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
                 }}
               >
                 <span aria-hidden="true" style={{
-                  flexShrink: 0, width: 32, height: 32, borderRadius: 9,
+                  flexShrink: 0, width: 32, height: 32, borderRadius: 10,
                   background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
                   color: 'var(--v3-primary)',
                   display: 'grid', placeItems: 'center'
@@ -217,7 +217,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
                   </div>
                   <div style={{
                     marginTop: 2,
-                    fontFamily: 'var(--font-body)', fontSize: 11,
+                    fontFamily: 'var(--font-body)', fontSize: 12,
                     color: 'var(--v3-text-muted)',
                     fontVariantNumeric: 'tabular-nums',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
@@ -238,7 +238,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
                     onClick={() => remove(e.id)}
                     aria-label="Delete expense"
                     style={{
-                      width: 28, height: 28, borderRadius: 8,
+                      width: 28, height: 28, borderRadius: 10,
                       border: 'none', background: 'transparent',
                       color: 'var(--v3-text-muted)', cursor: 'pointer',
                       display: 'grid', placeItems: 'center'

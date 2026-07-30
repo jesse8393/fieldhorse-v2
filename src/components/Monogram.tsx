@@ -1,10 +1,10 @@
-// Fieldhorse monogram — FH mark for app icon, push, loaders.
+// Fieldhorse monogram, FH mark for app icon, push, loaders.
 // Scales from 16 → 1024. Gold on onyx with subtle radial glow.
 
 export default function Monogram({ size = 48, variant = 'dark', glow = true }: any) {
-  const bg = variant === 'dark' ? '#0B0B0B' : 'var(--v3-text)'
-  const ink = variant === 'dark' ? 'var(--v3-text)' : '#0B0B0B'
-  const gold = '#C7A45A'
+  const bg = variant === 'dark' ? '#141414' : 'var(--v3-text)'
+  const ink = variant === 'dark' ? 'var(--v3-text)' : '#141414'
+  const gold = '#C9963A'
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -28,7 +28,7 @@ export default function Monogram({ size = 48, variant = 'dark', glow = true }: a
       </defs>
       <rect width="512" height="512" rx="96" fill={bg} />
       {glow && <rect width="512" height="512" rx="96" fill="url(#fh-glow)" />}
-      {/* FH monogram — geometric, Bebas-inspired */}
+      {/* FH monogram, geometric, Bebas-inspired */}
       <g stroke={gold} strokeWidth="0" fill={gold}>
         {/* F */}
         <rect x="120" y="150" width="28" height="220" />

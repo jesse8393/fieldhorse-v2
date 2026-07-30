@@ -1,6 +1,6 @@
 // Shared CSV building + download. Extracted from SnowInvoicesBuild /
 // SnowClientsBuild (audit: the escaping and Blob-download ritual was
-// duplicated verbatim — an escaping fix must land once, not twice).
+// duplicated verbatim, an escaping fix must land once, not twice).
 
 /** RFC-4180-style field escaping: quote when the value contains a
  *  delimiter, quote, or newline; double any embedded quotes. */
@@ -10,7 +10,7 @@ export function escapeCsvField(v: unknown): string {
 }
 
 /** Assemble a CSV string from a header row + data rows. Cells are
- *  escaped here — pass raw values. */
+ *  escaped here, pass raw values. */
 export function buildCsv(header: string[], rows: unknown[][]): string {
   const lines = [header.map(escapeCsvField).join(',')]
   for (const row of rows) lines.push(row.map(escapeCsvField).join(','))

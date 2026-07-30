@@ -10,9 +10,9 @@ import { loadUserRateCard } from '../../../lib/rateCard.ts'
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * Quote items section — fh_quote_items CRUD editor.
+ * Quote items section, fh_quote_items CRUD editor.
  *
- * Phase 4A-3: full line-item editor. Operators add, edit, reorder,
+ * Phase 4A-3: full line item editor. Operators add, edit, reorder,
  * and delete quote rows. The recalc trigger from migration 011 keeps
  * fh_contacts.amount in sync with the sum of base items
  * (is_optional=false AND is_excluded=false) on every write.
@@ -29,12 +29,12 @@ import { Eyebrow } from '../../../components/v3'
 const SECTION_SUGGESTIONS = ['Labor', 'Materials', 'Subs', 'Equipment', 'Other']
 
 /* ============================================================
-   Line-item autocomplete — kills the typing on the highest-
+   Line item autocomplete, kills the typing on the highest-
    frequency action in the app. Two sources, merged:
-     • history — the operator's own past fh_quote_items, ranked by
+     • history, the operator's own past fh_quote_items, ranked by
        how often a description recurs (most-used first), carrying
        the most recent unit + rate for each
-     • rates   — the Settings rate card (defaults + overrides),
+     • rates  , the Settings rate card (defaults + overrides),
        priced at the midpoint of the low/high band
    ============================================================ */
 export type ItemSuggestion = {
@@ -52,7 +52,7 @@ function useItemSuggestions(userId: any): ItemSuggestion[] {
     if (!userId) { setSuggestions([]); return }
     ;(async () => {
       const out: ItemSuggestion[] = []
-      // History — newest first so the first row seen per description
+      // History, newest first so the first row seen per description
       // carries the operator's latest pricing.
       const { data } = await supabase
         .from('fh_quote_items')
@@ -76,7 +76,7 @@ function useItemSuggestions(userId: any): ItemSuggestion[] {
         })
       }
       out.push(...byDesc.values())
-      // Rate card — Settings trades priced at the band midpoint.
+      // Rate card, Settings trades priced at the band midpoint.
       try {
         const { merged } = await loadUserRateCard(userId)
         for (const entry of Object.values(merged)) {
@@ -111,7 +111,7 @@ function matchSuggestions(all: ItemSuggestion[], input: string): ItemSuggestion[
   const contains: ItemSuggestion[] = []
   for (const s of all) {
     const d = s.description.toLowerCase()
-    if (d === q) continue // already typed exactly — no popup noise
+    if (d === q) continue // already typed exactly, no popup noise
     if (d.startsWith(q)) starts.push(s)
     else if (d.includes(q)) contains.push(s)
   }
@@ -120,7 +120,7 @@ function matchSuggestions(all: ItemSuggestion[], input: string): ItemSuggestion[
   return [...starts, ...contains].slice(0, 6)
 }
 
-// Mobile keyboard fix — when an input gains focus, the soft keyboard
+// Mobile keyboard fix, when an input gains focus, the soft keyboard
 // commonly covers the active field on phones. Defer the scroll until
 // the keyboard has had a moment to appear, then center the input in
 // the visible viewport. No-op on desktop (already-visible inputs ignore
@@ -175,7 +175,7 @@ function draftFromRow(row: any) {
 // Validate a draft before write. Returns null on success, or an error
 // message string. Description requirement is enforced in handlers via
 // the disabled state, but mirrored here for defense in depth. Numeric
-// fields are guarded against negatives and NaN — HTML `min="0"` is not
+// fields are guarded against negatives and NaN, HTML `min="0"` is not
 // reliably enforced on submit, so we re-check at the JS boundary.
 // Credit lines (negative amounts) are deferred to a later phase.
 function validateDraft(d: any) {
@@ -227,7 +227,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   const [editDraft, setEditDraft] = useState(emptyDraft)
   const [editing, setEditing] = useState(false)
 
-  // `silent` refetches without flashing the whole list to a skeleton —
+  // `silent` refetches without flashing the whole list to a skeleton :
   // used after every add/edit/delete so rapid multi-item entry stays
   // smooth instead of blinking on each write (the "glitchy" complaint).
   // Only the initial load shows the skeleton.
@@ -254,12 +254,12 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   useEffect(() => { fetchRows() }, [fetchRows])
 
   // Bumped after each successful add so the Add card re-focuses its
-  // description input — you can fire off line items back-to-back without
+  // description input, you can fire off line items back-to-back without
   // reaching for the field again.
   const [addFocusSignal, setAddFocusSignal] = useState(0)
 
   // ============================================================
-  // CRUD — all writes user_id-guarded. The migration-011 recalc
+  // CRUD, all writes user_id-guarded. The migration-011 recalc
   // trigger fires on each write and keeps fh_contacts.amount synced.
   // ============================================================
 
@@ -272,7 +272,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     const sortOrder = Number.isFinite(input.sort_order) ? input.sort_order : sortRef.current++
     const tempId = `temp-${(typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${rows.length}-${sortOrder}`}`
     const optimisticRow = { id: tempId, user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder, _pending: true }
-    // Show the line immediately — no network wait between entries. This is
+    // Show the line immediately, no network wait between entries. This is
     // what makes rapid multi-item entry feel instant instead of glitchy.
     setRows((rs) => [...rs, optimisticRow])
     const payload = { user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder }
@@ -311,7 +311,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 
   async function removeItem(id: any) {
     if (!id || !userId) return false
-    // A still-saving optimistic row has no real id yet — ignore until it
+    // A still-saving optimistic row has no real id yet, ignore until it
     // reconciles (its actions are disabled in the UI too).
     if (String(id).startsWith('temp-')) return false
     hapticTap()
@@ -373,7 +373,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   }
 
   // ============================================================
-  // Form handlers — add + edit share the same draft shape.
+  // Form handlers, add + edit share the same draft shape.
   // Auto-recompute amount when qty or rate change unless the
   // operator has explicitly overridden the amount field.
   // is_optional and is_excluded are mutually exclusive.
@@ -381,7 +381,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 
   function patchDraft(setter: any, key: any, value: any) {
     setter((d: any) => {
-      // Synthetic 'kind' key — drives the 3-way mode picker and writes
+      // Synthetic 'kind' key, drives the 3-way mode picker and writes
       // both is_optional + is_excluded atomically. Mutually exclusive
       // by design; eliminates the ambiguity of two parallel checkboxes.
       if (key === 'kind') {
@@ -447,7 +447,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     hapticTap()
     // Fire the optimistic add (it reconciles in the background) and reset
     // the form NOW so the next line can be typed with zero latency. Carry
-    // the section forward — quotes are usually entered a section at a time.
+    // the section forward, quotes are usually entered a section at a time.
     const carrySection = draft.section
     void addItem({ ...normalizeForDB(draft) })
     setDraft({ ...emptyDraft(), section: carrySection })
@@ -480,7 +480,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   }
 
   // ============================================================
-  // Derived totals — pure, no DB call.
+  // Derived totals, pure, no DB call.
   // ============================================================
   const totals = useMemo(() => {
     let base = 0
@@ -496,10 +496,10 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   }, [rows])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 32px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 32px' }}>
       <section
         className="v3-section v3-section--primary-quiet"
-        style={{ margin: 0, padding: '16px 18px' }}
+        style={{ margin: 0, padding: '16px 16px' }}
       >
         <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
           <Receipt size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
@@ -507,23 +507,23 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         </span>
         <h2 style={{
           margin: '6px 0 0',
-          fontSize: 'clamp(20px, 5vw, 26px)',
+          fontSize: 24,
           lineHeight: 1.1,
-          letterSpacing: '-0.015em',
+          letterSpacing: 0,
           fontWeight: 600,
           color: 'var(--v3-text)'
         }}>
           Line items
         </h2>
 
-        {/* Totals row — appears once items exist. Base = what fh_contacts.amount
+        {/* Totals row, appears once items exist. Base = what fh_contacts.amount
             becomes via the recalc trigger. Optional/Excluded shown only when > 0. */}
         {!loading && rows.length > 0 && (
           <div style={{
             marginTop: 14,
             display: 'flex',
             alignItems: 'baseline',
-            gap: 18,
+            gap: 16,
             flexWrap: 'wrap'
           }}>
             <Stat label="Items" value={String(totals.count)} />
@@ -547,11 +547,11 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         <p style={{
           margin: '12px 0 0',
           fontFamily: 'var(--font-body)',
-          fontSize: 11,
+          fontSize: 12,
           lineHeight: 1.5,
           color: 'var(--v3-text-muted)'
         }}>
-          Base items make up the quoted price. Optional add-ons and exclusions can be shown on the proposal without changing the approved total.
+          Base items make up the quoted price. Optional additions and exclusions can be shown on the proposal without changing the approved total.
         </p>
       </section>
 
@@ -574,13 +574,13 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         <SkeletonList rows={3} card={false} />
       ) : rows.length === 0 ? (
         <div style={{
-          padding: '20px 18px',
-          borderRadius: 14,
+          padding: '24px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)',
           fontFamily: 'var(--font-body)',
-          fontSize: 13,
+          fontSize: 14,
           textAlign: 'center',
           lineHeight: 1.5
         }}>
@@ -632,7 +632,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
 }
 
 /* ============================================================
-   ItemRow — collapsed view of a single quote item.
+   ItemRow, collapsed view of a single quote item.
    ============================================================ */
 function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, onMoveDown }: any) {
   const isOptional = !!row.is_optional && !row.is_excluded
@@ -647,8 +647,8 @@ function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, on
       exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
       style={{
-        padding: '12px 14px',
-        borderRadius: 12,
+        padding: '12px 12px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
         display: 'flex',
@@ -657,11 +657,11 @@ function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, on
         opacity: dim
       }}
     >
-      {/* Top row — section eyebrow + amount */}
+      {/* Top row, section eyebrow + amount */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
           {row.section && (
-            <Eyebrow style={{ padding: '2px 8px', borderRadius: 999, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
+            <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
               {row.section}
             </Eyebrow>
           )}
@@ -670,7 +670,7 @@ function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, on
         </div>
         <span style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 18, lineHeight: 1, letterSpacing: '0.02em',
+          fontSize: 20, lineHeight: 1, letterSpacing: 0,
           color: isExcluded ? 'var(--v3-text-muted)' : 'var(--v3-text)',
           fontVariantNumeric: 'tabular-nums',
           textDecoration: isExcluded ? 'line-through' : 'none'
@@ -715,9 +715,9 @@ function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, on
         </div>
       )}
 
-      {/* Actions — ↑ ↓ edit delete. Each ≥40px tap target. Disabled while
+      {/* Actions, ↑ ↓ edit delete. Each ≥40px tap target. Disabled while
           the row is still saving (optimistic add not yet reconciled). */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
         <RowActionButton ariaLabel="Move up" onClick={onMoveUp} disabled={isFirst || pending}>
           <ChevronUp size={16} />
         </RowActionButton>
@@ -732,7 +732,7 @@ function ItemRow({ row, pending, isFirst, isLast, onEdit, onDelete, onMoveUp, on
         </RowActionButton>
         {pending && (
           <span style={{
-            fontFamily: 'var(--font-body)', fontSize: 11,
+            fontFamily: 'var(--font-body)', fontSize: 12,
             color: 'var(--v3-text-muted)', marginLeft: 2
           }}>
             Saving…
@@ -793,14 +793,14 @@ function StatusChip({ label, tone }: any) {
         color: 'var(--v3-text-muted)'
       }
   return (
-    <Eyebrow style={{ padding: '2px 8px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
+    <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       {label}
     </Eyebrow>
   )
 }
 
 /* ============================================================
-   DraftCard — shared form layout for both Add and Edit.
+   DraftCard, shared form layout for both Add and Edit.
    ============================================================ */
 function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryDisabled, showCancel, onCancel, suggestions = [], onPickSuggestion, autoFocusSignal }: any) {
   // Suggestion popup state. Closes on blur (after a beat so a tap on a
@@ -834,19 +834,19 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
     <div
       onKeyDown={onCardKeyDown}
       style={{
-        padding: '14px 16px',
-        borderRadius: 14,
+        padding: '12px 16px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 10
+        gap: 12
       }}>
       <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
         {eyebrow}
       </span>
 
-      {/* Description (full width) — with rate-card / history autocomplete */}
+      {/* Description (full width), with rate-card / history autocomplete */}
       <FormField label="Description" required>
         <div style={{ position: 'relative' }}>
           <input
@@ -863,10 +863,10 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
             <div style={{
               position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)',
               zIndex: 30,
-              borderRadius: 12,
+              borderRadius: 10,
               background: 'var(--v3-surface-3)',
               border: '1px solid var(--v3-border-strong)',
-              boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
+              boxShadow: '0 12px 28px rgba(20, 20, 20,0.45)',
               overflow: 'hidden'
             }}>
               {matches.map((s: ItemSuggestion) => (
@@ -878,23 +878,23 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
                   onMouseDown={(ev) => { ev.preventDefault(); onPickSuggestion(s); setDescFocused(false) }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    width: '100%', padding: '10px 12px',
+                    width: '100%', padding: '12px 12px',
                     background: 'transparent', border: 'none',
                     borderBottom: '1px solid var(--v3-border)',
                     color: 'var(--v3-text)', textAlign: 'left',
-                    fontFamily: 'var(--font-body)', fontSize: 13,
+                    fontFamily: 'var(--font-body)', fontSize: 14,
                     cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
                   }}
                 >
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {s.description}
                   </span>
-                  <span style={{ flexShrink: 0, fontSize: 11, color: 'var(--v3-text-muted)' }}>
+                  <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--v3-text-muted)' }}>
                     {money(s.rate)}{s.unit ? `/${s.unit}` : ''}
                   </span>
                   <span style={{
-                    flexShrink: 0, fontSize: 9, letterSpacing: '0.08em',
-                    padding: '2px 6px', borderRadius: 999,
+                    flexShrink: 0, fontSize: 12, letterSpacing: 0,
+                    padding: '4px 8px', borderRadius: 10,
                     fontFamily: 'var(--font-display)',
                     background: s.source === 'rates' ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border)',
@@ -909,11 +909,11 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
         </div>
       </FormField>
 
-      {/* Numeric row — section / qty / unit / rate / amount. Wraps on narrow viewports. */}
+      {/* Numeric row, section / qty / unit / rate / amount. Wraps on narrow viewports. */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-        gap: 10
+        gap: 12
       }}>
         <FormField label="Section">
           <input
@@ -988,12 +988,12 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
         />
       </FormField>
 
-      {/* Mode — mutually exclusive 3-way segment. NOT wrapped in
+      {/* Mode, mutually exclusive 3-way segment. NOT wrapped in
           FormField (a <label>) because <label> forwards clicks to the
-          first form-control descendant — the Base button — which
+          first form-control descendant, the Base button, which
           silently reset every non-Base selection back to Base on the
           Add form. Inline div avoids the label-forward path entirely. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <Eyebrow>
           Mode
         </Eyebrow>
@@ -1003,10 +1003,10 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
         />
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 11, lineHeight: 1.4,
+          fontSize: 12, lineHeight: 1.4,
           color: 'var(--v3-text-muted)'
         }}>
-          Base items count toward the quoted price. Optional add-ons and exclusions appear on the proposal but never roll up.
+          Base items count toward the quoted price. Optional additions and exclusions appear on the proposal but never roll up.
         </span>
       </div>
 
@@ -1020,15 +1020,15 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
             style={{
               flex: '1 1 auto',
               minHeight: 44,
-              padding: '12px 14px',
-              borderRadius: 12,
+              padding: '12px 12px',
+              borderRadius: 10,
               background: 'var(--v3-surface-2)',
               border: '1px solid var(--v3-border)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
-              fontSize: 13, fontWeight: 600,
+              fontSize: 14, fontWeight: 600,
               cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               WebkitTapHighlightColor: 'transparent'
             }}
           >
@@ -1044,19 +1044,19 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
           style={{
             flex: showCancel ? '2 1 auto' : '1 1 auto',
             minHeight: 44,
-            padding: '12px 14px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             border: 'none',
             background: primaryDisabled
               ? 'var(--v3-surface-2)'
               : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
             color: primaryDisabled ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)',
-            fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+            fontSize: 14, fontWeight: 700, letterSpacing: 0,
             cursor: primaryDisabled ? 'default' : 'pointer',
             opacity: primaryDisabled ? 0.6 : 1,
-            boxShadow: primaryDisabled ? 'none' : '0 0 0 2px rgba(228, 190, 111, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            boxShadow: primaryDisabled ? 'none' : '0 0 0 2px rgba(201, 150, 58, 0.10), 0 4px 12px rgba(201, 150, 58, 0.18)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent'
           }}
         >
@@ -1070,7 +1070,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
 
 function FormField({ label, required, hint, children }: any) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <Eyebrow>
         {label}{required ? ' *' : ''}
       </Eyebrow>
@@ -1078,7 +1078,7 @@ function FormField({ label, required, hint, children }: any) {
       {hint && (
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 11, lineHeight: 1.4,
+          fontSize: 12, lineHeight: 1.4,
           color: 'var(--v3-text-muted)'
         }}>
           {hint}
@@ -1089,7 +1089,7 @@ function FormField({ label, required, hint, children }: any) {
 }
 
 /**
- * KindPicker — 3-way segment control for quote item classification.
+ * KindPicker, 3-way segment control for quote item classification.
  * Mutually exclusive by design: every row is exactly Base, Optional,
  * or Excluded. Replaces the prior parallel checkboxes that allowed
  * an ambiguous "neither flag set" state to slip through silently.
@@ -1097,7 +1097,7 @@ function FormField({ label, required, hint, children }: any) {
 function KindPicker({ value, onChange }: any) {
   const options = [
     { value: 'base',     label: 'Base',     hint: 'Counts toward quoted price' },
-    { value: 'optional', label: 'Optional', hint: 'Add-on, shown for reference' },
+    { value: 'optional', label: 'Optional', hint: 'Addition, shown for reference' },
     { value: 'excluded', label: 'Excluded', hint: 'Out of scope, not included' }
   ]
   return (
@@ -1107,7 +1107,7 @@ function KindPicker({ value, onChange }: any) {
       style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 6,
+        gap: 8,
         background: 'var(--v3-surface-2)',
         border: '1px solid var(--v3-border)',
         borderRadius: 10,
@@ -1126,8 +1126,8 @@ function KindPicker({ value, onChange }: any) {
             title={opt.hint}
             style={{
               minHeight: 40,
-              padding: '8px 6px',
-              borderRadius: 8,
+              padding: '8px 8px',
+              borderRadius: 10,
               border: 'none',
               background: on
                 ? 'color-mix(in srgb, var(--v3-primary) 18%, transparent)'
@@ -1136,7 +1136,7 @@ function KindPicker({ value, onChange }: any) {
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.06em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               cursor: 'pointer',
               WebkitTapHighlightColor: 'transparent',
@@ -1153,7 +1153,7 @@ function KindPicker({ value, onChange }: any) {
 
 const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
-  padding: '11px 13px',
+  padding: '12px 12px',
   borderRadius: 10,
   background: 'var(--v3-surface-2)',
   border: '1px solid var(--v3-border)',
@@ -1162,7 +1162,7 @@ const inputStyle: import('react').CSSProperties = {
   fontSize: 14,
   outline: 'none',
   fontVariantNumeric: 'tabular-nums',
-  // Mobile keyboard defense — when the browser auto-scroll-into-view
+  // Mobile keyboard defense, when the browser auto-scroll-into-view
   // fires on focus, scroll-margin tells it to leave keyboard room
   // below the field. Companion to scrollIntoCenterOnFocus().
   scrollMarginBottom: 320
@@ -1175,10 +1175,10 @@ function Stat({ label, value, tone = 'default' }: any) {
       ? 'var(--v3-text-muted)'
       : 'var(--v3-text)'
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
       <span style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 22, lineHeight: 1, letterSpacing: '0.02em',
+        fontSize: 20, lineHeight: 1, letterSpacing: 0,
         color: valueColor,
         fontVariantNumeric: 'tabular-nums'
       }}>

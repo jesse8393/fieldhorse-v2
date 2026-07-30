@@ -1,12 +1,12 @@
-// SubPortal — /sub-portal.
+// SubPortal, /sub-portal.
 //
 // Landing for subcontractors / accepted partners. Phase D pass 2:
-//   - Invitations list (read-only — direct fh_job_partners query)
+//   - Invitations list (read-only, direct fh_job_partners query)
 //   - Sub profile section (read + edit via /api/sub-profile-update)
-//   - Document uploads (COI / W-9 / License) via signed-upload-URL
+//   - Document uploads (COI / W9 / License) via signed-upload-URL
 //
 // Deliberately NO payment history here: fh_payments rows are the GC's
-// client receipts, not money paid to the sub — showing them here both
+// client receipts, not money paid to the sub, showing them here both
 // mis-stated the sub's income and leaked the GC's revenue.
 //
 // One round trip via /api/sub-portal-context returns profiles,
@@ -33,10 +33,10 @@ import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   try {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-  } catch { return '—' }
+  } catch { return '\u2003' }
 }
 
 function stageTone(stage: string | null): 'good' | 'warn' | 'bad' | 'neutral' {
@@ -56,7 +56,7 @@ function stageLabel(stage: string | null): string {
     case 'invoice': return 'Invoicing'
     case 'closed':  return 'Completed'
     case 'lost':    return 'Lost'
-    default:        return stage || '—'
+    default:        return stage || '\u2003'
   }
 }
 
@@ -129,7 +129,7 @@ export default function SubPortal() {
 
   // No payment figures in the portal: fh_payments rows are the GC's
   // client receipts, not money paid to the sub. The old "Paid YTD" KPI
-  // summed the GC's revenue on shared jobs — wrong for the sub AND a
+  // summed the GC's revenue on shared jobs, wrong for the sub AND a
   // leak of the GC's financials. The server no longer returns them.
   const stats = useMemo(() => {
     const active = partners.filter((p) => {
@@ -195,20 +195,20 @@ export default function SubPortal() {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Signed in as</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', wordBreak: 'break-all' }}>
-              {user?.email || '—'}
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', wordBreak: 'break-all' }}>
+              {user?.email || '\u2003'}
             </p>
             <p>
               {orgId
                 ? 'You also belong to an organization. Use the main sidebar for your owner / crew tools.'
-                : 'Manage your insurance, W-9, and payments across every contractor that has you on file.'}
+                : 'Manage your insurance, W9, and payments across every contractor that has you on file.'}
             </p>
           </div>
 
           <div className="fh-build-mini-grid">
             <MiniMetric label="Active jobs" value={String(stats.active)} accent />
             <MiniMetric label="Completed" value={String(stats.completed)} />
-            <MiniMetric label="All-time jobs" value={String(stats.total)} />
+            <MiniMetric label="All time jobs" value={String(stats.total)} />
             <MiniMetric
               label="Insurance"
               value={ins.label}
@@ -232,8 +232,8 @@ export default function SubPortal() {
         {!loading && !error && (
           <section className="fh-build-content-grid fh-build-content-grid--jobs">
 
-            {/* MAIN — invitations + payments + profile */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+            {/* MAIN, invitations + payments + profile */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
 
               {/* Profile + docs */}
               <section className="fh-build-card">
@@ -251,7 +251,7 @@ export default function SubPortal() {
                 </header>
 
                 {!profile ? (
-                  <div style={{ padding: '8px 22px 22px' }}>
+                  <div style={{ padding: '8px 24px 24px' }}>
                     <DataErrorState
                       compact
                       title="No contractor profile yet"
@@ -259,12 +259,12 @@ export default function SubPortal() {
                     />
                   </div>
                 ) : (
-                  <div style={{ padding: '8px 22px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <ProfileRow label="Name on file" value={profile.name || '—'} muted />
-                    <ProfileRow label="Company" value={profile.company || '—'} muted />
-                    <ProfileRow label="Phone" value={profile.phone || '—'} />
-                    <ProfileRow label="Address" value={profile.address || '—'} />
-                    <ProfileRow label="EIN" value={profile.ein || '—'} />
+                  <div style={{ padding: '8px 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <ProfileRow label="Name on file" value={profile.name || '\u2003'} muted />
+                    <ProfileRow label="Company" value={profile.company || '\u2003'} muted />
+                    <ProfileRow label="Phone" value={profile.phone || '\u2003'} />
+                    <ProfileRow label="Address" value={profile.address || '\u2003'} />
+                    <ProfileRow label="EIN" value={profile.ein || '\u2003'} />
                     <ProfileRow
                       label="Insurance carrier"
                       value={profile.insurance_carrier || 'Not provided'}
@@ -272,20 +272,20 @@ export default function SubPortal() {
                     />
                     <ProfileRow
                       label="Insurance policy #"
-                      value={profile.insurance_policy || '—'}
+                      value={profile.insurance_policy || '\u2003'}
                     />
                     <ProfileRow
                       label="Insurance expires"
                       value={profile.insurance_expires_on ? fmtDate(profile.insurance_expires_on) : 'Not on file'}
                       tone={ins.tone === 'bad' ? 'bad' : ins.tone === 'warn' ? 'warn' : undefined}
                     />
-                    <ProfileRow label="License #" value={profile.license_number || '—'} />
-                    <ProfileRow label="Payment method" value={profile.payment_method || '—'} />
-                    <ProfileRow label="Payment handle" value={profile.payment_handle || '—'} />
+                    <ProfileRow label="License #" value={profile.license_number || '\u2003'} />
+                    <ProfileRow label="Payment method" value={profile.payment_method || '\u2003'} />
+                    <ProfileRow label="Payment handle" value={profile.payment_handle || '\u2003'} />
 
-                    <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 14, marginTop: 4 }}>
+                    <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 12, marginTop: 4 }}>
                       <div className="fh-build-eyebrow" style={{ marginBottom: 10 }}>Documents</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                         <DocSlot
                           kind="coi"
                           label="Certificate of insurance"
@@ -295,7 +295,7 @@ export default function SubPortal() {
                         />
                         <DocSlot
                           kind="w9"
-                          label="W-9 tax form"
+                          label="W9 tax form"
                           path={profile.w9_path}
                           uploading={uploading === 'w9'}
                           onUpload={(f) => handleUpload('w9', f)}
@@ -345,7 +345,7 @@ export default function SubPortal() {
                         >
                           <strong className="fh-build-truncate" title={j?.name || ''}>{j?.name || 'Untitled job'}</strong>
                           <span className="fh-build-truncate fh-build-rel" title={j?.address || ''}>
-                            {j?.address ? <><MapPin size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{j.address}</> : '—'}
+                            {j?.address ? <><MapPin size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{j.address}</> : '\u2003'}
                           </span>
                           <span className="fh-build-rel" style={{ textTransform: 'capitalize' }}>
                             {p.partner_role || 'Partner'}
@@ -366,13 +366,13 @@ export default function SubPortal() {
 
             </div>
 
-            {/* RAIL — quick links + help */}
+            {/* RAIL, quick links + help */}
             <aside className="fh-build-rail fh-build-rail--page">
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Trades on file</div>
                 {stats.trades.length === 0 ? (
                   <>
-                    <strong>—</strong>
+                    <strong>:</strong>
                     <span>No trade tags on your accepted invites.</span>
                   </>
                 ) : (
@@ -388,7 +388,7 @@ export default function SubPortal() {
 
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Insurance</div>
-                <strong style={{ color: ins.tone === 'bad' ? 'var(--v3-danger-bright)' : ins.tone === 'warn' ? '#e0a141' : ins.tone === 'good' ? '#73c982' : undefined }}>
+                <strong style={{ color: ins.tone === 'bad' ? 'var(--v3-danger-bright)' : ins.tone === 'warn' ? '#C9963A' : ins.tone === 'good' ? '#2D7A4F' : undefined }}>
                   {ins.label}
                 </strong>
                 <span>
@@ -434,13 +434,13 @@ export default function SubPortal() {
 
 function ProfileRow({ label, value, tone, muted }: { label: string; value: string; tone?: 'warn' | 'bad'; muted?: boolean }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 180px) minmax(0, 1fr)', gap: 14, alignItems: 'baseline' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 180px) minmax(0, 1fr)', gap: 12, alignItems: 'baseline' }}>
       <Eyebrow>
         {label}
       </Eyebrow>
       <span style={{
         fontSize: 14,
-        color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#e0a141' : 'var(--v3-text)',
+        color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#C9963A' : 'var(--v3-text)',
         wordBreak: 'break-word',
       }}>
         {value}
@@ -475,13 +475,13 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
     <div
       style={{
         position: 'relative',
-        padding: 14,
-        borderRadius: 8,
+        padding: 12,
+        borderRadius: 10,
         background: path
-          ? 'color-mix(in srgb, var(--v3-primary, #c9963a) 8%, transparent)'
+          ? 'color-mix(in srgb, var(--v3-primary, #C9963A) 8%, transparent)'
           : 'var(--v3-glass-tint)',
         border: path
-          ? '1px solid color-mix(in srgb, var(--v3-primary, #c9963a) 28%, transparent)'
+          ? '1px solid color-mix(in srgb, var(--v3-primary, #C9963A) 28%, transparent)'
           : '1px solid var(--v3-border-mid)',
         display: 'flex',
         flexDirection: 'column',
@@ -489,12 +489,12 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary, #c9963a)' : 'var(--v3-text-muted)' }} />
-        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--v3-text)' }}>
+        <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary, #C9963A)' : 'var(--v3-text-muted)' }} />
+        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-text)' }}>
           {label}
         </strong>
       </div>
-      <div style={{ fontSize: 12, color: path ? '#73c982' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 12, color: path ? '#2D7A4F' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         {path ? <><Check size={12} aria-hidden="true" /> On file</> : 'Not uploaded'}
       </div>
       <input
@@ -504,7 +504,7 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
         style={{ display: 'none' }}
         onChange={(e) => onUpload(e.target.files?.[0] || null)}
       />
-      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
         <button
           type="button"
           onClick={() => ref.current?.click()}
@@ -587,7 +587,7 @@ function EditProfileDialog({
       aria-label="Edit sub profile"
       style={{
         position: 'fixed', inset: 0, zIndex: 90,
-        background: 'rgba(0,0,0,.55)',
+        background: 'rgba(20, 20, 20,.55)',
         display: 'grid', placeItems: 'center',
         padding: 16,
       }}
@@ -600,16 +600,16 @@ function EditProfileDialog({
           maxHeight: 'calc(100vh - 32px)',
           overflowY: 'auto',
           padding: 24,
-          borderRadius: 12,
-          background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
+          borderRadius: 10,
+          background: 'linear-gradient(180deg, rgba(20, 20, 20,.95), rgba(20, 20, 20,.98))',
           border: '1px solid var(--v3-border-mid)',
-          boxShadow: '0 22px 60px rgba(0,0,0,.50)',
+          boxShadow: '0 22px 60px rgba(20, 20, 20,.50)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>Edit profile</div>
-            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: '.005em', color: 'var(--v3-text)' }}>
+            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #C9963A)' }}>Edit profile</div>
+            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
               Keep your details current.
             </h2>
           </div>
@@ -620,7 +620,7 @@ function EditProfileDialog({
 
         <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--v3-text-muted)' }}>
           Updates apply to every contractor that has you on file. They can't change
-          your name, company, or email — those stay under each GC's control.
+          your name, company, or email, those stay under each GC's control.
         </p>
 
         <div style={{ display: 'grid', gap: 12 }}>
@@ -652,7 +652,7 @@ function EditProfileDialog({
         </div>
 
         {error && (
-          <div style={{ marginTop: 14, padding: 10, borderRadius: 6, background: 'rgba(216,93,74,.10)', border: '1px solid rgba(216,93,74,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
             {error}
           </div>
         )}
@@ -680,7 +680,7 @@ function Field({
   type?: string
 }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <span className="fh-build-eyebrow">{label}</span>
       <input
         type={type}
@@ -688,9 +688,9 @@ function Field({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         style={{
-          padding: '10px 12px',
-          borderRadius: 6,
-          background: 'rgba(0,0,0,.30)',
+          padding: '12px 12px',
+          borderRadius: 10,
+          background: 'rgba(20, 20, 20,.30)',
           border: '1px solid var(--v3-border-mid)',
           color: 'var(--v3-text)',
           fontFamily: 'var(--font-body)',

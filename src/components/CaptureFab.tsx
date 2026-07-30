@@ -3,7 +3,7 @@
 // The always-there capture button. Joins the canonical .fh-fab system
 // (visuals + position owned by global.css) as the circular mic variant;
 // when the current screen ships its own "+" FAB (Leads / Jobs / Clients
-// / Schedule), CSS stacks capture above it instead of overlapping —
+// / Schedule), CSS stacks capture above it instead of overlapping :
 // see the .fh-fab--capture rules in global.css. One tap opens the
 // CaptureSheet (which also answers Cmd/Ctrl+J and the command palette).
 //
@@ -21,7 +21,7 @@ export default function CaptureFab() {
   const button = (
     <button
       type="button"
-      aria-label="Capture — voice, text, or receipt"
+      aria-label="Capture, voice, text, or receipt"
       title="Capture (⌘J)"
       className="fh-fab fh-fab--capture"
       onClick={() => {

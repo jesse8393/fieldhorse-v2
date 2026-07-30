@@ -1,7 +1,7 @@
 // Shared desktop top bar used by Snow*Build screens. Was inlined in
 // every screen component; extracted so /compose, /bid, /settings (and
 // any future tool screens) get the same header without copy/paste.
-// Mobile (<900px) renders nothing — phone screens get the AppHeader
+// Mobile (<900px) renders nothing, phone screens get the AppHeader
 // instead.
 import { Search, Bell } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -9,7 +9,7 @@ import type { ReactNode } from 'react'
 type BuildTopbarProps = {
   /** Optional override for the placeholder text. */
   searchPlaceholder?: string
-  /** Right-side meta items — rendered as <span>'s separated by a vline. */
+  /** Right-side meta items, rendered as <span>'s separated by a vline. */
   meta?: ReactNode[]
   /** Optional primary CTA (gold "+ New X" button). Omit to use the
    *  --no-cta variant so the grid collapses cleanly. */

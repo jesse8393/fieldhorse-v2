@@ -4,7 +4,7 @@ import { hapticSwipe, hapticTap } from '../lib/haptics.ts'
 
 // Generic swipe-to-reveal wrapper. Pass `actions` (array of {icon, label, color, onClick})
 // and the wrapped children. Swipe-left reveals the actions; tap outside or swipe-right
-// snaps it back closed. Designed for list rows — Jobs, Notes, Clients.
+// snaps it back closed. Designed for list rows, Jobs, Notes, Clients.
 //
 // Snap points:
 //   * 0      → closed
@@ -32,7 +32,7 @@ export default function SwipeableRow({ children, actions = [], openOffset = -120
   const x = useMotionValue(0)
   const [open, setOpen] = useState(false)
   const lastFiredOpen = useRef(false)
-  // Animated background visibility — actions only show when row is dragged
+  // Animated background visibility, actions only show when row is dragged
   const actionsOpacity = useTransform(x, [openOffset, openOffset / 2, 0], [1, 0.5, 0])
 
   function handleDragEnd(_: unknown, info: { offset: { x: number }; velocity: { x: number } }) {
@@ -63,8 +63,8 @@ export default function SwipeableRow({ children, actions = [], openOffset = -120
   }
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 14, width: '100%' }}>
-      {/* Reveal action layer — sits behind the draggable content */}
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 10, width: '100%' }}>
+      {/* Reveal action layer, sits behind the draggable content */}
       <motion.div
         aria-hidden={!open}
         style={{
@@ -74,7 +74,7 @@ export default function SwipeableRow({ children, actions = [], openOffset = -120
           bottom: 0,
           display: 'flex',
           gap: 4,
-          padding: '6px 6px',
+          padding: '8px 8px',
           alignItems: 'center',
           justifyContent: 'flex-end',
           opacity: actionsOpacity
@@ -98,7 +98,7 @@ export default function SwipeableRow({ children, actions = [], openOffset = -120
               width: 44,
               height: 44,
               borderRadius: 10,
-              background: a.color || 'rgba(199, 164, 90, 0.18)',
+              background: a.color || 'rgba(201, 150, 58, 0.18)',
               border: '1px solid var(--v3-border-mid)',
               color: a.fg || 'var(--ink-strong)',
               cursor: 'pointer'

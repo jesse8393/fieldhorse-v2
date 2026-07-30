@@ -43,10 +43,10 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
         }}
       >
         <div style={{ maxWidth: 420, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, letterSpacing: '0.14em', marginBottom: 12 }}>
-            <span style={{ color: '#c9963a' }}>FIELD</span>HORSE
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, letterSpacing: 0, marginBottom: 12 }}>
+            <span style={{ color: '#C9963A' }}>FIELD</span>HORSE
           </div>
-          <h1 style={{ fontSize: 18, margin: '12px 0', color: '#e8b04c' }}>Something broke loading this page.</h1>
+          <h1 style={{ fontSize: 20, margin: '12px 0', color: '#C9963A' }}>Something broke loading this page.</h1>
           <pre
             style={{
               textAlign: 'left',
@@ -54,7 +54,7 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
               borderRadius: 10,
               background: 'rgba(192,57,43,0.12)',
               border: '1px solid rgba(192,57,43,0.35)',
-              color: '#ff7a6b',
+              color: '#C9963A',
               fontSize: 12,
               whiteSpace: 'pre-wrap',
               overflowWrap: 'anywhere'
@@ -64,14 +64,14 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
             onClick={this.handleReload}
             style={{
               marginTop: 16,
-              padding: '12px 18px',
+              padding: '12px 16px',
               borderRadius: 10,
               border: 'none',
-              background: 'linear-gradient(135deg, #e8b04c, #8c6f30)',
+              background: 'linear-gradient(135deg, #C9963A, #5C5C5C)',
               color: '#141414',
               fontFamily: 'Bebas Neue, sans-serif',
               fontSize: 14,
-              letterSpacing: '0.14em',
+              letterSpacing: 0,
               cursor: 'pointer'
             }}
           >

@@ -5,7 +5,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * Milestones section — operator-defined checklist persisted as JSONB on
+ * Milestones section, operator-defined checklist persisted as JSONB on
  * fh_contacts.milestones. Each item: { label, done, created_at }.
  *
  * Mutations go through `patch({ milestones: next })` (optimistic update +
@@ -18,7 +18,7 @@ export default function MilestonesSection({ contact, patch }: any) {
     [contact?.milestones]
   )
   const [draft, setDraft] = useState('')
-  // Empty submit shows an inline error — silently doing nothing read
+  // Empty submit shows an inline error, silently doing nothing read
   // as a successful save (UI audit #8).
   const [draftError, setDraftError] = useState(false)
   const doneCount = list.filter((m: any) => m.done).length
@@ -46,7 +46,7 @@ export default function MilestonesSection({ contact, patch }: any) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       {/* Progress eyebrow */}
       <div style={{
@@ -61,7 +61,7 @@ export default function MilestonesSection({ contact, patch }: any) {
         {list.length > 0 && (
           <span style={{
             fontFamily: 'var(--font-body)',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 700,
             color: doneCount === list.length ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums'
@@ -83,8 +83,8 @@ export default function MilestonesSection({ contact, patch }: any) {
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: '11px 14px',
-              borderRadius: 12,
+              padding: '12px 12px',
+              borderRadius: 10,
               background: 'var(--v3-surface)',
               border: draftError ? '1px solid var(--v3-danger-bright)' : '1px solid var(--v3-border)',
               color: 'var(--v3-text)',
@@ -109,19 +109,19 @@ export default function MilestonesSection({ contact, patch }: any) {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
+            gap: 8,
             padding: '0 16px',
-            borderRadius: 12,
+            borderRadius: 10,
             border: 'none',
             background: 'var(--v3-primary)',
             color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)',
             fontSize: 12,
             fontWeight: 700,
-            letterSpacing: '0.04em',
+            letterSpacing: 0,
             cursor: draft.trim() ? 'pointer' : 'default',
             opacity: draft.trim() ? 1 : 0.5,
-            boxShadow: draft.trim() ? '0 6px 18px rgba(212, 175, 55, 0.28)' : 'none',
+            boxShadow: draft.trim() ? '0 6px 18px rgba(201, 150, 58, 0.28)' : 'none',
             WebkitTapHighlightColor: 'transparent'
           }}
         >
@@ -134,7 +134,7 @@ export default function MilestonesSection({ contact, patch }: any) {
       {list.length === 0 ? (
         <EmptyMini label="No milestones yet. Drop in the first checkpoint above." />
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <AnimatePresence>
             {list.map((m: any, i: any) => (
               <motion.li
@@ -148,8 +148,8 @@ export default function MilestonesSection({ contact, patch }: any) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
-                  padding: '12px 14px',
-                  borderRadius: 12,
+                  padding: '12px 12px',
+                  borderRadius: 10,
                   background: 'var(--v3-surface)',
                   border: '1px solid var(--v3-border)'
                 }}
@@ -162,7 +162,7 @@ export default function MilestonesSection({ contact, patch }: any) {
                     flexShrink: 0,
                     width: 22,
                     height: 22,
-                    borderRadius: 7,
+                    borderRadius: 10,
                     border: m.done
                       ? '1px solid color-mix(in srgb, var(--v3-success-bright) 60%, transparent)'
                       : '1px solid var(--v3-border-strong)',
@@ -195,7 +195,7 @@ export default function MilestonesSection({ contact, patch }: any) {
                     flexShrink: 0,
                     width: 28,
                     height: 28,
-                    borderRadius: 8,
+                    borderRadius: 10,
                     border: 'none',
                     background: 'transparent',
                     color: 'var(--v3-text-muted)',
@@ -218,13 +218,13 @@ export default function MilestonesSection({ contact, patch }: any) {
 function EmptyMini({ label }: any) {
   return (
     <div style={{
-      padding: '20px 18px',
-      borderRadius: 14,
+      padding: '24px 16px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px dashed var(--v3-border-strong)',
       color: 'var(--v3-text-muted)',
       fontFamily: 'var(--font-body)',
-      fontSize: 13,
+      fontSize: 14,
       textAlign: 'center',
       lineHeight: 1.5
     }}>

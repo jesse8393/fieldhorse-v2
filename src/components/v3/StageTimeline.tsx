@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
 import { STAGES, STAGE_MAP } from '../../lib/stages.ts'
 
-// Visual stage progression — 4 steps in pipeline v2 (the 'invoice'
+// Visual stage progression, 4 steps in pipeline v2 (the 'invoice'
 // stage is retired; invoicing happens on the job via fh_invoices).
 // `lost` is rendered as a small inline banner above the timeline
 // rather than a fifth dot, since it's a terminal failure state, not a
@@ -24,19 +24,19 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
     return (
       <div style={{
         margin: '0 20px 16px',
-        padding: '10px 14px',
-        borderRadius: 12,
+        padding: '12px 12px',
+        borderRadius: 10,
         background: 'rgba(192, 57, 43, 0.10)',
         border: '1px solid rgba(192, 57, 43, 0.32)',
-        color: '#F47366',
+        color: '#C9963A',
         fontFamily: 'var(--font-body)',
         fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.08em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         textAlign: 'center'
       }}>
-        Lost — closed without conversion
+        Lost, closed without conversion
       </div>
     )
   }
@@ -61,17 +61,17 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
       aria-label="Pipeline stage progress"
       style={{
         margin: '0 20px 18px',
-        padding: '14px 8px 10px',
+        padding: '12px 8px 12px',
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
-        borderRadius: 12,
+        borderRadius: 10,
         position: 'relative',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'space-between'
       }}
     >
-      {/* Base rail — sits behind the dots at dot-center height (~28px from card top). */}
+      {/* Base rail, sits behind the dots at dot-center height (~28px from card top). */}
       <span
         aria-hidden="true"
         style={{
@@ -84,7 +84,7 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
           zIndex: 1
         }}
       />
-      {/* Filled rail — gold gradient with glow, sized to current progress. */}
+      {/* Filled rail, gold gradient with glow, sized to current progress. */}
       {filledFrac > 0 && (
         <span
           aria-hidden="true"
@@ -95,8 +95,8 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
             height: 2,
             width: `calc((100% - 56px) * ${filledFrac})`,
             background: 'linear-gradient(90deg, color-mix(in srgb, var(--v3-primary) 70%, transparent), var(--v3-primary))',
-            boxShadow: '0 0 8px rgba(228, 190, 111, 0.45)',
-            borderRadius: 99,
+            boxShadow: '0 0 8px rgba(201, 150, 58, 0.45)',
+            borderRadius: 10,
             zIndex: 1
           }}
         />
@@ -120,7 +120,7 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
           background: 'linear-gradient(180deg, var(--v3-primary-hot), var(--v3-primary))',
           border: '1px solid transparent',
           color: 'var(--v3-on-primary)',
-          boxShadow: '0 0 0 4px color-mix(in srgb, var(--v3-primary) 18%, transparent), 0 0 14px rgba(228, 190, 111, 0.4)'
+          boxShadow: '0 0 0 4px color-mix(in srgb, var(--v3-primary) 18%, transparent), 0 0 14px rgba(201, 150, 58, 0.4)'
         } : isComplete ? {
           background: 'var(--v3-primary-soft)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)',
@@ -143,7 +143,7 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 7,
+              gap: 8,
               position: 'relative',
               minWidth: 0,
               zIndex: 2
@@ -153,7 +153,7 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
             <span
               aria-hidden="true"
               style={{
-                width: 28, height: 28, borderRadius: '50%',
+                width: 28, height: 28, borderRadius: 10,
                 display: 'grid', placeItems: 'center',
                 fontFamily: 'var(--font-display)',
                 fontSize: 12,
@@ -169,9 +169,9 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
             {/* Label */}
             <span style={{
               fontFamily: 'var(--font-body)',
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: isCurrent ? 700 : 600,
-              letterSpacing: '0.16em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               color: labelColor,
               textAlign: 'center',

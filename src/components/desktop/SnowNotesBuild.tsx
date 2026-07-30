@@ -1,4 +1,4 @@
-// SnowNotesBuild — desktop /notes in the Build direction.
+// SnowNotesBuild, desktop /notes in the Build direction.
 //
 // Drop-in for SnowNotes at >=900px. Treats notes as field intelligence
 // and job documentation, not a journal.
@@ -67,9 +67,9 @@ type Props = {
 }
 
 function relTime(iso: any) {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   const diff = Date.now() - t
   if (diff < 60_000) return 'just now'
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
@@ -161,7 +161,7 @@ export default function SnowNotesBuild(props: Props) {
                   className="fh-build-capture__textarea"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="What happened on site? Speak or type — AI will pull out action items, risks, and materials."
+                  placeholder="What happened on site? Speak or type, AI will pull out action items, risks, and materials."
                   rows={4}
                 />
 
@@ -174,7 +174,7 @@ export default function SnowNotesBuild(props: Props) {
                     value={contactId || ''}
                     onChange={(e) => setContactId(e.target.value)}
                   >
-                    <option value="">— Unlinked —</option>
+                    <option value="">: Unlinked :</option>
                     {contacts.map((c) => (
                       <option key={c.id} value={c.id}>{c.name || 'Unnamed'}</option>
                     ))}
@@ -223,7 +223,7 @@ export default function SnowNotesBuild(props: Props) {
             {/* Recent reports */}
             <section className="fh-build-card fh-build-table fh-build-notes-table">
               <header className="fh-build-card-head">
-                {/* Say what the list actually is — "22 reports captured"
+                {/* Say what the list actually is, "22 reports captured"
                     above a 6-row list read as disagreeing numbers
                     (UI audit #11). */}
                 <div className="fh-build-eyebrow">Latest {recent.length} of {cockpitStats.total.toLocaleString()} reports</div>
@@ -233,7 +233,7 @@ export default function SnowNotesBuild(props: Props) {
                 <div className="fh-build-table__empty">Loading reports…</div>
               )}
               {!loading && recent.length === 0 && (
-                <div className="fh-build-table__empty">No reports yet — start one above.</div>
+                <div className="fh-build-table__empty">No reports yet, start one above.</div>
               )}
               {!loading && recent.slice(0, 25).map((n: any) => {
                 const linkedJob = contacts.find((c) => c.id === n.contact_id)

@@ -1,4 +1,4 @@
-// SnowJobDetailBuild — desktop chrome for /jobs/:id.
+// SnowJobDetailBuild, desktop chrome for /jobs/:id.
 //
 // Presentational. Receives the existing tab content (Overview/Quote/
 // Details/Financials/Files) as children. Forms, edit/save, invoice
@@ -8,9 +8,10 @@
 import type { ReactNode } from 'react'
 import {
   Bell, Search, ChevronLeft, Edit2, Trash2, Plus,
-  AlertTriangle, ClipboardCheck, Receipt,
+  AlertTriangle, ArrowRight, ClipboardCheck, Receipt,
 } from 'lucide-react'
 import { money, moneyFull } from '../../lib/format.ts'
+import { Button } from '../../ui'
 import MiniMetric from '../MiniMetric.tsx'
 
 type Tab = { id: string; label: string }
@@ -26,8 +27,9 @@ type Props = {
   onEdit?: () => void
   onDelete?: () => void
   onAddEvent?: () => void
+  primaryAction?: { label: string; onClick: () => void } | null
   isEditing?: boolean
-  // Derived signals — null when a field is not tracked yet.
+  // Derived signals, null when a field is not tracked yet.
   scheduleStatus?: { label: string; tone: 'good' | 'warn' | 'bad' } | null
   reportsMissing?: number | null
   billingStatus?: { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' } | null
@@ -59,19 +61,19 @@ export default function SnowJobDetailBuild(props: Props) {
   const {
     contact, client, tabs, activeTab, onTabChange,
     onBack, backLabel = 'Jobs', onEdit, onDelete, onAddEvent,
-    isEditing,
+    primaryAction, isEditing,
     scheduleStatus, reportsMissing, billingStatus, health, paid, outstanding, changeOrderTotals,
     children,
   } = props
 
   const stage = String(contact?.stage || '').toLowerCase()
-  const stageLabel = STAGE_LABEL[stage] || stage || '—'
+  const stageLabel = STAGE_LABEL[stage] || stage || '\u2003'
   const stageTone = STAGE_TONE[stage] || 'neutral'
 
   // Stage-aware chrome (audit §D). Execution panels (health, schedule,
   // reports, billing, change orders) and contract/paid/outstanding
   // stats only exist once the deal is actually being delivered. A $0
-  // unquoted lead showing "JOB HEALTH — AT RISK" and three "—" money
+  // unquoted lead showing "JOB HEALTH, AT RISK" and three "\u2003" money
   // stats read as broken, not premium.
   const isExecution = stage === 'job' || stage === 'invoice' || stage === 'closed'
   const recordNoun = stage === 'lead' ? 'Lead'
@@ -79,7 +81,7 @@ export default function SnowJobDetailBuild(props: Props) {
     : stage === 'lost' ? 'Lost deal'
     : 'Job file'
 
-  // Overall job health — best of available signals; honest "Not tracked"
+  // Overall job health, best of available signals; honest "Not tracked"
   // when no data points exist yet.
   const healthTone = health?.tier === 'behind' || health?.tier === 'lost'
     ? 'bad'
@@ -89,7 +91,7 @@ export default function SnowJobDetailBuild(props: Props) {
         ? 'good'
         : 'neutral'
 
-  // The rail's "Next action" card was removed — the Overview tab's
+  // The rail's "Next action" card was removed, the Overview tab's
   // NextActionCard is the single NEXT ACTION source of truth (audit
   // found the two derivations disagreeing on the same record).
 
@@ -159,6 +161,18 @@ export default function SnowJobDetailBuild(props: Props) {
                 </>
               )}
             </div>
+            {primaryAction && (
+              <Button
+                type="button"
+                size="md"
+                variant="solid"
+                rightIcon={ArrowRight}
+                className="fh-build-stage-action"
+                onClick={primaryAction.onClick}
+              >
+                {primaryAction.label}
+              </Button>
+            )}
           </div>
 
           <div className="fh-build-mini-grid fh-build-mini-grid--detail">
@@ -166,36 +180,36 @@ export default function SnowJobDetailBuild(props: Props) {
               <>
                 <MiniMetric
                   label="Contract"
-                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '—'}
+                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '\u2003'}
                   accent={Number(contact?.amount || 0) > 0}
                 />
                 <MiniMetric
                   label="Paid"
-                  value={paid == null ? '—' : moneyFull(paid)}
+                  value={paid == null ? '\u2003' : moneyFull(paid)}
                 />
                 <MiniMetric
                   label="Outstanding"
-                  value={outstanding == null ? '—' : outstanding > 0 ? moneyFull(outstanding) : 'Paid'}
+                  value={outstanding == null ? '\u2003' : outstanding > 0 ? moneyFull(outstanding) : 'Paid'}
                   tone={outstanding != null && outstanding > 0 ? 'warn' : undefined}
                 />
                 <MiniMetric label="Stage" value={stageLabel} />
               </>
             ) : (
               <>
-                {/* Pre-deal stats: a lead has no contract/paid/outstanding —
+                {/* Pre-deal stats: a lead has no contract/paid/outstanding :
                     show what matters for winning it instead. */}
                 <MiniMetric
                   label="Est. value"
-                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '—'}
+                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '\u2003'}
                   accent={Number(contact?.amount || 0) > 0}
                 />
                 <MiniMetric
                   label="Source"
-                  value={contact?.referred_by || '—'}
+                  value={contact?.referred_by || '\u2003'}
                 />
                 <MiniMetric
                   label="Last touch"
-                  // Clamped to the record's creation — imported rows can
+                  // Clamped to the record's creation, imported rows can
                   // carry a last_contact BEFORE the job existed, which
                   // read as "last touch predates creation" next to the
                   // activity log (UI audit #11).
@@ -238,7 +252,7 @@ export default function SnowJobDetailBuild(props: Props) {
           </div>
 
           <aside className="fh-build-rail fh-build-rail--page">
-            {/* Pre-deal rail — contact + source context, no execution
+            {/* Pre-deal rail, contact + source context, no execution
                 signals (a deal with no scheduled work can't be
                 "behind"). The Overview tab's NextActionCard is the
                 single NEXT ACTION source of truth; the duplicate rail
@@ -301,7 +315,7 @@ export default function SnowJobDetailBuild(props: Props) {
                 </>
               ) : (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>Schedule not tracked</span>
                 </>
               )}
@@ -316,7 +330,7 @@ export default function SnowJobDetailBuild(props: Props) {
               <div className="fh-build-eyebrow">Reports</div>
               {reportsMissing != null ? (
                 <>
-                  <strong style={{ color: reportsMissing > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-success-bright)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <strong style={{ color: reportsMissing > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-success-bright)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     {reportsMissing > 0 ? <AlertTriangle size={14} /> : <ClipboardCheck size={14} />}
                     {reportsMissing > 0 ? `${reportsMissing} missing` : 'Up to date'}
                   </strong>
@@ -324,7 +338,7 @@ export default function SnowJobDetailBuild(props: Props) {
                 </>
               ) : (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>No report cadence set</span>
                 </>
               )}
@@ -339,7 +353,7 @@ export default function SnowJobDetailBuild(props: Props) {
                          : billingStatus.tone === 'warn' ? 'var(--v3-primary-bright)'
                          : billingStatus.tone === 'good' ? 'var(--v3-success-bright)'
                          : undefined,
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
                   }}>
                     <Receipt size={14} /> {billingStatus.label}
                   </strong>
@@ -352,7 +366,7 @@ export default function SnowJobDetailBuild(props: Props) {
                 </>
               ) : (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>No invoicing yet</span>
                 </>
               )}
@@ -362,7 +376,7 @@ export default function SnowJobDetailBuild(props: Props) {
               <div className="fh-build-eyebrow">Change orders</div>
               {changeOrderTotals == null ? (
                 <>
-                  <strong>—</strong>
+                  <strong>:</strong>
                   <span>No change orders yet</span>
                 </>
               ) : (
@@ -406,9 +420,9 @@ function stageToneClass(tone: string) {
 
 // Compact relative date for the pre-deal "Last touch" stat.
 function relDate(iso: string | null | undefined) {
-  if (!iso) return '—'
+  if (!iso) return '\u2003'
   const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return '—'
+  if (!Number.isFinite(t)) return '\u2003'
   const days = Math.floor((Date.now() - t) / 86400000)
   if (days <= 0) return 'Today'
   if (days === 1) return 'Yesterday'

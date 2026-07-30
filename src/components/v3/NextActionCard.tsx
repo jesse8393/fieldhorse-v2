@@ -4,7 +4,7 @@ import { hapticTap } from '../../lib/haptics.ts'
 import { dueStatus } from '../../lib/dueDate.ts'
 
 /**
- * Next Action card — the most important thing on the Job Detail Overview.
+ * Next Action card, the most important thing on the Job Detail Overview.
  *
  *   ┌────────────────────────────────────────────────┐
  *   │ NEXT ACTION                                    │
@@ -44,19 +44,19 @@ export default function NextActionCard({
 
   return (
     <div style={{
-      padding: '18px 18px 16px',
-      borderRadius: 16,
+      padding: '16px 16px 16px',
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 14
+      gap: 12
     }}>
       <span style={{
         fontFamily: 'var(--font-body)',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.16em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         color: 'var(--v3-text-muted)'
       }}>
@@ -71,7 +71,7 @@ export default function NextActionCard({
             fontWeight: 600,
             lineHeight: 1.35,
             color: 'var(--v3-text)',
-            letterSpacing: '-0.005em'
+            letterSpacing: 0
           }}>
             {title}
           </div>
@@ -79,7 +79,7 @@ export default function NextActionCard({
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 8,
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               color: 'var(--v3-text-muted)',
@@ -99,17 +99,17 @@ export default function NextActionCard({
               marginTop: 4,
               width: '100%',
               padding: '12px 16px',
-              borderRadius: 12,
+              borderRadius: 10,
               background: 'var(--v3-primary)',
               color: 'var(--v3-on-primary)',
               border: 'none',
               fontFamily: 'var(--font-body)',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               cursor: loading ? 'wait' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              boxShadow: '0 4px 14px rgba(212, 175, 55, 0.20)',
+              boxShadow: '0 4px 14px rgba(201, 150, 58, 0.20)',
               WebkitTapHighlightColor: 'transparent'
             }}
           >
@@ -135,14 +135,14 @@ export default function NextActionCard({
               marginTop: 4,
               width: '100%',
               padding: '12px 16px',
-              borderRadius: 12,
+              borderRadius: 10,
               background: 'var(--v3-surface-2)',
               color: 'var(--v3-primary)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
               fontFamily: 'var(--font-body)',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: 0,
               cursor: 'pointer',
               WebkitTapHighlightColor: 'transparent'
             }}
@@ -156,7 +156,7 @@ export default function NextActionCard({
 }
 
 /**
- * DueStatusChip — same three-tone palette as the cockpit NextTodoDueChip
+ * DueStatusChip, same three-tone palette as the cockpit NextTodoDueChip
  * and the per-row DueChipButton. Keeps the chip vocabulary consistent
  * everywhere a due_at surfaces.
  */
@@ -183,15 +183,15 @@ function DueStatusChip({ status }: { status: { tone: string; label: string } }) 
       display: 'inline-flex',
       alignItems: 'center',
       alignSelf: 'flex-start',
-      padding: '3px 9px',
-      borderRadius: 999,
+      padding: '4px 8px',
+      borderRadius: 10,
       background: palette.bg,
       border: `1px solid ${palette.border}`,
       color: palette.color,
       fontFamily: 'var(--font-body)',
-      fontSize: 10,
+      fontSize: 12,
       fontWeight: 700,
-      letterSpacing: '0.06em',
+      letterSpacing: 0,
       textTransform: 'uppercase',
       whiteSpace: 'nowrap',
       lineHeight: 1.4

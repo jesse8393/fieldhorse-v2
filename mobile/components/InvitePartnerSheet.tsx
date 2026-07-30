@@ -1,4 +1,4 @@
-// mobile/components/InvitePartnerSheet.tsx — invite a partner/sub to a job.
+// mobile/components/InvitePartnerSheet.tsx, invite a partner/sub to a job.
 // Mirrors web src/components/InvitePartnerSheet.tsx: pick a job, enter the
 // partner's email (+ optional name/role), POST to the partner-invite
 // Netlify function, then surface the invite link to copy or share if the
@@ -88,17 +88,17 @@ export function InvitePartnerSheet({ open, onClose, userId, jobs, defaultJobId }
     <BottomSheet open={open} onClose={onClose} title="Invite a partner">
       {readyUrl ? (
         <>
-          <Text style={{ color: theme.ink, fontSize: 15, fontWeight: '700', marginBottom: 6 }}>Invite link ready</Text>
-          <Text style={{ color: theme.inkMuted, fontSize: 13, marginBottom: 14 }}>Email sending isn't configured — share this link with your partner.</Text>
-          <View style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 12, padding: 14, marginBottom: 16 }}>
-            <Text style={{ color: theme.goldBright, fontSize: 13 }} numberOfLines={2}>{readyUrl}</Text>
+          <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700', marginBottom: 6 }}>Invite link ready</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 14 }}>Email sending isn't configured, share this link with your partner.</Text>
+          <View style={{ backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.borderMid, borderRadius: 10, padding: 12, marginBottom: 16 }}>
+            <Text style={{ color: theme.goldBright, fontSize: 14 }} numberOfLines={2}>{readyUrl}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Pressable onPress={copy} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, paddingVertical: 13, borderWidth: 1, borderColor: theme.borderMid }}>
+            <Pressable onPress={copy} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 12, borderWidth: 1, borderColor: theme.borderMid }}>
               {copied ? <Check color={theme.success} size={16} /> : <Copy color={theme.ink} size={16} />}
               <Text style={{ color: copied ? theme.success : theme.ink, fontWeight: '700' }}>{copied ? 'Copied' : 'Copy'}</Text>
             </Pressable>
-            <Pressable onPress={() => Share.share({ message: readyUrl })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, paddingVertical: 13, backgroundColor: theme.goldBright }}>
+            <Pressable onPress={() => Share.share({ message: readyUrl })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 12, backgroundColor: theme.goldBright }}>
               <Share2 color={theme.onGold} size={16} />
               <Text style={{ color: theme.onGold, fontWeight: '800' }}>Share</Text>
             </Pressable>
@@ -107,7 +107,7 @@ export function InvitePartnerSheet({ open, onClose, userId, jobs, defaultJobId }
       ) : sentMsg ? (
         <>
           <View style={{ alignItems: 'center', paddingVertical: 12 }}>
-            <View style={{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(91,185,122,0.14)', borderWidth: 1, borderColor: 'rgba(91,185,122,0.4)' }}>
+            <View style={{ width: 52, height: 52, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(45, 122, 79,0.14)', borderWidth: 1, borderColor: 'rgba(45, 122, 79,0.4)' }}>
               <Check color={theme.success} size={26} />
             </View>
             <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700', marginTop: 12, textAlign: 'center' }}>{sentMsg}</Text>
@@ -116,13 +116,13 @@ export function InvitePartnerSheet({ open, onClose, userId, jobs, defaultJobId }
         </>
       ) : (
         <>
-          <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Job to share</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Job to share</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }} style={{ marginBottom: 14 }}>
             {jobs.slice(0, 40).map((j) => {
               const on = jobId === j.id
               return (
-                <Pressable key={j.id} onPress={() => setJobId(j.id)} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
-                  <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
+                <Pressable key={j.id} onPress={() => setJobId(j.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
+                  <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
                 </Pressable>
               )
             })}
@@ -131,19 +131,19 @@ export function InvitePartnerSheet({ open, onClose, userId, jobs, defaultJobId }
           <SheetField label="Partner email *" value={email} onChange={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="partner@email.com" />
           <SheetField label="Name" value={name} onChange={setName} placeholder="Partner or company name" />
 
-          <Text style={{ color: theme.inkMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Role</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Role</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 18 }}>
             {ROLES.map((r) => {
               const on = role === r.value
               return (
-                <Pressable key={r.value} onPress={() => setRole(r.value)} style={{ flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
+                <Pressable key={r.value} onPress={() => setRole(r.value)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
                   <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }}>{r.label}</Text>
                 </Pressable>
               )
             })}
           </View>
 
-          {err ? <Text style={{ color: theme.danger, fontSize: 13, marginBottom: 12 }}>{err}</Text> : null}
+          {err ? <Text style={{ color: theme.danger, fontSize: 14, marginBottom: 12 }}>{err}</Text> : null}
           <GoldButton label={sending ? 'Sending…' : 'Send invite'} onPress={send} loading={sending} />
         </>
       )}

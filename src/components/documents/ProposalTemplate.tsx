@@ -1,18 +1,18 @@
 // src/components/documents/ProposalTemplate.tsx
 //
-// Customer-facing HTML preview of a contractor proposal. The bar is a
+// Customer facing HTML preview of a contractor proposal. The bar is a
 // $500M company's estimate: the project total and expiry are visible
 // without scrolling, every line item is priced in the open (qty ·
 // rate · amount, grouped by trade with subtotals), options read as
-// add-ons that are explicitly NOT in the total, and the signature
-// block is honest — blank until someone actually signs.
+// additions that are explicitly NOT in the total, and the signature
+// block is honest, blank until someone actually signs.
 //
 // Composes:
 //   1. DocumentShell      (letterhead + number + meta dates + hero band)
-//   2. Hero band          (project total · line-item count · valid-until)
+//   2. Hero band          (project total · line item count · valid-until)
 //   3. LineItemsTable     (grouped itemized rows w/ section subtotals)
 //   4. Totals block       (subtotal → change orders → total)
-//   5. Optional add-ons   (is_optional items, "+$" amounts, not in total)
+//   5. Optional additions   (is_optional items, "+$" amounts, not in total)
 //   6. Change orders      (when present)
 //   7. Photos             (tagged strips, when present)
 //   8. Insurance          (when present)
@@ -35,17 +35,17 @@ const TEMPLATE_COMPONENTS: Record<string, (props: { view: any }) => any> = {
 }
 
 const DEFAULT_PAYMENT_COPY = '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
-const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, owner-requested additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
+const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
 
 export default function ProposalTemplate({
   company = {},
   contact = {},
   project,
   scopeSections = [],
-  upgrades = [],          // is_optional items — rendered as add-ons
+  upgrades = [],          // is_optional items, rendered as additions
   pricing = { baseTotal: 0, upgradeTotal: 0, discount: 0, taxRate: 0 },
   paymentSchedule = null, // optional [{ label, note }] override of the default terms copy
-  paymentTermsText = null, // contractor's own terms copy (contact.terms_text) — beats the 50/40/10 default
+  paymentTermsText = null, // contractor's own terms copy (contact.terms_text), beats the 50/40/10 default
   warrantyText,
   exclusions = [],
   insurance = null,
@@ -61,7 +61,7 @@ export default function ProposalTemplate({
   const expiresAt = meta.expiresAt || null
   const brand = resolveBrandGold(company)
 
-  // Itemized groups — one table section per trade, every row priced.
+  // Itemized groups, one table section per trade, every row priced.
   const groups = scopeSections.map((sec: any) => ({
     title: sec.title,
     items: (sec.items || []).map(normalizeItem)
@@ -86,7 +86,7 @@ export default function ProposalTemplate({
 
   const statusChip = statusToChip(status)
 
-  // Theme dispatch — named alternates render their own full design.
+  // Theme dispatch, named alternates render their own full design.
   const template = String(company?.estimate_template || 'classic').toLowerCase()
   const ThemeComponent = TEMPLATE_COMPONENTS[template]
   if (ThemeComponent) {
@@ -110,7 +110,7 @@ export default function ProposalTemplate({
       tax,
       taxRate: Number(pricing.taxRate || 0),
       total: grandTotal,
-      // The contractor's own terms when set — hardcoding the 50/40/10
+      // The contractor's own terms when set, hardcoding the 50/40/10
       // default here told customers a deposit schedule the contractor
       // never agreed to.
       paymentTerms: (paymentTermsText || '').trim() || DEFAULT_PAYMENT_COPY,
@@ -129,7 +129,7 @@ export default function ProposalTemplate({
   // the generic 50/40/10 default (last resort only).
   const paymentTermsCopy = (paymentTermsText || '').trim()
     || (Array.isArray(paymentSchedule) && paymentSchedule.length > 0
-      ? paymentSchedule.map((m: any) => [m.label, m.note].filter(Boolean).join(' — ')).join(' · ')
+      ? paymentSchedule.map((m: any) => [m.label, m.note].filter(Boolean).join(', ')).join(' · ')
       : DEFAULT_PAYMENT_COPY)
 
   return (
@@ -138,7 +138,7 @@ export default function ProposalTemplate({
       docType="Estimate"
       number={number}
       metaRows={[
-        { label: 'Issued', value: longDate(issuedAt) || '—' },
+        { label: 'Issued', value: longDate(issuedAt) || '\u2003' },
         expiresAt && { label: 'Valid until', value: longDate(expiresAt), strong: true }
       ].filter(Boolean)}
       status={statusChip}
@@ -156,17 +156,17 @@ export default function ProposalTemplate({
       }
       footer={DEFAULT_DISCLAIMER}
     >
-      {/* Scope narrative — the contractor's own words, when present. */}
+      {/* Scope narrative, the contractor's own words, when present. */}
       {(contact?.scope_text || project?.scope) && (
         <section>
           <SectionLabel>Scope of work</SectionLabel>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: DOC_COLORS.inkMid, whiteSpace: 'pre-wrap', maxWidth: '70ch' }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: DOC_COLORS.inkMid, whiteSpace: 'pre-wrap', maxWidth: '70ch' }}>
             {contact?.scope_text || project?.scope}
           </p>
         </section>
       )}
 
-      {/* Itemized pricing — the trust engine. Every line in the open. */}
+      {/* Itemized pricing, the trust engine. Every line in the open. */}
       {groups.length > 0 && (
         <section>
           <LineItemsTable groups={groups} company={company} layout="grouped" />
@@ -182,11 +182,11 @@ export default function ProposalTemplate({
         </section>
       )}
 
-      {/* Optional add-ons — explicitly outside the total. */}
+      {/* Optional additions, explicitly outside the total. */}
       {upgradeGroupsFlat.length > 0 && (
         <section>
-          <SectionLabel>Optional add-ons</SectionLabel>
-          <p style={{ margin: '-4px 0 10px', fontSize: 11.5, color: DOC_COLORS.inkMuted, lineHeight: 1.5 }}>
+          <SectionLabel>Optional additions</SectionLabel>
+          <p style={{ margin: '-4px 0 10px', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.5 }}>
             Priced separately and not included in the estimate total. Approve any option to add it to the contract.
           </p>
           <AddOnsTable items={upgradeGroupsFlat} />
@@ -207,14 +207,14 @@ export default function ProposalTemplate({
       {/* Insurance */}
       <InsuranceModeBlock insurance={insurance} company={company} />
 
-      {/* Terms grid — payment · warranty · exclusions */}
+      {/* Terms grid, payment · warranty · exclusions */}
       <section
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 20,
+          gap: 24,
           borderTop: `1px solid ${DOC_COLORS.rule}`,
-          paddingTop: 20
+          paddingTop: 24
         }}
       >
         <Detail label="Payment terms">{paymentTermsCopy}</Detail>
@@ -230,7 +230,7 @@ export default function ProposalTemplate({
         )}
       </section>
 
-      {/* Approval — honest signatures */}
+      {/* Approval, honest signatures */}
       <ApprovalLines company={company} contact={contact} approval={approval} status={status} />
     </DocumentShell>
   )
@@ -244,7 +244,7 @@ function itemAmount(it: any) {
 
 function normalizeItem(it: any) {
   return {
-    description: (it.description || '—').trim().replace(/^OPTION\s*[—–-]\s*/i, ''),
+    description: (it.description || '\u2003').trim().replace(/^OPTION\s*[:–-]\s*/i, ''),
     qty: Number(it.qty || 1),
     unit: (it.unit || '').trim(),
     rate: Number(it.rate || 0),
@@ -263,22 +263,22 @@ function HeroBand({ brand, total, itemCount, expiresAt, approved }: any) {
         alignItems: 'flex-end',
         gap: 24,
         flexWrap: 'wrap',
-        padding: '18px 22px',
+        padding: '16px 24px',
         background: DOC_COLORS.paperSoft,
         border: `1px solid ${DOC_COLORS.rule}`,
-        borderRadius: 6
+        borderRadius: 10
       }}
     >
       <div>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 4 }}>
           {approved ? 'Approved contract total' : 'Estimate total'}
         </div>
         <div
           style={{
             fontFamily: DOC_FONTS.serif,
-            fontSize: 40,
+            fontSize: 24,
             fontWeight: 500,
-            letterSpacing: '-0.02em',
+            letterSpacing: 0,
             lineHeight: 1,
             color: approved ? DOC_COLORS.signalGreen : DOC_COLORS.ink,
             fontVariantNumeric: 'tabular-nums'
@@ -287,14 +287,14 @@ function HeroBand({ brand, total, itemCount, expiresAt, approved }: any) {
           {money(total)}
         </div>
       </div>
-      <div style={{ textAlign: 'right', fontSize: 11.5, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
-        {itemCount > 0 && <div>{itemCount} priced line item{itemCount === 1 ? '' : 's'} — itemized below</div>}
+      <div style={{ textAlign: 'right', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
+        {itemCount > 0 && <div>{itemCount} priced line item{itemCount === 1 ? '' : 's'}, itemized below</div>}
         {expiresAt && !approved && (
           <div>
             Pricing honored through <span style={{ color: DOC_COLORS.ink, fontWeight: 600 }}>{longDate(expiresAt)}</span>
           </div>
         )}
-        {approved && <div style={{ color: DOC_COLORS.signalGreen, fontWeight: 600 }}>Approved — thank you</div>}
+        {approved && <div style={{ color: DOC_COLORS.signalGreen, fontWeight: 600 }}>Approved, thank you</div>}
       </div>
     </section>
   )
@@ -302,21 +302,21 @@ function HeroBand({ brand, total, itemCount, expiresAt, approved }: any) {
 
 function AddOnsTable({ items }: any) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 13 }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 14 }}>
       <tbody>
         {items.map((it: any, i: number) => (
           <tr key={i}>
-            <td style={{ padding: '10px 12px 10px 0', borderBottom: `1px solid ${DOC_COLORS.rule}`, verticalAlign: 'top' }}>
+            <td style={{ padding: '12px 12px 12px 0', borderBottom: `1px solid ${DOC_COLORS.rule}`, verticalAlign: 'top' }}>
               <span style={{ color: DOC_COLORS.ink }}>{it.description}</span>
               {it.section && (
-                <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: DOC_COLORS.inkFaint }}>
+                <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkFaint }}>
                   {it.section}
                 </span>
               )}
             </td>
             <td
               style={{
-                padding: '10px 0',
+                padding: '12px 0',
                 borderBottom: `1px solid ${DOC_COLORS.rule}`,
                 textAlign: 'right',
                 whiteSpace: 'nowrap',
@@ -353,14 +353,14 @@ function ProjectPhotosBlock({ photos }: any) {
         {entries.map(([tag, arr]) => (
           <div key={tag}>
             {entries.length > 1 && (
-              <div style={{ fontFamily: DOC_FONTS.body, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 8 }}>
+              <div style={{ fontFamily: DOC_FONTS.body, fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 8 }}>
                 {tag}
               </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
               {arr.slice(0, 6).map((p: any, i: any) => (
                 <figure key={`${tag}-${i}`} style={{ margin: 0 }}>
-                  <div style={{ width: '100%', aspectRatio: '4 / 3', background: '#e8e2d4', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: '100%', aspectRatio: '4 / 3', background: '#F2EDE4', borderRadius: 10, overflow: 'hidden' }}>
                     <img
                       src={p.url}
                       alt={p.caption || tag}
@@ -369,7 +369,7 @@ function ProjectPhotosBlock({ photos }: any) {
                     />
                   </div>
                   {p.caption && (
-                    <figcaption style={{ marginTop: 4, fontFamily: DOC_FONTS.body, fontSize: 10, color: DOC_COLORS.inkMuted, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    <figcaption style={{ marginTop: 4, fontFamily: DOC_FONTS.body, fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {p.caption}
                     </figcaption>
                   )}
@@ -388,9 +388,9 @@ function SectionLabel({ children }: any) {
     <div
       style={{
         fontFamily: DOC_FONTS.body,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.18em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         color: DOC_COLORS.ink,
         marginBottom: 10
@@ -404,7 +404,7 @@ function SectionLabel({ children }: any) {
 function Detail({ label, children }: any) {
   return (
     <div>
-      <div style={{ fontFamily: DOC_FONTS.body, fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: DOC_COLORS.inkFaint, marginBottom: 5 }}>
+      <div style={{ fontFamily: DOC_FONTS.body, fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkFaint, marginBottom: 5 }}>
         {label}
       </div>
       <div style={{ fontFamily: DOC_FONTS.body, fontSize: 12, color: DOC_COLORS.inkMid, lineHeight: 1.55 }}>
@@ -436,19 +436,19 @@ function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTota
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'baseline',
-            gap: 18,
+            gap: 16,
             marginTop: 6,
-            paddingTop: 10,
+            paddingTop: 12,
             borderTop: `2px solid ${DOC_COLORS.ink}`
           }}
         >
-          <span style={{ fontFamily: DOC_FONTS.body, fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: DOC_COLORS.ink }}>
+          <span style={{ fontFamily: DOC_FONTS.body, fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.ink }}>
             Total
           </span>
           <span
             style={{
               fontFamily: DOC_FONTS.body,
-              fontSize: 19,
+              fontSize: 20,
               fontWeight: 700,
               color: DOC_COLORS.ink,
               fontVariantNumeric: 'tabular-nums'
@@ -465,10 +465,10 @@ function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTota
 function Row({ label, value, muted }: any) {
   return (
     <tr>
-      <td style={{ padding: '5px 0', fontFamily: DOC_FONTS.body, fontSize: 12.5, color: DOC_COLORS.inkMuted, textAlign: 'left' }}>
+      <td style={{ padding: '4px 0', fontFamily: DOC_FONTS.body, fontSize: 12, color: DOC_COLORS.inkMuted, textAlign: 'left' }}>
         {label}
       </td>
-      <td style={{ padding: '5px 0', fontFamily: DOC_FONTS.body, fontSize: 12.5, color: muted ? DOC_COLORS.inkMuted : DOC_COLORS.ink, fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+      <td style={{ padding: '4px 0', fontFamily: DOC_FONTS.body, fontSize: 12, color: muted ? DOC_COLORS.inkMuted : DOC_COLORS.ink, fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </td>
     </tr>
@@ -476,8 +476,8 @@ function Row({ label, value, muted }: any) {
 }
 
 /*
- * Signature block. The old version pre-filled the customer's name in a
- * cursive font on UNSIGNED documents — which reads as a forged
+ * Signature block. The old version filled the customer's name in a
+ * cursive font on UNSIGNED documents, which reads as a forged
  * signature and is exactly the kind of thing that kills trust at
  * contract time. Rules now:
  *
@@ -487,7 +487,7 @@ function Row({ label, value, muted }: any) {
  *                 the date and an "approved electronically" record line
  */
 function ApprovalLines({ company, contact, approval, status }: any) {
-  // Stamp a signature ONLY when we have a real approval record — a typed
+  // Stamp a signature ONLY when we have a real approval record, a typed
   // name, a signature image, or a recorded approval timestamp. Status
   // alone must never fabricate a signature: the public link marks a
   // proposal 'approved' without returning the approval payload, and
@@ -504,7 +504,7 @@ function ApprovalLines({ company, contact, approval, status }: any) {
       <p style={{ margin: '0 0 20px', fontFamily: DOC_FONTS.body, fontSize: 12, lineHeight: 1.55, color: DOC_COLORS.inkMid, maxWidth: '64ch' }}>
         Signing below (or approving through the secure link this estimate was delivered with) authorizes {company?.name || 'the contractor'} to perform the work described above and forms a binding agreement under the stated terms.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <SigLine
           label="Customer"
           name={stamped ? (approval?.clientName || contact?.name) : null}
@@ -523,11 +523,11 @@ function ApprovalLines({ company, contact, approval, status }: any) {
         />
       </div>
       {stamped ? (
-        <p style={{ margin: '14px 0 0', fontSize: 10.5, color: DOC_COLORS.inkFaint, lineHeight: 1.5 }}>
+        <p style={{ margin: '14px 0 0', fontSize: 12, color: DOC_COLORS.inkFaint, lineHeight: 1.5 }}>
           Approved electronically via secure link. Name, date, and network address are recorded with this approval.
         </p>
       ) : isApproved ? (
-        <p style={{ margin: '14px 0 0', fontSize: 10.5, color: DOC_COLORS.signalGreen, fontWeight: 600, lineHeight: 1.5 }}>
+        <p style={{ margin: '14px 0 0', fontSize: 12, color: DOC_COLORS.signalGreen, fontWeight: 600, lineHeight: 1.5 }}>
           {approvedAt ? `Approved electronically on ${shortDateOnly(approvedAt)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
         </p>
       ) : null}
@@ -550,7 +550,7 @@ function SigLine({ label, name, nameUnder, dataUrl, date, stamped }: any) {
         {dataUrl ? (
           <img loading="lazy" src={dataUrl} alt="Signature" style={{ maxHeight: 44, maxWidth: '100%' }} />
         ) : name ? (
-          <span style={{ fontFamily: DOC_FONTS.serif, fontStyle: 'italic', fontSize: 22, color: DOC_COLORS.ink, letterSpacing: '0.01em' }}>
+          <span style={{ fontFamily: DOC_FONTS.serif, fontStyle: 'italic', fontSize: 20, color: DOC_COLORS.ink, letterSpacing: 0 }}>
             {name}
           </span>
         ) : null}
@@ -562,14 +562,14 @@ function SigLine({ label, name, nameUnder, dataUrl, date, stamped }: any) {
           justifyContent: 'space-between',
           alignItems: 'baseline',
           fontFamily: DOC_FONTS.body,
-          fontSize: 10,
+          fontSize: 12,
           color: DOC_COLORS.inkMuted
         }}
       >
-        <span style={{ fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-          {label}{!stamped && nameUnder ? ` — ${nameUnder}` : ''}
+        <span style={{ fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}>
+          {label}{!stamped && nameUnder ? `, ${nameUnder}` : ''}
         </span>
-        <span style={{ fontSize: 11 }}>
+        <span style={{ fontSize: 12 }}>
           Date{date ? `: ${shortDateOnly(date)}` : ''}
         </span>
       </div>

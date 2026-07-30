@@ -1,7 +1,7 @@
 // src/components/MarkCompleteSheet.tsx
 //
 // "Real system" for closing a job. Collects warranty start + duration,
-// customer sign-off (method + typed name + date), an optional closing
+// customer approval (method + typed name + date), an optional closing
 // note, and locks the snapshot via lib/closeout.saveCloseout(). Mounts
 // from the Overview tab when stage is job/invoice/closed.
 //
@@ -19,7 +19,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
-// Lazy — ~430KB pdf chunk only loads when the operator generates a
+// Lazy, ~430KB pdf chunk only loads when the operator generates a
 // completion certificate.
 async function loadPdf(): Promise<any> {
   return import('../lib/pdf.js')
@@ -91,7 +91,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     if (saving) return
     if (signoffMethod === 'signature_typed' && !signoffName.trim()) {
       hapticError()
-      toastError('Sign-off name required', 'Typed signature needs the customer name.')
+      toastError('Approval name required', 'Typed signature needs the customer name.')
       return
     }
     setSaving(true)
@@ -195,7 +195,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
         throw new Error(`Couldn't save the certificate PDF: ${upErr.message}`)
       }
       // Index it on fh_job_files so it shows up in the Files tab.
-      // Soft-fail if the audit row insert errors — the file itself
+      // Soft-fail if the audit row insert errors, the file itself
       // already landed and the email send doesn't depend on it.
       try {
         await supabase.from('fh_job_files').insert({
@@ -230,7 +230,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
         toastError(
           'Email sender is not configured yet',
-          'The PDF is saved to Files — share it manually.'
+          'The PDF is saved to Files, share it manually.'
         )
         downloadPdf(result)
         return
@@ -250,10 +250,10 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     }
   }
 
-  const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
   const fieldStyle: import('react').CSSProperties = {
-    padding: '11px 14px',
-    borderRadius: 12,
+    padding: '12px 12px',
+    borderRadius: 10,
     background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
@@ -280,17 +280,17 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               {isReopening ? <>Closeout on file.</> : <>Mark this job complete.</>}
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
             {isReopening
               ? <>Edit the closeout record for <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this job'}</strong>. Reopen the job to put it back on the active board.</>
-              : <>Locks the warranty start, customer sign-off, and a snapshot of dollars + photos for <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this job'}</strong>. Advances the stage to Complete.</>
+              : <>Locks the warranty start, customer approval, and a snapshot of dollars + photos for <strong style={{ color: 'var(--ink-strong)' }}>{contact?.name || 'this job'}</strong>. Advances the stage to Complete.</>
             }
           </DrawerDescription>
         </DrawerHeader>
@@ -298,11 +298,11 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
         <form
           ref={formRef}
           onSubmit={submit}
-          style={formStyle({ gap: 14 })}
+          style={formStyle({ gap: 12 })}
         >
           {loading ? (
             <div style={{
-              padding: 16, borderRadius: 12,
+              padding: 16, borderRadius: 10,
               background: 'var(--surface-2)', border: '1px solid var(--rule)',
               color: 'var(--ink-muted)', fontSize: 12, fontFamily: 'var(--font-body)',
               textAlign: 'center'
@@ -314,7 +314,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
               {/* Snapshot strip */}
               <div style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
-                padding: '12px 14px', borderRadius: 12,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--surface-2)', border: '1px solid var(--rule)'
               }}>
                 <Stat label="Contract" value={moneyFmt(contact?.amount)} />
@@ -323,20 +323,20 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
               </div>
               {balance > 0 && (
                 <div style={{
-                  padding: '10px 12px', borderRadius: 10,
-                  background: 'color-mix(in srgb, var(--alert-red, #b3493b) 12%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--alert-red, #b3493b) 35%, transparent)',
+                  padding: '12px 12px', borderRadius: 10,
+                  background: 'color-mix(in srgb, var(--alert-red, #C0392B) 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--alert-red, #C0392B) 35%, transparent)',
                   color: 'var(--ink-strong)',
                   fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.4
                 }}>
-                  Heads up — there's still {moneyFmt(balance)} unpaid. You can still close the job, but the balance carries on the client's lifetime number.
+                  Heads up, there's still {moneyFmt(balance)} unpaid. You can still close the job, but the balance carries on the client's lifetime number.
                 </div>
               )}
 
               {/* Warranty */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={labelStyle}>Warranty</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {WARRANTY_PRESETS.map((w) => {
                     const active = warrantyMonths === w.id
                     return (
@@ -353,7 +353,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                   })}
                 </div>
                 {warrantyMonths > 0 && (
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                     <span style={labelStyle}>Warranty start</span>
                     <div style={{ position: 'relative' }}>
                       <CalendarIcon size={14} style={{
@@ -366,17 +366,17 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                         value={warrantyStart}
                         onChange={(e) => setWarrantyStart(e.target.value)}
                         disabled={saving}
-                        style={{ ...fieldStyle, padding: '11px 14px 11px 38px' }}
+                        style={{ ...fieldStyle, padding: '12px 12px 12px 32px' }}
                       />
                     </div>
                   </label>
                 )}
               </div>
 
-              {/* Sign-off method */}
+              {/* Approval method */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={labelStyle}>Customer sign-off</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <span style={labelStyle}>Customer approval</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {SIGNOFF_METHODS.map((m) => {
                     const active = signoffMethod === m.id
                     return (
@@ -392,7 +392,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                     )
                   })}
                 </div>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                   <span style={labelStyle}>
                     Customer name {signoffMethod === 'signature_typed' && <span style={{ color: 'var(--ink-strong)' }}>*</span>}
                   </span>
@@ -408,7 +408,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
               </div>
 
               {/* Closing notes */}
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={labelStyle}>Closing notes</span>
                 <textarea
                   rows={3}
@@ -420,7 +420,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                 />
               </label>
 
-              {/* Certificate row — only when a closeout is on file.
+              {/* Certificate row, only when a closeout is on file.
                   Two buttons share one row: Download keeps the file
                   local; Send dispatches the email via /api/send-certificate.
                   Sits above the Cancel / Save / Reopen action grid. */}
@@ -456,7 +456,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isReopening ? 'auto 1fr 1.4fr' : '1fr 1.4fr',
-                gap: 10, marginTop: 4
+                gap: 12, marginTop: 4
               }}>
                 {isReopening && (
                   <button
@@ -465,11 +465,11 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                     disabled={saving}
                     aria-label="Reopen job"
                     style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      padding: '12px 12px', borderRadius: 12,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      padding: '12px 12px', borderRadius: 10,
                       background: 'rgba(192,57,43,0.10)',
                       border: '1px solid rgba(192,57,43,0.35)',
-                      color: 'var(--alert-red, #b3493b)',
+                      color: 'var(--alert-red, #C0392B)',
                       fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                       cursor: saving ? 'wait' : 'pointer'
                     }}
@@ -483,11 +483,11 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                   onClick={() => onClose?.()}
                   disabled={saving}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    padding: '12px 14px', borderRadius: 12,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '12px 12px', borderRadius: 10,
                     background: 'var(--surface-2)', border: '1px solid var(--rule)',
                     color: 'var(--ink-strong)',
-                    fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                    fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                     cursor: saving ? 'wait' : 'pointer'
                   }}
                 >
@@ -500,10 +500,10 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                   disabled={saving}
                   style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '12px 14px', borderRadius: 12, border: 'none',
+                    padding: '12px 12px', borderRadius: 10, border: 'none',
                     background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                     color: 'var(--onyx)',
-                    fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                    fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                     cursor: saving ? 'wait' : 'pointer',
                     boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                     opacity: saving ? 0.6 : 1
@@ -523,10 +523,10 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
 
 function certificateBtnStyle(variant: any, busy: any) {
   const base = {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    padding: '11px 12px', borderRadius: 12,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: '12px 12px', borderRadius: 10,
     fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-    letterSpacing: '0.06em', textTransform: 'uppercase',
+    letterSpacing: 0, textTransform: 'uppercase',
     cursor: busy ? 'wait' : 'pointer',
     opacity: busy ? 0.7 : 1
   }
@@ -549,8 +549,8 @@ function certificateBtnStyle(variant: any, busy: any) {
 
 function chipStyle(active: any, disabled: any) {
   return {
-    padding: '7px 12px',
-    borderRadius: 999,
+    padding: '8px 12px',
+    borderRadius: 10,
     border: active
       ? '1px solid var(--v3-border-strong)'
       : '1px solid var(--rule)',
@@ -570,9 +570,9 @@ function chipStyle(active: any, disabled: any) {
 
 function Stat({ label, value, tone = 'default' }: any) {
   const color = tone === 'good'
-    ? 'var(--signal-green, #4ade80)'
+    ? 'var(--signal-green, #2D7A4F)'
     : tone === 'danger'
-      ? 'var(--alert-red, #b3493b)'
+      ? 'var(--alert-red, #C0392B)'
       : 'var(--ink-strong)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>

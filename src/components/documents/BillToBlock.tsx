@@ -1,7 +1,7 @@
 // src/components/documents/BillToBlock.tsx
 //
 // "Bill to" panel for invoices + the "Prepared for" panel for
-// proposals. Same visual treatment — one side renders the client
+// proposals. Same visual treatment, one side renders the client
 // identity (name + address + phone + email), the other the project
 // snapshot (project title + project address + a one-line snapshot
 // metric like "Phase 2 of 4" or "Started Apr 12").
@@ -34,7 +34,7 @@ export default function BillToBlock({
     >
       <Panel label={clientLabel}>
         <div style={{ ...typeStyle('h3'), color: DOC_COLORS.ink, marginBottom: 4 }}>
-          {client?.name || '—'}
+          {client?.name || '\u2003'}
         </div>
         {client?.address && (
           <div style={{ ...typeStyle('body'), color: DOC_COLORS.inkMid }}>

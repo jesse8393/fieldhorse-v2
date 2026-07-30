@@ -1,10 +1,10 @@
 /**
- * StatusPill — unified status badge primitive (Phase V3-JOBS-1).
+ * StatusPill, unified status badge primitive (Phase V3-JOBS-1).
  *
  * One pill family for every status badge across the app: stage
  * (lead/quote/job/invoice/closed/lost), top-deal (gold), approved
  * (green check), cold (danger). Same shape, same padding, same
- * font — only the tone color varies.
+ * font, only the tone color varies.
  *
  * Replaces the prior mix of:
  *   • StagePill inline in JobCard
@@ -41,7 +41,7 @@ const TONE: Record<StatusTone, { color: string; label: string; Icon?: ComponentT
 
 type StatusPillProps = HTMLAttributes<HTMLSpanElement> & {
   tone?: StatusTone
-  /** Arbitrary token color (kit wave 2) — overrides the tone's color so
+  /** Arbitrary token color (kit wave 2), overrides the tone's color so
       screens with computed status colors (lead status, invoice status,
       AR aging buckets) can ride this pill instead of hand-rolling the
       same chip. Pass `label` alongside it. */
@@ -70,9 +70,9 @@ export default function StatusPill({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: IconCmp ? 5 : 0,
-        padding: '3px 9px',
-        borderRadius: 999,
+        gap: IconCmp ? 4 : 0,
+        padding: '4px 8px',
+        borderRadius: 10,
         background: `color-mix(in srgb, ${chipColor} 12%, transparent)`,
         border: `1px solid color-mix(in srgb, ${chipColor} 35%, transparent)`,
         // Mix toward the theme's text color, NOT white: in dark the text
@@ -80,9 +80,9 @@ export default function StatusPill({
         // the chip text for contrast on paper instead of washing it out.
         color: `color-mix(in srgb, ${chipColor} 80%, var(--v3-text) 20%)`,
         fontFamily: 'var(--font-body)',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.10em',
+        letterSpacing: 0,
         textTransform: 'uppercase',
         lineHeight: 1.4,
         whiteSpace: 'nowrap',

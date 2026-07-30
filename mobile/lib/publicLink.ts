@@ -3,7 +3,7 @@
 // Mint / list / revoke fh_public_links rows from the app (quote +
 // invoice surfaces). Mirrors src/lib/publicLink.ts on the web. The
 // public viewer page lives on the web origin (fieldhorse.io), so the
-// shared URL points there — the customer opens /p/{token} in a
+// shared URL points there, the customer opens /p/{token} in a
 // browser, no app required.
 
 import { supabase } from './supabase'

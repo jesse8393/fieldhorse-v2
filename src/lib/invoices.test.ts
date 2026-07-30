@@ -53,7 +53,7 @@ describe('suggestNextInvoice', () => {
       payments: [{ amount: 0.1 }, { amount: 0.2 }],
       invoices: [{ amount: 0.1, status: 'paid' }]
     })
-    // unbilled ≈ 0.2, balance ≈ 0 (paid in full) — amount is the unbilled
+    // unbilled ≈ 0.2, balance ≈ 0 (paid in full), amount is the unbilled
     // remainder; the key assertion is no NaN/negative from FP dust.
     expect(Number.isFinite(s.amount)).toBe(true)
     expect(s.amount).toBeGreaterThanOrEqual(0)

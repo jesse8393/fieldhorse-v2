@@ -11,7 +11,7 @@ import { orgMembersList, type OrgMember } from '../../../lib/orgApi.ts'
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * To-dos section — backed by fh_job_todos. Owns its own fetch (independent of
+ * Tasks section, backed by fh_job_todos. Owns its own fetch (independent of
  * the parent useJobData lifecycle since the per-tab refresh cost is tiny).
  *
  * Schema: { id, user_id, job_id, text, done, completed_at, created_at, due_at }
@@ -25,7 +25,7 @@ export default function TodosSection({ jobId, userId }: any) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState('')
-  // Optional due date for the new todo being composed. YYYY-MM-DD or ''.
+  // Optional due date for the new todo being composed. year month day or ''.
   // Converted to a local-end-of-day ISO at insert time via dateInputToTimestamp.
   const [dueDraft, setDueDraft] = useState('')
   // Optional assignee for the new todo. '' = unassigned ("anyone on
@@ -35,14 +35,14 @@ export default function TodosSection({ jobId, userId }: any) {
   const [members, setMembers] = useState<OrgMember[]>([])
 
   // Fetch the org member list once for the assignee picker. Best-effort
-  // — if the call fails (e.g. org_members endpoint unreachable) the
+  //, if the call fails (e.g. org_members endpoint unreachable) the
   // picker stays empty and the section still works for unassigned
   // tasks.
   useEffect(() => {
     let cancelled = false
     orgMembersList()
       .then((res) => { if (!cancelled) setMembers(res.members || []) })
-      .catch(() => { /* ignore — picker just stays empty */ })
+      .catch(() => { /* ignore, picker just stays empty */ })
     return () => { cancelled = true }
   }, [])
 
@@ -81,7 +81,7 @@ export default function TodosSection({ jobId, userId }: any) {
     if (assignDraft) payload.assigned_to = assignDraft
     const { queued, error } = await resilientInsert('fh_job_todos', payload)
     if (error) {
-      toastError("Couldn't add to-do", error.message)
+      toastError("Couldn't add task", error.message)
       return
     }
     if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')
@@ -160,16 +160,16 @@ export default function TodosSection({ jobId, userId }: any) {
   const undoneCount = rows.filter((r) => !r.done).length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
-          To-dos
+          Tasks
         </Eyebrow>
         {rows.length > 0 && (
           <span style={{
             fontFamily: 'var(--font-body)',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 700,
             color: undoneCount === 0 ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
             fontVariantNumeric: 'tabular-nums'
@@ -179,7 +179,7 @@ export default function TodosSection({ jobId, userId }: any) {
         )}
       </div>
 
-      {/* Add row — text + optional due date + Add. Wraps to two rows on
+      {/* Add row, text + optional due date + Add. Wraps to two rows on
           narrow viewports so the text input keeps its full width. */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
@@ -189,7 +189,7 @@ export default function TodosSection({ jobId, userId }: any) {
           placeholder="Add a task…"
           style={{
             flex: '1 1 200px', minWidth: 0,
-            padding: '11px 14px', borderRadius: 12,
+            padding: '12px 12px', borderRadius: 10,
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
             color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
             fontSize: 14, outline: 'none'
@@ -202,11 +202,11 @@ export default function TodosSection({ jobId, userId }: any) {
           aria-label="Due date (optional)"
           style={{
             flex: '0 0 auto',
-            padding: '11px 12px', borderRadius: 12,
+            padding: '12px 12px', borderRadius: 10,
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
             color: dueDraft ? 'var(--v3-text)' : 'var(--v3-text-muted)',
             fontFamily: 'var(--font-body)',
-            fontSize: 13, outline: 'none',
+            fontSize: 14, outline: 'none',
             WebkitTapHighlightColor: 'transparent'
           }}
         />
@@ -217,11 +217,11 @@ export default function TodosSection({ jobId, userId }: any) {
             aria-label="Assign to (optional)"
             style={{
               flex: '0 0 auto',
-              padding: '11px 10px', borderRadius: 12,
+              padding: '12px 12px', borderRadius: 10,
               background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
               color: assignDraft ? 'var(--v3-text)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
-              fontSize: 13, outline: 'none',
+              fontSize: 14, outline: 'none',
               cursor: 'pointer',
             }}
           >
@@ -240,14 +240,14 @@ export default function TodosSection({ jobId, userId }: any) {
           disabled={!draft.trim()}
           aria-label="Add task"
           style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '0 16px', borderRadius: 12, border: 'none',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '0 16px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: '0.04em',
+            letterSpacing: 0,
             cursor: draft.trim() ? 'pointer' : 'default',
             opacity: draft.trim() ? 1 : 0.5,
-            boxShadow: draft.trim() ? '0 6px 18px rgba(212, 175, 55, 0.28)' : 'none',
+            boxShadow: draft.trim() ? '0 6px 18px rgba(201, 150, 58, 0.28)' : 'none',
             WebkitTapHighlightColor: 'transparent'
           }}
         >
@@ -259,17 +259,17 @@ export default function TodosSection({ jobId, userId }: any) {
       {loading && <SkeletonList rows={3} card={false} />}
       {!loading && rows.length === 0 && (
         <div style={{
-          padding: '20px 18px', borderRadius: 14,
+          padding: '24px 16px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 13, textAlign: 'center'
+          fontSize: 14, textAlign: 'center'
         }}>
           No tasks yet. Field crew gets shorter days when this list is full.
         </div>
       )}
 
       {!loading && rows.length > 0 && (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <AnimatePresence>
             {rows.map((r) => (
               <motion.li
@@ -281,7 +281,7 @@ export default function TodosSection({ jobId, userId }: any) {
                 transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px', borderRadius: 12,
+                  padding: '12px 12px', borderRadius: 10,
                   background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
                 }}
               >
@@ -290,11 +290,11 @@ export default function TodosSection({ jobId, userId }: any) {
                   onClick={() => toggle(r)}
                   aria-label={r.done ? 'Mark not done' : 'Mark done'}
                   style={{
-                    flexShrink: 0, width: 22, height: 22, borderRadius: 7,
+                    flexShrink: 0, width: 22, height: 22, borderRadius: 10,
                     border: r.done
                       ? '1px solid color-mix(in srgb, var(--v3-success-bright) 60%, transparent)'
                       : '1px solid var(--v3-border-strong)',
-                    background: r.done ? 'rgba(46, 204, 113, 0.18)' : 'transparent',
+                    background: r.done ? 'rgba(45, 122, 79, 0.18)' : 'transparent',
                     color: 'var(--v3-success-bright)',
                     cursor: 'pointer',
                     display: 'grid', placeItems: 'center',
@@ -331,7 +331,7 @@ export default function TodosSection({ jobId, userId }: any) {
                   onClick={() => remove(r.id)}
                   aria-label="Delete task"
                   style={{
-                    flexShrink: 0, width: 28, height: 28, borderRadius: 8,
+                    flexShrink: 0, width: 28, height: 28, borderRadius: 10,
                     border: 'none', background: 'transparent',
                     color: 'var(--v3-text-muted)', cursor: 'pointer',
                     display: 'grid', placeItems: 'center'
@@ -349,11 +349,11 @@ export default function TodosSection({ jobId, userId }: any) {
 }
 
 /**
- * DueChipButton — wraps a hidden <input type="date"> in a <label> so
+ * DueChipButton, wraps a hidden <input type="date"> in a <label> so
  * tapping the chip opens the native date picker. When iso is set:
  * status chip (Overdue red / Today gold / muted future date). When
  * iso is null: a quiet calendar icon serves as the "set due date"
- * affordance — no labeled chip is shown, but the tap target stays.
+ * affordance, no labeled chip is shown, but the tap target stays.
  */
 function DueChipButton({ iso, done, onChange }: any) {
   const status = dueStatus(iso)
@@ -383,7 +383,7 @@ function DueChipButton({ iso, done, onChange }: any) {
   })()
 
   return (
-    <Eyebrow as="label" style={{ position: 'relative', justifyContent: 'center', gap: 4, flexShrink: 0, minWidth: 40, minHeight: 28, padding: status ? '0 9px' : 0, borderRadius: 999, background: palette.bg, border: status ? `1px solid ${palette.border}` : `1px solid transparent`, color: palette.color, whiteSpace: 'nowrap', opacity: done ? 0.5 : 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label={status ? `Due ${status.label}` : 'Set due date'}>
+    <Eyebrow as="label" style={{ position: 'relative', justifyContent: 'center', gap: 4, flexShrink: 0, minWidth: 40, minHeight: 28, padding: status ? '0 8px' : 0, borderRadius: 10, background: palette.bg, border: status ? `1px solid ${palette.border}` : `1px solid transparent`, color: palette.color, whiteSpace: 'nowrap', opacity: done ? 0.5 : 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label={status ? `Due ${status.label}` : 'Set due date'}>
       <input
         type="date"
         value={dateStr}
@@ -400,7 +400,7 @@ function DueChipButton({ iso, done, onChange }: any) {
   )
 }
 
-// AssignChipSelect — wraps an invisible <select> in a styled chip so
+// AssignChipSelect, wraps an invisible <select> in a styled chip so
 // every row's assignee can be re-picked with one tap. The chip text
 // shows the current assignee (or "Unassigned"); the native select
 // surface drives the choice. Only renders when the org has more than
@@ -421,14 +421,14 @@ function AssignChipSelect({ members, value, onChange, selfId, memberById }: any)
         alignItems: 'center',
         gap: 4,
         padding: '4px 8px',
-        borderRadius: 999,
+        borderRadius: 10,
         background: value ? 'color-mix(in srgb, var(--v3-primary) 12%, transparent)' : 'transparent',
         border: value ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)' : '1px solid var(--v3-border)',
         color: value ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
         fontFamily: 'var(--font-body)',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.04em',
+        letterSpacing: 0,
         cursor: 'pointer',
       }}
     >

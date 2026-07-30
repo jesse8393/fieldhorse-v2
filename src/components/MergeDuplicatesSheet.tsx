@@ -3,10 +3,10 @@
 // Review-and-merge sheet for duplicate clients. Receives pre-detected
 // clusters from Clients.jsx; for each cluster the user picks a survivor
 // (defaults to the oldest record so manual edits aren't blown away) and
-// commits the merge. Aggregates recompute server-side via trigger so
+// commits the merge. Aggregates recompute on the server via trigger so
 // the parent screen only needs to reload its rows.
 //
-// Each cluster is committed independently — partial merges are fine.
+// Each cluster is committed independently, partial merges are fine.
 // The sheet keeps itself open until every cluster is resolved or the
 // user closes manually.
 
@@ -28,9 +28,9 @@ function fmtPhone(n: any) {
 }
 
 function fmtDate(s: any) {
-  if (!s) return '—'
+  if (!s) return '\u2003'
   const d = new Date(s)
-  if (Number.isNaN(d.getTime())) return '—'
+  if (Number.isNaN(d.getTime())) return '\u2003'
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -109,11 +109,11 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
         }}
       >
         <DrawerHeader style={{
-          padding: '14px 20px 10px',
+          padding: '12px 24px 12px',
           borderBottom: '1px solid var(--v3-border)',
           background: 'var(--v3-surface)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span aria-hidden="true" style={{
               width: 32, height: 32, borderRadius: 10,
               background: 'var(--v3-glass-tint-2)',
@@ -125,13 +125,13 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <DrawerTitle style={{
-                margin: 0, fontFamily: 'var(--font-display)', fontSize: 18,
-                color: 'var(--v3-text)', letterSpacing: '-0.005em'
+                margin: 0, fontFamily: 'var(--font-display)', fontSize: 20,
+                color: 'var(--v3-text)', letterSpacing: 0
               }}>
                 Merge duplicates
               </DrawerTitle>
               <DrawerDescription style={{
-                margin: '2px 0 0', fontFamily: 'var(--font-body)', fontSize: 11,
+                margin: '2px 0 0', fontFamily: 'var(--font-body)', fontSize: 12,
                 color: 'var(--v3-text-muted)'
               }}>
                 {remaining.length === 0 ? 'All clean.' : `${remaining.length} ${remaining.length === 1 ? 'cluster' : 'clusters'} to review`}
@@ -157,16 +157,16 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
 
         <div style={{
           flex: 1, overflowY: 'auto',
-          padding: '14px 20px 28px',
-          display: 'flex', flexDirection: 'column', gap: 14
+          padding: '12px 24px 24px',
+          display: 'flex', flexDirection: 'column', gap: 12
         }}>
           {remaining.length === 0 && (
             <div style={{
-              padding: '24px 20px', borderRadius: 16,
+              padding: '24px 24px', borderRadius: 10,
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border-strong)',
               textAlign: 'center', color: 'var(--v3-text-muted)',
-              fontFamily: 'var(--font-body)', fontSize: 13
+              fontFamily: 'var(--font-body)', fontSize: 14
             }}>
               No duplicate clusters left. Nice cleanup.
             </div>
@@ -192,14 +192,14 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
   const matchedOn = cluster.matchedOn?.length ? cluster.matchedOn.join(' & ') : 'phone/email'
   return (
     <section style={{
-      borderRadius: 16,
+      borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border-strong)',
-      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(0, 0, 0, 0.25)',
+      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.25)',
       overflow: 'hidden'
     }}>
       <header style={{
-        padding: '10px 14px',
+        padding: '12px 12px',
         display: 'flex', alignItems: 'center', gap: 8,
         borderBottom: '1px solid var(--v3-border)',
         background: 'var(--v3-surface-2)'
@@ -224,7 +224,7 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                   gridTemplateColumns: '22px 1fr auto',
                   alignItems: 'center',
                   gap: 12,
-                  padding: '12px 14px',
+                  padding: '12px 12px',
                   background: isSurvivor ? 'color-mix(in srgb, var(--v3-primary) 8%, transparent)' : 'transparent',
                   border: 'none',
                   borderTop: i === 0 ? 'none' : '1px solid var(--v3-border)',
@@ -235,7 +235,7 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                 }}
               >
                 <span aria-hidden="true" style={{
-                  width: 18, height: 18, borderRadius: '50%',
+                  width: 18, height: 18, borderRadius: 10,
                   border: `2px solid ${isSurvivor ? 'var(--ink-strong)' : 'var(--v3-border-strong)'}`,
                   background: isSurvivor ? 'var(--ink-strong)' : 'transparent',
                   display: 'grid', placeItems: 'center',
@@ -260,7 +260,7 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                   <div style={{
                     marginTop: 2,
                     fontFamily: 'var(--font-body)',
-                    fontSize: 11,
+                    fontSize: 12,
                     color: 'var(--v3-text-muted)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                   }}>
@@ -268,8 +268,8 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                   </div>
                 </div>
                 <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: 10,
-                  fontWeight: 600, letterSpacing: '0.06em',
+                  fontFamily: 'var(--font-body)', fontSize: 12,
+                  fontWeight: 600, letterSpacing: 0,
                   color: 'var(--v3-text-muted)',
                   fontVariantNumeric: 'tabular-nums',
                   textAlign: 'right'
@@ -282,16 +282,16 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
         })}
       </ul>
       <div style={{
-        padding: '12px 14px',
+        padding: '12px 12px',
         borderTop: '1px solid var(--v3-border)',
         background: 'var(--v3-surface-2)',
         display: 'grid',
         gridTemplateColumns: '1fr 1.4fr',
-        gap: 10,
+        gap: 12,
         alignItems: 'center'
       }}>
         <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 11,
+          fontFamily: 'var(--font-body)', fontSize: 12,
           color: 'var(--v3-text-muted)',
           lineHeight: 1.35
         }}>
@@ -303,11 +303,11 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
           onClick={onCommit}
           disabled={busy || disabled}
           style={{
-            padding: '11px 14px', borderRadius: 12, border: 'none',
+            padding: '12px 12px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)',
             color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: '0.06em', textTransform: 'uppercase',
+            letterSpacing: 0, textTransform: 'uppercase',
             cursor: busy || disabled ? 'wait' : 'pointer',
             boxShadow: 'var(--v3-gold-glow)',
             opacity: busy || disabled ? 0.7 : 1

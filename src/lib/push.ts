@@ -5,12 +5,12 @@
 //
 // iOS reality check: Safari only allows web push for apps ADDED TO THE
 // HOME SCREEN (iOS 16.4+). In a normal Safari tab, PushManager is
-// undefined — pushSupport() reports 'needs-install' so the UI can say
+// undefined, pushSupport() reports 'needs-install' so the UI can say
 // "Add to Home Screen first" instead of failing silently.
 
 import { supabase } from './supabase.ts'
 
-// Public half of the VAPID pair (private half lives server-side in
+// Public half of the VAPID pair (private half lives on the server in
 // fh_app_config). Safe to ship in the bundle by design.
 export const VAPID_PUBLIC_KEY =
   'BG5p_lm1-VukSchD3E2kXFXJujpRA8ZJfuv4YaA-LcGzj7MO9S0osYR-Q0OHnUhIAg_HpWh0P4rJ10g-bSBBzwQ'

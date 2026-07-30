@@ -1,7 +1,7 @@
 // src/components/AddEventSheet.tsx
 //
 // Schedule a job event (kickoff, inspection, walkthrough, recurring
-// crew day). Was on the legacy ActionSheet chrome — now uses the v3
+// crew day). Was on the legacy ActionSheet chrome, now uses the v3
 // Drawer pattern shared with NewClientSheet / MarkCompleteSheet so the
 // schedule entry experience matches the rest of the system.
 //
@@ -30,7 +30,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   const [recurs, setRecurs] = useState(false)
   const [recurDays, setRecurDays] = useState(7)
   const [saving, setSaving] = useState(false)
-  // Inline validation — submitting without a title used to do nothing
+  // Inline validation, submitting without a title used to do nothing
   // at all (no message, no focus), which read as a successful save
   // (UI audit #8).
   const [titleError, setTitleError] = useState(false)
@@ -102,7 +102,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
     // Default a 1-hour end_at so deriveStatus / Live / Done filters have
     // a window to work with (they broke on events with a null end_at).
     // Shared series id (stored in the `recurring` text column) so every
-    // occurrence knows it belongs to one series — the Schedule screen
+    // occurrence knows it belongs to one series, the Schedule screen
     // uses it to offer "delete this / delete the whole series" instead
     // of orphaning the other 4 rows.
     const seriesId = recurs ? (crypto.randomUUID?.() || `series-${startMs}`) : null
@@ -120,7 +120,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
         rows.push(mkRow(startMs + recurDays * i * 86400000))
       }
     }
-    // Capture the error — a silent insert failure previously closed the
+    // Capture the error, a silent insert failure previously closed the
     // sheet as "saved" and lost the event.
     const { error } = await supabase.from('fh_schedule').insert(rows)
     setSaving(false)
@@ -131,10 +131,10 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
     onSaved?.()
   }
 
-  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
   const fieldStyle: import('react').CSSProperties = {
-    padding: '11px 14px',
-    borderRadius: 12,
+    padding: '12px 12px',
+    borderRadius: 10,
     background: 'var(--surface-2)',
     border: '1px solid var(--rule)',
     color: 'var(--ink-strong)',
@@ -161,15 +161,15 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
           <DrawerTitle asChild>
             <h2
               className="fh-font-serif"
-              style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}
+              style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
               {editing ? 'Edit event.' : 'Add an event.'}
             </h2>
           </DrawerTitle>
           <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
+            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
           >
-            Drops a single event on the calendar — flip recurrence on to repeat for the next four cycles.
+            Drops a single event on the calendar, flip recurrence on to repeat for the next four cycles.
           </DrawerDescription>
         </DrawerHeader>
 
@@ -178,7 +178,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
           onSubmit={save}
           style={formStyle()}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Title *</span>
             <input
               ref={titleRef}
@@ -201,8 +201,8 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
             )}
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Date</span>
               <input
                 type="date"
@@ -212,7 +212,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
                 style={fieldStyle}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Time</span>
               <input
                 type="time"
@@ -224,7 +224,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
             </label>
           </div>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Link to job</span>
             <select
               value={contactId}
@@ -235,27 +235,27 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               <option value="">None</option>
               {contacts.map((c) => {
                 // "Justin Bryan" × 8 with no other context was
-                // unpickable — append project / address and the stage
+                // unpickable, append project / address and the stage
                 // so each option is distinguishable (UI audit #10).
                 const where = (c.job_title || c.address || '').trim()
                 const stage = c.stage ? ` · ${String(c.stage)[0].toUpperCase()}${String(c.stage).slice(1)}` : ''
                 return (
                   <option key={c.id} value={c.id}>
-                    {c.name || 'Unnamed'}{where ? ` — ${where}` : ''}{stage}
+                    {c.name || 'Unnamed'}{where ? `, ${where}` : ''}{stage}
                   </option>
                 )
               })}
             </select>
           </label>
 
-          {/* Recurrence is create-only — editing changes just this one
+          {/* Recurrence is create-only, editing changes just this one
               occurrence. */}
           {!editing && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Recurrence</span>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               {[
-                { v: false, label: 'One-time' },
+                { v: false, label: 'One time' },
                 { v: true,  label: `Every ${recurDays} days × 4` }
               ].map((opt) => {
                 const active = recurs === opt.v
@@ -276,7 +276,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
           )}
 
           {!editing && recurs && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={labelStyle}>Repeat every (days)</span>
               <input
                 type="number"
@@ -289,17 +289,17 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
             </label>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12, marginTop: 6 }}>
             <button
               type="button"
               onClick={() => onClose?.()}
               disabled={saving}
               style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '12px 14px', borderRadius: 12,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--surface-2)', border: '1px solid var(--rule)',
                 color: 'var(--ink-strong)',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                 cursor: saving ? 'wait' : 'pointer'
               }}
             >
@@ -312,10 +312,10 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               disabled={saving || !title.trim()}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '12px 14px', borderRadius: 12, border: 'none',
+                padding: '12px 12px', borderRadius: 10, border: 'none',
                 background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
                 color: 'var(--onyx)',
-                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.14em',
+                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                 cursor: saving || !title.trim() ? 'not-allowed' : 'pointer',
                 boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
                 opacity: saving || !title.trim() ? 0.55 : 1
@@ -333,8 +333,8 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
 
 function chipStyle(active: any, disabled: any) {
   return {
-    padding: '7px 12px',
-    borderRadius: 999,
+    padding: '8px 12px',
+    borderRadius: 10,
     border: active
       ? '1px solid var(--v3-border-strong)'
       : '1px solid var(--rule)',

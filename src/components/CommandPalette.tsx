@@ -42,7 +42,7 @@ const QUICK_ACTIONS = [
   { id: 'newLead', label: 'New lead', hint: 'Add an opportunity', icon: Plus, to: '/work?new=1' },
   { id: 'newQuote', label: 'New quote', hint: 'Start a proposal with scope', icon: FileText, to: '/work?new=1&asStage=quote' },
   { id: 'newJob', label: 'New job', hint: 'Create active work', icon: Briefcase, to: '/work?new=1&asStage=job' },
-  { id: 'followups', label: 'Work follow-ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/work?stage=leads' },
+  { id: 'followups', label: 'Work follow ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/work?stage=leads' },
   { id: 'collect', label: 'Collect money', hint: 'Invoices and balances', icon: Receipt, to: '/invoices' },
   { id: 'compose', label: 'Draft message', hint: 'AI compose for customers', icon: MessageSquare, to: '/compose' },
 ]

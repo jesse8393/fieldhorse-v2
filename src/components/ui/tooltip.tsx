@@ -34,7 +34,7 @@ function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "ui:z-50 ui:w-fit ui:origin-(--radix-tooltip-content-transform-origin) ui:animate-in ui:rounded-md ui:bg-foreground ui:px-3 ui:py-1.5 ui:text-xs ui:text-balance ui:text-background ui:fade-in-0 ui:zoom-in-95 ui:data-[side=bottom]:slide-in-from-top-2 ui:data-[side=left]:slide-in-from-right-2 ui:data-[side=right]:slide-in-from-left-2 ui:data-[side=top]:slide-in-from-bottom-2 ui:data-[state=closed]:animate-out ui:data-[state=closed]:fade-out-0 ui:data-[state=closed]:zoom-out-95",
+          "ui:z-50 ui:w-fit ui:origin-(--radix-tooltip-content-transform-origin) ui:animate-in ui:rounded-[10px] ui:bg-foreground ui:px-3 ui:py-2 ui:text-xs ui:text-balance ui:text-background ui:fade-in-0 ui:zoom-in-95 ui:data-[side=bottom]:slide-in-from-top-2 ui:data-[side=left]:slide-in-from-right-2 ui:data-[side=right]:slide-in-from-left-2 ui:data-[side=top]:slide-in-from-bottom-2 ui:data-[state=closed]:animate-out ui:data-[state=closed]:fade-out-0 ui:data-[state=closed]:zoom-out-95",
           className
         )}
         {...props}>

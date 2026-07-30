@@ -8,13 +8,13 @@
 //                 render with comma grouping, e.g. 742 → "$742".
 //
 //   moneyFull(n)  Full currency, no fractional digits. For invoices,
-//                 payment confirmations, totals — anywhere the
+//                 payment confirmations, totals, anywhere the
 //                 operator needs the exact dollar amount. Example:
 //                 1_240_000 → "$1,240,000".
 //
 // Files with INTENTIONALLY different number-formatting rules (e.g.
 // V3PaymentSheet uses Intl.NumberFormat full currency; KanbanBoard
-// uses 1-decimal conditional K/M) keep their own helpers — this
+// uses 1-decimal conditional K/M) keep their own helpers, this
 // module is for the dominant canonical shape only.
 
 export function money(n: number | null | undefined): string {

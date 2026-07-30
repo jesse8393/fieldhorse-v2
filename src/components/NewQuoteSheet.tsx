@@ -10,11 +10,11 @@ import ClientPicker from './ClientPicker.tsx'
 import { Eyebrow } from './v3'
 
 /**
- * NewQuoteSheet — the ONE way to start a quote.
+ * NewQuoteSheet, the ONE way to start a quote.
  *
  * A quote is work you're pricing for a client, so this asks exactly two
- * things: who it's for, and (optionally) what it's for. Everything else —
- * the price, the scope, the terms — is the line-item builder's job, so on
+ * things: who it's for, and (optionally) what it's for. Everything else :
+ * the price, the scope, the terms, is the line item builder's job, so on
  * "Start quote" we create the quote and drop the operator straight into
  * that builder (onStarted). No re-typed client form, no amount field that
  * the line items would just overwrite.
@@ -58,7 +58,7 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
   }
 
   const canStart = !!client?.id && !starting
-  const labelStyle: import('react').CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !starting) onClose?.() }}>
@@ -69,22 +69,22 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
             New quote
           </Eyebrow>
           <DrawerTitle asChild>
-            <h2 className="fh-font-serif" style={{ margin: '6px 0 0', fontSize: 'clamp(22px, 6vw, 28px)', lineHeight: 1.1, letterSpacing: '-0.02em', fontWeight: 400, color: 'var(--ink-strong)' }}>
+            <h2 className="fh-font-serif" style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}>
               Who's it for?
             </h2>
           </DrawerTitle>
-          <DrawerDescription style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
-            Pick the client and go — you'll build the line items next.
+          <DrawerDescription style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
+            Pick the client and go, you'll build the line items next.
           </DrawerDescription>
         </DrawerHeader>
 
         <div ref={formRef as any} style={formStyle()}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Client</span>
             <ClientPicker userId={userId} value={client} onChange={setClient} />
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>What's it for? <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>(optional)</span></span>
             <input
               ref={titleRef}
@@ -94,19 +94,19 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
               onKeyDown={(e) => { if (e.key === 'Enter' && canStart) { e.preventDefault(); start() } }}
               placeholder="Kitchen remodel, driveway, roof…"
               style={{
-                width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 12,
+                width: '100%', boxSizing: 'border-box', padding: '12px 12px', borderRadius: 10,
                 background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)',
                 fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none', scrollMarginBottom: 120
               }}
             />
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 12, marginTop: 4 }}>
             <button
               type="button"
               onClick={() => onClose?.()}
               disabled={starting}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '13px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing: 'border-box' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', minWidth: 0, boxSizing: 'border-box' }}
             >
               <X size={14} />
               Cancel
@@ -118,11 +118,11 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
               disabled={!canStart}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '13px 14px', borderRadius: 12,
+                padding: '12px 12px', borderRadius: 10,
                 border: canStart ? 'none' : '1px solid var(--rule)',
                 background: canStart ? 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))' : 'var(--surface-2)',
                 color: canStart ? 'var(--onyx)' : 'var(--ink-muted)',
-                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: '0.12em',
+                fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
                 cursor: canStart ? 'pointer' : 'not-allowed',
                 boxShadow: canStart ? '0 6px 16px rgba(201,150,58,0.3)' : 'none',
                 minWidth: 0, boxSizing: 'border-box', touchAction: 'manipulation'

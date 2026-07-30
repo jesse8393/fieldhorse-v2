@@ -1,4 +1,4 @@
-// src/screens/Privacy.tsx — public privacy policy.
+// src/screens/Privacy.tsx, public privacy policy.
 // Reachable logged-out at /privacy. Linked from the mobile app's Settings
 // and used as the App Store / Play Store privacy policy URL.
 import LegalLayout, { H2, P, UL } from './LegalLayout.tsx'
@@ -14,18 +14,18 @@ export default function Privacy() {
 
       <H2>Information we collect</H2>
       <UL items={[
-        'Account information — your name, email address, and password (passwords are stored hashed by our authentication provider).',
-        'Business profile — company name, phone, email, website, address, license, insurance and warranty text, logo, trades, and brand color you enter.',
-        'Customer & job data — the clients, jobs, leads, estimates, invoices, payments, schedule events, subcontractors, notes, and photos you create in the app.',
-        'Photos — images you capture or upload to attach to a job, or to scan a lead/estimate with our AI feature.',
-        'Location — if you grant permission, your device location is used once to pin your service area for the weather work-window. We do not track your location in the background.',
-        'Usage data — basic logs needed to operate and secure the service.'
+        'Account information, your name, email address, and password (passwords are stored hashed by our authentication provider).',
+        'Business profile, company name, phone, email, website, address, license, insurance and warranty text, logo, trades, and brand color you enter.',
+        'Customer & job data, the clients, jobs, leads, estimates, invoices, payments, schedule events, subcontractors, notes, and photos you create in the app.',
+        'Photos, images you capture or upload to attach to a job, or to scan a lead/estimate with our AI feature.',
+        'Location, if you grant permission, your device location is used once to pin your service area for the weather work window. We do not track your location in the background.',
+        'Usage data, basic logs needed to operate and secure the service.'
       ]} />
 
       <H2>How we use it</H2>
       <UL items={[
         'To provide the app: store and display your jobs, clients, and documents across your devices.',
-        'To power features you trigger — AI estimates, AI message drafting, and lead/estimate photo scanning send the relevant text or image to our AI provider to generate a result.',
+        'To power features you trigger, AI estimates, AI message drafting, and lead/estimate photo scanning send the relevant text or image to our AI provider to generate a result.',
         'To show local weather conditions for your pinned service area.',
         'To send transactional email you initiate (e.g. partner invites) and to secure your account.'
       ]} />
@@ -33,10 +33,10 @@ export default function Privacy() {
       <H2>Service providers</H2>
       <P>We share data only with vendors that help us run the app, under their own security and privacy terms:</P>
       <UL items={[
-        'Supabase — database, authentication, and file storage hosting.',
-        'Anthropic (Claude) — processes the text/images you submit to AI features to return a result; not used to train their models on your data.',
-        'Open‑Meteo — receives only coordinates to return a weather forecast.',
-        'Resend — sends transactional emails you initiate.'
+        'Supabase, database, authentication, and file storage hosting.',
+        'Anthropic (Claude), processes the text/images you submit to AI features to return a result; not used to train their models on your data.',
+        'Open‑Meteo, receives only coordinates to return a weather forecast.',
+        'Resend, sends transactional emails you initiate.'
       ]} />
       <P>We do not sell your personal information or your customers' information.</P>
 

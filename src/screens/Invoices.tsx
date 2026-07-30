@@ -9,7 +9,7 @@ import { useProfile } from '../contexts/ProfileContext.tsx'
 import {
   createInvoice, sendInvoiceEmail, buildInvoicePdf, setInvoiceStatus
 } from '../lib/invoices.ts'
-// Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
+// Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (per-row Generate or Email Invoice).
 async function loadPdf(): Promise<any> {
   return import('../lib/pdf.js')
@@ -22,7 +22,7 @@ import DataErrorState from '../components/DataErrorState.tsx'
 import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { Button, FilterPill, Eyebrow, StampNumber, StatusPill } from '../components/v3'
-// V3PaymentSheet is lazy — only loads when an operator taps "Mark Paid".
+// V3PaymentSheet is lazy, only loads when an operator taps "Mark Paid".
 // Avoids dragging ~440KB into the initial Invoices route chunk.
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { useConfirm } from '../components/ConfirmSheet.tsx'
@@ -33,12 +33,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
 
-// Invoices / AR — v3 money command screen.
+// Invoices / AR, v3 money command screen.
 //
 // Pipeline v2: two layers on one screen.
-//   1. ISSUED INVOICES — real fh_invoices rows (deposit / draws /
+//   1. ISSUED INVOICES, real fh_invoices rows (deposit / draws /
 //      final), each with its own status + send / download / mark-paid.
-//   2. JOB BALANCES — per-job outstanding (contract − paid), the
+//   2. JOB BALANCES, per-job outstanding (contract − paid), the
 //      who-owes-me-what aging view, kept from the original screen.
 // The per-job Email action now creates a first-class invoice for the
 // balance instead of firing an untracked ad-hoc PDF.
@@ -85,7 +85,7 @@ export default function Invoices() {
   // Approved change orders raise each job's true contract; without this
   // the balances below understate what a job with signed COs owes.
   const approvedCoByJob = useMemo(() => approvedCoByContact(changeOrders), [changeOrders])
-  // View toggle in the URL (?view=) — survives refresh, shareable
+  // View toggle in the URL (?view=), survives refresh, shareable
   // (UI audit #30). 'outstanding' | 'all'.
   const [searchParams, setSearchParams] = useSearchParams()
   const filter = searchParams.get('view') === 'all' ? 'all' : 'outstanding'
@@ -101,7 +101,7 @@ export default function Invoices() {
   // rides along so the payment settles that fh_invoices row.
   const [payingRow, setPayingRow] = useState<any>(null)
   // Which row is mid-send (job.id or invoice.id) and which just
-  // succeeded — drives the per-row Email button's loading + Sent morph.
+  // succeeded, drives the per-row Email button's loading + Sent morph.
   const [sendingId, setSendingId] = useState<any>(null)
   const [sentId, setSentId] = useState<any>(null)
   const confirm = useConfirm()
@@ -115,7 +115,7 @@ export default function Invoices() {
 
   // Receivable-age anchor per job: the earliest OPEN (issued but not
   // paid/void/draft) invoice's due date, else its issue date. A/R aging
-  // must run from when the bill went out — NOT the job's creation date,
+  // must run from when the bill went out, NOT the job's creation date,
   // or a job that ran for months reads as "90d overdue" the day it's
   // first billed. Jobs with no issued invoice fall back to created_at.
   const arAnchorByJob = useMemo(() => {
@@ -166,19 +166,19 @@ export default function Invoices() {
   }, [jobs, paidByJob, approvedCoByJob, arAnchorByJob])
 
   // Memoized so `filtered` keeps a stable identity across unrelated
-  // re-renders — it feeds TanStack Table (SnowInvoicesBuild) as `data`,
+  // re-renders, it feeds TanStack Table (SnowInvoicesBuild) as `data`,
   // and a fresh array every render forces a full row-model rebuild.
   const filtered = useMemo(
     () => filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows,
     [rows, filter]
   )
-  // Bounded render window that grows on scroll — the A/R list can be long.
+  // Bounded render window that grows on scroll, the A/R list can be long.
   const { visible: visibleBalances, sentinelRef: balancesSentinelRef, hasMore: balancesHasMore } = useInfiniteRender(
     filtered,
     filter
   )
 
-  // BY-CLIENT A/R rollup — group every outstanding job balance under
+  // BY-CLIENT A/R rollup, group every outstanding job balance under
   // its linked client so "who owes me, and how overdue" reads at a
   // glance. Each group carries the client's jobs + the worst aging
   // bucket among them, and feeds the shared StatementSheet directly.
@@ -218,13 +218,13 @@ export default function Invoices() {
   const [statementClient, setStatementClient] = useState<any>(null)
 
   // Issued invoices (first-class fh_invoices rows), enriched with their
-  // job + effective status — a 'sent' invoice past its due date reads
+  // job + effective status, a 'sent' invoice past its due date reads
   // as overdue at display time without a background job mutating rows.
   const invoiceRows = useMemo(() => {
     const now = Date.now()
     return invoices.map((inv) => {
       const job = jobById.get(inv.contact_id) || null
-      // due_at can be date-only — LOCAL parse, and a bill due "July 25"
+      // due_at can be date-only, LOCAL parse, and a bill due "July 25"
       // isn't overdue until July 25 has fully passed locally.
       const due = parseDateOnly(inv.due_at)
       const pastDue = inv.status === 'sent' && due != null && due.getTime() + 86400000 <= now
@@ -251,7 +251,7 @@ export default function Invoices() {
     return out
   }, [rows])
 
-  // Month-to-date collection pace — payments logged in the current
+  // Month-to-date collection pace, payments logged in the current
   // calendar month vs the trailing-3-month monthly average. Surfaces
   // as the cockpit's "X collected this month · pace ±Y% vs avg" tip
   // (ported from owed-hero__tip in the design handoff).
@@ -262,7 +262,7 @@ export default function Invoices() {
     let monthCollected = 0
     let priorTotal = 0
     for (const p of payments) {
-      // paid_on is date-only — parse LOCAL so a payment dated the 1st
+      // paid_on is date-only, parse LOCAL so a payment dated the 1st
       // doesn't bucket into the prior month (UTC parse shifts it back
       // a day in every US timezone).
       const t = (parseDateOnly(p.paid_on) || parseDateOnly(p.created_at))?.getTime() ?? NaN
@@ -282,7 +282,7 @@ export default function Invoices() {
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
     phone: profile?.company_phone || '',
-    // Prefer customer-facing company_email (migration 015) over the
+    // Prefer customer facing company_email (migration 015) over the
     // operator's auth email so invoices show the public address.
     email: profile?.company_email || (profile as any)?.email || '',
     website: profile?.company_website || '',
@@ -303,7 +303,7 @@ export default function Invoices() {
     // wondering if anything happened.
     try {
       const { generateInvoice, downloadPdf } = await loadPdf()
-      // generateInvoice() became async in 4D-2D — pre-fetches the
+      // generateInvoice() became async in 4D-2D, pre-fetches the
       // contractor's logo via loadLogoForPdf before rendering.
       const c = resolveClient(row.job)
       // Pull payments for this job so the new PDF's Balance Summary +
@@ -356,14 +356,14 @@ export default function Invoices() {
     setPayingRow(row)
   }
 
-  // Payments scoped to one job — feeds the per-invoice PDF's balance
+  // Payments scoped to one job, feeds the per-invoice PDF's balance
   // summary + payment history blocks.
   function paymentsForJob(jobId: string) {
     return payments.filter((p) => p.contact_id === jobId)
   }
 
-  // Change orders scoped to one job — must be threaded into every PDF /
-  // email path or the customer-facing balance omits signed CO money
+  // Change orders scoped to one job, must be threaded into every PDF /
+  // email path or the customer facing balance omits signed CO money
   // (the A/R row already includes it, so the doc would understate).
   function changeOrdersForJob(jobId: string) {
     return changeOrders.filter((co) => (co as any).contact_id === jobId)
@@ -384,7 +384,7 @@ export default function Invoices() {
     try {
       // Reuse an existing open (unsent draft or already-sent, not paid/
       // void) invoice that covers this balance instead of minting a new
-      // "Balance due" row on every tap — repeated taps were creating
+      // "Balance due" row on every tap, repeated taps were creating
       // duplicate open invoices for the same money.
       const existing = invoices.find((inv) =>
         (inv as any).contact_id === job.id
@@ -417,7 +417,7 @@ export default function Invoices() {
         setSentId(job.id)
         setTimeout(() => setSentId(null), 2400)
       } else if (res.reason === 'sender_not_configured') {
-        toastError("Email NOT sent — sender isn't configured", 'Downloaded the PDF so you can email it manually. Saved as a draft invoice.')
+        toastError("Email NOT sent, sender isn't configured", 'Downloaded the PDF so you can email it manually. Saved as a draft invoice.')
       } else {
         throw new Error(res.message || 'Send failed')
       }
@@ -429,7 +429,7 @@ export default function Invoices() {
     }
   }
 
-  // Per-invoice actions — operate on the first-class fh_invoices rows.
+  // Per-invoice actions, operate on the first-class fh_invoices rows.
   async function handleInvoiceSend(r: any) {
     const { invoice, job } = r
     if (!user || !job) {
@@ -458,7 +458,7 @@ export default function Invoices() {
         setTimeout(() => setSentId(null), 2400)
         refresh()
       } else if (res.reason === 'sender_not_configured') {
-        toastError("Email NOT sent — sender isn't configured", 'Downloaded the PDF so you can email it manually.')
+        toastError("Email NOT sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
       } else {
         throw new Error(res.message || 'Send failed')
       }
@@ -512,15 +512,15 @@ export default function Invoices() {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
 
-  // Never render financial totals from a failed load — a fetch error would
+  // Never render financial totals from a failed load, a fetch error would
   // otherwise fall through to "$0 · all caught up", telling a contractor
   // they're owed nothing when the data simply didn't arrive.
   if (isError) {
     return (
-      <div className="v3-screen" style={{ padding: '24px 20px' }}>
+      <div className="v3-screen" style={{ padding: '24px 24px' }}>
         <DataErrorState
           title="Couldn't load invoices & payments"
-          message="We couldn't reach your billing data. Check your connection and retry — your numbers are safe."
+          message="We couldn't reach your billing data. Check your connection and retry, your numbers are safe."
           onRetry={() => refresh()}
         />
       </div>
@@ -588,7 +588,7 @@ export default function Invoices() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      // paddingBottom was 120 — defensive clearance for the bottom nav
+      // paddingBottom was 120, defensive clearance for the bottom nav
       // but it left a huge dead void below the last invoice card on
       // short lists. Bottom nav is ~56-64px tall; safe-area-inset-bottom
       // covers the iOS home indicator. Sum gives enough breathing room
@@ -600,23 +600,23 @@ export default function Invoices() {
         background: 'var(--v3-bg)'
       }}
     >
-      {/* COCKPIT — black-glass A/R panel: title eyebrow + state chip +
+      {/* COCKPIT, black-glass A/R panel: title eyebrow + state chip +
           headline total + aging bar + 3-cell aging breakdown.
           Backdrop-filter + neutral inner highlight match the v3 black-
           glass treatment shipped on Schedule/Notes/Home cockpits. */}
-      <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
+      <motion.div variants={item} style={{ padding: '8px 24px 12px' }}>
         <div style={{
           position: 'relative',
-          padding: '14px 16px',
-          borderRadius: 16,
+          padding: '12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface-glass)',
           backdropFilter: 'blur(14px) saturate(1.1)',
           WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(20, 20, 20, 0.40)',
           overflow: 'hidden'
         }}>
-          {/* Gold radial sweep behind the hero number — ported from
+          {/* Gold radial sweep behind the hero number, ported from
               owed-hero__sweep in the design handoff. Adds the premium
               "money sits on warm light" feel without changing layout. */}
           <span aria-hidden="true" style={{
@@ -625,7 +625,7 @@ export default function Invoices() {
             right: '-15%',
             width: '70%',
             height: '180%',
-            background: 'radial-gradient(45% 30% at 50% 50%, rgba(228, 190, 111, 0.14), transparent 70%)',
+            background: 'radial-gradient(45% 30% at 50% 50%, rgba(201, 150, 58, 0.14), transparent 70%)',
             pointerEvents: 'none'
           }} />
           {/* Top row: section eyebrow + state chip (urgency lives here, not in the total) */}
@@ -637,11 +637,11 @@ export default function Invoices() {
             {!loading && <BalanceStateChip totals={totals} />}
           </div>
 
-          {/* Headline total — always linen. Magnitude is the noun; state lives
+          {/* Headline total, always linen. Magnitude is the noun; state lives
               in the chip above. Stripe / Mercury pattern. */}
           <div style={{ marginTop: 8 }}>
             {loading ? (
-              <span className="v3-skeleton" style={{ display: 'inline-block', width: 200, height: 48, borderRadius: 6 }} />
+              <span className="v3-skeleton" style={{ display: 'inline-block', width: 200, height: 48, borderRadius: 10 }} />
             ) : (
               <StampNumber
                 size="2xl"
@@ -661,7 +661,7 @@ export default function Invoices() {
                 marginTop: 10,
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 10
+                gap: 12
               }}>
                 {AGING_BUCKETS.map((b) => {
                   const value = totals[b.id]
@@ -674,7 +674,7 @@ export default function Invoices() {
                   return (
                     <div key={b.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                       <StampNumber size="md" tone={tone}>{fmtMoney(value)}</StampNumber>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                         <Eyebrow style={{ whiteSpace: 'nowrap' }}>{b.label}</Eyebrow>
                         <Eyebrow style={{ color: 'var(--v3-text-faint, color-mix(in srgb, var(--v3-text-muted) 70%, transparent))', whiteSpace: 'nowrap' }}>{b.short}</Eyebrow>
                       </div>
@@ -685,19 +685,19 @@ export default function Invoices() {
             </div>
           )}
 
-          {/* Month-to-date collection pace — positive momentum signal that
+          {/* Month-to-date collection pace, positive momentum signal that
               balances the alarm of outstanding totals. Ported from
               owed-hero__tip in the design handoff. */}
           {!loading && collectionPace.monthCollected > 0 && (
             <div style={{
               marginTop: 12,
-              paddingTop: 10,
+              paddingTop: 12,
               borderTop: '1px solid var(--v3-border)',
               display: 'flex',
               alignItems: 'center',
               gap: 8,
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               color: 'var(--v3-text-muted)',
               position: 'relative'
             }}>
@@ -727,17 +727,17 @@ export default function Invoices() {
         </div>
       </motion.div>
 
-      {/* GLOBAL FILTER — one control governs every section below (issued
+      {/* GLOBAL FILTER, one control governs every section below (issued
           invoices, who-owes-you, job balances). It lives directly under
           the cockpit so the toggle sits ABOVE the sections it filters
           instead of buried in the last section's header, where changing
           it silently reshaped the sections already scrolled past. */}
-      <motion.div variants={item} style={{ display: 'flex', gap: 6, padding: '0 var(--v3-gutter) 16px' }}>
+      <motion.div variants={item} style={{ display: 'flex', gap: 8, padding: '0 var(--v3-gutter) 16px' }}>
         <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
         <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
       </motion.div>
 
-      {/* ISSUED INVOICES — first-class fh_invoices rows. Every deposit,
+      {/* ISSUED INVOICES, first-class fh_invoices rows. Every deposit,
           progress draw, and final bill lives here with its own status
           + actions. Created from the job screen's Send Invoice sheet
           (or the per-job Email button below). */}
@@ -750,7 +750,7 @@ export default function Invoices() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
             <SectionHeader label={filter === 'outstanding' ? 'Open invoices' : 'All invoices'} />
             <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
               color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
             }}>
               {shownInvoiceRows.length}
@@ -780,7 +780,7 @@ export default function Invoices() {
         </motion.div>
       )}
 
-      {/* BY-CLIENT A/R — who owes you, worst-aged first. Outstanding
+      {/* BY-CLIENT A/R, who owes you, worst-aged first. Outstanding
           filter only; one tap fires a statement across all their jobs. */}
       {!loading && filter === 'outstanding' && clientAR.length > 0 && (
         <motion.div
@@ -790,7 +790,7 @@ export default function Invoices() {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
             <SectionHeader label="Who owes you" />
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
               {clientAR.length}
             </span>
           </div>
@@ -799,7 +799,7 @@ export default function Invoices() {
               const b = AGING_BUCKETS.find((x) => x.id === g.worst) || AGING_BUCKETS[0]
               return (
                 <li key={g.clientId}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
                     <button
                       type="button"
                       onClick={() => { hapticTap(); navigate(`/clients/${g.clientId}`) }}
@@ -811,18 +811,18 @@ export default function Invoices() {
                         </span>
                         <StatusPill color={b.color} label={b.label} style={{ flexShrink: 0 }} />
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>
                         {g.jobs.length} {g.jobs.length === 1 ? 'property' : 'properties'}
                       </div>
                     </button>
-                    <span style={{ flexShrink: 0, fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 800, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ flexShrink: 0, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 800, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>
                       {fmtMoney(g.total)}
                     </span>
                     <button
                       type="button"
                       onClick={() => { hapticTap(); setStatementClient(g) }}
                       aria-label={`Statement for ${g.client.company_name || g.client.name || 'client'}`}
-                      style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 11px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                      style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 12px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
                     >
                       <Receipt size={13} /> Statement
                     </button>
@@ -842,7 +842,7 @@ export default function Invoices() {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
           <SectionHeader label={filter === 'outstanding' ? 'Job balances' : 'All money jobs'} />
-          <span style={{ fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
             {filtered.length}
           </span>
         </div>
@@ -852,7 +852,7 @@ export default function Invoices() {
         {!loading && filtered.length === 0 && (
           <div className="v3-empty">
             <Receipt size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
               {filter === 'outstanding' ? 'Nothing outstanding.' : 'No money jobs yet.'}
             </div>
             <div style={{ fontSize: 12 }}>
@@ -864,7 +864,7 @@ export default function Invoices() {
         )}
 
         {!loading && filtered.length > 0 && (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {visibleBalances.map((r) => (
               <PaymentCard
                 key={r.job.id}
@@ -874,7 +874,7 @@ export default function Invoices() {
                 onEmail={() => handleSendEmail(r)}
                 onPDF={() => handleGeneratePDF(r)}
                 onPaid={async () => {
-                  // Phase 11 stabilization — confirm before opening the
+                  // Phase 11 stabilization, confirm before opening the
                   // payment sheet so accidental Mark Paid taps in a
                   // dense list don't begin the log-payment flow.
                   const name = r.job?.name || 'this job'
@@ -883,7 +883,7 @@ export default function Invoices() {
                   })
                   const ok = await confirm({
                     title: `Log payment for ${name}?`,
-                    body: `Opens the payment sheet pre-filled with ${amt}.`,
+                    body: `Opens the payment sheet filled with ${amt}.`,
                     confirmLabel: 'Open sheet'
                   })
                   if (!ok) return
@@ -896,7 +896,7 @@ export default function Invoices() {
         )}
       </motion.div>
 
-      {/* Payment sheet — shared V3PaymentSheet from ContactDetail.
+      {/* Payment sheet, shared V3PaymentSheet from ContactDetail.
           Opens when the operator taps Mark Paid on a row, prefilled with
           that row's balance. On submit, logPayment cascades through
           pipeline.ts (auto-close on overpayment) and we refresh. */}
@@ -914,7 +914,7 @@ export default function Invoices() {
         )}
       </AnimatePresence>
 
-      {/* Client statement — fired from a "Who owes you" row */}
+      {/* Client statement, fired from a "Who owes you" row */}
       <StatementSheet
         open={!!statementClient}
         onClose={() => setStatementClient(null)}
@@ -929,7 +929,7 @@ export default function Invoices() {
 }
 
 /* ============================================================
-   BalanceStateChip — small premium state pill that lives in the
+   BalanceStateChip, small premium state pill that lives in the
    cockpit top-right. Carries the urgency signal so the headline
    total can stay calm linen. Three variants:
      - none:    muted "All caught up" with check (zero outstanding)
@@ -937,7 +937,7 @@ export default function Invoices() {
      - overdue: danger-tinted "Overdue · N" (60+ exists)
    ============================================================ */
 function BalanceStateChip({ totals }: any) {
-  // Variant selection — overdue beats collect beats none. Renders via
+  // Variant selection, overdue beats collect beats none. Renders via
   // the kit's StatusPill (wave 2) instead of a hand-rolled twin.
   if (totals.count === 0) {
     return <StatusPill color="var(--v3-text-muted)" icon={Check} label="All caught up" />
@@ -949,7 +949,7 @@ function BalanceStateChip({ totals }: any) {
 }
 
 /* ============================================================
-   AgingBar — single 6px segmented pill showing Current / Late /
+   AgingBar, single 6px segmented pill showing Current / Late /
    Overdue proportions of total outstanding. Mirrors the prototype
    owed-aging__bar pattern; segments collapse to zero-width when
    their bucket is empty.
@@ -965,8 +965,8 @@ function AgingBar({ totals }: any) {
       style={{
         display: 'flex',
         height: 6,
-        borderRadius: 999,
-        background: 'var(--v3-track, rgba(255, 240, 210, 0.05))',
+        borderRadius: 10,
+        background: 'var(--v3-track, rgba(242, 237, 228, 0.05))',
         overflow: 'hidden'
       }}
     >
@@ -990,7 +990,7 @@ function AgingBar({ totals }: any) {
 }
 
 /* ============================================================
-   InvoiceCard — one issued fh_invoices row. Compact: status spine +
+   InvoiceCard, one issued fh_invoices row. Compact: status spine +
    title/job + amount/due + actions (Send · Download · Mark paid ·
    Void). Paid/void rows render quiet with no actions.
    ============================================================ */
@@ -998,7 +998,7 @@ const INVOICE_STATUS_META: Record<string, { label: string; color: string }> = {
   draft:   { label: 'Draft',   color: 'var(--v3-text-muted)' },
   sent:    { label: 'Sent',    color: 'var(--v3-primary)' },
   overdue: { label: 'Overdue', color: 'var(--v3-danger-bright)' },
-  paid:    { label: 'Paid',    color: 'var(--v3-success-bright, #4ade80)' },
+  paid:    { label: 'Paid',    color: 'var(--v3-success-bright, #2D7A4F)' },
   void:    { label: 'Void',    color: 'var(--v3-text-muted)' }
 }
 
@@ -1021,9 +1021,9 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
-        padding: '12px 14px 12px 20px',
-        borderRadius: 12,
+        gap: 12,
+        padding: '12px 12px 12px 24px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: effStatus === 'overdue'
           ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
@@ -1046,7 +1046,7 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
             </div>
             <div style={{
               marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-              fontSize: 11, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)'
+              fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)'
             }}>
               {job ? (
                 <Link to={`/jobs/${job.id}?tab=financials`} style={{ color: 'var(--v3-text-muted)', textDecoration: 'none' }}>
@@ -1061,7 +1061,7 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
           </div>
           <div style={{ flexShrink: 0, textAlign: 'right' }}>
             <div style={{
-              fontFamily: 'var(--font-display)', fontSize: 18, lineHeight: 1,
+              fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1,
               color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums',
               textDecoration: effStatus === 'void' ? 'line-through' : 'none'
             }}>
@@ -1071,7 +1071,7 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
           </div>
         </div>
         {!settled && (
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             <Button size="sm" variant={isSent ? 'success' : 'secondary'} onClick={onSend} disabled={isSending}>
               {isSent ? <CheckCircle2 size={12} /> : <Send size={12} />}
               {isSent ? 'Sent' : isSending ? 'Sending…' : effStatus === 'draft' ? 'Send' : 'Resend'}
@@ -1093,7 +1093,7 @@ function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, o
 }
 
 /* ============================================================
-   PaymentCard — premium v3 invoice card.
+   PaymentCard, premium v3 invoice card.
    Layout:
      ┌──────────────────────────────────────────────────┐
      │  [spine]  Job name          $24,400  ›           │
@@ -1119,8 +1119,8 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
-          padding: '14px 14px 14px 22px',
-          borderRadius: 14,
+          padding: '12px 12px 12px 24px',
+          borderRadius: 10,
           // Solid surface instead of glass+backdrop-blur: backdrop-filter is
           // one of the most expensive mobile GPU ops, and this card renders
           // once per outstanding balance. A solid surface + hairline border
@@ -1129,11 +1129,11 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           border: isOverdue
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 4px 14px rgba(20, 20, 20, 0.30)',
           overflow: 'hidden'
         }}
       >
-        {/* Aging-color spine — left edge */}
+        {/* Aging-color spine, left edge */}
         <span aria-hidden="true" style={{
           position: 'absolute',
           left: 0, top: 12, bottom: 12,
@@ -1151,7 +1151,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
+                gap: 8,
                 color: 'var(--v3-text)',
                 textDecoration: 'none'
               }}
@@ -1159,8 +1159,8 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               <span style={{
                 fontFamily: 'var(--font-body)',
                 fontWeight: 700,
-                fontSize: 15,
-                letterSpacing: '-0.005em'
+                fontSize: 14,
+                letterSpacing: 0
               }}>
                 {job.name || 'Unnamed job'}
               </span>
@@ -1184,7 +1184,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           <div style={{ flexShrink: 0, textAlign: 'right' }}>
             <div style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(20px, 5vw, 26px)',
+              fontSize: 24,
               lineHeight: 1,
               color: balance > 0 ? 'var(--v3-text)' : 'var(--v3-success-bright)',
               fontVariantNumeric: 'tabular-nums',
@@ -1202,12 +1202,12 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           </div>
         </div>
 
-        {/* Paid progress — visible payment momentum */}
+        {/* Paid progress, visible payment momentum */}
         <div>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--v3-text-muted)',
             fontFamily: 'var(--font-body)',
             marginBottom: 5
@@ -1219,7 +1219,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
           </div>
           <div style={{
             height: 6,
-            borderRadius: 999,
+            borderRadius: 10,
             background: 'var(--v3-track)',
             overflow: 'hidden'
           }}>
@@ -1229,10 +1229,10 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               background: pctPaid >= 100
                 ? 'var(--v3-success-bright)'
                 : 'linear-gradient(90deg, var(--v3-primary-deep), var(--v3-primary))',
-              borderRadius: 999,
+              borderRadius: 10,
               transition: 'width 220ms ease',
               boxShadow: pctPaid >= 100
-                ? '0 0 8px rgba(74, 222, 128, 0.40)'
+                ? '0 0 8px rgba(45, 122, 79, 0.40)'
                 : 'none'
             }} />
           </div>
@@ -1247,7 +1247,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
             paddingTop: 4,
             flexWrap: 'wrap'
           }}>
-            {/* Email — primary send action. Mirrors the Send button on
+            {/* Email, primary send action. Mirrors the Send button on
                 InvoiceDetail. User shouldn't have to dive into the detail
                 page just to email the client. */}
             <Button

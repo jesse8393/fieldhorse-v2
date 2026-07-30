@@ -1,4 +1,4 @@
-// Materials section — backed by fh_materials.
+// Materials section, backed by fh_materials.
 //
 // Per-job procurement list. Each row carries qty_needed + optional
 // ordered/received quantities + an installed_at timestamp. The status
@@ -6,13 +6,13 @@
 // fields so the UI never has to keep an enum in sync with reality.
 //
 // Two ways to add rows:
-//   1. Inline composer  — name + qty + supplier + unit_cost.
-//   2. Bulk paste       — one line = one item; lightweight parse
+//   1. Inline composer , name + qty + supplier + unit_cost.
+//   2. Bulk paste      , one line = one item; lightweight parse
 //                         picks up a leading qty if present
 //                         ("4 of 2x4 studs" → qty 4, name "2x4 studs").
-//   3. Pull from notes  — fh_notes.parsed.materials_needed across
+//   3. Pull from notes , fh_notes.parsed.materials_needed across
 //                         the job is offered as a checkbox list so
-//                         the owner can promote AI-extracted items
+//                         the owner can promote AI found items
 //                         into real procurement rows without
 //                         retyping.
 
@@ -72,12 +72,12 @@ const STATUS_LABEL: Record<Status, string> = {
 }
 
 function fmtMoney(n: number | null | undefined): string {
-  if (n == null) return '—'
+  if (n == null) return '\u2003'
   return `$${Math.round(Number(n)).toLocaleString()}`
 }
 
 function fmtQty(n: number | null | undefined, unit?: string | null): string {
-  if (n == null) return '—'
+  if (n == null) return '\u2003'
   const s = Number(n) % 1 === 0 ? String(n) : Number(n).toFixed(2)
   return unit ? `${s} ${unit}` : s
 }
@@ -221,7 +221,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
   }, [rows])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <Eyebrow>
           Materials
@@ -241,13 +241,13 @@ export default function MaterialsSection({ jobId, userId }: any) {
         </div>
       </div>
 
-      {/* Inline composer — always visible. Press Enter on Name to add. */}
+      {/* Inline composer, always visible. Press Enter on Name to add. */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(160px, 2fr) 70px 70px minmax(120px, 1fr) 90px auto',
         gap: 8,
         padding: 12,
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
       }}>
@@ -303,8 +303,8 @@ export default function MaterialsSection({ jobId, userId }: any) {
       ) : rows.length === 0 ? (
         <div style={{
           padding: '24px 16px', textAlign: 'center', color: 'var(--v3-text-muted)',
-          fontFamily: 'var(--font-body)', fontSize: 13,
-          border: '1px dashed var(--v3-border)', borderRadius: 12,
+          fontFamily: 'var(--font-body)', fontSize: 14,
+          border: '1px dashed var(--v3-border)', borderRadius: 10,
         }}>
           <Truck size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary)' }} />
           No materials tracked yet. Add line items above, paste a list, or pull from your field reports.
@@ -381,10 +381,10 @@ function MaterialCard({
       style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1.6fr) 110px minmax(120px, 1fr) 110px 110px auto',
-        gap: 10,
+        gap: 12,
         alignItems: 'center',
-        padding: '12px 14px',
-        borderRadius: 12,
+        padding: '12px 12px',
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
       }}
@@ -394,7 +394,7 @@ function MaterialCard({
           {row.name}
         </strong>
         {(row.po_number || row.notes || (row.source && row.source?.from === 'note')) && (
-          <span style={{ fontSize: 11, color: 'var(--v3-text-muted)' }}>
+          <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>
             {row.po_number ? `PO ${row.po_number}` : ''}
             {row.source?.from === 'note' && (
               <span style={{ marginLeft: row.po_number ? 8 : 0 }}>
@@ -411,15 +411,15 @@ function MaterialCard({
       </div>
 
       <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {row.supplier || '—'}
+        {row.supplier || '\u2003'}
       </div>
 
       <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-        {row.unit_cost != null ? `${fmtMoney(row.unit_cost)}/u` : '—'}
+        {row.unit_cost != null ? `${fmtMoney(row.unit_cost)}/u` : '\u2003'}
       </div>
 
       <div style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: lineCost > 0 ? 'var(--v3-primary)' : 'var(--v3-text-muted)', fontWeight: lineCost > 0 ? 700 : 400 }}>
-        {lineCost > 0 ? fmtMoney(lineCost) : '—'}
+        {lineCost > 0 ? fmtMoney(lineCost) : '\u2003'}
       </div>
 
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
@@ -440,7 +440,7 @@ function MaterialCard({
           </button>
         )}
         {status === 'installed' && (
-          <button type="button" onClick={onUnmarkInstalled} title="Un-mark installed" aria-label="Un-mark installed" style={iconBtnStyle}>
+          <button type="button" onClick={onUnmarkInstalled} title="Mark as not installed installed" aria-label="Mark as not installed installed" style={iconBtnStyle}>
             <X size={13} />
           </button>
         )}
@@ -465,12 +465,12 @@ function BulkAddDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (lines:
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="4 of 2x4 studs&#10;1 box of #10 screws&#10;Drywall mud (3)&#10;Paint — eggshell white"
+        placeholder="4 of 2x4 studs&#10;1 box of #10 screws&#10;Drywall mud (3)&#10;Paint, eggshell white"
         rows={8}
         autoFocus
         style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
       />
-      <div style={{ fontSize: 11, color: 'var(--v3-text-muted)', marginTop: 6 }}>
+      <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 6 }}>
         {preview.length} item{preview.length === 1 ? '' : 's'} parsed.
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
@@ -530,27 +530,27 @@ function NotesPullDialog({ jobId, onClose, onAdd }: {
   const chosen = items.filter((it) => it.checked)
 
   return (
-    <DialogShell title="Pull from field notes" subtitle="AI-extracted materials from your notes on this job. Pick which ones to add as procurement rows." onClose={onClose}>
+    <DialogShell title="Pull from field notes" subtitle="AI found materials from your notes on this job. Pick which ones to add as procurement rows." onClose={onClose}>
       {loading ? (
-        <div style={{ padding: 18, textAlign: 'center', color: 'var(--v3-text-muted)' }}>Loading…</div>
+        <div style={{ padding: 16, textAlign: 'center', color: 'var(--v3-text-muted)' }}>Loading…</div>
       ) : items.length === 0 ? (
-        <div style={{ padding: 18, textAlign: 'center', color: 'var(--v3-text-muted)' }}>
+        <div style={{ padding: 16, textAlign: 'center', color: 'var(--v3-text-muted)' }}>
           No materials in this job's field notes yet. Capture a few field reports first.
         </div>
       ) : (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--v3-text-muted)' }}>{chosen.length} selected</span>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>{chosen.length} selected</span>
+            <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" onClick={selectAll} style={chipBtnGhost}>All</button>
               <button type="button" onClick={selectNone} style={chipBtnGhost}>None</button>
             </div>
           </div>
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
             {items.map((it, idx) => (
               <li key={it.note_id + idx} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 10px', borderRadius: 8,
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '8px 12px', borderRadius: 10,
                 background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border)',
               }}>
                 <input
@@ -559,10 +559,10 @@ function NotesPullDialog({ jobId, onClose, onAdd }: {
                   onChange={() => toggle(idx)}
                   style={{ accentColor: 'var(--v3-primary)' }}
                 />
-                <span style={{ flex: 1, fontSize: 13, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ flex: 1, fontSize: 14, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {it.name}
                 </span>
-                <span style={{ fontSize: 11, color: 'var(--v3-text-muted)' }}>×{it.qty}</span>
+                <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>×{it.qty}</span>
               </li>
             ))}
           </ul>
@@ -588,7 +588,7 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
       aria-label={title}
       style={{
         position: 'fixed', inset: 0, zIndex: 90,
-        background: 'rgba(0,0,0,.55)',
+        background: 'rgba(20, 20, 20,.55)',
         display: 'grid', placeItems: 'center',
         padding: 16,
       }}
@@ -600,11 +600,11 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
           width: '100%', maxWidth: 520,
           maxHeight: 'calc(100vh - 32px)',
           overflowY: 'auto',
-          padding: 22,
-          borderRadius: 12,
-          background: 'linear-gradient(180deg, rgba(19,22,27,.95), rgba(9,11,14,.98))',
+          padding: 24,
+          borderRadius: 10,
+          background: 'linear-gradient(180deg, rgba(20, 20, 20,.95), rgba(20, 20, 20,.98))',
           border: '1px solid var(--v3-border-mid)',
-          boxShadow: '0 22px 60px rgba(0,0,0,.50)',
+          boxShadow: '0 22px 60px rgba(20, 20, 20,.50)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -626,30 +626,30 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
 
 const inputStyle: React.CSSProperties = {
   flex: '1 1 auto', minWidth: 0,
-  padding: '10px 12px', borderRadius: 8,
-  background: 'var(--v3-surface-2, rgba(0,0,0,.20))',
+  padding: '12px 12px', borderRadius: 10,
+  background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
   border: '1px solid var(--v3-border)',
   color: 'var(--v3-text)',
-  fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none',
+  fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none',
 }
 
 const primaryBtn = (disabled: boolean): React.CSSProperties => ({
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-  padding: '9px 14px', borderRadius: 8, border: 'none',
+  padding: '8px 12px', borderRadius: 10, border: 'none',
   background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
-  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: 0,
   opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
 })
 
 const secondaryBtn: React.CSSProperties = {
-  padding: '9px 14px', borderRadius: 8,
+  padding: '8px 12px', borderRadius: 10,
   border: '1px solid var(--v3-border)',
   background: 'transparent', color: 'var(--v3-text-muted)',
-  fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
 }
 
 const iconBtnStyle: React.CSSProperties = {
-  width: 28, height: 28, borderRadius: 8,
+  width: 28, height: 28, borderRadius: 10,
   border: 'none', background: 'transparent',
   color: 'var(--v3-text-muted)', cursor: 'pointer',
   display: 'grid', placeItems: 'center',
@@ -657,11 +657,11 @@ const iconBtnStyle: React.CSSProperties = {
 
 const chipBtnGhost: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
-  padding: '5px 10px', borderRadius: 999,
+  padding: '4px 12px', borderRadius: 10,
   background: 'transparent',
   border: '1px solid var(--v3-border)',
   color: 'var(--v3-text-muted)',
-  fontSize: 11, fontWeight: 700, letterSpacing: '.04em', cursor: 'pointer',
+  fontSize: 12, fontWeight: 700, letterSpacing: 0, cursor: 'pointer',
 }
 
 // quiet unused-import lint

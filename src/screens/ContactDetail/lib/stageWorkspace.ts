@@ -5,18 +5,18 @@
 // Gating rules that matter:
 //   - Financials (invoices/payments) is available from `job` onward, so you
 //     can add an invoice while a job is running.
-//   - `invoice` / `closed` hide the Quote tab entirely — an invoice for
+//   - `invoice` / `closed` hide the Quote tab entirely, an invoice for
 //     materials or a quick job never needed a quote.
 
 export type DealTabId = 'overview' | 'quote' | 'details' | 'financials' | 'files' | 'logs' | 'selections' | 'materials' | 'change_orders'
 
 const ALL_TABS: DealTabId[] = ['overview', 'quote', 'details', 'financials', 'files', 'logs', 'selections', 'materials', 'change_orders']
 
-// Materials appears on the same stages as daily logs — there's no
+// Materials appears on the same stages as daily logs, there's no
 // procurement to track on a lead, but quote/job/invoice/closed all
 // need it (estimators want a working list before the job starts).
 //
-// Change orders show on quote / job / invoice / closed — a CO
+// Change orders show on quote / job / invoice / closed, a CO
 // amends the originally-approved scope, so there's nothing to amend
 // on a lead. They're ALSO rendered inline inside the Quote tab on
 // the quote stage (the existing quote-authoring flow) so quote-stage

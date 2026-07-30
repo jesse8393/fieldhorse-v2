@@ -3,7 +3,7 @@
 // Find-or-create an fh_clients row for a lead/job, matching on
 // phone → email → name (most-recent) before inserting. Shared by
 // NewLeadSheet and Universal Capture so every path that creates a lead
-// links a client — otherwise voice/scan leads were orphans with no
+// links a client, otherwise voice/scan leads were orphans with no
 // client record (invisible on /clients, and no client email to invoice
 // against later).
 
@@ -45,7 +45,7 @@ export async function findOrCreateClient(
     }).select('id').single()
     return created?.id || null
   } catch (e) {
-    // Non-fatal — caller proceeds with a null client_id.
+    // Non-fatal, caller proceeds with a null client_id.
     console.warn('[clients] findOrCreateClient failed', e)
     return null
   }

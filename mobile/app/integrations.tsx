@@ -1,4 +1,4 @@
-// mobile/app/integrations.tsx — Integrations hub.
+// mobile/app/integrations.tsx, Integrations hub.
 // Pushed from More. Lists each third-party provider with its connection
 // status from fh_integrations. Connecting launches the provider's OAuth
 // edge function once it's live; until then it explains what's still
@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, GoldButton, theme } from '../components/ui'
 
 const STATUS_TINT: Record<string, string> = {
-  connected: '#4F8C5E', error: '#7d2a1f', expired: '#C9963A', disconnected: '#5C5C5C'
+  connected: '#2D7A4F', error: '#C0392B', expired: '#C9963A', disconnected: '#5C5C5C'
 }
 
 export default function IntegrationsScreen() {
@@ -31,7 +31,7 @@ export default function IntegrationsScreen() {
   function onConnect(p: ProviderMeta) {
     if (!p.live) {
       Alert.alert(
-        `${p.name} — setup pending`,
+        `${p.name}, setup pending`,
         `The backend for this integration isn't connected yet.\n\n${p.setupNote || ''}`,
         [{ text: 'OK' }]
       )
@@ -51,7 +51,7 @@ export default function IntegrationsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
         <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Integrations" title="Connect your tools" />
         <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 6, marginBottom: 22 }}>Link FieldHorse to the apps you already run your business on.</Text>
 
@@ -68,20 +68,20 @@ export default function IntegrationsScreen() {
                 <Card key={p.id} glow={connected}>
                   <View style={{ padding: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: 'rgba(232,184,101,0.22)' }}>
+                      <View style={{ width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface2, borderWidth: 1, borderColor: 'rgba(201, 150, 58,0.22)' }}>
                         <Plug color={theme.goldBright} size={18} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }}>{p.name}</Text>
                         <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{p.blurb}</Text>
                       </View>
-                      <Text style={{ color: tint, fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                      <Text style={{ color: tint, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>
                         {connected ? 'Connected' : status === 'disconnected' ? 'Not connected' : status}
                       </Text>
                     </View>
 
                     {connected && row?.display_name ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
                         <Check color={theme.success} size={13} />
                         <Text style={{ color: theme.inkMuted, fontSize: 12 }}>{row.display_name}</Text>
                       </View>
@@ -92,13 +92,13 @@ export default function IntegrationsScreen() {
 
                     <View style={{ marginTop: 14 }}>
                       {connected ? (
-                        <Pressable onPress={() => onDisconnect(p)} style={{ borderRadius: 12, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(232,90,87,0.3)', backgroundColor: 'rgba(232,90,87,0.10)' }}>
+                        <Pressable onPress={() => onDisconnect(p)} style={{ borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(192, 57, 43,0.3)', backgroundColor: 'rgba(192, 57, 43,0.10)' }}>
                           <Text style={{ color: theme.danger, fontWeight: '700', fontSize: 14 }}>Disconnect</Text>
                         </Pressable>
                       ) : p.live ? (
                         <GoldButton label="Connect" onPress={() => onConnect(p)} />
                       ) : (
-                        <Pressable onPress={() => onConnect(p)} style={{ borderRadius: 12, paddingVertical: 11, alignItems: 'center', backgroundColor: 'rgba(232,184,101,0.16)', borderWidth: 1, borderColor: theme.borderGold }}>
+                        <Pressable onPress={() => onConnect(p)} style={{ borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: 'rgba(201, 150, 58,0.16)', borderWidth: 1, borderColor: theme.borderGold }}>
                           <Text style={{ color: theme.goldBright, fontWeight: '700', fontSize: 14 }}>Setup required</Text>
                         </Pressable>
                       )}
@@ -110,8 +110,8 @@ export default function IntegrationsScreen() {
           </View>
         )}
 
-        <Text style={{ color: theme.inkMuted, fontSize: 11, textAlign: 'center', marginTop: 24, lineHeight: 16 }}>
-          Connections are secured server-side — your tokens never touch the app.
+        <Text style={{ color: theme.inkMuted, fontSize: 12, textAlign: 'center', marginTop: 24, lineHeight: 16 }}>
+          Connections are secured on the server, your tokens never touch the app.
         </Text>
       </ScrollView>
     </View>

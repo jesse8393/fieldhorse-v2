@@ -21,17 +21,17 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription
 } from '@/components/ui/drawer'
 
-// Subs directory — v3 rebuild. Aggregates fh_subs rows by (name + phone)
+// Subs directory, v3 rebuild. Aggregates fh_subs rows by (name + phone)
 // so the same sub appearing on 5 jobs shows as ONE entry with 5-job
 // history. No migration needed; the existing per-job row is the source
 // of truth.
 //
 // Stats per sub (preserved from prior version):
-//   jobsCount   — distinct contact_ids
-//   totalRate   — sum of `rate` across rows (proxy for "billed")
-//   trades      — unique trade strings
-//   lastWorked  — newest created_at across rows
-//   jobIds      — list for the expanded "history" view
+//   jobsCount  , distinct contact_ids
+//   totalRate  , sum of `rate` across rows (proxy for "billed")
+//   trades     , unique trade strings
+//   lastWorked , newest created_at across rows
+//   jobIds     , list for the expanded "history" view
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -72,7 +72,7 @@ export default function Subs() {
     return map
   }, [bundle?.contacts])
 
-  // Roll up by sub identity — shared normalization (lib/subIdentity.ts):
+  // Roll up by sub identity, shared normalization (lib/subIdentity.ts):
   // digits-only phone when present, else lowercased name. Formatting
   // differences ("(615) 555-0101" vs "6155550101") no longer split one
   // sub into multiple cards with partial totals.
@@ -96,7 +96,7 @@ export default function Subs() {
           // instead of inventing dates. Flip to true when a future
           // join with a vendor profile table exposes real expiry data.
           insuranceTracked: false,
-          // Most recent non-empty status across this sub's rows —
+          // Most recent non-empty status across this sub's rows :
           // surfaces fh_subs.status (e.g. "active", "inactive") in
           // the Build component when set.
           status: null as string | null,
@@ -144,7 +144,7 @@ export default function Subs() {
     })
   }, [grouped, q, tradeFilter])
 
-  // Screen-level rollups — derived from the same grouped[] that powers
+  // Screen-level rollups, derived from the same grouped[] that powers
   // per-card stats. Single source of truth.
   const screenStats = useMemo(() => {
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
@@ -157,7 +157,7 @@ export default function Subs() {
     return { totalBilled, activeRecent }
   }, [grouped])
 
-  // Highest-billed sub in the filtered set — surfaces a small "TOP"
+  // Highest-billed sub in the filtered set, surfaces a small "TOP"
   // gold rib on its card. Threshold-gated to avoid noise on small
   // lists or zero-billed subs. Mirrors the Jobs / Clients pattern.
   const topSubKey = useMemo(() => {
@@ -211,19 +211,19 @@ export default function Subs() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ paddingBottom: 120, position: 'relative', background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
     >
-      {/* COCKPIT — black-glass panel: title eyebrow + state chip + KPI strip */}
-      <motion.div variants={item} style={{ padding: '8px 20px 12px' }}>
+      {/* COCKPIT, black-glass panel: title eyebrow + state chip + KPI strip */}
+      <motion.div variants={item} style={{ padding: '8px 24px 12px' }}>
         <div style={{
-          padding: '14px 16px',
-          borderRadius: 16,
+          padding: '12px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 8px 22px rgba(0, 0, 0, 0.40)'
+          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 8px 22px rgba(20, 20, 20, 0.40)'
         }}>
           {/* Header row: section eyebrow + state chip + Add sub action */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
             <Eyebrow tone="gold">
               <Hammer size={11} aria-hidden="true" />
               Sub Directory
@@ -244,21 +244,21 @@ export default function Subs() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 6,
+                  gap: 8,
                   minHeight: 44,
-                  padding: '0 14px 0 12px',
-                  borderRadius: 999,
+                  padding: '0 12px 0 12px',
+                  borderRadius: 10,
                   border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
                   background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                   color: 'var(--v3-on-primary)',
                   fontFamily: 'var(--font-body)',
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: 700,
-                  letterSpacing: '0.16em',
+                  letterSpacing: 0,
                   textTransform: 'uppercase',
                   cursor: 'pointer',
                   WebkitTapHighlightColor: 'transparent',
-                  boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)'
+                  boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)'
                 }}
               >
                 <Plus size={13} strokeWidth={2.6} />
@@ -267,7 +267,7 @@ export default function Subs() {
             </div>
           </div>
 
-          {/* KPI strip — Total billed | Subs · Trades */}
+          {/* KPI strip, Total billed | Subs · Trades */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1px 1fr',
@@ -302,7 +302,7 @@ export default function Subs() {
       {/* SEARCH + TRADE FILTER */}
       <motion.div
         variants={item}
-        style={{ padding: '0 20px 12px' }}
+        style={{ padding: '0 24px 12px' }}
       >
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{
@@ -319,13 +319,13 @@ export default function Subs() {
             placeholder="Search name, phone, trade…"
             style={{
               width: '100%',
-              padding: '11px 12px 11px 34px',
-              borderRadius: 12,
+              padding: '12px 12px 12px 32px',
+              borderRadius: 10,
               background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border-strong)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
-              fontSize: 13,
+              fontSize: 14,
               outline: 'none',
               boxSizing: 'border-box'
             }}
@@ -335,7 +335,7 @@ export default function Subs() {
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: 6,
+            gap: 8,
             marginTop: 10
           }}>
             <FilterPill size="sm" active={!tradeFilter} onClick={() => { hapticTap(); setTradeFilter('') }}>All</FilterPill>
@@ -366,7 +366,7 @@ export default function Subs() {
         {!loading && grouped.length === 0 && (
           <div className="v3-empty">
             <Hammer size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
               No subs yet.
             </div>
             <div style={{ fontSize: 12, lineHeight: 1.5 }}>
@@ -388,7 +388,7 @@ export default function Subs() {
             margin: '4px 0 0',
             display: 'flex',
             flexDirection: 'column',
-            gap: 10
+            gap: 12
           }}>
             {filtered.map((g) => (
               <SubCard key={g.key} g={g} contacts={contacts} isTop={g.key === topSubKey} />
@@ -397,7 +397,7 @@ export default function Subs() {
         )}
       </motion.div>
 
-      {/* Add Sub drawer — schema-honest fields only */}
+      {/* Add Sub drawer, schema-honest fields only */}
       <AddSubDrawer
         open={addOpen}
         userId={user?.id}
@@ -413,7 +413,7 @@ export default function Subs() {
 }
 
 /* ============================================================
-   SubCard — one rolled-up sub. Tap header to expand job history.
+   SubCard, one rolled-up sub. Tap header to expand job history.
    Layout:
      ┌──────────────────────────────────────────────────┐
      │  [HM]  Mike Diaz                   ▸ 5 jobs     │
@@ -444,16 +444,16 @@ function SubCard({ g, contacts, isTop }: any) {
         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
         style={{
           position: 'relative',
-          borderRadius: 14,
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: isTop
             ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)'
             : '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(255, 240, 210, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.30)',
+          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 4px 14px rgba(20, 20, 20, 0.30)',
           overflow: 'hidden'
         }}
       >
-        {/* Header — tap to expand */}
+        {/* Header, tap to expand */}
         <button
           type="button"
           onClick={() => { hapticTap(); setExpanded((v) => !v) }}
@@ -462,8 +462,8 @@ function SubCard({ g, contacts, isTop }: any) {
             width: '100%',
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
-            padding: '14px 14px 14px 18px',
+            gap: 12,
+            padding: '12px 12px 12px 16px',
             background: 'transparent',
             border: 'none',
             textAlign: 'left',
@@ -472,13 +472,13 @@ function SubCard({ g, contacts, isTop }: any) {
             WebkitTapHighlightColor: 'transparent'
           }}
         >
-          {/* Initial tile — restrained: surface-2 + subtle gold border + gold initial.
+          {/* Initial tile, restrained: surface-2 + subtle gold border + gold initial.
               Gold gradient + gold inset highlight dropped per the no-gold-wash direction. */}
           <span aria-hidden="true" style={{
             flexShrink: 0,
             width: 44,
             height: 44,
-            borderRadius: 12,
+            borderRadius: 10,
             display: 'grid',
             placeItems: 'center',
             background: 'var(--v3-surface-2)',
@@ -486,8 +486,8 @@ function SubCard({ g, contacts, isTop }: any) {
             color: 'var(--v3-primary)',
             fontFamily: 'var(--font-display)',
             fontSize: 16,
-            letterSpacing: '0.04em',
-            boxShadow: 'inset 0 1px 0 rgba(255, 240, 210, 0.05)'
+            letterSpacing: 0,
+            boxShadow: 'inset 0 1px 0 rgba(242, 237, 228, 0.05)'
           }}>
             {initials}
           </span>
@@ -503,20 +503,20 @@ function SubCard({ g, contacts, isTop }: any) {
               <span style={{
                 fontFamily: 'var(--font-body)',
                 fontWeight: 700,
-                fontSize: 15,
+                fontSize: 14,
                 color: 'var(--v3-text)',
-                letterSpacing: '-0.005em',
+                letterSpacing: 0,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
               }}>
                 {g.name}
               </span>
-              <Eyebrow tone="gold" style={{ flexShrink: 0, padding: '2px 8px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)' }}>
+              <Eyebrow tone="gold" style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)' }}>
                 {g.jobsCount} {g.jobsCount === 1 ? 'job' : 'jobs'}
               </Eyebrow>
               {isTop && (
-                <Eyebrow tone="gold" aria-hidden="true" style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 999, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)' }}>
+                <Eyebrow tone="gold" aria-hidden="true" style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)' }}>
                   Top
                 </Eyebrow>
               )}
@@ -543,7 +543,7 @@ function SubCard({ g, contacts, isTop }: any) {
               gap: 12,
               flexWrap: 'wrap',
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               color: 'var(--v3-text-muted)'
             }}>
               {g.phone && (
@@ -590,7 +590,7 @@ function SubCard({ g, contacts, isTop }: any) {
           </span>
         </button>
 
-        {/* Profile entry — surfaces vendor profile (insurance, banking,
+        {/* Profile entry, surfaces vendor profile (insurance, banking,
             docs). Visible whenever expanded, regardless of job history,
             so subs added from the Add-sub drawer with no jobs yet still
             have a way in. */}
@@ -601,15 +601,15 @@ function SubCard({ g, contacts, isTop }: any) {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              padding: '12px 18px',
+              gap: 12,
+              padding: '12px 16px',
               borderTop: '1px solid var(--v3-border)',
               color: 'var(--v3-primary)',
               textDecoration: 'none',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.06em'
+              letterSpacing: 0
             }}
           >
             <IdCard size={14} aria-hidden="true" />
@@ -618,16 +618,16 @@ function SubCard({ g, contacts, isTop }: any) {
           </Link>
         )}
 
-        {/* Expanded job history — preserved logic + restyled rows */}
+        {/* Expanded job history, preserved logic + restyled rows */}
         {expanded && g.rows.length > 0 && (
           <ul style={{
             listStyle: 'none',
-            padding: '4px 18px 14px 18px',
+            padding: '4px 16px 12px 16px',
             margin: 0,
             borderTop: '1px solid var(--v3-border)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 2
+            gap: 4
           }}>
             {g.rows.map((r: any) => {
               const c = contacts[r.contact_id]
@@ -638,8 +638,8 @@ function SubCard({ g, contacts, isTop }: any) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: 10,
-                    padding: '10px 0',
+                    gap: 12,
+                    padding: '12px 0',
                     borderBottom: '1px solid var(--v3-border)',
                     fontFamily: 'var(--font-body)',
                     fontSize: 12
@@ -668,7 +668,7 @@ function SubCard({ g, contacts, isTop }: any) {
                       {c.job_title && (
                         <span style={{
                           color: 'var(--v3-text-muted)',
-                          fontSize: 11,
+                          fontSize: 12,
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
@@ -683,13 +683,13 @@ function SubCard({ g, contacts, isTop }: any) {
                   <span style={{
                     flexShrink: 0,
                     fontFamily: 'var(--font-display)',
-                    fontSize: 13,
+                    fontSize: 14,
                     color: 'var(--v3-text)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '—'}
+                    {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}
                   </span>
-                  <Eyebrow style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 6, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
+                  <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
                     {r.status || 'scheduled'}
                   </Eyebrow>
                 </li>
@@ -703,7 +703,7 @@ function SubCard({ g, contacts, isTop }: any) {
 }
 
 /* ============================================================
-   AddSubDrawer — directory-level vendor creation. Inserts into
+   AddSubDrawer, directory-level vendor creation. Inserts into
    fh_subs with contact_id=null so the new sub appears in the
    directory roll-up immediately and can be linked to a job
    later via the per-job SubsSection.
@@ -749,15 +749,15 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
 
   const fieldStyle: import('react').CSSProperties = {
     width: '100%', boxSizing: 'border-box',
-    padding: '12px 14px', borderRadius: 12,
+    padding: '12px 12px', borderRadius: 10,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
     fontSize: 14, outline: 'none'
   }
   const labelStyle: import('react').CSSProperties = {
     fontFamily: 'var(--font-body)',
-    fontSize: 10, fontWeight: 700,
-    letterSpacing: '0.16em', textTransform: 'uppercase',
+    fontSize: 12, fontWeight: 700,
+    letterSpacing: 0, textTransform: 'uppercase',
     color: 'var(--v3-text-muted)'
   }
 
@@ -773,9 +773,9 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
             <h2 style={{
               margin: '6px 0 0',
               fontFamily: 'var(--font-body)',
-              fontSize: 'clamp(20px, 5.5vw, 24px)',
+              fontSize: 24,
               lineHeight: 1.1,
-              letterSpacing: '-0.01em',
+              letterSpacing: 0,
               fontWeight: 700,
               color: 'var(--v3-text)'
             }}>
@@ -795,7 +795,7 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
           onSubmit={save}
           className="fh-vaul-form"
           style={{
-            padding: '4px 20px 20px',
+            padding: '4px 24px 24px',
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
@@ -808,7 +808,7 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
             overscrollBehavior: 'contain'
           }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Name</span>
             <input
               autoFocus
@@ -819,7 +819,7 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Trade</span>
             <input
               value={form.trade}
@@ -828,7 +828,7 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
               style={fieldStyle}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={labelStyle}>Phone</span>
             <input
               type="tel"
@@ -840,16 +840,16 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
             />
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginTop: 4 }}>
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
               style={{
-                padding: '12px 14px', borderRadius: 12,
+                padding: '12px 12px', borderRadius: 10,
                 background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
                 color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer'
+                fontSize: 14, fontWeight: 700, cursor: 'pointer'
               }}
             >
               Cancel
@@ -863,15 +863,15 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
               // is conveyed via opacity (canonical TodosSection Add
               // pattern), which keeps text legible against the gold.
               style={{
-                padding: '12px 14px', borderRadius: 12,
+                padding: '12px 12px', borderRadius: 10,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                 background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
-                letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
+                letterSpacing: 0, textTransform: 'uppercase',
                 cursor: !form.name.trim() || saving ? 'default' : 'pointer',
                 opacity: !form.name.trim() || saving ? 0.5 : 1,
-                boxShadow: '0 0 0 2px rgba(228, 190, 111, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+                boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
               }}
             >
               {saving ? 'Saving…' : 'Add sub'}
@@ -884,7 +884,7 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
 }
 
 /* ============================================================
-   SubsStateChip — small premium status pill in the cockpit
+   SubsStateChip, small premium status pill in the cockpit
    top-right. Mirrors the Money Owed / Clients pattern.
      active recent (>0)  → gold  "N active in 30d"
      trades only         → muted "N trades covered"
@@ -909,7 +909,7 @@ function SubsStateChip({ activeRecent, tradesCount, totalSubs }: any) {
     label = 'No subs yet'
   }
   return (
-    <Eyebrow style={{ padding: '3px 9px', borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
+    <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
       {label}
     </Eyebrow>
   )

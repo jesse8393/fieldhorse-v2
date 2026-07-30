@@ -62,11 +62,11 @@ function Calendar({
           defaultClassNames.month_caption
         ),
         dropdowns: cn(
-          "ui:flex ui:h-(--cell-size) ui:w-full ui:items-center ui:justify-center ui:gap-1.5 ui:text-sm ui:font-medium",
+          "ui:flex ui:h-(--cell-size) ui:w-full ui:items-center ui:justify-center ui:gap-2 ui:text-sm ui:font-medium",
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "ui:relative ui:rounded-md ui:border ui:border-input ui:shadow-xs ui:has-focus:border-ring ui:has-focus:ring-[3px] ui:has-focus:ring-ring/50",
+          "ui:relative ui:rounded-[10px] ui:border ui:border-input ui:shadow-xs ui:has-focus:border-ring ui:has-focus:ring-[3px] ui:has-focus:ring-ring/50",
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(
@@ -75,11 +75,11 @@ function Calendar({
         ),
         caption_label: cn("ui:font-medium ui:select-none", captionLayout === "label"
           ? "ui:text-sm"
-          : "ui:flex ui:h-8 ui:items-center ui:gap-1 ui:rounded-md ui:pr-1 ui:pl-2 ui:text-sm ui:[&>svg]:size-3.5 ui:[&>svg]:text-muted-foreground", defaultClassNames.caption_label),
+          : "ui:flex ui:h-8 ui:items-center ui:gap-1 ui:rounded-[10px] ui:pr-1 ui:pl-2 ui:text-sm ui:[&>svg]:size-3.5 ui:[&>svg]:text-muted-foreground", defaultClassNames.caption_label),
         month_grid: cn("ui:w-full ui:border-collapse", defaultClassNames.month_grid),
         weekdays: cn("ui:flex", defaultClassNames.weekdays),
         weekday: cn(
-          "ui:flex-1 ui:rounded-md ui:text-[0.8rem] ui:font-normal ui:text-muted-foreground ui:select-none",
+          "ui:flex-1 ui:rounded-[10px] ui:text-[0.8rem] ui:font-normal ui:text-muted-foreground ui:select-none",
           defaultClassNames.weekday
         ),
         week: cn("ui:mt-2 ui:flex ui:w-full", defaultClassNames.week),
@@ -89,17 +89,17 @@ function Calendar({
           defaultClassNames.week_number
         ),
         day: cn(
-          "ui:group/day ui:relative ui:aspect-square ui:h-full ui:w-full ui:p-0 ui:text-center ui:select-none ui:[&:last-child[data-selected=true]_button]:rounded-r-md",
+          "ui:group/day ui:relative ui:aspect-square ui:h-full ui:w-full ui:p-0 ui:text-center ui:select-none ui:[&:last-child[data-selected=true]_button]:rounded-r-[10px]",
           props.showWeekNumber
-            ? "ui:[&:nth-child(2)[data-selected=true]_button]:rounded-l-md"
-            : "ui:[&:first-child[data-selected=true]_button]:rounded-l-md",
+            ? "ui:[&:nth-child(2)[data-selected=true]_button]:rounded-l-[10px]"
+            : "ui:[&:first-child[data-selected=true]_button]:rounded-l-[10px]",
           defaultClassNames.day
         ),
-        range_start: cn("ui:rounded-l-md ui:bg-accent", defaultClassNames.range_start),
+        range_start: cn("ui:rounded-l-[10px] ui:bg-accent", defaultClassNames.range_start),
         range_middle: cn("ui:rounded-none", defaultClassNames.range_middle),
-        range_end: cn("ui:rounded-r-md ui:bg-accent", defaultClassNames.range_end),
+        range_end: cn("ui:rounded-r-[10px] ui:bg-accent", defaultClassNames.range_end),
         today: cn(
-          "ui:rounded-md ui:bg-accent ui:text-accent-foreground ui:data-[selected=true]:rounded-none",
+          "ui:rounded-[10px] ui:bg-accent ui:text-accent-foreground ui:data-[selected=true]:rounded-none",
           defaultClassNames.today
         ),
         outside: cn(
@@ -171,7 +171,7 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
-        "ui:flex ui:aspect-square ui:size-auto ui:w-full ui:min-w-(--cell-size) ui:flex-col ui:gap-1 ui:leading-none ui:font-normal ui:group-data-[focused=true]/day:relative ui:group-data-[focused=true]/day:z-10 ui:group-data-[focused=true]/day:border-ring ui:group-data-[focused=true]/day:ring-[3px] ui:group-data-[focused=true]/day:ring-ring/50 ui:data-[range-end=true]:rounded-md ui:data-[range-end=true]:rounded-r-md ui:data-[range-end=true]:bg-primary ui:data-[range-end=true]:text-primary-foreground ui:data-[range-middle=true]:rounded-none ui:data-[range-middle=true]:bg-accent ui:data-[range-middle=true]:text-accent-foreground ui:data-[range-start=true]:rounded-md ui:data-[range-start=true]:rounded-l-md ui:data-[range-start=true]:bg-primary ui:data-[range-start=true]:text-primary-foreground ui:data-[selected-single=true]:bg-primary ui:data-[selected-single=true]:text-primary-foreground ui:dark:hover:text-accent-foreground ui:[&>span]:text-xs ui:[&>span]:opacity-70",
+        "ui:flex ui:aspect-square ui:size-auto ui:w-full ui:min-w-(--cell-size) ui:flex-col ui:gap-1 ui:leading-none ui:font-normal ui:group-data-[focused=true]/day:relative ui:group-data-[focused=true]/day:z-10 ui:group-data-[focused=true]/day:border-ring ui:group-data-[focused=true]/day:ring-[3px] ui:group-data-[focused=true]/day:ring-ring/50 ui:data-[range-end=true]:rounded-[10px] ui:data-[range-end=true]:rounded-r-[10px] ui:data-[range-end=true]:bg-primary ui:data-[range-end=true]:text-primary-foreground ui:data-[range-middle=true]:rounded-none ui:data-[range-middle=true]:bg-accent ui:data-[range-middle=true]:text-accent-foreground ui:data-[range-start=true]:rounded-[10px] ui:data-[range-start=true]:rounded-l-[10px] ui:data-[range-start=true]:bg-primary ui:data-[range-start=true]:text-primary-foreground ui:data-[selected-single=true]:bg-primary ui:data-[selected-single=true]:text-primary-foreground ui:dark:hover:text-accent-foreground ui:[&>span]:text-xs ui:[&>span]:opacity-70",
         defaultClassNames.day,
         className
       )}

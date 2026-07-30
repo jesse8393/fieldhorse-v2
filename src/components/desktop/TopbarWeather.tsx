@@ -1,8 +1,8 @@
-// TopbarWeather — ONE weather slot for every desktop topbar.
+// TopbarWeather, ONE weather slot for every desktop topbar.
 //
 // The build screens each hardcoded "Weather not set" while Home and
 // Forecast fetched real conditions, so the same header slot resolved on
-// two screens and failed on six — and the two that worked could even
+// two screens and failed on six, and the two that worked could even
 // disagree (UI audit #28). This component owns the fetch (shared
 // module-level cache, one request per coords per 10 minutes) so every
 // screen shows the same numbers or hides the slot entirely.
@@ -42,7 +42,7 @@ export default function TopbarWeather() {
     const lon = (profile as any)?.location_lon ?? MURFREESBORO.lon
     cachedWeather(lat, lon)
       .then((d) => { if (!cancelled) setSnapshot(d) })
-      .catch(() => { /* header weather is decorative — fail silent */ })
+      .catch(() => { /* header weather is decorative, fail silent */ })
     return () => { cancelled = true }
   }, [(profile as any)?.location_lat, (profile as any)?.location_lon])
 

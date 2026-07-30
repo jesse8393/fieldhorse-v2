@@ -30,8 +30,8 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
     return (
       <div role="tablist" aria-label={ariaLabel} className="fh-scrollbar-hidden" style={{
         display: 'flex',
-        gap: 6,
-        padding: '0 20px 12px',
+        gap: 8,
+        padding: '0 24px 12px',
         overflowX: 'auto',
         WebkitOverflowScrolling: 'touch',
         // Desktop drew a full native scrollbar (arrow buttons and all)
@@ -51,18 +51,18 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
                 flexShrink: 0,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
-                padding: '7px 12px',
-                borderRadius: 999,
+                gap: 8,
+                padding: '8px 12px',
+                borderRadius: 10,
                 border: isActive
                   ? '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)'
                   : '1px solid var(--v3-border)',
                 background: isActive ? 'var(--v3-primary-soft)' : 'transparent',
                 color: isActive ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 700,
-                letterSpacing: '0.06em',
+                letterSpacing: 0,
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
                 transition: 'background-color 160ms ease, border-color 160ms ease, color 160ms ease'
@@ -70,7 +70,7 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
             >
               {t.label}
               {typeof t.count === 'number' && (
-                <span style={{ fontSize: 10, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 12, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
                   {t.count}
                 </span>
               )}
@@ -81,7 +81,7 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
     )
   }
 
-  // 'underline' — top-level, full-width segmented control matching mockup
+  // 'underline', top-level, full-width segmented control matching mockup
   return (
     <div
       role="tablist"
@@ -105,14 +105,14 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
             style={{
               flex: 1,
               position: 'relative',
-              padding: '14px 4px',
+              padding: '12px 4px',
               background: 'transparent',
               border: 'none',
               color: isActive ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.14em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               cursor: 'pointer',
               WebkitTapHighlightColor: 'transparent',
@@ -130,7 +130,7 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
                   bottom: -1,
                   height: 2,
                   background: 'var(--v3-primary)',
-                  borderRadius: 2
+                  borderRadius: 10
                 }}
                 transition={{ type: 'spring', stiffness: 380, damping: 30 }}
               />

@@ -18,7 +18,7 @@ import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
 import { fetchInvoicesForContact } from '../lib/invoices.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-// Lazy — pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
+// Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (Generate, Share, Email Invoice).
 async function loadPdf(): Promise<any> {
   return import('../lib/pdf.js')
@@ -28,13 +28,13 @@ import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../components/v3'
-// Lazy — only loads when an operator taps "Mark Paid" (avoids ~440KB
+// Lazy, only loads when an operator taps "Mark Paid" (avoids ~440KB
 // in the InvoiceDetail route chunk).
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
 import { InvoiceTemplate } from '../components/documents'
 
 /**
- * InvoiceDetail — read-only mobile invoice surface at /invoices/:id.
+ * InvoiceDetail, read-only mobile invoice surface at /invoices/:id.
  *
  * No new schema. Reads fh_contacts + fh_payments and surfaces:
  *   - status (Outstanding / Overdue / Paid / Closed) computed from
@@ -43,7 +43,7 @@ import { InvoiceTemplate } from '../components/documents'
  *   - payment history (reverse chronological)
  *   - primary actions: Collect Payment / Generate PDF / Open Job
  *
- * Line-item CRUD is intentionally out of scope (would need
+ * Line item CRUD is intentionally out of scope (would need
  * fh_invoice_items). When the operator wants to edit the scope, they
  * use the Quote tab on Job Detail where line items already live.
  */
@@ -96,7 +96,7 @@ export default function InvoiceDetail() {
   const { data: bundle, isPending: loading, isError, error: queryError } = useInvoiceDetail(id, user?.id)
   const invalidateInvoiceDetail = useInvalidateInvoiceDetail()
   const queryClient = useQueryClient()
-  // Refresh BOTH caches — a payment can settle the current draw
+  // Refresh BOTH caches, a payment can settle the current draw
   // (stages.ts flips it to 'paid'), and refreshing only the contact
   // left the document view billing an already-paid draw until remount.
   const refresh = () => {
@@ -110,7 +110,7 @@ export default function InvoiceDetail() {
   const error = isError ? (queryError?.message || 'Could not load invoice') : ''
 
   // First-class invoice draws (fh_invoices) for this job. fh_contacts has
-  // no due_at column — the real issue/due dates, invoice number, and the
+  // no due_at column, the real issue/due dates, invoice number, and the
   // billing schedule all live on these rows, so the on-screen document
   // and the emailed PDF stay in sync with the public link.
   const { data: invoiceRows = [] } = useQuery({
@@ -139,23 +139,23 @@ export default function InvoiceDetail() {
   }, [invoiceRows])
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
-  // 'detail' = existing list-style breakdown (default — original UX).
-  // 'document' = new InvoiceTemplate preview (Phase 2 — opt-in so the
+  // 'detail' = existing list-style breakdown (default, original UX).
+  // 'document' = new InvoiceTemplate preview (Phase 2, opt-in so the
   // toggle is reversible and the existing flow stays untouched until
   // the operator chooses to switch).
   const [viewMode, setViewMode] = useState('detail')
-  // Send Invoice state — mirrors Send Proposal flow on the Quote tab.
+  // Send Invoice state, mirrors Send Proposal flow on the Quote tab.
   // Builds the PDF locally, uploads to job-files, posts the storage_path
-  // to /api/send-invoice for server-side Resend send + activity log.
+  // to /api/send-invoice for on the server Resend send + activity log.
   const [sending, setSending] = useState(false)
   // Sent flag flips back to false after 2.4s so the Send button
-  // briefly morphs to green ✓ "Sent" on success — mirrors the Compose
+  // briefly morphs to green ✓ "Sent" on success, mirrors the Compose
   // pattern. Gives the operator visual confirmation that's hard to
   // miss vs relying on the toast alone.
   const [sent, setSent] = useState(false)
   const [sharing, setSharing] = useState(false)
 
-  // Resolved client info — prefer the denormalized job-row fields, fall
+  // Resolved client info, prefer the denormalized job-row fields, fall
   // back to fh_clients (the source of truth when edits happen on the
   // client card and the job row stayed empty).
   const resolved = useMemo(() => {
@@ -179,7 +179,7 @@ export default function InvoiceDetail() {
     const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
     const balance = Math.max(0, amount - paid)
     // Age from when the receivable went out (open draw's due/issue
-    // date), NOT the job's creation date — the same anchor the Invoices
+    // date), NOT the job's creation date, the same anchor the Invoices
     // list uses. Anchoring on created_at made a job quoted in April and
     // first billed yesterday open with a red "Overdue · 91d" pill while
     // the A/R list said "Current · 1d".
@@ -200,7 +200,7 @@ export default function InvoiceDetail() {
   }, [contact, payments, changeOrders, currentDraw])
 
   const status = useMemo(() => {
-    // Computed status — no stored invoice_status column today. The four
+    // Computed status, no stored invoice_status column today. The four
     // visible buckets cover the common cases without inventing schema.
     if (totals.isClosed) return { label: 'Closed', tone: 'muted' }
     if (totals.isPaid) return { label: 'Paid', tone: 'good' }
@@ -224,7 +224,7 @@ export default function InvoiceDetail() {
 
   // What this screen is billing right now. When an open draw exists,
   // the PDF/email bill THAT draw (same as the Draws tab and the public
-  // link) — this path used to bill the whole contract, so the same
+  // link), this path used to bill the whole contract, so the same
   // customer could receive a $20,000 "invoice" from here and a $5,000
   // draw from the Draws tab for the same job. Jobs without draw rows
   // keep the whole-balance presentation.
@@ -267,7 +267,7 @@ export default function InvoiceDetail() {
           email: resolved.email,
           job_title: contact.job_title
         },
-        // Single canonical line — the new template renders a full
+        // Single canonical line, the new template renders a full
         // Balance Summary section underneath, so we no longer need
         // to inject a synthetic "Less: payments received" row.
         lineItems: pdfLineItems,
@@ -303,7 +303,7 @@ export default function InvoiceDetail() {
   // Mint a public share link for this invoice and copy it to the
   // clipboard. The customer opens the link → /p/{token} → sees the
   // branded InvoiceTemplate (no auth required, no app branding).
-  // Resolution happens server-side via service role; the table
+  // Resolution happens on the server via service role; the table
   // itself stays opaque to anonymous PostgREST traffic.
   async function handleShare() {
     if (!contact?.id || !user?.id || sharing) return
@@ -316,10 +316,10 @@ export default function InvoiceDetail() {
       })
       try {
         await navigator.clipboard.writeText(link.url)
-        toastSuccess('Share link copied', 'Send it however you want — text, email, anything.')
+        toastSuccess('Share link copied', 'Send it however you want, text, email, anything.')
       } catch {
-        // Clipboard write blocked (Safari permission) — still show
-        // the link so the operator can long-press to copy.
+        // Clipboard write blocked (Safari permission), still show
+        // the link so the operator can touch and hold to copy.
         toastSuccess('Share link ready', link.url)
       }
     } catch (e: any) {
@@ -405,7 +405,7 @@ export default function InvoiceDetail() {
 
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
         toastError(
-          "Email NOT sent — sender isn't configured",
+          "Email NOT sent, sender isn't configured",
           'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
         )
         downloadPdf(result)
@@ -436,34 +436,34 @@ export default function InvoiceDetail() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px 20px' }}>
-        <div className="v3-skeleton" style={{ height: 28, width: 200, borderRadius: 6, marginBottom: 12 }} />
-        <div className="v3-skeleton" style={{ height: 120, width: '100%', borderRadius: 14, marginBottom: 12 }} />
-        <div className="v3-skeleton" style={{ height: 80, width: '100%', borderRadius: 14 }} />
+      <div style={{ padding: '24px 24px' }}>
+        <div className="v3-skeleton" style={{ height: 28, width: 200, borderRadius: 10, marginBottom: 12 }} />
+        <div className="v3-skeleton" style={{ height: 120, width: '100%', borderRadius: 10, marginBottom: 12 }} />
+        <div className="v3-skeleton" style={{ height: 80, width: '100%', borderRadius: 10 }} />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <button
           type="button"
           onClick={() => { hapticTap(); navigate('/invoices') }}
           style={{
             alignSelf: 'flex-start',
-            display: 'inline-flex', alignItems: 'center', gap: 6,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
             padding: '8px 12px 8px 8px', borderRadius: 10,
             background: 'transparent', border: '1px solid var(--v3-border)',
             color: 'var(--v3-text)', cursor: 'pointer',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600
           }}
         >
           <ChevronLeft size={16} aria-hidden="true" />
           Money Owed
         </button>
         <div className="v3-empty">
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
             {error}
           </div>
           <div style={{ fontSize: 12 }}>The invoice may have been removed.</div>
@@ -482,9 +482,9 @@ export default function InvoiceDetail() {
       animate="show"
       // The bottom action bar is sticky+safe-area; pad screen bottom so
       // the last section can scroll above it.
-      style={{ paddingBottom: 132, position: 'relative', background: 'var(--v3-bg)' }}
+      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
     >
-      {/* HEADER STRIP — Back chevron + title eyebrow.
+      {/* HEADER STRIP, Back chevron + title eyebrow.
           Premium black-glass; no fog backdrop on the strip itself so
           the screen feels solid, not overlaid. */}
       <motion.div variants={item} style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -494,11 +494,11 @@ export default function InvoiceDetail() {
           aria-label="Back to Money Owed"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            minHeight: 40, padding: '0 12px 0 6px',
+            minHeight: 40, padding: '0 12px 0 8px',
             borderRadius: 10,
             background: 'transparent', border: '1px solid transparent',
             color: 'var(--v3-text)',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
           }}
         >
@@ -511,7 +511,7 @@ export default function InvoiceDetail() {
             Invoice
           </Eyebrow>
         </span>
-        {/* View toggle — Detail (default, original UX) vs Document
+        {/* View toggle, Detail (default, original UX) vs Document
             (new InvoiceTemplate preview). Reversible; lives in the
             header so the operator can flip without scrolling. Sized
             to match the back-chevron button so the eyebrow stays
@@ -538,18 +538,18 @@ export default function InvoiceDetail() {
       <>
       {/* ─── Existing list-style detail surface (preserved verbatim) ─── */}
 
-      {/* HERO CARD — status pill + total + balance + paid progress */}
+      {/* HERO CARD, status pill + total + balance + paid progress */}
       <motion.div variants={item} style={{ padding: '4px 16px 12px' }}>
         <div style={{
-          padding: '16px 18px',
-          borderRadius: 16,
+          padding: '16px 16px',
+          borderRadius: 10,
           background: 'var(--v3-surface-glass)',
           backdropFilter: 'blur(14px) saturate(1.1)',
           WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
           border: status.tone === 'danger'
             ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
             : '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(0, 0, 0, 0.40)',
+          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(20, 20, 20, 0.40)',
           display: 'flex', flexDirection: 'column', gap: 12
         }}>
           {/* Status pill + age */}
@@ -558,7 +558,7 @@ export default function InvoiceDetail() {
             {!totals.isClosed && !totals.isPaid && (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 600,
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
                 color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
               }}>
                 <Clock size={11} aria-hidden="true" />
@@ -568,10 +568,10 @@ export default function InvoiceDetail() {
           </div>
 
           {/* Client */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 18, fontWeight: 700,
-              color: 'var(--v3-text)', letterSpacing: '-0.01em',
+              fontFamily: 'var(--font-body)', fontSize: 20, fontWeight: 700,
+              color: 'var(--v3-text)', letterSpacing: 0,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
             }}>
               {resolved.name || 'Unnamed client'}
@@ -601,7 +601,7 @@ export default function InvoiceDetail() {
           <div>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 11, color: 'var(--v3-text-muted)',
+              fontSize: 12, color: 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)', marginBottom: 5,
               fontVariantNumeric: 'tabular-nums'
             }}>
@@ -611,7 +611,7 @@ export default function InvoiceDetail() {
               </span>
             </div>
             <div style={{
-              height: 6, borderRadius: 999,
+              height: 6, borderRadius: 10,
               background: 'var(--v3-track)', overflow: 'hidden'
             }}>
               <div style={{
@@ -620,10 +620,10 @@ export default function InvoiceDetail() {
                 background: totals.pctPaid >= 100
                   ? 'var(--v3-success-bright)'
                   : 'linear-gradient(90deg, var(--v3-primary-deep), var(--v3-primary))',
-                borderRadius: 999,
+                borderRadius: 10,
                 transition: 'width 220ms ease',
                 boxShadow: totals.pctPaid >= 100
-                  ? '0 0 8px rgba(74, 222, 128, 0.40)'
+                  ? '0 0 8px rgba(45, 122, 79, 0.40)'
                   : 'none'
               }} />
             </div>
@@ -631,15 +631,15 @@ export default function InvoiceDetail() {
         </div>
       </motion.div>
 
-      {/* SERVICE SUMMARY — derived single line, mirrors what the PDF
-          synthesizes today. Real line-item CRUD lives on the Quote tab
+      {/* SERVICE SUMMARY, derived single line, mirrors what the PDF
+          synthesizes today. Real line item CRUD lives on the Quote tab
           (Job Detail) since that's where the data model is. */}
       <motion.div variants={item} style={{ padding: '0 16px 12px' }}>
         <SectionTitle>Service</SectionTitle>
         <div style={{
           marginTop: 8,
-          padding: '12px 14px',
-          borderRadius: 12,
+          padding: '12px 12px',
+          borderRadius: 10,
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
           display: 'flex', alignItems: 'center', gap: 12
@@ -655,7 +655,7 @@ export default function InvoiceDetail() {
             {resolved.address && (
               <div style={{
                 marginTop: 3,
-                fontFamily: 'var(--font-body)', fontSize: 11,
+                fontFamily: 'var(--font-body)', fontSize: 12,
                 color: 'var(--v3-text-muted)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
               }}>
@@ -666,7 +666,7 @@ export default function InvoiceDetail() {
           <div style={{
             flexShrink: 0,
             fontFamily: 'var(--font-display)',
-            fontSize: 22,
+            fontSize: 20,
             color: 'var(--v3-text)',
             fontVariantNumeric: 'tabular-nums',
             lineHeight: 1
@@ -676,7 +676,7 @@ export default function InvoiceDetail() {
         </div>
         <div style={{
           marginTop: 6,
-          fontFamily: 'var(--font-body)', fontSize: 11,
+          fontFamily: 'var(--font-body)', fontSize: 12,
           color: 'var(--v3-text-muted)', lineHeight: 1.4
         }}>
           Edit line items on the Quote tab of the linked job.
@@ -690,24 +690,24 @@ export default function InvoiceDetail() {
           {payments.length === 0 ? (
             <div className="v3-empty">
               <DollarSign size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
                 No payments recorded yet.
               </div>
               <div style={{ fontSize: 12 }}>Tap Collect Payment to log cash, check, or other.</div>
             </div>
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {payments.map((p) => (
                 <li
                   key={p.id}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '11px 14px', borderRadius: 12,
+                    padding: '12px 12px', borderRadius: 10,
                     background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
                   }}
                 >
                   <span aria-hidden="true" style={{
-                    width: 30, height: 30, borderRadius: 8,
+                    width: 30, height: 30, borderRadius: 10,
                     background: 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border-strong)',
                     display: 'grid', placeItems: 'center',
@@ -718,7 +718,7 @@ export default function InvoiceDetail() {
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700,
+                      fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
                       color: 'var(--v3-text)', lineHeight: 1.3
                     }}>
                       {methodLabel(p.method)}
@@ -726,7 +726,7 @@ export default function InvoiceDetail() {
                     </div>
                     <div style={{
                       marginTop: 2,
-                      fontFamily: 'var(--font-body)', fontSize: 11,
+                      fontFamily: 'var(--font-body)', fontSize: 12,
                       color: 'var(--v3-text-muted)',
                       fontVariantNumeric: 'tabular-nums'
                     }}>
@@ -735,7 +735,7 @@ export default function InvoiceDetail() {
                   </div>
                   <div style={{
                     flexShrink: 0,
-                    fontFamily: 'var(--font-display)', fontSize: 18,
+                    fontFamily: 'var(--font-display)', fontSize: 20,
                     color: 'var(--v3-text)',
                     fontVariantNumeric: 'tabular-nums', lineHeight: 1
                   }}>
@@ -756,22 +756,22 @@ export default function InvoiceDetail() {
           style={{
             width: '100%',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            gap: 10, padding: '12px 14px',
-            borderRadius: 12,
+            gap: 12, padding: '12px 12px',
+            borderRadius: 10,
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
             color: 'var(--v3-text)', cursor: 'pointer',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             WebkitTapHighlightColor: 'transparent'
           }}
         >
-          <span>Open job — notes, schedule, files, line items</span>
+          <span>Open job, notes, schedule, files, line items</span>
           <ExternalLink size={14} aria-hidden="true" color="var(--v3-text-muted)" />
         </button>
       </motion.div>
       </>
       )}
 
-      {/* STICKY ACTION BAR — Send + Generate PDF + Collect Payment.
+      {/* STICKY ACTION BAR, Send + Generate PDF + Collect Payment.
           Three-button row: Send (email the invoice), PDF (local download),
           Collect (log a payment). Send is new (5/17 invoice-send port);
           Generate PDF + Collect Payment behavior unchanged. Sits above
@@ -784,7 +784,7 @@ export default function InvoiceDetail() {
           position: 'fixed',
           left: 0, right: 0,
           bottom: 'calc(56px + env(safe-area-inset-bottom))',
-          padding: '10px 16px 10px',
+          padding: '12px 16px 12px',
           background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--v3-bg) 92%, transparent) 32%, var(--v3-bg) 64%)',
           zIndex: 30,
           display: 'flex', gap: 8,
@@ -795,7 +795,7 @@ export default function InvoiceDetail() {
           type="button"
           onClick={() => {
             hapticTap()
-            // No client email on file — explain to the user instead of
+            // No client email on file, explain to the user instead of
             // silently no-op'ing (was the audit's #1 critical failure).
             if (!resolved.email) {
               toastError(
@@ -810,8 +810,8 @@ export default function InvoiceDetail() {
           style={{
             flex: 1,
             minHeight: 48,
-            padding: '12px 14px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             background: sent
               ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
               : 'var(--v3-surface-2)',
@@ -819,11 +819,11 @@ export default function InvoiceDetail() {
               ? '1px solid color-mix(in srgb, var(--v3-success) 55%, transparent)'
               : '1px solid var(--v3-border-strong)',
             color: sent
-              ? '#0a0a0a'
+              ? '#141414'
               : sending ? 'var(--v3-text-muted)' : 'var(--v3-text)',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             cursor: sending ? 'wait' : 'pointer',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
             touchAction: 'manipulation',
@@ -842,14 +842,14 @@ export default function InvoiceDetail() {
           style={{
             flex: 1,
             minHeight: 48,
-            padding: '12px 14px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border-strong)',
             color: sharing ? 'var(--v3-text-muted)' : 'var(--v3-text)',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             cursor: sharing ? 'wait' : 'pointer',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
             touchAction: 'manipulation'
@@ -865,14 +865,14 @@ export default function InvoiceDetail() {
           style={{
             flex: 1,
             minHeight: 48,
-            padding: '12px 14px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border-strong)',
             color: generating ? 'var(--v3-text-muted)' : 'var(--v3-text)',
-            fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             cursor: generating ? 'wait' : 'pointer',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
             touchAction: 'manipulation'
@@ -888,19 +888,19 @@ export default function InvoiceDetail() {
           style={{
             flex: 2,
             minHeight: 48,
-            padding: '12px 14px',
-            borderRadius: 12,
+            padding: '12px 12px',
+            borderRadius: 10,
             border: 'none',
             background: (totals.isPaid && totals.balance < 0.5)
               ? 'var(--v3-surface-2)'
               : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
             color: (totals.isPaid && totals.balance < 0.5) ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-            letterSpacing: '0.04em',
+            letterSpacing: 0,
             cursor: (totals.isPaid && totals.balance < 0.5) ? 'not-allowed' : 'pointer',
             boxShadow: (totals.isPaid && totals.balance < 0.5)
               ? 'none'
-              : '0 0 0 3px rgba(229, 193, 88, 0.10), 0 4px 12px rgba(229, 193, 88, 0.18), 0 1px 0 var(--v3-border-strong) inset',
+              : '0 0 0 3px rgba(201, 150, 58, 0.10), 0 4px 12px rgba(201, 150, 58, 0.18), 0 1px 0 var(--v3-border-strong) inset',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
@@ -929,7 +929,7 @@ export default function InvoiceDetail() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Phase 2 — Document preview pane.
+   Phase 2, Document preview pane.
    Mounts the new InvoiceTemplate from src/components/documents
    inside the same screen, behind an opt-in ViewModeToggle. Mapping
    is read-only: pulls already-loaded contact + payments + totals
@@ -945,7 +945,7 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
     return 'outstanding'
   })()
   // "This invoice" = the current open draw's amount (capped at the
-  // balance), exactly like the public link — billing totals.balance
+  // balance), exactly like the public link, billing totals.balance
   // here made this preview demand the whole remaining contract while
   // the Draws tab sent the same customer a $5K draw.
   const drawIsOpen = currentInvoice
@@ -960,8 +960,8 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
       style={{
         // Cream backdrop so the white letter-paper reads as a real
         // document on the otherwise-dark v3 surface.
-        padding: '8px 12px calc(132px + env(safe-area-inset-bottom, 0px))',
-        background: '#2a2520'
+        padding: '8px 12px calc(48px + env(safe-area-inset-bottom, 0px))',
+        background: '#141414'
       }}
     >
       <InvoiceTemplate
@@ -986,7 +986,7 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
         invoices={invoices}
         currentInvoice={currentInvoice}
         meta={{
-          // fh_contacts has no due_at column — issue/due dates come off
+          // fh_contacts has no due_at column, issue/due dates come off
           // the current fh_invoices draw, falling back to job created_at
           // for the issue date and no due date when there is no draw.
           issuedAt: currentInvoice?.issued_at || contact.created_at,
@@ -1011,8 +1011,8 @@ function ViewModeToggle({ value, onChange }: any) {
       aria-label="View mode"
       style={{
         display: 'inline-flex',
-        padding: 2,
-        borderRadius: 999,
+        padding: 4,
+        borderRadius: 10,
         background: 'var(--v3-surface)',
         border: '1px solid var(--v3-border)',
         flexShrink: 0
@@ -1028,16 +1028,16 @@ function ViewModeToggle({ value, onChange }: any) {
             aria-selected={on}
             onClick={() => { if (!on) { hapticTap(); onChange(o.v) } }}
             style={{
-              padding: '6px 10px',
+              padding: '8px 12px',
               minHeight: 32,
-              borderRadius: 999,
+              borderRadius: 10,
               border: 0,
               background: on ? 'var(--v3-primary-soft)' : 'transparent',
               color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.08em',
+              letterSpacing: 0,
               textTransform: 'uppercase',
               cursor: on ? 'default' : 'pointer',
               WebkitTapHighlightColor: 'transparent'
@@ -1055,7 +1055,7 @@ function SectionTitle({ children }: any) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      gap: 8, padding: '8px 2px 0'
+      gap: 8, padding: '8px 4px 0'
     }}>
       <Eyebrow>
         {children}
@@ -1075,14 +1075,14 @@ function StatusPill({ status }: any) {
         }
       case 'good':
         return {
-          bg: 'rgba(72, 130, 95, 0.14)',
-          border: 'rgba(72, 130, 95, 0.45)',
+          bg: 'rgba(45, 122, 79, 0.14)',
+          border: 'rgba(45, 122, 79, 0.45)',
           color: 'var(--v3-success-bright)'
         }
       case 'danger':
         return {
-          bg: 'rgba(179, 58, 58, 0.14)',
-          border: 'rgba(179, 58, 58, 0.45)',
+          bg: 'rgba(192, 57, 43, 0.14)',
+          border: 'rgba(192, 57, 43, 0.45)',
           color: 'var(--v3-danger-bright)'
         }
       default:
@@ -1094,7 +1094,7 @@ function StatusPill({ status }: any) {
     }
   })()
   return (
-    <Eyebrow style={{ padding: '5px 12px', borderRadius: 999, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
+    <Eyebrow style={{ padding: '4px 12px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       Invoice · {status.label}
     </Eyebrow>
   )
