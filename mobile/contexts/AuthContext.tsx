@@ -27,14 +27,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
+    let mounted = true
+    void supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (!mounted) return
+        if (error) console.warn('[fieldhorse] Could not restore the saved session:', error.message)
+        setSession(data.session)
+      })
+      .catch((error) => {
+        if (!mounted) return
+        console.warn('[fieldhorse] Could not read the saved session:', error)
+        setSession(null)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)
     })
-    return () => sub.subscription.unsubscribe()
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
   const value: AuthContextValue = {

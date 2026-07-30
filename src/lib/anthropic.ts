@@ -41,7 +41,7 @@ export async function claudeMessage({ system, messages, maxTokens = 1024, model,
     return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
-      throw new Error('Claude request timed out (15s)')
+      throw new Error(`Claude request timed out (${REQUEST_TIMEOUT_MS / 1000}s)`)
     }
     throw err
   } finally {
@@ -95,7 +95,7 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
     return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
-      throw new Error('Claude vision request timed out (15s)')
+      throw new Error(`Claude vision request timed out (${REQUEST_TIMEOUT_MS / 1000}s)`)
     }
     throw err
   } finally {

@@ -22,10 +22,12 @@ test.describe('public app shell', () => {
     await expect(page.getByLabel('Password')).toBeVisible()
   })
 
-  test('redirects protected root traffic to auth without crashing', async ({ page }) => {
+  test('loads the public product page at the root without crashing', async ({ page }) => {
     await page.goto('/')
 
     await expect(page.getByRole('main')).toBeVisible()
-    await expect(page.getByRole('heading', { name: /welcome back|built for builders/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /run the whole business/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /create a free account/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible()
   })
 })
