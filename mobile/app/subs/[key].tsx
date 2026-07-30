@@ -32,7 +32,7 @@ function expiryNote(iso: string | null) {
   if (!iso) return null
   const days = Math.floor((new Date(iso).getTime() - Date.now()) / 86400000)
   if (days < 0) return { txt: `Expired ${Math.abs(days)}d ago`, tint: theme.danger }
-  if (days <= 30) return { txt: `Expires in ${days}d`, tint: '#E8B865' }
+  if (days <= 30) return { txt: `Expires in ${days}d`, tint: '#C9963A' }
   return { txt: `Renews in ${days}d`, tint: theme.success }
 }
 

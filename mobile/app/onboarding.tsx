@@ -106,10 +106,10 @@ export default function OnboardingScreen() {
                 key={t.key}
                 onPress={() => toggle(t.key)}
                 className="flex-row items-center rounded-full px-4 py-2.5 border"
-                style={{ gap: 6, borderColor: on ? '#E8B865' : 'rgba(255,240,210,0.12)', backgroundColor: on ? 'rgba(232,184,101,0.14)' : 'rgba(24,20,17,0.6)' }}
+                style={{ gap: 6, borderColor: on ? '#C9963A' : 'rgba(255,240,210,0.12)', backgroundColor: on ? 'rgba(232,184,101,0.14)' : 'rgba(24,20,17,0.6)' }}
               >
-                {on ? <Check color="#E8B865" size={13} strokeWidth={3} /> : null}
-                <Text className="text-sm font-semibold" style={{ color: on ? '#E8B865' : '#F2EDE4' }}>{t.label}</Text>
+                {on ? <Check color="#C9963A" size={13} strokeWidth={3} /> : null}
+                <Text className="text-sm font-semibold" style={{ color: on ? '#C9963A' : '#F2EDE4' }}>{t.label}</Text>
               </Pressable>
             )
           })}
@@ -124,11 +124,11 @@ export default function OnboardingScreen() {
           className="flex-row items-center bg-[rgba(24,20,17,0.6)] rounded-xl px-4 py-3 border border-[rgba(232,184,101,0.12)]"
           style={{ gap: 10 }}
         >
-          <MapPin color={locStatus === 'ok' ? '#4F8C5E' : '#E8B865'} size={16} />
+          <MapPin color={locStatus === 'ok' ? '#4F8C5E' : '#C9963A'} size={16} />
           <Text className="text-ink text-sm flex-1">
             {locStatus === 'ok' ? 'Location captured' : locStatus === 'requesting' ? 'Getting location…' : locStatus === 'error' ? 'Location unavailable — tap to retry' : 'Use my current location'}
           </Text>
-          {locStatus === 'requesting' ? <ActivityIndicator size="small" color="#E8B865" /> : null}
+          {locStatus === 'requesting' ? <ActivityIndicator size="small" color="#C9963A" /> : null}
         </Pressable>
       </ScrollView>
 
@@ -140,7 +140,7 @@ export default function OnboardingScreen() {
           onPress={finish}
           disabled={!canSubmit || busy}
           className="rounded-xl py-4 items-center"
-          style={{ backgroundColor: !canSubmit || busy ? 'rgba(232,184,101,0.4)' : '#E8B865' }}
+          style={{ backgroundColor: !canSubmit || busy ? 'rgba(232,184,101,0.4)' : '#C9963A' }}
         >
           {busy
             ? <ActivityIndicator color="#1A120A" />

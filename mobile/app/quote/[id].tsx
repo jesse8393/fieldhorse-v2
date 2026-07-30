@@ -245,7 +245,7 @@ export default function QuoteScreen() {
       <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 120, paddingHorizontal: 20 }}>
         <Pressable onPress={() => router.back()} className="flex-row items-center mb-4" style={{ gap: 4 }}>
-          <ChevronLeft color="#E8B865" size={20} />
+          <ChevronLeft color="#C9963A" size={20} />
           <Text className="text-gold-bright font-bold">Job</Text>
         </Pressable>
 
@@ -262,7 +262,7 @@ export default function QuoteScreen() {
               className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
               style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
             >
-              <Eye color="#E8B865" size={16} />
+              <Eye color="#C9963A" size={16} />
               <Text className="text-gold-bright font-bold text-sm">Preview</Text>
             </Pressable>
             <Pressable
@@ -271,7 +271,7 @@ export default function QuoteScreen() {
               className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
               style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
             >
-              {sharing ? <ActivityIndicator color="#E8B865" /> : <><Share2 color="#E8B865" size={16} /><Text className="text-gold-bright font-bold text-sm">Share PDF</Text></>}
+              {sharing ? <ActivityIndicator color="#C9963A" /> : <><Share2 color="#C9963A" size={16} /><Text className="text-gold-bright font-bold text-sm">Share PDF</Text></>}
             </Pressable>
           </View>
           <View className="flex-row" style={{ gap: 10 }}>
@@ -279,7 +279,7 @@ export default function QuoteScreen() {
               onPress={onSendEmail}
               disabled={!hasBase || busy !== null}
               className="flex-1 flex-row items-center justify-center rounded-xl py-3"
-              style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: '#E8B865' }}
+              style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: '#C9963A' }}
             >
               {busy === 'send' ? <ActivityIndicator color="#1A120A" /> : <><Send color="#1A120A" size={16} /><Text className="text-[#1A120A] font-bold text-sm">Send to client</Text></>}
             </Pressable>
@@ -289,7 +289,7 @@ export default function QuoteScreen() {
               className="flex-1 flex-row items-center justify-center rounded-xl py-3 border border-[rgba(232,184,101,0.3)]"
               style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: 'rgba(232,184,101,0.10)' }}
             >
-              {busy === 'link' ? <ActivityIndicator color="#E8B865" /> : <><LinkIcon color="#E8B865" size={16} /><Text className="text-gold-bright font-bold text-sm">Copy link</Text></>}
+              {busy === 'link' ? <ActivityIndicator color="#C9963A" /> : <><LinkIcon color="#C9963A" size={16} /><Text className="text-gold-bright font-bold text-sm">Copy link</Text></>}
             </Pressable>
           </View>
           <Pressable
@@ -304,7 +304,7 @@ export default function QuoteScreen() {
         </View>
 
         {isPending ? (
-          <ActivityIndicator color="#E8B865" />
+          <ActivityIndicator color="#C9963A" />
         ) : items.length === 0 ? (
           <Text className="text-ink-muted text-sm">No line items yet. Add your first below.</Text>
         ) : (
@@ -361,7 +361,7 @@ export default function QuoteScreen() {
         >
           <Text className="text-gold-bright font-bold text-sm">Set as contract</Text>
         </Pressable>
-        <Pressable onPress={openAdd} className="rounded-full items-center justify-center" style={{ width: 50, height: 50, backgroundColor: '#E8B865' }}>
+        <Pressable onPress={openAdd} className="rounded-full items-center justify-center" style={{ width: 50, height: 50, backgroundColor: '#C9963A' }}>
           <Plus color="#1A120A" size={24} strokeWidth={2.6} />
         </Pressable>
       </View>
@@ -416,17 +416,17 @@ export default function QuoteScreen() {
             />
             <View className="flex-row items-center justify-between py-2">
               <Text className="text-ink text-sm font-semibold">Optional upgrade</Text>
-              <Switch value={optional} onValueChange={setOptional} trackColor={{ true: '#E8B865', false: '#3a352e' }} />
+              <Switch value={optional} onValueChange={setOptional} trackColor={{ true: '#C9963A', false: '#3a352e' }} />
             </View>
             <View className="flex-row items-center justify-between py-2 mb-4">
               <Text className="text-ink text-sm font-semibold">Excluded (not in total)</Text>
-              <Switch value={excluded} onValueChange={setExcluded} trackColor={{ true: '#E8B865', false: '#3a352e' }} />
+              <Switch value={excluded} onValueChange={setExcluded} trackColor={{ true: '#C9963A', false: '#3a352e' }} />
             </View>
             <Pressable
               onPress={submit}
               disabled={saving}
               className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: saving ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+              style={{ backgroundColor: saving ? 'rgba(232,184,101,0.5)' : '#C9963A' }}
             >
               {saving ? <ActivityIndicator color="#1A120A" /> : <Text className="text-[#1A120A] font-bold">{editing ? 'Save line item' : 'Add line item'}</Text>}
             </Pressable>
@@ -454,7 +454,7 @@ export default function QuoteScreen() {
               onPress={onShare}
               disabled={sharing}
               className="rounded-xl py-4 flex-row items-center justify-center"
-              style={{ gap: 8, backgroundColor: '#E8B865' }}
+              style={{ gap: 8, backgroundColor: '#C9963A' }}
             >
               {sharing ? <ActivityIndicator color="#1A120A" /> : <><Share2 color="#1A120A" size={18} /><Text className="text-[#1A120A] font-bold">Share PDF</Text></>}
             </Pressable>

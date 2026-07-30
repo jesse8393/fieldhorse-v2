@@ -91,7 +91,7 @@ export default function ClientDetailScreen() {
   }, [jobs])
 
   if (isPending) {
-    return <View className="flex-1 bg-bg items-center justify-center"><ActivityIndicator color="#E8B865" /></View>
+    return <View className="flex-1 bg-bg items-center justify-center"><ActivityIndicator color="#C9963A" /></View>
   }
   if (!client) {
     return (

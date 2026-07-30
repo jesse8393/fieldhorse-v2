@@ -33,7 +33,7 @@ export const DOC_COLORS = {
 
   // Brand
   gold:         '#C8A154',  // default brand accent (overridable per company)
-  goldBright:   '#E8B865',
+  goldBright:   '#C9963A',
   goldSoft:     '#F4ECD8',  // pill backgrounds
 
   // States

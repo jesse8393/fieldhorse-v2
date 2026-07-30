@@ -8,7 +8,7 @@ export default function Terms() {
       <P>
         These terms govern your use of FieldHorse (the "Service"). By creating
         an account or using the app, you agree to them. Questions:
-        <a href="mailto:support@fieldhorse.io" style={{ color: '#E8B865' }}> support@fieldhorse.io</a>.
+        <a href="mailto:support@fieldhorse.io" style={{ color: '#C9963A' }}> support@fieldhorse.io</a>.
       </P>
 
       <H2>Your account</H2>

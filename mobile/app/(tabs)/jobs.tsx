@@ -149,7 +149,7 @@ export default function JobsScreen() {
         onPress={() => setAddOpen(true)}
         style={{
           position: 'absolute', right: 20, bottom: insets.bottom + 20, borderRadius: 999,
-          shadowColor: '#E8B865', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12
+          shadowColor: '#C9963A', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12
         }}
       >
         <LinearGradient colors={['#F0CE86', '#E4BE6F', '#C9963A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>

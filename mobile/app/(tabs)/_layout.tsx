@@ -5,7 +5,7 @@
 import { Tabs } from 'expo-router'
 import { Home, Briefcase, Users, Calendar, MoreHorizontal } from 'lucide-react-native'
 
-const GOLD = '#E8B865'
+const GOLD = '#C9963A'
 const MUTED = 'rgba(242,237,228,0.55)'
 
 export default function TabsLayout() {

@@ -96,7 +96,7 @@ function PartnerCard({ p, onJob }: { p: PartnerEntry; onJob: (id: string) => voi
             </View>
           </View>
           <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: active ? `${theme.success}55` : '#C9963A55', backgroundColor: active ? `${theme.success}1f` : '#C9963A1f' }}>
-            <Text style={{ color: active ? theme.success : '#E8B865', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{active ? 'ACTIVE' : 'PENDING'}</Text>
+            <Text style={{ color: active ? theme.success : '#C9963A', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{active ? 'ACTIVE' : 'PENDING'}</Text>
           </View>
         </View>
 

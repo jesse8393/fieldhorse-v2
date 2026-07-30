@@ -741,7 +741,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
                     border: on
                       ? '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)'
                       : '1px solid var(--v3-border-mid)',
-                    color: on ? 'var(--v3-primary-bright, #E8B865)' : 'rgba(255, 255, 255, 0.78)',
+                    color: on ? 'var(--v3-primary-bright, #C9963A)' : 'rgba(255, 255, 255, 0.78)',
                     fontFamily: 'var(--font-body)', fontSize: 11,
                     fontWeight: on ? 700 : 500,
                     cursor: 'pointer'

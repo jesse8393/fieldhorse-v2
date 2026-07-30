@@ -91,7 +91,7 @@ export default function LoginScreen() {
           onPress={handleSignIn}
           disabled={busy}
           className="rounded-xl py-4 items-center"
-          style={{ backgroundColor: busy ? 'rgba(232,184,101,0.5)' : '#E8B865' }}
+          style={{ backgroundColor: busy ? 'rgba(232,184,101,0.5)' : '#C9963A' }}
         >
           {busy
             ? <ActivityIndicator color="#1A120A" />

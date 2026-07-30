@@ -9,7 +9,7 @@ export default function Privacy() {
       <P>
         FieldHorse ("we", "us") provides a job and customer management tool for
         contractors. This policy explains what we collect, how we use it, and
-        the choices you have. Questions: <a href="mailto:support@fieldhorse.io" style={{ color: '#E8B865' }}>support@fieldhorse.io</a>.
+        the choices you have. Questions: <a href="mailto:support@fieldhorse.io" style={{ color: '#C9963A' }}>support@fieldhorse.io</a>.
       </P>
 
       <H2>Information we collect</H2>
@@ -47,7 +47,7 @@ export default function Privacy() {
         <strong> Settings → Delete account</strong> in the mobile app. This
         removes your account and erases your jobs, clients, payments, notes,
         and other records from our systems. You may also email
-        <a href="mailto:support@fieldhorse.io" style={{ color: '#E8B865' }}> support@fieldhorse.io</a> to request deletion.
+        <a href="mailto:support@fieldhorse.io" style={{ color: '#C9963A' }}> support@fieldhorse.io</a> to request deletion.
       </P>
 
       <H2>Security</H2>

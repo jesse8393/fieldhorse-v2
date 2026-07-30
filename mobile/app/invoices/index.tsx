@@ -66,7 +66,7 @@ export default function InvoicesScreen() {
                 </View>
                 <View style={{ flexDirection: 'row', marginTop: 12 }}>
                   <Bucket label="Current · 0–30D" value={full(buckets[0])} tone={theme.ink} />
-                  <Bucket label="Late · 31–60D" value={full(buckets[1])} tone="#E8B865" />
+                  <Bucket label="Late · 31–60D" value={full(buckets[1])} tone="#C9963A" />
                   <Bucket label="Overdue · 60+D" value={full(buckets[2])} tone={theme.danger} />
                 </View>
                 <View style={{ borderTopWidth: 1, borderTopColor: theme.border, marginTop: 14, paddingTop: 12 }}>

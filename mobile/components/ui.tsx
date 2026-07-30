@@ -20,7 +20,7 @@ export const theme = {
   inkMuted: 'rgba(242,237,228,0.55)',
   inkFaint: 'rgba(242,237,228,0.40)',
   gold: '#C9963A',
-  goldBright: '#E8B865',
+  goldBright: '#C9963A',
   goldHot: '#E4BE6F',
   goldDeep: '#8C6F30',
   onGold: '#1A1208',
@@ -46,7 +46,7 @@ const shadow = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 }, elevation: 8
   },
   glow: {
-    shadowColor: '#E8B865', shadowOpacity: 0.40, shadowRadius: 22,
+    shadowColor: '#C9963A', shadowOpacity: 0.40, shadowRadius: 22,
     shadowOffset: { width: 0, height: 10 }, elevation: 12
   }
 })

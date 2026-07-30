@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom'
 const BG = '#0B0907'
 const INK = 'var(--v3-text)'
 const MUTED = 'var(--v3-text-muted)'
-const GOLD = '#E8B865'
+const GOLD = '#C9963A'
 
 export default function LegalLayout({ title, updated, children }: { title: string; updated: string; children: ReactNode }) {
   return (
@@ -26,7 +26,7 @@ export default function LegalLayout({ title, updated, children }: { title: strin
 }
 
 export function H2({ children }: { children: ReactNode }) {
-  return <h2 style={{ fontSize: 19, fontWeight: 800, color: '#E8B865', marginTop: 28, marginBottom: 8 }}>{children}</h2>
+  return <h2 style={{ fontSize: 19, fontWeight: 800, color: '#C9963A', marginTop: 28, marginBottom: 8 }}>{children}</h2>
 }
 
 export function P({ children }: { children: ReactNode }) {
