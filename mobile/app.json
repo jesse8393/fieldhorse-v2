@@ -25,7 +25,7 @@
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0B0907"
+        "backgroundColor": "#141414"
       }
     },
     "web": {
@@ -39,7 +39,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "backgroundColor": "#0B0907",
+          "backgroundColor": "#141414",
           "resizeMode": "contain",
           "imageWidth": 200
         }

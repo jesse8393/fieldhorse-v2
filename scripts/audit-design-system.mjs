@@ -3,7 +3,7 @@ import { extname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(fileURLToPath(new URL('..', import.meta.url)))
-const extensions = new Set(['.css', '.js', '.jsx', '.ts', '.tsx'])
+const extensions = new Set(['.css', '.html', '.js', '.json', '.jsx', '.ts', '.tsx'])
 const allowedColors = new Set([
   '#C9963A',
   '#141414',
@@ -44,8 +44,12 @@ function lineAt(text, index) {
   return text.slice(0, index).split('\n').length
 }
 
-for (const base of ['src', 'mobile']) {
-  for (const file of walk(join(root, base))) {
+const auditedFiles = [
+  ...['src', 'mobile', 'netlify', 'public'].flatMap((base) => walk(join(root, base))),
+  join(root, 'index.html')
+]
+
+for (const file of auditedFiles) {
     if (!extensions.has(extname(file)) || file.endsWith('database.types.ts')) continue
     const text = readFileSync(file, 'utf8')
 
@@ -107,7 +111,11 @@ for (const base of ['src', 'mobile']) {
     for (const match of text.matchAll(/\btracking-(?!\[0px\])(?:tight|tighter|wide|wider|widest)\b/g)) {
       add(file, lineAt(text, match.index), `nonzero tracking utility ${match[0]}`)
     }
-  }
+
+    for (const match of text.matchAll(/letterSpacing:\s*['"]?(-?\d+(?:\.\d+)?)(?:px|em)?|letter-spacing:\s*(-?\d+(?:\.\d+)?)(?:px|em)?/gi)) {
+      const value = Number(match[1] || match[2])
+      if (value !== 0) add(file, lineAt(text, match.index), `nonzero letter spacing ${value}`)
+    }
 }
 
 const v3Css = readFileSync(join(root, 'src/styles/v3.css'), 'utf8')

@@ -132,17 +132,17 @@ export default async (request) => {
         'This link expires in 14 days.',
       ].join('\n')
       const html = `
-        <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;padding:24px;color:#1a1a1a">
-          <p style="font-size:14px;color:#666;letter-spacing:.14em;text-transform:uppercase;margin:0 0 8px">FieldHorse</p>
+        <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;padding:24px;color:#141414">
+          <p style="font-size:14px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;margin:0 0 8px">FieldHorse</p>
           <h1 style="font-size:24px;margin:0 0 16px">Join ${safeOrgName}</h1>
-          <p style="font-size:15px;line-height:1.5;margin:0 0 20px">
+          <p style="font-size:16px;line-height:1.5;margin:0 0 24px">
             You've been invited to join <strong>${safeOrgName}</strong> as a <strong>${role}</strong>.
           </p>
           <p style="margin:0 0 24px">
-            <a href="${acceptUrl}" style="display:inline-block;padding:12px 20px;background:#c9963a;color:#0c0d0f;text-decoration:none;font-weight:700;border-radius:6px">Accept invite →</a>
+            <a href="${acceptUrl}" style="display:inline-block;padding:12px 24px;background:#C9963A;color:#141414;text-decoration:none;font-weight:700;border-radius:10px">Accept invite →</a>
           </p>
-          <p style="font-size:12px;color:#888;margin:0">This link expires in 14 days.</p>
-          <p style="font-size:11px;color:#aaa;margin:24px 0 0;word-break:break-all">${acceptUrl}</p>
+          <p style="font-size:12px;color:#5C5C5C;margin:0">This link expires in 14 days.</p>
+          <p style="font-size:12px;color:#5C5C5C;margin:24px 0 0;word-break:break-all">${acceptUrl}</p>
         </div>
       `.trim()
 

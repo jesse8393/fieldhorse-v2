@@ -74,11 +74,14 @@ function countRemovedLine(file, line) {
   }
   value.spacing += [...line.matchAll(/\b(?:p[trblxy]?|gap(?:-[xy])?)-(?:0\.5|1\.5|2\.5|3\.5|5|7)\b/g)].length
   value.tracking += [...line.matchAll(/\btracking-(?:tight|tighter|wide|wider|widest)\b/g)].length
+  for (const match of line.matchAll(/letterSpacing:\s*['"]?(-?\d+(?:\.\d+)?)(?:px|em)?|letter-spacing:\s*(-?\d+(?:\.\d+)?)(?:px|em)?/gi)) {
+    if (Number(match[1] || match[2]) !== 0) value.tracking += 1
+  }
 }
 
 const diff = execFileSync(
   'git',
-  ['diff', '--unified=0', '--no-ext-diff', baseline, '--', 'src', 'mobile'],
+  ['diff', '--unified=0', '--no-ext-diff', baseline, '--', 'src', 'mobile', 'netlify', 'index.html'],
   { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
 )
 
@@ -119,7 +122,7 @@ const markdown = [
   '',
   `Baseline: \`${baseline}\``,
   '',
-  'Counts are removed off-token declarations in the Phase B diff. Generated code and database type files are excluded by the design audit.',
+  'Counts are removed off-token declarations in the completed design sweep. Generated code and database type files are excluded by the design audit.',
   '',
   `Total replacements: **${totals.total.toLocaleString()}** across **${rows.length} files**.`,
   '',

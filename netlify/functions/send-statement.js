@@ -191,17 +191,17 @@ function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, p
   const payRow = renderPayBlock(payLink, payInstructions, amountLabel, safe)
   return `<!doctype html>
 <html lang="en">
-<body style="margin:0;padding:0;background:#f7f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f1f1f;line-height:1.55;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f7f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#ffffff;border-radius:12px;padding:32px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#F2EDE4;border-radius:10px;padding:32px;">
         <tr><td>
           <p style="margin:0 0 16px;">${safe(greeting)}</p>
           <p style="margin:0 0 16px;">Attached is your current statement of open invoices for <strong>${safe(clientLabel)}</strong> across all properties.${amountLabel ? ` Total due: <strong>${safe(amountLabel)}</strong>.` : ''}</p>
         </td></tr>
         ${payRow}
         <tr><td>
-          <p style="margin:0 0 16px;color:#555;">Reply directly to this email with any questions or to confirm payment.</p>
+          <p style="margin:0 0 16px;color:#5C5C5C;">Reply directly to this email with any questions or to confirm payment.</p>
           <p style="margin:24px 0 0;">— ${safe(senderLine)}</p>
         </td></tr>
       </table>
