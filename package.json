@@ -14,6 +14,7 @@
     "e2e": "playwright test",
     "qa:workflow": "playwright test --config playwright.workflow.config.ts",
     "audit:design": "node scripts/audit-design-system.mjs",
+    "audit:rls": "node scripts/audit-rls-policies.mjs",
     "test:all": "npm run lint && npm run typecheck && npm run test && npm run e2e && npm run build"
   },
   "dependencies": {
