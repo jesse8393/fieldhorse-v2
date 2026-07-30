@@ -7,6 +7,7 @@ import { getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut 
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { Eyebrow } from './v3'
+import { countNoun } from '../lib/format.ts'
 
 // Time clock card, Phase 19 / Upgrade Move #A2.
 //
@@ -188,7 +189,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       const { error } = await supabase.from('fh_expenses').insert({
         user_id: userId,
         contact_id: contact.id,
-        description: note.trim() || `Labor, ${hours.toFixed(2)} hrs @ $${rate}/hr`,
+        description: note.trim() || `Labor, ${hours.toFixed(2)} ${countNoun(hours, 'hr')} @ $${rate}/hr`,
         amount: billable,
         category: 'Labor',
         expense_date: todayYmd()
@@ -201,7 +202,10 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       setConfirming(false)
       setNote('')
       hapticSuccess()
-      toastSuccess('Time logged', `${hours.toFixed(2)} hrs · $${billable.toLocaleString()}`)
+      toastSuccess(
+        'Time logged',
+        `${hours.toFixed(2)} ${countNoun(hours, 'hr')} · $${billable.toLocaleString()}`
+      )
       // Refresh job cost / margin
       try { await recalcCost(contact.id, userId) } catch {}
       onLogged?.()

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import MiniMetric from '../MiniMetric.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
+import { countNoun } from '../../lib/format.ts'
 
 type EventRow = {
   id: string
@@ -257,7 +258,7 @@ export default function SnowScheduleBuild(props: Props) {
                           type="button"
                           className={`fh-build-cal__day${inMonth ? '' : ' is-out'}${isToday ? ' is-today' : ''}${evs.length ? ' has-events' : ''}`}
                           onClick={() => { setCursor(startOfDay(d)); setView('day') }}
-                          aria-label={fmtDayShort(d) + (evs.length ? `, ${evs.length} events` : '')}
+                          aria-label={fmtDayShort(d) + (evs.length ? `, ${evs.length} ${countNoun(evs.length, 'event')}` : '')}
                         >
                           <span className="fh-build-cal__num">{d.getDate()}</span>
                           <span className="fh-build-cal__chips">

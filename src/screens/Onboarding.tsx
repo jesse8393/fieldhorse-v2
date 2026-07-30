@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase.ts'
 import { seedDemoData } from '../lib/demoSeed.ts'
 import Wordmark from '../components/Wordmark.tsx'
 import LogoUploader from '../components/LogoUploader.tsx'
+import { countNoun } from '../lib/format.ts'
 
 const SERVICES = [
   {
@@ -256,7 +257,10 @@ export default function Onboarding() {
       try {
         const counts = await seedDemoData(supabase, user.id)
         hapticSuccess()
-        toastSuccess('Workspace ready', `Seeded ${counts.clients} clients, ${counts.jobs} jobs, ${counts.events} events`)
+        toastSuccess(
+          'Workspace ready',
+          `Seeded ${counts.clients} ${countNoun(counts.clients, 'client')}, ${counts.jobs} ${countNoun(counts.jobs, 'job')}, ${counts.events} ${countNoun(counts.events, 'event')}`
+        )
       } catch (ex: any) {
         // Don't block the user, they still have a clean account, just no demo
         toastError("Couldn't seed sample data", ex?.message || 'Continuing with empty workspace.')

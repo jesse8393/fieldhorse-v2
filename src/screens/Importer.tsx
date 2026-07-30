@@ -11,6 +11,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow } from '../components/v3'
+import { countNoun } from '../lib/format.ts'
 
 // Importable target fields, in display order. Used by the mapping
 // review UI + the AI mapper prompt.
@@ -181,7 +182,10 @@ export default function Importer() {
       applyHeaderMap(next)
       hapticSuccess()
       const mappedCount = TARGET_FIELDS.filter((f) => next[f.key]).length
-      toastSuccess('AI mapped your columns', `${mappedCount} of ${TARGET_FIELDS.length} fields matched`)
+      toastSuccess(
+        'AI mapped your columns',
+        `${mappedCount} of ${TARGET_FIELDS.length} ${countNoun(TARGET_FIELDS.length, 'field')} matched`
+      )
     } catch (e: any) {
       toastError("Couldn't map automatically", e?.message || 'Try the manual mapping below.')
     } finally {
@@ -223,7 +227,7 @@ export default function Importer() {
     setMapped([])
     setCsvHeaders([])
     setHeaderMap({})
-    toastSuccess(`Imported ${finalCount} contacts`, 'Now in your Pipeline')
+    toastSuccess(`Imported ${finalCount} ${countNoun(finalCount, 'contact')}`, 'Now in your Pipeline')
   }
 
   async function copyWebhook() {
@@ -316,7 +320,9 @@ export default function Importer() {
             <Upload size={22} />
           </div>
           <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)' }}>
-            {rows.length ? `${rows.length} rows loaded, mapped ${mapped.length}` : 'Drop CSV or tap to pick'}
+            {rows.length
+              ? `${rows.length} ${countNoun(rows.length, 'row')} loaded, ${mapped.length} ${countNoun(mapped.length, 'field')} mapped`
+              : 'Drop CSV or tap to pick'}
           </span>
           {!rows.length && (
             <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
@@ -472,7 +478,7 @@ export default function Importer() {
                 fontWeight: 600
               }}
             >
-              {done.err || `Imported ${done.count} contacts`}
+              {done.err || `Imported ${done.count} ${countNoun(done.count, 'contact')}`}
             </motion.div>
           )}
         </AnimatePresence>

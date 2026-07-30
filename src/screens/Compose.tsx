@@ -11,6 +11,7 @@ import { toastSuccess } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
+import { countNoun } from '../lib/format.ts'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -155,7 +156,10 @@ export default function Compose() {
 
       hapticSuccess()
       setSent(true)
-      toastSuccess(`Email sent to ${contact.email}`, `${draft.length} chars · ${countWords(draft)} words`)
+      toastSuccess(
+        `Email sent to ${contact.email}`,
+        `${draft.length} ${countNoun(draft.length, 'char')} · ${countWords(draft)} ${countNoun(countWords(draft), 'word')}`
+      )
       setTimeout(() => setSent(false), 2400)
     } catch (e: any) {
       setError(e?.message || 'Could not send the message. Try again.')

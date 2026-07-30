@@ -1,4 +1,5 @@
 import {
+  ArrowDownRight,
   ArrowUpRight,
   BarChart3,
   Bell,
@@ -494,9 +495,9 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
           {pipeline == null ? <Skel variant="money" /> : moneyFull(pipeline)}
         </div>
 
-        {trendPct != null && (
+        {trendPct != null && trendPct !== 0 && (
           <div className={trendUp ? 'fh-build-trend is-up' : 'fh-build-trend is-down'}>
-            <ArrowUpRight size={13} />
+            {trendUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
             {Math.abs(trendPct).toFixed(1)}%
           </div>
         )}

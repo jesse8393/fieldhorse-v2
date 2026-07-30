@@ -514,7 +514,7 @@ export default function Home() {
               </>
             )}
           </div>
-          {trendPct != null && (
+          {trendPct != null && trendPct !== 0 && (
             <span style={{
               flexShrink: 0,
               display: 'inline-flex',
@@ -708,7 +708,7 @@ export default function Home() {
             tone="success"
             icon={PhoneCall}
             value={followUpCount}
-            label="Follow ups"
+            label={followUpCount === 1 ? 'Follow up' : 'Follow ups'}
             subline={followUpCount != null && followUpCount > 0 ? 'Calls to leads' : null}
             onTap={() => navigate('/leads')}
           />
@@ -716,7 +716,7 @@ export default function Home() {
             tone="lead"
             icon={FileText}
             value={quoteAttentionCount}
-            label="Quotes"
+            label={quoteAttentionCount === 1 ? 'Quote' : 'Quotes'}
             subline={quoteAttentionCount != null && quoteAttentionCount > 0 ? 'Need follow up' : null}
             onTap={() => navigate('/quotes')}
           />
@@ -728,7 +728,7 @@ export default function Home() {
             tone={jobsBehindCount != null && jobsBehindCount > 0 ? 'danger' : 'primary'}
             icon={CalendarClock}
             value={jobsBehindCount}
-            label="Jobs Behind"
+            label={jobsBehindCount === 1 ? 'Job Behind' : 'Jobs Behind'}
             subline={jobsBehindCount != null && jobsBehindCount > 0 ? 'Reschedule' : 'All on track'}
             onTap={() => navigate('/schedule')}
           />

@@ -14,6 +14,7 @@ import { parseLeadFromImage } from '../lib/docIntelligence.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { JOB_TYPES } from '../lib/jobTypes.ts'
 import { getTemplatesForJobType, getTemplate, applyTemplate } from '../lib/jobTemplates.ts'
+import { countNoun } from '../lib/format.ts'
 import { Eyebrow } from './v3'
 
 const STAGE_OPTIONS = [
@@ -452,7 +453,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
         try {
           const { inserted } = await applyTemplate(supabase, { template: tmpl, jobId: id, userId })
           if (inserted > 0) {
-            toastSuccess(`Loaded ${inserted} milestones`, tmpl.label)
+            toastSuccess(`Loaded ${inserted} ${countNoun(inserted, 'milestone')}`, tmpl.label)
           }
         } catch (e) {
           console.warn('[fieldhorse] template apply failed (non-fatal)', e)
@@ -657,7 +658,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
             </div>
             <div className="fh-vtrail__meta">
               {transcript
-                ? `${transcript.trim().split(/\s+/).filter(Boolean).length} words${voiceState === 'listening' ? ' · live' : voiceState === 'parsing' ? ' · parsing' : ''}`
+                ? `${transcript.trim().split(/\s+/).filter(Boolean).length} ${countNoun(transcript.trim().split(/\s+/).filter(Boolean).length, 'word')}${voiceState === 'listening' ? ' · live' : voiceState === 'parsing' ? ' · parsing' : ''}`
                 : 'Working'}
             </div>
           </div>

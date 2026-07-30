@@ -10,7 +10,7 @@ import {
   TrendingDown,
   Target,
 } from 'lucide-react'
-import { money } from '../../lib/format.ts'
+import { countNoun, money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 
@@ -266,7 +266,11 @@ export default function SnowAnalyticsBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Strongest signal</div>
               <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '\u2003'}</strong>
-              <span>{strongestStage ? `${money(strongestStage.value)} in ${strongestStage.count} deals` : 'No data yet'}</span>
+              <span>
+                {strongestStage
+                  ? `${money(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'deal')}`
+                  : 'No data yet'}
+              </span>
               {strongestStage && <div className="fh-build-spark is-gold" />}
             </section>
 

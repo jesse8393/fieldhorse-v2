@@ -70,8 +70,13 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   if (await pipelineButton.count()) {
     await expect(pipelineButton.locator('.v3-skeleton')).toHaveCount(0)
   }
-  if (testInfo.project.name === 'desktop-workflow') {
+  if (testInfo.project.name.startsWith('desktop')) {
     await expect(page.getByText(/collected this week/i)).toHaveCount(1)
+  }
+  await expect(page.getByText(/\+?0(?:\.0)?%\s*[·•]\s*7d/i)).toHaveCount(0)
+  if (testInfo.project.name.startsWith('mobile')) {
+    await expect(page.getByText('Job Behind', { exact: true })).toBeVisible()
+    await expect(page.getByText('Jobs Behind', { exact: true })).toHaveCount(0)
   }
   await capture(page, testInfo, 'home', true)
 

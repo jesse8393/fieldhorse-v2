@@ -17,6 +17,7 @@ import { Users, Check, AlertTriangle, X } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mergeClients } from '../lib/clientMerge.ts'
+import { countNoun } from '../lib/format.ts'
 import { Eyebrow } from './v3'
 
 function fmtPhone(n: any) {
@@ -78,7 +79,9 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
       hapticMedium()
       toastSuccess(
         `Merged ${losers.length + 1} into 1`,
-        result.reassigned > 0 ? `${result.reassigned} jobs reassigned` : 'No jobs needed reassigning'
+        result.reassigned > 0
+          ? `${result.reassigned} ${countNoun(result.reassigned, 'job')} reassigned`
+          : 'No jobs needed reassigning'
       )
       setResolved((prev) => {
         const next = new Set(prev)

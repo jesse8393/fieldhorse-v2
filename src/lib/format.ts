@@ -36,3 +36,11 @@ export function moneyK(n: number | string | null | undefined): string | null {
   if (v >= 1000) return `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K`
   return `$${Math.round(v).toLocaleString()}`
 }
+
+export function countNoun(
+  count: number,
+  singular: string,
+  plural = `${singular}s`
+): string {
+  return Number(count) === 1 ? singular : plural
+}

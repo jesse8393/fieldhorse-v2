@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import MiniMetric from '../MiniMetric.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
+import { countNoun } from '../../lib/format.ts'
 
 type Contact = { id: string; name?: string | null }
 type Note = {
@@ -104,7 +105,7 @@ export default function SnowNotesBuild(props: Props) {
           <kbd>⌘K</kbd>
         </button>
         <div className="fh-build-topbar__meta">
-          <span>{cockpitStats.total.toLocaleString()} reports captured</span>
+          <span>{cockpitStats.total.toLocaleString()} {countNoun(cockpitStats.total, 'report')} captured</span>
           <span className="fh-build-vline" />
           <TopbarWeather />
         </div>
@@ -226,7 +227,9 @@ export default function SnowNotesBuild(props: Props) {
                 {/* Say what the list actually is, "22 reports captured"
                     above a 6-row list read as disagreeing numbers
                     (UI audit #11). */}
-                <div className="fh-build-eyebrow">Latest {recent.length} of {cockpitStats.total.toLocaleString()} reports</div>
+                <div className="fh-build-eyebrow">
+                  Latest {recent.length} of {cockpitStats.total.toLocaleString()} {countNoun(cockpitStats.total, 'report')}
+                </div>
               </header>
 
               {loading && (

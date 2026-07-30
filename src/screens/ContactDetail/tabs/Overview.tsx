@@ -21,6 +21,7 @@ import ActivityLog from '../sections/ActivityLog.tsx'
 import { resolvePrimaryAction } from '../lib/jobNextAction.ts'
 import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
+import { countNoun } from '../../../lib/format.ts'
 
 /**
  * v3 OVERVIEW tab, the "money screen" of the Job Detail.
@@ -297,7 +298,7 @@ export default function OverviewTab({
           label="Job Progress"
           value={milestonePct}
           caption={milestones.length
-            ? `${milestones.filter((m: any) => m.done).length} of ${milestones.length} milestones complete`
+            ? `${milestones.filter((m: any) => m.done).length} of ${milestones.length} ${countNoun(milestones.length, 'milestone')} complete`
             : 'No milestones added yet'
           }
         />

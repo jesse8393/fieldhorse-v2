@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase.ts'
 import { toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { todayYmd, toYmd } from '../lib/dates.ts'
+import { countNoun } from '../lib/format.ts'
 import { Eyebrow } from './v3'
 
 export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '', event = null }: any) {
@@ -256,7 +257,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
             <div style={{ display: 'flex', gap: 8 }}>
               {[
                 { v: false, label: 'One time' },
-                { v: true,  label: `Every ${recurDays} days × 4` }
+                { v: true,  label: `Every ${recurDays} ${countNoun(recurDays, 'day')} × 4` }
               ].map((opt) => {
                 const active = recurs === opt.v
                 return (

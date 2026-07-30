@@ -29,6 +29,7 @@ import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
+import { countNoun } from '../../../lib/format.ts'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -202,7 +203,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         createdCount++
       }
       toastSuccess(
-        `Generated ${createdCount} draws`,
+        `Generated ${createdCount} ${countNoun(createdCount, 'draw')}`,
         `Filled from ${schedule.map((s) => `${s.pct}%`).join(' / ')} payment terms`
       )
       await fetchDraws()
