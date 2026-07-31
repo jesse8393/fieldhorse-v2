@@ -1,4 +1,5 @@
 -- Add a first class customer change request state to the quote lifecycle.
+-- Applied to production as migration 20260731072644.
 --
 -- The request itself is written by the public link function through the
 -- service role. The latest request stays on the contact for the quote
