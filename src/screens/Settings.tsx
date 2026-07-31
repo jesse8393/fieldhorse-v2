@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, SunMedium } from 'lucide-react'
+import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, SunMedium, CalendarClock } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
@@ -18,6 +18,11 @@ import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Switch } from '@/components/ui/switch'
 import { Eyebrow } from '../components/v3'
+import {
+  mergeQuoteFollowUpPreferences,
+  QUOTE_FOLLOW_UP_DAY_OPTIONS,
+  readQuoteFollowUpPreferences,
+} from '../lib/quoteFollowUp.ts'
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
 
@@ -67,6 +72,12 @@ export default function Settings() {
   // Estimate/proposal design (migration 031). One default per company;
   // drives the HTML preview, the public client page, and the PDF export.
   const [estimateTemplate, setEstimateTemplate] = useState((profile as any)?.estimate_template || 'classic')
+  const [quoteFollowUpEnabled, setQuoteFollowUpEnabled] = useState(
+    () => readQuoteFollowUpPreferences(profile?.preferences).enabled,
+  )
+  const [quoteFollowUpDays, setQuoteFollowUpDays] = useState(
+    () => readQuoteFollowUpPreferences(profile?.preferences).days,
+  )
   // Dedupe + canonicalize on read. Older onboarding flows wrote both
   // duplicates AND ghost entries (typos, deprecated names like
   // "Painters" / "Drywaller") into profile.services. The chip
@@ -163,6 +174,9 @@ export default function Settings() {
     setPaymentInstructions((profile as any)?.payment_instructions || '')
     setBrandAccentHex(profile?.brand_accent_hex || '')
     setEstimateTemplate((profile as any)?.estimate_template || 'classic')
+    const quoteFollowUp = readQuoteFollowUpPreferences(profile?.preferences)
+    setQuoteFollowUpEnabled(quoteFollowUp.enabled)
+    setQuoteFollowUpDays(quoteFollowUp.days)
     setServices(() => {
       const canonical = new Set(SERVICES)
       return Array.from(new Set(
@@ -216,7 +230,7 @@ export default function Settings() {
       safeAccent = rawAccent.toLowerCase()
     }
 
-    await upsertProfile({
+    const { error } = await upsertProfile({
       company_name: companyName,
       company_phone: nullIfBlank(companyPhone),
       company_email: nullIfBlank(companyEmail),
@@ -229,9 +243,18 @@ export default function Settings() {
       payment_instructions: nullIfBlank(paymentInstructions),
       brand_accent_hex: safeAccent,
       estimate_template: estimateTemplate || 'classic',
+      preferences: mergeQuoteFollowUpPreferences(profile?.preferences, {
+        enabled: quoteFollowUpEnabled,
+        days: quoteFollowUpDays,
+      }),
       services
     })
-    refresh()
+    if (error) {
+      setSaving(false)
+      toastError("Couldn't save settings", error.message || 'Try again in a moment.')
+      return
+    }
+    await refresh()
     setSaving(false)
     setSaved(true)
     hapticSuccess()
@@ -499,6 +522,57 @@ export default function Settings() {
         </div>
       </Section>
 
+      <Section variants={item} title={<>Quote <em>follow ups.</em></>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            padding: '12px 12px', borderRadius: 10,
+            background: 'var(--surface-2)', border: '1px solid var(--rule)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+              <span aria-hidden="true" style={{
+                flexShrink: 0, width: 34, height: 34, borderRadius: 10,
+                display: 'grid', placeItems: 'center',
+                background: quoteFollowUpEnabled ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
+                border: '1px solid var(--v3-border-strong)',
+                color: quoteFollowUpEnabled ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+              }}>
+                <CalendarClock size={16} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)' }}>
+                  Set reminder when quote is sent
+                </div>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+                  {quoteFollowUpEnabled ? `${quoteFollowUpDays} ${quoteFollowUpDays === 1 ? 'day' : 'days'} after sending` : 'Off'}
+                </div>
+              </div>
+            </div>
+            <Switch
+              checked={quoteFollowUpEnabled}
+              onCheckedChange={(on: boolean) => { hapticMedium(); setQuoteFollowUpEnabled(on) }}
+              aria-label="Set a reminder when a quote is sent"
+            />
+          </div>
+
+          {quoteFollowUpEnabled && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <Eyebrow style={{ color: 'var(--ink-muted)' }}>Reminder delay</Eyebrow>
+              <select
+                value={quoteFollowUpDays}
+                onChange={(event) => setQuoteFollowUpDays(Number(event.target.value))}
+                aria-label="Quote reminder delay"
+                style={{ ...brandInputStyle, width: 'auto', minWidth: 112, padding: '8px 12px' }}
+              >
+                {QUOTE_FOLLOW_UP_DAY_OPTIONS.map((days) => (
+                  <option key={days} value={days}>{days} {days === 1 ? 'day' : 'days'}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      </Section>
+
       {/* GETTING PAID, bring-your-own pay link. We don't integrate with
           any processor; the contractor pastes a link they already have
           (Venmo / Zelle / Square / PayPal / their own Stripe Payment
@@ -763,9 +837,9 @@ export default function Settings() {
           right: isDesktop ? 'auto' : 0,
           bottom: isDesktop ? 'auto' : 'calc(96px + env(safe-area-inset-bottom, 0px))',
           zIndex: 'calc(var(--z-nav, 40) - 1)',
-          /* Right padding clears the capture FAB column (fixed right:20,
-             56px wide), the save button used to render underneath it. */
-          padding: isDesktop ? '12px 0 0' : '12px 48px 12px 24px',
+          /* Keep a spacing-scale gap between the save action and the capture
+             FAB (fixed right: 20px, 44px wide). */
+          padding: isDesktop ? '12px 0 0' : '12px calc(48px + 32px) 12px 24px',
           display: 'flex',
           justifyContent: 'flex-end',
           background: isDesktop ? 'transparent' : 'linear-gradient(180deg, var(--fh-chrome-veil-0) 0%, var(--fh-chrome-veil-2) 35%, var(--fh-chrome-veil-1) 100%)',
@@ -800,7 +874,7 @@ export default function Settings() {
           }}
         >
           <UploadIcon size={16} />
-          {saving ? 'SAVING…' : saved ? 'SAVED' : 'SAVE CHANGES'}
+          {saving ? 'SAVING...' : saved ? 'SAVED' : 'SAVE CHANGES'}
         </motion.button>
       </div>
     </>

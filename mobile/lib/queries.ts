@@ -976,6 +976,7 @@ export type UpdateProfileInput = {
   insuredText?: string | null
   warrantyDefault?: string | null
   estimateTemplate?: string | null
+  preferences?: Profile['preferences']
 }
 
 export function useUpdateProfile() {
@@ -994,6 +995,7 @@ export function useUpdateProfile() {
     if (input.insuredText !== undefined) patch.insured_text = input.insuredText
     if (input.warrantyDefault !== undefined) patch.warranty_default = input.warrantyDefault
     if (input.estimateTemplate !== undefined) patch.estimate_template = input.estimateTemplate
+    if (input.preferences !== undefined) patch.preferences = input.preferences
     const { error } = await supabase.from('profiles')
       .update(patch as any)
       .eq('user_id', input.userId)

@@ -108,7 +108,7 @@ export default async function handler(request) {
 
   const { data: contact, error: contactError } = await supabase
     .from('fh_contacts')
-    .select('id, user_id, org_id, name, job_title, stage, proposal_status, quote_change_request_note, quote_change_requested_at')
+    .select('id, user_id, org_id, name, job_title, stage, proposal_status, follow_up_on, quote_change_request_note, quote_change_requested_at')
     .eq('id', link.contact_id)
     .eq('user_id', link.user_id)
     .maybeSingle()
@@ -152,6 +152,7 @@ export default async function handler(request) {
       .from('fh_contacts')
       .update({
         proposal_status: contact.proposal_status || 'sent',
+        follow_up_on: contact.follow_up_on || null,
         quote_change_request_note: contact.quote_change_request_note || null,
         quote_change_requested_at: contact.quote_change_requested_at || null
       })

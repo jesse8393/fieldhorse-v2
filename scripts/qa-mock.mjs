@@ -11,7 +11,7 @@ const CLIENT = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@r
 const contacts = [
   { id: 'c-lead1', stage: 'lead',    name: 'Justin Bryan',     job_title: 'Vintage Burkitt Station Drainage', amount: 24400, follow_up_on: iso(now - 10 * day).slice(0, 10), referred_by: 'Google', job_type: 'Drainage' },
   { id: 'c-lead2', stage: 'lead',    name: 'Lily Grace North', job_title: 'Retaining wall + pad', amount: 18750, referred_by: 'Referral', job_type: 'Concrete' },
-  { id: 'c-quote', stage: 'quote',   name: 'MMC Properties',   job_title: 'Parking lot repour', amount: 46200, proposal_status: 'sent' },
+  { id: 'c-quote', stage: 'quote',   name: 'MMC Properties',   job_title: 'Parking lot repour', amount: 46200, proposal_status: 'sent', quote_sent_at: iso(now - day), follow_up_on: iso(now + 2 * day).slice(0, 10) },
   { id: 'c-change', stage: 'quote',  name: 'Taylor Reed',      job_title: 'Kitchen renovation', amount: 18400, proposal_status: 'changes_requested', quote_change_request_note: 'Please separate the cabinet allowance.', quote_change_requested_at: iso(now - 2 * 3600e3) },
   { id: 'c-job1',  stage: 'job',     name: 'Plumbing Bellevue', job_title: 'Slab + trench', amount: 33100 },
   { id: 'c-job2',  stage: 'invoice', name: 'Harold Wickham',   job_title: 'Driveway replacement', amount: 12800 },
@@ -39,7 +39,7 @@ const notesRows = [
 ]
 
 const TABLES = {
-  profiles: [{ user_id: USER.id, full_name: 'Jesse Parker', company_name: 'Parker Construction Company', onboarded_at: iso(now - 90 * day), logo_url: null, location_lat: 35.84, location_lon: -86.36, services: ['Concrete'], company_email: 'office@parker.co', brand_accent_hex: null }],
+  profiles: [{ user_id: USER.id, full_name: 'Jesse Parker', company_name: 'Parker Construction Company', onboarded_at: iso(now - 90 * day), logo_url: null, location_lat: 35.84, location_lon: -86.36, services: ['Concrete'], company_email: 'office@parker.co', brand_accent_hex: null, preferences: { quote_follow_up: { enabled: true, days: 3 } } }],
   // Role is env-overridable so QA can exercise the in-view permission
   // gates (e.g. QA_ROLE=crew to verify Work hides leads/quotes/$).
   org_members: [{ id: 'm1', org_id: 'org-1', user_id: USER.id, role: process.env.QA_ROLE || 'owner', revoked_at: null, joined_at: iso(now - 90 * day), default_hourly_rate: null, status: 'active' }],

@@ -83,8 +83,10 @@ export default async (request) => {
     recipient_name,
     storage_path,
     filename,
-    sender_message
+    sender_message,
+    follow_up_on
   } = body || {}
+  const followUpProvided = Object.prototype.hasOwnProperty.call(body || {}, 'follow_up_on')
 
   if (!contact_id || !sender_user_id || !recipient_email || !storage_path) {
     return json({
@@ -96,6 +98,10 @@ export default async (request) => {
   const normalizedEmail = String(recipient_email).toLowerCase().trim()
   if (!isEmail(normalizedEmail)) {
     return json({ error: 'invalid_email' }, 400)
+  }
+  const safeFollowUpOn = follow_up_on == null ? null : normalizeFollowUpOn(follow_up_on)
+  if (followUpProvided && follow_up_on != null && !safeFollowUpOn) {
+    return json({ error: 'invalid_follow_up_on' }, 400)
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -234,12 +240,16 @@ export default async (request) => {
   // if the quote isn't already past 'sent' (approved/closed shouldn't
   // be demoted). The CHECK constraint from migration 014 enforces the
   // legal value set.
-  const locked = contact.proposal_status === 'approved'
-    || ['job', 'invoice', 'closed', 'lost'].includes(contact.stage)
-  const nextStatus = locked ? contact.proposal_status : 'sent'
+  const { contactPatch, scheduledFollowUpOn } = buildQuoteTrackingPatch({
+    stage: contact.stage,
+    proposalStatus: contact.proposal_status,
+    sentAtIso,
+    followUpProvided,
+    followUpOn: safeFollowUpOn
+  })
   await supabase
     .from('fh_contacts')
-    .update({ quote_sent_at: sentAtIso, proposal_status: nextStatus })
+    .update(contactPatch)
     .eq('id', contact_id)
     .eq('user_id', sender_user_id)
 
@@ -248,7 +258,9 @@ export default async (request) => {
     await supabase.from('fh_notes').insert({
       user_id: sender_user_id,
       contact_id,
-      text: `Proposal sent to ${normalizedEmail}`,
+      text: scheduledFollowUpOn
+        ? `Proposal sent to ${normalizedEmail}. Follow up ${formatFollowUpOn(scheduledFollowUpOn)}.`
+        : `Proposal sent to ${normalizedEmail}`,
       category: 'activity'
     })
   } catch (e) {
@@ -258,7 +270,8 @@ export default async (request) => {
   return json({
     ok: true,
     email_id: emailId,
-    sent_at: sentAtIso
+    sent_at: sentAtIso,
+    follow_up_on: scheduledFollowUpOn
   })
 }
 
@@ -311,6 +324,54 @@ function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders() }
+  })
+}
+
+export function normalizeFollowUpOn(value, now = new Date()) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''))
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const timestamp = Date.UTC(year, month - 1, day)
+  const parsed = new Date(timestamp)
+  if (
+    parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
+  ) return null
+
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  if (timestamp < today - 86400000 || timestamp > today + (92 * 86400000)) return null
+  return `${match[1]}-${match[2]}-${match[3]}`
+}
+
+export function buildQuoteTrackingPatch({
+  stage,
+  proposalStatus,
+  sentAtIso,
+  followUpProvided,
+  followUpOn
+}) {
+  const locked = proposalStatus === 'approved'
+    || ['job', 'invoice', 'closed', 'lost'].includes(stage)
+  const contactPatch = {
+    quote_sent_at: sentAtIso,
+    proposal_status: locked ? proposalStatus : 'sent'
+  }
+  if (!locked && followUpProvided) contactPatch.follow_up_on = followUpOn
+
+  return {
+    contactPatch,
+    scheduledFollowUpOn: !locked && followUpProvided ? followUpOn : null
+  }
+}
+
+function formatFollowUpOn(value) {
+  const [year, month, day] = String(value).split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
   })
 }
 

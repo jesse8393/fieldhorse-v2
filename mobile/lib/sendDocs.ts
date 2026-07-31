@@ -57,6 +57,7 @@ export async function sendProposalEmail(input: {
   filename: string
   userId: string
   contact: { id: string; name?: string | null; email?: string | null }
+  followUpOn?: string | null
 }): Promise<SendResult> {
   const email = (input.contact.email || '').trim()
   if (!email) return { ok: false, message: 'Add a client email first so we know where to send.' }
@@ -70,7 +71,8 @@ export async function sendProposalEmail(input: {
       recipient_email: email,
       recipient_name: input.contact.name || null,
       storage_path: storagePath,
-      filename: input.filename
+      filename: input.filename,
+      follow_up_on: input.followUpOn ?? null
     })
   })
   const body = await res.json().catch(() => ({} as any))

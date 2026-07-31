@@ -216,6 +216,10 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
 
   const risky = contacts.filter((contact) => {
     if (contact.stage !== 'lead' && contact.stage !== 'quote') return false
+    if (
+      contact.stage === 'quote'
+      && ['approved', 'changes_requested', 'rejected', 'expired'].includes(contact.proposal_status || '')
+    ) return false
     const last = new Date(contact.updated_at || contact.created_at || 0)
     return last < sevenDaysAgo
   })
@@ -255,6 +259,15 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   }, 0)
 
   const actions: HomeNextAction[] = []
+  const removeGenericFollowUps = (contactId: string) => {
+    for (let index = actions.length - 1; index >= 0; index -= 1) {
+      const action = actions[index]
+      if (
+        action.contactId === contactId
+        && ['followup', 'followup-due', 'viewed-quiet'].includes(action.kind)
+      ) actions.splice(index, 1)
+    }
+  }
 
   for (const contact of risky) {
     const lastTouchMs = new Date(contact.updated_at || contact.created_at || 0).getTime()
@@ -333,6 +346,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   for (const contact of contacts) {
     if (!contact.follow_up_on || contact.follow_up_on > todayYmdStr) continue
     if (!['lead', 'quote'].includes(contact.stage || '')) continue
+    removeGenericFollowUps(contact.id)
     const due = new Date(`${contact.follow_up_on}T12:00:00`)
     const overdueDays = Math.max(0, Math.round((now.getTime() - due.getTime()) / 86400000))
     actions.push({
@@ -364,6 +378,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   }
   for (const contact of contacts) {
     if (contact.stage !== 'quote' || contact.proposal_status !== 'changes_requested') continue
+    removeGenericFollowUps(contact.id)
     const requestedAt = contact.quote_change_requested_at || contact.updated_at || contact.created_at
     actions.push({
       id: `quote-changes-${contact.id}`,

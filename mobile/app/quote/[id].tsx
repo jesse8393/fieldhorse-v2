@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { WebView } from 'react-native-webview'
-import { ChevronLeft, Plus, Pencil, Eye, Share2, X, Send, Link as LinkIcon } from 'lucide-react-native'
+import { ChevronLeft, Plus, Pencil, Eye, Share2, X, Send, Link as LinkIcon, CalendarClock } from 'lucide-react-native'
 import {
   useQuoteItems, useAddQuoteItem, useUpdateQuoteItem, useDeleteQuoteItem,
   useApplyQuoteTotal, useProfile, useJobDetail, type QuoteItem
@@ -26,6 +26,7 @@ import { sendProposalEmail } from '../../lib/sendDocs'
 import { mintPublicLink } from '../../lib/publicLink'
 import { approveQuoteVersion, type ApprovalMethod } from '../../lib/approveQuote'
 import { supabase } from '../../lib/supabase'
+import { formatFollowUpDate, quoteFollowUpDate } from '../../lib/quoteFollowUp'
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -50,8 +51,10 @@ export default function QuoteScreen() {
   const [busy, setBusy] = useState<null | 'send' | 'link'>(null)
   const hasBase = items.some((it) => !it.is_optional && !it.is_excluded)
   const contact = jobDetail?.contact || null
-  const isApproved = (contact?.proposal_status || '').toLowerCase() === 'approved'
-  const isChangesRequested = (contact?.proposal_status || '').toLowerCase() === 'changes_requested'
+  const quoteStatus = (contact?.proposal_status || '').toLowerCase()
+  const isApproved = quoteStatus === 'approved'
+  const isChangesRequested = quoteStatus === 'changes_requested'
+  const canAwaitResponse = !isApproved && !['rejected', 'expired'].includes(quoteStatus)
 
   // Approval modal state
   const [approveOpen, setApproveOpen] = useState(false)
@@ -136,7 +139,8 @@ export default function QuoteScreen() {
         html: buildHtml(),
         filename: filename(),
         userId: user.id,
-        contact: { id: String(id), name: contact?.name, email: contact?.email }
+        contact: { id: String(id), name: contact?.name, email: contact?.email },
+        followUpOn: quoteFollowUpDate(profile?.preferences),
       })
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ['jobDetail', id] })
@@ -158,12 +162,15 @@ export default function QuoteScreen() {
     try {
       const { url } = await mintPublicLink({ contactId: String(id), userId: user.id, kind: 'proposal' })
       await Clipboard.setStringAsync(url)
-      if (isChangesRequested) {
+      if (canAwaitResponse) {
+        const sentAt = new Date()
+        const followUpOn = quoteFollowUpDate(profile?.preferences, sentAt)
         const { error } = await supabase
           .from('fh_contacts')
           .update({
             proposal_status: 'sent',
-            quote_sent_at: new Date().toISOString()
+            quote_sent_at: sentAt.toISOString(),
+            follow_up_on: followUpOn
           })
           .eq('id', String(id))
           .eq('user_id', user.id)
@@ -335,6 +342,20 @@ export default function QuoteScreen() {
               <Text style={{ color: '#5C5C5C', fontWeight: '700', fontSize: 14 }}>{isApproved ? 'Approved · record another' : 'Approve quote'}</Text>
             </Pressable>
           )}
+          {!isChangesRequested && !isApproved && ['sent', 'viewed'].includes(quoteStatus) && contact?.follow_up_on ? (
+            <View
+              className="rounded-[10px] p-3 flex-row items-center"
+              style={{ gap: 12, backgroundColor: 'rgba(201, 150, 58,0.10)', borderWidth: 1, borderColor: 'rgba(201, 150, 58,0.30)' }}
+            >
+              <CalendarClock color="#C9963A" size={17} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#F2EDE4', fontSize: 14, fontWeight: '700' }}>
+                  Follow up {formatFollowUpDate(contact.follow_up_on)}
+                </Text>
+                <Text style={{ color: '#5C5C5C', fontSize: 12, marginTop: 2 }}>Visible on Home and Work</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
         {isPending ? (

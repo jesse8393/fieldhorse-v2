@@ -67,6 +67,15 @@ export function addMonthsYmd(value: string | Date | null | undefined, months: nu
   return todayYmd(new Date(targetY, targetM, day))
 }
 
+/** Add whole calendar days without crossing through UTC. */
+export function addDaysYmd(value: string | Date | null | undefined, days: number): string | null {
+  const start = parseDateOnly(value)
+  if (!start || !Number.isFinite(days)) return null
+  const next = new Date(start)
+  next.setDate(next.getDate() + Math.trunc(days))
+  return todayYmd(next)
+}
+
 /**
  * Format a date-only or timestamp value for display. `long` gives
  * "June 1, 2026", otherwise "Jun 1, 2026". Empty string on invalid.

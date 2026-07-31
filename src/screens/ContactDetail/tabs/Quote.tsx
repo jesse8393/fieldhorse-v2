@@ -19,6 +19,7 @@ import { proposalNumber } from '../../../components/documents/numbers.ts'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { Eyebrow } from '../../../components/v3'
+import { formatFollowUpDate, quoteFollowUpDate } from '../../../lib/quoteFollowUp.ts'
 
 /**
  * QUOTE tab, the formal sellable scope. Lead → Quote → Approved Job
@@ -50,6 +51,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     contact?.proposal_status,
     contact?.quote_sent_at,
     contact?.quote_expires_at,
+    contact?.follow_up_on,
     pastQuote
   ])
 
@@ -337,10 +339,15 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         userId,
         kind: 'proposal'
       })
-      if ((contact.proposal_status || '').toLowerCase() === 'changes_requested' && patch) {
+      const currentStatus = (contact.proposal_status || 'draft').toLowerCase()
+      const canAwaitResponse = !pastQuote && !['approved', 'rejected', 'expired'].includes(currentStatus)
+      if (canAwaitResponse && patch) {
+        const sentAt = new Date()
+        const followUpOn = quoteFollowUpDate(profile?.preferences, sentAt)
         await patch({
           proposal_status: 'sent',
-          quote_sent_at: new Date().toISOString()
+          quote_sent_at: sentAt.toISOString(),
+          follow_up_on: followUpOn
         })
         await fetchAll?.()
       }
@@ -413,7 +420,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           recipient_email: contact.email,
           recipient_name: contact.name || null,
           storage_path: path,
-          filename: result.filename
+          filename: result.filename,
+          follow_up_on: quoteFollowUpDate(profile?.preferences)
         })
       })
       const sendBody = await sendRes.json().catch(() => ({}))
@@ -1326,6 +1334,11 @@ function deriveStatus(contact: any, pastQuote = false) {
   }
   else if (raw === 'approved') { tone = 'good'; sub = relativeAgo(sentIso, 'Sent') }
   else if (raw === 'rejected') { tone = 'danger' }
+
+  if (['sent', 'viewed'].includes(raw) && contact?.follow_up_on) {
+    const followUpLabel = formatFollowUpDate(contact.follow_up_on)
+    if (followUpLabel) sub = sub ? `${sub}, follow up ${followUpLabel}` : `Follow up ${followUpLabel}`
+  }
 
   // Job has advanced past the quote phase but the explicit Approve
   // button was never tapped (manual stage advance, legacy data, etc).
