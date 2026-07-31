@@ -104,6 +104,16 @@ describe('resolvePrimaryAction pipeline priority', () => {
     expect(r.pipelineFn).toBe('approveQuote')
   })
 
+  it('reviews customer changes before quote approval', () => {
+    const r = resolvePrimaryAction({
+      contact: { stage: 'quote', proposal_status: 'changes_requested' },
+      todos: [{ id: 't1', text: 'Follow up' }]
+    })
+    expect(r.kind).toBe('stage')
+    expect(r.ctaLabel).toBe('Review changes')
+    expect(r.pipelineFn).toBe('reviewQuoteChanges')
+  })
+
   it('keeps active job delivery work primary until the job is complete', () => {
     const r = resolvePrimaryAction({
       contact: { stage: 'job' },

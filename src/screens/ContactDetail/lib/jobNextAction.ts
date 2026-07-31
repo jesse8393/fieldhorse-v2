@@ -69,6 +69,14 @@ function normalizeStage(stage: any) {
 export function resolvePipelineAction(contact: any): JobNextAction | null {
   if (!contact) return null
   const stage = normalizeStage(contact.stage)
+  if (stage === 'quote' && contact.proposal_status === 'changes_requested') {
+    return {
+      kind: 'stage',
+      title: 'Review the customer requested changes.',
+      ctaLabel: 'Review changes',
+      pipelineFn: 'reviewQuoteChanges'
+    }
+  }
   const fallback = (stage === 'job' && contact.completed_at)
     ? JOB_COMPLETED_DEFAULT
     : STAGE_DEFAULTS[stage] || STAGE_DEFAULTS.lead

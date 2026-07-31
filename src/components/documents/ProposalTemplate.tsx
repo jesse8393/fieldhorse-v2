@@ -588,6 +588,8 @@ function statusToChip(status: any) {
   switch (String(status || 'draft').toLowerCase()) {
     case 'approved': return { label: 'Approved', tone: 'green' }
     case 'sent':     return { label: 'Sent',     tone: 'gold' }
+    case 'viewed':   return { label: 'Viewed',   tone: 'gold' }
+    case 'changes_requested': return { label: 'Changes requested', tone: 'red' }
     case 'expired':  return { label: 'Expired',  tone: 'red' }
     case 'rejected': return { label: 'Declined', tone: 'red' }
     default:         return { label: 'Draft',    tone: 'slate' }

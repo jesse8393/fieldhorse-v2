@@ -262,6 +262,8 @@ export default async function handler(req) {
       job_type: contact.job_type,
       stage: contact.stage,
       proposal_status: contact.proposal_status,
+      quote_change_request_note: contact.quote_change_request_note,
+      quote_change_requested_at: contact.quote_change_requested_at,
       quote_sent_at: contact.quote_sent_at,
       quote_expires_at: contact.quote_expires_at,
       created_at: contact.created_at,

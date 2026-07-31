@@ -16,7 +16,10 @@ function localYmd(d: Date) {
 type ContactRow = Pick<
   Database['public']['Tables']['fh_contacts']['Row'],
   'id' | 'name' | 'amount' | 'stage' | 'updated_at' | 'created_at' | 'completed_at' | 'follow_up_on' | 'proposal_status'
->
+> & Partial<Pick<
+  Database['public']['Tables']['fh_contacts']['Row'],
+  'quote_change_request_note' | 'quote_change_requested_at'
+>>
 
 type ScheduleRow = Pick<
   Database['public']['Tables']['fh_schedule']['Row'],
@@ -57,6 +60,7 @@ export type HomePriorityTone = 'success' | 'warn' | 'danger'
 export type HomeActionIntent =
   | 'follow_up'
   | 'quote_followup'
+  | 'review_quote_changes'
   | 'reschedule'
   | 'send_invoice'
   | 'nudge_invoice'
@@ -70,6 +74,7 @@ export type HomeNextAction = {
     | 'invoice'
     | 'followup-due'
     | 'viewed-quiet'
+    | 'quote-changes'
     | 'co-unsigned'
     | 'inv-overdue'
   contactId: string
@@ -358,6 +363,27 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     if (viewedAt > prev) latestViewByContact.set(view.contact_id, viewedAt)
   }
   for (const contact of contacts) {
+    if (contact.stage !== 'quote' || contact.proposal_status !== 'changes_requested') continue
+    const requestedAt = contact.quote_change_requested_at || contact.updated_at || contact.created_at
+    actions.push({
+      id: `quote-changes-${contact.id}`,
+      kind: 'quote-changes',
+      contactId: contact.id,
+      verb: 'Review',
+      contactName: contact.name || 'Customer',
+      contactAmount: Number(contact.amount || 0),
+      dueIso: requestedAt || now.toISOString(),
+      dueKind: 'overdue',
+      title: 'Customer requested quote changes',
+      detail: contact.quote_change_request_note || 'Open the quote and review the requested revision.',
+      urgencyLabel: 'Needs revision',
+      urgencyTone: 'danger',
+      urgency: 0.5,
+      tab: 'quote',
+      intent: 'review_quote_changes',
+    })
+  }
+  for (const contact of contacts) {
     if (contact.stage !== 'quote') continue
     if (!['sent', 'viewed'].includes((contact.proposal_status || '').toLowerCase())) continue
     const viewedAt = latestViewByContact.get(contact.id)
@@ -452,6 +478,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
 
   const quotesAttention = contacts.filter((contact) => {
     if (contact.stage !== 'quote') return false
+    if (contact.proposal_status === 'changes_requested') return true
     return new Date(contact.updated_at || contact.created_at || 0) < sevenDaysAgo
   }).length
 
@@ -632,8 +659,8 @@ export async function fetchHomeDashboard(
     // mixed in partner-shared rows the other signals exclude, inflating the
     // pipeline total and not scaling.
     (orgId
-      ? supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status').eq('org_id', orgId)
-      : supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status').eq('user_id', userId)
+      ? supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at').eq('org_id', orgId)
+      : supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at').eq('user_id', userId)
     ),
     overdueScheduleQuery,
     paymentsPromise,

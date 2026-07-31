@@ -114,7 +114,7 @@ export default async (request) => {
   // RLS, so we filter explicitly on user_id to prevent open-relay use.
   const { data: contact, error: contactErr } = await supabase
     .from('fh_contacts')
-    .select('id, name, job_title, user_id, proposal_status')
+    .select('id, name, job_title, user_id, stage, proposal_status')
     .eq('id', contact_id)
     .eq('user_id', sender_user_id)
     .maybeSingle()
@@ -234,9 +234,9 @@ export default async (request) => {
   // if the quote isn't already past 'sent' (approved/closed shouldn't
   // be demoted). The CHECK constraint from migration 014 enforces the
   // legal value set.
-  const nextStatus = ['draft'].includes(contact.proposal_status)
-    ? 'sent'
-    : contact.proposal_status
+  const locked = contact.proposal_status === 'approved'
+    || ['job', 'invoice', 'closed', 'lost'].includes(contact.stage)
+  const nextStatus = locked ? contact.proposal_status : 'sent'
   await supabase
     .from('fh_contacts')
     .update({ quote_sent_at: sentAtIso, proposal_status: nextStatus })

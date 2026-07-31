@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   PhoneCall,
+  PenLine,
   CalendarClock,
   ChevronRight,
   Zap
@@ -1163,6 +1164,7 @@ const NEXT_ACTION_KIND: Record<string, any> = {
   followup:   { Icon: PhoneCall },
   'followup-due': { Icon: PhoneCall },
   'viewed-quiet': { Icon: PhoneCall },
+  'quote-changes': { Icon: PenLine },
   reschedule: { Icon: CalendarClock },
   invoice:    { Icon: Receipt },
   'inv-overdue': { Icon: Receipt },

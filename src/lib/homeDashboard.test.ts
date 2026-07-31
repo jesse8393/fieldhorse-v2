@@ -128,6 +128,35 @@ describe('buildHomeDashboardBundle', () => {
     })
   })
 
+  it('puts customer quote changes at the front of the owner queue', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      contacts: [{
+        id: 'quote-change-1',
+        name: 'Kitchen client',
+        amount: 18000,
+        stage: 'quote',
+        created_at: '2026-06-10T12:00:00.000Z',
+        updated_at: '2026-06-18T10:00:00.000Z',
+        completed_at: null,
+        follow_up_on: null,
+        proposal_status: 'changes_requested',
+        quote_change_request_note: 'Please separate the cabinet allowance.',
+        quote_change_requested_at: '2026-06-18T10:00:00.000Z',
+      }],
+    }))
+
+    expect(bundle.nextActions[0]).toMatchObject({
+      kind: 'quote-changes',
+      contactId: 'quote-change-1',
+      verb: 'Review',
+      detail: 'Please separate the cabinet allowance.',
+      urgencyTone: 'danger',
+      tab: 'quote',
+      intent: 'review_quote_changes',
+    })
+    expect(bundle.dealsAtRisk.quotesAttention).toBe(1)
+  })
+
   it('does not chase invoices on jobs already paid in full, whenever they were paid', () => {
     const bundle = buildHomeDashboardBundle(baseSource({
       contacts: [{

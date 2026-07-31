@@ -12,6 +12,7 @@ const contacts = [
   { id: 'c-lead1', stage: 'lead',    name: 'Justin Bryan',     job_title: 'Vintage Burkitt Station Drainage', amount: 24400, follow_up_on: iso(now - 10 * day).slice(0, 10), referred_by: 'Google', job_type: 'Drainage' },
   { id: 'c-lead2', stage: 'lead',    name: 'Lily Grace North', job_title: 'Retaining wall + pad', amount: 18750, referred_by: 'Referral', job_type: 'Concrete' },
   { id: 'c-quote', stage: 'quote',   name: 'MMC Properties',   job_title: 'Parking lot repour', amount: 46200, proposal_status: 'sent' },
+  { id: 'c-change', stage: 'quote',  name: 'Taylor Reed',      job_title: 'Kitchen renovation', amount: 18400, proposal_status: 'changes_requested', quote_change_request_note: 'Please separate the cabinet allowance.', quote_change_requested_at: iso(now - 2 * 3600e3) },
   { id: 'c-job1',  stage: 'job',     name: 'Plumbing Bellevue', job_title: 'Slab + trench', amount: 33100 },
   { id: 'c-job2',  stage: 'invoice', name: 'Harold Wickham',   job_title: 'Driveway replacement', amount: 12800 },
   { id: 'c-done',  stage: 'closed',  name: 'Danielle Ortiz',   job_title: 'Patio + walkway', amount: 9600, completed_at: iso(now - 20 * day) },
