@@ -61,6 +61,7 @@ export default function PublicDoc() {
   }, [load])
 
   const { loading, data, error } = state
+  const proposalStatus = String(data?.contact?.proposal_status || '').toLowerCase()
 
   return (
     <div
@@ -76,7 +77,7 @@ export default function PublicDoc() {
       {!loading && data && data.kind === 'proposal' && (
         <>
           <ProposalView data={data} />
-          {(data.contact?.proposal_status || '').toLowerCase() !== 'approved' && (
+          {proposalStatus !== 'approved' && proposalStatus !== 'changes_requested' && (
             <ApproveProposalBar
               token={token}
               companyName={data.company?.name || ''}
@@ -86,8 +87,15 @@ export default function PublicDoc() {
               onApproved={load}
             />
           )}
-          {(data.contact?.proposal_status || '').toLowerCase() === 'approved' && (
+          {proposalStatus === 'approved' && (
             <ApprovedNote companyName={data.company?.name} />
+          )}
+          {proposalStatus === 'changes_requested' && (
+            <ChangesRequestedNote
+              companyName={data.company?.name}
+              requestedNote={data.contact?.quote_change_request_note}
+              requestedAt={data.contact?.quote_change_requested_at}
+            />
           )}
         </>
       )}
@@ -273,6 +281,52 @@ function ApprovedNote({ companyName }: any) {
       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
         {companyName ? `${companyName} has` : 'The contractor has'} a record of your approval. They'll be in touch with next steps.
       </p>
+    </div>
+  )
+}
+
+function ChangesRequestedNote({ companyName, requestedNote, requestedAt }: any) {
+  return (
+    <div
+      style={{
+        maxWidth: 760,
+        margin: '24px auto 0',
+        padding: '24px 24px',
+        borderRadius: 10,
+        background: 'rgba(201, 150, 58, 0.10)',
+        border: '1px solid rgba(201, 150, 58, 0.40)',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        color: '#141414',
+        textAlign: 'center'
+      }}
+    >
+      <div style={{
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: 0,
+        textTransform: 'uppercase',
+        color: '#C9963A',
+        marginBottom: 8
+      }}>
+        Changes requested
+      </div>
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+        {companyName || 'The contractor'} has your feedback and will send a revised proposal before approval.
+        {requestedAt ? ` Request received ${new Date(requestedAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.` : ''}
+      </p>
+      {requestedNote ? (
+        <p style={{
+          margin: '16px 0 0',
+          fontSize: 14,
+          lineHeight: 1.5,
+          textAlign: 'left',
+          color: '#5C5C5C',
+          fontStyle: 'italic',
+          whiteSpace: 'pre-wrap'
+        }}>
+          {requestedNote}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -484,7 +484,10 @@ export default function ContactDetail() {
   // ('invoice' is the legacy alias of 'job', same treatment.)
   const stageCta: { label: string; onClick: () => void } | null =
     contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
-    : contact.stage === 'quote'   ? { label: 'Approve quote',  onClick: () => setApproveOpen(true) }
+    : contact.stage === 'quote'
+      ? contact.proposal_status === 'changes_requested'
+        ? { label: 'Review changes', onClick: () => setTab('quote') }
+        : { label: 'Approve quote', onClick: () => setApproveOpen(true) }
     : contact.stage === 'job' || contact.stage === 'invoice'
       ? (Number(balance || 0) > 0
           ? { label: 'Send invoice',   onClick: () => setInvoiceOpen(true) }

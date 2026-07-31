@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare, Eye, ShieldCheck, FileEdit } from 'lucide-react'
+import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare, Eye, ShieldCheck, FileEdit, PenLine } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Eyebrow } from './v3'
 import { useAuth } from '../contexts/AuthContext.tsx'
@@ -18,6 +18,7 @@ const KIND_META: Record<string, any> = {
   sub_responded:      { Icon: MessageSquare,   color: 'var(--ink-strong)' },
   public_link_viewed: { Icon: Eye,             color: 'var(--ink-strong)' },
   quote_approved:     { Icon: ShieldCheck,     color: 'var(--signal-green)' },
+  quote_changes_requested: { Icon: PenLine,    color: 'var(--alert-red)' },
   change_order_added: { Icon: FileEdit,        color: 'var(--ink-strong)' }
 }
 function metaFor(kind: any) {

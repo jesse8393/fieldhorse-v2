@@ -208,7 +208,7 @@ function Th({ children, align = 'left', style }: { children?: import('react').Re
       scope="col"
       style={{
         textAlign: align,
-        padding: '0 0 8px',
+        padding: align === 'left' ? '0 12px 8px 0' : '0 0 8px 12px',
         borderBottom: `2px solid ${DOC_COLORS.ink}`,
         fontFamily: DOC_FONTS.body,
         fontSize: 12,

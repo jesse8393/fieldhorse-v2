@@ -30,8 +30,12 @@ export default function ApproveProposalBar({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState<any>(null)
+  const [requestMode, setRequestMode] = useState(false)
+  const [requestText, setRequestText] = useState('')
+  const [requestDone, setRequestDone] = useState<any>(null)
 
   const ready = name.trim().length > 1 && authorized && !busy
+  const requestReady = name.trim().length > 1 && requestText.trim().length >= 3 && !busy
 
   async function submit(e: any) {
     e?.preventDefault?.()
@@ -71,6 +75,61 @@ export default function ApproveProposalBar({
     }
   }
 
+  async function submitChangeRequest(e: any) {
+    e?.preventDefault?.()
+    if (!requestReady || isCO) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch('/api/public-link-request-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          requester_name: name.trim(),
+          request_text: requestText.trim()
+        })
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body?.ok) {
+        const friendly =
+          body?.error === 'already_approved' ? 'This proposal has already been approved.'
+          : body?.error === 'expired' ? 'This link has expired. Please ask the contractor for a fresh one.'
+          : body?.error === 'revoked' ? 'This link has been revoked.'
+          : body?.error === 'gone' ? 'This proposal is no longer open for changes.'
+          : body?.error === 'rate_limited' ? 'Too many requests. Please wait a minute and try again.'
+          : body?.message || 'We could not send your request. Please try again.'
+        throw new Error(friendly)
+      }
+      setRequestDone({
+        name: body.requested_by || name.trim(),
+        at: body.requested_at || new Date().toISOString()
+      })
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (requestDone) {
+    return (
+      <div style={panelStyle} aria-live="polite">
+        <div style={eyebrowStyle}>Changes requested</div>
+        <h3 style={headlineStyle}>Your feedback is with the contractor.</h3>
+        <p style={bodyStyle}>
+          {companyName || 'The contractor'} will review your request and send a revised proposal before approval.
+        </p>
+        <div style={metaRowStyle}>
+          <span>Requested by</span>
+          <strong style={{ color: '#141414' }}>{requestDone.name}</strong>
+          <span style={dotStyle} aria-hidden="true" />
+          <span>{formatStamp(requestDone.at)}</span>
+        </div>
+      </div>
+    )
+  }
+
   if (done) {
     return (
       <div style={panelStyle} aria-live="polite">
@@ -89,6 +148,73 @@ export default function ApproveProposalBar({
           <span>{formatStamp(done.at)}</span>
         </div>
       </div>
+    )
+  }
+
+  if (requestMode && !isCO) {
+    return (
+      <form style={panelStyle} onSubmit={submitChangeRequest}>
+        <div style={eyebrowStyle}>Request changes</div>
+        <h3 style={headlineStyle}>What should be revised?</h3>
+        <p style={bodyStyle}>
+          Tell {companyName || 'the contractor'} what needs attention. Approval will pause until a revised proposal is sent.
+        </p>
+
+        <label style={fieldStackStyle}>
+          <span style={labelStyle}>Your full name</span>
+          <input
+            type="text"
+            autoComplete="name"
+            required
+            disabled={busy}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Jane Homeowner"
+            style={inputStyle}
+          />
+        </label>
+
+        <label style={fieldStackStyle}>
+          <span style={labelStyle}>Changes needed</span>
+          <textarea
+            rows={4}
+            required
+            minLength={3}
+            maxLength={2000}
+            disabled={busy}
+            value={requestText}
+            onChange={(e) => setRequestText(e.target.value)}
+            placeholder="Describe the scope, price, timing, or terms you want updated"
+            style={{ ...inputStyle, resize: 'vertical', minHeight: 96 }}
+          />
+        </label>
+
+        {error && <div role="alert" style={errorStyle}>{error}</div>}
+
+        <div style={actionRowStyle}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => { setError(''); setRequestMode(false) }}
+            style={secondaryButtonStyle}
+          >
+            Back
+          </button>
+          <button
+            type="submit"
+            disabled={!requestReady}
+            style={{
+              ...buttonStyle,
+              flex: 1,
+              width: 'auto',
+              opacity: requestReady ? 1 : 0.55,
+              cursor: requestReady ? 'pointer' : 'not-allowed'
+            }}
+          >
+            {busy ? 'Sending request...' : 'Send request'}
+          </button>
+        </div>
+      </form>
     )
   }
 
@@ -164,6 +290,16 @@ export default function ApproveProposalBar({
       >
         {busy ? 'Recording approval…' : 'Approve & notify contractor'}
       </button>
+      {!isCO && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => { setError(''); setRequestMode(true) }}
+          style={{ ...secondaryButtonStyle, width: '100%', marginTop: 8 }}
+        >
+          Request changes
+        </button>
+      )}
     </form>
   )
 }
@@ -198,18 +334,18 @@ const panelStyle: import('react').CSSProperties = {
 
 const eyebrowStyle: import('react').CSSProperties = {
   fontSize: 12, fontWeight: 700, letterSpacing: 0,
-  textTransform: 'uppercase', color: '#C9963A', marginBottom: 6
+  textTransform: 'uppercase', color: '#C9963A', marginBottom: 8
 }
 
 const headlineStyle: import('react').CSSProperties = {
   margin: 0,
-  fontFamily: "'Cormorant Garamond', Georgia, serif",
-  fontSize: 24, fontWeight: 500, color: '#141414',
+  fontFamily: "'Bebas Neue', Impact, sans-serif",
+  fontSize: 24, fontWeight: 400, color: '#141414',
   letterSpacing: 0
 }
 
 const bodyStyle: import('react').CSSProperties = {
-  margin: '10px 0 16px',
+  margin: '12px 0 16px',
   fontSize: 14, lineHeight: 1.55, color: '#141414'
 }
 
@@ -227,7 +363,7 @@ const inputStyle: import('react').CSSProperties = {
   padding: '12px 12px',
   borderRadius: 10,
   background: '#F2EDE4',
-  border: '1px solid #F2EDE4',
+  border: '1px solid #5C5C5C',
   color: '#141414',
   fontFamily: "'DM Sans', system-ui, sans-serif",
   fontSize: 14,
@@ -245,7 +381,8 @@ const checkboxRowStyle: import('react').CSSProperties = {
 
 const buttonStyle: import('react').CSSProperties = {
   display: 'block', width: '100%',
-  padding: '12px 16px',
+  height: 40,
+  padding: '0 16px',
   borderRadius: 10, border: 'none',
   background: 'linear-gradient(135deg, #C9963A 0%, #C9963A 100%)',
   color: '#141414',
@@ -253,6 +390,25 @@ const buttonStyle: import('react').CSSProperties = {
   fontSize: 14, fontWeight: 700,
   letterSpacing: 0, textTransform: 'uppercase',
   boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
+}
+
+const secondaryButtonStyle: import('react').CSSProperties = {
+  height: 40,
+  padding: '0 16px',
+  borderRadius: 10,
+  border: '1px solid #5C5C5C',
+  background: '#F2EDE4',
+  color: '#141414',
+  fontFamily: "'DM Sans', system-ui, sans-serif",
+  fontSize: 14,
+  fontWeight: 700,
+  cursor: 'pointer'
+}
+
+const actionRowStyle: import('react').CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8
 }
 
 const errorStyle: import('react').CSSProperties = {
@@ -268,7 +424,7 @@ const errorStyle: import('react').CSSProperties = {
 const metaRowStyle: import('react').CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
   fontSize: 12, color: '#5C5C5C',
-  paddingTop: 12, marginTop: 14,
+  paddingTop: 12, marginTop: 16,
   borderTop: '1px solid #F2EDE4'
 }
 

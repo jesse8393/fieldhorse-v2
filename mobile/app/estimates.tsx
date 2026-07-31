@@ -15,6 +15,7 @@ function statusMeta(r: EstimateRow): { label: string; tint: string } {
   switch (r.status) {
     case 'accepted': case 'approved': case 'won': case 'signed': return { label: 'ACCEPTED', tint: theme.success }
     case 'declined': case 'rejected': case 'lost': return { label: 'DECLINED', tint: theme.danger }
+    case 'changes_requested': return { label: 'CHANGES REQUESTED', tint: theme.danger }
     case 'viewed': case 'opened': return { label: 'VIEWED', tint: theme.goldBright }
     case 'sent': return { label: 'SENT', tint: '#5C5C5C' }
     default: return { label: 'DRAFT', tint: theme.inkMuted }
@@ -26,7 +27,7 @@ function matches(r: EstimateRow, f: Filter) {
   if (f === 'all') return true
   const m = statusMeta(r).label
   if (f === 'accepted') return m === 'ACCEPTED'
-  return m === 'SENT' || m === 'VIEWED' || m === 'DRAFT'
+  return m === 'SENT' || m === 'VIEWED' || m === 'DRAFT' || m === 'CHANGES REQUESTED'
 }
 
 export default function EstimatesScreen() {

@@ -25,6 +25,7 @@ import { shareProposalPdf } from '../../lib/quotePdf'
 import { sendProposalEmail } from '../../lib/sendDocs'
 import { mintPublicLink } from '../../lib/publicLink'
 import { approveQuoteVersion, type ApprovalMethod } from '../../lib/approveQuote'
+import { supabase } from '../../lib/supabase'
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -50,6 +51,7 @@ export default function QuoteScreen() {
   const hasBase = items.some((it) => !it.is_optional && !it.is_excluded)
   const contact = jobDetail?.contact || null
   const isApproved = (contact?.proposal_status || '').toLowerCase() === 'approved'
+  const isChangesRequested = (contact?.proposal_status || '').toLowerCase() === 'changes_requested'
 
   // Approval modal state
   const [approveOpen, setApproveOpen] = useState(false)
@@ -61,6 +63,10 @@ export default function QuoteScreen() {
   const [approving, setApproving] = useState(false)
 
   function openApprove() {
+    if (isChangesRequested) {
+      Alert.alert('Review changes first', contact?.quote_change_request_note || 'Update the quote, then send the revision before approval.')
+      return
+    }
     setApprMethod('verbal')
     setApprName(contact?.name || '')
     setApprEmail(contact?.email || '')
@@ -152,6 +158,19 @@ export default function QuoteScreen() {
     try {
       const { url } = await mintPublicLink({ contactId: String(id), userId: user.id, kind: 'proposal' })
       await Clipboard.setStringAsync(url)
+      if (isChangesRequested) {
+        const { error } = await supabase
+          .from('fh_contacts')
+          .update({
+            proposal_status: 'sent',
+            quote_sent_at: new Date().toISOString()
+          })
+          .eq('id', String(id))
+          .eq('user_id', user.id)
+        if (error) throw error
+        await queryClient.invalidateQueries({ queryKey: ['jobDetail', id] })
+        await queryClient.invalidateQueries({ queryKey: ['estimates'] })
+      }
       Alert.alert('Share link copied', 'Paste it into a text or email, the customer can view and approve online.')
     } catch (e: any) {
       Alert.alert("Couldn't create link", e?.message || 'Try again.')
@@ -292,15 +311,30 @@ export default function QuoteScreen() {
               {busy === 'link' ? <ActivityIndicator color="#C9963A" /> : <><LinkIcon color="#C9963A" size={16} /><Text className="text-gold-bright font-bold text-sm">Copy link</Text></>}
             </Pressable>
           </View>
-          <Pressable
-            onPress={openApprove}
-            disabled={!hasBase}
-            className="flex-row items-center justify-center rounded-[10px] py-3"
-            style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: isApproved ? 'rgba(45, 122, 79,0.18)' : 'rgba(45, 122, 79,0.14)', borderWidth: 1, borderColor: 'rgba(45, 122, 79,0.5)' }}
-          >
-            <ShieldCheck color="#5C5C5C" size={16} />
-            <Text style={{ color: '#5C5C5C', fontWeight: '700', fontSize: 14 }}>{isApproved ? 'Approved · record another' : 'Approve quote'}</Text>
-          </Pressable>
+          {isChangesRequested ? (
+            <View
+              className="rounded-[10px] p-3"
+              style={{ gap: 8, backgroundColor: 'rgba(192, 57, 43,0.10)', borderWidth: 1, borderColor: 'rgba(192, 57, 43,0.40)' }}
+            >
+              <Text style={{ color: '#C0392B', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>Customer requested changes</Text>
+              <Text style={{ color: '#F2EDE4', fontSize: 14, lineHeight: 20 }}>
+                {contact?.quote_change_request_note || 'Review the feedback before sending a revised quote.'}
+              </Text>
+              <Text style={{ color: '#5C5C5C', fontSize: 12, lineHeight: 18 }}>
+                Update the quote, then send it or copy the link. Approval stays paused until the revision is shared.
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={openApprove}
+              disabled={!hasBase}
+              className="flex-row items-center justify-center rounded-[10px] py-3"
+              style={{ gap: 8, opacity: hasBase ? 1 : 0.45, backgroundColor: isApproved ? 'rgba(45, 122, 79,0.18)' : 'rgba(45, 122, 79,0.14)', borderWidth: 1, borderColor: 'rgba(45, 122, 79,0.5)' }}
+            >
+              <ShieldCheck color="#5C5C5C" size={16} />
+              <Text style={{ color: '#5C5C5C', fontWeight: '700', fontSize: 14 }}>{isApproved ? 'Approved · record another' : 'Approve quote'}</Text>
+            </Pressable>
+          )}
         </View>
 
         {isPending ? (

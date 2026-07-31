@@ -237,6 +237,8 @@ export type Database = {
           phone: string | null
           photos: Json | null
           proposal_status: string | null
+          quote_change_request_note: string | null
+          quote_change_requested_at: string | null
           quote_expires_at: string | null
           quote_sent_at: string | null
           referred_by: string | null
@@ -272,6 +274,8 @@ export type Database = {
           phone?: string | null
           photos?: Json | null
           proposal_status?: string | null
+          quote_change_request_note?: string | null
+          quote_change_requested_at?: string | null
           quote_expires_at?: string | null
           quote_sent_at?: string | null
           referred_by?: string | null
@@ -307,6 +311,8 @@ export type Database = {
           phone?: string | null
           photos?: Json | null
           proposal_status?: string | null
+          quote_change_request_note?: string | null
+          quote_change_requested_at?: string | null
           quote_expires_at?: string | null
           quote_sent_at?: string | null
           referred_by?: string | null

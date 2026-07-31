@@ -309,7 +309,14 @@ export default function Work() {
   // mounted cards.
   const handleOpen = useCallback((c: JobRow) => navigate(detailRoute(c)), [navigate])
   const handleHover = useCallback((c: JobRow) => { if (canHover) prefetchJobDetail(queryClient, c.id, user?.id) }, [queryClient, user?.id])
-  const handleWon = useCallback((c: JobRow) => run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`)), [run, navigate])
+  const handleWon = useCallback((c: JobRow) => {
+    if (c.proposal_status === 'changes_requested') {
+      toastError('Review changes first', 'Send the revised quote before marking it won.')
+      navigate(`/quotes/${c.id}?tab=quote`)
+      return
+    }
+    run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`))
+  }, [run, navigate])
   const handleLost = useCallback((c: JobRow) => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost"), [run])
   const handleReopen = useCallback((c: JobRow) => run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen"), [run])
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
@@ -562,15 +569,18 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
   const isTerminal = c.stage === 'lost' || c.stage === 'closed'
   // Sell actions require both a sellable stage AND a money role.
   const canSell = mayMoveStage && (c.stage === 'lead' || c.stage === 'quote')
+  const canMarkWon = canSell && c.proposal_status !== 'changes_requested'
   // Reopen also moves a stage, money roles only.
   const canReopen = mayMoveStage && isTerminal
   // Follow up actions show on any non-terminal deal (all roles). If a
   // terminal deal offers no reopen (field role), the ⋯ menu is empty :
   // hide the trigger entirely rather than open an empty sheet.
   const hasActions = !isTerminal || canReopen
-  const pillLabel = c.stage === 'quote' && (c.proposal_status === 'sent' || c.proposal_status === 'viewed')
-    ? 'Quote sent'
-    : meta.label
+  const pillLabel = c.stage === 'quote' && c.proposal_status === 'changes_requested'
+    ? 'Changes requested'
+    : c.stage === 'quote' && (c.proposal_status === 'sent' || c.proposal_status === 'viewed')
+      ? 'Quote sent'
+      : meta.label
 
   const swipeActions: Array<{ icon: ReactNode; label: string; color: string; fg: string; onClick: () => void }> = []
   if (phone) {
@@ -722,9 +732,11 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
             {canSell && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => { hapticMedium(); onWon(c) }}>
-                  <Trophy size={13} /> Mark won
-                </DropdownMenuItem>
+                {canMarkWon && (
+                  <DropdownMenuItem onSelect={() => { hapticMedium(); onWon(c) }}>
+                    <Trophy size={13} /> Mark won
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem variant="destructive" onSelect={() => onLost(c)}>
                   <XCircle size={13} /> Mark lost
                 </DropdownMenuItem>

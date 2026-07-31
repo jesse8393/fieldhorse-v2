@@ -136,6 +136,11 @@ export default function OverviewTab({
           break
         }
         case 'stage': {
+          if (nextAction.pipelineFn === 'reviewQuoteChanges') {
+            hapticStageChange()
+            onOpenQuote?.()
+            break
+          }
           // Approval intercept (Phase 4C-2): the bare approveQuote()
           // pipeline call would advance stage + add a kickoff schedule
           // but write NO immutable snapshot, leaving no record of what

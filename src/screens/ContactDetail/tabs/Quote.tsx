@@ -337,6 +337,13 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         userId,
         kind: 'proposal'
       })
+      if ((contact.proposal_status || '').toLowerCase() === 'changes_requested' && patch) {
+        await patch({
+          proposal_status: 'sent',
+          quote_sent_at: new Date().toISOString()
+        })
+        await fetchAll?.()
+      }
       try {
         await navigator.clipboard.writeText(link.url)
         toastSuccess('Share link copied', 'Send via text, email, however you like.')
@@ -599,7 +606,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           onEsign={handleEsign}
         />
 
-        {(pastQuote || contact?.proposal_status === 'approved') && (
+        {(pastQuote || ['approved', 'changes_requested'].includes(contact?.proposal_status)) && (
           <ApproveBand
             contact={contact}
             baseCount={baseCount}
@@ -686,6 +693,7 @@ function DocumentPreviewPane({ company, contact, items, photos = [], loading, in
   const status = (contact?.proposal_status || 'draft').toLowerCase()
   const docStatus = status === 'approved' ? 'approved'
     : status === 'sent' ? 'sent'
+    : status === 'changes_requested' ? 'sent'
     : status === 'expired' ? 'expired'
     : 'draft'
 
@@ -1006,6 +1014,7 @@ function ContextCard({ contact, status }: any) {
    ============================================================ */
 function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprove }: any) {
   const status = (contact?.proposal_status || 'draft').toLowerCase()
+  const changesRequested = status === 'changes_requested'
   const explicitlyApproved = status === 'approved'
   // Either the operator pressed Approve, or the pipeline has already
   // advanced past quote, in both cases the proposal is effectively
@@ -1013,6 +1022,43 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
   const isApproved = explicitlyApproved || (pastQuote && status !== 'rejected')
   const canApprove = !isApproved && baseCount > 0 && !busy
   const approvedAt = contact?.updated_at && explicitlyApproved ? contact.updated_at : null
+
+  if (changesRequested) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        padding: '12px 16px',
+        borderRadius: 10,
+        background: 'rgba(192, 57, 43, 0.10)',
+        border: '1px solid rgba(192, 57, 43, 0.40)'
+      }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>
+          <PenLine size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
+          Customer requested changes
+        </span>
+        <p style={{
+          margin: 0,
+          fontFamily: 'var(--font-body)',
+          fontSize: 14,
+          lineHeight: 1.5,
+          color: 'var(--v3-text)'
+        }}>
+          {contact.quote_change_request_note || 'Review the customer feedback before sending a revised quote.'}
+        </p>
+        <p style={{
+          margin: 0,
+          fontFamily: 'var(--font-body)',
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: 'var(--v3-text-muted)'
+        }}>
+          Update the quote, then use Send or Share link. Approval stays paused until the revision is sent.
+        </p>
+      </div>
+    )
+  }
 
   if (isApproved) {
     const implicit = !explicitlyApproved && pastQuote
@@ -1273,6 +1319,11 @@ function deriveStatus(contact: any, pastQuote = false) {
   if (raw === 'draft') { tone = 'muted' }
   else if (raw === 'sent') { tone = 'gold'; sub = relativeAgo(sentIso, 'Sent') }
   else if (raw === 'viewed') { tone = 'gold'; sub = relativeAgo(sentIso, 'Sent') }
+  else if (raw === 'changes_requested') {
+    label = 'Changes requested'
+    tone = 'danger'
+    sub = relativeAgo(contact?.quote_change_requested_at, 'Requested')
+  }
   else if (raw === 'approved') { tone = 'good'; sub = relativeAgo(sentIso, 'Sent') }
   else if (raw === 'rejected') { tone = 'danger' }
 
@@ -1293,11 +1344,11 @@ function deriveStatus(contact: any, pastQuote = false) {
   // passes is still approved (the customer already committed); flipping
   // it to "Expired · danger" made closed-won jobs look like they fell
   // through (audit FH-QA-009).
-  if (isExpired && raw !== 'approved' && raw !== 'rejected') {
+  if (isExpired && raw !== 'approved' && raw !== 'rejected' && raw !== 'changes_requested') {
     label = 'Expired'
     tone = 'danger'
     sub = expIso ? `Was due ${shortDate(expIso)}` : null
-  } else if (expIso && raw !== 'approved' && raw !== 'rejected') {
+  } else if (expIso && raw !== 'approved' && raw !== 'rejected' && raw !== 'changes_requested') {
     sub = sub ? `${sub} · Expires ${shortDate(expIso)}` : `Expires ${shortDate(expIso)}`
   }
 
