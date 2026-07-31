@@ -135,8 +135,8 @@ describe('buildHomeDashboardBundle', () => {
         name: 'Kitchen client',
         amount: 18000,
         stage: 'quote',
-        created_at: '2026-06-10T12:00:00.000Z',
-        updated_at: '2026-06-18T10:00:00.000Z',
+        created_at: '2026-05-10T12:00:00.000Z',
+        updated_at: '2026-06-01T10:00:00.000Z',
         completed_at: null,
         follow_up_on: null,
         proposal_status: 'changes_requested',
@@ -155,6 +155,32 @@ describe('buildHomeDashboardBundle', () => {
       intent: 'review_quote_changes',
     })
     expect(bundle.dealsAtRisk.quotesAttention).toBe(1)
+    expect(bundle.nextActions.filter((row) => row.contactId === 'quote-change-1')).toHaveLength(1)
+  })
+
+  it('uses one explicit reminder action instead of duplicating a stale quote', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      contacts: [{
+        id: 'quote-follow-up-1',
+        name: 'Patio client',
+        amount: 12000,
+        stage: 'quote',
+        created_at: '2026-05-01T12:00:00.000Z',
+        updated_at: '2026-06-01T12:00:00.000Z',
+        completed_at: null,
+        follow_up_on: '2026-06-18',
+        proposal_status: 'sent',
+      }],
+    }))
+
+    const actions = bundle.nextActions.filter((row) => row.contactId === 'quote-follow-up-1')
+    expect(actions).toHaveLength(1)
+    expect(actions[0]).toMatchObject({
+      kind: 'followup-due',
+      title: 'Call Patio client',
+      detail: 'Follow up due today',
+      intent: 'quote_followup',
+    })
   })
 
   it('does not chase invoices on jobs already paid in full, whenever they were paid', () => {

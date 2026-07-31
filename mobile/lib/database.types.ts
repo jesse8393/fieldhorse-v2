@@ -195,6 +195,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           exclusions_text: string | null
+          follow_up_on: string | null
           has_inspections: boolean | null
           heat_score: number | null
           id: string
@@ -229,6 +230,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           exclusions_text?: string | null
+          follow_up_on?: string | null
           has_inspections?: boolean | null
           heat_score?: number | null
           id?: string
@@ -263,6 +265,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           exclusions_text?: string | null
+          follow_up_on?: string | null
           has_inspections?: boolean | null
           heat_score?: number | null
           id?: string

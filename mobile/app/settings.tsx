@@ -3,15 +3,20 @@
 // trades, brand accent, service area, session) that brands quotes/invoices
 // and powers the Home weather pill + Pour Window. Saves via useUpdateProfile.
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, TextInput, ActivityIndicator, Pressable, Alert, Linking } from 'react-native'
+import { View, Text, ScrollView, TextInput, ActivityIndicator, Pressable, Alert, Linking, Switch } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as Location from 'expo-location'
-import { MapPin, LogOut, Trash2 } from 'lucide-react-native'
+import { MapPin, LogOut, Trash2, CalendarClock } from 'lucide-react-native'
 import { useProfile, useUpdateProfile, useSaveLocation, useDeleteAccount } from '../lib/queries'
 import { reverseGeocode } from '../lib/weather'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, ScreenHeader, GoldButton, theme } from '../components/ui'
+import {
+  mergeQuoteFollowUpPreferences,
+  QUOTE_FOLLOW_UP_DAY_OPTIONS,
+  readQuoteFollowUpPreferences,
+} from '../lib/quoteFollowUp'
 
 const TRADES = [
   { key: 'concrete', label: 'Concrete' }, { key: 'framing', label: 'Framing' },
@@ -75,6 +80,8 @@ export default function SettingsScreen() {
   const [services, setServices] = useState<string[]>([])
   const [accent, setAccent] = useState<string>(ACCENTS[0])
   const [template, setTemplate] = useState<string>('classic')
+  const [quoteFollowUpEnabled, setQuoteFollowUpEnabled] = useState(true)
+  const [quoteFollowUpDays, setQuoteFollowUpDays] = useState(3)
   const [cityName, setCityName] = useState<string | null>(null)
   const [pinning, setPinning] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -94,6 +101,9 @@ export default function SettingsScreen() {
     setServices((profile.services as string[]) || [])
     setAccent(profile.brand_accent_hex || ACCENTS[0])
     setTemplate((profile as any).estimate_template || 'classic')
+    const quoteFollowUp = readQuoteFollowUpPreferences(profile.preferences)
+    setQuoteFollowUpEnabled(quoteFollowUp.enabled)
+    setQuoteFollowUpDays(quoteFollowUp.days)
   }, [profile])
 
   useEffect(() => {
@@ -139,10 +149,19 @@ export default function SettingsScreen() {
       warrantyDefault: warranty.trim() || null,
       services,
       brandAccentHex: accent,
-      estimateTemplate: template
+      estimateTemplate: template,
+      preferences: mergeQuoteFollowUpPreferences(profile?.preferences, {
+        enabled: quoteFollowUpEnabled,
+        days: quoteFollowUpDays,
+      }) as any,
     })
     setSaving(false)
-    if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+    if (error) {
+      Alert.alert("Couldn't save settings", error.message || 'Try again in a moment.')
+      return
+    }
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
   function confirmSignOut() {
@@ -237,6 +256,58 @@ export default function SettingsScreen() {
                 )
               })}
             </View>
+
+            <SectionTitle>Quote follow ups</SectionTitle>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+              padding: 16, borderRadius: 10,
+              backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.borderMid
+            }}>
+              <View style={{
+                width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: quoteFollowUpEnabled ? `${theme.goldBright}1f` : theme.bg,
+                borderWidth: 1, borderColor: quoteFollowUpEnabled ? theme.borderGold : theme.borderMid
+              }}>
+                <CalendarClock color={quoteFollowUpEnabled ? theme.goldBright : theme.inkMuted} size={18} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }}>Set reminder when quote is sent</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>
+                  {quoteFollowUpEnabled ? `${quoteFollowUpDays} ${quoteFollowUpDays === 1 ? 'day' : 'days'} after sending` : 'Off'}
+                </Text>
+              </View>
+              <Switch
+                value={quoteFollowUpEnabled}
+                onValueChange={setQuoteFollowUpEnabled}
+                trackColor={{ false: theme.borderMid, true: theme.gold }}
+                thumbColor={quoteFollowUpEnabled ? theme.onGold : theme.inkMuted}
+                accessibilityLabel="Set a reminder when a quote is sent"
+              />
+            </View>
+            {quoteFollowUpEnabled ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                {QUOTE_FOLLOW_UP_DAY_OPTIONS.map((days) => {
+                  const on = quoteFollowUpDays === days
+                  return (
+                    <Pressable
+                      key={days}
+                      onPress={() => setQuoteFollowUpDays(days)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      style={{
+                        minWidth: 56, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10,
+                        alignItems: 'center', backgroundColor: on ? `${theme.goldBright}26` : theme.surface,
+                        borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid
+                      }}
+                    >
+                      <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }}>
+                        {days}d
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            ) : null}
 
             <SectionTitle>What you do</SectionTitle>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

@@ -48,6 +48,7 @@ test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
 
   await openRoute(page, '/quotes/c-quote?tab=quote')
   await expect(page.getByRole('button', { name: /approve quote/i })).toBeVisible()
+  await expect(page.getByText(/follow up [a-z]{3} \d{1,2}/i).first()).toBeVisible()
   await capture(page, testInfo, 'quote')
 
   await openRoute(page, '/jobs/c-job1')
@@ -90,7 +91,12 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
 
   await openRoute(page, '/settings')
   await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible()
+  const quoteReminderSetting = page.getByText('Set reminder when quote is sent', { exact: true })
+  await expect(quoteReminderSetting).toBeVisible()
+  await expect(page.getByLabel('Quote reminder delay')).toHaveValue('3')
   await capture(page, testInfo, 'settings')
+  await quoteReminderSetting.scrollIntoViewIfNeeded()
+  await capture(page, testInfo, 'settings-quote-follow-up')
 
   await openRoute(page, '/this-route-does-not-exist')
   await expect(page.getByText(/page not found/i)).toBeVisible()
