@@ -2466,6 +2466,7 @@ a {
     grid-template-columns: minmax(360px, 1fr) minmax(0, 1.2fr);
     column-gap: 24px;
     align-items: start;
+    align-content: start;
     padding: 4px 0 32px;
   }
   /* First child = input cockpit motion.div (entire block). Second
@@ -7804,6 +7805,45 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
   .fh-build-utility > * + * { margin-top: 0; }
 
+  /* Bid is a working estimate desk on desktop: scope controls stay in
+     the main pane while the generated estimate occupies a persistent
+     review pane. Mobile keeps the original single-column flow. */
+  .fh-app--layout-responsive .v3-screen.fh-bid-workspace {
+    width: 100%;
+    max-width: none !important;
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(420px, .85fr);
+    grid-template-areas:
+      "topbar topbar"
+      "header header"
+      "templates templates"
+      "scope result";
+    column-gap: 16px;
+    align-items: start;
+    align-content: start;
+  }
+
+  .fh-bid-workspace > .fh-build-topbar { grid-area: topbar; }
+  .fh-bid-workspace__header {
+    grid-area: header;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .fh-bid-workspace__templates {
+    grid-area: templates;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .fh-bid-workspace__scope {
+    grid-area: scope;
+    margin: 0 !important;
+  }
+  .fh-bid-workspace__result {
+    grid-area: result;
+    margin: 0 !important;
+  }
+
   /* Section cards — adopt the Build card look (gradient surface,
      thin white border, soft shadow, 9px radius) without touching
      the actual <Section> JSX. */
@@ -7857,6 +7897,19 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
      stacking with empty space on the right. */
   .v3-screen--compose.fh-build-utility .v3-section + .v3-section {
     margin-top: 18px !important;
+  }
+
+  @media (max-width: 1199px) {
+    .fh-app--layout-responsive .v3-screen.fh-bid-workspace {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "topbar"
+        "header"
+        "templates"
+        "scope"
+        "result";
+      row-gap: 16px;
+    }
   }
 
   /* ─── Job-detail Quote builder ───
