@@ -233,6 +233,86 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
   expectNoPageErrors()
 })
 
+test('keeps estimating and dispatch desktop-native while preserving their mobile forms', async ({ page }, testInfo) => {
+  const expectNoPageErrors = failOnPageErrors(page)
+  const desktop = testInfo.project.name.startsWith('desktop')
+
+  if (!desktop) {
+    for (const route of [
+      { path: '/bid', ready: '.fh-bid-workspace__scope' },
+      { path: '/compose', ready: '.fh-compose-workspace__input' },
+    ]) {
+      const path = route.path
+      await openRoute(page, path)
+      await expect(page.locator(route.ready)).toBeVisible()
+      await expect(page.locator('[data-build-screen]')).toHaveCount(0)
+      const geometry = await page.evaluate(() => ({
+        viewportWidth: window.innerWidth,
+        pageWidth: document.documentElement.scrollWidth,
+        rootWidth: document.querySelector('.fh-app__main-inner')?.firstElementChild?.getBoundingClientRect().width || 0,
+      }))
+      expect(geometry.rootWidth).toBeLessThanOrEqual(geometry.viewportWidth)
+      expect(geometry.pageWidth).toBeLessThanOrEqual(geometry.viewportWidth + 1)
+      await page.waitForTimeout(500)
+      await capture(page, testInfo, `mobile-${path.slice(1)}`, true)
+    }
+    expectNoPageErrors()
+    return
+  }
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+
+  await openRoute(page, '/bid')
+  await expect(page.locator('.fh-bid-workspace')).toBeVisible()
+  const bidWide = await page.evaluate(() => {
+    const root = document.querySelector('.fh-bid-workspace')?.getBoundingClientRect()
+    const scope = document.querySelector('.fh-bid-workspace__scope')?.getBoundingClientRect()
+    const result = document.querySelector('.fh-bid-workspace__result')?.getBoundingClientRect()
+    return {
+      rootWidth: root?.width || 0,
+      sideBySide: Boolean(scope && result && result.left >= scope.right),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }
+  })
+  expect(bidWide.rootWidth).toBeGreaterThan(1000)
+  expect(bidWide.sideBySide).toBe(true)
+  expect(bidWide.overflow).toBeLessThanOrEqual(1)
+  await capture(page, testInfo, 'desktop-bid-workspace', true)
+
+  await openRoute(page, '/compose')
+  await expect(page.locator('[data-build-screen="Compose"]')).toBeVisible()
+  const composeWide = await page.evaluate(() => {
+    const input = document.querySelector('.fh-compose-workspace__input')?.getBoundingClientRect()
+    const output = document.querySelector('.fh-compose-workspace__output')?.getBoundingClientRect()
+    return {
+      inputTop: input?.top || Number.POSITIVE_INFINITY,
+      sideBySide: Boolean(input && output && output.left >= input.right),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }
+  })
+  expect(composeWide.inputTop).toBeLessThan(260)
+  expect(composeWide.sideBySide).toBe(true)
+  expect(composeWide.overflow).toBeLessThanOrEqual(1)
+  await capture(page, testInfo, 'desktop-compose-workspace', true)
+
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await openRoute(page, '/bid')
+  await expect(page.locator('.fh-bid-workspace__scope')).toBeVisible()
+  await expect(page.locator('.fh-bid-workspace__result')).toBeVisible()
+  const bidCompact = await page.evaluate(() => {
+    const scope = document.querySelector('.fh-bid-workspace__scope')?.getBoundingClientRect()
+    const result = document.querySelector('.fh-bid-workspace__result')?.getBoundingClientRect()
+    return {
+      stacked: Boolean(scope && result && result.top >= scope.bottom),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }
+  })
+  expect(bidCompact.stacked).toBe(true)
+  expect(bidCompact.overflow).toBeLessThanOrEqual(1)
+
+  expectNoPageErrors()
+})
+
 test('keeps customer quote change requests in the workflow', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
   let submitted: any = null

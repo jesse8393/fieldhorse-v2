@@ -207,7 +207,7 @@ export default function Compose() {
       )}
       {/* INPUT COCKPIT, black-glass panel: header eyebrow + channel pills
           + intent + contact + context chips + CTA */}
-      <motion.div variants={item} style={{ padding: '8px 24px 12px' }}>
+      <motion.div className="fh-compose-workspace__input" variants={item} style={{ padding: '8px 24px 12px' }}>
         <div style={{
           padding: '12px 16px',
           borderRadius: 10,
@@ -421,6 +421,7 @@ export default function Compose() {
       {draft ? (
           <motion.div
             key="draft"
+            className="fh-compose-workspace__output"
             variants={item}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -641,6 +642,7 @@ export default function Compose() {
           /* Empty state, quiet hint, not a chrome panel */
           <motion.div
             key="empty"
+            className="fh-compose-workspace__output"
             variants={item}
             style={{ padding: '4px 24px 24px' }}
           >

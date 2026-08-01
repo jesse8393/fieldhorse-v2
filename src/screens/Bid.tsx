@@ -315,7 +315,7 @@ export default function Bid() {
 
   return (
     <motion.div
-      className={`v3-screen${isDesktop ? ' fh-build-utility' : ''}`}
+      className={`v3-screen${isDesktop ? ' fh-build-utility fh-bid-workspace' : ''}`}
       data-build-screen={isDesktop ? 'Bid' : undefined}
       variants={stagger}
       initial="hidden"
@@ -329,6 +329,7 @@ export default function Bid() {
           uses the same Bebas Neue display style as Jobs/Clients/
           Schedule so /bid matches the rest of the command center. */}
       <motion.div
+        className="fh-bid-workspace__header"
         variants={item}
         style={{
           padding: '12px var(--v3-gutter) 12px',
@@ -378,6 +379,7 @@ export default function Bid() {
           renders when at least one template exists. */}
       {templates.length > 0 && (
         <motion.div
+          className="fh-bid-workspace__templates"
           variants={item}
           style={{ padding: '0 var(--v3-gutter) 12px' }}
         >
@@ -498,7 +500,7 @@ export default function Bid() {
       {/* SCOPE INPUT CARD, primary workspace */}
       <motion.div
         variants={item}
-        className="v3-section"
+        className="v3-section fh-bid-workspace__scope"
         style={{ margin: '0 var(--v3-gutter) 14px' }}
       >
         <SectionHeader label="Scope" />
@@ -701,7 +703,7 @@ export default function Bid() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
-            className="v3-section v3-section--primary"
+            className="v3-section v3-section--primary fh-bid-workspace__result"
             style={{ margin: '0 var(--v3-gutter) 28px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
@@ -915,7 +917,7 @@ export default function Bid() {
           <motion.div
             key="empty"
             variants={item}
-            className="v3-section"
+            className="v3-section fh-bid-workspace__result"
             style={{ margin: '0 var(--v3-gutter) 28px' }}
           >
             <div style={{
