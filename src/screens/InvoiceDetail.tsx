@@ -436,7 +436,7 @@ export default function InvoiceDetail() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px 24px' }}>
+      <div className="fh-invoice-detail-state" style={{ padding: '24px 24px' }}>
         <div className="v3-skeleton" style={{ height: 28, width: 200, borderRadius: 10, marginBottom: 12 }} />
         <div className="v3-skeleton" style={{ height: 120, width: '100%', borderRadius: 10, marginBottom: 12 }} />
         <div className="v3-skeleton" style={{ height: 80, width: '100%', borderRadius: 10 }} />
@@ -446,7 +446,7 @@ export default function InvoiceDetail() {
 
   if (error) {
     return (
-      <div style={{ padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="fh-invoice-detail-state" style={{ padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <button
           type="button"
           onClick={() => { hapticTap(); navigate('/invoices') }}
@@ -476,7 +476,7 @@ export default function InvoiceDetail() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen v3-screen--invoice-detail"
       variants={stagger}
       initial="hidden"
       animate="show"
@@ -487,7 +487,7 @@ export default function InvoiceDetail() {
       {/* HEADER STRIP, Back chevron + title eyebrow.
           Premium black-glass; no fog backdrop on the strip itself so
           the screen feels solid, not overlaid. */}
-      <motion.div variants={item} style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <motion.div className="fh-invoice-detail__header" variants={item} style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
           type="button"
           onClick={() => { hapticTap(); navigate('/invoices') }}
@@ -539,7 +539,7 @@ export default function InvoiceDetail() {
       {/* ─── Existing list-style detail surface (preserved verbatim) ─── */}
 
       {/* HERO CARD, status pill + total + balance + paid progress */}
-      <motion.div variants={item} style={{ padding: '4px 16px 12px' }}>
+      <motion.div className="fh-invoice-detail__hero" variants={item} style={{ padding: '4px 16px 12px' }}>
         <div style={{
           padding: '16px 16px',
           borderRadius: 10,
@@ -634,7 +634,7 @@ export default function InvoiceDetail() {
       {/* SERVICE SUMMARY, derived single line, mirrors what the PDF
           synthesizes today. Real line item CRUD lives on the Quote tab
           (Job Detail) since that's where the data model is. */}
-      <motion.div variants={item} style={{ padding: '0 16px 12px' }}>
+      <motion.div className="fh-invoice-detail__service" variants={item} style={{ padding: '0 16px 12px' }}>
         <SectionTitle>Service</SectionTitle>
         <div style={{
           marginTop: 8,
@@ -684,7 +684,7 @@ export default function InvoiceDetail() {
       </motion.div>
 
       {/* PAYMENT HISTORY */}
-      <motion.div variants={item} style={{ padding: '0 16px 12px' }}>
+      <motion.div className="fh-invoice-detail__payments" variants={item} style={{ padding: '0 16px 12px' }}>
         <SectionTitle>Payments</SectionTitle>
         <div style={{ marginTop: 8 }}>
           {payments.length === 0 ? (
@@ -749,7 +749,7 @@ export default function InvoiceDetail() {
       </motion.div>
 
       {/* JOB LINK */}
-      <motion.div variants={item} style={{ padding: '0 16px 24px' }}>
+      <motion.div className="fh-invoice-detail__job" variants={item} style={{ padding: '0 16px 24px' }}>
         <button
           type="button"
           onClick={() => { hapticTap(); navigate(`/jobs/${contact.id}`) }}
@@ -956,6 +956,7 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
 
   return (
     <motion.div
+      className="fh-invoice-document-pane"
       variants={item}
       style={{
         // Cream backdrop so the white letter-paper reads as a real

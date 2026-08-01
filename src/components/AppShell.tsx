@@ -16,6 +16,7 @@ import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOutboxSync } from '../lib/outbox.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import { layoutForPath } from '../lib/appLayout.ts'
 
 // Route-loading skeleton, matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader + BottomNav stay mounted around it.
@@ -60,71 +61,6 @@ function RouteFallback() {
  * just render their mobile-first markup and the shell decides how much
  * canvas they get.
  */
-function layoutForPath(pathname: any) {
-  // Responsive Desktop Command Center.
-  //   Phase 1: Home (`/`), multi-column dashboard canvas.
-  //   Phase 2: Jobs (`/jobs`) + Clients (`/clients`), desktop command
-  //            header + wide card grid.
-  //   Phase 2.5 / 3: All remaining tool routes get the responsive
-  //            workspace canvas at >=900px so they stop rendering as a
-  //            440px phone column inside a giant desktop shell. Each
-  //            screen author can layer dedicated desktop CSS on top of
-  //            their `v3-screen` markup as time permits, until then the
-  //            wider canvas + sensible gutters is the floor we ship.
-  //   Phase 3 (still pending): Job Detail multi-column dashboard.
-  //
-  // Detail routes (`/jobs/:id`, `/clients/:id`) intentionally stay on
-  // mobile-frame because their internal layouts (tab strips, full-bleed
-  // photo grids) are still mobile-tuned; promoting them would stretch
-  // those internals weirdly. Will be lifted once Phase 3 designs land.
-  //
-  // Below 900px the layout collapses to the mobile frame automatically
-  // (the responsive max-width media queries only activate at >=900px),
-  // so phones are unaffected by every promotion below.
-  if (pathname === '/') return 'responsive'
-  if (pathname === '/work') return 'responsive'
-  if (pathname === '/leads') return 'responsive'
-  if (pathname === '/quotes') return 'responsive'
-  if (pathname === '/pipeline') return 'responsive'
-  if (pathname === '/jobs') return 'responsive'
-  if (pathname === '/clients') return 'responsive'
-  if (pathname === '/schedule') return 'responsive'
-  if (pathname === '/compose') return 'responsive'
-  if (pathname === '/bid') return 'responsive'
-  if (pathname === '/invoices') return 'responsive'
-  if (pathname === '/analytics') return 'responsive'
-  if (pathname === '/subs') return 'responsive'
-  if (pathname === '/settings') return 'responsive'
-  if (pathname === '/import') return 'responsive'
-  if (pathname === '/pour-window') return 'responsive'
-  if (pathname === '/notes') return 'responsive'
-  if (pathname === '/activity') return 'responsive'
-  // V3-CMD-CENTER-FIX (audit Jun 2026): Crew Home / Tasks / Team /
-  // Timesheets were falling through to mobile-frame and rendering as
-  // a 440px column floating in the desktop viewport. They use the same
-  // Snow*Build chrome as Jobs/Clients/etc and need the wide canvas.
-  if (pathname === '/crew') return 'responsive'
-  if (pathname === '/tasks') return 'responsive'
-  if (pathname === '/team') return 'responsive'
-  if (pathname === '/timesheets') return 'responsive'
-  // Phase 4: Job Detail (`/jobs/:id`) is the host of the Estimate
-  // workspace (Quote tab) and gets the responsive canvas. Non-quote
-  // tabs (Overview / Details / Financials / Files) inherit the wider
-  // canvas but keep their existing per-section padding so they render
-  // as wide rows rather than a 440px column floating in space. Quote
-  // tab itself flips to a true 2-pane workspace via scoped CSS keyed
-  // off the .v3-screen--quote-active modifier set in ContactDetail.
-  if (pathname.startsWith('/leads/')) return 'responsive'
-  if (pathname.startsWith('/quotes/')) return 'responsive'
-  if (pathname.startsWith('/jobs/')) return 'responsive'
-  // Client Detail renders the full-width SnowClientDetailBuild on desktop :
-  // it needs the wide canvas too, or it renders crammed inside the 440px
-  // mobile-frame cap (the worst of both). Give it the responsive canvas
-  // like every other detail route.
-  if (pathname.startsWith('/clients/')) return 'responsive'
-  return 'mobile-frame'
-}
-
 function permissionRouteForPath(pathname: string) {
   if (pathname.startsWith('/leads/')) return '/leads'
   if (pathname.startsWith('/quotes/')) return '/quotes'

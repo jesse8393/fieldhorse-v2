@@ -26,6 +26,8 @@ import { useFhMotion } from '../lib/motion.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import SnowActivityBuild from '../components/desktop/SnowActivityBuild.tsx'
 
 const PAGE_SIZE = 60
 
@@ -70,6 +72,7 @@ function timeAt(d: any) {
 
 export default function Activity() {
   const { user } = useAuth()
+  const isDesktop = useIsDesktop()
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
   const { data: bundle, isError, refetch, isFetching } = useActivityFeed(user?.id, pageSize)
   const { stagger, item } = useFhMotion()
@@ -117,7 +120,8 @@ export default function Activity() {
           icon: DollarSign,
           tone: 'green',
           title: `${money(p.amount)} received${kindStr}`,
-          sub: p.method ? capitalize(p.method) : null
+          sub: p.method ? capitalize(p.method) : null,
+          amount: Number(p.amount || 0)
         })
       }
 
@@ -135,7 +139,8 @@ export default function Activity() {
           title: isApproved
             ? `CO #${co.sequence_number} approved, ${co.title || ''}`
             : `CO #${co.sequence_number} added, ${co.title || ''}`,
-          sub: `${co.amount >= 0 ? '+' : ''}${money(co.amount)}`
+          sub: `${co.amount >= 0 ? '+' : ''}${money(co.amount)}`,
+          amount: Number(co.amount || 0)
         })
       }
 
@@ -150,7 +155,8 @@ export default function Activity() {
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',
           title: `Draw #${inv.sequence_number} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `, ${inv.title}` : ''}`,
-          sub: money(inv.amount)
+          sub: money(inv.amount),
+          amount: Number(inv.amount || 0)
         })
       }
 
@@ -178,13 +184,24 @@ export default function Activity() {
   // skeleton that looks like a hang. Show an honest error + retry instead.
   if (isError) {
     return (
-      <div className="v3-screen" style={{ padding: '24px 24px' }}>
+      <div className={isDesktop ? 'fh-build-page fh-activity-build' : 'v3-screen'} style={isDesktop ? undefined : { padding: '24px 24px' }}>
         <DataErrorState
           title="Couldn't load activity"
           message="We couldn't reach your activity feed. Check your connection and retry."
           onRetry={() => refetch()}
         />
       </div>
+    )
+  }
+
+  if (isDesktop) {
+    return (
+      <SnowActivityBuild
+        events={events as any}
+        hasMore={Boolean(bundle?.hasMore && pageSize < 480)}
+        isFetching={isFetching}
+        onLoadOlder={() => setPageSize((size) => Math.min(size + PAGE_SIZE, 480))}
+      />
     )
   }
 

@@ -28,6 +28,8 @@ import { authHeaders } from '../lib/supabase.ts'
 import { usePartnerDirectory, useInvalidatePartners } from '../lib/queries.ts'
 import { revokePartnerRow } from '../lib/partners.ts'
 import { stageColor } from '../lib/stages.ts'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import SnowPartnersBuild from '../components/desktop/SnowPartnersBuild.tsx'
 
 const STATUS_FILTERS = [
   { id: 'all',      label: 'All',      match: () => true },
@@ -50,6 +52,7 @@ function relTime(input: any) {
 
 export default function Partners() {
   const { user } = useAuth()
+  const isDesktop = useIsDesktop()
   const confirm = useConfirm()
   const { data: rows = [], isLoading: loading } = usePartnerDirectory(user?.id)
   const load = useInvalidatePartners()
@@ -140,6 +143,22 @@ export default function Partners() {
     } finally {
       setBusyKey(null)
     }
+  }
+
+  if (isDesktop) {
+    return (
+      <SnowPartnersBuild
+        rows={rows}
+        filtered={filtered}
+        loading={loading}
+        filter={filter}
+        setFilter={setFilter}
+        counts={counts}
+        busyKey={busyKey}
+        onResend={resend}
+        onRevoke={revoke}
+      />
+    )
   }
 
   return (

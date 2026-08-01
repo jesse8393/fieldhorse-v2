@@ -12,6 +12,9 @@ import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
+import MiniMetric from '../components/MiniMetric.tsx'
 
 // Importable target fields, in display order. Used by the mapping
 // review UI + the AI mapper prompt.
@@ -71,6 +74,7 @@ function pick(row: any, header: any) {
 }
 
 export default function Importer() {
+  const isDesktop = useIsDesktop()
   const { user } = useAuth()
   const [preset, setPreset] = useState('jobber')
   const [rows, setRows] = useState<any[]>([])
@@ -240,11 +244,31 @@ export default function Importer() {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
   const { stagger, item } = useFhMotion()
+  const mappedFieldCount = TARGET_FIELDS.filter((field) => headerMap[field.key]).length
 
   return (
-    <motion.div className="fh-screen fh-readable-desktop" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative' }}>
+    <motion.div
+      className={isDesktop ? 'fh-build-page fh-importer-build' : 'fh-screen'}
+      data-build-screen={isDesktop ? 'Importer' : undefined}
+      data-build-route={isDesktop ? '/import' : undefined}
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      style={{ paddingBottom: 48, position: 'relative' }}
+    >
+      {isDesktop && (
+        <BuildTopbar
+          searchPlaceholder="Search jobs, clients, invoices, notes..."
+          meta={[
+            rows.length ? `${rows.length} ${countNoun(rows.length, 'row')} loaded` : 'No file loaded',
+            `${mappedFieldCount} of ${TARGET_FIELDS.length} fields mapped`,
+          ]}
+        />
+      )}
+
+      <main className={isDesktop ? 'fh-importer-build__main' : undefined}>
       {/* HEADER */}
-      <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '24px 24px 12px' }}>
+      {!isDesktop && <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '24px 24px 12px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <Eyebrow>
             Import
@@ -260,10 +284,34 @@ export default function Importer() {
         >
           <FileSpreadsheet size={20} />
         </div>
-      </motion.div>
+      </motion.div>}
+
+      {isDesktop && (
+        <motion.section variants={item} className="fh-build-hero-row fh-build-hero-row--page fh-importer-build__hero">
+          <div>
+            <div className="fh-build-good">Office</div>
+            <h1 className="fh-build-title">IMPORT DATA.</h1>
+          </div>
+          <div className="fh-build-focus">
+            <div className="fh-build-eyebrow">Import readiness</div>
+            <p>
+              {rows.length
+                ? `${mapped.length} ${countNoun(mapped.length, 'record')} ready for review.`
+                : `Choose a ${PRESETS[preset].label} export or a generic CSV.`}
+            </p>
+            <span className="fh-importer-build__focus-meta">Destination · Leads pipeline</span>
+          </div>
+          <div className="fh-build-mini-grid">
+            <MiniMetric label="Rows loaded" value={String(rows.length)} accent={rows.length > 0} />
+            <MiniMetric label="Mapped fields" value={`${mappedFieldCount}/${TARGET_FIELDS.length}`} />
+            <MiniMetric label="Ready records" value={String(mapped.length)} />
+            <MiniMetric label="Source" value={PRESETS[preset].label} />
+          </div>
+        </motion.section>
+      )}
 
       {/* CSV UPLOAD SECTION */}
-      <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
+      <motion.section variants={item} className="v3-section fh-importer-build__upload" style={{ margin: '0 var(--v3-gutter) 14px' }}>
         <header style={{ marginBottom: 10 }}>
           <Eyebrow style={{ color: 'var(--ink-muted)' }}>
             CSV upload
@@ -488,8 +536,8 @@ export default function Importer() {
           Collapsed by default. Copy stays in business language; the
           example payload is labelled "Example lead details" so it
           reads as guidance, not a JSON spec. */}
-      <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
-        <details style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
+      <motion.section variants={item} className="v3-section fh-importer-build__intake" style={{ margin: '0 var(--v3-gutter) 14px' }}>
+        <details open={isDesktop ? true : undefined} style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
           <summary
             style={{
               display: 'flex',
@@ -599,6 +647,7 @@ export default function Importer() {
           </div>
         </details>
       </motion.section>
+      </main>
     </motion.div>
   )
 }
