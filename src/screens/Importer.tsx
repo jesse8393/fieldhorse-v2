@@ -15,6 +15,7 @@ import { countNoun } from '../lib/format.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import MiniMetric from '../components/MiniMetric.tsx'
+import { Button } from '../ui/index.ts'
 
 // Importable target fields, in display order. Used by the mapping
 // review UI + the AI mapper prompt.
@@ -370,7 +371,7 @@ export default function Importer() {
           <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)' }}>
             {rows.length
               ? `${rows.length} ${countNoun(rows.length, 'row')} loaded, ${mapped.length} ${countNoun(mapped.length, 'field')} mapped`
-              : 'Drop CSV or tap to pick'}
+              : isDesktop ? 'Drop CSV or choose a file' : 'Choose a CSV file'}
           </span>
           {!rows.length && (
             <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
@@ -587,39 +588,24 @@ export default function Importer() {
                 </button>
               </div>
             ) : (
-              <motion.button
+              <Button
                 type="button"
-                whileTap={{ scale: 0.97 }}
                 onClick={ensureWebhookKey}
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-                  color: 'var(--onyx)',
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 14,
-                  letterSpacing: 0,
-                  cursor: 'pointer',
-                  boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8
-                }}
+                size="md"
+                leftIcon={Zap}
               >
-                <Zap size={14} />
                 Generate intake link
-              </motion.button>
+              </Button>
             )}
 
-            <Eyebrow as="p" style={{ margin: '14px 0 6px', color: 'var(--ink-muted)' }}>
+            <Eyebrow as="p" style={{ display: 'flex', margin: '16px 0 8px', color: 'var(--ink-muted)' }}>
               What to send
             </Eyebrow>
             <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
               <strong style={{ color: 'var(--ink-strong)' }}>Required:</strong> name. <strong style={{ color: 'var(--ink-strong)' }}>Optional:</strong> phone, email, address, job title, amount, notes.
             </p>
 
-            <Eyebrow as="p" style={{ margin: '0 0 6px', color: 'var(--ink-muted)' }}>
+            <Eyebrow as="p" style={{ display: 'flex', margin: '0 0 8px', color: 'var(--ink-muted)' }}>
               Example lead details
             </Eyebrow>
             <pre

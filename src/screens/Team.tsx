@@ -117,8 +117,8 @@ export default function Team() {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Team</div>
-            <h1 className="fh-build-title">FIELD ROSTER.</h1>
+            <div className="fh-build-good">Office</div>
+            <h1 className="fh-build-title">TEAM</h1>
           </div>
 
           <div className="fh-build-focus">

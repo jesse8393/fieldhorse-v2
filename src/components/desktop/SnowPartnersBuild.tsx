@@ -117,7 +117,7 @@ export default function SnowPartnersBuild({
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Office</div>
-            <h1 className="fh-build-title">PARTNERS.</h1>
+            <h1 className="fh-build-title">PARTNERS</h1>
           </div>
 
           <div className="fh-build-focus">

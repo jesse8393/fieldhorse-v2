@@ -562,7 +562,11 @@ export default function InvoiceDetail() {
                 color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
               }}>
                 <Clock size={11} aria-hidden="true" />
-                {totals.ageDays}d
+                {totals.ageDays < 0
+                  ? `in ${Math.abs(totals.ageDays)}d`
+                  : totals.ageDays === 0
+                    ? 'today'
+                    : `${totals.ageDays}d`}
               </span>
             )}
           </div>

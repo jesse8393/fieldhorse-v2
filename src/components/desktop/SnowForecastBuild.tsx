@@ -112,6 +112,15 @@ export default function SnowForecastBuild(props: Props) {
   const bestDay = daily.find((d) => dayWorkStatus(d).tone === 'good')
   const rainRiskDays = daily.filter((d) => (d.rainPct ?? 0) >= 50).length
   const noGoDays = daily.filter((d) => dayWorkStatus(d).tone === 'bad').length
+  const suggestedAction = noGoDays >= 3
+    ? 'Reschedule outdoor crews'
+    : windowTone === 'bad'
+      ? 'Hold and reassess'
+      : windowTone === 'warn'
+        ? 'Review before dispatch'
+        : noGoDays > 0
+          ? 'Review affected days'
+          : 'Keep crews on plan'
 
   return (
     <div className="fh-build-page" data-build-screen="SnowForecastBuild">
@@ -138,7 +147,7 @@ export default function SnowForecastBuild(props: Props) {
               <Sun size={16} className="fh-build-sun" />
             </>
           ) : (
-            <span>:</span>
+            <span>Weather unavailable</span>
           )}
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
@@ -150,8 +159,8 @@ export default function SnowForecastBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Forecast</div>
-            <h1 className="fh-build-title">PLAN THE WORK.</h1>
+            <div className="fh-build-good">Planning</div>
+            <h1 className="fh-build-title">FORECAST</h1>
           </div>
 
           <div className={`fh-build-focus fh-build-window-card is-${windowTone}`}>
@@ -282,7 +291,7 @@ export default function SnowForecastBuild(props: Props) {
               <span>{tMax != null && (tMax > 90 || tMax < 40) ? 'Outside comfort range' : 'In comfort range'}</span>
               <div className="fh-build-rail-card__spark">
                 <Thermometer size={14} />
-                <span>{tMax != null ? (tMax > 80 ? 'hot' : tMax < 50 ? 'cool' : 'mild') : '\u2003'}</span>
+                <span>{tMax != null ? (tMax > 90 ? 'Hot' : tMax < 50 ? 'Cold' : 'Comfortable') : '\u2003'}</span>
               </div>
             </section>
 
@@ -294,9 +303,7 @@ export default function SnowForecastBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Suggested action</div>
-              <strong>
-                {noGoDays >= 3 ? 'Reschedule outdoor crews' : windowTone === 'good' ? 'Push schedule forward' : 'Hold + reassess'}
-              </strong>
+              <strong>{suggestedAction}</strong>
               <span>
                 {noGoDays} of next 7 days marked unavailable
               </span>

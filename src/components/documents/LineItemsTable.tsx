@@ -108,7 +108,7 @@ export default function LineItemsTable({
                     <div key={i} style={{ marginTop: i === 0 ? 0 : 5, color: DOC_COLORS.inkMid }}>
                       {line}
                     </div>
-                  )) : <span style={{ color: DOC_COLORS.inkFaint }}>:</span>}
+                  )) : <span style={{ color: DOC_COLORS.inkFaint }}>{' '}</span>}
                 </Td>
                 <Td align="right" mono bold>{money(amount, { cents: true })}</Td>
               </tr>

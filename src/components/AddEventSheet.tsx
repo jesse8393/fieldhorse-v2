@@ -164,13 +164,11 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               className="fh-font-serif"
               style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
-              {editing ? 'Edit event.' : 'Add an event.'}
+              {editing ? 'Edit event' : 'Add event'}
             </h2>
           </DrawerTitle>
-          <DrawerDescription
-            style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
-          >
-            Drops a single event on the calendar, flip recurrence on to repeat for the next four cycles.
+          <DrawerDescription className="ui:sr-only">
+            Create or update a calendar event.
           </DrawerDescription>
         </DrawerHeader>
 

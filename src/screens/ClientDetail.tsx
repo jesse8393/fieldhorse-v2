@@ -1370,7 +1370,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                         <span>
                           {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
                         </span>
-                        <span style={{ color: balance > 0 ? 'var(--v3-danger-bright, #C9963A)' : 'var(--v3-success-bright, #2D7A4F)' }}>
+                        <span style={{ color: balance > 0 ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-success-bright, #2D7A4F)' }}>
                           {balance > 0 ? `${money(balance)} due` : 'Paid in full'}
                         </span>
                       </div>

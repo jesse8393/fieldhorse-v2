@@ -27,7 +27,7 @@ const routes = [
   { name: 'tasks', path: '/tasks', ready: '[data-build-screen="Tasks"]' },
   { name: 'sub-portal', path: '/sub-portal', ready: '[data-build-screen="SubPortal"]' },
   { name: 'invoices', path: '/invoices', ready: '[data-build-screen="SnowInvoicesBuild"]' },
-  { name: 'invoice-detail', path: '/invoices/c-job2', ready: '.v3-screen--invoice-detail' },
+  { name: 'invoice-detail', path: '/invoices/c-job2', ready: '.fh-invoice-detail__hero' },
 ] as const
 
 async function installSession(context: BrowserContext) {
@@ -54,6 +54,7 @@ test.beforeEach(async ({ context }) => {
 test('audits every authenticated workspace at the reported desktop size', async ({ page }, testInfo) => {
   test.setTimeout(180_000)
   test.skip(!testInfo.project.name.startsWith('desktop'), 'Wide desktop audit')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 2048, height: 1192 })
 
   const pageErrors: string[] = []
@@ -65,6 +66,34 @@ test('audits every authenticated workspace at the reported desktop size', async 
     await page.goto(route.path, { waitUntil: 'domcontentloaded', timeout: 30_000 })
     await expect(page.locator('.fh-app__main-inner')).toBeVisible()
     await expect(page.locator(route.ready).first()).toBeVisible()
+    await expect(page.locator('.fh-build-rail-card > strong').filter({ hasText: /^:$/ })).toHaveCount(0)
+
+    if (route.name === 'schedule') {
+      await expect(page.locator('.fh-build-weekplan')).toBeVisible()
+      await expect(page.locator('.fh-build-weekplan__day')).toHaveCount(7)
+    }
+
+    if (route.name === 'analytics') {
+      await expect(page.locator('.fh-build-trend-col__label')).toHaveCount(6)
+      const labels = await page.locator('.fh-build-trend-col__label').allTextContents()
+      expect(labels.every((label) => label.trim().length > 0), 'Analytics trend has unlabeled periods').toBe(true)
+    }
+
+    if (route.name === 'clients') {
+      await expect(page.getByText('flat', { exact: true })).toHaveCount(0)
+    }
+
+    if (route.name === 'subs') {
+      await expect(page.getByText('Schedule integration coming', { exact: true })).toHaveCount(0)
+      await expect(page.getByText('Team roles not yet configured', { exact: true })).toHaveCount(0)
+    }
+
+    if (route.name === 'invoices') {
+      const paymentButton = page.locator('.fh-build-row-btn').filter({ hasText: 'Log payment' }).first()
+      await expect(paymentButton).toHaveCSS('height', '32px')
+      const wraps = await paymentButton.evaluate((button) => button.scrollHeight > button.clientHeight)
+      expect(wraps, 'Invoice row action wraps onto multiple lines').toBe(false)
+    }
 
     const geometry = await page.evaluate(() => {
       const inner = document.querySelector<HTMLElement>('.fh-app__main-inner')
@@ -91,4 +120,35 @@ test('audits every authenticated workspace at the reported desktop size', async 
 
   console.table(measurements)
   expect(pageErrors, pageErrors.join('\n')).toEqual([])
+})
+
+test('keeps the core desktop workspace coherent in light theme', async ({ page }, testInfo) => {
+  test.setTimeout(90_000)
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Wide desktop audit')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('[data-build-screen="SnowHomeBuild"]')).toBeVisible()
+
+  const lightRoutes = [
+    { name: 'home', path: '/', ready: '[data-build-screen="SnowHomeBuild"]' },
+    { name: 'schedule', path: '/schedule', ready: '.fh-build-weekplan' },
+    { name: 'clients', path: '/clients', ready: '[data-build-screen="SnowClientsBuild"]' },
+    { name: 'job-detail', path: '/jobs/c-job1', ready: '[data-build-screen="SnowJobDetailBuild"]' },
+    { name: 'settings', path: '/settings', ready: '[data-build-screen="SnowSettingsBuild"]' },
+  ]
+
+  for (const route of lightRoutes) {
+    await page.goto(route.path, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator(route.ready).first()).toBeVisible()
+    await page.evaluate(() => {
+      localStorage.setItem('fh:theme', 'light')
+      document.documentElement.setAttribute('data-theme', 'light')
+    })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    expect(overflow, `${route.path} overflows in light theme`).toBeLessThanOrEqual(1)
+    await capture(page, testInfo, `light-${route.name}`)
+  }
 })

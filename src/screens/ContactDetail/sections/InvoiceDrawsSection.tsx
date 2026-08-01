@@ -871,7 +871,7 @@ function Tag({ tone, children }: any) {
     muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
     green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79, 0.30)' },
     gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(201, 150, 58, 0.30)' },
-    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-bright, #C9963A)', br: 'rgba(192, 57, 43, 0.30)' }
+    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-bright, #C0392B)', br: 'rgba(192, 57, 43, 0.30)' }
   } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
     <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
@@ -894,7 +894,7 @@ function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
-        color: danger ? 'var(--v3-danger-bright, #C9963A)' : 'var(--v3-text)',
+        color: danger ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-text)',
         cursor: disabled ? 'wait' : 'pointer',
         opacity: disabled ? 0.6 : 1
       }}

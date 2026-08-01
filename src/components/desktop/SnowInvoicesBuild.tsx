@@ -114,6 +114,12 @@ function ageBucket(days: number): { label: string; tone: 'good' | 'warn' | 'bad'
   return { label: 'Overdue', tone: 'bad' }
 }
 
+function ageLabel(days: number) {
+  if (days < 0) return `in ${Math.abs(days)}d`
+  if (days === 0) return 'today'
+  return `${days}d`
+}
+
 const INVOICE_STATUS: Record<string, { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' }> = {
   draft: { label: 'Draft', tone: 'neutral' },
   sent: { label: 'Sent', tone: 'warn' },
@@ -224,8 +230,8 @@ export default function SnowInvoicesBuild({
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Accounts Receivable</div>
-            <h1 className="fh-build-title">COLLECT.</h1>
+            <div className="fh-build-good">Get paid</div>
+            <h1 className="fh-build-title">INVOICES</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -450,7 +456,7 @@ export default function SnowInvoicesBuild({
                     )}
                   </div>
                   <span className={`fh-build-dot is-${bucket.tone}`}>{bucket.label}</span>
-                  <span className="fh-build-num fh-build-rel">{r.ageDays}d</span>
+                  <span className="fh-build-num fh-build-rel">{ageLabel(r.ageDays)}</span>
                   <span className="fh-build-num">{moneyFull(r.amount)}</span>
                   <span className="fh-build-num fh-build-rel">{r.paid > 0 ? moneyFull(r.paid) : '\u2003'}</span>
                   <span

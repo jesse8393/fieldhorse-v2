@@ -683,7 +683,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                 fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45,
                 color: 'var(--ink-muted)'
               }}>
-                Advances stage to Job and adds a kickoff to your calendar tomorrow 9–5. Uncheck if you're approving paperwork before the start date is set.
+                Advances stage to Job and adds a kickoff to your calendar tomorrow from 9 to 5. Uncheck if you're approving paperwork before the start date is set.
               </span>
             </span>
           </label>

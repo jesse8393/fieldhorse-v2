@@ -133,7 +133,7 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Recent</div>
-            <h1 className="fh-build-title">ACTIVITY.</h1>
+            <h1 className="fh-build-title">ACTIVITY</h1>
           </div>
 
           <div className="fh-build-focus">

@@ -205,10 +205,7 @@ export default function SnowClientDetailBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Open risks</div>
               {activeCount === 0 ? (
-                <>
-                  <strong>:</strong>
-                  <span>No active jobs</span>
-                </>
+                <span>No active jobs</span>
               ) : status.tone === 'warn' ? (
                 <>
                   <strong style={{ color: 'var(--v3-primary-bright)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -227,10 +224,7 @@ export default function SnowClientDetailBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Recent activity</div>
               {recent.length === 0 ? (
-                <>
-                  <strong>:</strong>
-                  <span>No jobs yet</span>
-                </>
+                <span>No jobs yet</span>
               ) : (
                 <ul className="fh-build-rail-list" style={{ marginTop: 10 }}>
                   {recent.map((j: any) => (

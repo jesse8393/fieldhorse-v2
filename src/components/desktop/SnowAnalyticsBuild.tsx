@@ -27,6 +27,7 @@ type RevenueRow = {
   month?: string
   value?: number
   amount?: number
+  total?: number
 }
 
 type TopClient = {
@@ -81,15 +82,19 @@ function ratioToPct(r: number | null | undefined) {
   return Number(r) * 100
 }
 
+function revenueValue(row: RevenueRow) {
+  return Number(row.value ?? row.amount ?? row.total ?? 0)
+}
+
 export default function SnowAnalyticsBuild(props: Props) {
   const { loading, stats, byStage, revenueByMonth, topClients } = props
 
   const maxStage = Math.max(...byStage.map((b) => b.value), 1)
-  const maxRev = Math.max(...revenueByMonth.map((r) => Number(r.value ?? r.amount ?? 0)), 1)
+  const maxRev = Math.max(...revenueByMonth.map(revenueValue), 1)
 
   // Derived signals for the right rail
   const strongestStage = [...byStage].sort((a, b) => b.value - a.value)[0]
-  const weakestStage = [...byStage].filter((s) => s.value === 0)[0]
+  const weakestStage = [...byStage].sort((a, b) => a.value - b.value)[0]
 
   // Only compute a real collection rate when BOTH invoiced and
   // collected have come through as real numbers from the parent.
@@ -100,10 +105,13 @@ export default function SnowAnalyticsBuild(props: Props) {
     : null
   const cashConnected = stats.invoiced != null && stats.collected != null
 
-  const lastMonth = revenueByMonth[revenueByMonth.length - 1]
-  const prevMonth = revenueByMonth[revenueByMonth.length - 2]
-  const monthOverMonth = (lastMonth && prevMonth)
-    ? Number(lastMonth.value ?? lastMonth.amount ?? 0) - Number(prevMonth.value ?? prevMonth.amount ?? 0)
+  // The last bucket is the current partial month. Comparing it with a
+  // full prior month makes every first-of-month dashboard look like a
+  // collapse, so trend only compares the two latest completed months.
+  const lastCompleteMonth = revenueByMonth[revenueByMonth.length - 2]
+  const previousCompleteMonth = revenueByMonth[revenueByMonth.length - 3]
+  const monthOverMonth = (lastCompleteMonth && previousCompleteMonth)
+    ? revenueValue(lastCompleteMonth) - revenueValue(previousCompleteMonth)
     : 0
 
   return (
@@ -130,8 +138,8 @@ export default function SnowAnalyticsBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Analytics</div>
-            <h1 className="fh-build-title">KNOW THE BUSINESS.</h1>
+            <div className="fh-build-good">Business</div>
+            <h1 className="fh-build-title">ANALYTICS</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -204,7 +212,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 
             <section className="fh-build-card fh-build-chart-card">
               <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">Revenue trend · last {revenueByMonth.length}</div>
+                <div className="fh-build-eyebrow">Revenue received · last {revenueByMonth.length} months</div>
                 <span className="fh-build-rel">
                   {monthOverMonth > 0 ? (
                     <span style={{ color: 'var(--v3-success-bright)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -223,11 +231,11 @@ export default function SnowAnalyticsBuild(props: Props) {
                 ) : revenueByMonth.length === 0 ? (
                   <div className="fh-build-table__empty">No revenue history yet.</div>
                 ) : revenueByMonth.map((r, i) => {
-                  const v = Number(r.value ?? r.amount ?? 0)
+                  const v = revenueValue(r)
                   const h = (v / maxRev) * 100
                   return (
                     <div key={i} className="fh-build-trend-col" title={`${r.label || r.month || ''}: ${money(v)}`}>
-                      <div className="fh-build-trend-col__bar" style={{ height: `${Math.max(h, 4)}%` }} />
+                      <div className="fh-build-trend-col__bar" style={{ height: `${Math.max(h * 1.3, 6)}px` }} />
                       <div className="fh-build-trend-col__label">{r.label || r.month || ''}</div>
                       <div className="fh-build-trend-col__value">{money(v)}</div>
                     </div>
@@ -264,7 +272,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Strongest signal</div>
+              <div className="fh-build-eyebrow">Largest stage</div>
               <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '\u2003'}</strong>
               <span>
                 {strongestStage
@@ -275,11 +283,13 @@ export default function SnowAnalyticsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Weakest stage</div>
-              <strong style={{ color: weakestStage ? 'var(--v3-primary-bright)' : undefined }}>
-                {weakestStage ? (weakestStage.label || weakestStage.id) : 'All active'}
-              </strong>
-              <span>{weakestStage ? 'No movement' : 'Every stage moving'}</span>
+              <div className="fh-build-eyebrow">Smallest stage</div>
+              <strong>{weakestStage ? (weakestStage.label || weakestStage.id) : ' '}</strong>
+              <span>
+                {weakestStage
+                  ? `${money(weakestStage.value)} in ${weakestStage.count} ${countNoun(weakestStage.count, 'deal')}`
+                  : 'No data yet'}
+              </span>
             </section>
 
             <section className="fh-build-rail-card">
@@ -305,9 +315,9 @@ export default function SnowAnalyticsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Follow up drag</div>
+              <div className="fh-build-eyebrow">Active leads</div>
               <strong>{stats.leads || 0}</strong>
-              <span>active leads waiting</span>
+              <span>currently in the pipeline</span>
             </section>
 
             <section className="fh-build-rail-card">
@@ -316,11 +326,11 @@ export default function SnowAnalyticsBuild(props: Props) {
                 {monthOverMonth > 0 ? 'Trending up' : monthOverMonth < 0 ? 'Trending down' : 'Flat'}
               </strong>
               <span>
-                {monthOverMonth !== 0 ? `${money(Math.abs(monthOverMonth))} vs prior month` : 'Hold steady'}
+                {monthOverMonth !== 0 ? `${money(Math.abs(monthOverMonth))} vs prior full month` : 'Hold steady'}
               </span>
               <div className="fh-build-rail-card__spark">
                 <Target size={14} />
-                <span>{(stats.closeRate || 0) >= 0.3 ? 'on pace' : 'tighten ops'}</span>
+                <span>{pct(stats.closeRate || 0)} close rate</span>
               </div>
             </section>
           </aside>

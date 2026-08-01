@@ -348,7 +348,7 @@ export default function Analytics() {
         loading={loading}
         stats={stats}
         byStage={byStage}
-        revenueByMonth={trendData}
+        revenueByMonth={revenueByMonth}
         topClients={topClients}
       /></Suspense>
     )
@@ -890,7 +890,7 @@ function KPI({ label, to, format, Icon, gold, note }: any) {
         }}
       >
         {to == null ? (
-          <span style={{ color: 'var(--v3-text-muted)' }}>:</span>
+          <span style={{ color: 'var(--v3-text-muted)' }}>{' '}</span>
         ) : (
           <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />
         )}

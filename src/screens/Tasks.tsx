@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, Bell, Calendar, Check, ChevronRight, Clock, Search, UserRound, Trash2, Plus,
+  AlertTriangle, Bell, Calendar, Check, ChevronRight, ClipboardCheck, Clock, Search, UserRound, Trash2, Plus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
@@ -26,6 +26,7 @@ import { supabase } from '../lib/supabase.ts'
 import { orgMembersList, type OrgMember } from '../lib/orgApi.ts'
 import { toastError, toastSuccess, toastUndo } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
+import { Button } from '../ui/index.ts'
 
 type TaskRow = {
   id: string
@@ -236,7 +237,7 @@ export default function Tasks() {
           <section className="fh-build-hero-row fh-build-hero-row--page">
             <div>
               <div className="fh-build-good">Tasks</div>
-              <h1 className="fh-build-title">RESTRICTED.</h1>
+              <h1 className="fh-build-title">RESTRICTED ACCESS</h1>
             </div>
           </section>
           <div className="fh-build-table__empty">
@@ -279,8 +280,8 @@ export default function Tasks() {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Tasks</div>
-            <h1 className="fh-build-title">CLEAR THE QUEUE.</h1>
+            <div className="fh-build-good">Team</div>
+            <h1 className="fh-build-title">TASKS</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -320,26 +321,22 @@ export default function Tasks() {
           </div>
         )}
 
-        {/* Create task */}
-        {!loading && (
-          <div style={{ marginBottom: 16 }}>
-            {!composerOpen ? (
-              <button
-                type="button"
-                onClick={() => setComposerOpen(true)}
-                className="fh-build-select"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px' }}
-              >
-                <Plus size={13} /> New task
-              </button>
-            ) : (
-              <TaskComposer
-                jobs={allJobs}
-                members={members}
-                onCancel={() => setComposerOpen(false)}
-                onCreate={async (input: any) => { const ok = await createTask(input); if (ok) setComposerOpen(false) }}
-              />
-            )}
+        {!loading && !composerOpen && filteredTasks.length > 0 && (
+          <div className="fh-build-toolbar-row">
+            <Button type="button" variant="outline" leftIcon={Plus} onClick={() => setComposerOpen(true)}>
+              New task
+            </Button>
+          </div>
+        )}
+
+        {!loading && composerOpen && (
+          <div className="fh-build-composer-wrap">
+            <TaskComposer
+              jobs={allJobs}
+              members={members}
+              onCancel={() => setComposerOpen(false)}
+              onCreate={async (input: any) => { const ok = await createTask(input); if (ok) setComposerOpen(false) }}
+            />
           </div>
         )}
 
@@ -348,7 +345,19 @@ export default function Tasks() {
         )}
 
         {!loading && filteredTasks.length === 0 && (
-          <div className="fh-build-table__empty">All clear, nothing waiting on the team.</div>
+          <div className="fh-build-table__empty fh-build-table__empty--action">
+            <ClipboardCheck size={20} aria-hidden="true" />
+            <span>{tasks.length === 0 ? 'No open tasks.' : 'No tasks match this assignee.'}</span>
+            {tasks.length === 0 ? (
+              <Button type="button" leftIcon={Plus} onClick={() => setComposerOpen(true)}>
+                New task
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setFilterAssignee('')}>
+                Clear filter
+              </Button>
+            )}
+          </div>
         )}
 
         {!loading && BUCKETS.map((b) => {

@@ -55,7 +55,8 @@ export default function Schedule() {
     if (typeof window === 'undefined') return 'day'
     try {
       const v = window.localStorage.getItem('fh:schedule:view')
-      return v === 'week' || v === 'month' ? v : 'day'
+      if (v === 'day' || v === 'week' || v === 'month') return v
+      return window.matchMedia('(min-width: 900px)').matches ? 'week' : 'day'
     } catch { return 'day' }
   })
   useEffect(() => {
@@ -267,6 +268,7 @@ export default function Schedule() {
             view={view}
             setView={setView}
             onAddEvent={() => setAddOpen(true)}
+            onOpenEvent={(event: any) => setEditEvent(event)}
           />
         </Suspense>
         <AddEventSheet
@@ -274,6 +276,13 @@ export default function Schedule() {
           userId={user?.id}
           onClose={() => setAddOpen(false)}
           onSaved={() => { setAddOpen(false); load() }}
+        />
+        <AddEventSheet
+          open={!!editEvent}
+          userId={user?.id}
+          event={editEvent}
+          onClose={() => setEditEvent(null)}
+          onSaved={() => { setEditEvent(null); load() }}
         />
       </>
     )
@@ -1013,7 +1022,7 @@ function WeekView({ start, events, onClick, onDelete }: any) {
               <span className="fh-week__num">{d.getDate()}</span>
             </header>
             <div className="fh-week__body">
-              {dayEvents.length === 0 && <span className="fh-week__empty">:</span>}
+              {dayEvents.length === 0 && <span className="fh-week__empty">{' '}</span>}
               {dayEvents.map((e: any) => (
                 <div key={e.id} className="fh-week__evt" style={{ position: 'relative' }}>
                   <button type="button" onClick={() => e.contact_id && onClick(e.contact_id)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: e.contact_id ? 'pointer' : 'default', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 4 }}>
