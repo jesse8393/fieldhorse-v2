@@ -2070,8 +2070,14 @@ a {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    /* Subtle scroll fade for long lists */
-    scrollbar-width: thin;
+    /* Keep short-height desktops scrollable without painting a bright
+       browser scrollbar through the navigation. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .fh-desktop-sidebar__nav::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
   .fh-desktop-sidebar__group {
     display: flex;
@@ -2388,7 +2394,8 @@ a {
    ========================================================================= */
 @media (min-width: 900px) {
   .fh-app--layout-responsive
-    .v3-screen:not(.v3-screen--home):not(.v3-screen--jobs):not(.v3-screen--clients):not(.v3-screen--schedule):not(.v3-screen--compose):not(.v3-screen--job-detail) {
+    .v3-screen:not(.v3-screen--home):not(.v3-screen--jobs):not(.v3-screen--clients):not(.v3-screen--schedule):not(.v3-screen--compose):not(.v3-screen--job-detail):not(.v3-screen--invoice-detail) {
+    width: 100%;
     max-width: 960px;
     margin-left: auto;
     margin-right: auto;
@@ -2398,6 +2405,7 @@ a {
      workspace cap rather than stretched. */
   .fh-app--layout-responsive
     .fh-screen:not(.fh-screen--home):not(.fh-screen--jobs):not(.fh-screen--clients):not(.fh-screen--schedule):not(.fh-screen--compose) {
+    width: 100%;
     max-width: 960px;
     margin-left: auto;
     margin-right: auto;
@@ -3067,9 +3075,588 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
    either .v3-screen or .fh-screen. */
 @media (min-width: 900px) {
   .fh-readable-desktop {
+    width: 100%;
     max-width: 880px;
     margin-inline: auto;
   }
+}
+
+/* Invoice detail desktop workspace. */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .v3-screen--invoice-detail {
+    width: min(100%, 1280px);
+    max-width: 1280px;
+    margin-inline: auto;
+    padding: 24px 24px calc(var(--space-7) + var(--space-7) + var(--space-4)) !important;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(360px, .8fr);
+    grid-template-rows: auto auto auto 1fr;
+    gap: 16px;
+    align-content: start;
+  }
+
+  .fh-invoice-detail-state {
+    width: min(100%, 1280px);
+    margin-inline: auto;
+  }
+
+  .fh-invoice-detail__header {
+    grid-column: 1 / -1;
+    min-height: 56px;
+    padding: 8px 12px !important;
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    background: var(--v3-surface-glass);
+  }
+
+  .fh-invoice-detail__hero {
+    grid-column: 1;
+    grid-row: 2;
+    padding: 0 !important;
+  }
+
+  .fh-invoice-detail__hero > div {
+    min-height: 248px;
+    padding: 24px !important;
+    justify-content: space-between;
+  }
+
+  .fh-invoice-detail__service {
+    grid-column: 1;
+    grid-row: 3;
+    padding: 0 !important;
+  }
+
+  .fh-invoice-detail__payments {
+    grid-column: 2;
+    grid-row: 2 / span 3;
+    min-width: 0;
+    align-self: start;
+    padding: 16px !important;
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    background: var(--v3-surface-glass);
+  }
+
+  .fh-invoice-detail__job {
+    grid-column: 1;
+    grid-row: 4;
+    padding: 0 !important;
+  }
+
+  .fh-invoice-document-pane {
+    grid-column: 1 / -1;
+    width: min(100%, 960px);
+    margin-inline: auto;
+  }
+
+  .fh-invoice-actionbar {
+    width: min(1280px, calc(100% - 320px));
+    left: calc(50% + 128px) !important;
+    right: auto !important;
+    bottom: 16px !important;
+    transform: translateX(-50%);
+    padding: 12px !important;
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    background: var(--v3-surface-glass) !important;
+    box-shadow: 0 16px 42px rgba(20, 20, 20, 0.40);
+    backdrop-filter: blur(20px);
+  }
+
+  .fh-invoice-actionbar > button {
+    min-height: 44px !important;
+    height: 44px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1120px) {
+  .fh-app--layout-responsive .v3-screen--invoice-detail {
+    grid-template-columns: 1fr;
+  }
+  .fh-invoice-detail__hero,
+  .fh-invoice-detail__service,
+  .fh-invoice-detail__payments,
+  .fh-invoice-detail__job {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+/* Activity desktop ledger. Mobile keeps the compact card feed. */
+@media (min-width: 900px) {
+  .fh-activity-build__focus-meta {
+    display: block;
+    color: var(--v3-text-muted);
+    font-size: 12px;
+  }
+
+  .fh-build-content-grid--activity {
+    grid-template-columns: minmax(0, 1fr) 288px;
+    align-items: start;
+  }
+
+  .fh-activity-ledger {
+    min-width: 0;
+  }
+
+  .fh-activity-ledger > .fh-build-card-head {
+    min-height: 48px;
+    margin: 0;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--v3-border-mid);
+  }
+
+  .fh-activity-day + .fh-activity-day {
+    border-top: 1px solid var(--v3-border-mid);
+  }
+
+  .fh-activity-day__head {
+    min-height: 40px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--v3-text-muted);
+    background: var(--v3-glass-tint);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .fh-activity-table__head {
+    display: grid;
+    grid-template-columns: minmax(240px, 1.4fr) minmax(150px, 1fr) 112px 116px 16px;
+    gap: 16px;
+    min-height: 32px;
+    padding: 0 16px 0 calc(var(--space-7) + var(--space-4));
+    align-items: center;
+    color: var(--v3-text-faint);
+    border-top: 1px solid var(--v3-border);
+    border-bottom: 1px solid var(--v3-border);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .fh-activity-table__row {
+    display: grid;
+    grid-template-columns: 32px minmax(192px, 1.4fr) minmax(150px, 1fr) 112px 116px 16px;
+    gap: 16px;
+    min-height: 64px;
+    padding: 8px 16px;
+    align-items: center;
+    border-bottom: 1px solid var(--v3-border);
+    color: var(--v3-text-secondary);
+    text-decoration: none;
+    font-size: 12px;
+    transition: background 140ms ease, color 140ms ease;
+  }
+
+  .fh-activity-table__row:hover {
+    background: var(--v3-glass-tint);
+    color: var(--v3-text);
+  }
+
+  .fh-activity-table__row:last-child {
+    border-bottom: 0;
+  }
+
+  .fh-activity-table__icon,
+  .fh-activity-mix__icon {
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--v3-border-mid);
+    background: var(--v3-glass-tint);
+    color: var(--v3-text-muted);
+    border-radius: 10px;
+  }
+
+  .fh-activity-table__icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .fh-activity-table__icon.is-good,
+  .fh-activity-mix__icon.is-good { color: var(--v3-success-bright); border-color: color-mix(in srgb, var(--v3-success-bright) 30%, transparent); }
+  .fh-activity-table__icon.is-warn,
+  .fh-activity-mix__icon.is-warn { color: var(--v3-primary-bright); border-color: color-mix(in srgb, var(--v3-primary) 30%, transparent); }
+  .fh-activity-table__icon.is-bad { color: var(--v3-danger-bright); border-color: color-mix(in srgb, var(--v3-danger-bright) 30%, transparent); }
+
+  .fh-activity-table__event {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .fh-activity-table__event strong,
+  .fh-activity-table__event span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-activity-table__event strong {
+    color: var(--v3-text);
+    font-size: 14px;
+  }
+
+  .fh-activity-table__event span,
+  .fh-activity-table__row time span {
+    color: var(--v3-text-muted);
+    font-size: 12px;
+  }
+
+  .fh-activity-table__row time {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-activity-ledger__loading,
+  .fh-activity-ledger__empty,
+  .fh-activity-ledger__more {
+    padding: 24px;
+  }
+
+  .fh-activity-ledger__empty {
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+    color: var(--v3-text-muted);
+    font-size: 14px;
+  }
+
+  .fh-activity-ledger__empty strong { color: var(--v3-text); }
+  .fh-activity-ledger__more { display: flex; justify-content: center; border-top: 1px solid var(--v3-border); }
+
+  .fh-activity-mix {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 12px;
+  }
+
+  .fh-activity-mix__row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 8px;
+    min-height: 36px;
+    align-items: center;
+    color: var(--v3-text-secondary);
+    font-size: 12px;
+  }
+
+  .fh-activity-mix__icon { width: 28px; height: 28px; }
+  .fh-activity-mix__row strong { color: var(--v3-text); font-size: 14px; }
+  .fh-activity-build__rail-title { font-family: var(--font-body) !important; font-size: 16px !important; line-height: 1.3 !important; }
+
+  .fh-activity-shortcuts a {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--v3-border);
+    color: var(--v3-text-secondary);
+    text-decoration: none;
+    font-size: 12px;
+  }
+
+  .fh-activity-shortcuts a:last-child { border-bottom: 0; }
+  .fh-activity-shortcuts a:hover { color: var(--v3-primary); }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .fh-build-content-grid--activity { grid-template-columns: 1fr; }
+  .fh-build-content-grid--activity > .fh-build-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fh-activity-table__head { grid-template-columns: minmax(220px, 1fr) minmax(130px, .8fr) 100px 108px 16px; }
+  .fh-activity-table__row { grid-template-columns: 32px minmax(172px, 1fr) minmax(130px, .8fr) 100px 108px 16px; }
+}
+
+/* Partners desktop access roster. */
+@media (min-width: 900px) {
+  .fh-activity-build .fh-build-content-grid--activity,
+  .fh-partners-build .fh-build-content-grid--partners {
+    grid-template-columns: minmax(0, 1fr) 288px;
+    align-items: start;
+  }
+
+  .fh-partners-table {
+    min-width: 0;
+  }
+
+  .fh-partners-table > .fh-build-card-head {
+    min-height: 48px;
+    margin: 0;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--v3-border-mid);
+  }
+
+  .fh-partners-table__head,
+  .fh-partners-table__row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(80px, .55fr) minmax(260px, 1.5fr) 96px 104px 40px;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .fh-partners-table__head {
+    min-height: 36px;
+    padding: 0 16px;
+    color: var(--v3-text-faint);
+    background: var(--v3-glass-tint);
+    border-bottom: 1px solid var(--v3-border-mid);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .fh-partners-table__row {
+    min-height: 72px;
+    padding: 12px 16px;
+    color: var(--v3-text-secondary);
+    border-bottom: 1px solid var(--v3-border);
+    font-size: 12px;
+    transition: background 140ms ease;
+  }
+
+  .fh-partners-table__row:hover { background: var(--v3-glass-tint); }
+  .fh-partners-table__row:last-child { border-bottom: 0; }
+
+  .fh-partners-table__identity {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .fh-partners-table__identity > span {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent);
+    border-radius: 10px;
+    background: var(--v3-primary-soft);
+    color: var(--v3-primary);
+    font-family: var(--font-display);
+    font-size: 20px;
+  }
+
+  .fh-partners-table__identity > div {
+    min-width: 0;
+  }
+
+  .fh-partners-table__identity strong,
+  .fh-partners-table__identity small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-partners-table__identity strong { color: var(--v3-text); font-size: 14px; }
+  .fh-partners-table__identity small { margin-top: 4px; color: var(--v3-text-muted); font-size: 12px; }
+
+  .fh-partners-table__jobs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .fh-partners-table__jobs > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 32px;
+    gap: 8px;
+    align-items: center;
+    min-height: 32px;
+  }
+
+  .fh-partners-table__jobs a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--v3-text-secondary);
+    text-decoration: none;
+  }
+
+  .fh-partners-table__jobs a span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-partners-table__jobs a:hover { color: var(--v3-primary); }
+  .fh-partners-table__time { display: flex; align-items: center; gap: 4px; color: var(--v3-text-muted); }
+  .fh-partners-table__actions { display: flex; justify-content: flex-end; }
+  .fh-build-icon-action.is-danger { color: var(--v3-danger-bright); }
+
+  .fh-partners-table__loading,
+  .fh-partners-table__empty {
+    padding: 24px;
+  }
+
+  .fh-partners-table__empty {
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--v3-text-muted);
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .fh-partners-table__empty strong { color: var(--v3-text); }
+  .fh-partners-build__warn { color: var(--v3-primary-bright) !important; }
+
+  .fh-partners-role-mix {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 12px;
+  }
+
+  .fh-partners-role-mix > div {
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--v3-border);
+    color: var(--v3-text-secondary);
+    font-size: 12px;
+    text-transform: capitalize;
+  }
+
+  .fh-partners-role-mix > div:last-child { border-bottom: 0; }
+  .fh-partners-role-mix strong { color: var(--v3-text); font-size: 14px; }
+}
+
+@media (min-width: 900px) and (max-width: 1240px) {
+  .fh-partners-build .fh-build-content-grid--partners { grid-template-columns: 1fr; }
+  .fh-partners-build .fh-build-content-grid--partners > .fh-build-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fh-partners-table__head,
+  .fh-partners-table__row { grid-template-columns: minmax(170px, 1fr) minmax(70px, .45fr) minmax(220px, 1.25fr) 88px 96px 36px; gap: 8px; }
+}
+
+@media (min-width: 900px) and (max-width: 1599px) {
+  .fh-activity-table__head {
+    grid-template-columns: minmax(160px, 1.4fr) minmax(110px, 1fr) 84px 84px 16px;
+    gap: 8px;
+    padding-left: calc(var(--space-7) + var(--space-2));
+  }
+
+  .fh-activity-table__row {
+    grid-template-columns: 32px minmax(160px, 1.4fr) minmax(110px, 1fr) 84px 84px 16px;
+    gap: 8px;
+  }
+
+  .fh-partners-table__head,
+  .fh-partners-table__row {
+    grid-template-columns: minmax(140px, 1fr) minmax(72px, .45fr) minmax(160px, 1fr) 88px 92px 36px;
+    gap: 8px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1080px) {
+  .fh-partners-table__head,
+  .fh-partners-table__row {
+    grid-template-columns: minmax(150px, 1fr) minmax(160px, 1.2fr) 80px 36px;
+  }
+
+  .fh-partners-table__head > :nth-child(2),
+  .fh-partners-table__head > :nth-child(5),
+  .fh-partners-table__row > :nth-child(2),
+  .fh-partners-table__row > :nth-child(5) {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .fh-activity-build .fh-build-content-grid--activity {
+    grid-template-columns: 1fr;
+  }
+
+  .fh-activity-build .fh-build-content-grid--activity > .fh-build-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Import desktop migration workspace. */
+@media (min-width: 900px) {
+  .fh-app--layout-responsive .fh-importer-build {
+    max-width: none;
+    margin: 0;
+    padding: 0 0 48px !important;
+    display: block;
+  }
+
+  .fh-importer-build__main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    gap: 16px;
+    padding: 24px;
+    align-items: start;
+  }
+
+  .fh-importer-build__hero {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .fh-importer-build__focus-meta {
+    display: block;
+    color: var(--v3-text-muted);
+    font-size: 12px;
+  }
+
+  .fh-importer-build__upload,
+  .fh-importer-build__intake {
+    margin: 0 !important;
+  }
+
+  .fh-importer-build__upload {
+    min-width: 0;
+    padding: 24px;
+  }
+
+  .fh-importer-build__intake {
+    padding: 0;
+    position: sticky;
+    top: 92px;
+  }
+
+  .fh-importer-build__intake > details {
+    background: transparent !important;
+    border: 0 !important;
+  }
+
+  .fh-importer-build__intake summary {
+    min-height: 48px;
+    padding: 0 16px !important;
+    border-bottom: 1px solid var(--v3-border-mid);
+  }
+
+  .fh-importer-build__intake details[open] > summary .fh-importer-chev {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1100px) {
+  .fh-importer-build__main { grid-template-columns: 1fr; }
+  .fh-importer-build__intake { position: static; }
 }
 
 /* AppHeader right-slot icon buttons — steel at rest, gold on hover/active.

@@ -46,14 +46,13 @@
    INVOICE STICKY ACTION BAR — desktop sidebar overlap fix (5/17).
    The bar is position:fixed; left:0 so on mobile it spans the
    viewport. On desktop the 256px sidebar sat ON TOP of the Email
-   button (the leftmost button), making it invisible. Inset the
-   left edge past the sidebar at >=900px so all three buttons
-   render in the visible content area. Also drop the bottom nav
-   offset since desktop has no bottom nav.
+   button (the leftmost button), making it invisible. Desktop
+   positioning now lives with the invoice workspace in
+   global.css so the bar shares that screen's width and center line.
+   This late-loaded safety sheet only drops the mobile nav offset.
    ================================================================ */
 @media (min-width: 900px) {
   .fh-invoice-actionbar {
-    left: 256px !important;
     bottom: 12px !important;
   }
 }

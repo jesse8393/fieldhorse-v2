@@ -105,6 +105,134 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   expectNoPageErrors()
 })
 
+test('uses the full desktop workspace without changing the mobile screens', async ({ page }, testInfo) => {
+  const expectNoPageErrors = failOnPageErrors(page)
+  const desktop = testInfo.project.name.startsWith('desktop')
+
+  if (!desktop) {
+    const mobileRoutes = [
+      { path: '/activity', name: 'activity', desktopScreen: 'SnowActivityBuild' },
+      { path: '/import', name: 'import', desktopScreen: 'Importer' },
+      { path: '/partners', name: 'partners', desktopScreen: 'SnowPartnersBuild' },
+    ]
+
+    for (const route of mobileRoutes) {
+      await openRoute(page, route.path)
+      await expect(page.locator('.fh-app')).toHaveAttribute('data-layout', 'responsive')
+      await expect(page.locator(`[data-build-screen="${route.desktopScreen}"]`)).toHaveCount(0)
+      const dimensions = await page.evaluate(() => {
+        const inner = document.querySelector('.fh-app__main-inner')
+        return {
+          contentWidth: inner?.getBoundingClientRect().width || 0,
+          viewportWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+        }
+      })
+      expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.viewportWidth)
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+      await page.waitForTimeout(500)
+      await capture(page, testInfo, `mobile-${route.name}`, true)
+    }
+
+    expectNoPageErrors()
+    return
+  }
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const desktopRoutes = [
+    { path: '/activity', name: 'activity', ready: '[data-build-screen="SnowActivityBuild"]', minWidth: 1000 },
+    { path: '/import', name: 'import', ready: '[data-build-screen="Importer"]', minWidth: 1000 },
+    { path: '/partners', name: 'partners', ready: '[data-build-screen="SnowPartnersBuild"]', minWidth: 1000 },
+    { path: '/invoices/c-job2', name: 'invoice-detail', ready: '.v3-screen--invoice-detail', minWidth: 900 },
+    { path: '/subs/qa-missing', name: 'sub-detail', ready: '[data-build-screen="SubDetailState"]', minWidth: 1000 },
+    { path: '/sub-portal', name: 'sub-portal', ready: '[data-build-screen="SubPortal"]', minWidth: 1000 },
+  ]
+
+  for (const route of desktopRoutes) {
+    await openRoute(page, route.path)
+    await expect(page.locator('.fh-app')).toHaveAttribute('data-layout', 'responsive')
+    await expect(page.locator(route.ready)).toBeVisible()
+    const dimensions = await page.evaluate((selector) => {
+      const content = document.querySelector(selector)
+      return {
+        contentWidth: content?.getBoundingClientRect().width || 0,
+        viewportWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      }
+    }, route.ready)
+    expect(dimensions.contentWidth).toBeGreaterThan(route.minWidth)
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+
+    if (route.name === 'invoice-detail') {
+      const alignment = await page.evaluate(() => {
+        const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
+        const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
+        return {
+          centerDelta: screen && actionbar
+            ? Math.abs((screen.left + screen.width / 2) - (actionbar.left + actionbar.width / 2))
+            : Number.POSITIVE_INFINITY,
+          contained: Boolean(screen && actionbar && actionbar.left >= screen.left && actionbar.right <= screen.right),
+        }
+      })
+      expect(alignment.centerDelta).toBeLessThanOrEqual(1)
+      expect(alignment.contained).toBe(true)
+    }
+
+    if (route.name === 'activity' || route.name === 'partners') {
+      const tableHeader = page.locator(route.name === 'activity'
+        ? '.fh-activity-table__head'
+        : '.fh-partners-table__head')
+      const tableWidth = await tableHeader.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }))
+      expect(tableWidth.scrollWidth).toBeLessThanOrEqual(tableWidth.clientWidth + 1)
+    }
+
+    await capture(page, testInfo, `desktop-${route.name}`, true)
+  }
+
+  const sidebarOverflow = await page.locator('.fh-desktop-sidebar__nav').evaluate((element) => ({
+    overflowY: getComputedStyle(element).overflowY,
+    scrollbarWidth: getComputedStyle(element).scrollbarWidth,
+  }))
+  expect(sidebarOverflow.overflowY).toBe('auto')
+  expect(sidebarOverflow.scrollbarWidth).toBe('none')
+
+  await page.setViewportSize({ width: 1024, height: 900 })
+  const compactDesktopRoutes = [
+    { path: '/activity', ready: '[data-build-screen="SnowActivityBuild"]', table: '.fh-activity-table__head' },
+    { path: '/partners', ready: '[data-build-screen="SnowPartnersBuild"]', table: '.fh-partners-table__head' },
+    { path: '/invoices/c-job2', ready: '.v3-screen--invoice-detail', table: null },
+  ]
+
+  for (const route of compactDesktopRoutes) {
+    await openRoute(page, route.path)
+    await expect(page.locator(route.ready)).toBeVisible()
+    const geometry = await page.evaluate(({ table }) => {
+      const tableElement = table ? document.querySelector(table) : null
+      const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
+      const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
+      return {
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        tableOverflow: tableElement ? tableElement.scrollWidth - tableElement.clientWidth : 0,
+        invoiceCenterDelta: screen && actionbar
+          ? Math.abs((screen.left + screen.width / 2) - (actionbar.left + actionbar.width / 2))
+          : 0,
+        invoiceContained: screen && actionbar
+          ? actionbar.left >= screen.left && actionbar.right <= screen.right
+          : true,
+      }
+    }, route)
+    expect(geometry.pageOverflow).toBeLessThanOrEqual(1)
+    expect(geometry.tableOverflow).toBeLessThanOrEqual(1)
+    expect(geometry.invoiceCenterDelta).toBeLessThanOrEqual(1)
+    expect(geometry.invoiceContained).toBe(true)
+  }
+
+  expectNoPageErrors()
+})
+
 test('keeps customer quote change requests in the workflow', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
   let submitted: any = null
