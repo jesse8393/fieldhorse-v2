@@ -283,7 +283,7 @@ export default function SnowHomeBuild(props: Props) {
         <section className="fh-build-hero-row">
           <div>
             <div className="fh-build-good">{greetingFor(now)}, {firstName || 'there'}</div>
-            <h1 className="fh-build-title">LET’S BUILD.</h1>
+            <h1 className="fh-build-title">TODAY</h1>
           </div>
 
           <FocusCard onGoToSchedule={onGoToSchedule} />
@@ -376,13 +376,13 @@ function RevenueOperatingLayer({
   const primaryAction = firstAction?.verb || firstAction?.title || 'Review owner queue'
 
   return (
-    <section className="fh-crm-os" aria-label="Revenue operating system">
+    <section className="fh-crm-os" aria-label="Revenue workspace">
       <article className="fh-crm-brief">
-        <div className="fh-build-eyebrow">AI revenue brief</div>
-        <h2>Lead to close, without dropping the thread.</h2>
+        <div className="fh-build-eyebrow">Revenue overview</div>
+        <h2>Pipeline at a glance</h2>
         <p>
           {pipeline == null
-            ? 'Building the live command brief from your jobs, leads, invoices, and activity.'
+            ? 'Loading current jobs, invoices, and activity.'
             : `${moneyFull(pipeline)} in active pipeline across ${openCount} open opportunities. ${healthCopy}`}
         </p>
         <div className="fh-crm-brief__chips">

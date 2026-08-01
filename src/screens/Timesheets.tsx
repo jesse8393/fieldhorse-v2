@@ -8,13 +8,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Bell, Check, CheckCheck, ChevronRight, Search, AlertTriangle } from 'lucide-react'
+import { Bell, Check, CheckCheck, ChevronRight, CircleCheckBig, Search, AlertTriangle, Users } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { orgPunchApprove, orgPunchFlag, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
 import { recalcCost } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
+import { Button } from '../ui/index.ts'
 
 // HH:MM format, see comment in screens/Crew.tsx. Bebas Neue
 // (the display font on duration metrics) is uppercase-only, so
@@ -192,7 +193,7 @@ export default function Timesheets() {
           <section className="fh-build-hero-row fh-build-hero-row--page">
             <div>
               <div className="fh-build-good">Timesheets</div>
-              <h1 className="fh-build-title">RESTRICTED.</h1>
+              <h1 className="fh-build-title">RESTRICTED ACCESS</h1>
             </div>
           </section>
           <div className="fh-build-table__empty">
@@ -235,8 +236,8 @@ export default function Timesheets() {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Timesheets</div>
-            <h1 className="fh-build-title">APPROVE THE WEEK.</h1>
+            <div className="fh-build-good">Team</div>
+            <h1 className="fh-build-title">TIMESHEETS</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -284,8 +285,12 @@ export default function Timesheets() {
         )}
 
         {!loading && groups.length === 0 && (
-          <div className="fh-build-table__empty">
-            All caught up. No punches waiting on approval.
+          <div className="fh-build-table__empty fh-build-table__empty--action">
+            <CircleCheckBig size={20} aria-hidden="true" />
+            <span>No timesheets are waiting for approval.</span>
+            <Button type="button" variant="outline" leftIcon={Users} onClick={() => navigate('/crew')}>
+              Open crew
+            </Button>
           </div>
         )}
 
@@ -348,7 +353,7 @@ export default function Timesheets() {
                   ) : (
                     <span className="fh-build-rel">No job linked</span>
                   )}
-                  <span className="fh-build-rel">{fmtTime(r.punch_in_at)} – {fmtTime(r.punch_out_at)}</span>
+                  <span className="fh-build-rel">{fmtTime(r.punch_in_at)} to {fmtTime(r.punch_out_at)}</span>
                   <span className="fh-build-num">{fmtMinutes(r.minutes)}</span>
                   <span className="fh-build-num">{fmtMoney(r.cost)}</span>
                   <span>

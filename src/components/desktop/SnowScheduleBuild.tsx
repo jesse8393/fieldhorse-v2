@@ -10,7 +10,6 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Clock,
   MapPin,
   Plus,
   Search,
@@ -43,7 +42,12 @@ type Props = {
   view: string
   setView: (v: any) => void
   onAddEvent: () => void
+  onOpenEvent?: (event: EventRow) => void
 }
+
+const DAY_START_HOUR = 6
+const DAY_END_HOUR = 20
+const HOUR_HEIGHT = 44
 
 function fmtTime(iso: string) {
   if (!iso) return ''
@@ -76,6 +80,21 @@ function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
+function eventPosition(event: EventRow) {
+  const start = event.start_at ? new Date(event.start_at) : new Date()
+  const end = event.end_at ? new Date(event.end_at) : new Date(start.getTime() + 60 * 60 * 1000)
+  const dayStartMinutes = DAY_START_HOUR * 60
+  const dayEndMinutes = DAY_END_HOUR * 60
+  const rawStart = start.getHours() * 60 + start.getMinutes()
+  const rawEnd = end.getHours() * 60 + end.getMinutes()
+  const startMinutes = Math.max(dayStartMinutes, Math.min(dayEndMinutes - 30, rawStart))
+  const endMinutes = Math.max(startMinutes + 30, Math.min(dayEndMinutes, rawEnd))
+  return {
+    top: ((startMinutes - dayStartMinutes) / 60) * HOUR_HEIGHT,
+    height: Math.max(40, ((endMinutes - startMinutes) / 60) * HOUR_HEIGHT),
+  }
+}
+
 const VIEWS: { key: 'day' | 'week' | 'month'; label: string }[] = [
   { key: 'day',   label: 'Day' },
   { key: 'week',  label: 'Week' },
@@ -83,7 +102,10 @@ const VIEWS: { key: 'day' | 'week' | 'month'; label: string }[] = [
 ]
 
 export default function SnowScheduleBuild(props: Props) {
-  const { events: eventsIn, upcoming: upcomingIn, loading, cursor, setCursor, view: viewIn, setView, onAddEvent } = props
+  const {
+    events: eventsIn, upcoming: upcomingIn, loading, cursor, setCursor,
+    view: viewIn, setView, onAddEvent, onOpenEvent,
+  } = props
 
   const events: EventRow[] = eventsIn || []
   const upcoming: EventRow[] = upcomingIn || []
@@ -93,7 +115,10 @@ export default function SnowScheduleBuild(props: Props) {
   const days: Date[] = useMemo(() => {
     const base = startOfDay(cursor)
     if (view === 'day')   return [base]
-    if (view === 'week')  return Array.from({ length: 7 }, (_, i) => addDays(base, i))
+    if (view === 'week') {
+      const weekStart = addDays(base, -base.getDay())
+      return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+    }
     // Month view shows the LABELED calendar month, 1st → last day. It
     // used to render a rolling 28 days from the cursor while the header
     // said "July 2026", July 1–24 missing, August dates present (UI
@@ -133,6 +158,7 @@ export default function SnowScheduleBuild(props: Props) {
     const end = addDays(start, 7)
     return d >= start && d < end
   }).length
+  const selectedDayEvents = eventsByDay.get(startOfDay(cursor).toISOString()) || []
 
   return (
     <div className="fh-build-page" data-build-screen="SnowScheduleBuild">
@@ -161,8 +187,8 @@ export default function SnowScheduleBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Schedule</div>
-            <h1 className="fh-build-title">RUN THE DAY.</h1>
+            <div className="fh-build-good">Operations</div>
+            <h1 className="fh-build-title">SCHEDULE</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -278,61 +304,105 @@ export default function SnowScheduleBuild(props: Props) {
                 </div>
               </div>
             )}
-            {!loading && view !== 'month' && days.map((d) => {
-              const key = d.toISOString()
-              const evs = eventsByDay.get(key) || []
-              const isToday = sameDay(d, new Date())
-              return (
-                <article key={key} className={`fh-build-agenda__day${isToday ? ' is-today' : ''}`}>
-                  <header className="fh-build-agenda__head">
-                    <div className="fh-build-agenda__date">
-                      <span className="fh-build-agenda__weekday">
-                        {d.toLocaleDateString(undefined, { weekday: 'short' })}
-                      </span>
-                      <span className="fh-build-agenda__daynum">{d.getDate()}</span>
-                      <span className="fh-build-agenda__month">
-                        {d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase()}
-                      </span>
+            {!loading && view === 'day' && (
+              <section className="fh-build-dayplan">
+                <header className="fh-build-dayplan__head">
+                  <div>
+                    <div className="fh-build-eyebrow">
+                      {cursor.toLocaleDateString(undefined, { weekday: 'long' })}
                     </div>
-                    <div className="fh-build-agenda__head-meta">
-                      {isToday && <span className="fh-build-agenda__today-chip">Today</span>}
-                      <span>{evs.length} {evs.length === 1 ? 'event' : 'events'}</span>
+                    <strong>{cursor.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</strong>
+                  </div>
+                  <span>{selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'event' : 'events'}</span>
+                </header>
+                <div
+                  className="fh-build-dayplan__timeline"
+                  style={{ height: (DAY_END_HOUR - DAY_START_HOUR) * HOUR_HEIGHT }}
+                >
+                  {Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, index) => {
+                    const hour = DAY_START_HOUR + index
+                    const label = new Date(2026, 0, 1, hour).toLocaleTimeString(undefined, { hour: 'numeric' })
+                    return (
+                      <div
+                        key={hour}
+                        className="fh-build-dayplan__hour"
+                        style={{ top: index * HOUR_HEIGHT }}
+                      >
+                        <span>{label}</span>
+                      </div>
+                    )
+                  })}
+                  <div className="fh-build-dayplan__events">
+                    {selectedDayEvents.map((event) => {
+                      const position = eventPosition(event)
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          className="fh-build-dayplan__event"
+                          style={{ top: position.top, height: position.height }}
+                          onClick={() => onOpenEvent?.(event)}
+                        >
+                          <span>{fmtTime(event.start_at || '')}{event.end_at && ` to ${fmtTime(event.end_at)}`}</span>
+                          <strong>{event.title || 'Untitled event'}</strong>
+                          {event.location && <small><MapPin size={11} /> {event.location}</small>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {selectedDayEvents.length === 0 && (
+                    <div className="fh-build-dayplan__empty">
+                      <span>No events scheduled.</span>
+                      <button type="button" onClick={onAddEvent}><Plus size={13} /> Add event</button>
                     </div>
-                  </header>
-
-                  {evs.length === 0 ? (
-                    <div className="fh-build-agenda__empty">No events scheduled.</div>
-                  ) : (
-                    <ul className="fh-build-agenda__list">
-                      {evs.map((e) => (
-                        <li key={e.id} className="fh-build-agenda__event">
-                          <span className="fh-build-agenda__time">
-                            <Clock size={12} />
-                            {fmtTime(e.start_at || '')}{e.end_at && ` to ${fmtTime(e.end_at)}`}
-                          </span>
-                          <strong className="fh-build-agenda__title">{e.title || 'Untitled event'}</strong>
-                          {e.location && (
-                            <span className="fh-build-agenda__loc">
-                              <MapPin size={12} /> {e.location}
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
                   )}
-                </article>
-              )
-            })}
+                </div>
+              </section>
+            )}
+
+            {!loading && view === 'week' && (
+              <div className="fh-build-weekplan">
+                {days.map((day) => {
+                  const key = startOfDay(day).toISOString()
+                  const dayEvents = eventsByDay.get(key) || []
+                  const isToday = sameDay(day, new Date())
+                  return (
+                    <section key={key} className={`fh-build-weekplan__day${isToday ? ' is-today' : ''}`}>
+                      <button
+                        type="button"
+                        className="fh-build-weekplan__head"
+                        onClick={() => { setCursor(startOfDay(day)); setView('day') }}
+                      >
+                        <span>{day.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                        <strong>{day.getDate()}</strong>
+                      </button>
+                      <div className="fh-build-weekplan__body">
+                        {dayEvents.length === 0 && <span className="fh-build-weekplan__empty">No events</span>}
+                        {dayEvents.map((event) => (
+                          <button
+                            key={event.id}
+                            type="button"
+                            className="fh-build-weekplan__event"
+                            onClick={() => onOpenEvent?.(event)}
+                          >
+                            <span>{fmtTime(event.start_at || '')}</span>
+                            <strong>{event.title || 'Untitled event'}</strong>
+                            {event.location && <small>{event.location}</small>}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
+            )}
           </section>
 
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Up next</div>
               {upcoming.length === 0 ? (
-                <>
-                  <strong>:</strong>
-                  <span>Nothing scheduled</span>
-                </>
+                <span>Nothing scheduled</span>
               ) : (
                 <>
                   <div className="fh-build-upnext">

@@ -198,8 +198,8 @@ export default function SnowClientsBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Clients</div>
-            <h1 className="fh-build-title">RELATIONSHIP DESK.</h1>
+            <div className="fh-build-good">Office</div>
+            <h1 className="fh-build-title">CLIENTS</h1>
           </div>
 
           {/* One filter control per screen: the counted pill row below
@@ -341,10 +341,12 @@ export default function SnowClientsBuild(props: Props) {
               <div className="fh-build-eyebrow">New this month</div>
               <strong>{newThisMonth}</strong>
               <span>added in last 30d</span>
-              <div className="fh-build-rail-card__spark">
-                <ArrowUpRight size={14} />
-                <span>{newThisMonth > 0 ? 'growing' : 'flat'}</span>
-              </div>
+              {newThisMonth > 0 && (
+                <div className="fh-build-rail-card__spark">
+                  <ArrowUpRight size={14} />
+                  <span>growing</span>
+                </div>
+              )}
             </section>
           </aside>
         </section>

@@ -252,7 +252,7 @@ export default function Crew() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">{fmtDayHeading(new Date())}</div>
-            <h1 className="fh-build-title">RUN YOUR DAY.</h1>
+            <h1 className="fh-build-title">CREW</h1>
           </div>
 
           <div className={`fh-build-focus fh-build-window-card is-${activePunch ? 'good' : 'neutral'}`}>
@@ -360,7 +360,7 @@ export default function Crew() {
                     >
                       <span style={{ color: 'var(--v3-primary, #C9963A)', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                         <Clock size={11} style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
-                        {fmtTime(ev.start_at)}{ev.end_at ? ` – ${fmtTime(ev.end_at)}` : ''}
+                        {fmtTime(ev.start_at)}{ev.end_at ? ` to ${fmtTime(ev.end_at)}` : ''}
                       </span>
                       <strong style={{ color: 'var(--v3-text)', fontSize: 14, fontWeight: 700 }}>
                         {ev.title || 'Untitled event'}
@@ -374,7 +374,7 @@ export default function Crew() {
                           <MapPin size={11} /> Job <ChevronRight size={11} />
                         </button>
                       ) : (
-                        <span style={{ color: 'var(--v3-text-faint)', fontSize: 12 }}>:</span>
+                        <span style={{ color: 'var(--v3-text-faint)', fontSize: 12 }}>{' '}</span>
                       )}
                     </li>
                   ))}

@@ -100,7 +100,7 @@ export default function RateCardEditor() {
         }
       })
       hapticSuccess()
-      toastSuccess('Rate saved', `${row.current?.label || row.key}: $${low}–$${high}/${d.unit}`)
+      toastSuccess('Rate saved', `${row.current?.label || row.key}: $${low} to $${high}/${d.unit}`)
       await reload()
       setDraft((dd: any) => {
         const next = { ...dd }
@@ -313,7 +313,7 @@ export default function RateCardEditor() {
                   color: 'var(--ink-faint, var(--ink-muted))',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
-                  Default · {seedUnit} · ${seedLow}–${seedHigh}
+                  Default · {seedUnit} · ${seedLow} to ${seedHigh}
                 </div>
               )}
             </div>

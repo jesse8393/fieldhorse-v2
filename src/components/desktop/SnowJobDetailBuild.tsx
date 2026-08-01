@@ -314,10 +314,7 @@ export default function SnowJobDetailBuild(props: Props) {
                   <span>vs planned timeline</span>
                 </>
               ) : (
-                <>
-                  <strong>:</strong>
-                  <span>Schedule not tracked</span>
-                </>
+                <span>Schedule not tracked</span>
               )}
               {onAddEvent && (
                 <button type="button" className="fh-build-rail-card__action" onClick={onAddEvent}>
@@ -337,10 +334,7 @@ export default function SnowJobDetailBuild(props: Props) {
                   <span>{reportsMissing > 0 ? 'Capture today’s field report' : 'Recent reports filed'}</span>
                 </>
               ) : (
-                <>
-                  <strong>:</strong>
-                  <span>No report cadence set</span>
-                </>
+                <span>No report cadence set</span>
               )}
             </section>
 
@@ -365,20 +359,14 @@ export default function SnowJobDetailBuild(props: Props) {
                   </span>
                 </>
               ) : (
-                <>
-                  <strong>:</strong>
-                  <span>No invoicing yet</span>
-                </>
+                <span>No invoicing yet</span>
               )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Change orders</div>
               {changeOrderTotals == null ? (
-                <>
-                  <strong>:</strong>
-                  <span>No change orders yet</span>
-                </>
+                <span>No change orders yet</span>
               ) : (
                 <>
                   <strong style={{

@@ -105,6 +105,41 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   expectNoPageErrors()
 })
 
+test('keeps the desktop schedule planning workflow complete', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop schedule workflow')
+  const expectNoPageErrors = failOnPageErrors(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+
+  await openRoute(page, '/schedule')
+  await expect(page.locator('.fh-build-weekplan')).toBeVisible()
+  await expect(page.locator('.fh-build-weekplan__day')).toHaveCount(7)
+  await capture(page, testInfo, 'desktop-schedule-week', true)
+
+  await page.getByRole('button', { name: 'Day', exact: true }).click()
+  await expect(page.locator('.fh-build-dayplan')).toBeVisible()
+  const event = page.locator('.fh-build-dayplan__event').first()
+  await expect(event).toContainText('Pour slab')
+  await capture(page, testInfo, 'desktop-schedule-day', true)
+  await event.click()
+  await expect(page.getByRole('heading', { name: 'Edit event' })).toBeVisible()
+  await capture(page, testInfo, 'desktop-schedule-edit', true)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+  await page.getByRole('button', { name: 'Month', exact: true }).click()
+  await expect(page.locator('.fh-build-cal')).toBeVisible()
+  await capture(page, testInfo, 'desktop-schedule-month', true)
+  await page.getByRole('button', { name: 'Week', exact: true }).click()
+  await expect(page.locator('.fh-build-weekplan')).toBeVisible()
+
+  await page.getByRole('button', { name: 'New event', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible()
+  await capture(page, testInfo, 'desktop-schedule-new', true)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+  expectNoPageErrors()
+})
+
 test('uses the full desktop workspace without changing the mobile screens', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
   const desktop = testInfo.project.name.startsWith('desktop')

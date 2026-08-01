@@ -8,8 +8,6 @@ import {
   ChevronRight,
   Search,
   Plus,
-  ShieldCheck,
-  Hammer,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { money } from '../../lib/format.ts'
@@ -92,10 +90,6 @@ export default function SnowSubsBuild(props: Props) {
         return st.tone === 'warn' || st.tone === 'bad'
       }).length
     : 0
-  const needsReview = insuranceIsTracked
-    ? filtered.filter((s) => s.insuranceTracked !== false && !s.insurance_expires_at && (s.jobsCount || 0) > 0).length
-    : 0
-
   // Trade coverage, count of distinct trades present in the filtered list.
   // s.trades upstream may be a Set, array, plain object, or a single
   // string depending on the bundle shape; normalize before iterating.
@@ -134,8 +128,8 @@ export default function SnowSubsBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Vendor ops</div>
-            <h1 className="fh-build-title">SUB NETWORK.</h1>
+            <div className="fh-build-good">Office</div>
+            <h1 className="fh-build-title">SUBCONTRACTORS</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -207,7 +201,7 @@ export default function SnowSubsBuild(props: Props) {
                   <strong className="fh-build-truncate" title={s.name || 'Unnamed'}>{s.name || 'Unnamed'}</strong>
                   <span className="fh-build-trade-chips">
                     {trades.length === 0 ? (
-                      <span className="fh-build-rel">:</span>
+                      <span className="fh-build-rel">{' '}</span>
                     ) : trades.map((t: string) => (
                       <span key={t} className="fh-build-chip">{t}</span>
                     ))}
@@ -237,8 +231,14 @@ export default function SnowSubsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Insurance expiring</div>
-              {insuranceIsTracked ? (
+              <div className="fh-build-eyebrow">Total billed</div>
+              <strong>{money(screenStats.totalBilled)}</strong>
+              <span>across the vendor network</span>
+            </section>
+
+            {insuranceIsTracked && (
+              <section className="fh-build-rail-card">
+                <div className="fh-build-eyebrow">Insurance expiring</div>
                 <>
                   <strong style={{ color: insuranceExpiring > 0 ? 'var(--v3-primary-bright)' : undefined }}>
                     {insuranceExpiring}
@@ -246,55 +246,13 @@ export default function SnowSubsBuild(props: Props) {
                   <span>{insuranceExpiring > 0 ? 'Verify before next use' : 'All current'}</span>
                   {insuranceExpiring > 0 && <div className="fh-build-spark is-gold" />}
                 </>
-              ) : (
-                <>
-                  <strong>:</strong>
-                  <span>Insurance not tracked yet</span>
-                </>
-              )}
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">On jobs today</div>
-              <strong>:</strong>
-              <span>Schedule integration coming</span>
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Vendor portal</div>
-              <strong>Not connected</strong>
-              <span>Invite flow ready for partner access</span>
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Owner / admin access</div>
-              <strong>Single owner</strong>
-              <span>Team roles not yet configured</span>
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Needs review</div>
-              {insuranceIsTracked ? (
-                <>
-                  <strong>{needsReview}</strong>
-                  <span>used without insurance on file</span>
-                </>
-              ) : (
-                <>
-                  <strong>:</strong>
-                  <span>Enable insurance tracking to surface</span>
-                </>
-              )}
-            </section>
+              </section>
+            )}
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Trade coverage</div>
               <strong>{tradeCoverage}</strong>
               <span>distinct trades in network</span>
-              <div className="fh-build-rail-card__spark">
-                <ShieldCheck size={14} />
-                <span>{tradeCoverage >= 5 ? 'broad' : 'narrow'}</span>
-              </div>
             </section>
           </aside>
         </section>
@@ -302,9 +260,6 @@ export default function SnowSubsBuild(props: Props) {
     </div>
   )
 }
-
-// Silence unused icon import.
-void Hammer
 
 // normalizeTrades, Subs.tsx aggregates each sub's trades into a Set
 // (`new Set()`), so passing the grouped object straight into a

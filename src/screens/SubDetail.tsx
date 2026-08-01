@@ -20,6 +20,7 @@ import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import { EmptyState } from '../ui/index.ts'
 
 // SubDetail, vendor profile surface at /subs/:key.
 //
@@ -35,7 +36,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 // rolled-up name + phone, then re-fetches.
 
 const PAYMENT_METHODS = [
-  { value: '',         label: ': Not set :' },
+  { value: '',         label: 'Not set' },
   { value: 'check',    label: 'Check' },
   { value: 'ach',      label: 'ACH / Direct deposit' },
   { value: 'zelle',    label: 'Zelle' },
@@ -70,9 +71,9 @@ function daysUntil(dateStr: any) {
 }
 
 function fmtDate(dateStr: any) {
-  if (!dateStr) return '-'
+  if (!dateStr) return '\u2003'
   const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return '-'
+  if (Number.isNaN(d.getTime())) return '\u2003'
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -201,6 +202,7 @@ export default function SubDetail() {
     if (isDesktop) {
       return (
         <SubDetailStatePage
+          empty
           title="Sub not found"
           message="This vendor is not in the directory yet."
           onBack={() => navigate('/subs')}
@@ -644,9 +646,9 @@ function SubDetailDesktop({
                     return (
                       <Link key={r.id} to={c ? `/jobs/${c.id}` : '#'} className="fh-build-table__row is-subdetail-jobs">
                         <strong className="fh-build-truncate" title={c?.name || ''}>{c?.name || 'Job not found'}</strong>
-                        <span className="fh-build-rel">{r.trade || '-'}</span>
-                        <span className="fh-build-rel">{r.created_at ? fmtRelativeDate(new Date(r.created_at)) : '-'}</span>
-                        <span className="fh-build-num">{Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '-'}</span>
+                        <span className="fh-build-rel">{r.trade || '\u2003'}</span>
+                        <span className="fh-build-rel">{r.created_at ? fmtRelativeDate(new Date(r.created_at)) : '\u2003'}</span>
+                        <span className="fh-build-num">{Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}</span>
                         <ChevronRight size={13} aria-hidden="true" />
                       </Link>
                     )
@@ -713,11 +715,13 @@ function SubDetailStatePage({
   title,
   message,
   loading,
+  empty,
   onBack,
 }: {
   title: string
   message: string
   loading?: boolean
+  empty?: boolean
   onBack: () => void
 }) {
   return (
@@ -732,13 +736,21 @@ function SubDetailStatePage({
         </div>
       </header>
       <main className="fh-build-main">
-        <section className="fh-build-card">
+        <section className="fh-build-card fh-subdetail-state-card">
           {loading ? (
             <div className="fh-subdetail-loading-grid" aria-label={title}>
               <div className="v3-skeleton" />
               <div className="v3-skeleton" />
               <div className="v3-skeleton" />
             </div>
+          ) : empty ? (
+            <EmptyState
+              icon="crew"
+              title={title}
+              sub={message}
+              action="Back to subs"
+              onAction={onBack}
+            />
           ) : (
             <DataErrorState title={title} message={message} />
           )}
@@ -1208,7 +1220,7 @@ function ExpiryNote({ days }: any) {
         ? 'color-mix(in srgb, var(--v3-danger, #C0392B) 16%, transparent)'
         : 'var(--v3-primary-soft)', border: `1px solid ${expired
         ? 'color-mix(in srgb, var(--v3-danger, #C0392B) 50%, transparent)'
-        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`, color: expired ? 'var(--v3-danger-bright, #C9963A)' : 'var(--v3-primary)' }}>
+        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`, color: expired ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-primary)' }}>
       <AlertTriangle size={12} />
       {expired ? `Expired ${Math.abs(days)}d ago` : `Expires in ${days}d`}
     </Eyebrow>
@@ -1250,7 +1262,7 @@ function IconButton({ children, onClick, disabled, primary, danger, title }: any
         color: primary
           ? 'var(--v3-on-primary)'
           : danger
-          ? 'var(--v3-danger-bright, #C9963A)'
+          ? 'var(--v3-danger-bright, #C0392B)'
           : 'var(--v3-text)',
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.5 : 1,

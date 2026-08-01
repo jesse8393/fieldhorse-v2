@@ -89,7 +89,7 @@ export default function Bid() {
     setBid(null)
     try {
       const rateText = Object.keys(userRates)
-        .map((k) => `${k}: $${userRates[k].low}–$${userRates[k].high} per ${userRates[k].unit}`)
+        .map((k) => `${k}: $${userRates[k].low} to $${userRates[k].high} per ${userRates[k].unit}`)
         .join('; ')
       const res = await claudeMessage({
         system: `${SYSTEM}\n\nRate card: ${rateText}`,
@@ -297,10 +297,10 @@ export default function Bid() {
       `${bid.summary || (jobType ? `${jobType} estimate` : 'Estimate')}`,
       '',
       `Recommended price (${marginPct}% margin): ${money(Math.round(total.withMargin))}`,
-      `Raw range: ${money(total.low)} – ${money(total.high)}`,
+      `Raw range: ${money(total.low)} to ${money(total.high)}`,
       '',
       'Line items:',
-      ...(bid.line_items || []).map((li: any) => `  • ${li.name}${li.notes ? `, ${li.notes}` : ''} (${li.qty || 1} ${li.unit}: ${money((li.rate_low || 0) * (li.qty || 1))} – ${money((li.rate_high || 0) * (li.qty || 1))})`),
+      ...(bid.line_items || []).map((li: any) => `  • ${li.name}${li.notes ? `, ${li.notes}` : ''} (${li.qty || 1} ${li.unit}: ${money((li.rate_low || 0) * (li.qty || 1))} to ${money((li.rate_high || 0) * (li.qty || 1))})`),
       ...(bid.assumptions?.length ? ['', 'Assumptions:', ...bid.assumptions.map((a: any) => `  • ${a}`)] : []),
       ...(bid.risks?.length ? ['', 'Risks:', ...bid.risks.map((r: any) => `  • ${r}`)] : [])
     ]
@@ -359,7 +359,7 @@ export default function Bid() {
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
-            {isDesktop ? 'BUILD THE ESTIMATE.' : 'Build a clean estimate'}
+            {isDesktop ? 'ESTIMATE BUILDER' : 'Build a clean estimate'}
           </h1>
           <p style={{
             margin: '6px 0 0',
@@ -368,7 +368,7 @@ export default function Bid() {
             lineHeight: 1.5,
             color: 'var(--v3-text-muted)'
           }}>
-            Describe the scope below. The AI returns a structured bid with line items, ranges, and a recommended price.
+            Describe the scope below. FieldHorse returns a structured bid with line items, ranges, and a recommended price.
           </p>
         </div>
       </motion.div>
@@ -449,7 +449,7 @@ export default function Bid() {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       background: 'transparent',
                       border: '1px solid rgba(192, 57, 43, 0.35)',
-                      color: 'var(--v3-danger-bright, #C9963A)', cursor: 'pointer'
+                      color: 'var(--v3-danger-bright, #C0392B)', cursor: 'pointer'
                     }}
                   >
                     <Trash2 size={12} aria-hidden="true" />
@@ -802,7 +802,7 @@ export default function Bid() {
                 <CountUp to={Math.round(total.withMargin)} duration={0.9} prefix="$" formatter={formatThousands} />
               </motion.div>
               <span className="v3-caption" style={{ fontSize: 12 }}>
-                Raw range: {money(total.low)} – {money(total.high)}
+                Raw range: {money(total.low)} to {money(total.high)}
               </span>
             </div>
 
@@ -879,7 +879,7 @@ export default function Bid() {
                       color: 'var(--v3-text)',
                       fontVariantNumeric: 'tabular-nums'
                     }}>
-                      {money((li.rate_low || 0) * (li.qty || 1))} – {money((li.rate_high || 0) * (li.qty || 1))}
+                      {money((li.rate_low || 0) * (li.qty || 1))} to {money((li.rate_high || 0) * (li.qty || 1))}
                     </span>
                   </motion.div>
                 ))}

@@ -371,10 +371,7 @@ export default function SubPortal() {
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Trades on file</div>
                 {stats.trades.length === 0 ? (
-                  <>
-                    <strong>:</strong>
-                    <span>No trade tags on your accepted invites.</span>
-                  </>
+                  <span>No trade tags on your accepted invites.</span>
                 ) : (
                   <ul className="fh-build-rail-list" style={{ marginTop: 10 }}>
                     {stats.trades.slice(0, 6).map((t) => (

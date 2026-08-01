@@ -201,7 +201,7 @@ export default function Compose() {
           <BuildTopbar />
           <div style={{ padding: '12px var(--v3-gutter) 12px' }}>
             <div className="fh-build-good">Dispatch</div>
-            <h1 className="fh-build-title">SAY IT FAST.</h1>
+            <h1 className="fh-build-title">MESSAGE COMPOSER</h1>
           </div>
         </div>
       )}

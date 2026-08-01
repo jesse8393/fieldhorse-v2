@@ -1387,7 +1387,7 @@ function StatusPill({ status }: any) {
         return {
           bg: 'rgba(192, 57, 43, 0.14)',
           border: 'rgba(192, 57, 43, 0.45)',
-          color: 'var(--v3-danger-bright, #C9963A)'
+          color: 'var(--v3-danger-bright, #C0392B)'
         }
       default:
         return {

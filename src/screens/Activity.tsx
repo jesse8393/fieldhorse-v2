@@ -302,7 +302,7 @@ function EventRow({ event }: any) {
     neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', br: 'var(--v3-border-mid)' },
     gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
     green:   { fg: 'var(--v3-success-bright, #2D7A4F)', bg: 'rgba(45, 122, 79,0.10)', br: 'rgba(45, 122, 79,0.30)' },
-    red:     { fg: 'var(--v3-danger-bright, #C9963A)', bg: 'rgba(192, 57, 43,0.10)', br: 'rgba(192, 57, 43,0.30)' }
+    red:     { fg: 'var(--v3-danger-bright, #C0392B)', bg: 'rgba(192, 57, 43,0.10)', br: 'rgba(192, 57, 43,0.30)' }
   } as Record<string, any>)[event.tone || 'neutral']
 
   const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'

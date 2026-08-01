@@ -55,8 +55,8 @@ export default function SnowSettingsBuild(props: Props) {
       <main className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
-            <div className="fh-build-good">Settings</div>
-            <h1 className="fh-build-title">CONTROL ROOM.</h1>
+            <div className="fh-build-good">Account</div>
+            <h1 className="fh-build-title">SETTINGS</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -122,12 +122,6 @@ export default function SnowSettingsBuild(props: Props) {
                   </ul>
                 </>
               )}
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Connected systems</div>
-              <strong>:</strong>
-              <span>Integrations not tracked yet</span>
             </section>
 
             <section className="fh-build-rail-card">

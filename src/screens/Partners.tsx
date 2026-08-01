@@ -418,7 +418,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
                 padding: '8px 12px', borderRadius: 10,
                 background: 'rgba(192,57,43,0.10)',
                 border: '1px solid rgba(192,57,43,0.35)',
-                color: 'var(--v3-danger-bright, #C9963A)',
+                color: 'var(--v3-danger-bright, #C0392B)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 0,
                 cursor: busy ? 'wait' : 'pointer',

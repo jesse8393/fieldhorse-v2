@@ -253,6 +253,611 @@
   .fh-build-skel { animation: none; opacity: 0.6; }
 }
 
+/* August 2026 desktop product pass.
+   The Build screens share one quieter workspace treatment: neutral
+   onyx surfaces, compact page context, dense tables, and one grouped
+   insight rail. Mobile keeps its existing app composition. */
+@media (min-width: 900px) {
+  .fh-build-page {
+    background: var(--fh-canvas);
+  }
+
+  .fh-build-topbar {
+    height: 64px;
+    gap: 12px;
+    padding: 0 16px;
+    background: var(--v3-surface);
+    background-image: none;
+    border-bottom-color: var(--v3-border-mid);
+    box-shadow: 0 8px 24px rgba(20, 20, 20, 0.28);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .fh-build-search {
+    background: var(--v3-surface-page);
+    border-color: var(--v3-border-mid);
+    color: var(--v3-text-secondary);
+  }
+
+  .fh-build-topbar__meta {
+    color: var(--v3-text);
+    opacity: 0.58;
+  }
+
+  .fh-subdetail-build .fh-build-topbar {
+    grid-template-columns: auto minmax(240px, 1fr) auto auto;
+  }
+
+  .fh-subdetail-build .fh-build-topbar--no-cta {
+    grid-template-columns: auto 1fr;
+  }
+
+  .fh-subdetail-build .fh-build-topbar--no-cta .fh-build-topbar__meta {
+    justify-self: end;
+  }
+
+  .fh-subdetail-state-card {
+    width: min(100%, 720px);
+    margin: 48px auto 0;
+    padding: 32px;
+  }
+
+  .fh-build-main {
+    padding: 24px 24px 32px;
+  }
+
+  .fh-build-hero-row--page {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    align-items: start;
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+
+  .fh-build-hero-row--page > .fh-build-mini-grid {
+    display: none;
+  }
+
+  .fh-build-hero-row--page .fh-build-focus {
+    min-height: 0;
+    padding: 12px 16px;
+  }
+
+  .fh-build-hero-row--page .fh-build-focus p {
+    margin: 8px 0 0;
+  }
+
+  .fh-build-good {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .fh-build-card,
+  .fh-build-focus,
+  .fh-build-mini,
+  .fh-build-window-card,
+  .fh-crm-brief,
+  .fh-crm-flow,
+  .fh-crm-saved {
+    background: var(--v3-surface);
+    background-image: none;
+    border-color: var(--v3-border-mid);
+    box-shadow: 0 8px 24px rgba(20, 20, 20, 0.24);
+  }
+
+  .fh-build-mini {
+    background: var(--v3-surface-2);
+  }
+
+  .fh-build-eyebrow,
+  .fh-build-mini span,
+  .fh-build-rel,
+  .fh-build-table__head,
+  .fh-crm-flow__stages span,
+  .fh-crm-flow__stages small {
+    color: var(--v3-text);
+    opacity: 0.58;
+  }
+
+  .fh-build-mini strong,
+  .fh-build-money,
+  .fh-build-kpi-cell strong,
+  .fh-build-rail-card strong,
+  .fh-crm-flow__stages strong {
+    font-family: var(--font-body);
+    font-size: 20px;
+    line-height: 1.1;
+    font-weight: 700;
+  }
+
+  .fh-build-page[data-build-screen="SnowAnalyticsBuild"] .fh-build-kpi-strip {
+    gap: 0;
+    overflow: hidden;
+    background: var(--v3-surface);
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(20, 20, 20, 0.24);
+  }
+
+  .fh-build-page[data-build-screen="SnowAnalyticsBuild"] .fh-build-kpi-cell {
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+  }
+
+  .fh-build-page[data-build-screen="SnowAnalyticsBuild"] .fh-build-kpi-cell:last-child {
+    border-right: 0;
+  }
+
+  .fh-build-row-btn {
+    min-width: 104px;
+    height: 32px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .fh-build-content-grid {
+    align-items: start;
+  }
+
+  .fh-build-card.fh-build-table {
+    gap: 0;
+    padding: 0;
+  }
+
+  .fh-build-card-head {
+    min-height: 0;
+    margin-bottom: 0;
+    padding: 16px 16px 12px;
+  }
+
+  .fh-build-table__head,
+  .fh-build-table__row {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .fh-build-content-grid > .fh-build-rail--page {
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+    background: var(--v3-surface);
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(20, 20, 20, 0.24);
+  }
+
+  .fh-build-content-grid > .fh-build-rail--page > .fh-build-rail-card {
+    min-height: 0;
+    padding: 16px;
+    background: transparent;
+    background-image: none;
+    border: 0;
+    border-bottom: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    box-shadow: none;
+  }
+
+  .fh-build-content-grid > .fh-build-rail--page > .fh-build-rail-card:last-child {
+    border-bottom: 0;
+  }
+
+  .fh-build-rail-card strong {
+    margin-top: 8px;
+  }
+
+  .fh-build-rail-card span {
+    margin-top: 4px;
+    color: var(--v3-text);
+    opacity: 0.72;
+  }
+
+  .fh-build-main > .fh-build-table__empty {
+    min-height: 160px;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--v3-surface);
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    color: var(--v3-text);
+    opacity: 0.72;
+  }
+
+  .fh-build-table__empty--action {
+    grid-template-columns: auto auto auto;
+    justify-content: center;
+    gap: 12px;
+    opacity: 1;
+  }
+
+  .fh-build-table__empty--action > svg {
+    color: var(--v3-primary);
+  }
+
+  .fh-build-toolbar-row,
+  .fh-build-composer-wrap {
+    margin-bottom: 16px;
+  }
+
+  .fh-build-dayplan,
+  .fh-build-weekplan {
+    min-width: 0;
+    overflow: hidden;
+    background: var(--v3-surface);
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(20, 20, 20, 0.24);
+  }
+
+  .fh-build-dayplan__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--v3-border-mid);
+  }
+
+  .fh-build-dayplan__head > div > strong {
+    display: block;
+    margin-top: 4px;
+    color: var(--v3-text);
+    font-family: var(--font-body);
+    font-size: 16px;
+  }
+
+  .fh-build-dayplan__head > span {
+    color: var(--v3-text-secondary);
+    font-size: 12px;
+  }
+
+  .fh-build-dayplan__timeline {
+    position: relative;
+    margin: 16px;
+  }
+
+  .fh-build-dayplan__hour {
+    position: absolute;
+    right: 0;
+    left: 0;
+    border-top: 1px solid var(--v3-border-mid);
+  }
+
+  .fh-build-dayplan__hour > span {
+    position: absolute;
+    top: -8px;
+    left: 0;
+    width: 56px;
+    color: var(--v3-text-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-dayplan__events {
+    position: absolute;
+    inset: 0 0 0 72px;
+  }
+
+  .fh-build-dayplan__event {
+    position: absolute;
+    right: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    overflow: hidden;
+    padding: 12px;
+    background: var(--v3-primary-soft);
+    border: 1px solid var(--v3-border-strong);
+    border-radius: 10px;
+    color: var(--v3-text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fh-build-dayplan__event:hover,
+  .fh-build-weekplan__event:hover {
+    border-color: var(--v3-primary);
+  }
+
+  .fh-build-dayplan__event > span {
+    color: var(--v3-primary-bright);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fh-build-dayplan__event > strong {
+    overflow: hidden;
+    font-family: var(--font-body);
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-dayplan__event > small {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--v3-text-secondary);
+    font-size: 12px;
+  }
+
+  .fh-build-dayplan__empty {
+    position: absolute;
+    top: 48px;
+    left: 72px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--v3-text-secondary);
+    font-size: 14px;
+  }
+
+  .fh-build-dayplan__empty > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    background: transparent;
+    border: 1px solid var(--v3-border-strong);
+    border-radius: 10px;
+    color: var(--v3-primary-bright);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .fh-build-weekplan {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(92px, 1fr));
+    overflow-x: auto;
+  }
+
+  .fh-build-weekplan__day {
+    min-width: 0;
+    border-right: 1px solid var(--v3-border-mid);
+  }
+
+  .fh-build-weekplan__day:last-child {
+    border-right: 0;
+  }
+
+  .fh-build-weekplan__head {
+    width: 100%;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--v3-border-mid);
+    color: var(--v3-text-secondary);
+    cursor: pointer;
+  }
+
+  .fh-build-weekplan__head > span {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .fh-build-weekplan__head > strong {
+    color: var(--v3-text);
+    font-family: var(--font-body);
+    font-size: 20px;
+  }
+
+  .fh-build-weekplan__day.is-today .fh-build-weekplan__head {
+    background: var(--v3-primary-soft);
+  }
+
+  .fh-build-weekplan__day.is-today .fh-build-weekplan__head > strong {
+    color: var(--v3-primary-bright);
+  }
+
+  .fh-build-weekplan__body {
+    min-height: 440px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .fh-build-weekplan__empty {
+    padding: 8px 4px;
+    color: var(--v3-text-muted);
+    font-size: 12px;
+  }
+
+  .fh-build-weekplan__event {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: var(--v3-primary-soft);
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    color: var(--v3-text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fh-build-weekplan__event > span,
+  .fh-build-weekplan__event > small {
+    overflow: hidden;
+    color: var(--v3-text-secondary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fh-build-weekplan__event > strong {
+    overflow: hidden;
+    font-family: var(--font-body);
+    font-size: 14px;
+    text-overflow: ellipsis;
+  }
+
+  .fh-build-content-grid--home {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .fh-build-content-grid--home > .fh-build-today,
+  .fh-build-content-grid--home > .fh-build-health {
+    grid-column: 1 / -1;
+  }
+
+  .fh-build-content-grid--home > .fh-build-owner {
+    grid-column: 1;
+  }
+
+  .fh-build-content-grid--home > .fh-build-revenue {
+    grid-column: 2;
+  }
+
+  .fh-build-today {
+    padding: 0;
+  }
+
+  .fh-build-today__body {
+    padding: 16px;
+  }
+
+  .fh-build-today__stats {
+    margin-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .fh-build-today__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+  }
+
+  .fh-crm-brief p {
+    color: var(--v3-text);
+    opacity: 0.72;
+  }
+
+  .fh-crm-flow__stages {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+  }
+
+  .fh-crm-flow__stages button {
+    min-height: 88px;
+    background: transparent;
+    background-image: none;
+    border: 0;
+    border-right: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+  }
+
+  .fh-crm-flow__stages button:last-child {
+    border-right: 0;
+  }
+
+  .fh-crm-brief__actions button,
+  .fh-crm-saved button {
+    min-height: 40px;
+    background: transparent;
+  }
+
+  .fh-crm-saved {
+    gap: 0;
+  }
+
+  .fh-crm-saved button {
+    justify-content: flex-start;
+    border: 0;
+    border-bottom: 1px solid var(--v3-border-mid);
+    border-radius: 10px;
+    text-align: left;
+  }
+
+  .fh-crm-saved button:last-of-type {
+    border-bottom: 0;
+  }
+
+  .fh-desktop-sidebar__link {
+    color: var(--ink-strong);
+    opacity: 0.58;
+  }
+
+  .fh-desktop-sidebar__link:hover {
+    opacity: 0.86;
+  }
+
+  .fh-desktop-sidebar__link.is-active {
+    opacity: 1;
+  }
+
+  [data-theme='light'] .fh-build-topbar {
+    box-shadow: 0 4px 12px rgba(20, 20, 20, 0.08);
+  }
+
+  [data-theme='light'] .fh-build-card,
+  [data-theme='light'] .fh-build-focus,
+  [data-theme='light'] .fh-build-mini,
+  [data-theme='light'] .fh-build-window-card,
+  [data-theme='light'] .fh-crm-brief,
+  [data-theme='light'] .fh-crm-flow,
+  [data-theme='light'] .fh-crm-saved,
+  [data-theme='light'] .fh-build-content-grid > .fh-build-rail--page,
+  [data-theme='light'] .fh-build-dayplan,
+  [data-theme='light'] .fh-build-weekplan,
+  [data-theme='light'] .fh-build-page[data-build-screen="SnowAnalyticsBuild"] .fh-build-kpi-strip {
+    box-shadow: 0 4px 12px rgba(20, 20, 20, 0.08);
+  }
+
+  [data-theme='light'] .fh-build-settings-main > .v3-section {
+    background: var(--v3-surface) !important;
+    box-shadow: 0 4px 12px rgba(20, 20, 20, 0.08) !important;
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1679px) {
+  .fh-detail-split {
+    display: block;
+  }
+
+  .fh-detail-split__rail {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .fh-build-hero-row--page {
+    grid-template-columns: 1fr;
+  }
+
+  .fh-build-content-grid--home {
+    grid-template-columns: 1fr;
+  }
+
+  .fh-build-content-grid--home > .fh-build-today,
+  .fh-build-content-grid--home > .fh-build-owner,
+  .fh-build-content-grid--home > .fh-build-revenue,
+  .fh-build-content-grid--home > .fh-build-health {
+    grid-column: 1;
+  }
+}
+
 /* Loading tile for the Lead to cash stage strip. Mirrors the real
    .fh-crm-flow__stages button shell (border, radius, padding) but is
    inert and carries shimmer bars instead of $0 / 0 deals. */

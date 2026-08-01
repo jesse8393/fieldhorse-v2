@@ -44,8 +44,8 @@ const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.
 // balance instead of firing an untracked ad-hoc PDF.
 
 const AGING_BUCKETS = [
-  { id: '0-30',  label: 'Current',  short: '0–30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
-  { id: '31-60', label: 'Late',     short: '31–60 d', max: 60,        color: 'var(--v3-primary)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
+  { id: '0-30',  label: 'Current',  short: '0 to 30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
+  { id: '31-60', label: 'Late',     short: '31 to 60 d', max: 60,        color: 'var(--v3-primary)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
   { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-bright)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
 
