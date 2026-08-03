@@ -916,7 +916,7 @@ function ProfileEditor({ profile, onSaved }: any) {
       {/* STICKY SAVE */}
       <div className="fh-subdetail-savebar" style={{
         position: 'sticky',
-        bottom: 80,
+        bottom: 'calc(var(--fh-mobile-dock-height) + 16px)',
         margin: '0 20px',
         zIndex: 5
       }}>

@@ -9,6 +9,7 @@ import {
 import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { Eyebrow } from './v3'
+import { lockDocumentScroll } from '../lib/documentScrollLock.ts'
 
 // Mobile-native search overlay, replaces CommandPalette on phone widths
 // (the cmdk popover renders clipped on iOS Safari + Chrome behind the
@@ -72,9 +73,7 @@ export default function MobileSearchOverlay() {
       return
     }
     // Lock body scroll while open.
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
+    return lockDocumentScroll()
   }, [open])
 
   // Auto-focus input shortly after open so iOS's keyboard animation

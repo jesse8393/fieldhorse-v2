@@ -99,8 +99,9 @@ export const session = {
 }
 
 
-export async function installMock(ctx) {
-  await ctx.route((u) => u.hostname === 'qa-mock.supabase.co', async (route) => {
+export async function installMock(ctx, options = {}) {
+  const supabaseHosts = new Set(options.supabaseHosts || ['qa-mock.supabase.co'])
+  await ctx.route((u) => supabaseHosts.has(u.hostname), async (route) => {
     const req = route.request()
     const url = req.url()
     if (url.includes('/auth/v1/user')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(USER) })

@@ -289,7 +289,7 @@ export default function Schedule() {
   }
 
   return (
-    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))', position: 'relative', background: 'var(--v3-bg)' }}>
+    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ position: 'relative', background: 'var(--v3-bg)' }}>
       {/* COMPACT HEADER, matches design's app-head--titled pattern.
           Eyebrow gives context ("Tue · May 20 · 4 visits"), h1 anchors
           the screen. Stats live inline under the eyebrow instead of

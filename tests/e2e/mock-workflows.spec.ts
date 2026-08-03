@@ -90,7 +90,13 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   await capture(page, testInfo, 'schedule')
 
   await openRoute(page, '/settings')
-  await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible()
+  const settingsSave = page.getByRole('button', { name: /save changes/i })
+  if (testInfo.project.name.startsWith('mobile')) {
+    await expect(settingsSave).toHaveCount(0)
+    const companyName = page.getByLabel('Company name')
+    await companyName.fill(`${await companyName.inputValue()} LLC`)
+  }
+  await expect(settingsSave).toBeVisible()
   const quoteReminderSetting = page.getByText('Set reminder when quote is sent', { exact: true })
   await expect(quoteReminderSetting).toBeVisible()
   await expect(page.getByLabel('Quote reminder delay')).toHaveValue('3')

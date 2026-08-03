@@ -185,6 +185,31 @@ export default function Settings() {
     })
   }, [profile])
 
+  const profileQuoteFollowUp = readQuoteFollowUpPreferences(profile?.preferences)
+  const profileServices = Array.from(new Set(
+    (profile?.services || [])
+      .map((service) => String(service || '').trim())
+      .filter((service) => service && SERVICES.includes(service))
+  )).sort()
+  const hasUnsavedChanges = Boolean(profile) && (
+    displayName !== (profile?.full_name || '') ||
+    companyName !== (profile?.company_name || '') ||
+    companyPhone !== (profile?.company_phone || '') ||
+    companyEmail !== (profile?.company_email || '') ||
+    companyWebsite !== (profile?.company_website || '') ||
+    companyAddress !== (profile?.company_address || '') ||
+    licenseNumber !== (profile?.license_number || '') ||
+    insuredText !== (profile?.insured_text || '') ||
+    warrantyDefault !== (profile?.warranty_default || '') ||
+    paymentLink !== ((profile as any)?.payment_link || '') ||
+    paymentInstructions !== ((profile as any)?.payment_instructions || '') ||
+    brandAccentHex.toLowerCase() !== (profile?.brand_accent_hex || '').toLowerCase() ||
+    estimateTemplate !== ((profile as any)?.estimate_template || 'classic') ||
+    quoteFollowUpEnabled !== profileQuoteFollowUp.enabled ||
+    quoteFollowUpDays !== profileQuoteFollowUp.days ||
+    JSON.stringify([...services].sort()) !== JSON.stringify(profileServices)
+  )
+
   async function saveDisplayName() {
     const next = displayName.trim()
     if (next === (profile?.full_name || '')) return
@@ -231,6 +256,7 @@ export default function Settings() {
     }
 
     const { error } = await upsertProfile({
+      full_name: nullIfBlank(displayName),
       company_name: companyName,
       company_phone: nullIfBlank(companyPhone),
       company_email: nullIfBlank(companyEmail),
@@ -824,27 +850,21 @@ export default function Settings() {
         </Section>
       )}
 
-      {/* SAVE BAR, fixed strip above the bottom nav. position:sticky
-          previously didn't actually stick because its containing block
-          was the page (not a scroll container with overflow). position:
-          fixed against the viewport works. Sits 96 px above the bottom
-          edge (= bottom nav height) so it never overlaps the nav. */}
-      <div
+      {/* Desktop keeps the action in flow. Mobile only shows a compact
+          floating action after a field changes, leaving ordinary
+          scrolling with one persistent chrome layer instead of three. */}
+      {(isDesktop || hasUnsavedChanges || saving || saved) && <div
         className="fh-settings-save-bar"
         style={{
           position: isDesktop ? 'static' : 'fixed',
-          left: isDesktop ? 'auto' : 0,
-          right: isDesktop ? 'auto' : 0,
-          bottom: isDesktop ? 'auto' : 'calc(96px + env(safe-area-inset-bottom, 0px))',
+          left: 'auto',
+          right: isDesktop ? 'auto' : 80,
+          bottom: isDesktop ? 'auto' : 'calc(var(--fh-mobile-dock-height) + 16px)',
           zIndex: 'calc(var(--z-nav, 40) - 1)',
-          /* Keep a spacing-scale gap between the save action and the capture
-             FAB (fixed right: 20px, 44px wide). */
-          padding: isDesktop ? '12px 0 0' : '12px calc(48px + 32px) 12px 24px',
+          padding: isDesktop ? '12px 0 0' : 0,
           display: 'flex',
           justifyContent: 'flex-end',
-          background: isDesktop ? 'transparent' : 'linear-gradient(180deg, var(--fh-chrome-veil-0) 0%, var(--fh-chrome-veil-2) 35%, var(--fh-chrome-veil-1) 100%)',
-          backdropFilter: isDesktop ? 'none' : 'blur(10px)',
-          WebkitBackdropFilter: isDesktop ? 'none' : 'blur(10px)',
+          background: 'transparent',
           pointerEvents: 'none'
         }}
       >
@@ -876,7 +896,7 @@ export default function Settings() {
           <UploadIcon size={16} />
           {saving ? 'SAVING...' : saved ? 'SAVED' : 'SAVE CHANGES'}
         </motion.button>
-      </div>
+      </div>}
     </>
   )
 
@@ -899,7 +919,7 @@ export default function Settings() {
   }
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative' }}>
+    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: hasUnsavedChanges || saving || saved ? 56 : 0, position: 'relative' }}>
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '12px 24px 12px' }}>
         <Eyebrow>

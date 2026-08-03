@@ -936,7 +936,11 @@ body,
      address bar shrinks, which pushes fixed-position drawers + wide rows
      past the right edge. Clamp + hide horizontal overflow globally. */
   max-width: 100%;
-  overflow-x: hidden;
+  /* `hidden` computes the other axis to `auto`, turning each root node
+     into a vertical scroll container and preventing AppHeader from
+     sticking to the document viewport. `clip` blocks horizontal paint
+     without taking ownership of vertical scrolling. */
+  overflow-x: clip;
 }
 
 body {
@@ -1718,7 +1722,7 @@ a {
      it again here stacked a second inset, leaving a dead ~59px band
      between the header and every screen's content. */
   padding-top: 0;
-  padding-bottom: calc(48px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--fh-mobile-dock-height) + var(--space-4));
   /* V3-SYSTEM-1A2: base shell — no width cap here. Phase 1 of the
      Responsive Desktop Command Center: the cap moved from this element
      to .fh-app__main-inner so the desktop sidebar offset (padding-left
@@ -1811,6 +1815,7 @@ a {
      top of the solid bg. Onyx tile only. */
   background: var(--surface-1);
   border-top: 1px solid var(--rule);
+  box-sizing: border-box;
 }
 /* V3-SYSTEM-1A2: bottom nav cap follows the active layout mode on
    .fh-app root, so the dock and the content column always agree. In
@@ -1821,35 +1826,35 @@ a {
    the bottom nav with sidebar nav, and that decision happens when
    those layouts ship, not here. */
 @media (min-width: 720px) {
-  .fh-app--layout-mobile-frame .fh-nav,
-  .fh-app--layout-prose .fh-nav {
+  .fh-nav[data-layout='mobile-frame'],
+  .fh-nav[data-layout='prose'] {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     width: 100%;
     max-width: 440px;
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
     border-left: 1px solid var(--rule);
     border-right: 1px solid var(--rule);
   }
 }
 @media (min-width: 720px) {
-  .fh-app--layout-prose .fh-nav { max-width: 640px; }
+  .fh-nav[data-layout='prose'] { max-width: 640px; }
 }
 /* Phase 1: Responsive route at tablet widths keeps the same centered
    440px BottomNav as mobile-frame, since Home looks the same at 720-
    899px (sidebar hasn't activated yet). At >=900px the BottomNav is
    hidden entirely by the desktop shell rules below. */
 @media (min-width: 720px) and (max-width: 899px) {
-  .fh-app--layout-responsive .fh-nav {
+  .fh-nav[data-layout='responsive'] {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     width: 100%;
     max-width: 440px;
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
     border-left: 1px solid var(--rule);
     border-right: 1px solid var(--rule);
   }
@@ -1865,7 +1870,7 @@ a {
      header padding extends touch beyond the visible cell. */
   min-height: 44px;
   min-width: 44px;
-  padding: 8px 8px 4px;
+  padding: 4px;
   background: none;
   border: none;
   color: var(--ink-muted);
@@ -1876,6 +1881,7 @@ a {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  box-sizing: border-box;
 }
 /* V3-SYSTEM-1B-2: active state keeps the gold wash + inner stroke
    pattern but quieter — alpha 0.18 → 0.12 and inner stroke gold@30%
@@ -1910,6 +1916,7 @@ a {
   letter-spacing: 0;
   text-transform: none;
   pointer-events: none;
+  line-height: 1;
 }
 .fh-nav__dot {
   position: absolute;
@@ -2066,10 +2073,11 @@ a {
   /* Nav stack */
   .fh-desktop-sidebar__nav {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     /* Keep short-height desktops scrollable without painting a bright
        browser scrollbar through the navigation. */
     scrollbar-width: none;
@@ -3018,7 +3026,7 @@ a {
 .fh-fab {
   position: fixed;
   right: 20px;
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--fh-mobile-dock-height) + var(--space-4));
   z-index: 40;
   width: 44px;
   height: 44px;
@@ -3047,6 +3055,15 @@ a {
 }
 .fh-fab:active { transform: scale(0.94); }
 
+/* Fixed invoice actions share the same 44px control geometry on mobile
+   and desktop. Without border-box their vertical padding made the row
+   taller than its declared minimum and buried content beneath it. */
+.fh-invoice-actionbar > button {
+  box-sizing: border-box;
+  min-height: 44px !important;
+  height: 44px;
+}
+
 /* Universal Capture FAB — the circular mic variant of .fh-fab.
    Default position is the canonical FAB spot. When the current screen
    renders its own "+" FAB (Leads / Jobs / Clients / Schedule), capture
@@ -3057,15 +3074,22 @@ a {
   transition: transform 160ms ease, box-shadow 160ms ease, bottom 200ms ease;
 }
 body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
-  bottom: calc(164px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--fh-mobile-dock-height) + var(--space-4) + 56px);
 }
 /* Desktop: screens that hide their own FAB at >=900px (inline header
    action instead) release the stacked offset — capture drops back to
    the canonical spot. Schedule keeps its FAB on desktop, so the
    stacked rule above still applies there. */
 @media (min-width: 900px) {
+  .fh-fab {
+    right: 24px;
+    bottom: 24px;
+  }
+  body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
+    bottom: 80px;
+  }
   body:has(.fh-fab--hide-desktop) .fh-fab.fh-fab--capture {
-    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    bottom: 24px;
   }
 }
 
@@ -5634,9 +5658,12 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 @media (min-width: 900px) {
   .fh-desktop-sidebar__brand--build {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 12px;
-    padding: 16px 16px 16px !important;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px 8px 16px !important;
+    margin-bottom: 8px;
     border-bottom: 1px solid var(--v3-border-mid);
   }
 
@@ -5681,7 +5708,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 
   .fh-desktop-sidebar__eyebrow--build {
     display: block;
-    margin: 18px 18px 8px;
+    margin: 8px 12px 4px;
     color: var(--v3-text-faint);
     font-size: 12px;
     font-weight: 850;
@@ -5702,6 +5729,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
     height: 76px;
     display: grid;
     /* search | meta | bell | cta. Meta is `auto` so the column matches
@@ -5716,6 +5746,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     gap: 16px;
     padding: 0 24px;
     border-bottom: 1px solid var(--v3-border-mid);
+    background: var(--surface-1);
   }
 
   /* Variant for screens without a primary +New action — drops the

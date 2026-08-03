@@ -79,6 +79,11 @@
   --space-7: 48px;
   --space-8: 48px;
 
+  /* Mobile chrome geometry. The dock is one 44px control row, 8px
+     vertical padding, and a 1px top rule. Safe area is part of its
+     rendered height, so every floating control can share this offset. */
+  --fh-mobile-dock-height: calc(61px + env(safe-area-inset-bottom, 0px));
+
   /* Motion */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);

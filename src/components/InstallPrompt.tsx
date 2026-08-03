@@ -131,7 +131,7 @@ export default function InstallPrompt() {
         right: 16,
         // Sit above the mobile BottomNav (it ranges ~64–80px tall) and
         // safe-area inset on notched devices.
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+        bottom: 'calc(var(--fh-mobile-dock-height) + 16px)',
         zIndex: 9000,
         display: 'flex',
         alignItems: 'center',

@@ -212,7 +212,6 @@ export default function Activity() {
       initial="hidden"
       animate="show"
       style={{
-        paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
         background: 'var(--v3-bg)'
       }}
     >
