@@ -203,7 +203,7 @@ export default function AppShell() {
         richColors
         visibleToasts={3}
         offset={{ bottom: '20px', right: '92px' }}
-        mobileOffset={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)', left: '16px', right: '16px' }}
+        mobileOffset={{ bottom: 'calc(var(--fh-mobile-dock-height) + 16px)', left: '16px', right: '16px' }}
         toastOptions={{
           style: {
             maxWidth: 'min(380px, calc(100vw - 32px))',

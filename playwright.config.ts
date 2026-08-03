@@ -14,7 +14,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: process.env.SCROLL_BASE_URL || 'http://127.0.0.1:5173',
     channel: 'chrome',
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
@@ -31,7 +31,7 @@ export default defineConfig({
       use: { ...devices['Pixel 7'], channel: 'chrome' }
     }
   ],
-  webServer: {
+  webServer: process.env.SCROLL_BASE_URL ? undefined : {
     command: 'npm run dev -- --host 127.0.0.1',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: true,

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useDragControls } from 'framer-motion'
+import { lockDocumentScroll } from '../lib/documentScrollLock.ts'
 
 const EASE = [0.16, 1, 0.3, 1]
 const DUR = 0.5
@@ -55,11 +56,10 @@ export default function ActionSheet({
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleCommit() }
     }
     window.addEventListener('keydown', handleKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockDocumentScroll()
     return () => {
       window.removeEventListener('keydown', handleKey)
-      document.body.style.overflow = prev
+      unlock()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose])

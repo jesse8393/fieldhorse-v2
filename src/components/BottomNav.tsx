@@ -8,6 +8,8 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
 import { canHover } from '../lib/hover.ts'
+import { layoutForPath } from '../lib/appLayout.ts'
+import { lockDocumentScroll } from '../lib/documentScrollLock.ts'
 
 // IA collapse (redesign W2): the thumb bar is the contractor's verbs :
 // Home, Sell (Leads), Work (Jobs), Get Paid (Money). Money replaced
@@ -150,11 +152,10 @@ export default function BottomNav() {
       if (e.key === 'Escape') { e.preventDefault(); setMoreOpen(false) }
     }
     window.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockDocumentScroll()
     return () => {
       window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
+      unlock()
     }
   }, [moreOpen])
 
@@ -389,49 +390,52 @@ export default function BottomNav() {
     </AnimatePresence>
   )
 
+  const navigation = (
+    <nav className="fh-nav" data-layout={layoutForPath(location.pathname)} aria-label="Primary">
+      {visiblePrimaryItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          className={({ isActive }: any) => `fh-nav__item${(item.match ? item.match(location.pathname) : isActive) ? ' is-active' : ''}`}
+        >
+          {({ isActive: navActive }: any) => {
+            const isActive = item.match ? item.match(location.pathname) : navActive
+            return (
+            <>
+              <span className="fh-nav__icon">
+                <Icon name={item.icon} size={18} />
+              </span>
+              <span className="fh-nav__label">{item.label}</span>
+              {isActive && (
+                <motion.span
+                  layoutId="fh-nav-dot"
+                  className="fh-nav__dot"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+            </>
+            )
+          }}
+        </NavLink>
+      ))}
+      <button
+        type="button"
+        className={`fh-nav__item${moreOpen ? ' is-active' : ''}`}
+        onClick={() => setMoreOpen((v) => !v)}
+        aria-expanded={moreOpen}
+      >
+        <span className="fh-nav__icon">
+          <Icon name="more" size={18} />
+        </span>
+        <span className="fh-nav__label">More</span>
+      </button>
+    </nav>
+  )
+
   return (
     <>
-      <nav className="fh-nav" aria-label="Primary">
-        {visiblePrimaryItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }: any) => `fh-nav__item${(item.match ? item.match(location.pathname) : isActive) ? ' is-active' : ''}`}
-          >
-            {({ isActive: navActive }: any) => {
-              const isActive = item.match ? item.match(location.pathname) : navActive
-              return (
-              <>
-                <span className="fh-nav__icon">
-                  <Icon name={item.icon} size={20} />
-                </span>
-                <span className="fh-nav__label">{item.label}</span>
-                {isActive && (
-                  <motion.span
-                    layoutId="fh-nav-dot"
-                    className="fh-nav__dot"
-                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </>
-              )
-            }}
-          </NavLink>
-        ))}
-        <button
-          type="button"
-          className={`fh-nav__item${moreOpen ? ' is-active' : ''}`}
-          onClick={() => setMoreOpen((v) => !v)}
-          aria-expanded={moreOpen}
-        >
-          <span className="fh-nav__icon">
-            <Icon name="more" size={20} />
-          </span>
-          <span className="fh-nav__label">More</span>
-        </button>
-      </nav>
-
+      {typeof document !== 'undefined' && createPortal(navigation, document.body)}
       {typeof document !== 'undefined' && createPortal(drawer, document.body)}
     </>
   )

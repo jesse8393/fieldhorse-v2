@@ -480,9 +480,12 @@ export default function InvoiceDetail() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      // The bottom action bar is sticky+safe-area; pad screen bottom so
-      // the last section can scroll above it.
-      style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}
+      // Reserve the action row in addition to the shell-owned dock space.
+      style={{
+        paddingBottom: 'calc(44px + var(--space-5) + var(--space-4))',
+        position: 'relative',
+        background: 'var(--v3-bg)'
+      }}
     >
       {/* HEADER STRIP, Back chevron + title eyebrow.
           Premium black-glass; no fog backdrop on the strip itself so
@@ -787,8 +790,8 @@ export default function InvoiceDetail() {
         style={{
           position: 'fixed',
           left: 0, right: 0,
-          bottom: 'calc(56px + env(safe-area-inset-bottom))',
-          padding: '12px 16px 12px',
+          bottom: 'calc(var(--fh-mobile-dock-height) + 16px)',
+          padding: '12px 16px',
           background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--v3-bg) 92%, transparent) 32%, var(--v3-bg) 64%)',
           zIndex: 30,
           display: 'flex', gap: 8,

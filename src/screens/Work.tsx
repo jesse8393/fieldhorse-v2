@@ -330,7 +330,7 @@ export default function Work() {
       variants={stagger}
       initial="hidden"
       animate="show"
-      style={{ position: 'relative', paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))' }}
+      style={{ position: 'relative' }}
     >
       {/* HEADER, one title, one honest stat line. No cockpit panels:
           Home already owns "what should I do next"; this screen's job
