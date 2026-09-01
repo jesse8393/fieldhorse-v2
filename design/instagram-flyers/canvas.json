@@ -1,12 +1,50 @@
 {
   "artboards": [
-    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1080, "h": 1350, "title": "Feed 1080x1350 dark", "print": "fixed" },
-    { "file": "FeedLight.dc.html", "x": 1240, "y": 0, "w": 1080, "h": 1350, "title": "Feed 1080x1350 stone", "print": "fixed" },
-    { "file": "Story.dc.html", "x": 2480, "y": 0, "w": 1080, "h": 1920, "title": "Story 1080x1920", "print": "fixed" }
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1080,
+      "h": 1350,
+      "title": "Feed 1080x1350 dark",
+      "print": "fixed"
+    },
+    {
+      "file": "FeedLight.dc.html",
+      "x": 1240,
+      "y": 0,
+      "w": 1080,
+      "h": 1350,
+      "title": "Feed 1080x1350 stone",
+      "print": "fixed"
+    },
+    {
+      "file": "Story.dc.html",
+      "x": 2480,
+      "y": 0,
+      "w": 1080,
+      "h": 1920,
+      "title": "Story 1080x1920",
+      "print": "fixed"
+    }
   ],
   "annotations": [
-    { "id": "logo-slot", "x": 0, "y": -220, "w": 420, "text": "Logo goes where the PARKER wordmark sits at the top of each flyer. Send the file and I will drop it in." },
-    { "id": "placeholders", "x": 1240, "y": -220, "w": 420, "text": "Bracketed items are placeholders: phone, website, service area." }
+    {
+      "id": "logo-slot",
+      "x": 0,
+      "y": -220,
+      "w": 420,
+      "text": "Wordmark set to match the logo you sent: Jost light, wide tracking, Construction Co. centered under Parker. Send a transparent SVG or PNG if you want the real art placed instead."
+    },
+    {
+      "id": "placeholders",
+      "x": 1240,
+      "y": -220,
+      "w": 420,
+      "text": "Bracketed items are placeholders: phone, website, service area."
+    }
   ],
-  "launch": { "view": "canvas" }
+  "launch": {
+    "view": "canvas"
+  }
 }

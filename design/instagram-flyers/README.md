@@ -11,5 +11,9 @@ Working files for the Parker Construction Company flyer canvas.
 Type: Cormorant Garamond (display) over Jost (labels and body).
 Color: ink `#16130F`, stone `#EFEAE2`, brass `#B08D4F`.
 
-Bracketed items are placeholders: phone, website, service area. The
-typeset PARKER wordmark stands in for the logo file.
+Bracketed items are placeholders: phone, website, service area.
+
+The wordmark is set in type to match the supplied logo: Jost light,
+wide tracking, CONSTRUCTION CO. centered under PARKER. The file in
+`reference/` is a mockup render on a gray wall, so it cannot be placed
+directly. A transparent SVG or PNG would replace the typeset lockup.
